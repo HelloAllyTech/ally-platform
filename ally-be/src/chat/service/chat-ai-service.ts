@@ -1,0 +1,243 @@
+import { Injectable } from '@nestjs/common';
+import { Repository } from 'typeorm';
+import { CallDetails } from '../entity/call.details.entity';
+import {
+  FlattenedSummaryNotePayload,
+  FlattenedSummaryNotePayloadCamelCase,
+} from '../type/call.details.type';
+import { CommonUtil } from '../../common/util/common.util';
+import { ChatService } from './chat.service';
+import { Message, MessageType } from '../entity/message.entity';
+import { MessageRequest } from '../../ai/dto/ai.request.dto';
+import { UserRole } from '../../common/constants/user.constants';
+import { InjectRepository } from '@nestjs/typeorm';
+import { LoggerService } from '../../logger/logger.service';
+import { ValidationException } from '../../exception/custom.exception';
+import { CryptoService } from '../../common/service/crypto.service';
+import {
+  ExecutionContextPropagation,
+  WithExecutionContext,
+} from '../../common/decorator/execution.context.decorator';
+import { ExecutionManager } from '../../common/execution/execution-manager';
+import { S3Service } from '../../aws/service/s3.service';
+import { AppConfigService } from '../../config/config.service';
+import { ChatAudioUploadsService } from 'src/audio/service/chat-audio-uploads.service';
+import { Chat } from '../entity/chat.entity';
+import { AUDIT_EVENTS } from '../../audit/constants/audit-event.constants';
+import { AuditLoggerService } from 'src/audit/service/audit-logger.service';
+import { UserService } from 'src/user/service/user.service';
+import { NotificationService } from 'src/notification/service/notification.service';
+import { ScribeSessionMode } from '../../common/constants/chat.constants';
+
+@Injectable()
+export class ChatAiService {
+  constructor(
+    @InjectRepository(CallDetails)
+    private readonly callDetailsRepository: Repository<CallDetails>,
+    @InjectRepository(Message)
+    private readonly messageRepository: Repository<Message>,
+    private readonly chatService: ChatService,
+    private readonly s3Service: S3Service,
+    private readonly config: AppConfigService,
+    private readonly chatAudioUploadsService: ChatAudioUploadsService,
+    private readonly cryptoService: CryptoService,
+    private readonly notificationService: NotificationService,
+    private readonly userService: UserService,
+  ) {}
+
+  private readonly logger = LoggerService.getInstance(ChatAiService.name);
+  private readonly auditLogger = AuditLoggerService.getInstance();
+
+  @WithExecutionContext(ExecutionContextPropagation.SUPPORTS)
+  async addSummary(chatId: number, summary: FlattenedSummaryNotePayload) {
+    try {
+      this.logger.info(`Adding summary for chatId: ${chatId} from ai service`);
+
+      this.auditLogger.log({
+        eventType: AUDIT_EVENTS.SUMMARY_RECEIVED,
+        details: {
+          chatId,
+        },
+      });
+
+      const chat = await this.chatService.getChatByIdForServiceCall(chatId);
+
+      if (!chat) {
+        throw new ValidationException('Chat not found');
+      }
+
+      const convertedResponse = CommonUtil.convertToCamelCase(
+        summary,
+      ) as FlattenedSummaryNotePayloadCamelCase;
+      const { callDetails } =
+        await this.chatService.getChatWithCallDetails(chatId);
+      convertedResponse.mode =
+        callDetails?.callInfo?.mode ?? ScribeSessionMode.SCRIBE;
+      if (convertedResponse.sessionSummary) {
+        convertedResponse.sessionSummary = await this.cryptoService.encrypt(
+          convertedResponse.sessionSummary,
+          this.config.phiData?.phiDataEncryptionKey,
+        );
+      }
+
+      await this.callDetailsRepository.update(
+        { chatId },
+        {
+          summary: convertedResponse,
+        },
+      );
+
+      this.setAuthContext({
+        userId: chat.counselorId!,
+        tenantId: chat.tenantId,
+      });
+
+      // NOTE: the counselor email is intentionally NOT sent here. It is a slow,
+      // non-critical step (SMTP) that used to run on the synchronous
+      // process-transcript path and push it past the AI-service callback
+      // timeout. It now runs after the chat is marked SUCCESS via
+      // sendSummaryReadyEmail() — see ChatTranscriptService.
+      this.logger.info(`Summary added for chatId: ${chatId} from ai service`);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Error adding summary for chatId: ${chatId} from ai service with error ${JSON.stringify(
+          error,
+        )}`,
+      );
+      throw new ValidationException('Error adding summary');
+    }
+  }
+
+  @WithExecutionContext(ExecutionContextPropagation.SUPPORTS)
+  async addTranscript(chat: Chat, messages: MessageRequest[]) {
+    try {
+      this.logger.info(
+        `Adding transcript for chatId: ${chat.id} from ai service`,
+      );
+
+      this.setAuthContext({
+        userId: chat.counselorId!,
+        tenantId: chat.tenantId,
+      });
+
+      // Idempotency: with two-phase delivery (transcript first, then summary)
+      // and SQS redrive, the transcript can be delivered more than once. If it
+      // is already stored, do nothing — never duplicate the transcript.
+      const existingTranscriptCount = await this.messageRepository.count({
+        where: { chatId: chat.id, type: MessageType.TEXT },
+      });
+      if (existingTranscriptCount > 0) {
+        this.logger.info(
+          `Transcript already present for chatId: ${chat.id}; skipping duplicate insert`,
+        );
+        return true;
+      }
+
+      const formattedMessages = messages.map(async (message) => {
+        const encryptedContent = await this.cryptoService.encrypt(
+          message.content,
+          this.config.phiData?.phiDataEncryptionKey,
+        );
+        return this.messageRepository.create({
+          chatId: chat.id,
+          senderId:
+            message.role === UserRole.CLIENT ? chat.clientId : chat.counselorId,
+          type: MessageType.TEXT,
+          content: encryptedContent,
+          startSeconds: message.start_time,
+          endSeconds: message.end_time,
+          tenantId: ExecutionManager.getTenantId(),
+        });
+      });
+      const createdMessages = await Promise.all(formattedMessages);
+      await this.messageRepository.save(createdMessages);
+      // update message statistics
+      this.chatService.updateMessageStatistics(chat);
+
+      this.auditLogger.log({
+        eventType: AUDIT_EVENTS.TRANSCRIPT_RECEIVED,
+        details: {
+          chatId: chat.id,
+        },
+      });
+      this.logger.info(
+        `Transcript added for chatId: ${chat.id} from ai service`,
+      );
+      // NOTE: the recording is intentionally NOT deleted here. It is kept until
+      // the summary is final (SUCCESS on first pass, a manual retry, or
+      // auto-retry) so a summary timeout/failure can be recovered by
+      // re-transcribing/re-summarising. Deletion happens on summary success via
+      // ChatAudioUploadsService.cleanupStoredAudio.
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Error adding transcript for chatId: ${chat.id} from ai service with error ${JSON.stringify(
+          error,
+        )}`,
+      );
+      throw new ValidationException('Error adding transcript');
+    }
+  }
+
+  /**
+   * Emails the counselor that their summary is ready. Split out of addSummary
+   * so it can run *after* the chat is marked SUCCESS (off the synchronous
+   * callback path). Best-effort: never throws — a failed email must not affect
+   * the summary's success.
+   */
+  async sendSummaryReadyEmail(chatId: number): Promise<void> {
+    try {
+      const chat = await this.chatService.getChatByIdForServiceCall(chatId);
+      if (!chat?.counselorId) {
+        this.logger.error(
+          `Cannot send summary email; counselor id not set for chatId: ${chatId}`,
+        );
+        return;
+      }
+
+      this.setAuthContext({
+        userId: chat.counselorId,
+        tenantId: chat.tenantId,
+      });
+
+      const counselor = await this.userService.get(chat.counselorId);
+      if (!counselor) {
+        this.logger.error(
+          `Cannot send summary email; counselor not found for chatId: ${chatId}`,
+        );
+        return;
+      }
+
+      const { callDetails } =
+        await this.chatService.getChatWithCallDetails(chatId);
+
+      // The log line below used to sit OUTSIDE any check on the outcome, above a
+      // `sendEmail` that returned `false` instead of throwing — so it asserted
+      // "email sent" on every single failure. That is worse than logging
+      // nothing: on-call reading it would rule out email as the fault and go
+      // looking somewhere else. Now that the send throws, reaching this line
+      // means it really was accepted by SES; a failure lands in the catch below
+      // and has already raised a Slack alert from SESService.
+      await this.notificationService.sendEmailSummaryNotification({
+        to: counselor.email,
+        chatId,
+        summaryName: callDetails?.callInfo?.summaryName,
+      });
+      this.logger.info(`Summary-ready email sent for chatId: ${chatId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send summary-ready email for chatId ${chatId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  setAuthContext(context: { userId: number; tenantId: string }) {
+    ExecutionManager.setAuthContext(
+      context.userId.toString(),
+      context.tenantId,
+    );
+  }
+}

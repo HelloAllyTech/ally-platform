@@ -1,0 +1,45 @@
+import { ApiProperty } from '@nestjs/swagger';
+
+export class ScenarioSessionSkillCoverageItemDto {
+  @ApiProperty({
+    description: 'Skill category',
+    enum: ['Learning', 'Support', 'Standards'],
+  })
+  category!: string;
+
+  @ApiProperty({ description: 'Coverage percentage (0-100)' })
+  percentage!: number;
+
+  @ApiProperty({
+    description:
+      'URL of the skill icon in the assets S3 bucket (skill-icons folder)',
+    example:
+      'https://assets-bucket.s3.us-east-1.amazonaws.com/skill-icons/Learning.svg',
+  })
+  iconUrl?: string;
+}
+
+export class ScenarioSessionEmotionalMovementItemDto {
+  @ApiProperty({ description: 'Message id' })
+  messageId!: string;
+
+  @ApiProperty({ description: 'Emotional level' })
+  level!: number;
+
+  @ApiProperty({ description: 'Start time in seconds', required: false })
+  startTime?: number;
+}
+
+export class ScenarioSessionSkillsResponseDto {
+  @ApiProperty({
+    type: [ScenarioSessionSkillCoverageItemDto],
+    description: 'Skill coverage from scenario session evaluation',
+  })
+  skillCoverage!: ScenarioSessionSkillCoverageItemDto[];
+
+  @ApiProperty({
+    type: [ScenarioSessionEmotionalMovementItemDto],
+    description: 'Emotional movement data from scenario session evaluation',
+  })
+  emotionalMovement!: ScenarioSessionEmotionalMovementItemDto[];
+}

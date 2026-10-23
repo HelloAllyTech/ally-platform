@@ -1,0 +1,97 @@
+# Which documentation covers which code.
+#
+# Read by the shared docs-guard workflow (helloallytech/.github) on every PR, and by
+# the weekly wiki reconciler. Adding a rule here is how you make a doc impossible to
+# forget. Spec: https://tech.helloally.ai/#/wiki/contributing/docs-system.md
+#
+# requires:
+#   <path>              a file in this repo — the PR must touch it
+#   wiki:<page>         a page in the wiki repo — the PR body must carry a Wiki-PR: trailer
+#
+# Escape hatch: add the `docs:skip` label, or a `Wiki-PR: none — <reason>` trailer.
+
+version: 1
+repo: ally-be
+
+rules:
+  - id: data-schema
+    watch:
+      - "src/**/entity/*.entity.ts"
+    requires: DATA_SCHEMA.md
+    why: >
+      DATA_SCHEMA.md is the platform-wide map of what data exists and where. An entity
+      change that skips it makes the map wrong for every repo that reads it.
+
+  - id: repo-page-architecture
+    watch:
+      - "src/app.module.ts"
+      - "src/**/*.gateway.ts"
+      - "src/main.ts"
+    requires: wiki:repos/ally-be.md
+    why: >
+      Module wiring and WebSocket gateways are the service's public shape; the repo page
+      describes it to every other repo and to agents that never open this codebase.
+
+  - id: prompt-conventions
+    watch:
+      - "src/prompts/**"
+    requires: docs/prompts-folder.md
+    why: Prompt folder layout and .meta.json conventions are documented, not discoverable.
+
+  - id: weak-metrics-definitions
+    watch:
+      - "src/analytics/repository/weak-metrics-analytics.repository.ts"
+    requires: docs/weak-metrics-queries.md
+    why: >
+      That repository holds both the metric definitions and the deterministic thresholds
+      the dashboard reads. The query cookbook restates them so analysts can run them by
+      hand — and a cookbook that has drifted from the dashboard is worse than none,
+      because both look authoritative.
+
+  - id: ai-task-registry
+    watch:
+      - "src/**/service/*-ai.service.ts"
+      - "src/**/service/*autofill*.service.ts"
+      - "src/**/service/*-orchestrator.service.ts"
+      # Every provider layer, not just the ones that existed when this rule was
+      # written: `src/llm-agent/` was added by the character-interview
+      # multi-provider change and would have slipped through a narrower list.
+      - "src/**/provider/*.ts"
+      - "src/**/providers/*.ts"
+      - "src/learn/enum/llm-task.enum.ts"
+    requires: src/llm/constants/ai-task-registry.constants.ts
+    why: >
+      The AI task registry is the one place that says which platform actions call a model
+      and which model each one uses — it feeds the admin AI Tasks tab and is what anyone
+      costing a feature reads. A new or re-pointed LLM call that skips it makes the map
+      quietly wrong, and a wrong map is worse than no map because it still looks
+      authoritative. See docs/ai-task-registry.md.
+
+      `src/builder/service/builder-*.service.ts` was watched here until every Builder
+      service went through `src/llm-agent/`. While they each held their own Anthropic
+      client they used no task id, so the static guard in
+      `src/llm/constants/test/ai-task-ids-resolve.spec.ts` had nothing to resolve and
+      this rule was their only cover — at the cost of firing on all 22 of them, most of
+      which never call a model. Now that they resolve through LlmCompletionService and
+      the agent factory, the scan sees their ids and the glob is redundant noise.
+
+  - id: agent-entrypoints-in-sync
+    watch:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+    requires: mirror
+    why: >
+      AGENTS.md and CLAUDE.md must stay byte-identical. `mirror` asserts equality rather
+      than requiring a companion edit.
+
+  - id: language-glossary-architecture
+    watch:
+      - "src/language/**"
+    requires: docs/LANGUAGE_GLOSSARY_DESIGN.md
+    why: >
+      The glossary is an unattended loop: it consolidates, adjudicates and re-tiers its
+      own content with no reviewer in the path. The architecture doc is the only place
+      the cadences, gates and irreversibility rules are written down, and it drifted six
+      weeks without anything failing because it used to live outside this repo. By then
+      it described a human-in-the-loop pipeline that no longer existed, and reading it
+      produced confidently wrong conclusions.

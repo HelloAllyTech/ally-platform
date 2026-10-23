@@ -1,0 +1,1361 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
+
+import { ApiAuthGuard } from 'src/auth/guards/api-auth.guard';
+import { AppConfigService } from 'src/config/config.service';
+
+import { BugHunterService } from '../service/bug-hunter.service';
+import { BugFindingService } from '../service/bug-finding.service';
+import {
+  BugHunterFinderDataService,
+  ProdLogFinding,
+  ReportedBugFinding,
+  WebErrorFinding,
+} from '../service/bug-hunter-finder-data.service';
+import {
+  BugHuntRunDetailDto,
+  BugHuntEventDto,
+  BugFindingDto,
+  CloseBugHuntRunDto,
+  PatchBugFindingDto,
+  PersistBugFindingsDto,
+  RecordBugFixPlanDto,
+  RecordBugHuntRunCostDto,
+  RecordBugHuntRunModelDto,
+  ReportBugHuntEventDto,
+  StartBugHuntRunDto,
+} from '../dto/bug-hunter.dto';
+import { BugFixSessionService } from '../service/bug-fix-session.service';
+import { BugHunterTelemetryService } from '../service/bug-hunter-telemetry.service';
+import {
+  RecordBugHuntContextDto,
+  RecordBugHuntLookupDto,
+  RecordBugHuntPhaseDto,
+} from '../dto/bug-hunter-telemetry.dto';
+import { BugHuntLookupKind } from '../enum/bug-hunt-telemetry.enum';
+import { BugHunterEvalService } from '../service/bug-hunter-eval.service';
+import { BugHunterPolicyService } from '../service/bug-hunter-policy.service';
+import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
+import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
+import { AGENT_MEMORY_IN_CONTEXT } from 'src/agent-memory/constants/agent-memory.constants';
+import {
+  BugHunterMemorySearchResponseDto,
+  SearchBugHunterMemoryQueryDto,
+  WriteBugHunterMemoryDto,
+  BugHunterMemoryFeedbackDto,
+} from '../dto/bug-hunter-memory.dto';
+import {
+  BugHunterEvalSetDto,
+  BugHunterEvalSetQueryDto,
+  RecordBugHunterEvalRunDto,
+} from '../dto/bug-hunter-eval.dto';
+import { BugHuntRunStatus } from '../enum/bug-hunt-run.enum';
+import { BugFindingStatus } from '../enum/bug-finding.enum';
+import { toEventDto, toRunDto, toFindingDto } from './bug-hunter.controller';
+import { buildFixSessionPrompt } from '../constants/bug-fix-prompt';
+import { FixDossier } from '../constants/bug-fix-dossier';
+import { BugHunterDossierService } from '../service/bug-hunter-dossier.service';
+import { BugCaseFileService } from '../service/bug-case-file.service';
+import {
+  BugVerifyFixService,
+  storedVerifier,
+} from '../service/bug-verify-fix.service';
+import { BugVerifyFindingsService } from '../service/bug-verify-findings.service';
+import { BugHunterFinderService } from '../service/bug-hunter-finder.service';
+import { BugHuntEventStage } from '../enum/bug-hunt-event.enum';
+import { BugFixStudyService } from '../service/bug-fix-study.service';
+import { BugHunterOrchestratorService } from '../service/bug-hunter-orchestrator.service';
+import { bugAdminUrl, renderPrBody } from '../constants/bug-pr-body';
+import { buildPrReviewPrompt } from '../constants/bug-pr-review-prompt';
+import { PrReviewTarget } from '../type/bug-hunter-pr-review.type';
+import { FixPlan, FixRetry } from '../type/bug-hunter-orchestrator.type';
+import { buildVerifyFindingsPrompt } from '../constants/bug-verify-findings-prompt';
+import { buildVerifyFixPrompt } from '../constants/bug-verify-fix-prompt';
+import { prNumberFrom } from '../service/bug-hunter-policy.service';
+import { BugCaseFile } from '../constants/bug-case-file';
+import { BugHuntRunRepository } from '../repository/bug-hunt-run.repository';
+import {
+  BUG_HUNT_REPOS,
+  BugHuntRepoConfig,
+} from '../constants/bug-hunt-repos.constants';
+import { buildSweepPrompt } from '../constants/bug-hunt-sweep-prompt';
+import { BugHunterModelSettingsService } from '../service/bug-hunter-model-settings.service';
+import { BugHunterModelSettingsDto } from '../dto/bug-hunter.dto';
+import { BugHuntTrigger } from '../enum/bug-hunt-run.enum';
+import { BugHunterProbeService } from '../service/bug-hunter-probe.service';
+import { BugHunterKnowledgeService } from '../service/bug-hunter-knowledge.service';
+import { BugHunterPrecedentService } from '../service/bug-hunter-precedent.service';
+import {
+  BugHunterFeatureMapService,
+  FeatureCardInput,
+} from '../service/bug-hunter-feature-map.service';
+import { playbooksFor } from '../constants/bug-hunter-playbooks';
+import { buildFeatureMapPrompt } from '../constants/bug-feature-map-prompt';
+import { BugKnowledge } from '../constants/bug-hunter-knowledge';
+
+/**
+ * The Bug Hunter MACHINE surface — start/report/close plus the findings
+ * lifecycle, called by the `.claude/workflows/bug-hunt.mjs` pipeline over
+ * HTTP (it runs as an external Claude Code agent, not in-process, so it can't
+ * call BugHunterService/BugFindingService directly).
+ *
+ * `x-api-key` guarded (`ApiAuthGuard`, same platform `API_KEY` already used
+ * for ally-ai/ally-ai-learn inbound calls — see the webhook controllers under
+ * the identical pattern elsewhere) rather than
+ * `@RequireFeatureToggle`: that decorator's `AuthGuard('jwt')` requires a
+ * logged-in human, which an autonomous pipeline is not. Split into its own
+ * controller (not just a different decorator on the same class) so the two
+ * auth models never mix on one route table by accident.
+ */
+@ApiTags('Bug Hunter Pipeline')
+@Controller('v1/bug-hunter')
+@UseGuards(ApiAuthGuard)
+@ApiSecurity('api-key')
+export class BugHunterPipelineController {
+  constructor(
+    private readonly bugHunterService: BugHunterService,
+    private readonly bugFindingService: BugFindingService,
+    private readonly finderDataService: BugHunterFinderDataService,
+    private readonly bugFixSessionService: BugFixSessionService,
+    private readonly configService: AppConfigService,
+    private readonly modelSettingsService: BugHunterModelSettingsService,
+    private readonly telemetryService: BugHunterTelemetryService,
+    private readonly evalService: BugHunterEvalService,
+    private readonly policyService: BugHunterPolicyService,
+    private readonly memoryService: AgentMemoryService,
+    private readonly dossierService: BugHunterDossierService,
+    private readonly caseFileService: BugCaseFileService,
+    private readonly verifyFixService: BugVerifyFixService,
+    private readonly verifyFindingsService: BugVerifyFindingsService,
+    private readonly finderService: BugHunterFinderService,
+    private readonly runRepository: BugHuntRunRepository,
+    private readonly orchestrator: BugHunterOrchestratorService,
+    private readonly studyService: BugFixStudyService,
+    private readonly probeService: BugHunterProbeService,
+    private readonly knowledgeService: BugHunterKnowledgeService,
+    private readonly precedentService: BugHunterPrecedentService,
+    private readonly featureMapService: BugHunterFeatureMapService,
+  ) {}
+
+  // ── Tools for locating a fault (2026-10-13) ──────────────────────────────
+  // Every route below is read-only except the feature-map write, which only
+  // a map run uses. See renderToolbox for how a protocol presents them.
+
+  @Get('pipeline/probes')
+  @ApiOperation({
+    summary: 'The catalogue of read-only production probes (pipeline only)',
+  })
+  listProbes() {
+    return { probes: this.probeService.catalogue() };
+  }
+
+  @Get('pipeline/probes/:name')
+  @ApiOperation({
+    summary: 'Ask one read-only production probe (pipeline only)',
+    description:
+      'A fixed question about live data or logs — see PIPELINE_PROBES. Every database probe runs a fixed query ' +
+      'in a READ ONLY transaction with a 5-second statement timeout and answers with ids, counts and authored ' +
+      'text only. Pass ?runId= and the call is recorded as a probe lookup on that run.',
+  })
+  async runProbe(
+    @Param('name') name: string,
+    @Query() query: Record<string, string | undefined>,
+  ): Promise<Record<string, unknown>> {
+    const { runId, ...params } = query;
+    return this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.PROBE,
+      () => this.probeService.run(name, params),
+      (result) => ({ itemCount: 1, chars: JSON.stringify(result).length }),
+      { probe: name, params },
+    );
+  }
+
+  @Get('pipeline/playbooks')
+  @ApiOperation({
+    summary: 'Playbooks that fit a bug, by its words (pipeline only)',
+  })
+  getPlaybooks(@Query('q') q?: string) {
+    return { playbooks: q ? playbooksFor(q, 3) : [] };
+  }
+
+  @Get('pipeline/precedents')
+  @ApiOperation({
+    summary:
+      'Resolved or decided bugs that read like one finding, and where their fault was (pipeline only)',
+  })
+  async getPrecedents(
+    @Query('findingId', ParseUUIDPipe) findingId: string,
+    @Query('runId') runId?: string,
+  ) {
+    const finding = await this.bugFindingService.getOne(findingId);
+    const precedents = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.PRECEDENTS,
+      () => this.precedentService.similar(finding, 5),
+      (rows) => ({ itemCount: rows.length, chars: 0 }),
+      { findingId },
+    );
+    return { precedents };
+  }
+
+  @Get('pipeline/feature-maps')
+  @ApiOperation({
+    summary:
+      'Feature cards that fit a few words, or every card for a repo (pipeline only)',
+  })
+  async getFeatureMaps(
+    @Query('q') q?: string,
+    @Query('repo') repo?: string,
+    @Query('runId') runId?: string,
+  ) {
+    const cards = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.FEATURE_MAP,
+      () =>
+        q
+          ? this.featureMapService.forBug({ title: q, description: q }, 5)
+          : this.featureMapService.list(repo),
+      (rows) => ({
+        itemCount: rows.length,
+        chars: rows.reduce((sum, r) => sum + r.summary.length, 0),
+      }),
+      { q: q ?? null, repo: repo ?? null },
+    );
+    return { cards };
+  }
+
+  @Post('pipeline/feature-maps')
+  @ApiOperation({
+    summary: 'Save a batch of feature cards from a map run (pipeline only)',
+  })
+  saveFeatureMaps(
+    @Body()
+    body: {
+      runId?: string;
+      repo: string;
+      sourceSha?: string;
+      cards: FeatureCardInput[];
+    },
+  ) {
+    return this.featureMapService.save({
+      repo: body?.repo,
+      runId: body?.runId ?? null,
+      sourceSha: body?.sourceSha ?? null,
+      cards: body?.cards,
+    });
+  }
+
+  @Get('pipeline/runs/:id/feature-map-prompt')
+  @ApiOperation({
+    summary:
+      "The weekly feature-map run's protocol for one repo, as plain text (pipeline only)",
+  })
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async getFeatureMapPrompt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('repo') repo?: string,
+  ): Promise<string> {
+    const run = await this.bugHunterService.getRun(id);
+    if (run.trigger !== BugHuntTrigger.FEATURE_MAP) {
+      throw new BadRequestException(`Run ${id} is not a feature-map run.`);
+    }
+    const target = repo ?? run.repo;
+    // Every repo's cards: the run refreshes its own and extends others'.
+    const existing = await this.featureMapService.list();
+    return buildFeatureMapPrompt({
+      repo: target,
+      runId: run.id,
+      apiBaseUrl: this.configService.publicApiBaseUrl,
+      existing,
+    });
+  }
+
+  @Get('pipeline/memory/search')
+  @ApiOperation({
+    summary: "Search Bug Hunter's notebook by meaning (pipeline only)",
+    description:
+      'The nearest active entries for a question, narrowed to the repo in play plus ' +
+      'platform-wide ones. Pass ?runId= and the lookup is recorded as a memory context ' +
+      'lookup with its top relevance, so "asked the notebook and got nothing" is a fact ' +
+      'the pipeline telemetry can count. See docs/bug-hunter-memory-adr.md.',
+  })
+  @ApiResponse({ status: 200, type: BugHunterMemorySearchResponseDto })
+  async searchMemory(
+    @Query() query: SearchBugHunterMemoryQueryDto,
+  ): Promise<BugHunterMemorySearchResponseDto> {
+    const hits = await this.telemetryService.timed(
+      query.runId,
+      BugHuntLookupKind.MEMORY,
+      () =>
+        this.memoryService.search({
+          agent: AgentMemoryAgent.BUG_HUNTER,
+          query: query.q,
+          repo: query.repo,
+          limit: query.limit,
+          minSimilarity: query.minSimilarity,
+        }),
+      (rows) => ({
+        itemCount: rows.length,
+        chars: rows.reduce((sum, r) => sum + r.body.length, 0),
+      }),
+      { repo: query.repo ?? null, queryChars: query.q.length },
+    );
+    return { hits };
+  }
+
+  @Post('pipeline/memory')
+  @ApiOperation({
+    summary: "Write one lesson to Bug Hunter's notebook (pipeline only)",
+    description:
+      'Under 600 characters, written for a stranger. Lands active and is embedded for ' +
+      'search best-effort; a failed embed is recorded on the row and healed later, never ' +
+      'thrown. Curation of candidates into the active set is OPP-0714.',
+  })
+  async writeMemory(
+    @Body() body: WriteBugHunterMemoryDto,
+  ): Promise<{ id: string }> {
+    const row = await this.memoryService.write({
+      agent: AgentMemoryAgent.BUG_HUNTER,
+      body: body.body,
+      repos: body.repos,
+      tags: body.tags,
+      runId: body.runId ?? null,
+      findingId: body.findingId ?? null,
+      // The pipeline may not pin: a pin is a human outranking the curator.
+      pinned: false,
+    });
+    return { id: row.id };
+  }
+
+  @Post('pipeline/memory/feedback')
+  @ApiOperation({
+    summary:
+      'Tell the notebook which entries a run used or found wrong (pipeline only)',
+    description:
+      'The feedback half of the notebook (OPP-0752). `applied` ids get times_applied+1 and ' +
+      'a last_applied_at; `contradicted` ids get times_contradicted+1. The run is marked as ' +
+      'having reported, which is what lets the nightly retirement pass count "never applied" ' +
+      'against an entry: only runs that reported are counted, so an empty list is a real ' +
+      'answer and must be sent.',
+  })
+  async memoryFeedback(
+    @Body() body: BugHunterMemoryFeedbackDto,
+  ): Promise<{ applied: number; contradicted: number }> {
+    const counts = await this.memoryService.recordFeedback({
+      applied: body.applied,
+      contradicted: body.contradicted ?? [],
+    });
+    // Best-effort mark on the run: the counters above are the record, this is
+    // the denominator the retirement pass divides by.
+    try {
+      const run = await this.runRepository.findOne({
+        where: { id: body.runId },
+      });
+      if (run) {
+        // `save` rather than `update`: TypeORM's update() types a jsonb
+        // column's nested object as a query expression and refuses a plain
+        // string inside it.
+        run.metadata = {
+          ...(run.metadata ?? {}),
+          memoryFeedback: {
+            reportedAt: new Date().toISOString(),
+            applied: body.applied.length,
+            contradicted: body.contradicted?.length ?? 0,
+          },
+        };
+        await this.runRepository.save(run);
+      }
+    } catch {
+      // Logged by TypeORM; the counters already landed.
+    }
+    return counts;
+  }
+
+  @Get('pipeline/eval-set')
+  @ApiOperation({
+    summary:
+      'Settled findings with a truth label, for replaying the verifier prompt (pipeline only)',
+    description:
+      'Findings a human rejected as not_a_bug, dismissals a shipped fix later reversed, and ' +
+      'fixes that merged or released — each with the ORIGINAL description the verifier saw. ' +
+      'Declines for wont_fix, too_risky, duplicate, wrong_repo and other are excluded: they ' +
+      'say nothing about whether the code was wrong. ?includeWeak=true adds uncontradicted ' +
+      'verifier dismissals older than the decline-suppression window, marked weak. Consumed ' +
+      'by scripts/bug-hunter/eval-verifier.mjs.',
+  })
+  @ApiResponse({ status: 200, type: BugHunterEvalSetDto })
+  async getEvalSet(
+    @Query() query: BugHunterEvalSetQueryDto,
+  ): Promise<BugHunterEvalSetDto> {
+    return this.evalService.buildSet({
+      repo: query.repo,
+      limit: query.limit,
+      includeWeak: query.includeWeak === 'true',
+    });
+  }
+
+  @Post('pipeline/eval-runs')
+  @ApiOperation({
+    summary:
+      'Store the score of one replay of a prompt over the eval set (pipeline only)',
+    description:
+      'Keyed by the sha256 of the prompt as run and the model, so two rows with the same pair ' +
+      'are the same experiment. Written by scripts/bug-hunter/eval-verifier.mjs after a run.',
+  })
+  async recordEvalRun(
+    @Body() body: RecordBugHunterEvalRunDto,
+  ): Promise<{ id: string }> {
+    const row = await this.evalService.recordRun(body);
+    return { id: row.id };
+  }
+
+  // The four finder-data reads below take an optional `?runId=`. When the
+  // sweep passes it, the fetch is recorded as a context lookup on that run —
+  // how many items came back, how large, how long it took — with no further
+  // cooperation from the agent. See BugHunterTelemetryService.timed. Omitting
+  // it changes nothing about the response, so older workflow copies keep
+  // working unmeasured.
+
+  @Get('pipeline/prod-logs')
+  @ApiOperation({
+    summary:
+      "Last 24h of a repo's CloudWatch errors, for the production-log finder (pipeline only). Null events for a repo with no log group (frontend repos). Pass ?runId= to record the lookup on that run.",
+  })
+  async getProdLogs(
+    @Query('repo') repo: string,
+    @Query('runId') runId?: string,
+  ): Promise<{ events: ProdLogFinding[] | null }> {
+    const events = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.PROD_LOGS,
+      () => this.finderDataService.getRecentErrors(repo),
+      measureList,
+      { repo },
+    );
+    return { events };
+  }
+
+  @Get('pipeline/web-logs')
+  @ApiOperation({
+    summary:
+      "Last 24h of a repo's browser-side PostHog exceptions, for the web-error finder (pipeline only). Null events for a repo with no PostHog-instrumented client (every repo but ally-web today). Pass ?runId= to record the lookup on that run.",
+  })
+  async getWebLogs(
+    @Query('repo') repo: string,
+    @Query('runId') runId?: string,
+  ): Promise<{ events: WebErrorFinding[] | null }> {
+    const events = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.WEB_LOGS,
+      () => this.finderDataService.getWebErrors(repo),
+      measureList,
+      { repo },
+    );
+    return { events };
+  }
+
+  @Get('pipeline/reported-bugs')
+  @ApiOperation({
+    summary:
+      'Human-reported bugs still at NEW, for the reported-bugs finder (pipeline only). Optional ?repo= narrows to items already classified as this repo, plus anything still unfiled. Pass ?runId= to record the lookup on that run.',
+  })
+  async getReportedBugs(
+    @Query('repo') repo?: string,
+    @Query('runId') runId?: string,
+  ): Promise<{ items: ReportedBugFinding[] }> {
+    const items = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.REPORTED_BUGS,
+      () => this.finderDataService.getReportedBugs(repo),
+      measureList,
+      { repo: repo ?? null },
+    );
+    return { items };
+  }
+
+  @Get('pipeline/approved-findings')
+  @ApiOperation({
+    summary:
+      'Manual-mode findings an admin has approved for this repo, waiting for the Fix phase (pipeline only). Pass ?runId= to record the lookup on that run.',
+  })
+  async getApprovedFindings(
+    @Query('repo') repo: string,
+    @Query('runId') runId?: string,
+  ): Promise<{ items: BugFindingDto[] }> {
+    const items = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.APPROVED_FINDINGS,
+      () => this.bugFindingService.listApprovedForRepo(repo),
+      measureList,
+      { repo },
+    );
+    return { items: items.map(toFindingDto) };
+  }
+
+  @Post('runs/:id/phases')
+  @ApiOperation({
+    summary:
+      'Mark the start or end of a phase, for per-phase timing (pipeline only)',
+    description:
+      'The agent POSTs {"phase","event":"started"|"finished"} as it enters and leaves each ' +
+      'phase of the sweep (discover, verify, fix, close) or fix protocol (reproduce, fix, suite, ' +
+      'pr). One row per run and phase; a repeated start keeps the first start and counts the ' +
+      'repeat, so a second fix attempt extends the fix phase rather than replacing it.',
+  })
+  async recordPhase(
+    @Param('id', ParseUUIDPipe) runId: string,
+    @Body() body: RecordBugHuntPhaseDto,
+  ): Promise<{ ok: true }> {
+    await this.telemetryService.recordPhase(runId, body);
+    return { ok: true };
+  }
+
+  @Post('runs/:id/lookups')
+  @ApiOperation({
+    summary:
+      'Record a context lookup the agent performed itself, such as a memory search (pipeline only)',
+    description:
+      'Only for lookups the server cannot see. The pipeline endpoints above record themselves ' +
+      'when called with ?runId=; posting one of those kinds here double-counts it.',
+  })
+  async recordLookup(
+    @Param('id', ParseUUIDPipe) runId: string,
+    @Body() body: RecordBugHuntLookupDto,
+  ): Promise<{ ok: true }> {
+    await this.telemetryService.recordReportedLookup(runId, body);
+    return { ok: true };
+  }
+
+  @Post('runs/:id/context')
+  @ApiOperation({
+    summary:
+      'Record how much of the repo the agent was shown — commits, files and lines in scope, deep or diff-scoped (pipeline only)',
+  })
+  async recordContext(
+    @Param('id', ParseUUIDPipe) runId: string,
+    @Body() body: RecordBugHuntContextDto,
+  ): Promise<{ ok: true }> {
+    await this.telemetryService.recordContext(runId, body);
+    return { ok: true };
+  }
+
+  @Get('pipeline/findings/:id')
+  @ApiOperation({
+    summary:
+      'The one finding a dispatched fix session was started for (pipeline only)',
+    description:
+      'A fix session is handed only its finding id as a workflow input — it ' +
+      'reads the bug itself, plus any escalation answer already on record ' +
+      'from a previous attempt, from here.',
+  })
+  async getFindingForPipeline(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<BugFindingDto> {
+    return toFindingDto(await this.bugFindingService.getOne(id));
+  }
+
+  @Get('pipeline/repo-commands')
+  @ApiOperation({
+    summary:
+      'Test/lint commands and fixability for every repo Bug Hunter knows (pipeline only)',
+    description:
+      'The single definition of this map. It used to exist twice — once in ' +
+      '`.claude/workflows/bug-hunt.mjs` and once in `bug-fix-prompt.ts` — and ' +
+      'the two had already drifted by an entry. The workflow script now fetches ' +
+      'it from here instead of carrying its own copy.',
+  })
+  getRepoCommands(): { repos: Record<string, BugHuntRepoConfig> } {
+    return { repos: BUG_HUNT_REPOS };
+  }
+
+  @Get('pipeline/models')
+  @ApiOperation({
+    summary:
+      'Which models the sweep/fix session and its escalation subagent should run on (pipeline only)',
+    description:
+      'Fetched at runtime by `bug-hunt-sweep.yml`/`bug-fix-session.yml`, on every trigger path — ' +
+      'including the nightly cron sweep, which never goes through `workflow_dispatch` and so ' +
+      'cannot receive this as a dispatch input. Takes an optional `?repo=` for parity with this ' +
+      "controller's other endpoints, but does not read it yet: Bug Hunter's model settings are " +
+      "platform-wide, same as Builder's.",
+  })
+  @ApiResponse({ status: 200, type: BugHunterModelSettingsDto })
+  async getModels(
+    @Query('role') role?: string,
+    @Query('findingId') findingId?: string,
+  ): Promise<BugHunterModelSettingsDto> {
+    const settings = await this.modelSettingsService.get();
+    // The Verifier's model (OPP-0779) was chosen and stored on the finding
+    // at dispatch, so the workflow's first call gets it back here rather
+    // than the platform default.
+    // The Finder's D2 (OPP-0781): the sweep workflow asks by run id.
+    if (role === 'finder' && findingId) {
+      const run = await this.bugHunterService
+        .getRun(findingId)
+        .catch(() => null);
+      const chosen = run?.metadata?.finder?.model;
+      const senses = run?.metadata?.finder?.senses;
+      if (chosen?.engine && chosen?.model) {
+        return {
+          ...settings,
+          engine: chosen.engine,
+          defaultModel: chosen.model,
+          escalationModel: chosen.model,
+          ...(Array.isArray(senses) ? { senses } : {}),
+        };
+      }
+    }
+    // Same for the finding verifier (OPP-0780), whose `finding_id` input is
+    // the verify run's id, because its subject is a sweep, not one bug.
+    if (role === 'verify_findings' && findingId) {
+      const run = await this.bugHunterService
+        .getRun(findingId)
+        .catch(() => null);
+      const counterpart = storedVerifier(
+        run?.metadata?.verifyFindings?.counterpart,
+        settings,
+      );
+      if (counterpart) {
+        return {
+          ...settings,
+          engine: counterpart.engine,
+          defaultModel: counterpart.model,
+          escalationModel: counterpart.model,
+        };
+      }
+    }
+    // The orchestrator's D6 (OPP-0783): the fix workflow asks by finding id
+    // and gets the model the plan chose for this attempt.
+    if (role === 'fix' && findingId) {
+      const finding = await this.bugFindingService
+        .getOne(findingId)
+        .catch(() => null);
+      const plan = finding?.metadata?.fixPlan as FixPlan | undefined;
+      if (plan?.engine && plan?.model) {
+        return {
+          ...settings,
+          engine: plan.engine,
+          defaultModel: plan.model,
+          escalationModel: plan.model,
+        };
+      }
+    }
+    if (role === 'verify_fix' && findingId) {
+      const finding = await this.bugFindingService
+        .getOne(findingId)
+        .catch(() => null);
+      const counterpart = storedVerifier(
+        finding?.metadata?.verifyFix?.counterpart,
+        settings,
+      );
+      if (counterpart) {
+        return {
+          ...settings,
+          engine: counterpart.engine,
+          defaultModel: counterpart.model,
+          escalationModel: counterpart.model,
+        };
+      }
+    }
+    return settings;
+  }
+
+  @Get('pipeline/sweep-prompt')
+  @ApiOperation({
+    summary: 'The full repo-wide sweep protocol, as plain text (pipeline only)',
+    description:
+      'The unattended executor for a sweep. `.claude/workflows/bug-hunt.mjs` ' +
+      'is a Claude Code Workflow script and cannot run on a GitHub runner, ' +
+      'which is why nothing used to trigger a sweep automatically. ' +
+      '`bug-hunt-sweep.yml` fetches this and hands it to Claude Code, exactly ' +
+      'as `bug-fix-session.yml` already does with the fix protocol. The prompt ' +
+      'embeds the mode, because MANUAL stops at pending_approval and AI carries ' +
+      'on into Fix. Returns `text/plain` — the runner pipes it.',
+  })
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async getSweepPrompt(
+    @Query('repo') repo: string,
+    @Query('runId') runId: string,
+    @Query('deep') deep?: string,
+  ): Promise<string> {
+    // Validate here so an unknown repo is a 400 the runner can report clearly.
+    // buildSweepPrompt also throws, but as a defensive invariant — surfacing
+    // that as a 500 would read to an admin as a Bug Hunter outage rather than a
+    // bad workflow input.
+    if (!BUG_HUNT_REPOS[repo]) {
+      throw new BadRequestException(
+        `Bug Hunter is not configured for "${repo}". Known repos: ${Object.keys(
+          BUG_HUNT_REPOS,
+        ).join(', ')}.`,
+      );
+    }
+    // The Finder's plan (OPP-0781): D1 picks the senses, D2 the model, once
+    // per run, here — the first thing the workflow fetches — so the models
+    // call that follows gets the chosen engine.
+    const run = await this.bugHunterService.getRun(runId);
+    const plan = await this.finderService.ensurePlan(run);
+    // Read the live mode rather than trusting a workflow input: the switch may
+    // have moved between the dispatch and the runner actually starting, and the
+    // mode decides whether this sweep is allowed to fix anything.
+    const settings = await this.bugHunterService.getSettings();
+    // The engine the runner is about to use. Read here rather than passed in:
+    // the workflow resolves it from the same settings row a step later, and
+    // the prompt has to know it NOW because Gemini has no Task tool, so its
+    // Verify phase cannot be the Claude one — see buildSweepPrompt.
+    const engine = plan.model.engine;
+    // What this repo's reviewers already ruled were not bugs. Fetched here
+    // rather than baked into the workflow file for the same reason the whole
+    // protocol is served rather than copied: it changes every time someone
+    // triages, and a sweep should read the current state of the argument.
+    const knownNonBugs = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.KNOWN_NON_BUGS,
+      () => this.bugFindingService.listKnownNonBugs(repo),
+      (rows) => ({
+        itemCount: rows.length,
+        chars: rows.reduce(
+          (sum, row) =>
+            sum +
+            row.title.length +
+            row.reason.length +
+            (row.note?.length ?? 0),
+          0,
+        ),
+      }),
+      { repo },
+    );
+    // The always-on half of memory: the strongest notebook entries for this
+    // repo, rendered up front. Recorded as a memory lookup like a search, so
+    // the telemetry counts the context the agent was handed either way.
+    const memories = await this.telemetryService.timed(
+      runId,
+      BugHuntLookupKind.MEMORY,
+      () =>
+        this.memoryService.listActive(
+          AgentMemoryAgent.BUG_HUNTER,
+          repo,
+          AGENT_MEMORY_IN_CONTEXT,
+        ),
+      (rows) => ({
+        itemCount: rows.length,
+        chars: rows.reduce((sum, r) => sum + r.body.length, 0),
+      }),
+      { repo, mode: 'always_on' },
+    );
+    return buildSweepPrompt({
+      repo,
+      runId,
+      apiBaseUrl: this.configService.publicApiBaseUrl,
+      mode: settings.mode,
+      deep: deep === 'true',
+      senses: plan.senses,
+      light: plan.light,
+      knownNonBugs,
+      engine,
+      memories: memories.map((m) => ({
+        id: m.id,
+        body: m.body,
+        tags: m.tags,
+        repos: m.repos,
+      })),
+    });
+  }
+
+  @Get('pipeline/pr-review-prompt')
+  @ApiOperation({
+    summary:
+      'The PR review brief for a pr_review run: review one open pull request on its head, read-only, filing findings linked to it (pipeline only, OPP-0785)',
+  })
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async getPrReviewPrompt(
+    @Query('repo') repo: string,
+    @Query('runId') runId: string,
+  ): Promise<string> {
+    const run = await this.bugHunterService.getRun(runId);
+    const pr = run.metadata?.prReview as PrReviewTarget | undefined;
+    if (!pr?.number || !pr.headSha) {
+      throw new BadRequestException(
+        `Run ${runId} is not a PR review run: it carries no pull request.`,
+      );
+    }
+    return buildPrReviewPrompt({
+      repo: repo ?? run.repo,
+      runId,
+      apiBaseUrl: this.configService.publicApiBaseUrl,
+      pr,
+    });
+  }
+
+  @Get('pipeline/findings/:id/fix-prompt')
+  @ApiOperation({
+    summary:
+      'The full fix-session protocol for this finding, as plain text (pipeline only)',
+    description:
+      "Each repo's `bug-fix-session.yml` fetches this and hands it straight " +
+      'to Claude Code, which is what keeps those four workflow files thin and ' +
+      'genuinely identical instead of four drifting copies of the same ' +
+      'protocol. The prompt is finding-specific: it embeds the bug, the repo ' +
+      'commands, any answer an admin already gave, and whether merging is ' +
+      'permitted (it is not, for a guarded path). Returns `text/plain` — the ' +
+      'runner pipes it, it is not JSON for a client to parse.',
+  })
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async getFixPrompt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('runId') runId: string,
+    @Query('repo') repo?: string,
+  ): Promise<string> {
+    const finding = await this.bugFindingService.getOne(id);
+    const targetRepo = repo ?? finding.repo ?? '';
+    // Same reason the sweep prompt reads the engine: the escalation step
+    // names a Task-tool subagent that only exists on Claude Code.
+    const { engine } = await this.modelSettingsService.get();
+    // Best-effort: a dossier that could not be assembled must not stop the
+    // session from starting — the prompt then simply carries no dossier
+    // section, which is what every session got before this existed.
+    let dossier: FixDossier | undefined;
+    try {
+      dossier = await this.dossierService.build(finding, targetRepo, runId);
+    } catch {
+      dossier = undefined;
+    }
+    return buildFixSessionPrompt({
+      finding,
+      repo: targetRepo,
+      runId,
+      apiBaseUrl: this.configService.publicApiBaseUrl,
+      dossier,
+      engine,
+      // The orchestrator's plan and reason for a retry (OPP-0783).
+      plan: (finding.metadata?.fixPlan as FixPlan | undefined) ?? null,
+      retry: (finding.metadata?.retry as FixRetry | undefined) ?? null,
+    });
+  }
+
+  @Get('pipeline/findings/:id/dossier')
+  @ApiOperation({
+    summary:
+      'Everything already known about a bug, for the session about to fix it (pipeline only)',
+    description:
+      'The same dossier `GET pipeline/findings/:id/fix-prompt` embeds, as JSON: verifier ' +
+      'verdicts and reasons, structured records of earlier fix attempts, regression ' +
+      'lineage, the reporter and their captured context, fixes that shipped nearby in the ' +
+      'repo, other bugs open in the same file, and the closest notebook entries. Every ' +
+      'part is best-effort; only the finding itself is required. `runId` records the ' +
+      'notebook lookup against that run.',
+  })
+  async getFixDossier(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('runId') runId?: string,
+    @Query('repo') repo?: string,
+  ): Promise<FixDossier> {
+    const finding = await this.bugFindingService.getOne(id);
+    return this.dossierService.build(
+      finding,
+      repo ?? finding.repo ?? '',
+      runId,
+    );
+  }
+
+  @Get('pipeline/runs/:id/verify-findings-prompt')
+  @ApiOperation({
+    summary:
+      "The independent finding verifier's protocol for one closed sweep's unproven findings, as plain text (pipeline only)",
+    description:
+      'Fetched by `bug-fix-session.yml` when dispatched with mode=verify_findings (OPP-0780). ' +
+      'Lists every unproven finding the sweep kept; the verifier reproduces and tries to refute ' +
+      "each on the Verifier's Gemini model and PATCHes a findingVerdict per finding.",
+  })
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async getVerifyFindingsPrompt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('repo') repo?: string,
+  ): Promise<string> {
+    const run = await this.bugHunterService.getRun(id);
+    const dispatched = run.metadata?.verifyFindings ?? null;
+    if (!dispatched?.findingIds?.length) {
+      throw new BadRequestException(
+        `Run ${id} is not a verify-findings run, or has no findings to verify.`,
+      );
+    }
+    const findings = (
+      await Promise.all(
+        (dispatched.findingIds as string[]).map((fid) =>
+          this.bugFindingService.getOne(fid).catch(() => null),
+        ),
+      )
+    ).filter((f): f is NonNullable<typeof f> => f != null);
+    // What Bug Hunter already knows about each finding: playbooks, resolved
+    // look-alikes, feature cards. A failed lookup costs that finding's block.
+    const knowledge: Record<string, BugKnowledge> = {};
+    if (dispatched.heldCheck !== true) {
+      for (const f of findings) {
+        knowledge[f.id] = await this.knowledgeService.forFinding(f, run.id);
+      }
+    }
+    return buildVerifyFindingsPrompt({
+      findings,
+      repo: repo ?? run.repo,
+      runId: run.id,
+      apiBaseUrl: this.configService.publicApiBaseUrl,
+      engine: dispatched.counterpart?.engine ?? 'gemini',
+      model: dispatched.counterpart?.model ?? 'gemini-2.5-pro',
+      sweepEngine: dispatched.sweepEngine ?? null,
+      heldCheck: dispatched.heldCheck === true,
+      knowledge,
+    });
+  }
+
+  @Get('pipeline/findings/:id/verify-prompt')
+  @ApiOperation({
+    summary:
+      "The Verifier's protocol for this finding's open PR, as plain text (pipeline only)",
+    description:
+      'Fetched by `bug-fix-session.yml` when dispatched with mode=verify (OPP-0779). A read-only ' +
+      "checklist over the PR on the Verifier's Gemini model: reproduce at base, pass at head, suite " +
+      'against base, diff against the brief, data-file counts, blast radius. Ends in a verdict PATCH.',
+  })
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async getVerifyFixPrompt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('runId') runId: string,
+    @Query('repo') repo?: string,
+  ): Promise<string> {
+    const finding = await this.bugFindingService.getOne(id);
+    const targetRepo = repo ?? finding.repo ?? '';
+    if (!finding.prUrl) {
+      throw new BadRequestException(
+        'This finding has no pull request to verify.',
+      );
+    }
+    const prNumber = prNumberFrom(finding.prUrl);
+    if (!prNumber) {
+      throw new BadRequestException(
+        `Could not read a PR number out of ${finding.prUrl}.`,
+      );
+    }
+    const dispatched = finding.metadata?.verifyFix ?? null;
+    const caseFile = await this.caseFileService.build(finding, {
+      currentRunId: runId,
+    });
+    return buildVerifyFixPrompt({
+      finding,
+      caseFile,
+      repo: targetRepo,
+      runId,
+      apiBaseUrl: this.configService.publicApiBaseUrl,
+      prUrl: finding.prUrl,
+      prNumber,
+      engine: dispatched?.counterpart?.engine ?? 'gemini',
+      model: dispatched?.counterpart?.model ?? 'gemini-2.5-pro',
+      fixEngine: dispatched?.fixEngine ?? null,
+    });
+  }
+
+  @Get('pipeline/findings/:id/case')
+  @ApiOperation({
+    summary:
+      "One bug's case file, for a stage that wants typed records rather than a rendered brief (pipeline only)",
+    description:
+      'The shared half of the dossier (OPP-0775): verdicts, sessions with structured attempts, ' +
+      'lineage, post-mortem, miss record, budget and totals. `runId` excludes the calling run ' +
+      'from the sessions, since it has done nothing yet.',
+  })
+  async getCaseFile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('runId') runId?: string,
+  ): Promise<BugCaseFile> {
+    const finding = await this.bugFindingService.getOne(id);
+    return this.caseFileService.build(finding, { currentRunId: runId });
+  }
+
+  @Get('pipeline/findings/:id/pr-body')
+  @ApiOperation({
+    summary:
+      "A fix PR's description, rendered from the case file, with two marker lines for the Fixer to fill (pipeline only)",
+    description:
+      'OPP-0784: the bug as filed, who verified it and how (the independent reproduction verbatim), ' +
+      'every orchestration decision and the cost so far come from the case file; the Fixer replaces ' +
+      'the two markers with the change in words and what it left untouched on purpose. The drawer ' +
+      'reads the same case file, so the PR and the drawer say the same thing. Returns Markdown.',
+  })
+  @Header('Content-Type', 'text/markdown; charset=utf-8')
+  async getPrBody(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('runId') runId?: string,
+  ): Promise<string> {
+    const finding = await this.bugFindingService.getOne(id);
+    const caseFile = await this.caseFileService.build(finding, {
+      currentRunId: runId,
+    });
+    return renderPrBody(caseFile, {
+      repo: finding.repo ?? 'unknown',
+      adminUrl: bugAdminUrl(this.configService.adminBaseUrl, finding.id),
+    });
+  }
+
+  @Post('pipeline/findings/:id/plan')
+  @ApiOperation({
+    summary:
+      'Report that this bug spans several repos, as an ordered plan (pipeline only)',
+    description:
+      'A fix session only has one repo checked out, so on finding that a ' +
+      'complete fix needs work elsewhere it reports the plan here instead of ' +
+      'landing half of it. Bug Hunter turns each step into its own finding and ' +
+      'drives them one at a time, then releases them in the same order. ' +
+      '**`steps` must be in dependency order** — the step that has to ship ' +
+      'first comes first. Idempotent: a retry returns the existing plan rather ' +
+      'than creating a second set of steps.',
+  })
+  async recordPlan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RecordBugFixPlanDto,
+  ): Promise<{ steps: BugFindingDto[] }> {
+    const steps = await this.bugFixSessionService.recordPlan(id, body.steps);
+    return { steps: steps.map(toFindingDto) };
+  }
+
+  @Post('runs')
+  @ApiOperation({
+    summary:
+      'Start a run, or record a skipped run if the switch is off or (for a scheduled sweep) the repo has nothing new (pipeline only)',
+  })
+  @ApiResponse({ status: 400, description: 'Unrecognised `trigger`.' })
+  async startRun(@Body() body: StartBugHuntRunDto): Promise<{
+    runId: string | null;
+    mode: string | null;
+    skippedReason?: 'disabled' | 'quiet';
+  }> {
+    const mode = await this.bugHunterService.requireEnabledOrRecordSkip(
+      body.trigger,
+      body.repo,
+    );
+    if (!mode) return { runId: null, mode: null, skippedReason: 'disabled' };
+
+    const worthSweeping =
+      await this.bugHunterService.requireWorthSweepingOrRecordSkip(
+        body.trigger,
+        body.repo,
+      );
+    if (!worthSweeping) {
+      return { runId: null, mode, skippedReason: 'quiet' };
+    }
+
+    const run = await this.bugHunterService.startRun(body.trigger, body.repo);
+    return { runId: run.id, mode };
+  }
+
+  @Get('runs/:id/status')
+  @ApiOperation({
+    summary: 'Whether a run is still open (pipeline only)',
+    description:
+      'Read by each sweep workflow immediately after `claude -p` exits. The ' +
+      'CLI exits 0 whenever the agent produces a final response — including ' +
+      'when it ends its turn mid-protocol without closing its run — so a ' +
+      'green job is not evidence the sweep finished. A run still RUNNING at ' +
+      'that point was abandoned, and the workflow fails itself rather than ' +
+      'leaving it open forever. Deliberately narrower than the admin ' +
+      "controller's run detail: a CI gate needs the status and nothing else.",
+  })
+  async getRunStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ status: BugHuntRunStatus }> {
+    const run = await this.bugHunterService.getRun(id);
+    return { status: run.status };
+  }
+
+  @Post('runs/:id/findings')
+  @ApiOperation({
+    summary:
+      "Persist one Discover round's findings against a repo, deduped against still-open findings (pipeline only)",
+    description:
+      'Returns the persisted rows in the same order as the input — the ' +
+      'pipeline should zip each one back to its own in-memory finding and use ' +
+      '`.id` in every subsequent report/status call about it.',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'A finding carries an unrecognised `source`/`severity`, or no `description`. Nothing is persisted — retry the batch.',
+  })
+  async persistFindings(
+    @Param('id', ParseUUIDPipe) runId: string,
+    @Body() body: PersistBugFindingsDto,
+  ): Promise<{ items: BugFindingDto[] }> {
+    const findings = await this.bugFindingService.persistFindings(
+      runId,
+      body.repo,
+      body.findings,
+    );
+    // D3 (OPP-0781): verify, hold or drop each new unproven finding. Not
+    // awaited; the sweep carries on and the independent verifier at close
+    // only takes what is still NEW.
+    void this.finderService.triageNew(findings, runId);
+    return { items: findings.map(toFindingDto) };
+  }
+
+  @Patch('pipeline/findings/:id')
+  @ApiOperation({
+    summary:
+      'Transition a finding: dismiss on refute, fixing on fix-start, pr_opened/merged/failed on fix-finish, needs_input + a question on genuine escalation (pipeline only)',
+  })
+  @ApiResponse({ status: 400, description: 'Unrecognised `status`.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'The transition breaks an autonomy rule: fixing an unverified, low-confidence or unapproved-in-MANUAL finding, or merging a guarded-path, never-merges-here, over-cap or non-trivial change. The message says which and what to do instead.',
+  })
+  async patchFinding(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: PatchBugFindingDto,
+  ): Promise<BugFindingDto> {
+    // The Verifier's report (OPP-0779): checks in, verdict computed, stored
+    // on the case file, acted on. A verdict never changes status directly —
+    // the merge or the hand-off is the server's move, not the verifier's.
+    // The post-release check (link six): the symptom gone or back, nothing else.
+    if (body.heldCheck) {
+      const { heldCheck, ...rest } = body;
+      await this.verifyFindingsService.recordHeldCheck(id, heldCheck);
+      const hasMore = Object.values(rest).some((v) => v !== undefined);
+      if (!hasMore) {
+        return toFindingDto(await this.bugFindingService.getOne(id));
+      }
+      body = rest as PatchBugFindingDto;
+    }
+    if (body.findingVerdict) {
+      const { findingVerdict, ...rest } = body;
+      await this.verifyFindingsService.recordVerdict(id, findingVerdict);
+      const hasMore = Object.values(rest).some((v) => v !== undefined);
+      if (!hasMore) {
+        return toFindingDto(await this.bugFindingService.getOne(id));
+      }
+      body = rest as PatchBugFindingDto;
+    }
+    if (body.verdict) {
+      const { verdict, ...rest } = body;
+      await this.verifyFixService.recordVerdict(id, verdict);
+      const hasMore = Object.values(rest).some((v) => v !== undefined);
+      if (!hasMore) {
+        return toFindingDto(await this.bugFindingService.getOne(id));
+      }
+      body = rest as PatchBugFindingDto;
+    }
+    // The rules the sweep prompt states, enforced where the agent's write
+    // arrives — see BugHunterPolicyService. Human routes never pass through
+    // here, which is the point: a person's decision is what these defer to.
+    await this.policyService.assertTransitionAllowed(id, body);
+    const finding = await this.bugFindingService.setStatus(id, body);
+    // A fix reached its PR: the Verifier reads it next (OPP-0779). Not
+    // awaited — the fix session's PATCH is done; `dispatch` swallows its
+    // own failures and leaves the PR for a person if it cannot run.
+    if (body.status === BugFindingStatus.PR_OPENED) {
+      void this.verifyFixService.dispatch(id);
+    }
+    // A session gave up (OPP-0783): the orchestrator's D7 decides whether a
+    // stronger attempt goes in with the post-mortem, or a person is asked.
+    // Not awaited, and it swallows its own failures.
+    if (body.status === BugFindingStatus.FAILED) {
+      void this.orchestrator.onSessionFailed(id);
+    }
+    // The agent's own merge path. Its protocol merges with --delete-branch,
+    // so this usually finds the branch already gone; it is the backstop for a
+    // session that merged and then ran out of time before deleting
+    // (OPP-0750). Best-effort: the merge is recorded, a cleanup failure must
+    // not read to the runner as "the PATCH did not land".
+    if (body.status === BugFindingStatus.MERGED) {
+      try {
+        await this.bugFixSessionService.deleteBranchAfterAgentMerge(finding);
+      } catch {
+        // Logged inside the session service; nothing more to do here.
+      }
+    }
+    // A post-mortem's repo gotcha is a lesson about the repo, not the bug —
+    // exactly what the notebook is for. Written as a candidate for the hourly
+    // curator, like every agent-authored entry, and best-effort: the session
+    // has already recorded its failure, and a notebook write must not turn
+    // that into a 500 the runner reads as "the PATCH did not land".
+    const gotcha = body.postmortem?.repoGotcha?.trim();
+    if (gotcha && finding.repo) {
+      try {
+        await this.memoryService.write({
+          agent: AgentMemoryAgent.BUG_HUNTER,
+          body: `${finding.repo}: ${gotcha}`.slice(0, 600),
+          repos: [finding.repo],
+          tags: ['fix-gotcha', 'postmortem'],
+          runId: finding.runId ?? undefined,
+          findingId: finding.id,
+        });
+      } catch {
+        // Logged inside the memory service; nothing more to do here.
+      }
+    }
+    return toFindingDto(finding);
+  }
+
+  @Get('pipeline/findings/:id/answer')
+  @ApiOperation({
+    summary:
+      "Poll target for the fix agent's bounded escalation-wait loop (pipeline only)",
+  })
+  async getFindingAnswer(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ answered: boolean; answer: string | null }> {
+    return this.bugFindingService.getAnswerIfReady(id);
+  }
+
+  @Post('runs/:id/report')
+  @ApiOperation({
+    summary: 'Append one pipeline event to a run (pipeline only)',
+    description:
+      'An unrecognised `stage` is rejected with a 400 naming it, rather than ' +
+      "reaching the column's CHECK constraint and coming back as a generic " +
+      '500 — see ReportBugHuntEventDto for why this one route validates ' +
+      'strictly.',
+  })
+  @ApiResponse({ status: 400, description: 'Unrecognised `stage`.' })
+  async report(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ReportBugHuntEventDto,
+  ): Promise<BugHuntEventDto> {
+    // A fix session's study (stage `study`) is more than a timeline line: it
+    // is validated, read by a second model and stored on the finding, and the
+    // event's payload — which this response carries back — is the stored
+    // study WITH that review, so the session reads the concerns in the same
+    // round trip. A study missing a required field is a 400 naming it; the
+    // prompt tells the session to fix the body and post again.
+    let payload = body.payload;
+    if (body.stage === BugHuntEventStage.STUDY && body.findingId) {
+      const finding = await this.bugFindingService.getOne(body.findingId);
+      payload = (await this.studyService.record(
+        finding,
+        id,
+        body.payload,
+      )) as unknown as Record<string, any>;
+    }
+    return toEventDto(
+      await this.bugHunterService.appendEvent({ runId: id, ...body, payload }),
+    );
+  }
+
+  @Post('runs/:id/cost')
+  @ApiOperation({
+    summary:
+      "Attach this run's real per-model token usage from `claude -p --output-format json` (pipeline only)",
+    description:
+      'Called by the GitHub Actions runner after the sweep/fix-session ' +
+      'agent finishes, always AFTER the agent already closed this run via ' +
+      '/close — attaching cost to an already-closed run is the normal case. ' +
+      'Writes one `llm_usage` row per model and re-derives `totalTokenCostUsd`.',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Malformed `modelUsage`. Worth a real response: `recordActualCost` is best-effort and swallows its own failures, so a bad body used to drop this run's cost data with nothing but a log line.",
+  })
+  async recordCost(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RecordBugHuntRunCostDto,
+  ): Promise<{ totalTokenCostUsd: string }> {
+    await this.bugHunterService.recordActualCost(id, body);
+    const run = await this.bugHunterService.getRun(id);
+    return { totalTokenCostUsd: run.totalTokenCostUsd };
+  }
+
+  @Post('runs/:id/model')
+  @ApiOperation({
+    summary: 'Attach which CLI/model actually ran this run (pipeline only)',
+    description:
+      'Called by the "Resolve configured models" workflow step right after ' +
+      'it resolves `GET pipeline/models` — ally-be never learns this at ' +
+      'dispatch time, since the model is resolved independently inside the ' +
+      'CI workflow on every trigger path, including the nightly cron sweep. ' +
+      "Powers the findings list's model/provider label.",
+  })
+  async recordModel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RecordBugHuntRunModelDto,
+  ): Promise<{ engine: string; model: string }> {
+    await this.bugHunterService.recordResolvedModel(id, body);
+    return body;
+  }
+
+  @Post('runs/:id/close')
+  @ApiOperation({
+    summary: 'Close a run with final totals (pipeline only)',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Missing or unrecognised `status`. The run stays OPEN rather than being recorded as completed — see CloseBugHuntRunDto.',
+  })
+  async closeRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CloseBugHuntRunDto,
+  ): Promise<BugHuntRunDetailDto> {
+    const { status, errorMessage } = body;
+    // Omitting a total has always meant "leave it at zero"; naming the zeros
+    // is the same write, just no longer by way of an undefined the UPDATE
+    // happens to skip.
+    const totals = {
+      foundCount: body.foundCount ?? 0,
+      autoMergedCount: body.autoMergedCount ?? 0,
+      prOpenedCount: body.prOpenedCount ?? 0,
+      dismissedCount: body.dismissedCount ?? 0,
+    };
+    const run = await this.bugHunterService.closeRun(
+      id,
+      // Safe as a two-way branch only because CloseBugHuntRunDto has already
+      // refused anything that is not one of these two. It used to be reachable
+      // with any value at all, which quietly filed a failed sweep as
+      // COMPLETED.
+      status === 'failed'
+        ? BugHuntRunStatus.FAILED
+        : BugHuntRunStatus.COMPLETED,
+      totals,
+      errorMessage,
+    );
+    // A sweep closed: every unproven finding it kept now goes to the
+    // independent verifier on Gemini (OPP-0780). Not awaited; the
+    // service swallows its own failures and leaves findings pending.
+    if (
+      run.trigger === BugHuntTrigger.SCHEDULED ||
+      run.trigger === BugHuntTrigger.MANUAL ||
+      run.trigger === BugHuntTrigger.PR_REVIEW
+    ) {
+      void this.verifyFindingsService.dispatchForRun(run.id);
+    }
+    const { events } = await this.bugHunterService.getRunWithEvents(id);
+    return { ...toRunDto(run), events: events.map(toEventDto) };
+  }
+}
+
+/**
+ * Size a finder-data response for the context-lookup record: item count and
+ * serialised size. `null` (a repo with no log group) is zero items, which is
+ * the right reading of "asked, nothing there" — see `BugHuntContextLookup`.
+ */
+function measureList<T>(result: T[] | null): {
+  itemCount: number;
+  chars: number;
+} {
+  if (!result) return { itemCount: 0, chars: 0 };
+  return { itemCount: result.length, chars: JSON.stringify(result).length };
+}

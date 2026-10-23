@@ -1,0 +1,202 @@
+import { Module } from '@nestjs/common';
+import { ReleaseModule } from 'src/release/release.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { NotificationModule } from 'src/notification/notification.module';
+import { LogsModule } from 'src/logs/logs.module';
+import { GithubModule } from 'src/github/github.module';
+import { PromptModule } from 'src/prompt/prompt.module';
+import { LlmUsageModule } from 'src/analytics/llm-usage.module';
+import { RoadmapOpportunity } from 'src/product-roadmap/entity/roadmap-opportunity.entity';
+import { User } from 'src/user/entity/user.entity';
+import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
+import { GlobalSettingsRepository } from 'src/settings/repository/global-settings.repository';
+import { PosthogQueryService } from 'src/ux-signals/service/posthog-query.service';
+import { AgentMemoryModule } from 'src/agent-memory/agent-memory.module';
+
+import { BugHunterController } from './controller/bug-hunter.controller';
+import { BugHunterPipelineController } from './controller/bug-hunter-pipeline.controller';
+import { BugHuntRun } from './entity/bug-hunt-run.entity';
+import { BugHuntEvent } from './entity/bug-hunt-event.entity';
+import { BugHunterSettings } from './entity/bug-hunter-settings.entity';
+import { BugFinding } from './entity/bug-finding.entity';
+import { BugHunterNotification } from './entity/bug-hunter-notification.entity';
+import { BugHuntPhaseTiming } from './entity/bug-hunt-phase.entity';
+import { BugHuntContextLookup } from './entity/bug-hunt-context-lookup.entity';
+import { BugHuntRunRepository } from './repository/bug-hunt-run.repository';
+import {
+  BugHuntContextLookupRepository,
+  BugHuntPhaseRepository,
+} from './repository/bug-hunt-telemetry.repository';
+import { BugHunterTelemetryService } from './service/bug-hunter-telemetry.service';
+import { BugHunterEvalRun } from './entity/bug-hunter-eval-run.entity';
+import { BugHunterEvalRunRepository } from './repository/bug-hunter-eval-run.repository';
+import { BugHunterEvalService } from './service/bug-hunter-eval.service';
+import { BugHunterPolicyService } from './service/bug-hunter-policy.service';
+import { BugHunterDossierService } from './service/bug-hunter-dossier.service';
+import { BugHunterMemoryRetirementService } from './service/bug-hunter-memory-retirement.service';
+import { BugHuntEventRepository } from './repository/bug-hunt-event.repository';
+import { BugHunterSettingsRepository } from './repository/bug-hunter-settings.repository';
+import { BugFindingRepository } from './repository/bug-finding.repository';
+import { BugHunterNotificationRepository } from './repository/bug-hunter-notification.repository';
+import { BugHuntSweepService } from './service/bug-hunt-sweep.service';
+import { BugHunterService } from './service/bug-hunter.service';
+import { BugFindingService } from './service/bug-finding.service';
+import { BugHunterFinderDataService } from './service/bug-hunter-finder-data.service';
+import { BugHunterMetricsService } from './service/bug-hunter-metrics.service';
+import { BugFixSessionService } from './service/bug-fix-session.service';
+import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { BugHunterRepoClassifierService } from './service/bug-hunter-repo-classifier.service';
+import { BugHunterMissClassifierService } from './service/bug-hunter-miss-classifier.service';
+import { BugFixStudyService } from './service/bug-fix-study.service';
+import { BugHunterWrongFixService } from './service/bug-hunter-wrong-fix.service';
+import { BugHunterHeldWatchService } from './service/bug-hunter-held-watch.service';
+import { BugCaseBudgetService } from './service/bug-case-budget.service';
+import { BugCaseFileService } from './service/bug-case-file.service';
+import { BugVerifyFixService } from './service/bug-verify-fix.service';
+import { BugVerifyFindingsService } from './service/bug-verify-findings.service';
+import { BugHunterDecisionService } from './service/bug-hunter-decision.service';
+import { BugHunterDecisionReplayService } from './service/bug-hunter-decision-replay.service';
+import { BugFixPlanService } from './service/bug-fix-plan.service';
+import { BugHunterOrchestratorService } from './service/bug-hunter-orchestrator.service';
+import { BugHunterProtectionDriftService } from './service/bug-hunter-protection-drift.service';
+import { BugHunterPrReviewService } from './service/bug-hunter-pr-review.service';
+import { BugHunterScoreboardService } from './service/bug-hunter-scoreboard.service';
+import { BugHunterFinderService } from './service/bug-hunter-finder.service';
+import { BugHunterTodayService } from './service/bug-hunter-today.service';
+import { BugHuntDecision } from './entity/bug-hunt-decision.entity';
+import { BugHunterNotificationService } from './service/bug-hunter-notification.service';
+import { BugFixSessionSchedulerRegistrationService } from './service/bug-fix-session-scheduler-registration.service';
+import { BugHunterModelSettingsService } from './service/bug-hunter-model-settings.service';
+import { BugHunterFeatureMap } from './entity/bug-hunter-feature-map.entity';
+import { BugHunterFeatureMapRepository } from './repository/bug-hunter-feature-map.repository';
+import { BugHunterProbeService } from './service/bug-hunter-probe.service';
+import { BugHunterPrecedentService } from './service/bug-hunter-precedent.service';
+import { BugHunterFeatureMapService } from './service/bug-hunter-feature-map.service';
+import { BugHunterKnowledgeService } from './service/bug-hunter-knowledge.service';
+
+/**
+ * Bug Hunter: the kill switch, the comprehensive findings table, run history,
+ * and event transcript for the autonomous find-and-fix agent. Off by default
+ * — see the introducing migration and `BugHunterSettings`.
+ *
+ * This module owns none of the actual bug-finding/fixing logic: that lives in
+ * the external `.claude/workflows/bug-hunt.mjs` Claude Code pipeline, which
+ * calls this module's HTTP surface to check the switch, open/close runs,
+ * persist/transition findings, and report each pipeline step. Keeping the two
+ * separate means this module has no dependency on Claude Code tooling and can
+ * be tested like any other NestJS module.
+ *
+ * No import of ProductRoadmapModule: `BugFinding` is registered here for
+ * `@InjectRepository` in RoadmapOpportunityService too (see its `create()`),
+ * the same cross-domain-entity pattern that file already uses for `User` —
+ * importing this whole module there would risk the circular-import trap this
+ * codebase has been bitten by before (see ally-be/CLAUDE.md's gotchas). The
+ * same trick runs in the other direction too: `RoadmapOpportunity` is
+ * registered here, just the entity and not ProductRoadmapModule, so
+ * `BugFindingService` and `BugFixSessionService` can release the linked
+ * roadmap opportunity the moment a reported bug's finding merges — by
+ * whichever of the three merge routes gets there first (see the shared
+ * `releaseLinkedRoadmapOpportunity` util).
+ *
+ * `GlobalSettingsRepository` is registered locally, same reasoning as
+ * `WhatsAppModule`: `SettingsModule` does not export it, and a TypeORM
+ * repository is a stateless wrapper over the shared DataSource, so a second
+ * instance over the same entity is safe. It backs
+ * `BugHunterModelSettingsService` — the sweep/fix-session model tiers live
+ * there rather than as new columns on `BugHunterSettings`, so this feature
+ * doesn't repeat the bespoke-settings-table pattern Builder's own
+ * `builder_settings` already copied from this module.
+ */
+@Module({
+  imports: [
+    ReleaseModule,
+    GithubModule,
+    TypeOrmModule.forFeature([
+      BugHuntRun,
+      BugHuntEvent,
+      BugHunterSettings,
+      BugFinding,
+      BugHunterNotification,
+      BugHuntPhaseTiming,
+      BugHuntContextLookup,
+      BugHunterEvalRun,
+      BugHuntDecision,
+      BugHunterFeatureMap,
+      RoadmapOpportunity,
+      // Read-only, for resolving reporter and stage-pinner names — see
+      // BugFindingService.enrich. Raw repository rather than an import of
+      // UserModule, matching how RoadmapOpportunity is taken here: the point is
+      // to avoid pulling a module graph in for two `SELECT name` lookups.
+      User,
+      GlobalSettings,
+    ]),
+    NotificationModule,
+    LogsModule,
+    PromptModule,
+    LlmUsageModule,
+    LlmAgentModule,
+    // The notebook Bug Hunter reads before hunting and writes at close — see
+    // docs/bug-hunter-memory-adr.md. Exposed here on Bug Hunter's own two auth
+    // surfaces rather than by AgentMemoryModule itself.
+    AgentMemoryModule,
+  ],
+  controllers: [BugHunterController, BugHunterPipelineController],
+  providers: [
+    BugHuntSweepService,
+    BugHuntRunRepository,
+    BugHuntEventRepository,
+    BugHunterSettingsRepository,
+    GlobalSettingsRepository,
+    BugFindingRepository,
+    BugHunterNotificationRepository,
+    BugHuntPhaseRepository,
+    BugHuntContextLookupRepository,
+    BugHunterEvalRunRepository,
+    BugHunterFeatureMapRepository,
+    BugHunterService,
+    BugHunterTelemetryService,
+    BugHunterEvalService,
+    BugHunterPolicyService,
+    BugCaseBudgetService,
+    BugCaseFileService,
+    BugVerifyFixService,
+    BugVerifyFindingsService,
+    BugHunterDecisionService,
+    BugHunterDecisionReplayService,
+    BugHunterScoreboardService,
+    BugHunterFinderService,
+    BugFixPlanService,
+    BugHunterOrchestratorService,
+    BugHunterProtectionDriftService,
+    BugHunterPrReviewService,
+    BugHunterTodayService,
+    BugHunterDossierService,
+    BugHunterMemoryRetirementService,
+    BugFindingService,
+    // Provided directly rather than importing UxSignalsModule: it constructs
+    // itself from the global AppConfigModule alone, so this costs nothing and
+    // avoids pulling that module's whole detector/writer graph in for one
+    // HTTP client — the same reasoning UxSignalsModule itself gives for
+    // providing BugFindingRepository directly instead of importing this
+    // module (see that module's own doc).
+    PosthogQueryService,
+    BugHunterFinderDataService,
+    BugHunterMetricsService,
+    BugHunterNotificationService,
+    BugFixSessionService,
+    BugHunterRepoClassifierService,
+    BugHunterMissClassifierService,
+    BugFixStudyService,
+    BugHunterWrongFixService,
+    BugHunterHeldWatchService,
+    BugHunterProbeService,
+    BugHunterPrecedentService,
+    BugHunterFeatureMapService,
+    BugHunterKnowledgeService,
+    BugFixSessionSchedulerRegistrationService,
+    BugHunterModelSettingsService,
+  ],
+  exports: [BugHunterService, BugFindingService, BugHunterNotificationService],
+})
+export class BugHunterModule {}

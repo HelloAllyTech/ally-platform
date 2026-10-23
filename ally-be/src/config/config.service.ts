@@ -1,0 +1,1188 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { TIME } from '../common/constants/time.constants';
+import {
+  BUILDER_MODEL_DEFAULTS,
+  BUILDER_WORKFLOW_REF,
+} from '../builder/constants/builder.constants';
+import {
+  LLM_TIER_ENV_VAR,
+  LLM_TIER_FLOOR,
+  LlmModelTier,
+} from '../llm/constants/llm-tier.constants';
+
+export type AwsLogServiceKey = 'ally-be' | 'ally-ai' | 'ally-ai-learn';
+
+@Injectable()
+export class AppConfigService {
+  constructor(private configService: ConfigService) {}
+
+  get port(): number {
+    return this.configService.get<number>('PORT', 8001);
+  }
+
+  get nodeEnv(): string {
+    return this.configService.get<string>('NODE_ENV', 'development');
+  }
+
+  get logLevel(): string {
+    return this.configService.get<string>('LOG_LEVEL', 'warn');
+  }
+
+  get apiKey(): string {
+    return this.configService.get<string>('API_KEY', '');
+  }
+
+  /**
+   * PAT (or GitHub App installation token) used to dispatch Bug Hunter fix
+   * sessions and production releases. Empty on environments that should not
+   * write into CI — every caller checks `GithubActionsService.isConfigured`
+   * and refuses cleanly rather than failing mid-dispatch.
+   */
+  get githubToken(): string {
+    return this.configService.get<string>('GITHUB_TOKEN', '');
+  }
+
+  get githubOrg(): string {
+    return this.configService.get<string>('GITHUB_ORG', 'HelloAllyTech');
+  }
+
+  /**
+   * Auth token for the ally-mobile GitHub Actions / Contents API calls behind
+   * the super-duper-admin Mobile Releases page. Deliberately separate from
+   * `githubToken` (Bug Hunter/Builder's write-scoped dispatch token) — this
+   * page only ever reads, so it gets its own, narrower credential. Empty on
+   * environments that haven't set it — MobileReleasesService refuses cleanly
+   * rather than calling GitHub with no auth.
+   */
+  get githubActionsToken(): string {
+    return this.configService.get<string>('GITHUB_ACTIONS_TOKEN', '');
+  }
+
+  /**
+   * Read-only token for fetching `ally-changelog`'s CHANGELOG.md, which IS the
+   * public changelog feed — there is no database copy of it any more. The repo
+   * is private, so an unauthenticated read gets a 404.
+   *
+   * Falls back to `githubToken` because every environment that already runs
+   * Bug Hunter has one, and a read is strictly narrower than what that token
+   * already does. Set `GITHUB_CHANGELOG_TOKEN` to something scoped to
+   * `Contents: read` on that one repo to keep the public page off the
+   * write-scoped credential. Empty on environments with neither, where
+   * `GET /v1/changelog/public` answers 503 rather than an empty feed —
+   * "we cannot reach it" and "there is nothing to say" are different.
+   */
+  get changelogSourceToken(): string {
+    return (
+      this.configService.get<string>('GITHUB_CHANGELOG_TOKEN', '') ||
+      this.githubToken
+    );
+  }
+
+  /**
+   * Feature-level product updates (src/product-updates).
+   *
+   * - `enabled` gates the half-hourly pipeline and the daily digest. Off by
+   *   default: the pipeline calls GitHub and a model on a schedule, so an
+   *   environment opts in rather than discovering it on its bill.
+   * - `startAt` is the oldest journal entry turned into an update. The journal
+   *   began on 2026-08-13; the default replays all of it.
+   * - `digestTo` is who gets the daily email (comma-separated). Empty means no
+   *   email, even when enabled.
+   * - `digestHour` is the business-timezone (IST) hour it goes out.
+   */
+  get productUpdates() {
+    const start = new Date(
+      this.configService.get<string>(
+        'PRODUCT_UPDATES_START',
+        '2026-08-13T00:00:00Z',
+      ),
+    );
+    const hour = Number(
+      this.configService.get<string>('PRODUCT_UPDATES_DIGEST_HOUR', '18'),
+    );
+    return {
+      enabled:
+        String(
+          this.configService.get<string>('PRODUCT_UPDATES_ENABLED', 'false'),
+        ) === 'true',
+      startAt: Number.isNaN(start.getTime())
+        ? new Date('2026-08-13T00:00:00Z')
+        : start,
+      digestTo: (
+        this.configService.get<string>('PRODUCT_UPDATES_DIGEST_TO') ?? ''
+      )
+        .split(',')
+        .map((address) => address.trim())
+        .filter(Boolean),
+      digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
+    };
+  }
+
+  get githubMobileRepo(): string {
+    return this.configService.get<string>(
+      'GITHUB_MOBILE_REPO',
+      'HelloAllyTech/ally-mobile',
+    );
+  }
+
+  /**
+   * App Store Connect API credentials, for the super-duper-admin Mobile
+   * Releases page's read-only iOS TestFlight status endpoint. Brand new to
+   * ally-be — these secrets previously only existed as GitHub Actions
+   * secrets on HelloAllyTech/ally-mobile (a separate secrets store) for
+   * scripts/promote-ios-testflight.mjs, and must be provisioned here
+   * separately with the same values before that endpoint will work. All
+   * empty-string-default like githubActionsToken — MobileReleasesService
+   * refuses cleanly rather than minting a JWT with missing credentials.
+   */
+  get appStoreConnect() {
+    return {
+      issuerId: this.configService.get<string>('APPSTORE_ISSUER_ID', ''),
+      apiKeyId: this.configService.get<string>('APPSTORE_API_KEY_ID', ''),
+      privateKey: this.configService.get<string>(
+        'APPSTORE_API_PRIVATE_KEY',
+        '',
+      ),
+      testflightExternalGroupName: this.configService.get<string>(
+        'TESTFLIGHT_EXTERNAL_GROUP_NAME',
+        '',
+      ),
+    };
+  }
+
+  /**
+   * Play Developer API service account, for the super-duper-admin Mobile
+   * Releases page's Android auto-minimum-version-bump task. Same
+   * dual-provisioning caveat as appStoreConnect above: this previously only
+   * existed as an ally-mobile GitHub Actions secret (a separate secrets
+   * store) for scripts/promote-android-release.mjs, and must be provisioned
+   * here separately with the same JSON value before this feature will work.
+   * Empty-string default — MobileReleasesService refuses cleanly rather than
+   * authenticating with no credentials.
+   */
+  get androidPublisher() {
+    return {
+      serviceAccountJson: this.configService.get<string>(
+        'ANDROID_SERVICE_ACCOUNT_JSON',
+        '',
+      ),
+    };
+  }
+
+  /**
+   * Explicit kill switch for the Android auto-minimum-version-bump task,
+   * default OFF. Unlike the iOS equivalent (safe by construction —
+   * READY_FOR_DISTRIBUTION only ever means genuinely live), the Android
+   * signal this task relies on (production track status: 'completed') is
+   * only trustworthy once Managed Publishing is turned OFF for this app in
+   * Play Console — with it on, a track's status reflects what was
+   * committed, not what Google's review-then-manual-publish gate has
+   * actually released. Flip ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED=true only
+   * after confirming that in Play Console; the task no-ops (not errors)
+   * while this is unset.
+   *
+   * SECOND, SEPARATE PRECONDITION, confirmed live: this task authenticates
+   * as the same ANDROID_SERVICE_ACCOUNT_JSON identity the release pipeline's
+   * uploads/promotions use, and the Play Developer API invalidates a service
+   * account's other open edits the instant a new one is created (Google's
+   * own concurrency-considerations docs). A tick landing mid-upload can kill
+   * that upload's edit out from under it — this already broke a real build
+   * once, from this same module's read-only status endpoint, before this
+   * task was even enabled. Do not flip this on until ally-be reads via a
+   * SEPARATE, read-only-scoped service account from the one CI writes with.
+   */
+  get androidMinVersionAutoBumpEnabled(): boolean {
+    return (
+      this.configService.get<string>(
+        'ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED',
+        'false',
+      ) === 'true'
+    );
+  }
+
+  /**
+   * Base URL a GitHub-hosted runner can reach this API on, handed to the
+   * fix-session workflow so it can report progress back. Falls back to the
+   * local port purely so a dev environment fails with an obvious connection
+   * error instead of a confusing undefined-URL one.
+   */
+  /**
+   * Where Builder checks a service is healthy after releasing it, by release
+   * target (RELEASE_TARGETS key). BUILDER_HEALTH_URLS (JSON) overrides; a
+   * target with no URL is reported as not checked, never as healthy.
+   */
+  get builderHealthUrls(): Record<string, string> {
+    const defaults: Record<string, string> = {
+      'ally-be': `${this.publicApiBaseUrl}/api/health`,
+      'ally-web:admin': 'https://admin.helloally.ai',
+    };
+    try {
+      const raw = this.configService.get<string>('BUILDER_HEALTH_URLS', '');
+      return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+    } catch {
+      return defaults;
+    }
+  }
+
+  get publicApiBaseUrl(): string {
+    return this.configService.get<string>(
+      'PUBLIC_API_BASE_URL',
+      `http://localhost:${this.port}`,
+    );
+  }
+
+  get isDevelopment(): boolean {
+    return this.nodeEnv === 'development';
+  }
+
+  get isLocal(): boolean {
+    return this.nodeEnv === 'local';
+  }
+
+  get database() {
+    const config = {
+      host: this.configService.get<string>('DB_HOST'),
+      port: this.configService.get<number>('DB_PORT'),
+      username: this.configService.get<string>('DB_USERNAME'),
+      password: this.configService.get<string>('DB_PASSWORD'),
+      database: this.configService.get<string>('DB_DATABASE'),
+    };
+
+    return config;
+  }
+
+  get ai() {
+    return {
+      apiUrl: this.configService.get<string>('AI_SERVICE_API_URL'),
+      learnApiUrl: this.configService.get<string>('AI_LEARN_SERVICE_API_URL'),
+      sentenceCompletionRequired:
+        this.configService.get<string>('SENTENCE_COMPLETION_REQUIRED') ===
+        'true',
+      // outbound key (BE -> AI) for x-api-key header
+      outboundApiKey: this.configService.get<string>(
+        'AI_SERVICE_OUTBOUND_API_KEY',
+      ),
+      learnOutboundApiKey: this.configService.get<string>(
+        'AI_LEARN_SERVICE_OUTBOUND_API_KEY',
+      ),
+    };
+  }
+
+  get jwt() {
+    return {
+      accessToken: {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: this.configService.get<string>(
+          'JWT_ACCESS_EXPIRES_IN',
+          '1d',
+        ),
+      },
+      refreshToken: {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.configService.get<string>(
+          'JWT_REFRESH_EXPIRES_IN',
+          '7d',
+        ),
+        ttlDays: this.configService.get<number>('REFRESH_TOKEN_TTL_DAYS', 7),
+      },
+    };
+  }
+
+  /**
+   * Optional dedicated secret for text-helpline guest tokens (anonymous
+   * talkers). Empty when unset, and that is a supported configuration:
+   * `HelplineGuestTokenService` then derives one as
+   * HMAC-SHA256(JWT_ACCESS_SECRET, 'helpline-guest-v1'). Either way it is
+   * never the access secret itself, so `JwtStrategy` cannot accept a guest
+   * token. Deliberately not `.required()` in env.validation.ts.
+   */
+  get helplineGuestJwtSecret(): string {
+    return this.configService.get<string>('HELPLINE_GUEST_JWT_SECRET', '');
+  }
+
+  get slack() {
+    return {
+      botToken: this.configService.get<string>('SLACK_BOT_TOKEN'),
+      channel: this.configService.get<string>('SLACK_CHANNEL'),
+      /**
+       * Verifies that an inbound interaction really came from Slack.
+       *
+       * Unset means inbound Slack is off, and the endpoint refuses everything.
+       * That is the safe default: without this secret there is no way to tell
+       * a real button click from anyone on the internet posting the same JSON
+       * at a URL that merges to master.
+       */
+      signingSecret: this.configService.get<string>('SLACK_SIGNING_SECRET'),
+    };
+  }
+
+  get rateLimit() {
+    return {
+      otp: {
+        ttl: this.configService.get<number>(
+          'THROTTLE_TTL_OTP',
+          TIME.MINUTE_IN_MS * 10,
+        ),
+        limit: this.configService.get<number>('THROTTLE_LIMIT_OTP', 5),
+      },
+    };
+  }
+
+  get redis() {
+    return {
+      host: this.configService.get<string>('REDIS_HOST'),
+      port: this.configService.get<number>('REDIS_PORT', 6379),
+      prefix: this.configService.get<string>('REDIS_PREFIX', 'ally'),
+    };
+  }
+
+  /**
+   * Base64-encoded Firebase service-account JSON, used by `PushService` to
+   * send FCM data messages (engagement reminders today). Empty on
+   * environments that haven't set it up — `PushService` no-ops rather than
+   * throwing, same pattern as `githubToken`/`githubActionsToken` above.
+   */
+  get firebaseServiceAccountJsonBase64(): string {
+    return this.configService.get<string>(
+      'FIREBASE_SERVICE_ACCOUNT_JSON_BASE64',
+      '',
+    );
+  }
+
+  get aws() {
+    return {
+      region: this.configService.get<string>('AWS_REGION'),
+      accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID'),
+      secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY'),
+      sessionToken: this.configService.get<string>('AWS_SESSION_TOKEN'),
+      endpointUrl: this.configService.get<string>('AWS_ENDPOINT_URL'),
+    };
+  }
+
+  /**
+   * CloudWatch log group per service, for the super-duper-admin Logs viewer.
+   * Unset until infra supplies the real group names — callers must surface a
+   * clear "not configured" error rather than querying an empty group name.
+   */
+  get awsLogs() {
+    return {
+      logGroups: {
+        'ally-be': this.configService.get<string>('AWS_LOG_GROUP_ALLY_BE'),
+        'ally-ai': this.configService.get<string>('AWS_LOG_GROUP_ALLY_AI'),
+        'ally-ai-learn': this.configService.get<string>(
+          'AWS_LOG_GROUP_ALLY_AI_LEARN',
+        ),
+      } as Record<AwsLogServiceKey, string | undefined>,
+    };
+  }
+
+  /** Local/dev only: bypass S3 for scenario cover image presign. */
+  get isMockScenarioCoverImageUpload(): boolean {
+    return (
+      this.configService.get<string>('MOCK_SCENARIO_COVER_IMAGE_UPLOAD') ===
+      'true'
+    );
+  }
+
+  get mockScenarioCoverImageUrl(): string {
+    const url = this.configService.get<string>('MOCK_SCENARIO_COVER_IMAGE_URL');
+    if (url?.trim()) {
+      return url.trim();
+    }
+    return 'https://placehold.co/1920x1080/png?text=Local+dev+cover';
+  }
+
+  get email() {
+    return {
+      sourceEmail: this.configService.get<string>('SOURCE_EMAIL'),
+      ses: {
+        region: this.configService.get<string>('SMTP_REGION'),
+        accessKeyId: this.configService.get<string>('SMTP_ACCESS_KEY_ID'),
+        secretAccessKey: this.configService.get<string>(
+          'SMTP_SECRET_ACCESS_KEY',
+        ),
+      },
+    };
+  }
+
+  get otp() {
+    return {
+      ttl: this.configService.get<number>(
+        'OTP_TTL',
+        TIME.MINUTE_IN_SECONDS * 5,
+      ),
+    };
+  }
+
+  /**
+   * PostHog product analytics. Optional on every environment: with no API key
+   * the client is built disabled (see `PostHogModule`), so local, CI and test
+   * runs capture nothing instead of failing at startup.
+   */
+  get posthog() {
+    return {
+      apiKey: this.configService.get<string>('POSTHOG_API_KEY', ''),
+      host: this.configService.get<string>(
+        'POSTHOG_HOST',
+        'https://us.i.posthog.com',
+      ),
+    };
+  }
+
+  get analytics() {
+    return {
+      integration: this.configService.get<string>('ANALYTICS_INTEGRATION'),
+      metabase: {
+        url: this.configService.get<string>('METABASE_URL')!,
+        apiKey: this.configService.get<string>('METABASE_API_KEY')!,
+      },
+    };
+  }
+
+  get sqs() {
+    return {
+      region: this.configService.get<string>('AWS_REGION', 'us-east-1'),
+      transcription: {
+        requestQueueUrl: this.configService.get<string>(
+          'SQS_TRANSCRIPTION_REQUEST_QUEUE_URL',
+        ),
+        requestDlqUrl: this.configService.get<string>(
+          'SQS_TRANSCRIPTION_REQUEST_DLQ_URL',
+        ),
+      },
+      audioFile: {
+        retryQueueUrl: this.configService.get<string>(
+          'SQS_AUDIO_FILE_RETRY_QUEUE_URL',
+        ),
+        retryDlqUrl: this.configService.get<string>(
+          'SQS_AUDIO_FILE_RETRY_DLQ_URL',
+        ),
+      },
+      learn: {
+        messageAndEventQueueUrl: this.configService.get<string>(
+          'SQS_LEARN_MESSAGE_AND_EVENT_QUEUE_URL',
+        ),
+      },
+      labRun: {
+        queueUrl: this.configService.get<string>('SQS_LAB_RUN_QUEUE_URL'),
+        dlqUrl: this.configService.get<string>('SQS_LAB_RUN_DLQ_URL'),
+      },
+      knowledgeBase: {
+        ingestQueueUrl: this.configService.get<string>(
+          'SQS_KB_INGEST_QUEUE_URL',
+        ),
+        ingestDlqUrl: this.configService.get<string>('SQS_KB_INGEST_DLQ_URL'),
+      },
+      whatsapp: {
+        inboundQueueUrl: this.configService.get<string>(
+          'SQS_WHATSAPP_INBOUND_QUEUE_URL',
+        ),
+        inboundDlqUrl: this.configService.get<string>(
+          'SQS_WHATSAPP_INBOUND_DLQ_URL',
+        ),
+      },
+    };
+  }
+
+  /**
+   * WhatsApp Business Cloud API credentials.
+   *
+   * All optional so the service boots without them — the bot is off until configured, and the
+   * settings row's `enabled` flag is the actual switch. `appSecret` missing makes the webhook fail
+   * CLOSED rather than accept unsigned requests.
+   */
+  get whatsapp() {
+    return {
+      /** Verifies the webhook-registration handshake (hub.verify_token). Chosen by us. */
+      verifyToken: this.configService.get<string>('WHATSAPP_VERIFY_TOKEN'),
+      /** Meta app secret; keys the X-Hub-Signature-256 HMAC. */
+      appSecret: this.configService.get<string>('WHATSAPP_APP_SECRET'),
+      /** The sending number's id, not the number itself. */
+      phoneNumberId: this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID'),
+      accessToken: this.configService.get<string>('WHATSAPP_ACCESS_TOKEN'),
+      /**
+       * The WhatsApp Business Account the number belongs to. Optional: nothing on the message path
+       * reads it. The admin connection check uses it to confirm the Meta app is subscribed to the
+       * account's webhooks — the one setup step whose omission is completely silent (the webhook
+       * handshake succeeds, and then no message ever arrives).
+       */
+      businessAccountId: this.configService.get<string>(
+        'WHATSAPP_BUSINESS_ACCOUNT_ID',
+      ),
+      /**
+       * v25.0 expires 2028-07-29. v21.0, the original default, expires 2027-01-21 — after which
+       * every send fails. Meta publishes the schedule at developers.facebook.com/docs/graph-api/changelog/versions.
+       */
+      graphApiVersion: this.configService.get<string>(
+        'WHATSAPP_GRAPH_API_VERSION',
+        'v25.0',
+      ),
+    };
+  }
+  get s3() {
+    return {
+      audioBucket: this.configService.get<string>('AUDIO_STORAGE_S3_BUCKET'),
+      learnMediaPublicBucket: this.configService.get<string>(
+        'LEARN_MEDIA_PUBLIC_S3_BUCKET',
+      ),
+      assetsBucket: this.configService.get<string>('ASSETS_S3_BUCKET'),
+    };
+  }
+
+  get audioStorage() {
+    return {
+      dir: this.configService.get<string>('AUDIO_STORAGE_DIR'),
+    };
+  }
+
+  get cloudTelephony() {
+    return {
+      credentialsEncryptionKey: this.configService.get<string>(
+        'CLOUD_TELEPHONY_CREDENTIALS_ENCRYPTION_KEY',
+      ),
+    };
+  }
+
+  get ozonetel() {
+    return {
+      apiUrl: this.configService.get<string>('OZONETEL_API_URL'),
+    };
+  }
+
+  get api() {
+    return {
+      baseUrl: this.configService.get<string>('API_BASE_URL'),
+    };
+  }
+
+  get testAccounts() {
+    return this.configService.get<string>('TEST_ACCOUNTS');
+  }
+
+  get phiData() {
+    return {
+      phiDataEncryptionKey: this.configService.get<string>(
+        'PHI_DATA_ENCRYPTION_KEY',
+      ),
+    };
+  }
+
+  get cors() {
+    const origins = this.configService.get('ALLOWED_ORIGINS', '');
+    return {
+      allowedOrigins: origins ? origins.split(',') : [],
+    };
+  }
+
+  get livekit() {
+    const agentName = this.configService.get<string>(
+      'LIVEKIT_AGENT_NAME',
+      'Agent',
+    );
+    return {
+      apiKey: this.configService.get<string>('LIVEKIT_API_KEY'),
+      apiSecret: this.configService.get<string>('LIVEKIT_API_SECRET'),
+      serverUrl: this.configService.get<string>('LIVEKIT_URL'),
+      environment: this.configService.get<string>('LIVEKIT_ENVIRONMENT'),
+      agentName,
+      // Second agent that plays the counselor side in superadmin V2V test
+      // sessions; dispatched into the same room under this name.
+      simulatedUserAgentName: this.configService.get<string>(
+        'SIMULATED_USER_AGENT_NAME',
+        'SimulatedUser',
+      ),
+    };
+  }
+
+  /**
+   * When true, frontend can trigger agent dispatch (for local dev when webhook unreachable).
+   * Only enabled by explicit env var or NODE_ENV=local. Not enabled for NODE_ENV=development,
+   * so dev server (webhook reachable) does not double-dispatch and cause voice echo.
+   */
+  get allowDirectAgentDispatch(): boolean {
+    const explicit =
+      this.configService.get<boolean>('ALLOW_DIRECT_AGENT_DISPATCH') === true;
+    const isLocalOnly = this.nodeEnv === 'local';
+    return explicit || isLocalOnly;
+  }
+
+  /**
+   * When true, LiveKit room + dispatch metadata carry only a fetch pointer
+   * (learn_room_metadata webhook) instead of the full ~180KB scenario
+   * envelope, which otherwise rides inside every agent availability request
+   * and can blow LiveKit's 3s dispatch window. Requires an agent build that
+   * understands `metadataFetch` (ally-ai-learn >= 1.26); flip only after the
+   * agent is deployed.
+   */
+  get learnMetadataFetchEnabled(): boolean {
+    // Env values arrive as strings (this key is not in the Joi schema, so
+    // nothing coerces it) — compare like the featureFlag getters, NOT like
+    // allowDirectAgentDispatch's `get<boolean>() === true`, which reads the
+    // string 'true' as false.
+    return (
+      this.configService.get<string>(
+        'LEARN_METADATA_FETCH_ENABLED',
+        'false',
+      ) === 'true'
+    );
+  }
+
+  get app() {
+    return {
+      baseUrl: this.configService.get<string>('APP_BASE_URL'),
+      adminBaseUrl: this.configService.get<string>('ADMIN_APP_BASE_URL'),
+    };
+  }
+
+  get simulationCredits() {
+    return {
+      lifespanSecondsPerCredit: this.configService.get<number>(
+        'SIMULATION_SESSION_SECONDS_PER_CREDIT',
+      ),
+    };
+  }
+
+  get simulationConcurrency() {
+    return {
+      maxConcurrentSimulations: this.configService.get<number>(
+        'MAX_CONCURRENT_SIMULATIONS',
+        100,
+      ),
+    };
+  }
+
+  get simulationPath() {
+    return {
+      simulationPathItemMinDurationForCompletion:
+        this.configService.get<number>(
+          'SCENARIO_PATH_ITEM_MIN_DURATION_FOR_COMPLETION',
+        ),
+    };
+  }
+  get cases() {
+    return {
+      caseItemMinDurationForCompletion: this.configService.get<number>(
+        'CASE_ITEM_MIN_DURATION_FOR_COMPLETION',
+      ),
+    };
+  }
+  get featureFlag() {
+    return {
+      // Defaults ON. The `false` branch calls ally-ai's old
+      // /summary/scenario/feedback route, which that service no longer serves,
+      // so an unset env var used to mean "every learner sees 'Failed to
+      // generate summary'". It is also the only branch that produces the
+      // supervisor debrief note. Kept as a flag purely as a kill switch.
+      useScenarioSessionEvaluation:
+        this.configService.get<string>(
+          'FEATURE_SCENARIO_SESSION_EVALUATION',
+          'true',
+        ) !== 'false',
+      scenarioSessionAudioRecording:
+        this.configService.get<string>(
+          'FEATURE_SCENARIO_SESSION_AUDIO_RECORDING',
+          'false',
+        ) === 'true',
+    };
+  }
+
+  get googleCloudTranslationConfig() {
+    return {
+      credentials: this.configService.get<string>(
+        'GOOGLE_APPLICATION_CREDENTIALS',
+      ),
+      projectId: this.configService.get<string>('PROJECT_ID'),
+    };
+  }
+
+  /**
+   * Every OAuth client id Ally's own apps sign in to Google with. A Google ID
+   * token must be issued to one of these; an access token to one of these or
+   * another client in the same Google Cloud project. Each variable may hold a
+   * comma-separated list, so another web client can be added without dropping
+   * the one mobile builds already use.
+   */
+  get googleAuth() {
+    const clientIds = [
+      'GOOGLE_WEB_CLIENT_ID',
+      'GOOGLE_IOS_CLIENT_ID',
+      'GOOGLE_ANDROID_CLIENT_ID',
+    ]
+      .flatMap((key) => this.configService.get<string>(key, '').split(','))
+      .map((id) => id.trim())
+      .filter(Boolean);
+    return { clientIds };
+  }
+
+  get appleAuth() {
+    const bundleIds = this.configService
+      .get<string>('APPLE_BUNDLE_IDS', '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    return { bundleIds };
+  }
+
+  get openai() {
+    return {
+      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
+      translationModel: this.configService.get<string>(
+        'OPENAI_TRANSLATION_MODEL',
+        'gpt-4o-mini',
+      ),
+      autofillModel: this.configService.get<string>(
+        'OPENAI_AUTOFILL_MODEL',
+        'gpt-5-mini',
+      ),
+      // Speech-to-text model for the manual scribe-note voice dictation flow.
+      // whisper-1 accepts webm/mp4/mp3/wav (<=25MB) and auto-detects language.
+      transcriptionModel: this.configService.get<string>(
+        'OPENAI_TRANSCRIPTION_MODEL',
+        'whisper-1',
+      ),
+      imageModel: this.configService.get<string>(
+        'OPENAI_IMAGE_MODEL',
+        'gpt-image-1',
+      ),
+    };
+  }
+
+  /**
+   * Platform model tiers — the layer every LLM caller falls back to when no
+   * per-task row and no per-prompt row names a model.
+   *
+   * Two vars rather than one per task on purpose: a task's tier is on its
+   * AI-task-registry row and a per-prompt override lives on the prompt row, so
+   * this is the only place a model id is compiled in. See
+   * llm-tier.constants.ts.
+   */
+  get llmTiers(): Record<LlmModelTier, string> {
+    return Object.values(LlmModelTier).reduce(
+      (acc, tier) => ({
+        ...acc,
+        [tier]: this.configService.get<string>(
+          LLM_TIER_ENV_VAR[tier],
+          LLM_TIER_FLOOR[tier],
+        ),
+      }),
+      {} as Record<LlmModelTier, string>,
+    );
+  }
+
+  get anthropic() {
+    const autofillModel = this.configService.get<string>(
+      'ANTHROPIC_AUTOFILL_MODEL',
+      'claude-sonnet-4-6',
+    );
+    return {
+      apiKey: this.configService.get<string>('ANTHROPIC_API_KEY'),
+      autofillModel,
+      // Analytics Suggestions (admin Analytics -> Suggestions tab). Defaults to
+      // the autofill model so there is one model to upgrade, but overridable on
+      // its own: this call carries a whole analytics window in its prompt and is
+      // the one place where a larger model may be worth the latency.
+      suggestionsModel: this.configService.get<string>(
+        'ANTHROPIC_SUGGESTIONS_MODEL',
+        autofillModel,
+      ),
+    };
+  }
+
+  /**
+   * Read access to the self-hosted PostHog, for the UX Signals scan.
+   *
+   * Write-side PostHog config lives in the frontends (VITE_POSTHOG_*) and is
+   * unrelated: this is a *query* credential (a personal API key with read
+   * scope), used only to pull aggregates back out.
+   *
+   * `enabled` is derived rather than configured. A missing value means the scan
+   * skips itself and says so, which is what we want on a local or CI boot — the
+   * alternative is every environment without a PostHog credential failing a
+   * scheduled task once a day.
+   *
+   * All three are read with NO fallback, `host` included. An internal hostname
+   * must not be committed (the repo's gitleaks config rejects them outright),
+   * and a default host would be the wrong safety anyway: it would aim a
+   * credential at whichever environment the default named, rather than at the
+   * one whose credential it is.
+   */
+  get posthogQuery() {
+    const host = this.configService.get<string>('POSTHOG_HOST');
+    const personalApiKey = this.configService.get<string>(
+      'POSTHOG_PERSONAL_API_KEY',
+    );
+    const projectId = this.configService.get<string>('POSTHOG_PROJECT_ID');
+    return {
+      host,
+      personalApiKey,
+      projectId,
+      enabled: Boolean(host && personalApiKey && projectId),
+    };
+  }
+
+  /**
+   * The roadmap's opportunity copilot — the guided interview that files every opportunity.
+   *
+   * Sonnet by default: each turn is a short tool loop over research (board, analytics, code,
+   * interview notes) followed by a structured answer, which is squarely what it is for, at a
+   * fraction of Opus's per-turn cost. A `roadmap_opportunity_copilot` prompt row naming a
+   * model beats this. When the resolved provider has no key on this environment the copilot
+   * falls back to `fallbackModel` rather than refusing to file anything.
+   */
+  get roadmapCopilot() {
+    return {
+      model: this.configService.get<string>(
+        'ROADMAP_COPILOT_MODEL',
+        'claude-sonnet-5-5',
+      ),
+      fallbackModel: this.configService.get<string>(
+        'ROADMAP_COPILOT_FALLBACK_MODEL',
+        'gpt-5',
+      ),
+    };
+  }
+
+  get builder() {
+    return {
+      // Model per role in the tiered loop. Defaults live in ONE place
+      // (BUILDER_MODEL_DEFAULTS) — the previous per-getter literals drifted
+      // (interview on claude-sonnet-4-6 while the build ran claude-sonnet-5).
+      interviewModel: this.configService.get<string>(
+        'BUILDER_INTERVIEW_MODEL',
+        BUILDER_MODEL_DEFAULTS.interview,
+      ),
+      plannerModel: this.configService.get<string>(
+        'BUILDER_PLANNER_MODEL',
+        BUILDER_MODEL_DEFAULTS.planner,
+      ),
+      // `BUILDER_BUILD_MODEL` kept as the env name for the coder tier so an
+      // environment that already sets it keeps working.
+      coderModel: this.configService.get<string>(
+        'BUILDER_BUILD_MODEL',
+        BUILDER_MODEL_DEFAULTS.coder,
+      ),
+      verifierModel: this.configService.get<string>(
+        'BUILDER_VERIFIER_MODEL',
+        BUILDER_MODEL_DEFAULTS.verifier,
+      ),
+      // The ally-be ref a design run's builder-session.yml runs from. master
+      // everywhere except while a change to the runner is proven on dev
+      // against its own branch before it merges. Design runs only: releases
+      // always dispatch from master.
+      designWorkflowRef: this.configService.get<string>(
+        'BUILDER_WORKFLOW_REF',
+        BUILDER_WORKFLOW_REF,
+      ),
+      // Cheap tier for mechanical passes: repo maps, summaries, consolidation.
+      mechanicalModel: this.configService.get<string>(
+        'BUILDER_MECHANICAL_MODEL',
+        BUILDER_MODEL_DEFAULTS.mechanical,
+      ),
+      // Hard cap on tool-use round-trips per interview turn. Generous because
+      // a substantial turn legitimately chains research calls with several
+      // update_prd patches; on cap-hit the orchestrator wraps up in prose.
+      maxToolIterations: this.configService.get<number>(
+        'BUILDER_MAX_TOOL_ITERATIONS',
+        16,
+      ),
+      // Default spend ceiling per session, in USD. Null disables the cap.
+      defaultBudgetUsd: this.configService.get<number>(
+        'BUILDER_DEFAULT_BUDGET_USD',
+        25,
+      ),
+      // Where a paused or failed build announces itself. Unset falls through
+      // to SLACK_CHANNEL, the platform default, so the announcements work the
+      // day they ship and moving them to a dedicated channel later is a
+      // setting rather than a deploy. Separable because the two audiences are
+      // different: the platform channel carries operational alerts for
+      // everyone, and a build waiting on an answer concerns whoever started
+      // it. Announcements get muted when they land in the wrong room, and a
+      // muted channel is worse than no channel because it still looks like
+      // coverage.
+      slackChannel: this.configService.get<string>('BUILDER_SLACK_CHANNEL'),
+      /**
+       * Slack user ids allowed to merge and release from the channel.
+       *
+       * Deny by default: unset means nobody, not everybody. A button in a
+       * channel is clickable by anyone who was ever invited to it, and the
+       * thing behind this one ships to production — so channel membership is
+       * not an authorisation model.
+       */
+      slackApprovers: (
+        this.configService.get<string>('BUILDER_SLACK_APPROVERS') ?? ''
+      )
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    };
+  }
+
+  /**
+   * Where the admin console is served from, used to build deep links a person
+   * follows from outside the app — a Builder pull-request body, or a Slack
+   * announcement, pointing back at the session that produced it.
+   *
+   * Reads `ADMIN_APP_BASE_URL`, the variable `app.adminBaseUrl` and the
+   * evaluator emails have always used and which `env.validation.ts` marks
+   * required, so the value is guaranteed present wherever the app boots. This
+   * getter originally invented `ADMIN_BASE_URL` instead, which was set
+   * nowhere: every Builder link it produced pointed at localhost, and did so
+   * silently because the fallback is a valid URL. A second name for a value we
+   * already have is not configuration, it is a second thing to forget.
+   */
+  get adminBaseUrl(): string {
+    return this.configService.get<string>(
+      'ADMIN_APP_BASE_URL',
+      'http://localhost:8081',
+    );
+  }
+
+  /**
+   * Stacks — the team's curated product-guidance library, reached over HTTP
+   * (ally-be is not an MCP client). Optional: unset simply means the
+   * interview runs without product guidance.
+   */
+  get stacks() {
+    return {
+      apiUrl: this.configService.get<string>('STACKS_API_URL'),
+      apiKey: this.configService.get<string>('STACKS_API_KEY'),
+    };
+  }
+
+  get courseCopilot() {
+    return {
+      // Interview/edit-loop model. The `course_copilot_interviewer_system`
+      // prompt row wins when it names a model — that is the supported way to
+      // change it per environment. Defaults to the REASONING tier rather than a
+      // vendor id, for the reason characterInterview.model gives below.
+      model: this.configService.get<string>(
+        'COURSE_COPILOT_MODEL',
+        this.llmTiers[LlmModelTier.REASONING],
+      ),
+      // Usually unset: the provider is inferred from the model id.
+      provider: this.configService.get<string>('COURSE_COPILOT_PROVIDER'),
+      // Tool round-trips per turn. A normal interview turn is 1-3 (an
+      // update_brief, a lookup, ask_trainer); an edit turn can chain a read,
+      // a regenerate and a meta update.
+      maxToolIterations: Number(
+        this.configService.get<number>(
+          'COURSE_COPILOT_MAX_TOOL_ITERATIONS',
+          10,
+        ),
+      ),
+      // Default per-session spend ceiling, USD. 0 = uncapped.
+      sessionBudgetUsd: Number(
+        this.configService.get<number>('COURSE_COPILOT_SESSION_BUDGET_USD', 15),
+      ),
+      // Images have no pricing row; each counts at this flat rate.
+      imageCostUsd: Number(
+        this.configService.get<number>('COURSE_COPILOT_IMAGE_COST_USD', 0.1),
+      ),
+      buildConcurrency: Number(
+        this.configService.get<number>('COURSE_COPILOT_BUILD_CONCURRENCY', 4),
+      ),
+      maxNewRoleplays: Number(
+        this.configService.get<number>('COURSE_COPILOT_MAX_NEW_ROLEPLAYS', 4),
+      ),
+    };
+  }
+
+  get characterInterview() {
+    return {
+      // Character-library interview agent model.
+      //
+      // Anthropic, OpenAI and Gemini models all run — the turn loop goes
+      // through `AgentLlmProviderFactory`. The prompt row for
+      // `character_interview.interviewer_system` overrides this when it carries
+      // its own provider/model, which is the supported way to change it per
+      // environment; this is the fallback.
+      //
+      // Defaults to the REASONING tier rather than a vendor's model id. It used
+      // to name claude-sonnet-4-6, which meant an expired Anthropic credential
+      // took the interview down even though the loop can run three providers —
+      // the fallback pointed at the thing that had failed.
+      model: this.configService.get<string>(
+        'CHARACTER_INTERVIEW_MODEL',
+        this.llmTiers[LlmModelTier.REASONING],
+      ),
+      // Usually left unset: the provider is inferred from the model id, which
+      // is unambiguous for every model any of the three actually ships. Set it
+      // only for a model id whose name doesn't say who runs it.
+      provider: this.configService.get<string>('CHARACTER_INTERVIEW_PROVIDER'),
+      // Hard cap on tool-use round-trips per interview turn. A normal turn is
+      // 1-2 (commentary + ask_question); the final turn legitimately chains
+      // get_voices + a validation-retried save_character_draft.
+      maxToolIterations: this.configService.get<number>(
+        'CHARACTER_INTERVIEW_MAX_TOOL_ITERATIONS',
+        8,
+      ),
+    };
+  }
+
+  get gemini() {
+    return {
+      // Prefer an explicit GEMINI_API_KEY; fall back to the standard
+      // GOOGLE_GENERATIVE_AI_API_KEY so an existing Google key works without
+      // duplicating the secret. Used by the coaching-chat Gemini provider.
+      apiKey:
+        this.configService.get<string>('GEMINI_API_KEY') ??
+        this.configService.get<string>('GOOGLE_GENERATIVE_AI_API_KEY'),
+      imageModel: this.configService.get<string>(
+        'GEMINI_IMAGE_MODEL',
+        'gemini-2.5-flash-image',
+      ),
+    };
+  }
+
+  get characterImage() {
+    return {
+      defaultProvider: this.configService.get<string>(
+        'CHARACTER_IMAGE_DEFAULT_PROVIDER',
+        'openai',
+      ),
+    };
+  }
+
+  get aiChat() {
+    return {
+      defaultProvider: this.configService.get<string>(
+        'AI_CHAT_DEFAULT_PROVIDER',
+        'openai',
+      ),
+      model: this.configService.get<string>(
+        'AI_CHAT_OPENAI_MODEL',
+        'gpt-4o-mini',
+      ),
+      maxTokens: this.configService.get<number>('AI_CHAT_MAX_TOKENS', 1500),
+      temperature: this.configService.get<number>('AI_CHAT_TEMPERATURE', 0.7),
+      maxContextTokens: this.configService.get<number>(
+        'AI_CHAT_MAX_CONTEXT_TOKENS',
+        100000,
+      ),
+    };
+  }
+
+  /**
+   * Defaults for translating agent prompt templates (main_agent / branching)
+   * into Indian languages. These are fallbacks only: the seeded
+   * `agent_template_translation` prompt row carries its own provider/model,
+   * editable from Prompt Management, which take precedence. Temperature is kept
+   * low for faithful translation, and maxTokens is generous since a full agent
+   * template can be long.
+   */
+  /**
+   * Engine for every translation stored in the DB (OpenAITranslationsService:
+   * simulations, events, behaviors, badges, courses, paths, cases, tooltips,
+   * transcripts, dynamic i18n). Gemini by default; TRANSLATION_PROVIDER=openai
+   * switches back to OPENAI_TRANSLATION_MODEL without a code change.
+   */
+  get translation() {
+    const provider = this.configService.get<string>(
+      'TRANSLATION_PROVIDER',
+      'gemini',
+    );
+    return {
+      provider,
+      model:
+        this.configService.get<string>('TRANSLATION_MODEL') ??
+        (provider === 'openai'
+          ? this.openai.translationModel
+          : 'gemini-2.5-flash'),
+      // Generous: a whole scenario's metadata comes back in one JSON object,
+      // and Gemini 2.5 counts thinking tokens against this budget.
+      maxTokens: Number(
+        this.configService.get<number>('TRANSLATION_MAX_TOKENS', 16384),
+      ),
+      // Gemini 2.5 thinking is off for translation: in side-by-side runs it
+      // cost ~10-14x the output tokens and ~4x the latency without reliably
+      // better tone. TRANSLATION_THINKING_BUDGET overrides (-1 = model decides).
+      thinkingBudget: Number(
+        this.configService.get<number>('TRANSLATION_THINKING_BUDGET', 0),
+      ),
+    };
+  }
+
+  get promptTranslation() {
+    return {
+      defaultProvider: this.configService.get<string>(
+        'PROMPT_TRANSLATION_PROVIDER',
+        'gemini',
+      ),
+      defaultModel: this.configService.get<string>(
+        'PROMPT_TRANSLATION_MODEL',
+        'gemini-2.5-pro',
+      ),
+      maxTokens: this.configService.get<number>(
+        'PROMPT_TRANSLATION_MAX_TOKENS',
+        8192,
+      ),
+      temperature: this.configService.get<number>(
+        'PROMPT_TRANSLATION_TEMPERATURE',
+        0.2,
+      ),
+    };
+  }
+
+  get i18n() {
+    return {
+      rootDir: this.configService.get<string>('I18N_ROOT_DIR', '/var/www/i18n'),
+      sourceDir: this.configService.get<string>('I18N_SOURCE_DIR'),
+      versionRetention: this.configService.get<number>(
+        'I18N_VERSION_RETENTION',
+        5,
+      ),
+    };
+  }
+
+  get voicePreview() {
+    return {
+      deepgramApiKey: this.configService.get<string>('DEEPGRAM_API_KEY'),
+      elevenlabsApiKey: this.configService.get<string>('ELEVENLABS_API_KEY'),
+      sarvamApiKey: this.configService.get<string>('SARVAM_API_KEY'),
+      humeApiKey: this.configService.get<string>('HUME_API_KEY'),
+      cartesiaApiKey: this.configService.get<string>('CARTESIA_API_KEY'),
+      smallestApiKey: this.configService.get<string>('SMALLEST_API_KEY'),
+    };
+  }
+
+  /**
+   * Read-only vendor credentials for the video-actor face catalogue.
+   *
+   * Listing faces is a plain GET on each vendor and is not metered — it is the
+   * rendering that costs. These keys are the same ones ally-ai-learn dispatches
+   * with, deliberately: a face this catalogue offers must be one the worker can
+   * actually render, and two different keys would mean two different accounts
+   * and a picker full of ids that fail at session start.
+   *
+   * `videoActorApiKey` is the pre-existing single-vendor value, kept as the
+   * fallback so a deployment that configured only one key keeps working.
+   */
+  get videoActorCatalog() {
+    return {
+      beyApiKey:
+        this.configService.get<string>('VIDEO_ACTOR_BEY_API_KEY') ??
+        this.configService.get<string>('VIDEO_ACTOR_API_KEY'),
+      tavusApiKey:
+        this.configService.get<string>('VIDEO_ACTOR_TAVUS_API_KEY') ??
+        this.configService.get<string>('VIDEO_ACTOR_API_KEY'),
+    };
+  }
+
+  get scenarioSessionAudioStorage() {
+    return {
+      bucket: this.configService.get<string>(
+        'SCENARIO_SESSION_AUDIO_STORAGE_S3_BUCKET',
+      ),
+      region: this.configService.get<string>(
+        'SCENARIO_SESSION_AUDIO_STORAGE_REGION',
+      ),
+      accessKey: this.configService.get<string>(
+        'SCENARIO_SESSION_AUDIO_STORAGE_ACCESS_KEY',
+      ),
+      secret: this.configService.get<string>(
+        'SCENARIO_SESSION_AUDIO_STORAGE_SECRET',
+      ),
+    };
+  }
+}

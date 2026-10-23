@@ -1,0 +1,139 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { TRACK_MAX_COMPETENCIES } from '../constants/track.constant';
+import { TrackStatus } from '../type/track.type';
+import { TrackLandingPageDto } from './track-landing-page.dto';
+
+const COMPETENCY_IDS_DESCRIPTION =
+  'The competencies this course teaches: ids of shared (non-custom) ' +
+  '`competencies` rows, at most ' +
+  TRACK_MAX_COMPETENCIES +
+  '. Optional. Analytics → Course impact reads the course on these skills ' +
+  "when set, and falls back to the competencies of the course's roleplay " +
+  'scenarios when not. Omit the key to leave the tag unchanged; send `null` ' +
+  'or `[]` to clear it (stored as NULL). An id the course already carries ' +
+  'whose competency has since been deleted is dropped silently.';
+
+export class CreateTrackDto {
+  @ApiPropertyOptional({ description: 'Title of the track' })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiPropertyOptional({ description: 'Description of the track' })
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @ApiPropertyOptional({ description: 'Cover image URL' })
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Whether the track is global' })
+  @IsOptional()
+  @IsBoolean()
+  isGlobal?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Public view. When true, the course's share link shows its outline to " +
+      'anyone, including logged-out visitors, while the course is published. ' +
+      'Taking the course still requires access through the learner’s ' +
+      'organisation and group. Defaults to false.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPublicView?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Status of the track',
+    enum: TrackStatus,
+    default: TrackStatus.DRAFT,
+  })
+  @IsOptional()
+  @IsEnum(TrackStatus)
+  status?: TrackStatus;
+
+  @ApiPropertyOptional({ description: 'Estimated duration in minutes' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  estimatedDurationMinutes?: number;
+
+  @ApiPropertyOptional({
+    description: COMPETENCY_IDS_DESCRIPTION,
+    type: [String],
+    nullable: true,
+    maxItems: TRACK_MAX_COMPETENCIES,
+    example: ['123e4567-e89b-42d3-a456-426614174000'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(TRACK_MAX_COMPETENCIES)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  competencyIds?: string[] | null;
+
+  @ApiPropertyOptional({
+    description:
+      "The course's story-led landing page (hero, persona, first move, " +
+      'story arc, outcomes, cast, per-block switches). Every key is optional ' +
+      'at every level; the server fills defaults and stores the full ' +
+      'normalised shape. A non-empty `hero.hook` turns story mode on for the ' +
+      'public share link. Omit the key to leave it unchanged; send `null` to ' +
+      'clear it.',
+    type: () => TrackLandingPageDto,
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TrackLandingPageDto)
+  landingPage?: TrackLandingPageDto | null;
+}
+
+export class TrackSummaryResponseDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title?: string;
+
+  @ApiProperty()
+  description?: string | null;
+
+  @ApiProperty()
+  coverImageUrl?: string;
+
+  @ApiProperty({ enum: TrackStatus })
+  status!: TrackStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'Stored `tracks.competencyIds`: the competencies the author tagged this ' +
+      'course with, or null when untagged (Course impact then derives them ' +
+      "from the course's roleplay scenarios).",
+    type: [String],
+    nullable: true,
+  })
+  competencyIds?: string[] | null;
+
+  @ApiProperty({
+    description:
+      "Whether the course's share link is public (see isPublicView).",
+  })
+  isPublicView!: boolean;
+}

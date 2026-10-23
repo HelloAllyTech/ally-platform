@@ -1,0 +1,464 @@
+import { Injectable } from '@nestjs/common';
+import { IsNull } from 'typeorm';
+import { LoggerService } from 'src/logger/logger.service';
+import { BuilderSession } from '../entity/builder-session.entity';
+import { BuilderNotificationRepository } from '../repository/builder-build.repository';
+import { BuilderNotificationKind } from '../enum/builder.enum';
+import { SlackService } from 'src/notification/service/slack.service';
+import { AppConfigService } from 'src/config/config.service';
+import { BUILDER_ANNOUNCED_KINDS } from '../constants/builder.constants';
+
+/**
+ * What happened while the admin was elsewhere.
+ *
+ * A backgrounded agent's worst failure is silence: a build blocked on an
+ * unanswered question looks exactly like a build still working unless
+ * something says otherwise. Every method here marks a moment where the
+ * session either stopped being able to progress on its own, or finished.
+ *
+ * Messages are written whole, in the agent's voice, rather than assembled
+ * client-side from a kind and some ids — the inbox and a push both need the
+ * same sentence, and templating it twice is how they drift.
+ */
+@Injectable()
+export class BuilderNotificationService {
+  private readonly logger = LoggerService.getInstance(
+    BuilderNotificationService.name,
+  );
+
+  constructor(
+    private readonly repository: BuilderNotificationRepository,
+    private readonly slack: SlackService,
+    private readonly configService: AppConfigService,
+  ) {}
+
+  private async notify(
+    session: BuilderSession,
+    kind: BuilderNotificationKind,
+    message: string,
+  ): Promise<void> {
+    try {
+      await this.repository.save(
+        this.repository.create({
+          adminId: session.createdBy,
+          sessionId: session.id,
+          kind,
+          message,
+        }),
+      );
+    } catch (error) {
+      // Never let a notification failure break the thing it is reporting on.
+      this.logger.warn(
+        `Could not record Builder notification (${kind}) for session ${session.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    await this.announce(session, kind, message);
+  }
+
+  /**
+   * Say it somewhere a person will see without going looking.
+   *
+   * The in-app inbox is a pull surface: it works only for someone already
+   * looking at Builder, which is exactly who does not need telling. A build
+   * paused on a question is indistinguishable from a build still working until
+   * something says otherwise, and the docstring on this class has named that
+   * as the worst failure mode since it was written — while every notification
+   * stayed a database row nobody was pushed toward.
+   *
+   * Not every kind is worth interrupting for. A completed build is good news
+   * that keeps; a question, a failure, a spend ceiling and a fix run touching
+   * a pull request someone may be reviewing all have somebody waiting on the
+   * other side. Announcing everything is how a channel gets muted, and a muted
+   * channel is worse than no channel because it still looks like coverage.
+   *
+   * Best-effort after the row is written, never before, and never able to
+   * throw: a Slack outage must not lose the notification or fail the thing it
+   * was reporting on. The row is the record; this is the tap on the shoulder.
+   */
+  private async announce(
+    session: BuilderSession,
+    kind: BuilderNotificationKind,
+    message: string,
+  ): Promise<void> {
+    if (!BUILDER_ANNOUNCED_KINDS.includes(kind)) return;
+    try {
+      const url = `${this.configService.adminBaseUrl}/builder/${session.id}`;
+      await this.slack.sendMessage(
+        `${message}\n${url}`,
+        // Undefined means the platform default channel — SlackService's own
+        // fallback, not a second one restated here.
+        this.configService.builder.slackChannel,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not announce Builder notification (${kind}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  buildCompleted(session: BuilderSession): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.BUILD_COMPLETED,
+      `“${session.title}” is done.`,
+    );
+  }
+
+  buildFailed(session: BuilderSession, error: string | null): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.BUILD_FAILED,
+      `“${session.title}” stopped: ${error ?? 'the build failed.'}`,
+    );
+  }
+
+  prsOpened(session: BuilderSession, count: number): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.PRS_OPENED,
+      count === 1
+        ? `“${session.title}” has a pull request open for review.`
+        : `“${session.title}” has ${count} pull requests open for review.`,
+    );
+  }
+
+  /**
+   * A pull request that is green, reviewed, approved and mergeable — with the
+   * button to merge it.
+   *
+   * The only notification here that carries a control rather than describing
+   * one. It fires at the single moment when a person's click is the last thing
+   * standing between the work and production, which is what makes it worth a
+   * message when "a pull request opened" is not.
+   *
+   * `notify` still records the row; the blocks are the announcement. If Slack
+   * refuses the blocks the row survives, so the pull request is still visible
+   * in the admin view rather than lost with the message.
+   */
+  async prReadyToMerge(
+    session: BuilderSession,
+    pullRequest: {
+      id: string;
+      repo: string;
+      prNumber: number;
+      prUrl: string;
+      title?: string | null;
+    },
+  ): Promise<void> {
+    const what = pullRequest.title?.trim()
+      ? `${pullRequest.repo}#${pullRequest.prNumber} — ${pullRequest.title.trim()}`
+      : `${pullRequest.repo}#${pullRequest.prNumber}`;
+    const text = `${what} is green, reviewed and approved. Merging it will release it to production.`;
+
+    await this.notify(session, BuilderNotificationKind.PR_READY_TO_MERGE, text);
+
+    // Said plainly on the message rather than only in the button label,
+    // because with auto-release on, this click ships. Someone scanning a
+    // channel should not have to remember that.
+    const blocks = [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `*${what}*\n${text}` },
+      },
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            style: 'primary',
+            text: { type: 'plain_text', text: 'Merge and release' },
+            // Carries the row id, not the PR number: the handler must look up
+            // exactly what was announced rather than trust a repo/number pair
+            // out of a payload.
+            action_id: 'builder_merge',
+            value: pullRequest.id,
+            confirm: {
+              title: { type: 'plain_text', text: 'Merge and release?' },
+              text: {
+                type: 'mrkdwn',
+                text: `This merges ${what} to master and dispatches its production release.`,
+              },
+              confirm: { type: 'plain_text', text: 'Merge' },
+              deny: { type: 'plain_text', text: 'Cancel' },
+            },
+          },
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: 'Open on GitHub' },
+            url: pullRequest.prUrl,
+            action_id: 'builder_open_pr',
+          },
+        ],
+      },
+    ];
+
+    const result = await this.slack.sendBlocks({
+      text,
+      blocks,
+      channel: this.configService.builder.slackChannel,
+    });
+    if (!result.ok) {
+      this.logger.warn(
+        `Could not offer a merge button for ${pullRequest.repo}#${pullRequest.prNumber}: ${result.error}`,
+      );
+    }
+  }
+
+  /**
+   * Said after the fact, because there was no click to offer.
+   *
+   * The counterpart to {@link prReadyToMerge}: same moment in a pull request's
+   * life, opposite direction. That one exists to ask; this one exists because
+   * nobody was asked. A change reaching master — and, with auto-release on,
+   * production — while the channel stays quiet is the failure this whole
+   * module's notifications are written against.
+   *
+   * No button. There is nothing left to decide here, and offering a control
+   * that only reverts would invite a revert-by-reflex on work that passed
+   * every gate. The link is what a reader needs: somewhere to go and look.
+   */
+  async prMergedAutomatically(
+    session: BuilderSession,
+    pullRequest: {
+      id: string;
+      repo: string;
+      prNumber: number;
+      prUrl: string;
+      title?: string | null;
+    },
+    releasing: boolean,
+  ): Promise<void> {
+    const what = pullRequest.title?.trim()
+      ? `${pullRequest.repo}#${pullRequest.prNumber} — ${pullRequest.title.trim()}`
+      : `${pullRequest.repo}#${pullRequest.prNumber}`;
+    // Which of the two things just happened is the part a reader acts on, so
+    // it is in the sentence rather than left to be inferred from settings.
+    const text = releasing
+      ? `Merged ${what} on a clean review, and its production release is on the way.`
+      : `Merged ${what} on a clean review. It is on master; releasing it is still a person's job.`;
+
+    await this.notify(
+      session,
+      BuilderNotificationKind.PR_MERGED_AUTOMATICALLY,
+      text,
+    );
+
+    const result = await this.slack.sendBlocks({
+      text,
+      blocks: [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: `*${what}*\n${text}` },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Open on GitHub' },
+              url: pullRequest.prUrl,
+              action_id: 'builder_open_pr',
+            },
+          ],
+        },
+      ],
+      channel: this.configService.builder.slackChannel,
+    });
+    if (!result.ok) {
+      this.logger.warn(
+        `Could not announce the automatic merge of ${pullRequest.repo}#${pullRequest.prNumber}: ${result.error}`,
+      );
+    }
+  }
+
+  /**
+   * The one nobody can afford to miss.
+   *
+   * "Merged but not deployed" is worse than never having released: master has
+   * moved on, the pull request reads as done, and everyone assumes the change
+   * is live. On 2026-09-15 exactly this happened to an ally-be release — the
+   * ECS circuit breaker rolled it back and prod silently served the previous
+   * version for the better part of an hour. The whole point of watching a
+   * release is to make that state impossible to sit in unnoticed.
+   */
+  releaseFailed(
+    session: BuilderSession,
+    repo: string,
+    prNumber: number,
+    tag: string | null,
+    detail: string | null,
+    runUrl: string | null,
+  ): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.RELEASE_FAILED,
+      `${repo}#${prNumber} is merged to master but is NOT deployed — release ${
+        tag ?? 'dispatch'
+      } failed${detail ? ` (${detail})` : ''}.${runUrl ? ` ${runUrl}` : ''}`,
+    );
+  }
+
+  /**
+   * Merged, and deliberately not released.
+   *
+   * Quieter than a failure and still worth saying: the change is on master and
+   * waiting for someone to ship it, which nobody will do if nobody is told.
+   */
+  releaseSkipped(
+    session: BuilderSession,
+    repo: string,
+    prNumber: number,
+    why: string,
+  ): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.RELEASE_SKIPPED,
+      `${repo}#${prNumber} is merged but was not released automatically — ${why}. It needs a manual release.`,
+    );
+  }
+
+  /**
+   * The loop stopped itself.
+   *
+   * Louder than any single failure, because what has stopped is the automation
+   * rather than one run — and the silence that follows would otherwise look
+   * exactly like a session quietly finishing.
+   */
+  /**
+   * Said once per trip, not once per refused dispatch.
+   *
+   * The breaker is consulted on every reconcile tick, so an un-deduplicated
+   * announcement here is one Slack message every five minutes for as long as
+   * the session stays broken — which is indefinitely, since a tripped breaker
+   * is what stops the runs that would clear it. The comment at the call site
+   * always claimed this behaviour; it was never implemented, and the channel
+   * filled up.
+   *
+   * `since` is the newest run's timestamp. An announcement newer than that
+   * means this same trip has already been reported. A further failed run moves
+   * it forward and earns a fresh one — the situation genuinely changed.
+   */
+  /**
+   * Automation stopped on one pull request and handed it to a person. Sent
+   * once per escalation — the caller only escalates a PR that is not already
+   * waiting on someone.
+   */
+  async prNeedsHuman(
+    session: BuilderSession,
+    pullRequest: { repo: string; prNumber: number; prUrl: string },
+    reason: string,
+  ): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.PR_NEEDS_HUMAN,
+      `${pullRequest.repo}#${pullRequest.prNumber} needs you: ${reason} I've stopped working on it — have a look at ${pullRequest.prUrl}, then resume it from the build page if you want me to carry on.`,
+    );
+  }
+
+  async automationPaused(
+    session: BuilderSession,
+    failures: number,
+    since?: Date | null,
+  ): Promise<void> {
+    if (
+      since &&
+      (await this.repository.existsSince(
+        session.id,
+        BuilderNotificationKind.AUTOMATION_PAUSED,
+        since,
+      ))
+    ) {
+      return;
+    }
+    return this.notify(
+      session,
+      BuilderNotificationKind.AUTOMATION_PAUSED,
+      `I've stopped sending runs at “${session.title}” — ${failures} in a row failed and nothing is converging. Have a look before retrying.`,
+    );
+  }
+
+  /**
+   * The GitHub credential is being rejected, so everything downstream is blind.
+   *
+   * Not attached to a session, because it is not about one: nothing Builder
+   * does works while this is true. It is sent once per outage rather than per
+   * refused call — the polling loops would otherwise repeat it every five
+   * minutes for as long as it lasted.
+   */
+  async credentialRejected(
+    session: BuilderSession,
+    failures: number,
+    since: Date | null,
+  ): Promise<void> {
+    // Once per outage, not once per tick. `since` is the outage's identity: an
+    // announcement newer than the moment the failures began has already
+    // reported this one. The circuit breaker shipped without this and posted
+    // every five minutes for as long as it stayed tripped.
+    if (
+      since &&
+      (await this.repository.existsSince(
+        session.id,
+        BuilderNotificationKind.CREDENTIAL_REJECTED,
+        since,
+      ))
+    ) {
+      return;
+    }
+
+    const started = since
+      ? ` It started failing at ${since.toISOString().slice(11, 16)} UTC.`
+      : '';
+    return this.notify(
+      session,
+      BuilderNotificationKind.CREDENTIAL_REJECTED,
+      `GitHub is rejecting my credential — ${failures} calls in a row came back unauthorised, so I ` +
+        `cannot read pull requests, dispatch runs or release anything.${started} The token has most ` +
+        'likely expired and needs replacing; nothing else will work until it is.',
+    );
+  }
+
+  budgetReached(session: BuilderSession, spent: number): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.BUDGET_REACHED,
+      `“${session.title}” has reached its $${spent.toFixed(2)} budget and won't start more work until you raise it.`,
+    );
+  }
+
+  listForAdmin(adminId: number, unreadOnly = false) {
+    return this.repository.listForAdmin(adminId, unreadOnly);
+  }
+
+  countUnread(adminId: number): Promise<number> {
+    return this.repository.countUnread(adminId);
+  }
+
+  async markRead(id: string, adminId: number): Promise<void> {
+    await this.repository.update({ id, adminId }, { readAt: new Date() });
+  }
+
+  /**
+   * `IsNull()`, not `null`.
+   *
+   * A bare `null` in an update's criteria becomes `WHERE "readAt" = NULL`,
+   * which is never true of any row, so this matched nothing and the endpoint
+   * above it answered `{ ok: true }` for work it had not done. The bell sat on
+   * fifty unread for days and "mark all read" did nothing you could see — the
+   * one failure mode a success response guarantees nobody investigates.
+   *
+   * The `as any` it used to need was the tell: the type said this was wrong
+   * before the database did. Every read path here already uses `IsNull()`, and
+   * so does Bug Hunter's equivalent; this was the one that did not.
+   */
+  async markAllRead(adminId: number): Promise<void> {
+    await this.repository.update(
+      { adminId, readAt: IsNull() },
+      { readAt: new Date() },
+    );
+  }
+}

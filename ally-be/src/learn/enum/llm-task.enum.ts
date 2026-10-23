@@ -1,0 +1,318 @@
+/**
+ * Canonical taxonomy of LLM "tasks" (operation types) for token-consumption
+ * analytics. This is the CROSS-REPO CONTRACT: the Python services (ally-ai,
+ * ally-ai-learn) send these exact strings on the `llm_usage` SQS message, and
+ * the in-process ally-be call sites (autofill / translation) use them directly.
+ *
+ * The `task` column on `llm_usage` stores the raw string. `UNKNOWN` is the
+ * fallback the processor records when a sender emits a task that is not yet in
+ * this enum, so a new Python task type degrades gracefully (one bucket) rather
+ * than dropping the row.
+ */
+export enum LlmTask {
+  // Live conversational agent (ally-ai-learn) — highest volume.
+  AGENT_TURN = 'agent_turn',
+  // Episodic-memory summarizer in ally-ai-learn (rolling-summary compaction
+  // during the session + the end-of-session final fold).
+  ROLLING_SUMMARY = 'rolling_summary',
+  // Live supervisor notes in ally-ai-learn: one call per committed learner
+  // turn, deciding whether to send the learner a coaching hint mid-session.
+  // Its own label because it runs at agent_turn frequency on a deliberately
+  // cheaper model, so folding it into AGENT_TURN would distort both figures.
+  SUPERVISOR_NOTE = 'supervisor_note',
+  // Client working memory in ally-ai-learn: one detached call per learner turn
+  // deriving the actor's inner state (stance, affect, ledgers). Same cadence as
+  // AGENT_TURN but off the reply path, so it has to be separable from turn cost
+  // for the feature's spend to be arguable against its benefit.
+  CLIENT_WORKING_MEMORY = 'client_working_memory',
+  // Back-channel phrases in ally-ai-learn: one call per session, at session
+  // start, generating the listener affirmations ("mm-hmm") the character plays
+  // while the learner holds the floor. Its own label rather than AGENT_TURN
+  // because the feature is a per-simulation opt-in, so its spend has to be
+  // readable on its own to be argued for.
+  BACKCHANNEL_PHRASES = 'backchannel_phrases',
+  // The rest of the live session's side calls in ally-ai-learn. Before these
+  // labels existed none of them recorded usage at all, so a session's cost was
+  // understated by everything that is not the reply itself. Each has its own
+  // label because the roleplay session-cost chart groups them into different
+  // components (see SESSION_COST_COMPONENT_BY_TASK), which a shared label would
+  // make impossible.
+  //   Fillers & holding: the fast interim reply covering a pause, and the
+  //   thinking fillers (predictive, seed and in-turn), plus the separate clip
+  //   TTS instance that voices fillers, back-channels and interim clips.
+  INTERIM_REPLY = 'interim_reply',
+  THINKING_FILLER = 'thinking_filler',
+  CLIP_TTS = 'clip_tts',
+  //   Live dialogue: the pick of which knowledge keys a turn needs, and the
+  //   embeddings behind the character's working-memory recall.
+  KNOWLEDGE_RETRIEVAL = 'knowledge_retrieval',
+  WORKING_MEMORY_EMBEDDING = 'working_memory_embedding',
+  //   Events & rules: branching, behaviour detection, and the per-turn event
+  //   detectors (guardrail, binary classifier, paraphrase, semantic
+  //   similarity embeddings).
+  BRANCHING_INSTRUCTION = 'branching_instruction',
+  BRANCHING_CHAT_SUMMARY = 'branching_chat_summary',
+  BEHAVIOUR_DETECTION = 'behaviour_detection',
+  GUARDRAIL_CHECK = 'guardrail_check',
+  BINARY_CLASSIFIER = 'binary_classifier',
+  HELPER_PARAPHRASED = 'helper_paraphrased',
+  EVENT_EMBEDDING = 'event_embedding',
+  // Goal-based actor evaluation of a REAL session in ally-ai-learn, after it
+  // ends. Measures the character's quality for us, not feedback for the
+  // learner, so it is tagged to the session but kept OUT of the session's
+  // delivery cost.
+  ACTOR_EVALUATION = 'actor_evaluation',
+  // Studio rehearsal report in ally-ai-learn (Simulation Studio -> Generate
+  // Report): a simulated counsellor talks to the client agent for N turns,
+  // then a judge scores the CLIENT agent. Authoring spend — no learner and no
+  // session — so both labels stay out of every per-learner cost. Two labels
+  // because the counsellor runs once per turn while the judge runs once per
+  // report, so one line would hide which of them a long report is paying for.
+  SCENARIO_REPORT_COUNSELOR = 'scenario_report_counselor',
+  SCENARIO_REPORT_EVALUATION = 'scenario_report_evaluation',
+  // V2V tester in ally-ai-learn: the simulated learner in a super-admin
+  // AI-vs-AI test session. One reply per exchange, and one end-of-run judge
+  // counting turns where the tester slipped into the client's role. Test
+  // tooling, so neither is learner spend; separate labels because the reply
+  // scales with exchanges and the judge with runs.
+  V2V_TESTER_REPLY = 'v2v_tester_reply',
+  V2V_ROLE_FIDELITY_JUDGE = 'v2v_role_fidelity_judge',
+  // Debrief chat in ally-be: the learner's post-session chat about their
+  // debrief, and the rolling summary that keeps its history bounded. Recorded
+  // nothing before these labels.
+  DEBRIEF_CHAT = 'debrief_chat',
+  DEBRIEF_CHAT_SUMMARY = 'debrief_chat_summary',
+  // Track-level memory consolidation in ally-be: folds per-session memories
+  // into one evolving learner memory per track enrollment.
+  TRACK_MEMORY_FOLD = 'track_memory_fold',
+
+  // ally-ai post-/in-session operations.
+  NUDGE = 'nudge',
+  SUMMARY = 'summary',
+  DYNAMIC_SUMMARY = 'dynamic_summary',
+  SCENARIO_EVALUATION = 'scenario_evaluation',
+  // The same debrief evaluation re-run in another language, when a viewer
+  // opens a debrief in a UI language other than the one it was written in
+  // (ScenarioSessionService.generateLanguageSummary). Learner-caused like
+  // SCENARIO_EVALUATION and costed the same way, but its own label so the
+  // price of serving debriefs in several languages is visible rather than
+  // hidden inside the first evaluation's line.
+  SCENARIO_EVALUATION_LANGUAGE = 'scenario_evaluation_language',
+  COUNSELOR_ANALYSIS = 'counselor_analysis',
+  USER_IDENTIFICATION = 'user_identification',
+  CONTENT_ENHANCE = 'content_enhance',
+  TAG_POSITIVITY = 'tag_positivity',
+  DIARIZATION = 'diarization',
+  EMBEDDING = 'embedding',
+  DRIFT_JUDGE = 'drift_judge',
+  // The drift judge's labels-only top-up (POST /drift/judge-labels): same
+  // rubric and model, response constrained to the labels added since v1. Its
+  // own label so the saving over DRIFT_JUDGE is measured rather than asserted.
+  // ally-ai emitted it before this member existed; the processor stores the
+  // raw string, so those rows already carry this value.
+  DRIFT_JUDGE_LABELS = 'drift_judge_labels',
+  LANGUAGE_JUDGE = 'language_judge',
+  // Feedback-groundedness judge in ally-ai: is each debrief claim supported by
+  // the transcript? Emitted by ally-ai before this member existed; the
+  // processor stores the raw string, so those rows already carry this value.
+  FEEDBACK_GROUNDEDNESS_JUDGE = 'feedback_groundedness_judge',
+  // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
+  // character and fitted the turn. Its own label rather than folded into
+  // LANGUAGE_JUDGE because it runs on a different cadence over a different
+  // slice — sharing one would make both lines unreadable.
+  FILLER_JUDGE = 'filler_judge',
+  // RAG-quality judge in ally-ai: labels whether the passages a corpus
+  // retrieval returned actually answered the query, and what a short retrieval
+  // was missing. Its own label because the unit is a retrieval rather than a
+  // session — far more rows, each a fraction of the tokens — so folded into
+  // another judge's line it would swamp the count and dilute the cost.
+  RAG_QUALITY_JUDGE = 'rag_quality_judge',
+  // Recall-quality judge in ally-ai: did the voice agent's client recall the
+  // backstory fact the turn called for, or was it ranked below the cap of five?
+  // Its own label because the unit is a TURN — a 30-turn session produces 30
+  // calls — so folded into another judge's line it would swamp every count.
+  RECALL_QUALITY_JUDGE = 'recall_quality_judge',
+  // Analytics Agent (admin Analytics -> Analytics Agent tab): one planning call
+  // (question -> SQL) and one narration call (rows -> answer) per question.
+  // Separate labels because the planner carries the whole schema catalogue and
+  // the narrator carries result rows, so their token profiles differ.
+  ANALYTICS_AGENT_PLAN = 'analytics_agent_plan',
+  ANALYTICS_AGENT_ANSWER = 'analytics_agent_answer',
+  // Analytics Suggestions (admin Analytics -> Suggestions tab): one call per
+  // Generate run. Its own label because the profile is unlike anything else
+  // here — a whole analytics window in, at most ten suggestions out.
+  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
+  // UX Signals scan (src/ux-signals): one triage call per scan, turning
+  // threshold-crossing PostHog signals into bug findings and suggestions. Its
+  // own label because the input is telemetry aggregates rather than an
+  // analytics window, so its token profile tracks detector count, not date range.
+  UX_SIGNALS = 'ux_signals',
+  // Foundational helping skills (src/foundational-skills): one call per
+  // 5,000-character cut of a learner's roleplay speech, scoring it against the
+  // fixed foundational helping skills rubric. Scheduled, never on a request path. Its own
+  // label because it is analytics spend (deliberately absent from TASK_AREA, so
+  // it never counts towards the learner unit cost) with a transcript-sized input.
+  FOUNDATIONAL_SKILLS_ASSESSMENT = 'foundational_skills_assessment',
+  // Foundational skills BENCHMARK (src/foundational-skills): one call per
+  // completed session of a roleplay flagged `metadata.fhsBenchmark`, scoring the
+  // whole session with the same rubric, prompt and pinned model as the cut
+  // judge above. Scheduled, never on a request path. Its own label so the
+  // benchmark's spend separates from the cut pipeline's, and like that one it is
+  // analytics spend, deliberately absent from TASK_AREA.
+  FOUNDATIONAL_SKILLS_BENCHMARK_JUDGE = 'foundational_skills_benchmark_judge',
+  // Text helpline (src/helpline, docs/text-helpline.md §9). Three labels
+  // because the three calls differ in volume and shape: the risk screen runs
+  // on EVERY talker message, the copilot turn once per talker burst (debounced)
+  // in an active chat, the QA judge once per ended chat. The first two are
+  // made by ally-ai, which records them under these same strings. All three
+  // serve helpline talkers and listeners, not a learner practising, so they
+  // are deliberately absent from TASK_AREA (non-learner spend).
+  HELPLINE_RISK_CLASSIFY = 'helpline_risk_classify',
+  HELPLINE_COPILOT_TURN = 'helpline_copilot_turn',
+  HELPLINE_QA_JUDGE = 'helpline_qa_judge',
+  // Feedback → skill mapping (src/foundational-skills): one call per completed
+  // session whose debrief names areas of growth, filing each under one
+  // foundational helping skill (or none) for the Helping skills "named
+  // improvements" chart. Scheduled, off unless FEEDBACK_SKILL_MAPPING_SCHEDULE
+  // is on. Analytics spend like the FHS judges: tagged to the session, absent
+  // from TASK_AREA and SESSION_COST_COMPONENT_BY_TASK.
+  FEEDBACK_IMPROVEMENT_SKILL_MAPPING = 'feedback_improvement_skill_mapping',
+  // Mobile Releases admin page (src/mobile-releases): one call per
+  // ios-whats-new-suggestion request, turning raw ally-mobile commit
+  // subjects since the last release into a draft App Store "What's New"
+  // text. Its own label because the input is a short commit list, not an
+  // analytics window or telemetry aggregate.
+  MOBILE_RELEASE_WHATS_NEW = 'mobile_release_whats_new',
+  // Product updates (src/product-updates): one call per batch of clustered
+  // merges, placing each cluster as a new product update, onto an open one, or
+  // as noise, and writing its public and team text. Scheduled half-hourly and
+  // on an admin's backfill, never on a request path. Its own label because it
+  // is the only call whose output reaches the public changelog.
+  PRODUCT_UPDATES_CONSOLIDATION = 'product_updates_consolidation',
+
+  // ally-be studio operations (in-process).
+  AUTOFILL_FIELD = 'autofill_field',
+  AUTOFILL_ENHANCE_FIELD = 'autofill_enhance_field',
+  // Agent Builder Copilot: one parallel per-field generation call.
+  AUTOFILL_AGENT_FIELD = 'autofill_agent_field',
+  // Event Builder: one per-field generation call turning an author's free-text
+  // behaviour description into a BINARY_CLASSIFIER event's configuration. Its
+  // own label rather than folded into AUTOFILL_AGENT_FIELD because the unit is
+  // an EVENT, not a simulation — far more of them, each a fraction of the
+  // tokens — so sharing a line would make the copilot's own cost unreadable.
+  AUTOFILL_EVENT_FIELD = 'autofill_event_field',
+  // Character-library interview agent: one streamed interviewer/tool-loop
+  // turn building a character profile.
+  CHARACTER_INTERVIEW = 'character_interview',
+  // Builder: one streamed PRD-interview turn (the coding half's usage is
+  // reported by the runner and recorded against BUILDER_BUILD).
+  BUILDER_INTERVIEW = 'builder_interview',
+  BUILDER_BUILD = 'builder_build',
+  // The flywheel's cheap passes: folding retrospective bullets into the
+  // curated lesson set, categorising how a build actually turned out, and
+  // picking which past lessons/exemplars a new session should see.
+  BUILDER_LESSON_CURATION = 'builder_lesson_curation',
+  BUILDER_OUTCOME_CATEGORISE = 'builder_outcome_categorise',
+  BUILDER_CONTEXT_SELECTION = 'builder_context_selection',
+  // Cutting a large PRD into independently shippable milestones.
+  BUILDER_EPIC_DECOMPOSITION = 'builder_epic_decomposition',
+  // The interview's one-shot research pass over the codebase.
+  BUILDER_RESEARCH = 'builder_research',
+  // Bounding interview context growth by summarising older turns.
+  BUILDER_INTERVIEW_SUMMARY = 'builder_interview_summary',
+  // The cold PRD reviewer: one full review when a PRD first reads ready, then
+  // rechecks of its open findings as the PRD changes (metadata.mode says which).
+  BUILDER_PRD_REVIEW = 'builder_prd_review',
+  // The interview protocol's discovery sweep: one call that plans the short
+  // searches the server runs before Builder's first reply.
+  BUILDER_DISCOVERY_PLAN = 'builder_discovery_plan',
+  // Builder's replay eval: every model call a replay makes — the sandboxed
+  // interviewer and reviewer (relabelled so eval spend is not reported as real
+  // interviews; metadata.evalOf keeps the original task), the simulated admin
+  // and the checklist judge.
+  BUILDER_EVAL = 'builder_eval',
+  // The learning loop: is an admin's reply in a Builder interview a
+  // correction, and of what kind.
+  BUILDER_CORRECTION_CLASSIFY = 'builder_correction_classify',
+  // The roadmap's opportunity copilot: one pass of the guided interview's tool
+  // loop (research, then a structured turn). Tagged with metadata.iteration so
+  // a turn's passes can be summed.
+  ROADMAP_OPPORTUNITY_COPILOT = 'roadmap_opportunity_copilot',
+  // Track 2.0 quiz: grading one open-ended learner answer against its rubric.
+  TRACK_QUIZ_GRADING = 'track_quiz_grading',
+  TRANSLATE_SCENARIO = 'translate_scenario',
+  // Admin-dashboard scenario cover-image generation (Simulation Studio).
+  GENERATE_COVER_IMAGE = 'generate_cover_image',
+  // Course editor (Track settings): a trainer generates the course cover from
+  // a prompt they wrote. Not the scenario template above, and not filed into
+  // the roleplay cover library.
+  GENERATE_COURSE_COVER_IMAGE = 'generate_course_cover_image',
+  TRANSLATE_TEXT = 'translate_text',
+  TRANSLATE_OBJECT = 'translate_object',
+  // Scribe voice note: turning one dictation transcript into note fields.
+  // Previously recorded NO usage row at all — the call went straight to the
+  // Anthropic SDK and skipped the sink — so scribe dictation cost was
+  // invisible. Labelled now that it resolves through LlmCompletionService.
+  VOICE_NOTE_EXTRACT = 'voice_note_extract',
+  // AI Lab: one run of a saved skill against its chosen model. Also recorded
+  // nothing before; the AI Lab's own run rows tracked cost, so it was absent
+  // from platform-wide LLM spend.
+  AI_LAB_RUN = 'ai_lab_run',
+  // LLM Preview: one 32-token round trip proving a model still answers.
+  // Individually trivial, but the monthly liveness sweep runs it across the
+  // whole catalog, so it is worth being able to see rather than inferring it
+  // from a gap in the numbers.
+  LLM_PREVIEW = 'llm_preview',
+
+  // STT (speech-to-text) tasks.
+  AGENT_STT = 'agent_stt', // live agent listening (per turn)
+  TRANSCRIPTION = 'transcription', // batch uploaded-audio transcription
+
+  // TTS (text-to-speech) tasks.
+  AGENT_TTS = 'agent_tts', // live agent voice (per turn)
+
+  // Bug Hunter: any LLM call inside the autonomous find-and-fix pipeline
+  // (finder classification, adversarial verify, fix drafting, doc sync).
+  // One label across every stage — see BugHunterService.snapshotCostUsd,
+  // which sums llm_usage by this task tagged with metadata.runId to cost a
+  // run, not by stage within it.
+  BUG_HUNTER = 'bug_hunter',
+
+  // Agent memory: the curator pass that folds an agent's notebook candidates
+  // into its active set — see AgentMemoryCuratorService. Its own label rather
+  // than BUG_HUNTER because the notebook is agent-scoped and Builder's lessons
+  // are due to move onto the same table (OPP-0714).
+  AGENT_MEMORY_CURATION = 'agent_memory_curation',
+
+  // Skill experiments (auto-improve): the judge that scores one skill output
+  // against the admin's rubric, the designer that drafts the next variant,
+  // and the challenger generator that aggregates feedback to propose a new prompt.
+  // All tagged with metadata.experimentId so an experiment's spend is one
+  // llm_usage query.
+  SKILL_EXPERIMENT_JUDGE = 'skill_experiment_judge',
+  SKILL_EXPERIMENT_DESIGNER = 'skill_experiment_designer',
+  SKILL_EXPERIMENT_CHALLENGER_JOB = 'skill_experiment_challenger_job',
+
+  // Course Copilot: the admin agent that interviews a trainer, plans a course
+  // blueprint and generates every component into a DRAFT course. One label per
+  // call site so a build's spend reads by stage; every row also carries
+  // metadata.courseCopilotSessionId, which is what the session budget sums.
+  COURSE_COPILOT_INTERVIEW = 'course_copilot_interview',
+  COURSE_COPILOT_BLUEPRINT = 'course_copilot_blueprint',
+  COURSE_COPILOT_ARTICLE = 'course_copilot_article',
+  COURSE_COPILOT_QUIZ = 'course_copilot_quiz',
+  COURSE_COPILOT_JOURNAL = 'course_copilot_journal',
+  COURSE_COPILOT_ANNOTATION = 'course_copilot_annotation',
+  COURSE_COPILOT_META = 'course_copilot_meta',
+  COURSE_COPILOT_REVIEW = 'course_copilot_review',
+  COURSE_COPILOT_SUMMARY = 'course_copilot_summary',
+  COURSE_COPILOT_ROLEPLAY_BRIEF = 'course_copilot_roleplay_brief',
+  COURSE_COPILOT_IMAGE_PROMPT = 'course_copilot_image_prompt',
+  COURSE_COPILOT_IMAGE = 'course_copilot_image',
+  // The one Course Copilot call made outside a session: an admin's click on the
+  // builder's Landing page tab. Tagged with metadata.trackId, not a session id.
+  COURSE_COPILOT_LANDING_PAGE = 'course_copilot_landing_page',
+
+  // Fallback for an un-mapped sender task (never drop a usage row).
+  UNKNOWN = 'unknown',
+}

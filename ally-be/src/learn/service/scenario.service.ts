@@ -1,0 +1,4305 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource, DeepPartial, EntityManager, In } from 'typeorm';
+
+// Page size for `translateChecklistItems` — keeps a single batch's worth of
+// `ScenarioEvents` (+ their base `SessionEvents`) in memory at a time.
+const DEFAULT_CHECKLIST_TRANSLATION_BATCH_SIZE = 50;
+
+async function executeInChunks<T, R>(
+  items: T[],
+  chunkSize: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+import { Scenarios } from '../entity/scenarios.entity';
+import { CreateScenariosDto } from '../dto/create-scenarios.dto';
+import { UpdateScenarioDto } from '../dto/update-scenario.dto';
+import {
+  validateKnowledgeSourceUnlocks,
+  validateSimulationStates,
+} from '../util/validate-simulation-states.util';
+import { KnowledgeSourceDto } from '../dto/knowledge-source.dto';
+import { SimulationState } from '../type/simulation-state.type';
+import { buildGeneratedStates } from '../util/build-generated-states.util';
+import { acquireGlobalScenarioTenantLock } from '../util/global-scenario-tenant-lock.util';
+
+import { LlmModelService } from 'src/llm/service/llm-model.service';
+import { ScenariosRepository } from '../repository/scenario.repository';
+
+import { ScenarioVoices } from '../entity/scenario-voices.entity';
+import { CreateScenarioVoicesDto } from '../dto/create-scenario-voices.dto';
+import { UpdateScenarioVoiceDto } from '../dto/update-scenario-voice.dto';
+import {
+  CreateScenarioEventsDto,
+  EventMappingDto,
+} from '../dto/create-scenario-events.dto';
+import { DeleteScenarioEventsDto } from '../dto/delete-scenario-events.dto';
+import { ScenarioEvents } from '../entity/scenario-events.entity';
+import { Pagination, SuccessResponse } from 'src/common/type/common.type';
+import { ScenarioVoicesRepository } from '../repository/scenario-voices.repository';
+import { validateVoiceConfig } from '../util/voice-config-schema.util';
+import { CreateScenarioDto } from '../dto/create-scenario.dto';
+import {
+  ScenarioAppLangugeTranslations,
+  ScenarioStatus,
+} from '../type/scenario.type';
+import { SCENARIO_STATUS_MAP } from 'src/learn/constants/scenario-status.map';
+import { S3Service } from 'src/aws/service/s3.service';
+import { AppConfigService } from 'src/config/config.service';
+import { ScenarioImageUploadRequestDto } from '../dto/scenario-image-upload-request.dto';
+import { ScenarioImageUploadResponseDto } from '../dto/scenario-image-upload-response.dto';
+import { ScenarioImageUploadContentType } from '../enum/scenario-image-upload-content-type.enum';
+import { ScenarioEventsRepository } from '../repository/scenario-events.repository';
+import { DeleteCoverImageDto } from '../dto/delete-cover-image.dto';
+import { LoggerService } from 'src/logger/logger.service';
+import { ScenarioVideoUploadRequestDto } from '../dto/scenario-video-upload-request.dto';
+import { ScenarioVideoUploadResponseDto } from '../dto/scenario-video-upload-response.dto';
+import { ScenarioVideoUploadContentType } from '../enum/scenario-video-upload-content-type';
+import { DeleteCoverVideoDto } from '../dto/delete-cover-video.dto';
+import {
+  UPLOADED_VIDEO_FILE_DURATION_LIMIT,
+  UPLOADED_VIDEO_FILE_SIZE_LIMIT,
+} from '../constants/scenario-cover-video.constants';
+import {
+  GetAdminScenarioDto,
+  GetScenarioDto,
+  GetScenarioDtoWithPagination,
+} from '../dto/get-scenario.dto';
+import {
+  formatScenarioTriggerWarningsList,
+  getActiveScenarioMandatoryFields,
+  mapCreateScenarioRequestToEntity,
+  mapUpdateScenarioRequestToEntity,
+  formatAutoTerminationEventsList,
+  applyScenarioTranslations,
+  withoutFhsBenchmarkFlag,
+} from '../util/scenario.util';
+import { sanitizeJsonbMetadata } from 'src/common/util/sanitize-jsonb.util';
+import { htmlToPlainText } from 'src/common/util/sanitize-html.util';
+import { TenantService } from 'src/tenant/service/tenant.service';
+import { Tenant } from 'src/tenant/entity/tenant.entity';
+import { ScenarioTenants } from '../entity/scenario-tenants.entity';
+import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
+import { ScenarioTriggerWarnings } from '../entity/scenario-trigger-warnings.entity';
+import { ScenarioPathSharedService } from 'src/scenario-path/service/scenario-path-shared.service';
+import {
+  GetScenarioByIdOptions,
+  ScenarioFilters,
+} from '../type/scenario-filter.type';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
+import { PreferenceName } from 'src/common/constants/user.constants';
+import { GetScenarioResponse } from '../interface/session.interface';
+import { ScenarioCompletionSummary } from '../interface/scenario-completion.interface';
+import { ScenarioSessionRepository } from '../repository/scenario-session.repository';
+import { TriggerWarningsService } from './trigger-warnings.service';
+import { ScenarioTranslationsRepository } from '../repository/scenario-translations.repository';
+import { GoogleTranslationsService } from 'src/common/service/google-translation.service';
+import { SharedLanguageService } from '../../language/service/shared-language.service';
+import { ScenarioSharedService } from './scenario-shared.service';
+import { ScenarioEventsTranslationsRepository } from '../repository/scenario-events-translations.repository';
+import {
+  MetadataShape,
+  TranslationConsiderableData,
+} from '../type/scenario-translation-metadata.type';
+import {
+  CreateScenarioTranslation,
+  UpdateScenarioTranslation,
+} from '../interface/scenario-translation.interface';
+import {
+  CreateScenarioEventsTranslation,
+  ScenarioEventsTranslationData,
+} from '../interface/scenario-events-translation.interface';
+import { DEFAULT_LANGUAGE_TRANSLATION_CODE } from '../constants/scenario-session.constants';
+import { TerminationEventsDto } from '../dto/termination-events.dto';
+import isDuplicateKeyException from 'src/exception/custom.exception';
+import {
+  BRANCHING_INSTRUCTION_DYNAMIC_SHORTCUTS,
+  LOWER_MAX_TIMER_VALUE,
+  SCENARIO_FIELDS,
+  UPPER_MAX_TIMER_VALUE,
+} from '../constants/scenario.constants';
+import {
+  wrapFieldPlaceholders,
+  unwrapFieldPlaceholders,
+} from 'src/session-event/util/session-event.util';
+import {
+  OpenAITranslationsService,
+  TranslationProgressCallback,
+} from 'src/common/service/openai-translation.service';
+import { ScenarioTranslationNotificationService } from './scenario-translation-notification.service';
+import {
+  ScenarioTranslationAction,
+  ScenarioTranslationStatus,
+} from '../enum/scenario-translation.enum';
+import { randomUUID } from 'crypto';
+import { ScenarioReportService } from 'src/scenario-report/service/scenario-report.service';
+import { SessionEventSharedService } from 'src/session-event/service/session-event-shared.service';
+import { SessionEventTranslationService } from 'src/session-event/service/session-event-translation.service';
+import { ScenarioBehaviorInstructionService } from './scenario-behavior-instruction.service';
+import { ScenarioBehaviorInstructionRequest } from '../type/scenario-behavior-instructions.type';
+import { CaseSharedService } from 'src/case/service/case-shared.service';
+import {
+  ENHANCE_AUTO_IMPROVE_INSTRUCTION,
+  parseFirstJsonObject,
+} from '../util/autofill-shared.util';
+import { AutofillService } from './autofill.service';
+import {
+  EnhanceScenarioFieldDto,
+  EnhanceScenarioFieldResponseDto,
+} from '../dto/enhance-scenario-field.dto';
+import {
+  EnhanceableField,
+  ENHANCEABLE_FIELD_LABELS,
+  ENHANCE_FIELD_PROMPT_CODE,
+  ENHANCE_STATE_PROMPT_CODE,
+} from '../enum/enhanceable-field.enum';
+import { CompetencyService } from './competency.service';
+import { BehaviorService } from './behavior.service';
+import {
+  AgentBuilderField,
+  ignoresEstablishedContext,
+  isLanguageScopedAgentBuilderField,
+  MAX_SPOKEN_LANGUAGES,
+} from '../enum/agent-builder-field.enum';
+import {
+  EstablishedContextDto,
+  GenerateAgentBuilderFieldDto,
+  GenerateAgentBuilderFieldResponseDto,
+} from '../dto/generate-agent-builder-field.dto';
+import { toPromptCode } from 'src/prompt/util/prompt-code.util';
+import { LlmTask } from '../enum/llm-task.enum';
+import { ScenarioVoiceLanguage } from '../type/scenario-language-voice.type';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+import {
+  LlmRuntime,
+  LlmProviderName,
+} from 'src/llm/constants/llm-model-registry.constants';
+import {
+  AvailableLanguageItem,
+  buildAvailableLanguagesMap,
+  getDistinctScenarioLanguageIds,
+  getDistinctScenarioVoiceIds,
+  getLanguageVoiceIds,
+} from 'src/common/util/language-availability.util';
+import {
+  isValidTimeFormatHHMMSS,
+  parseTimeToSeconds,
+} from 'src/common/util/time.util';
+import { PermissionsService } from 'src/authorization/service/permissions.service';
+import { TokenUser } from 'src/auth/type/auth.types';
+import { AuditLogService } from 'src/audit/service/audit-log.service';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_EVENTS,
+} from 'src/audit/constants/audit-event.constants';
+import { BehaviorInstructionDto } from '../dto/behavior-instruction.dto';
+
+@Injectable()
+export class ScenarioService {
+  private readonly logger = LoggerService.getInstance(ScenarioService.name);
+  static REQUIRED_CONTEXT_FIELDS: any;
+
+  constructor(
+    private readonly llmModelService: LlmModelService,
+    private scenariosRepository: ScenariosRepository,
+    private scenarioEventsRepository: ScenarioEventsRepository,
+    private sessionEventSharedService: SessionEventSharedService,
+    private readonly sessionEventTranslationService: SessionEventTranslationService,
+    private tenantService: TenantService,
+    private scenarioVoiceRepository: ScenarioVoicesRepository,
+    private s3Service: S3Service,
+    private configService: AppConfigService,
+    private dataSource: DataSource,
+    private scenarioPathSharedService: ScenarioPathSharedService,
+    private caseSharedService: CaseSharedService,
+    private triggerWarningsService: TriggerWarningsService,
+    private scenarioTranslationsRepository: ScenarioTranslationsRepository,
+    private googleTranslationsService: GoogleTranslationsService,
+    private openaiTranslationsService: OpenAITranslationsService,
+    private sharedLanguageService: SharedLanguageService,
+    private scenarioSharedService: ScenarioSharedService,
+    private scenarioEventTranslationsRepository: ScenarioEventsTranslationsRepository,
+    private scenarioReportService: ScenarioReportService,
+    private scenarioBehaviorInstructionService: ScenarioBehaviorInstructionService,
+    private competencyService: CompetencyService,
+    private autofillService: AutofillService,
+    private behaviorService: BehaviorService,
+    private permissionsService: PermissionsService,
+    private readonly auditLogService: AuditLogService,
+    private readonly scenarioTranslationNotificationService: ScenarioTranslationNotificationService,
+    private readonly promptSharedService: PromptSharedService,
+    private readonly scenarioSessionRepository: ScenarioSessionRepository,
+    private readonly cohortVisibilityService: CohortVisibilityService,
+    private readonly tenantFeatureService: TenantFeatureService,
+  ) {}
+
+  async getScenarios(): Promise<GetScenarioDto[]> {
+    const { data } = await this.scenariosRepository.getScenarios();
+    return data;
+  }
+
+  async getPublicScenarios(): Promise<GetScenarioDtoWithPagination> {
+    const { data, count } = await this.scenariosRepository.getScenarios({
+      isPublic: true,
+    });
+
+    return { data, count };
+  }
+
+  async getScenariosV2(
+    languageCode?: string,
+  ): Promise<GetScenarioDtoWithPagination> {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID is required');
+    }
+    // Cohort narrowing. Resolved here rather than in the repository because only
+    // the request context knows who is asking; `null` back means the learner is
+    // in no cohort, which is a real audience ("Unassigned") and must still be
+    // passed through — treating it as "skip filtering" would hand unplaced users
+    // everything the tenant has.
+    const userId = Number(ExecutionManager.getUserId());
+    const cohortId =
+      userId && !Number.isNaN(userId)
+        ? await this.cohortVisibilityService.resolveUserCohortId(userId)
+        : null;
+
+    const { data: fetchedData, count } =
+      await this.scenariosRepository.getScenarios({
+        tenantId,
+        cohortScope: { cohortId },
+        ...(languageCode && { languageCode }),
+      });
+    let data = fetchedData;
+
+    // Only languages whose voice Studio still shows as configured.
+    const activeVoices =
+      await this.sharedLanguageService.getActiveScenarioVoices(
+        getDistinctScenarioVoiceIds(data),
+      );
+    const languageIds = getDistinctScenarioLanguageIds(data, activeVoices);
+
+    const languages = languageIds.length
+      ? await this.sharedLanguageService.getLanguagesByIds(languageIds)
+      : [];
+
+    const availableLanguagesMap = buildAvailableLanguagesMap(languages);
+
+    data = data.map((scenario: any) => {
+      const languageVoiceIds = getLanguageVoiceIds(
+        scenario?.metadata?.languageVoices,
+        activeVoices,
+      );
+
+      delete scenario?.metadata;
+      return {
+        ...scenario,
+        availableLanguages: languageVoiceIds.length
+          ? languageVoiceIds
+              .map((languageId) => availableLanguagesMap.get(languageId))
+              .filter(Boolean)
+          : null,
+      };
+    });
+
+    if (languageCode) {
+      data.forEach((scenario) =>
+        applyScenarioTranslations(scenario, languageCode),
+      );
+      data.forEach((scenario) =>
+        scenario.triggerWarnings?.forEach((triggerWarning) => {
+          if (
+            triggerWarning.translations &&
+            triggerWarning.translations[languageCode]
+          ) {
+            triggerWarning.name =
+              triggerWarning.translations[languageCode].name ||
+              triggerWarning.name;
+          }
+        }),
+      );
+    }
+
+    const completions = await this.getCompletionsForCurrentUser(
+      tenantId,
+      data.map((scenario) => scenario.id),
+    );
+    data.forEach((scenario) => {
+      scenario.completion = completions.get(scenario.id) ?? null;
+    });
+
+    return { data, count };
+  }
+
+  /**
+   * The current request user's completion records for `scenarioIds`, keyed by
+   * scenario id. Never throws: a missing user id (or a failing query) degrades
+   * to "no completions", so the catalog still renders — the badge is
+   * decoration, not something worth 500ing a page load over.
+   */
+  private async getCompletionsForCurrentUser(
+    tenantId: string,
+    scenarioIds: number[],
+  ): Promise<Map<number, ScenarioCompletionSummary>> {
+    try {
+      const userId = Number(ExecutionManager.getUserId());
+      if (!userId || Number.isNaN(userId)) return new Map();
+      return await this.scenarioSessionRepository.getCompletionsForUser({
+        userId,
+        tenantId,
+        scenarioIds,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to load scenario completions: ${(error as Error)?.message}`,
+      );
+      return new Map();
+    }
+  }
+
+  async getAdminScenarios(
+    scenarioFilters?: ScenarioFilters,
+    options?: Pagination,
+    currentUser?: TokenUser,
+  ) {
+    const {
+      status,
+      category,
+      partnerOrgName,
+      tenantId,
+      assignmentStatus,
+      search,
+    } = scenarioFilters ?? {};
+    if (tenantId) {
+      const tenant = await this.tenantService.findById(tenantId);
+      if (!tenant) {
+        throw new NotFoundException('Tenant not found');
+      }
+    }
+
+    const isMultiTenantAdmin = currentUser
+      ? await this.permissionsService.isMultiTenantAdmin(currentUser.id)
+      : false;
+
+    const scenarios = await this.scenariosRepository.getAdminScenarios(
+      {
+        status,
+        category,
+        partnerOrgName,
+        tenantId,
+        assignmentStatus,
+        search,
+        isMultiTenantAdmin,
+        userId: currentUser?.id,
+      },
+      options,
+    );
+
+    const activeVoices =
+      await this.sharedLanguageService.getActiveScenarioVoices(
+        getDistinctScenarioVoiceIds(scenarios),
+      );
+    const languageIds = getDistinctScenarioLanguageIds(scenarios, activeVoices);
+
+    const languages = languageIds.length
+      ? await this.sharedLanguageService.getLanguagesByIds(languageIds)
+      : [];
+
+    const availableLanguagesMap = buildAvailableLanguagesMap(languages);
+    const mappedData = scenarios.map((item) => {
+      const isPreviewEnabled =
+        this.scenarioSharedService.hasAllActiveScenarioMandatoryFields(item);
+
+      const languageVoiceIds = getLanguageVoiceIds(
+        item?.scenario_metadata?.languageVoices,
+        activeVoices,
+      );
+
+      return {
+        id: item.scenario_id,
+        title: item.scenario_title,
+        createdAt: item.scenario_createdAt,
+        updatedAt: item.scenario_updatedAt,
+        scenario: item.scenario_scenario,
+        description: item.scenario_description,
+        coverImageUrl: item.scenario_coverImageUrl,
+        coverVideoUrl: item.scenario_coverVideoUrl,
+        createdBy: item.user_name,
+        createdByUserId: item.scenario_createdBy,
+        status: item.scenario_status,
+        category: item.scenario_category,
+        partnerOrgName: item.scenario_partnerOrgName,
+        usage: item.usage,
+        isAssignedToTenant: item.isAssignedToTenant,
+        triggerWarnings: item.triggerWarnings,
+        isPreviewEnabled,
+        isPublic: item.scenario_isPublic,
+        availableLanguages: languageVoiceIds.length
+          ? languageVoiceIds
+              .map((languageId) => availableLanguagesMap.get(languageId))
+              .filter(Boolean)
+          : null,
+      };
+    });
+
+    return { data: mappedData };
+  }
+
+  async getScenarioEvents(scenarioId: number, options?: Pagination) {
+    const result = await this.scenarioEventsRepository.getScenarioEvents(
+      scenarioId,
+      options,
+    );
+
+    const data = result.data.map((item) => ({
+      eventId: item.eventId,
+      name: item.sessionEvent?.name,
+      feedbackStatus: item.feedbackStatus,
+      score: item.score,
+      ...(item.feedbackStatus
+        ? {
+            emoji: item.emoji,
+            message: item.message,
+          }
+        : {
+            emoji: item.sessionEvent?.emoji,
+            message: item.sessionEvent?.message,
+          }),
+      branchingStatus: item.branchingStatus,
+      ...(item.branchingStatus
+        ? {
+            branchInstruction: item.branchInstruction,
+          }
+        : {
+            branchInstruction: item.sessionEvent?.branchInstruction,
+          }),
+      detectionConfig: item.detectionConfig,
+      checklistVisibilityStatus: item.checklistVisibilityStatus,
+      tags: item.sessionEvent?.tags,
+    }));
+
+    return { data, count: result.count };
+  }
+
+  async getScenario(
+    id: number,
+    options?: GetScenarioByIdOptions,
+    languageCode?: string,
+  ): Promise<GetScenarioResponse> {
+    const scenario = await this.scenariosRepository.getScenarioById(id, {
+      select: options?.select,
+      em: options?.em,
+      isPublic: options?.isPublic,
+      ...(languageCode && { languageCode }),
+    });
+
+    if (!scenario) {
+      throw new NotFoundException('Scenario not found');
+    }
+
+    if (languageCode) {
+      applyScenarioTranslations(scenario, languageCode);
+      scenario.triggerWarnings?.forEach((triggerWarning) => {
+        if (
+          triggerWarning.translations &&
+          triggerWarning.translations[languageCode]
+        ) {
+          triggerWarning.name =
+            triggerWarning.translations[languageCode].name ||
+            triggerWarning.name;
+        }
+        delete triggerWarning.translations;
+      });
+    }
+
+    if (options?.includeCompletion) {
+      const tenantId = ExecutionManager.getTenantId();
+      const completions = tenantId
+        ? await this.getCompletionsForCurrentUser(tenantId, [scenario.id])
+        : new Map<number, ScenarioCompletionSummary>();
+      scenario.completion = completions.get(scenario.id) ?? null;
+    }
+
+    if (options?.includeTextChatAvailability) {
+      scenario.textChatAvailable = await this.isTextChatAvailable(scenario.id);
+    }
+
+    if (options?.includeAvailableLanguages) {
+      scenario.availableLanguages = await this.getVoicedLanguages(scenario.id);
+    }
+
+    return scenario;
+  }
+
+  /**
+   * The languages a scenario has a voice for, built exactly as the catalog
+   * list builds them. Read separately for the same reason as
+   * isTextChatAvailable: the learner detail query never selects `metadata`,
+   * and this needs only its `languageVoices` key.
+   */
+  private async getVoicedLanguages(
+    scenarioId: number,
+  ): Promise<AvailableLanguageItem[] | null> {
+    const rows: { languageVoices: Record<string, unknown> | null }[] =
+      await this.scenariosRepository.query(
+        `SELECT "metadata"->'languageVoices' AS "languageVoices"
+         FROM "scenarios" WHERE "id" = $1 LIMIT 1`,
+        [scenarioId],
+      );
+    const languageVoices = rows?.[0]?.languageVoices;
+    // Same rule as the catalog: a language counts only while its voice is an
+    // active catalog voice, which is what Studio shows as configured.
+    const activeVoices =
+      await this.sharedLanguageService.getActiveScenarioVoices(
+        getDistinctScenarioVoiceIds([{ metadata: { languageVoices } }]),
+      );
+    const languageIds = getLanguageVoiceIds(languageVoices, activeVoices);
+    if (!languageIds.length) return null;
+    const languagesMap = buildAvailableLanguagesMap(
+      await this.sharedLanguageService.getLanguagesByIds(languageIds),
+    );
+    return languageIds
+      .map((languageId) => languagesMap.get(languageId))
+      .filter((language): language is AvailableLanguageItem => !!language);
+  }
+
+  /**
+   * Text chat is offered to a learner only when their org has it switched on
+   * AND the scenario's author offered it. Read separately from the learner
+   * detail query on purpose: that query never selects `metadata` (it holds the
+   * persona's prompt material), and this needs exactly one key of it.
+   * The org check runs first because it is off for almost every tenant, which
+   * saves the scenario read.
+   */
+  private async isTextChatAvailable(scenarioId: number): Promise<boolean> {
+    const orgEnabled = await this.tenantFeatureService.isEnabledForTenant(
+      PreferenceName.TEXT_CHAT_ROLEPLAY_ENABLED,
+      ExecutionManager.getTenantId(),
+    );
+    if (!orgEnabled) return false;
+    const rows: { textChatEnabled: boolean | null }[] =
+      await this.scenariosRepository.query(
+        `SELECT ("metadata"->>'textChatEnabled')::boolean AS "textChatEnabled"
+         FROM "scenarios" WHERE "id" = $1 LIMIT 1`,
+        [scenarioId],
+      );
+    return rows?.[0]?.textChatEnabled === true;
+  }
+
+  async getAdminScenario(
+    id: number,
+    currentUser?: TokenUser,
+  ): Promise<GetAdminScenarioDto> {
+    const result = await this.scenarioSharedService.getAdminScenario(id);
+
+    if (!result) {
+      throw new NotFoundException('Scenario not found');
+    }
+
+    if (currentUser) {
+      const isMultiTenantAdmin =
+        await this.permissionsService.isMultiTenantAdmin(currentUser.id);
+      if (isMultiTenantAdmin && result.createdBy !== currentUser.id) {
+        throw new ForbiddenException(
+          'You do not have permission to view this roleplay',
+        );
+      }
+    }
+
+    return result;
+  }
+
+  async getPresignedUrlForScenarioCoverImage(
+    scenarioImageUploadRequestDto: ScenarioImageUploadRequestDto,
+  ): Promise<ScenarioImageUploadResponseDto> {
+    if (
+      !Object.values(ScenarioImageUploadContentType).includes(
+        scenarioImageUploadRequestDto.contentType,
+      )
+    ) {
+      throw new BadRequestException('Invalid file type');
+    }
+
+    if (this.configService.isMockScenarioCoverImageUpload) {
+      return {
+        presignedUrl: '',
+        coverImageUrl: this.configService.mockScenarioCoverImageUrl,
+      };
+    }
+
+    const bucket = this.configService.s3.learnMediaPublicBucket;
+    if (!bucket) {
+      throw new Error(
+        'S3 bucket name for learnMediaPublicBucket is not defined',
+      );
+    }
+
+    const { presignedUrl, imageUrl } =
+      await this.s3Service.getPresignedUrlForImageUpload(
+        bucket,
+        'scenario-cover-images',
+        scenarioImageUploadRequestDto.fileName,
+        scenarioImageUploadRequestDto.fileSize,
+        scenarioImageUploadRequestDto.contentType,
+      );
+
+    return { presignedUrl, coverImageUrl: imageUrl };
+  }
+
+  async deleteCoverImage(deleteCoverImageDto: DeleteCoverImageDto) {
+    if (this.configService.isMockScenarioCoverImageUpload) {
+      return { success: true };
+    }
+    const bucket = this.configService.s3.learnMediaPublicBucket;
+    if (!bucket) {
+      throw new Error(
+        'S3 bucket name for learnMediaPublicBucket is not defined',
+      );
+    }
+    return this.s3Service.deleteS3Image(
+      bucket,
+      deleteCoverImageDto.coverImageUrl,
+    );
+  }
+
+  async getPresignedUrlForScenarioCoverVideo(
+    scenarioVideoUploadRequestDto: ScenarioVideoUploadRequestDto,
+  ): Promise<ScenarioVideoUploadResponseDto> {
+    const bucket = this.configService.s3.learnMediaPublicBucket;
+    if (!bucket) {
+      throw new Error(
+        'S3 bucket name for learnMediaPublicBucket is not defined',
+      );
+    }
+    const { fileName, fileSize, duration, contentType } =
+      scenarioVideoUploadRequestDto;
+
+    if (!Object.values(ScenarioVideoUploadContentType).includes(contentType)) {
+      throw new BadRequestException('Invalid file type');
+    }
+
+    if (fileSize > UPLOADED_VIDEO_FILE_SIZE_LIMIT) {
+      throw new BadRequestException(
+        `File size must be less than ${UPLOADED_VIDEO_FILE_SIZE_LIMIT / 1024 / 1024} MB`,
+      );
+    }
+
+    if (duration > UPLOADED_VIDEO_FILE_DURATION_LIMIT) {
+      throw new BadRequestException(
+        `File duration must be less than ${UPLOADED_VIDEO_FILE_DURATION_LIMIT}s`,
+      );
+    }
+
+    const sanitizedFileName = this.s3Service.sanitizeFileName(fileName);
+
+    const storageKey = `scenario-cover-videos/${Date.now()}-${sanitizedFileName}`;
+    const presignedUrl = await this.s3Service.generatePresignedUrl({
+      bucket,
+      key: storageKey,
+      operation: 'put',
+      expiresIn: 600, //10 min
+      contentType,
+    });
+
+    const region = this.configService.aws.region;
+    const coverVideoUrl = `https://${bucket}.s3.${region}.amazonaws.com/${storageKey}`;
+    return { presignedUrl, coverVideoUrl };
+  }
+
+  async deleteCoverVideo(deleteCoverVideoDto: DeleteCoverVideoDto) {
+    const bucket = this.configService.s3.learnMediaPublicBucket;
+    if (!bucket) {
+      throw new Error(
+        'S3 bucket name for learnMediaPublicBucket is not defined',
+      );
+    }
+
+    const coverVideoUrl = deleteCoverVideoDto.coverVideoUrl;
+    const s3CoverVideoUrlPattern =
+      /^https:\/\/[^.]+\.s3\.[^.]+\.amazonaws\.com\/(.+)$/;
+    const coverVideoUrlMatch = coverVideoUrl.match(s3CoverVideoUrlPattern);
+    const storageKey = coverVideoUrlMatch ? coverVideoUrlMatch[1] : null;
+
+    if (!storageKey) {
+      this.logger.warn(`Invalid or unrecognized S3 URL: ${coverVideoUrl}`);
+      return { success: false };
+    }
+
+    try {
+      await this.s3Service.deleteObject({
+        bucket,
+        key: storageKey,
+      });
+      return { success: true };
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete uploaded cover video with error ${JSON.stringify(
+          error,
+        )}`,
+      );
+      return { success: false };
+    }
+  }
+
+  /**
+   * The glossary and multilingual toggles are production kill-switches for
+   * default-ON language features — restricted to SUPER_DUPER_ADMIN. Other
+   * editors' updates silently preserve the stored values (create: drop, so
+   * the platform defaults apply). Lightweight group lookup, no cache: these
+   * writes are rare studio operations.
+   */
+  private async canEditLanguageRolloutToggles(
+    userId: number,
+  ): Promise<boolean> {
+    const rows = await this.dataSource.query(
+      `SELECT 1 FROM user_groups ug JOIN groups g ON g.id = ug."groupId"
+       WHERE ug."userId" = $1 AND g.name = 'SUPER_DUPER_ADMIN' LIMIT 1`,
+      [userId],
+    );
+    return rows.length > 0;
+  }
+
+  async createScenarios(
+    createScenariosDto: CreateScenariosDto,
+    userId: number,
+  ): Promise<Scenarios[]> {
+    if (
+      createScenariosDto.scenarios.some(
+        (sc) =>
+          sc.languageGlossaryEnabled !== undefined ||
+          sc.mainPromptVariantByLanguage !== undefined,
+      ) &&
+      !(await this.canEditLanguageRolloutToggles(userId))
+    ) {
+      this.logger.warn(
+        `User ${userId} lacks SUPER_DUPER_ADMIN; dropping language rollout toggles from scenario create`,
+      );
+      for (const sc of createScenariosDto.scenarios) {
+        delete sc.languageGlossaryEnabled;
+        delete sc.mainPromptVariantByLanguage;
+      }
+    }
+    const createScenarioDtos = await executeInChunks(
+      createScenariosDto.scenarios,
+      10,
+      async (scenario) => {
+        // Prune BEFORE validate so orphaned states from a variant whose
+        // body no longer references {state_x_guidelines} don't fail the
+        // strict-bounds validator with their legacy null bounds.
+        await this.pruneStatesIfPromptNotStateful(scenario);
+        await this.validateCreateScenario(scenario);
+        return mapCreateScenarioRequestToEntity(scenario, userId);
+      },
+    );
+
+    const isMultiTenantAdmin =
+      await this.permissionsService.isMultiTenantAdmin(userId);
+
+    try {
+      const savedScenarios = await this.dataSource.transaction(
+        async (entityManager) => {
+          const scenariosRepo = entityManager.getRepository(Scenarios);
+          const scenarioEventsRepo =
+            entityManager.getRepository(ScenarioEvents);
+          const scenarios = scenariosRepo.create(createScenarioDtos);
+          const savedScenarios = await scenariosRepo.save(scenarios);
+
+          if (isMultiTenantAdmin) {
+            savedScenarios.forEach((scenario) => {
+              this.auditLogService.log({
+                eventType: AUDIT_EVENTS.MULTI_TENANT_ADMIN_EDITED_SCENARIO,
+                details: {
+                  action: AUDIT_ACTIONS.CREATE_SCENARIO,
+                  scenarioId: scenario.id,
+                  userId,
+                },
+              });
+            });
+          }
+
+          const globalScenarios = savedScenarios.filter(
+            (scenario) => scenario.isGlobal,
+          );
+
+          if (globalScenarios.length > 0) {
+            // Serialise against tenant creation, which reads the global
+            // scenario list under the same lock. Without it a tenant that
+            // commits between this read and this transaction's commit gets no
+            // scenario_tenants row from either side. The list is read through
+            // the transaction's own manager so the lock actually covers it.
+            await acquireGlobalScenarioTenantLock(entityManager);
+            const tenants = await this.tenantService.findAll(entityManager);
+            const tenantIds = tenants.map((tenant) => tenant.id);
+
+            for (const globalScenario of globalScenarios) {
+              const scenarioTenantRepository =
+                entityManager.getRepository(ScenarioTenants);
+              const scenarioTenant = tenantIds.map((tenantId) =>
+                scenarioTenantRepository.create({
+                  scenarioId: globalScenario.id,
+                  tenantId,
+                }),
+              );
+              await scenarioTenantRepository.save(scenarioTenant);
+            }
+          }
+          const autoTerminationEventList = formatAutoTerminationEventsList(
+            createScenariosDto,
+            savedScenarios,
+          );
+
+          const scenarioTerminationEvents = scenarioEventsRepo.create(
+            autoTerminationEventList,
+          );
+
+          if (scenarioTerminationEvents.length > 0) {
+            await scenarioEventsRepo.save(scenarioTerminationEvents);
+            this.createUpdateScenarioEventsTranslations(
+              scenarioTerminationEvents,
+            );
+          }
+          const triggerWarningList = formatScenarioTriggerWarningsList(
+            createScenariosDto,
+            savedScenarios,
+          );
+          if (triggerWarningList.length > 0) {
+            const scenarioTriggerWarningsRepo = entityManager.getRepository(
+              ScenarioTriggerWarnings,
+            );
+            const scenarioTriggerWarnings =
+              scenarioTriggerWarningsRepo.create(triggerWarningList);
+            await scenarioTriggerWarningsRepo.save(scenarioTriggerWarnings);
+          }
+
+          // Create behavior instructions for each scenario
+          const scenarioBehaviorInstructionList: ScenarioBehaviorInstructionRequest[] =
+            createScenariosDto.scenarios?.map((scenario, index) => ({
+              scenarioId: savedScenarios[index].id,
+              behaviorInstructions: scenario.behaviorInstructions,
+            }));
+
+          const hasAnyBehaviorInstruction =
+            scenarioBehaviorInstructionList?.some(
+              (item) =>
+                item.behaviorInstructions &&
+                item.behaviorInstructions.length > 0,
+            );
+
+          if (hasAnyBehaviorInstruction)
+            await this.scenarioBehaviorInstructionService.createBehaviorInstructions(
+              scenarioBehaviorInstructionList,
+              entityManager,
+            );
+
+          // Persist translations for active scenarios
+          const activeScenarios = savedScenarios.filter(
+            (scenario) => scenario.status == ScenarioStatus.ACTIVE,
+          );
+
+          if (activeScenarios.length > 0) {
+            for (const scenario of activeScenarios) {
+              const translationConsiderableData: TranslationConsiderableData = {
+                currentLocation: scenario.metadata?.currentLocation,
+                profession: scenario.metadata?.profession,
+                context: scenario.metadata?.context,
+                age: scenario.metadata?.age,
+                gender: scenario.metadata?.gender,
+              };
+
+              this.persistTranslationsForScenarios(
+                [scenario],
+                () =>
+                  this.sanitizeMetadata({
+                    title: scenario.title,
+                    description: scenario.description,
+                    context: scenario.metadata?.context,
+                    sexualOrientation: scenario.metadata?.sexualOrientation,
+                    genderIdentity: scenario.metadata?.genderIdentity,
+                    customFields: scenario.metadata?.customFields,
+                    // Phase 2: opening dialogues are not auto-translated; primary stays in
+                    // scenario.metadata.openingStatements, others in scenario_translations (upsert).
+                    // FEATURE_CLEANUP(FEATURE_SCENARIO_BEHAVIOR_STATE_INSTRUCTIONS): Remove stateInstructions field
+                    stateInstructions: scenario.metadata?.stateInstructions,
+                    knowledgeSources: scenario.metadata?.knowledgeSources,
+                    stateNames: scenario.metadata?.stateNames,
+                  }),
+                translationConsiderableData,
+                undefined,
+                {
+                  userId,
+                  jobId: randomUUID(),
+                  action: ScenarioTranslationAction.CREATE,
+                },
+              );
+            }
+          }
+
+          return savedScenarios;
+        },
+      );
+      for (let i = 0; i < savedScenarios.length; i++) {
+        const dto = createScenariosDto.scenarios[i];
+        if (
+          dto.translationOpeningStatements &&
+          Object.keys(dto.translationOpeningStatements).length > 0
+        ) {
+          await this.upsertTranslationOpeningStatements(
+            savedScenarios[i].id,
+            dto.translationOpeningStatements,
+            savedScenarios[i].metadata,
+          );
+        }
+        if (
+          dto.translationDescription &&
+          Object.keys(dto.translationDescription).length > 0
+        ) {
+          await this.upsertTranslationDescription(
+            savedScenarios[i].id,
+            dto.translationDescription,
+            savedScenarios[i].metadata,
+          );
+        }
+        if (
+          dto.translationTitle &&
+          Object.keys(dto.translationTitle).length > 0
+        ) {
+          await this.upsertTranslationTitle(
+            savedScenarios[i].id,
+            dto.translationTitle,
+            savedScenarios[i].metadata,
+          );
+        }
+        if (
+          dto.translationReminders &&
+          Object.keys(dto.translationReminders).length > 0
+        ) {
+          await this.upsertTranslationReminders(
+            savedScenarios[i].id,
+            dto.translationReminders,
+            savedScenarios[i].metadata,
+          );
+        }
+      }
+
+      return savedScenarios;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create scenarios with error ${JSON.stringify(error)}`,
+      );
+      throw new BadRequestException(
+        `Failed to create scenarios: ${error.message}`,
+      );
+    }
+  }
+
+  async validateCreateScenario(
+    createScenarioDto: CreateScenarioDto,
+  ): Promise<void> {
+    this.validateScenarioStatus(createScenarioDto);
+
+    if (createScenarioDto.languageVoices) {
+      await this.validateLanguageVoices(createScenarioDto.languageVoices);
+    }
+
+    if (
+      createScenarioDto.triggerWarningIds &&
+      createScenarioDto.triggerWarningIds.length > 0
+    ) {
+      await this.validateTriggerWarnings(createScenarioDto.triggerWarningIds);
+    }
+    if (
+      createScenarioDto.terminationEvents &&
+      createScenarioDto.terminationEvents.length > 0
+    ) {
+      await this.validateTerminationEvents(createScenarioDto.terminationEvents);
+    }
+    if (createScenarioDto.behaviorInstructions) {
+      await this.scenarioBehaviorInstructionService.validateBehaviorInstructionsBehaviors(
+        createScenarioDto.behaviorInstructions,
+      );
+    }
+    await this.validateCompetencySelection(createScenarioDto);
+    if (
+      createScenarioDto.timerMode === true &&
+      createScenarioDto.maxTimeValue
+    ) {
+      this.validateMaxTimeValue(createScenarioDto.maxTimeValue);
+    }
+
+    // Mirror the state validation in validateUpdateScenario so create and
+    // update paths apply the same constraints (contiguous ranges, min gap
+    // 50, finite bounds). The starting state is emergent (the range
+    // containing 0), so there is no starting-state rule.
+    if (
+      Array.isArray(createScenarioDto.states) &&
+      createScenarioDto.states.length > 0
+    ) {
+      const stateErrors = validateSimulationStates(createScenarioDto.states);
+      if (stateErrors.length > 0) {
+        throw new BadRequestException(
+          `Invalid simulation states: ${stateErrors.join(' ')}`,
+        );
+      }
+    }
+
+    const unlockErrors = validateKnowledgeSourceUnlocks(
+      createScenarioDto.knowledgeSources,
+      createScenarioDto.states,
+    );
+    if (unlockErrors.length > 0) {
+      throw new BadRequestException(unlockErrors.join(' '));
+    }
+
+    // Cross-check: when the scenario points at a hasStates main-agent
+    // variant, states must be non-empty — otherwise the runtime renders
+    // {state_x_guidelines} blank silently. Skip the lookup when no variant
+    // is selected (default main agent doesn't use states).
+    await this.validateStatesPairing(
+      createScenarioDto.selectedMainPromptCode,
+      createScenarioDto.states,
+    );
+  }
+
+  /**
+   * When a scenario selects a `hasStates: true` main-agent prompt, its
+   * `states` array must contain at least one entry. Without this gate,
+   * scenarios with selectedMainPromptCode set to a stateful variant but
+   * empty states save successfully and silently render empty state
+   * guidance at runtime.
+   */
+  private async validateStatesPairing(
+    selectedMainPromptCode: string | undefined,
+    states: unknown,
+  ): Promise<void> {
+    if (!selectedMainPromptCode) return;
+    // PromptSharedService is the only cross-module accessor for prompt
+    // rows from learn services; using it avoids a hard dependency on
+    // PromptsRepository here.
+    const matches = await this.promptSharedService.getPromptsByOptions({
+      promptCode: [selectedMainPromptCode],
+    });
+    const selectedPrompt = matches?.[0];
+    // Body-driven decision (shared with pruneStatesIfPromptNotStateful):
+    // does the variant's body actually reference {state_x_guidelines}?
+    // The legacy hasStates flag is consulted only for never-reconciled
+    // rows, so duplicates whose admin removed the placeholder no longer
+    // trigger the "must have states" requirement.
+    const usesStates = selectedPrompt
+      ? this.promptReferencesStates(selectedPrompt)
+      : false;
+    if (!usesStates) {
+      this.logger.debug(
+        `[STATES_VALIDATE] pairing ok — promptCode=${selectedMainPromptCode} ` +
+          `does not reference {state_x_guidelines} (no states required)`,
+      );
+      return;
+    }
+    if (!Array.isArray(states) || states.length === 0) {
+      this.logger.debug(
+        `[STATES_VALIDATE] no states defined for promptCode=${selectedMainPromptCode} ` +
+          `which references {state_x_guidelines} — allowed, states are optional`,
+      );
+      return;
+    }
+    this.logger.info(
+      `[STATES_VALIDATE] pairing ok — promptCode=${selectedMainPromptCode} ` +
+        `references {state_x_guidelines} statesCount=${(states as unknown[]).length}`,
+    );
+  }
+
+  /**
+   * Drop `states` from the dto when the selected main-agent prompt's
+   * body does NOT reference `{state_x_guidelines}`. Prevents dormant
+   * state data from a previous variant selection leaking into
+   * `metadata.states` on a variant switch.
+   *
+   * Body-driven via auto-reconciled `availableVariables`, mirroring the
+   * runtime gate in ai-learn (_get_selected_prompt_has_states) and the
+   * UI gate in StatesEditor. Critically — does NOT consult the legacy
+   * `hasStates` boolean column when the variant has a reconciled
+   * variable list, because duplicates carry `hasStates=true` forever
+   * (forced at duplicate time), so a hasStates-based check would never
+   * trigger pruning for any duplicated variant whose admin later
+   * removed `{state_x_guidelines}` from the body.
+   *
+   * Mutates the dto in place. Skips when no prompt is selected (we
+   * can't determine the default's behaviour here without an extra
+   * lookup, so we err on the side of preserving user input).
+   */
+  private async pruneStatesIfPromptNotStateful(dto: {
+    selectedMainPromptCode?: string;
+    states?: unknown;
+  }): Promise<void> {
+    if (!dto.selectedMainPromptCode) return;
+    if (!Array.isArray(dto.states) || dto.states.length === 0) return;
+    const matches = await this.promptSharedService.getPromptsByOptions({
+      promptCode: [dto.selectedMainPromptCode],
+    });
+    const selectedPrompt = matches?.[0];
+    if (!selectedPrompt) return; // unknown prompt — preserve user input
+
+    const usesStates = this.promptReferencesStates(selectedPrompt);
+    if (!usesStates) {
+      const droppedCount = Array.isArray(dto.states) ? dto.states.length : 0;
+      this.logger.info(
+        `[STATES_VALIDATE] pruned ${droppedCount} dormant states — selected ` +
+          `promptCode=${dto.selectedMainPromptCode} does not reference ` +
+          `{state_x_guidelines} in its body`,
+      );
+      dto.states = undefined;
+    }
+  }
+
+  /**
+   * Body-driven check: does the variant's auto-reconciled
+   * `availableVariables` list include `state_x_guidelines`? Falls back
+   * to the legacy `hasStates` flag only when the list is empty / null
+   * (i.e. the row predates auto-reconcile and has never been re-saved).
+   *
+   * Shared by pruneStatesIfPromptNotStateful and validateStatesPairing
+   * so both decisions agree on whether a variant "uses states" today.
+   */
+  private promptReferencesStates(prompt: {
+    availableVariables?: unknown;
+    hasStates?: boolean | null;
+  }): boolean {
+    const list = Array.isArray(prompt.availableVariables)
+      ? (prompt.availableVariables as Array<
+          string | { name?: string; label?: string; required?: boolean }
+        >)
+      : [];
+    if (list.length > 0) {
+      return list.some((entry) => {
+        const name = typeof entry === 'string' ? entry : entry?.name;
+        return name === 'state_x_guidelines';
+      });
+    }
+    // Empty / missing list → legacy row; honor the flag.
+    return Boolean(prompt.hasStates);
+  }
+
+  private async validateTriggerWarnings(triggerWarningIds: string[]) {
+    const uniqueTriggerWarningIds = [...new Set(triggerWarningIds)];
+    const triggerWarnings =
+      await this.triggerWarningsService.getTriggerWarningsByIds(
+        uniqueTriggerWarningIds,
+      );
+    if (triggerWarnings.length !== uniqueTriggerWarningIds.length) {
+      throw new BadRequestException('Invalid trigger warning IDs');
+    }
+  }
+
+  private async validateTerminationEvents(
+    terminationEvents: TerminationEventsDto[],
+  ) {
+    const uniqueTerminationEventIds = Array.from(
+      new Set(terminationEvents.map((event) => event.id)),
+    );
+    if (uniqueTerminationEventIds.length !== terminationEvents.length) {
+      throw new BadRequestException('Termination events must be unique');
+    }
+    // check if each termination event contains message and it should have some value in it
+    const isTerminationEventMessageInvalid = terminationEvents.some(
+      (event) => !event.message || event.message.trim()?.length === 0,
+    );
+    if (isTerminationEventMessageInvalid) {
+      throw new BadRequestException('Termination event message is required');
+    }
+    const validEvents = await this.sessionEventSharedService.findByIds(
+      uniqueTerminationEventIds,
+    );
+    if (validEvents.length !== uniqueTerminationEventIds.length) {
+      throw new BadRequestException('Invalid termination event IDs');
+    }
+  }
+
+  private validateScenarioStatus(
+    data: CreateScenarioDto | UpdateScenarioDto,
+  ): void {
+    const { status, ...otherFields } = data;
+
+    // Validate DRAFT: at least one field besides status must be provided
+    if (status === ScenarioStatus.DRAFT) {
+      const hasAtLeastOneField = Object.values(otherFields).some(
+        (value) => value !== undefined && value !== null,
+      );
+
+      if (!hasAtLeastOneField) {
+        throw new BadRequestException(
+          'At least one field other than status must be provided for DRAFT scenario',
+        );
+      }
+    }
+
+    // Validate ACTIVE: all required fields must be present
+    if (status === ScenarioStatus.ACTIVE) {
+      const ACTIVE_SCENARIO_MANDATORY_FIELDS =
+        getActiveScenarioMandatoryFields();
+      const missingFields = ACTIVE_SCENARIO_MANDATORY_FIELDS.filter(
+        (field) => !data[field as keyof typeof data],
+      );
+
+      if (missingFields.length > 0) {
+        throw new BadRequestException(
+          `The following required fields are missing for ACTIVE scenario: ${missingFields.join(', ')}`,
+        );
+      }
+
+      // Behavior instructions are optional. Only validate structure when the
+      // caller actually provided one or more entries — an empty array means
+      // "no BI" and should be accepted, same as omitting the field entirely.
+      if (data?.behaviorInstructions && data.behaviorInstructions.length > 0) {
+        this.validateBehaviorInstructionsStructure(data.behaviorInstructions);
+      }
+    }
+  }
+
+  private validateBehaviorInstructionsStructure(
+    behaviorInstructions: BehaviorInstructionDto[],
+  ) {
+    // Callers gate on non-empty input; this method only validates the structure
+    // of each provided entry. The "BI required" check has been removed because
+    // behavior instructions are now optional for ACTIVE scenarios.
+    //
+    // Per-state coaching (`stateInstructions`) is optional content, not a
+    // gating field: newer prompt variants hide those columns entirely, and
+    // AI-generated rows may reasonably omit them. Only category + at least
+    // one linked behaviour drive scoring, so those are the only fields
+    // required here.
+    const invalidBehaviorInstructions = behaviorInstructions?.filter(
+      (instruction) =>
+        !instruction.category ||
+        !instruction.behaviors ||
+        instruction.behaviors.length === 0,
+    );
+    if (invalidBehaviorInstructions.length > 0) {
+      this.logger.error(JSON.stringify(invalidBehaviorInstructions));
+      throw new BadRequestException('Invalid behavior instructions');
+    }
+  }
+
+  /**
+   * Validates every competency the caller named. `competencyIds` carries the
+   * whole selection — a cluster arrives here already expanded — so each id has
+   * to exist, not just the scalar mirror. Checked in parallel: a large cluster
+   * is a lookup per competency, and sequentially that is a round-trip each on
+   * every save.
+   */
+  private async validateCompetencySelection(
+    dto: CreateScenarioDto | UpdateScenarioDto,
+  ): Promise<void> {
+    const ids = new Set(
+      [...(dto.competencyIds ?? []), dto.competencyId].filter(
+        (id): id is string => Boolean(id),
+      ),
+    );
+    await Promise.all(
+      [...ids].map((id) => this.competencyService.validateCompetencyId(id)),
+    );
+  }
+
+  private validateMaxTimeValue(maxTimeValue: string): void {
+    if (!maxTimeValue) {
+      return;
+    }
+
+    if (!isValidTimeFormatHHMMSS(maxTimeValue)) {
+      throw new BadRequestException(
+        'Time value must be in format HH:MM:SS (e.g., 01:30:00)',
+      );
+    }
+
+    // Parse time string to total seconds
+    const timeInSeconds = parseTimeToSeconds(maxTimeValue);
+    const minSeconds = parseTimeToSeconds(LOWER_MAX_TIMER_VALUE);
+    const maxSeconds = parseTimeToSeconds(UPPER_MAX_TIMER_VALUE);
+
+    if (timeInSeconds < minSeconds || timeInSeconds > maxSeconds) {
+      throw new BadRequestException(
+        `Time value must be between ${LOWER_MAX_TIMER_VALUE} and ${UPPER_MAX_TIMER_VALUE}`,
+      );
+    }
+  }
+
+  /**
+   * For ACTIVE scenarios, linguisticStyleSamples must contain at least one
+   * non-empty sample per active language in languageVoices. Deactivated
+   * languages are skipped — the admin UI hides them, so samples can't be
+   * provided for them and a stale languageVoices entry shouldn't block publish.
+   */
+  private async validateLinguisticStyleSamples(
+    languageVoices?: Record<string, string>,
+    linguisticStyleSamples?: Record<string, string[]>,
+  ): Promise<void> {
+    if (!languageVoices || Object.keys(languageVoices).length === 0) {
+      return;
+    }
+
+    const languageIds = Object.entries(languageVoices)
+      .filter(
+        ([, voiceId]) =>
+          typeof voiceId === 'string' && voiceId.trim().length > 0,
+      )
+      .map(([id]) => parseInt(id, 10))
+      .filter((id) => !Number.isNaN(id));
+
+    if (languageIds.length === 0) {
+      return;
+    }
+
+    const activeLanguages =
+      await this.sharedLanguageService.getLanguagesByIds(languageIds);
+
+    const samples = linguisticStyleSamples ?? {};
+    const missing: string[] = [];
+    for (const lang of activeLanguages) {
+      const langId = String(lang.id);
+      const langSamples = samples[langId];
+      const hasContent =
+        Array.isArray(langSamples) &&
+        langSamples.some((s) => typeof s === 'string' && s.trim().length > 0);
+      if (!hasContent) {
+        missing.push(lang.label);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Linguistic style samples are required. ` +
+          `Please provide at least one sample for: ${missing.join(', ')}`,
+      );
+    }
+  }
+
+  private async validateLanguageVoices(
+    languageVoices: Record<string, string>,
+  ): Promise<void> {
+    const voiceIds = Array.from(
+      new Set(
+        Object.values(languageVoices).filter(
+          (voiceId): voiceId is string =>
+            typeof voiceId === 'string' && voiceId.trim().length > 0,
+        ),
+      ),
+    );
+
+    await executeInChunks(voiceIds, 10, async (voiceId) =>
+      this.getScenarioVoice(voiceId),
+    );
+  }
+
+  private async updateScenarioTerminationEvents(
+    id: number,
+    terminationEvents: TerminationEventsDto[],
+    em: EntityManager,
+  ) {
+    const scenarioEventsRepo = em.getRepository(ScenarioEvents);
+    const existingScenarioTerminationEvents = await scenarioEventsRepo.find({
+      where: { scenarioId: id, autoTerminationStatus: true },
+    });
+    const terminationEventsToDelete = existingScenarioTerminationEvents.filter(
+      (event) => !terminationEvents.some((te) => te.id === event.eventId),
+    );
+    if (terminationEventsToDelete.length > 0) {
+      await scenarioEventsRepo.delete(
+        terminationEventsToDelete.map((event) => event.id),
+      );
+      this.scenarioEventTranslationsRepository.delete({
+        scenarioId: id,
+        eventId: In(terminationEventsToDelete?.map((event) => event.eventId)),
+      });
+    }
+    const terminationEventsToAdd = terminationEvents.filter(
+      (event) =>
+        !existingScenarioTerminationEvents.some(
+          (te) => te.eventId === event.id,
+        ),
+    );
+    if (terminationEventsToAdd.length > 0) {
+      const newTerminationEvents = terminationEventsToAdd.map((event) =>
+        scenarioEventsRepo.create({
+          scenarioId: id,
+          eventId: event.id,
+          autoTerminationStatus: true,
+          message: event.message,
+        }),
+      );
+      await scenarioEventsRepo.save(newTerminationEvents);
+      this.createUpdateScenarioEventsTranslations(
+        terminationEventsToAdd?.map((event) => ({
+          scenarioId: id,
+          eventId: event.id,
+          message: event.message,
+        })),
+      );
+    }
+
+    // Update the message of existing termination events
+    const existingScenarioTerminationEventsToUpdate =
+      existingScenarioTerminationEvents
+        .filter((event) =>
+          terminationEvents.some((te) => te.id === event.eventId),
+        )
+        ?.map((event) => {
+          const updatedTerminationEvent = terminationEvents?.find(
+            (te) => te.id === event.eventId,
+          );
+          return {
+            ...event,
+            message: updatedTerminationEvent?.message,
+          };
+        });
+    if (existingScenarioTerminationEventsToUpdate.length > 0) {
+      existingScenarioTerminationEventsToUpdate.forEach((event) =>
+        scenarioEventsRepo.update(event.id, { message: event.message }),
+      );
+      this.createUpdateScenarioEventsTranslations(
+        existingScenarioTerminationEventsToUpdate?.map((event) => ({
+          scenarioId: id,
+          eventId: event.id,
+          message: event.message,
+        })),
+      );
+    }
+  }
+
+  private async checkForInProgressScenarioReports(
+    scenarioId: number,
+  ): Promise<void> {
+    await this.scenarioReportService.checkForInProgressScenarioReports(
+      scenarioId,
+      'Cannot update scenario while a report is in progress',
+    );
+  }
+
+  async updateScenario(
+    id: number,
+    updateScenarioDto: UpdateScenarioDto,
+    userId: number,
+    // When provided, the update runs inside the caller's transaction (used by
+    // publishVersion to make config + events + version-status atomic) instead
+    // of opening its own. Omitted on the normal edit path — behaviour is
+    // unchanged there.
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    if (
+      (updateScenarioDto.languageGlossaryEnabled !== undefined ||
+        updateScenarioDto.mainPromptVariantByLanguage !== undefined) &&
+      !(await this.canEditLanguageRolloutToggles(userId))
+    ) {
+      // Preserve the STORED values rather than deleting: update rebuilds
+      // metadata from the dto, so a dropped key would erase a
+      // super-duper-admin's earlier setting (the version-publish path
+      // replays configs through here with the publisher's userId).
+      const existing = await this.scenariosRepository.findOne({
+        where: { id },
+      });
+      this.logger.warn(
+        `User ${userId} lacks SUPER_DUPER_ADMIN; preserving stored language rollout toggles on scenario ${id}`,
+      );
+      updateScenarioDto.languageGlossaryEnabled =
+        existing?.metadata?.languageGlossaryEnabled;
+      updateScenarioDto.mainPromptVariantByLanguage =
+        existing?.metadata?.mainPromptVariantByLanguage;
+    }
+
+    // Drop stale states data BEFORE validation runs. The previous order
+    // (validate → prune) rejected updates whenever a variant whose body
+    // used to include {state_x_guidelines} had its placeholder removed
+    // — the orphaned states (often with legacy null bounds) failed the
+    // strict-bounds validator before pruning got a chance to clear
+    // them. With body-driven pruning + this reorder, the dto reaches
+    // the validator already cleaned.
+    await this.pruneStatesIfPromptNotStateful(updateScenarioDto);
+
+    const scenario = await this.validateUpdateScenario(id, updateScenarioDto);
+
+    const isMultiTenantAdmin =
+      await this.permissionsService.isMultiTenantAdmin(userId);
+    if (isMultiTenantAdmin && scenario.createdBy !== userId) {
+      throw new ForbiddenException('You can only edit your own roleplays');
+    }
+
+    await this.checkForInProgressScenarioReports(scenario.id);
+
+    try {
+      const runUpdate = async (
+        entityManager: EntityManager,
+      ): Promise<boolean> => {
+        const updateData = mapUpdateScenarioRequestToEntity(
+          updateScenarioDto,
+          scenario,
+          userId,
+        );
+
+        const scenarioRepository = entityManager.getRepository(Scenarios);
+        const updated = await scenarioRepository.update(id, updateData);
+        // The status after this update: publishing a draft must translate it.
+        const statusAfterUpdate = updateScenarioDto.status ?? scenario.status;
+        if (statusAfterUpdate == ScenarioStatus.ACTIVE) {
+          const translationConsiderableData: TranslationConsiderableData = {
+            currentLocation: scenario.metadata?.currentLocation,
+            profession: scenario.metadata?.profession,
+            context: scenario.metadata?.context,
+            age: scenario.metadata?.age,
+            gender: scenario.metadata?.gender,
+          };
+          this.persistTranslationsForScenarios(
+            [scenario], // single-item array so helper can reuse same logic
+            () =>
+              this.sanitizeMetadata({
+                title: updateScenarioDto.title,
+                description: updateScenarioDto.description,
+                sexualOrientation: updateScenarioDto.sexualOrientation,
+                genderIdentity: updateScenarioDto.genderIdentity,
+                customFields: updateScenarioDto?.customFields,
+                knowledgeSources: updateScenarioDto?.knowledgeSources,
+                stateNames: updateScenarioDto?.stateNames,
+              }),
+            translationConsiderableData,
+            (s) =>
+              updateScenarioDto.languageVoices ?? s.metadata?.languageVoices,
+            {
+              userId,
+              jobId: randomUUID(),
+              action: ScenarioTranslationAction.UPDATE,
+            },
+          );
+        }
+        await this.updateScenarioTerminationEvents(
+          id,
+          updateScenarioDto?.terminationEvents || [],
+          entityManager,
+        );
+
+        // Update behavior instructions when the caller explicitly sent an
+        // array (including `[]`, which means "remove all existing BIs").
+        // An omitted field (undefined) means "no change to BIs"; the
+        // updateBehaviorInstructions service does a full sync — creating,
+        // updating, and soft-deleting as needed.
+        if (Array.isArray(updateScenarioDto.behaviorInstructions)) {
+          await this.scenarioBehaviorInstructionService.updateBehaviorInstructions(
+            {
+              scenarioId: id,
+              behaviorInstructions: updateScenarioDto.behaviorInstructions,
+            },
+            entityManager,
+          );
+        }
+
+        if (updated.affected === 0) return false;
+
+        const updatedScenario = await scenarioRepository.findOne({
+          where: { id },
+        });
+        if (
+          updateScenarioDto.isGlobal !== undefined &&
+          updatedScenario?.isGlobal !== scenario.isGlobal
+        ) {
+          const tenants = await this.tenantService.findAll();
+          const tenantIds = tenants.map((tenant) => tenant.id);
+          const scenarioTenantRepo =
+            entityManager.getRepository(ScenarioTenants);
+
+          if (updateScenarioDto.isGlobal) {
+            await scenarioTenantRepo.delete({ scenarioId: id });
+            const scenarioTenantMappings = tenantIds.map((tenantId) => ({
+              scenarioId: id,
+              tenantId: tenantId,
+            }));
+            await scenarioTenantRepo.save(
+              scenarioTenantRepo.create(scenarioTenantMappings),
+            );
+          } else {
+            await scenarioTenantRepo.delete({
+              scenarioId: id,
+              tenantId: In(tenantIds),
+            });
+          }
+        }
+        const scenarioTriggerWarningsRepo = entityManager.getRepository(
+          ScenarioTriggerWarnings,
+        );
+        const existingTriggerWarnings = await scenarioTriggerWarningsRepo.find({
+          where: { scenarioId: id },
+        });
+        const existingTriggerWarningIds = existingTriggerWarnings?.map(
+          (warning) => warning.triggerWarningId,
+        );
+        // Getting triggerWarnings that need to be added
+        const newTriggerWarningIds = [
+          ...new Set(
+            !existingTriggerWarningIds
+              ? updateScenarioDto?.triggerWarningIds
+              : updateScenarioDto?.triggerWarningIds?.filter(
+                  (id) => !existingTriggerWarningIds?.includes(id),
+                ),
+          ),
+        ];
+        if (newTriggerWarningIds && newTriggerWarningIds.length > 0) {
+          const scenarioTriggerWarningList = newTriggerWarningIds.map(
+            (triggerWarningId) =>
+              scenarioTriggerWarningsRepo.create({
+                scenarioId: id,
+                triggerWarningId,
+              }),
+          );
+          await scenarioTriggerWarningsRepo.save(scenarioTriggerWarningList);
+        }
+
+        // Getting triggerWranings that need to be deleted
+        const triggerWarningListToDelete = existingTriggerWarnings
+          ?.filter(
+            ({ triggerWarningId }) =>
+              !updateScenarioDto.triggerWarningIds?.includes(triggerWarningId),
+          )
+          ?.map(({ id }) => id);
+        if (triggerWarningListToDelete.length > 0) {
+          await scenarioTriggerWarningsRepo.delete(triggerWarningListToDelete);
+        }
+
+        if (isMultiTenantAdmin) {
+          this.auditLogService.log({
+            eventType: AUDIT_EVENTS.MULTI_TENANT_ADMIN_EDITED_SCENARIO,
+            details: {
+              action: AUDIT_ACTIONS.UPDATE_SCENARIO,
+              scenarioId: id,
+              userId,
+            },
+          });
+        }
+
+        return true;
+      };
+      const success = manager
+        ? await runUpdate(manager)
+        : await this.dataSource.transaction(runUpdate);
+
+      if (
+        success &&
+        (updateScenarioDto.translationOpeningStatements !== undefined ||
+          updateScenarioDto.translationDescription !== undefined ||
+          updateScenarioDto.translationTitle !== undefined ||
+          updateScenarioDto.translationReminders !== undefined)
+      ) {
+        // On the publish path `manager` is still an OPEN transaction holding
+        // the row lock from the UPDATE above, so these upserts must run on it
+        // too — a pooled connection would block on that lock until
+        // statement_timeout ("Failed to update scenario: canceling statement
+        // due to statement timeout" on every versioned publish with
+        // translations). Reading through it also lets each upsert see the
+        // previous one's uncommitted merge of scenarios.translations.
+        const fresh = await (
+          manager ? manager.getRepository(Scenarios) : this.scenariosRepository
+        ).findOne({
+          where: { id },
+        });
+        if (updateScenarioDto.translationOpeningStatements !== undefined) {
+          await this.upsertTranslationOpeningStatements(
+            id,
+            updateScenarioDto.translationOpeningStatements,
+            fresh?.metadata,
+            manager,
+          );
+        }
+        if (updateScenarioDto.translationDescription !== undefined) {
+          await this.upsertTranslationDescription(
+            id,
+            updateScenarioDto.translationDescription,
+            fresh?.metadata,
+            manager,
+          );
+        }
+        if (updateScenarioDto.translationTitle !== undefined) {
+          await this.upsertTranslationTitle(
+            id,
+            updateScenarioDto.translationTitle,
+            fresh?.metadata,
+            manager,
+          );
+        }
+        if (updateScenarioDto.translationReminders !== undefined) {
+          await this.upsertTranslationReminders(
+            id,
+            updateScenarioDto.translationReminders,
+            fresh?.metadata,
+            manager,
+          );
+        }
+      }
+
+      return success;
+    } catch (error) {
+      this.logger.error(
+        `Failed to update scenario with error ${JSON.stringify(error)}`,
+      );
+      throw new BadRequestException(
+        `Failed to update scenario: ${error.message}`,
+      );
+    }
+  }
+
+  async duplicateScenario(
+    id: number,
+    currentUser?: TokenUser,
+  ): Promise<Scenarios> {
+    const scenario = await this.getAdminScenario(id, currentUser);
+
+    const scenarioEvents = await this.scenarioEventsRepository.find({
+      where: { scenarioId: id },
+    });
+
+    const triggerWarnings =
+      await this.triggerWarningsService.getTriggerWarningsByScenarioId(id);
+
+    // Get behavior instructions from the original scenario
+    const originalBehaviorInstructions =
+      await this.scenarioSharedService.getBehaviorInstructionsByScenarioId(id);
+
+    const newScenario = {
+      title: `Copy of ${scenario.title}`,
+      description: scenario.description,
+      coverImageUrl: scenario.coverImageUrl,
+      coverVideoUrl: scenario.coverVideoUrl,
+      status: ScenarioStatus.DRAFT,
+      isPublic: scenario.isPublic,
+      prompt: scenario.prompt,
+      // A copy is a new roleplay, never the benchmark it was copied from.
+      metadata: withoutFhsBenchmarkFlag(scenario.metadata) ?? undefined,
+      isGlobal: scenario.isGlobal,
+      scenario: scenario.scenario,
+      competencyId: scenario.competencyId, // Copy competency from original scenario
+      category: scenario.category,
+      partnerOrgName: scenario.partnerOrgName,
+      createdBy: Number(ExecutionManager.getUserId()),
+      updatedBy: Number(ExecutionManager.getUserId()),
+    };
+
+    return await this.dataSource.transaction(async (manager) => {
+      // Serialise with tenant creation, which maintains the same
+      // global-simulation ↔ tenant pairing from the other end. Taken before
+      // anything is read or written, and released when this transaction ends,
+      // rollback included.
+      await acquireGlobalScenarioTenantLock(manager);
+
+      const scenarioRepo = manager.getRepository(Scenarios);
+      const scenarioEventRepo = manager.getRepository(ScenarioEvents);
+      const triggerWarningsScenarioRepo = manager.getRepository(
+        ScenarioTriggerWarnings,
+      );
+
+      const newScenarioData = await scenarioRepo.save(newScenario);
+
+      if (scenarioEvents.length > 0) {
+        const newScenarioEvents = scenarioEvents.map((item) =>
+          scenarioEventRepo.create({
+            scenarioId: newScenarioData.id,
+            autoTerminationStatus: item.autoTerminationStatus,
+            branchingStatus: item.branchingStatus,
+            branchInstruction: item.branchInstruction,
+            emoji: item.emoji,
+            eventId: item.eventId,
+            feedbackStatus: item.feedbackStatus,
+            message: item.message,
+            score: item.score,
+            detectionConfig: item.detectionConfig,
+            checklistVisibilityStatus: item.checklistVisibilityStatus,
+          }),
+        );
+        await scenarioEventRepo.save(newScenarioEvents);
+      }
+
+      if (triggerWarnings.length > 0) {
+        const newScenarioTriggerWarnings = triggerWarnings.map((item) =>
+          triggerWarningsScenarioRepo.create({
+            scenarioId: newScenarioData.id,
+            triggerWarningId: item.triggerWarningId,
+          }),
+        );
+        await triggerWarningsScenarioRepo.save(newScenarioTriggerWarnings);
+      }
+
+      // A copy nobody can reach is not a copy. `scenario_tenants` is the only
+      // thing that makes a simulation startable outside a course/case/path:
+      // `validateStartScenarioSession` requires an explicit row for the
+      // caller's tenant on the standalone start branch, and the learner
+      // catalog inner-joins the same table. Duplicating a tenant-scoped
+      // simulation without them produced a copy that looks complete in the
+      // studio, can be published, can be reached by id — and then refuses
+      // every Practice click with "Scenario is not available for your
+      // organization", permanently, with nothing in the duplicate flow ever
+      // backfilling the rows.
+      //
+      // Both audiences are read here, inside the transaction and under the
+      // lock above, not before it: a list read outside the transaction is a
+      // list that may already be wrong by the time the rows are written, and
+      // the miss is silent and permanent.
+      if (newScenarioData.isGlobal) {
+        const tenants = await manager.getRepository(Tenant).find();
+        const tenantIds = tenants.map((tenant) => tenant.id);
+        const scenarioTenantRepo = manager.getRepository(ScenarioTenants);
+        const scenarioTenants = tenantIds.map((tenantId) =>
+          scenarioTenantRepo.create({
+            scenarioId: newScenarioData.id,
+            tenantId,
+          }),
+        );
+        await scenarioTenantRepo.save(scenarioTenants);
+      } else {
+        // Copying the source's own set can only ever reproduce the audience
+        // the source has, never widen it.
+        const scenarioTenantRepo = manager.getRepository(ScenarioTenants);
+        const sourceScenarioTenants = await scenarioTenantRepo.find({
+          where: { scenarioId: id },
+        });
+        if (sourceScenarioTenants.length > 0) {
+          await scenarioTenantRepo.save(
+            sourceScenarioTenants.map(({ tenantId }) =>
+              scenarioTenantRepo.create({
+                scenarioId: newScenarioData.id,
+                tenantId,
+              }),
+            ),
+          );
+        }
+      }
+
+      // Copy behavior instructions from the original scenario
+      if (
+        originalBehaviorInstructions &&
+        originalBehaviorInstructions.length > 0
+      ) {
+        const behaviorInstructionsToCreate = originalBehaviorInstructions.map(
+          (instruction) => ({
+            category: instruction.category,
+            stateInstructions: instruction.stateInstructions,
+            behaviors: instruction.behaviors.map((behavior) => behavior.id),
+          }),
+        );
+
+        await this.scenarioBehaviorInstructionService.createBehaviorInstructions(
+          [
+            {
+              scenarioId: newScenarioData.id,
+              behaviorInstructions: behaviorInstructionsToCreate,
+            },
+          ],
+          manager,
+        );
+      }
+
+      if (currentUser?.id) {
+        const isMultiTenantAdmin =
+          await this.permissionsService.isMultiTenantAdmin(currentUser.id);
+        if (isMultiTenantAdmin) {
+          this.auditLogService.log({
+            eventType: AUDIT_EVENTS.MULTI_TENANT_ADMIN_EDITED_SCENARIO,
+            details: {
+              action: AUDIT_ACTIONS.DUPLICATE_SCENARIO,
+              originalScenarioId: id,
+              newScenarioId: newScenarioData.id,
+            },
+          });
+        }
+      }
+
+      this.logger.info(`Scenario ${id} duplicated successfully`);
+      return newScenarioData;
+    });
+  }
+
+  async validateUpdateScenario(
+    id: number,
+    updateScenarioDto: UpdateScenarioDto,
+  ): Promise<Scenarios> {
+    const scenario = await this.scenariosRepository.findOne({ where: { id } });
+    if (!scenario) {
+      throw new NotFoundException('Scenario not found');
+    }
+
+    // States schema validation runs whenever a non-empty `states` array is
+    // present in the payload. Empty / unset is allowed at the schema level
+    // — pairing with a hasStates prompt is gated by validateStatesPairing
+    // below.
+    if (
+      Array.isArray(updateScenarioDto.states) &&
+      updateScenarioDto.states.length > 0
+    ) {
+      const stateErrors = validateSimulationStates(updateScenarioDto.states);
+      if (stateErrors.length > 0) {
+        throw new BadRequestException(
+          `Invalid simulation states: ${stateErrors.join(' ')}`,
+        );
+      }
+    }
+
+    // Cross-check pairing: if the (possibly newly-selected) main-agent
+    // variant has hasStates=true, the simulation must carry a non-empty
+    // states array. Use the incoming selectedMainPromptCode when set,
+    // else fall back to whatever was already on the scenario.
+    const effectiveCode =
+      updateScenarioDto.selectedMainPromptCode !== undefined
+        ? updateScenarioDto.selectedMainPromptCode
+        : (scenario.metadata as { selectedMainPromptCode?: string } | undefined)
+            ?.selectedMainPromptCode;
+    const effectiveStates =
+      updateScenarioDto.states !== undefined
+        ? updateScenarioDto.states
+        : (scenario.metadata as { states?: unknown } | undefined)?.states;
+    await this.validateStatesPairing(effectiveCode, effectiveStates);
+
+    // Memory locks are checked against the EFFECTIVE pair: a payload may carry
+    // only one of knowledgeSources / states, and a lock must still resolve
+    // against whichever of the two is already stored.
+    const unlockErrors = validateKnowledgeSourceUnlocks(
+      updateScenarioDto.knowledgeSources !== undefined
+        ? updateScenarioDto.knowledgeSources
+        : (
+            scenario.metadata as
+              | { knowledgeSources?: KnowledgeSourceDto[] }
+              | undefined
+          )?.knowledgeSources,
+      effectiveStates as SimulationState[] | undefined,
+    );
+    if (unlockErrors.length > 0) {
+      throw new BadRequestException(unlockErrors.join(' '));
+    }
+
+    if (
+      updateScenarioDto?.status &&
+      updateScenarioDto.status !== scenario.status &&
+      (updateScenarioDto.status === ScenarioStatus.DRAFT ||
+        updateScenarioDto.status === ScenarioStatus.ARCHIVED)
+    ) {
+      const scenarioPathItem =
+        await this.scenarioPathSharedService.getScenarioPathItemByScenarioId(
+          id,
+        );
+      if (scenarioPathItem) {
+        throw new BadRequestException(
+          'This simulation is part of a Simulation Pathway and can’t be moved to draft. Please publish the changes.',
+        );
+      }
+
+      const caseItem = await this.caseSharedService.getCaseItemByScenarioId(id);
+      if (caseItem) {
+        throw new BadRequestException(
+          'This simulation is part of a Case and can’t be moved to draft. Please publish the changes.',
+        );
+      }
+    }
+
+    if (updateScenarioDto.status) {
+      if (
+        !SCENARIO_STATUS_MAP.get(scenario.status)?.includes(
+          updateScenarioDto.status,
+        )
+      ) {
+        throw new BadRequestException(
+          `Unable to update status from ${scenario.status} to ${updateScenarioDto.status}`,
+        );
+      }
+      await this.validateScenarioStatus(updateScenarioDto);
+    }
+
+    if (updateScenarioDto.languageVoices) {
+      await this.validateLanguageVoices(updateScenarioDto.languageVoices);
+    }
+
+    if (
+      updateScenarioDto.triggerWarningIds &&
+      updateScenarioDto.triggerWarningIds.length > 0
+    ) {
+      await this.validateTriggerWarnings(updateScenarioDto.triggerWarningIds);
+    }
+
+    if (
+      updateScenarioDto?.terminationEvents &&
+      updateScenarioDto?.terminationEvents?.length > 0
+    ) {
+      await this.validateTerminationEvents(updateScenarioDto.terminationEvents);
+    }
+
+    if (updateScenarioDto.behaviorInstructions) {
+      await this.scenarioBehaviorInstructionService.validateBehaviorInstructionsBehaviors(
+        updateScenarioDto.behaviorInstructions,
+      );
+    }
+    await this.validateCompetencySelection(updateScenarioDto);
+    if (
+      updateScenarioDto.timerMode === true &&
+      updateScenarioDto.maxTimeValue
+    ) {
+      this.validateMaxTimeValue(updateScenarioDto.maxTimeValue);
+    }
+
+    return scenario;
+  }
+
+  async deleteAdminScenario(
+    id: number,
+    currentUser?: TokenUser,
+  ): Promise<boolean> {
+    // To check if the scenario exists
+    await this.getAdminScenario(id, currentUser);
+
+    const scenarioPathItem =
+      await this.scenarioPathSharedService.getScenarioPathItemByScenarioId(id);
+    if (scenarioPathItem) {
+      throw new BadRequestException(
+        'This simulation cannot be deleted as it is part of a Simulation Pathway',
+      );
+    }
+
+    const caseItem = await this.caseSharedService.getCaseItemByScenarioId(id);
+    if (caseItem) {
+      throw new BadRequestException(
+        'This simulation cannot be deleted as it is part of a Case',
+      );
+    }
+    await this.dataSource.transaction(async (em) => {
+      await em.getRepository(Scenarios).softDelete(id);
+      await em.getRepository(ScenarioEvents).softDelete({ scenarioId: id });
+      await em.getRepository(ScenarioTenants).softDelete({ scenarioId: id });
+      await em.getRepository(ScenarioTriggerWarnings).delete({
+        scenarioId: id,
+      });
+    });
+    return true;
+  }
+
+  async mapEventsToScenario(
+    createScenarioEventsDto: CreateScenarioEventsDto,
+    // When provided, runs inside the caller's transaction (publishVersion).
+    manager?: EntityManager,
+  ) {
+    const { scenarioId, events } = createScenarioEventsDto;
+
+    await this.validateMapEventsToScenario(scenarioId, events);
+    await this.checkForInProgressScenarioReports(scenarioId);
+
+    try {
+      const runMap = async (entityManager: EntityManager) => {
+        const scenarioEventsRepo = entityManager.getRepository(ScenarioEvents);
+
+        // Create an array of ScenarioEvents entities to be saved
+        const scenarioEvents = await executeInChunks(
+          events,
+          10,
+          async (event) => {
+            const scenarioEvent = await scenarioEventsRepo.findOne({
+              where: {
+                scenarioId,
+                eventId: event.id,
+                autoTerminationStatus: false,
+              },
+            });
+
+            return {
+              ...scenarioEvent,
+              scenarioId,
+              eventId: event.id,
+              autoTerminationStatus: false,
+              score: event.score ?? scenarioEvent?.score,
+              ...(event.feedbackStatus
+                ? {
+                    feedbackStatus: event.feedbackStatus,
+                    emoji: event.emoji,
+                    message: event.message,
+                  }
+                : {
+                    feedbackStatus: false,
+                    emoji: undefined,
+                    message: undefined,
+                  }),
+              ...(event.branchingStatus
+                ? {
+                    branchingStatus: event.branchingStatus,
+                    branchInstruction: event.branchInstruction,
+                  }
+                : {
+                    branchingStatus: false,
+                    branchInstruction: undefined,
+                  }),
+              detectionConfig:
+                event.detectionConfig ?? scenarioEvent?.detectionConfig,
+              checklistVisibilityStatus: event.checklistVisibilityStatus,
+            };
+          },
+        );
+
+        await scenarioEventsRepo.save(scenarioEvents);
+
+        this.createUpdateScenarioEventsTranslations(scenarioEvents);
+
+        return {
+          scenarioId,
+          events: scenarioEvents.map((event) => ({
+            id: event.eventId,
+            feedbackStatus: event.feedbackStatus,
+            score: event.score,
+            emoji: event.emoji,
+            message: event.message,
+            branchingStatus: event.branchingStatus,
+            branchInstruction: event.branchInstruction,
+            detectionConfig: event.detectionConfig,
+            checklistVisibilityStatus: event.checklistVisibilityStatus,
+          })),
+        };
+      };
+      return manager
+        ? await runMap(manager)
+        : await this.dataSource.transaction(runMap);
+    } catch (error) {
+      if (
+        isDuplicateKeyException(
+          error,
+          'uq_scenario_events_scenario_id_event_id_auto_term_status_idx',
+        )
+      ) {
+        throw new BadRequestException('Event already exists in scenario');
+      }
+      this.logger.error(`Error mapping events to scenario: ${error}`);
+      throw error;
+    }
+  }
+
+  private async validateMapEventsToScenario(
+    scenarioId: number,
+    events: EventMappingDto[],
+  ) {
+    if (events.length === 0) {
+      throw new BadRequestException('Events array cannot be empty');
+    }
+
+    const eventIds = events.map((event) => event.id);
+
+    await this.getScenario(scenarioId);
+    // Validate events exist
+    const validEvents =
+      await this.sessionEventSharedService.findByIds(eventIds);
+    const validIdsSet = new Set(validEvents.map((e) => e.id));
+    const invalidEventIds = eventIds.filter((id) => !validIdsSet.has(id));
+    if (invalidEventIds.length > 0) {
+      throw new BadRequestException(`Invalid event IDs: ${invalidEventIds}`);
+    }
+
+    for (const event of events) {
+      if (event.detectionConfig?.startTime === null) {
+        throw new BadRequestException('Start time cannot be null');
+      }
+
+      if (
+        event.detectionConfig?.startTime &&
+        event.detectionConfig?.endTime &&
+        event.detectionConfig?.startTime > event.detectionConfig?.endTime
+      ) {
+        throw new BadRequestException(
+          'Start time cannot be greater than end time',
+        );
+      }
+
+      if (
+        event.detectionConfig?.minGapTime &&
+        event.detectionConfig?.minGapTime < 0
+      ) {
+        throw new BadRequestException('Minimum gap time cannot be less than 0');
+      }
+
+      if (
+        event.detectionConfig?.maxOccurrences &&
+        event.detectionConfig?.maxOccurrences < 0
+      ) {
+        throw new BadRequestException(
+          'Maximum occurrences cannot be less than 0',
+        );
+      }
+
+      if (
+        event.detectionConfig?.minScore &&
+        event.detectionConfig?.maxScore &&
+        event.detectionConfig?.minScore > event.detectionConfig?.maxScore
+      ) {
+        throw new BadRequestException(
+          'Minimum score cannot be greater than maximum score',
+        );
+      }
+
+      if (
+        event.detectionConfig?.occurrenceInterval &&
+        event.detectionConfig?.occurrenceInterval < 1
+      ) {
+        throw new BadRequestException(
+          'Occurrence interval should be at least 1',
+        );
+      }
+    }
+  }
+
+  async deleteScenarioEvents(
+    scenarioEvents: DeleteScenarioEventsDto,
+    // When provided, deletes within the caller's transaction (publishVersion).
+    manager?: EntityManager,
+  ) {
+    const { scenarioId, eventIds } = scenarioEvents;
+    if (eventIds.length === 0) {
+      throw new BadRequestException('Event IDs array cannot be empty');
+    }
+
+    await this.getScenario(scenarioId);
+    await this.checkForInProgressScenarioReports(scenarioId);
+
+    const eventsRepo = manager
+      ? manager.getRepository(ScenarioEvents)
+      : this.scenarioEventsRepository;
+    const result = await eventsRepo.delete({
+      eventId: In(eventIds),
+      scenarioId,
+      autoTerminationStatus: false,
+    });
+
+    if (result.affected === 0) {
+      throw new BadRequestException('No scenario events found to delete');
+    }
+    return result.affected;
+  }
+
+  async getScenarioVoices(
+    searchName: string | undefined,
+    providers: string | undefined,
+    languageIds: string | undefined,
+    options: Pagination,
+    genders?: string,
+    ages?: string,
+  ): Promise<ScenarioVoices[]> {
+    return this.scenarioVoiceRepository.getScenarioVoices(
+      searchName,
+      providers,
+      languageIds,
+      options,
+      genders,
+      ages,
+    );
+  }
+
+  async getScenarioVoice(id: string): Promise<ScenarioVoices> {
+    return this.scenarioSharedService.getScenarioVoice(id);
+  }
+
+  async createScenarioVoices(
+    createScenarioVoicesDto: CreateScenarioVoicesDto,
+  ): Promise<ScenarioVoices[]> {
+    createScenarioVoicesDto.voices.forEach((voice, index) =>
+      this.assertValidVoiceConfig(
+        voice.provider,
+        voice.config,
+        createScenarioVoicesDto.voices.length > 1
+          ? `voices[${index}]: `
+          : undefined,
+      ),
+    );
+
+    const scenarioVoices = this.scenarioVoiceRepository.create(
+      createScenarioVoicesDto.voices,
+    );
+    return this.scenarioVoiceRepository.save(scenarioVoices);
+  }
+
+  async updateScenarioVoice(
+    id: string,
+    updateScenarioVoiceDto: UpdateScenarioVoiceDto,
+  ): Promise<boolean> {
+    const scenarioVoice = await this.scenarioVoiceRepository.findOne({
+      where: { id },
+    });
+
+    if (!scenarioVoice) {
+      throw new NotFoundException('Scenario voice not found');
+    }
+
+    // Partial updates are allowed, so validate the config that will actually be
+    // stored: whichever of provider/config the caller sent, falling back to the
+    // persisted values for the ones they left out.
+    if (
+      updateScenarioVoiceDto.provider !== undefined ||
+      updateScenarioVoiceDto.config !== undefined
+    ) {
+      this.assertValidVoiceConfig(
+        updateScenarioVoiceDto.provider ?? scenarioVoice.provider,
+        updateScenarioVoiceDto.config ?? scenarioVoice.config,
+      );
+    }
+
+    const updated = await this.scenarioVoiceRepository.update(
+      id,
+      updateScenarioVoiceDto as DeepPartial<ScenarioVoices>,
+    );
+
+    return updated.affected !== 0;
+  }
+
+  /**
+   * Reject a voice whose config the runtime can't use.
+   *
+   * Without this the write succeeds and the breakage only shows up mid-call:
+   * `create_tts_client()` catches the client's ValueError and falls back to a
+   * default Google voice, so the scenario just plays in the wrong voice.
+   */
+  private assertValidVoiceConfig(
+    provider: string | undefined,
+    config: Record<string, any> | undefined,
+    messagePrefix = '',
+  ): void {
+    const errors = validateVoiceConfig(provider ?? '', config);
+    if (errors.length) {
+      throw new BadRequestException(
+        `${messagePrefix}${errors.join(' ')}`.trim(),
+      );
+    }
+  }
+
+  async getScenarioVoiceLanguagesForAdmin(
+    active?: boolean,
+    voicesNeeded?: boolean,
+  ) {
+    return this.scenarioVoiceRepository.getLanguagesWithVoices(
+      active,
+      voicesNeeded,
+    );
+  }
+
+  async getLanguagesForScenario(active?: boolean, hasVoices?: boolean) {
+    return this.scenarioVoiceRepository.getLanguagesForScenario(
+      active,
+      hasVoices,
+    );
+  }
+
+  /**
+   * Sanitize metadata for a `jsonb` column.
+   *
+   * Delegates to the shared `sanitizeJsonbMetadata` helper which:
+   *   - drops null / undefined / empty-string top-level values,
+   *   - trims top-level strings,
+   *   - recursively strips C0 control bytes (NULL, etc.) from strings,
+   *     INCLUDING strings buried inside arrays / nested objects.
+   *
+   * The nested cleanup is the critical bit: a stray NULL byte anywhere
+   * in `metadata.openingStatements[i]` would otherwise fail the
+   * `scenario_translations` insert with Postgres 22P05 ("\u0000 cannot
+   * be converted to text") — the issue this method now defends against.
+   *
+   * Kept as a thin instance method (instead of inlining the util at
+   * each call site) to preserve the existing test seam — spec files
+   * stub `(service as any).sanitizeMetadata` and we don't want to
+   * churn those.
+   */
+  private sanitizeMetadata<T extends Record<string, any>>(
+    metadata: T,
+  ): Partial<T> {
+    return sanitizeJsonbMetadata(metadata);
+  }
+
+  /**
+   * Build translated metadata map for a list of language codes.
+   * Returns an object: { [langCode]: Partial<MetadataShape> }
+   * Uses OpenAI for Indian languages (natural code-mixing)
+   * Falls back to Google Translate for other languages
+   */
+  private async buildTranslatedMetadataForLanguageCodes(
+    metadataObj:
+      | Partial<MetadataShape>
+      | Partial<{ message: string; branchInstruction: string }>,
+    languageCodes: string[],
+    translationConsiderableData?: TranslationConsiderableData,
+    onProgress?: TranslationProgressCallback,
+  ): Promise<Record<string, Partial<MetadataShape>>> {
+    // validation
+    const codes = (languageCodes ?? [])
+      .map((c) => (typeof c === 'string' ? c.trim() : ''))
+      .filter(Boolean);
+    if (!codes.length) {
+      this.logger?.debug?.(
+        '[buildTranslatedMetadataForLanguageCodes] no language codes provided',
+      );
+      return {};
+    }
+    if (!metadataObj || Object.keys(metadataObj).length === 0) {
+      this.logger?.debug?.(
+        '[buildTranslatedMetadataForLanguageCodes] no metadata to translate',
+      );
+      return {};
+    }
+
+    // Delegate to external translations service. It should itself validate/truncate and handle retries.
+    // Expect translateObjectToLanguages to accept a sanitized metadata object and array of codes.
+    try {
+      const openaiTranslatedVersion =
+        await this.openaiTranslationsService.translateScenarioData(
+          metadataObj,
+          codes,
+          translationConsiderableData,
+          onProgress,
+        );
+
+      if (
+        openaiTranslatedVersion &&
+        Object.keys(openaiTranslatedVersion).length > 0
+      ) {
+        this.logger?.debug?.(
+          '[buildTranslatedMetadataForLanguageCodes] successfully translated using OpenAI',
+        );
+        return openaiTranslatedVersion;
+      }
+
+      this.logger?.debug?.(
+        '[buildTranslatedMetadataForLanguageCodes] OpenAI translation returned empty, falling back to Google Translate',
+      );
+
+      const translated =
+        await this.googleTranslationsService.translateObjectToLanguages(
+          metadataObj,
+          codes,
+          { mimeType: 'text/html' },
+        );
+
+      // Expect translated to be a map { langCode: { tone: '...', ... } }
+      return translated ?? {};
+    } catch (err) {
+      this.logger?.error?.(
+        '[buildTranslatedMetadataForLanguageCodes] translation call failed',
+        { err, languageCodes: codes },
+      );
+      // bubble up or return empty map to continue processing other languages
+      return {};
+    }
+  }
+
+  private hasTranslatableFieldsChanged(
+    scenario: Scenarios,
+    sanitized: Partial<MetadataShape>,
+  ): boolean {
+    const isCreateOrNew =
+      !scenario.translations || Object.keys(scenario.translations).length === 0;
+
+    if (isCreateOrNew) {
+      return true;
+    }
+
+    for (const [key, newValue] of Object.entries(sanitized)) {
+      let oldValue: any;
+      if (
+        key === SCENARIO_FIELDS.TITLE ||
+        key === SCENARIO_FIELDS.DESCRIPTION
+      ) {
+        oldValue = (scenario as any)[key];
+      } else {
+        oldValue = scenario.metadata?.[key];
+      }
+
+      if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async upsertTranslationDescription(
+    scenarioId: number,
+    translationDescription: Record<string, string>,
+    metadataForPrimaryResolution?: Record<string, any> | null,
+    // When provided, every read AND write goes through the caller's
+    // transaction. publishVersion holds a row lock on `scenarios` for the
+    // whole publish; a write from the pool here would wait on that lock
+    // forever (the transaction is waiting on us) and die at statement_timeout.
+    manager?: EntityManager,
+  ): Promise<void> {
+    const primaryId =
+      await this.scenarioSharedService.resolveOpeningDialoguePrimaryLanguageId(
+        metadataForPrimaryResolution,
+      );
+
+    const existing =
+      await this.scenarioTranslationsRepository.getScenarioTranslationsByScenarioId(
+        scenarioId,
+        manager,
+      );
+
+    const toCreate: CreateScenarioTranslation[] = [];
+    const toUpdate: UpdateScenarioTranslation[] = [];
+    const normalizedByLanguageId: Record<number, string> = {};
+
+    for (const [langIdStr, raw] of Object.entries(translationDescription)) {
+      const languageId = Number(langIdStr);
+      if (!Number.isFinite(languageId)) continue;
+      if (primaryId != null && languageId === primaryId) continue;
+
+      const row = existing?.find((r) => Number(r.languageId) === languageId);
+      const normalized = typeof raw === 'string' ? raw.trim() : '';
+      normalizedByLanguageId[languageId] = normalized;
+
+      const mergedMetadata = {
+        ...(row?.metadata ?? {}),
+        description: normalized,
+      };
+
+      if (row) {
+        toUpdate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      } else {
+        toCreate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      }
+    }
+
+    if (toCreate.length) {
+      await this.scenarioTranslationsRepository.createScenarioTranslations(
+        toCreate,
+        manager,
+      );
+    }
+    if (toUpdate.length) {
+      await this.scenarioTranslationsRepository.updateScenarioTranslations(
+        toUpdate,
+        manager,
+      );
+    }
+
+    // Mirror description translations into scenarios.translations JSONB keyed
+    // by translationCode so applyScenarioTranslations() can resolve by the
+    // app's language code at read time. The side table (keyed by languageId)
+    // and this JSONB (keyed by code) must stay in sync.
+    const touchedLanguageIds = Object.keys(normalizedByLanguageId).map(Number);
+    if (touchedLanguageIds.length) {
+      const languages =
+        await this.sharedLanguageService.getLanguagesByIds(touchedLanguageIds);
+      if (languages.length) {
+        const scenariosRepo = manager
+          ? manager.getRepository(Scenarios)
+          : this.dataSource.getRepository(Scenarios);
+        const scenario = await scenariosRepo.findOne({
+          where: { id: scenarioId },
+        });
+        const currentTranslations: Record<string, any> =
+          (scenario?.translations as Record<string, any>) || {};
+        const mergedTranslations: Record<string, any> = {
+          ...currentTranslations,
+        };
+        for (const language of languages) {
+          const code = language.translationCode?.trim();
+          if (!code) continue;
+          mergedTranslations[code] = {
+            ...(currentTranslations[code] || {}),
+            description: normalizedByLanguageId[Number(language.id)],
+          };
+        }
+        await scenariosRepo.update(scenarioId, {
+          translations: mergedTranslations,
+        });
+      }
+    }
+  }
+
+  private async upsertTranslationTitle(
+    scenarioId: number,
+    translationTitle: Record<string, string>,
+    metadataForPrimaryResolution?: Record<string, any> | null,
+    // When provided, every read AND write goes through the caller's
+    // transaction. publishVersion holds a row lock on `scenarios` for the
+    // whole publish; a write from the pool here would wait on that lock
+    // forever (the transaction is waiting on us) and die at statement_timeout.
+    manager?: EntityManager,
+  ): Promise<void> {
+    const primaryId =
+      await this.scenarioSharedService.resolveOpeningDialoguePrimaryLanguageId(
+        metadataForPrimaryResolution,
+      );
+
+    const existing =
+      await this.scenarioTranslationsRepository.getScenarioTranslationsByScenarioId(
+        scenarioId,
+        manager,
+      );
+
+    const toCreate: CreateScenarioTranslation[] = [];
+    const toUpdate: UpdateScenarioTranslation[] = [];
+    const normalizedByLanguageId: Record<number, string> = {};
+
+    for (const [langIdStr, raw] of Object.entries(translationTitle)) {
+      const languageId = Number(langIdStr);
+      if (!Number.isFinite(languageId)) continue;
+      if (primaryId != null && languageId === primaryId) continue;
+
+      const row = existing?.find((r) => Number(r.languageId) === languageId);
+      const normalized = typeof raw === 'string' ? raw.trim() : '';
+      normalizedByLanguageId[languageId] = normalized;
+
+      const mergedMetadata = {
+        ...(row?.metadata ?? {}),
+        title: normalized,
+      };
+
+      if (row) {
+        toUpdate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      } else {
+        toCreate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      }
+    }
+
+    if (toCreate.length) {
+      await this.scenarioTranslationsRepository.createScenarioTranslations(
+        toCreate,
+        manager,
+      );
+    }
+    if (toUpdate.length) {
+      await this.scenarioTranslationsRepository.updateScenarioTranslations(
+        toUpdate,
+        manager,
+      );
+    }
+
+    // Mirror title translations into scenarios.translations JSONB keyed by
+    // translationCode so applyScenarioTranslations() (and the session read
+    // paths) can resolve by the app's language code at read time.
+    const touchedLanguageIds = Object.keys(normalizedByLanguageId).map(Number);
+    if (touchedLanguageIds.length) {
+      const languages =
+        await this.sharedLanguageService.getLanguagesByIds(touchedLanguageIds);
+      if (languages.length) {
+        const scenariosRepo = manager
+          ? manager.getRepository(Scenarios)
+          : this.dataSource.getRepository(Scenarios);
+        const scenario = await scenariosRepo.findOne({
+          where: { id: scenarioId },
+        });
+        const currentTranslations: Record<string, any> =
+          (scenario?.translations as Record<string, any>) || {};
+        const mergedTranslations: Record<string, any> = {
+          ...currentTranslations,
+        };
+        for (const language of languages) {
+          const code = language.translationCode?.trim();
+          if (!code) continue;
+          mergedTranslations[code] = {
+            ...(currentTranslations[code] || {}),
+            title: normalizedByLanguageId[Number(language.id)],
+          };
+        }
+        await scenariosRepo.update(scenarioId, {
+          translations: mergedTranslations,
+        });
+      }
+    }
+  }
+
+  private async upsertTranslationReminders(
+    scenarioId: number,
+    translationReminders: Record<string, string[]>,
+    metadataForPrimaryResolution?: Record<string, any> | null,
+    // When provided, every read AND write goes through the caller's
+    // transaction. publishVersion holds a row lock on `scenarios` for the
+    // whole publish; a write from the pool here would wait on that lock
+    // forever (the transaction is waiting on us) and die at statement_timeout.
+    manager?: EntityManager,
+  ): Promise<void> {
+    const primaryId =
+      await this.scenarioSharedService.resolveOpeningDialoguePrimaryLanguageId(
+        metadataForPrimaryResolution,
+      );
+
+    const existing =
+      await this.scenarioTranslationsRepository.getScenarioTranslationsByScenarioId(
+        scenarioId,
+        manager,
+      );
+
+    const toCreate: CreateScenarioTranslation[] = [];
+    const toUpdate: UpdateScenarioTranslation[] = [];
+    const normalizedByLanguageId: Record<number, string[]> = {};
+
+    for (const [langIdStr, lines] of Object.entries(translationReminders)) {
+      const languageId = Number(langIdStr);
+      if (!Number.isFinite(languageId)) continue;
+      if (primaryId != null && languageId === primaryId) continue;
+
+      const row = existing?.find((r) => Number(r.languageId) === languageId);
+      const normalizedLines = Array.isArray(lines)
+        ? lines.map((l) => String(l).trim()).filter((l) => l.length > 0)
+        : [];
+      normalizedByLanguageId[languageId] = normalizedLines;
+
+      const mergedMetadata = {
+        ...(row?.metadata ?? {}),
+        reminders: normalizedLines,
+      };
+
+      if (row) {
+        toUpdate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      } else {
+        toCreate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      }
+    }
+
+    if (toCreate.length) {
+      await this.scenarioTranslationsRepository.createScenarioTranslations(
+        toCreate,
+        manager,
+      );
+    }
+    if (toUpdate.length) {
+      await this.scenarioTranslationsRepository.updateScenarioTranslations(
+        toUpdate,
+        manager,
+      );
+    }
+
+    // Mirror reminders translations into scenarios.translations JSONB keyed
+    // by translationCode — reminders are shown live during a session (unlike
+    // openingStatements, which are admin/prompt-only), so the session-start
+    // read path needs the same code-keyed lookup as description/title.
+    const touchedLanguageIds = Object.keys(normalizedByLanguageId).map(Number);
+    if (touchedLanguageIds.length) {
+      const languages =
+        await this.sharedLanguageService.getLanguagesByIds(touchedLanguageIds);
+      if (languages.length) {
+        const scenariosRepo = manager
+          ? manager.getRepository(Scenarios)
+          : this.dataSource.getRepository(Scenarios);
+        const scenario = await scenariosRepo.findOne({
+          where: { id: scenarioId },
+        });
+        const currentTranslations: Record<string, any> =
+          (scenario?.translations as Record<string, any>) || {};
+        const mergedTranslations: Record<string, any> = {
+          ...currentTranslations,
+        };
+        for (const language of languages) {
+          const code = language.translationCode?.trim();
+          if (!code) continue;
+          mergedTranslations[code] = {
+            ...(currentTranslations[code] || {}),
+            reminders: normalizedByLanguageId[Number(language.id)],
+          };
+        }
+        await scenariosRepo.update(scenarioId, {
+          translations: mergedTranslations,
+        });
+      }
+    }
+  }
+
+  private async upsertTranslationOpeningStatements(
+    scenarioId: number,
+    translationOpeningStatements: Record<string, string[]>,
+    metadataForPrimaryResolution?: Record<string, any> | null,
+    // When provided, every read AND write goes through the caller's
+    // transaction. publishVersion holds a row lock on `scenarios` for the
+    // whole publish; a write from the pool here would wait on that lock
+    // forever (the transaction is waiting on us) and die at statement_timeout.
+    manager?: EntityManager,
+  ): Promise<void> {
+    const primaryId =
+      await this.scenarioSharedService.resolveOpeningDialoguePrimaryLanguageId(
+        metadataForPrimaryResolution,
+      );
+
+    const existing =
+      await this.scenarioTranslationsRepository.getScenarioTranslationsByScenarioId(
+        scenarioId,
+        manager,
+      );
+
+    const toCreate: CreateScenarioTranslation[] = [];
+    const toUpdate: UpdateScenarioTranslation[] = [];
+
+    for (const [langIdStr, lines] of Object.entries(
+      translationOpeningStatements,
+    )) {
+      const languageId = Number(langIdStr);
+      if (!Number.isFinite(languageId)) continue;
+      if (primaryId != null && languageId === primaryId) continue;
+
+      const row = existing?.find((r) => Number(r.languageId) === languageId);
+      const normalizedLines = Array.isArray(lines)
+        ? lines.map((l) => String(l).trim()).filter((l) => l.length > 0)
+        : [];
+
+      const mergedMetadata = {
+        ...(row?.metadata ?? {}),
+        openingStatements: normalizedLines,
+      };
+
+      if (row) {
+        toUpdate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      } else {
+        toCreate.push({ scenarioId, languageId, metadata: mergedMetadata });
+      }
+    }
+
+    if (toCreate.length) {
+      await this.scenarioTranslationsRepository.createScenarioTranslations(
+        toCreate,
+        manager,
+      );
+    }
+    if (toUpdate.length) {
+      await this.scenarioTranslationsRepository.updateScenarioTranslations(
+        toUpdate,
+        manager,
+      );
+    }
+  }
+
+  /**
+   * Target languages for auto-translation: scenario Language–Voice mappings only
+   * (not the global catalog rule requiring male+female voices per language).
+   */
+  private async getTranslationTargetLanguagesFromLanguageVoices(
+    languageVoices: Record<string, string> | null | undefined,
+  ): Promise<
+    Array<{
+      language_id: number;
+      value: string;
+      label: string;
+      translationCode: string;
+    }>
+  > {
+    if (!languageVoices || typeof languageVoices !== 'object') {
+      return [];
+    }
+
+    const languageIds = Object.entries(languageVoices)
+      .filter(([, voiceId]) => voiceId != null && String(voiceId).trim() !== '')
+      .map(([langId]) => Number(langId))
+      .filter((id) => Number.isFinite(id));
+
+    if (!languageIds.length) {
+      return [];
+    }
+
+    const rows =
+      await this.sharedLanguageService.getLanguagesByIds(languageIds);
+
+    const isEnglishTranslationTarget = (code: string): boolean => {
+      const c = code.trim().toLowerCase();
+      return c === DEFAULT_LANGUAGE_TRANSLATION_CODE || c.startsWith('en-');
+    };
+
+    return (rows ?? [])
+      .filter((l) => l.active)
+      .filter((l) => l.translationCode && l.translationCode.trim() !== '')
+      .filter((l) => !isEnglishTranslationTarget(l.translationCode))
+      .map((l) => ({
+        language_id: l.id,
+        value: l.value,
+        label: l.label,
+        translationCode: l.translationCode.trim(),
+      }));
+  }
+
+  /** Strip opening lines from auto-translate output so DB merges never overwrite manual/per-tab openings. */
+  private omitOpeningStatementsFromTranslationMetadata(
+    metadata: Partial<MetadataShape>,
+  ): Partial<MetadataShape> {
+    if (!metadata || typeof metadata !== 'object') {
+      return metadata;
+    }
+    const rest = { ...metadata };
+    delete rest.openingStatements;
+    return rest;
+  }
+
+  /**
+   * Merge translated titles/descriptions into scenarios.translations (keyed by
+   * translationCode), which is what the learner catalog reads. Merged in SQL
+   * per language so concurrent jobs on the same scenario never overwrite each
+   * other from a stale read, and a field a run didn't translate is kept.
+   */
+  private async mergeServedScenarioTranslations(
+    scenarioId: number,
+    translatedMap: Record<string, Partial<MetadataShape>>,
+  ): Promise<void> {
+    for (const [code, metadata] of Object.entries(translatedMap)) {
+      const entry: Partial<ScenarioAppLangugeTranslations> = {};
+      if (metadata?.title) entry.title = metadata.title;
+      if (metadata?.description) entry.description = metadata.description;
+      if (!Object.keys(entry).length) continue;
+      await this.dataSource.query(
+        `UPDATE scenarios
+            SET translations = jsonb_set(
+              COALESCE(translations, '{}'::jsonb),
+              ARRAY[$1::text],
+              COALESCE(translations -> $1::text, '{}'::jsonb) || $2::jsonb
+            )
+          WHERE id = $3`,
+        [code, JSON.stringify(entry), scenarioId],
+      );
+    }
+  }
+
+  /**
+   * Translate every ACTIVE scenario into the languages it is still missing:
+   * its voice languages (full metadata) and the app-picker languages (title
+   * and description). Runs in the background, one scenario at a time; text
+   * that is already translated is not re-sent. Returns how many were queued.
+   */
+  async backfillMissingScenarioTranslations(): Promise<{ queued: number }> {
+    const scenarios = await this.dataSource.getRepository(Scenarios).find({
+      where: { status: ScenarioStatus.ACTIVE },
+    });
+
+    void (async () => {
+      for (const scenario of scenarios) {
+        await this.persistTranslationsForScenarios(
+          [scenario],
+          (s) =>
+            this.sanitizeMetadata({
+              title: s.title,
+              description: s.description,
+              context: s.metadata?.context,
+              sexualOrientation: s.metadata?.sexualOrientation,
+              genderIdentity: s.metadata?.genderIdentity,
+              customFields: s.metadata?.customFields,
+              // FEATURE_CLEANUP(FEATURE_SCENARIO_BEHAVIOR_STATE_INSTRUCTIONS): Remove stateInstructions field
+              stateInstructions: s.metadata?.stateInstructions,
+              knowledgeSources: s.metadata?.knowledgeSources,
+              stateNames: s.metadata?.stateNames,
+            }),
+          {
+            currentLocation: scenario.metadata?.currentLocation,
+            profession: scenario.metadata?.profession,
+            context: scenario.metadata?.context,
+            age: scenario.metadata?.age,
+            gender: scenario.metadata?.gender,
+          },
+        );
+      }
+      this.logger.info(
+        `[backfillMissingScenarioTranslations] finished ${scenarios.length} scenarios`,
+      );
+    })().catch((err) =>
+      this.logger.error('[backfillMissingScenarioTranslations] failed', {
+        err,
+      }),
+    );
+
+    return { queued: scenarios.length };
+  }
+
+  /**
+   * Persist translations for scenarios:
+   * - creates new translations for new languageIds
+   * - updates existing translations for existing languageIds
+   */
+  private async persistTranslationsForScenarios(
+    scenarios: Array<Scenarios>,
+    metadataExtractor: (scenario: Scenarios) => MetadataShape,
+    translationConsiderableData?: TranslationConsiderableData,
+    resolveLanguageVoices?: (
+      scenario: Scenarios,
+    ) => Record<string, string> | undefined,
+    progressContext?: {
+      userId: number;
+      jobId: string;
+      action: ScenarioTranslationAction;
+    },
+  ) {
+    if (!scenarios.length) {
+      return;
+    }
+    // If you expect many scenarios at once and want fewer DB calls, implement batching here.
+    for (const scenario of scenarios) {
+      const emitProgress = progressContext
+        ? (
+            status: ScenarioTranslationStatus,
+            extra: Partial<{
+              language: string;
+              completed: number;
+              total: number;
+              error: string;
+            }> = {},
+          ) => {
+            this.scenarioTranslationNotificationService.notifyProgress(
+              progressContext.userId,
+              {
+                jobId: progressContext.jobId,
+                scenarioId: scenario.id,
+                scenarioTitle: scenario.title,
+                action: progressContext.action,
+                status,
+                language: extra.language,
+                completed: extra.completed ?? 0,
+                total: extra.total ?? 0,
+                error: extra.error,
+                emittedAt: new Date().toISOString(),
+              },
+            );
+          }
+        : undefined;
+
+      const onLanguageProgress: TranslationProgressCallback | undefined =
+        emitProgress
+          ? (event) => {
+              if (event.kind === 'language_started') {
+                emitProgress(ScenarioTranslationStatus.TRANSLATING, {
+                  language: event.language,
+                  completed: event.completed,
+                  total: event.total,
+                });
+              } else if (event.kind === 'language_completed') {
+                emitProgress(ScenarioTranslationStatus.TRANSLATED, {
+                  language: event.language,
+                  completed: event.completed,
+                  total: event.total,
+                });
+              } else {
+                emitProgress(ScenarioTranslationStatus.LANGUAGE_FAILED, {
+                  language: event.language,
+                  completed: event.completed,
+                  total: event.total,
+                  error: event.error,
+                });
+              }
+            }
+          : undefined;
+
+      try {
+        const rawMetadata = metadataExtractor(scenario);
+
+        const sanitized = this.sanitizeMetadata(
+          rawMetadata,
+        ) as Partial<MetadataShape>;
+
+        if (!sanitized || Object.keys(sanitized).length === 0) {
+          this.logger?.debug?.(
+            `[persistTranslationsForScenarios] scenario ${scenario.id}: no non-empty metadata, skipping`,
+          );
+          continue;
+        }
+
+        const languageVoices =
+          resolveLanguageVoices?.(scenario) ??
+          scenario.metadata?.languageVoices;
+        const voiceLanguages =
+          await this.getTranslationTargetLanguagesFromLanguageVoices(
+            languageVoices,
+          );
+        const voiceCodes = new Set(
+          voiceLanguages.map((l) => l.translationCode),
+        );
+
+        // The app-language picker (hi/mr/ta/kn) shows every simulation card,
+        // so title and description are translated into each of those even
+        // when the scenario has no voice for it. Only the catalog JSONB gets
+        // these; scenario_translations stays reserved for voice languages.
+        const catalogLanguages = (
+          await this.sharedLanguageService.getEligibleAppLanguages()
+        )
+          .filter((l) => l.translationCode?.trim())
+          .filter((l) => !voiceCodes.has(l.translationCode.trim()));
+
+        const existingTranslations =
+          (await this.scenarioTranslationsRepository.getScenarioTranslationsByScenarioId(
+            scenario.id,
+          )) ?? [];
+        const existingLanguageIdSet = new Set(
+          existingTranslations.map((r) => Number(r.languageId)),
+        );
+        const hasServedEntry = (code: string) =>
+          !!scenario.translations?.[code]?.title;
+
+        // Unchanged text still gets translated for any language that has no
+        // stored entry yet (a voice added later, a backfill, a failed run).
+        const fieldsChanged = this.hasTranslatableFieldsChanged(
+          scenario,
+          sanitized,
+        );
+        const voiceTargets = fieldsChanged
+          ? voiceLanguages
+          : voiceLanguages.filter(
+              (l) =>
+                !existingLanguageIdSet.has(Number(l.language_id)) ||
+                !hasServedEntry(l.translationCode),
+            );
+
+        const catalogFields = this.sanitizeMetadata({
+          title: sanitized.title ?? scenario.title,
+          description: sanitized.description ?? scenario.description,
+        }) as Partial<MetadataShape>;
+        const catalogTextChanged =
+          (sanitized.title !== undefined &&
+            sanitized.title !== scenario.title) ||
+          (sanitized.description !== undefined &&
+            sanitized.description !== scenario.description);
+        const catalogTargets = Object.keys(catalogFields).length
+          ? catalogLanguages.filter(
+              (l) =>
+                catalogTextChanged || !hasServedEntry(l.translationCode.trim()),
+            )
+          : [];
+
+        if (!voiceTargets.length && !catalogTargets.length) {
+          this.logger?.debug?.(
+            `[persistTranslationsForScenarios] scenario ${scenario.id}: every language is already translated and nothing changed, skipping`,
+          );
+          continue;
+        }
+
+        const voiceTargetCodes = voiceTargets.map((l) => l.translationCode);
+        const catalogTargetCodes = catalogTargets.map((l) =>
+          l.translationCode.trim(),
+        );
+        const total = voiceTargetCodes.length + catalogTargetCodes.length;
+
+        emitProgress?.(ScenarioTranslationStatus.STARTED, {
+          completed: 0,
+          total,
+        });
+
+        // Two translation calls report their own counts; shift the second so
+        // the progress stream reads as one job.
+        const offsetProgress =
+          (offset: number): TranslationProgressCallback | undefined =>
+          (event) =>
+            onLanguageProgress?.({
+              ...event,
+              completed: event.completed + offset,
+              total,
+            });
+
+        this.logger.info(
+          `[persistTranslationsForScenarios] invoking translation API for scenario ${scenario.id} → voice: ${voiceTargetCodes.join(', ') || '-'}; catalog: ${catalogTargetCodes.join(', ') || '-'}`,
+        );
+        const translatedMap = voiceTargetCodes.length
+          ? await this.buildTranslatedMetadataForLanguageCodes(
+              sanitized,
+              voiceTargetCodes,
+              translationConsiderableData as TranslationConsiderableData,
+              onLanguageProgress && offsetProgress(0),
+            )
+          : {};
+        const catalogTranslatedMap = catalogTargetCodes.length
+          ? await this.buildTranslatedMetadataForLanguageCodes(
+              catalogFields,
+              catalogTargetCodes,
+              translationConsiderableData as TranslationConsiderableData,
+              onLanguageProgress && offsetProgress(voiceTargetCodes.length),
+            )
+          : {};
+
+        // Build translatedList: map back to languageId
+        const translatedList: Array<CreateScenarioTranslation> = [];
+        for (const language of voiceTargets) {
+          const code = language.translationCode.trim();
+          const translatedData = translatedMap[code];
+          if (!translatedData || Object.keys(translatedData).length === 0)
+            continue;
+          translatedList.push({
+            scenarioId: scenario.id,
+            languageId: Number(language.language_id),
+            metadata: translatedData as MetadataShape,
+          });
+        }
+
+        const toCreate: Array<any> = [];
+        const toUpdate: Array<any> = [];
+
+        for (const t of translatedList) {
+          const existingRow = existingTranslations.find(
+            (r) => Number(r.languageId) === Number(t.languageId),
+          );
+          const mergedMetadata = {
+            ...(existingRow?.metadata ?? {}),
+            ...this.omitOpeningStatementsFromTranslationMetadata(
+              t.metadata as Partial<MetadataShape>,
+            ),
+          } as MetadataShape;
+          const entry = {
+            scenarioId: t.scenarioId,
+            languageId: t.languageId,
+            metadata: mergedMetadata,
+          };
+          if (existingLanguageIdSet.has(Number(t.languageId)))
+            toUpdate.push(entry);
+          else toCreate.push(entry);
+        }
+
+        // Persist creates first
+        if (toCreate.length) {
+          await this.scenarioTranslationsRepository.createScenarioTranslations(
+            toCreate,
+          );
+        }
+
+        if (toUpdate.length) {
+          await this.scenarioTranslationsRepository.updateScenarioTranslations(
+            toUpdate,
+          );
+        }
+
+        await this.mergeServedScenarioTranslations(scenario.id, {
+          ...translatedMap,
+          ...catalogTranslatedMap,
+        });
+
+        emitProgress?.(ScenarioTranslationStatus.COMPLETED, {
+          completed: total,
+          total,
+        });
+      } catch (outerErr) {
+        this.logger?.error?.(
+          `[persistTranslationsForScenarios] unexpected error processing scenario ${scenario.id}`,
+          { outerErr },
+        );
+        emitProgress?.(ScenarioTranslationStatus.FAILED, {
+          error: (outerErr as Error)?.message ?? 'Unknown error',
+        });
+      }
+    }
+  }
+
+  /**
+   * Persist translations for scenario events:
+   * - creates new translations for new languageIds
+   * - updates existing translations for existing languageIds
+   */
+  async createUpdateScenarioEventsTranslations(scenarioEvents: any[]) {
+    const validLanguagesCodes =
+      await this.scenarioSharedService.getUniqueLanguagesFromScenarioTranslations();
+
+    if (
+      !Array.isArray(validLanguagesCodes) ||
+      validLanguagesCodes.length == 0
+    ) {
+      this.logger?.warn?.(
+        `[createUpdateScenarioEventsTranslations] no valid languages, skipping`,
+      );
+      return;
+    }
+
+    const { languages } =
+      await this.sharedLanguageService.getValidLanguages(validLanguagesCodes);
+
+    if (!languages || !languages.length) {
+      this.logger?.warn?.(
+        `[createUpdateScenarioEventsTranslations] no valid languages, skipping`,
+      );
+      return;
+    }
+
+    await this.persistScenarioEventTranslations(
+      scenarioEvents, // array of session events or single-element array
+      (sessionEvent) => ({
+        message: sessionEvent.message,
+        branchInstruction: sessionEvent.branchInstruction,
+      }),
+      languages,
+    );
+  }
+
+  /**
+   * Persist translations for scenario events:
+   * - creates new translations for new languageIds
+   * - updates existing translations for existing languageIds
+   */
+  async persistScenarioEventTranslations(
+    scenarioEvents: Array<any>,
+    metadataExtractor: (scenarioEvent: any) => {
+      message: string;
+      branchInstruction: string;
+    },
+    languages: any,
+  ) {
+    for (const scenarioEvent of scenarioEvents) {
+      const rawMetadata = metadataExtractor(scenarioEvent);
+      const sanitized = this.sanitizeMetadata({
+        message: wrapFieldPlaceholders(rawMetadata?.message),
+        branchInstruction: wrapFieldPlaceholders(
+          rawMetadata?.branchInstruction,
+        ),
+      });
+
+      if (!sanitized || Object.keys(sanitized).length === 0) {
+        this.logger?.debug?.(
+          `[persistSessionEventTranslations] ${scenarioEvent.id}: no non-empty metadata, skipping`,
+        );
+        continue;
+      }
+
+      const languagesFiltered = (languages ?? []).filter(
+        (l: any) => l && l.translationCode && l.translationCode.trim() !== '',
+      );
+
+      if (!languagesFiltered.length) {
+        this.logger?.warn?.(
+          `[persistSessionEventTranslations] ${scenarioEvent.id}: no valid languages, skipping`,
+        );
+        continue;
+      }
+
+      const languageCodes = languagesFiltered.map((l: any) =>
+        l.translationCode.trim(),
+      );
+
+      let translatedMap: Record<string, ScenarioEventsTranslationData> = {};
+      try {
+        const openaiResult =
+          await this.openaiTranslationsService.translateObjectToLanguages(
+            sanitized as Partial<ScenarioEventsTranslationData>,
+            languageCodes,
+            toPromptCode('openai_translation', 'session_event'),
+          );
+
+        if (openaiResult && Object.keys(openaiResult).length > 0) {
+          this.logger?.debug?.(
+            '[persistScenarioEventTranslations] successfully translated using OpenAI',
+          );
+          translatedMap = openaiResult as Record<
+            string,
+            ScenarioEventsTranslationData
+          >;
+        }
+      } catch (err) {
+        this.logger?.error?.(
+          '[persistScenarioEventTranslations] translation call failed',
+          { err, languageCodes },
+        );
+        translatedMap = {};
+      }
+
+      if (!translatedMap || Object.keys(translatedMap).length === 0) {
+        this.logger?.warn?.(
+          `[persistSessionEventTranslations] ${scenarioEvent.id}: no translations found, skipping`,
+        );
+        continue;
+      }
+
+      // Map translated map back to sessionEventId + languageId
+      const translatedList: Array<CreateScenarioEventsTranslation> = [];
+
+      for (const language of languagesFiltered) {
+        const code = language.translationCode.trim();
+        const translatedData = translatedMap[code];
+        if (!translatedData || Object.keys(translatedData).length === 0)
+          continue;
+        translatedList.push({
+          scenarioId: scenarioEvent.scenarioId,
+          eventId: scenarioEvent.eventId,
+          languageId: Number(language.id),
+          message: unwrapFieldPlaceholders(translatedData.message) ?? '',
+          branchInstruction:
+            unwrapFieldPlaceholders(translatedData.branchInstruction) ?? '',
+        });
+
+        if (!translatedList.length) {
+          this.logger?.debug?.(
+            `[persistScenarioEventTranslations] ${scenarioEvent.id}: no translations after mapping, skipping DB ops`,
+          );
+          continue;
+        }
+      }
+
+      // Fetch existing translations for this sessionEvent to split create vs update
+      const existingTranslations =
+        await this.scenarioEventTranslationsRepository.getScenarioEventsTranslationsByScenarioIdEventId(
+          scenarioEvent.scenarioId,
+          scenarioEvent.eventId,
+        );
+
+      const existingTranslationKeySet = new Set(
+        (existingTranslations ?? []).map((r) => `${r.eventId}-${r.languageId}`),
+      );
+
+      const toCreate: Array<any> = [];
+      const toUpdate: Array<any> = [];
+
+      for (const t of translatedList) {
+        const key = `${t.eventId}-${t.languageId}`;
+
+        if (existingTranslationKeySet.has(key)) {
+          toUpdate.push(t);
+        } else {
+          toCreate.push(t);
+        }
+      }
+
+      if (toCreate.length) {
+        await this.scenarioEventTranslationsRepository.createTranslations(
+          toCreate,
+        );
+      }
+
+      if (toUpdate.length) {
+        await this.scenarioEventTranslationsRepository.updateTranslations(
+          toUpdate,
+        );
+      }
+    }
+  }
+
+  /**
+   * Re-runs translation for every checklist item currently shown to
+   * learners, across every scenario and every configured language.
+   *
+   * A checklist item's text comes from two places: the per-scenario
+   * `ScenarioEvents` override (`message`/`branchInstruction`) and the base
+   * `SessionEvents` row it references (`name`, plus its own `message`/
+   * `branchInstruction` as a fallback when no override exists). Both need
+   * retranslating to fully refresh a checklist item, so this re-translates
+   * both sides for every `ScenarioEvents` row with
+   * `checklistVisibilityStatus = true`.
+   *
+   * Processes one page of `batchSize` `ScenarioEvents` rows at a time
+   * (instead of loading every checklist-visible row up front) so memory
+   * stays bounded and a crash/timeout partway through only loses the
+   * in-flight batch — re-invoking the method just resumes from batch 1 and
+   * safely re-upserts anything already done. Base `SessionEvents` are
+   * deduped across batches (via `translatedSessionEventIds`) so the same
+   * shared event referenced by many scenarios is only retranslated once.
+   */
+  async translateChecklistItems(
+    batchSize: number = DEFAULT_CHECKLIST_TRANSLATION_BATCH_SIZE,
+  ): Promise<
+    SuccessResponse & {
+      processedScenarioEvents: number;
+      processedSessionEvents: number;
+    }
+  > {
+    const effectiveBatchSize =
+      batchSize > 0 ? batchSize : DEFAULT_CHECKLIST_TRANSLATION_BATCH_SIZE;
+
+    const attemptedSessionEventIds = new Set<string>();
+    let processedSessionEvents = 0;
+    let offset = 0;
+    let processedScenarioEvents = 0;
+
+    for (;;) {
+      const batch =
+        await this.scenarioEventsRepository.getAllChecklistVisibleEvents({
+          limit: effectiveBatchSize,
+          offset,
+        });
+
+      if (!batch.length) {
+        break;
+      }
+
+      await this.createUpdateScenarioEventsTranslations(batch);
+
+      const newEventIds = Array.from(
+        new Set(batch.map((event) => event.eventId)),
+      ).filter((eventId) => !attemptedSessionEventIds.has(eventId));
+
+      if (newEventIds.length) {
+        newEventIds.forEach((eventId) => attemptedSessionEventIds.add(eventId));
+
+        const sessionEvents =
+          await this.sessionEventSharedService.findByIds(newEventIds);
+
+        if (sessionEvents.length) {
+          await this.sessionEventTranslationService.createUpdateSessionEventTranslations(
+            sessionEvents,
+          );
+          processedSessionEvents += sessionEvents.length;
+        }
+      }
+
+      processedScenarioEvents += batch.length;
+      this.logger?.info?.(
+        `[translateChecklistItems] processed ${processedScenarioEvents} checklist item(s) so far (batch offset ${offset}, size ${effectiveBatchSize})`,
+      );
+
+      if (batch.length < effectiveBatchSize) {
+        break;
+      }
+      offset += effectiveBatchSize;
+    }
+
+    return {
+      success: true,
+      processedScenarioEvents,
+      processedSessionEvents,
+    };
+  }
+
+  async getBranchingInstructionDynamicShortcuts(
+    scenarioId?: number,
+  ): Promise<string[]> {
+    const dynamicBranchShortcuts: string[] = [
+      ...BRANCHING_INSTRUCTION_DYNAMIC_SHORTCUTS,
+    ];
+    if (scenarioId) {
+      const scenario = await this.getScenario(scenarioId);
+      const customFields = scenario.metadata?.customFields;
+      if (customFields) {
+        dynamicBranchShortcuts.push(
+          ...customFields.map((customField: any) => customField.name),
+        );
+      }
+    }
+    return dynamicBranchShortcuts;
+  }
+
+  async getAvailableModels(): Promise<
+    {
+      value: string;
+      label: string;
+      provider: string;
+      supportsTemperature: boolean;
+    }[]
+  > {
+    // Sourced from the llm_models catalog (via LlmModelService, which falls
+    // back to the in-code list when the table is empty or unreadable), filtered
+    // to the providers the autofill/enhance/copilot path can actually execute
+    // (OpenAI + Anthropic — no Gemini autofill client exists).
+    //
+    // Reads the service rather than getLlmModels() directly: otherwise a model
+    // added to the catalog appears in Prompt Management but not here, which is
+    // exactly the drift the catalog exists to end.
+    const AUTOFILL_PROVIDERS = new Set<LlmProviderName>([
+      'openai',
+      'anthropic',
+    ]);
+    const models = await this.llmModelService.getModels(LlmRuntime.ALLY_BE);
+    return models
+      .filter((m) => AUTOFILL_PROVIDERS.has(m.provider))
+      .map((m) => ({
+        value: m.model,
+        label: m.label,
+        provider: m.provider,
+        supportsTemperature: m.supportsTemperature,
+      }));
+  }
+
+  /**
+   * Field-level Enhance: improve the existing content of a single scenario
+   * field. Unlike {@link generateField} this never invents content — it takes
+   * the field's current value plus the other field values as grounding context
+   * and rewrites it according to a preset/custom instruction. Provider routing
+   * mirrors generateField.
+   */
+  async enhanceField(
+    enhanceScenarioFieldDto: EnhanceScenarioFieldDto,
+  ): Promise<EnhanceScenarioFieldResponseDto> {
+    const { fieldName, currentValue, guidance, model, provider, translateTo } =
+      enhanceScenarioFieldDto;
+
+    if (!currentValue?.trim()) {
+      throw new BadRequestException(
+        'currentValue is required to enhance a field — there is nothing to improve.',
+      );
+    }
+
+    // Blank custom box ⇒ generic auto-improve directive.
+    const effectiveGuidance =
+      guidance?.trim() || ENHANCE_AUTO_IMPROVE_INSTRUCTION;
+
+    // The state field is structured: it carries a JSON {name, guidelines} and
+    // expects a JSON object back. Everything else is plain text in/out and uses
+    // the single generic enhance prompt (editable in Prompt Management).
+    let promptCode: string;
+    let variables: Record<string, string>;
+    let expectJson = false;
+    let stateInput: { name: string; guidelines: string } | null = null;
+    if (fieldName === EnhanceableField.STATE) {
+      let parsed: { name?: string; guidelines?: string } = {};
+      try {
+        parsed = JSON.parse(currentValue) as {
+          name?: string;
+          guidelines?: string;
+        };
+      } catch {
+        throw new BadRequestException(
+          'currentValue for a state must be JSON {"name","guidelines"}.',
+        );
+      }
+      stateInput = {
+        name: typeof parsed.name === 'string' ? parsed.name : '',
+        guidelines:
+          typeof parsed.guidelines === 'string' ? parsed.guidelines : '',
+      };
+      if (!stateInput.name.trim() && !stateInput.guidelines.trim()) {
+        throw new BadRequestException(
+          'A state needs a name or guidelines before it can be improved.',
+        );
+      }
+      promptCode = ENHANCE_STATE_PROMPT_CODE;
+      variables = {
+        currentName: stateInput.name,
+        currentGuidelines: stateInput.guidelines,
+        guidance: effectiveGuidance,
+      };
+      expectJson = true;
+    } else {
+      promptCode = ENHANCE_FIELD_PROMPT_CODE;
+      variables = {
+        fieldLabel: ENHANCEABLE_FIELD_LABELS[fieldName] ?? fieldName,
+        currentValue,
+        guidance: effectiveGuidance,
+      };
+    }
+
+    // Provider and model resolve inside the completion layer, from the prompt
+    // row then the platform tier — so there is no provider to pick here, and a
+    // prompt row selecting Gemini is no longer silently ignored.
+    const content = await this.autofillService.enhanceFieldContent(
+      fieldName,
+      promptCode,
+      variables,
+      expectJson,
+      model,
+      enhanceScenarioFieldDto.temperature,
+      provider,
+    );
+
+    this.logger.info(`Enhancement completed for ${fieldName}`);
+
+    // For the structured state field, normalise the model output into a clean,
+    // guaranteed-parseable {name, guidelines} JSON string so the studio never
+    // has to parse free-form prose. A missing key falls back to the original
+    // value; unparseable output is a hard failure (surfaced as a 500 → error
+    // toast) rather than silently corrupting the field.
+    if (fieldName === EnhanceableField.STATE && stateInput) {
+      return {
+        fieldName,
+        content: this.normaliseStateEnhanceOutput(content, stateInput),
+      };
+    }
+
+    // Primary+translation fields (Challenge Description, Opening Dialogues):
+    // re-translate the improved primary content into the scenario's other
+    // languages so all languages stay in sync from one action. A failed
+    // translation falls back to the original text (translateText behaviour)
+    // rather than blocking the improve.
+    if (translateTo?.length) {
+      // Translate all target languages in parallel — sequential awaits add up
+      // fast when a scenario has many languages.
+      const entries = await Promise.all(
+        translateTo.map(
+          async (target) =>
+            [
+              target.languageId,
+              await this.openaiTranslationsService.translateText(
+                content,
+                target.languageCode,
+              ),
+            ] as const,
+        ),
+      );
+      return {
+        fieldName,
+        content,
+        translations: Object.fromEntries(entries),
+      };
+    }
+
+    return { fieldName, content };
+  }
+
+  /**
+   * Coerce the model's state-enhance output into a clean, guaranteed-parseable
+   * `{"name","guidelines"}` JSON string. Extracts the first balanced JSON
+   * object (tolerating stray prose/braces around it), falls back to the
+   * original value for any missing/blank key, and throws if nothing parseable
+   * is found so the studio shows a failure toast instead of writing garbage.
+   */
+  private normaliseStateEnhanceOutput(
+    raw: string,
+    original: { name: string; guidelines: string },
+  ): string {
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    let parsed: { name?: unknown; guidelines?: unknown } | null = null;
+    if (start !== -1 && end > start) {
+      try {
+        parsed = JSON.parse(raw.slice(start, end + 1));
+      } catch {
+        parsed = null;
+      }
+    }
+    if (!parsed) {
+      throw new InternalServerErrorException(
+        'State enhancement returned malformed JSON.',
+      );
+    }
+    const pick = (value: unknown, fallback: string): string =>
+      typeof value === 'string' && value.trim() ? value : fallback;
+    return JSON.stringify({
+      name: pick(parsed.name, original.name),
+      guidelines: pick(parsed.guidelines, original.guidelines),
+    });
+  }
+
+  /**
+   * Agent Builder Copilot: generate ONE Basic Settings field from the
+   * wizard's three inputs (actor brief + competency + agent test cases). Each
+   * field has its own editable prompt template (src/prompts/agent_builder/)
+   * and is fired independently in parallel by the frontend, so the results
+   * paint into the form as each returns. Provider routing mirrors generateField.
+   *
+   * Three of the fields are about language rather than a form field of their
+   * own. `spoken_languages` reads the brief against the studio's language
+   * catalog and answers which languages the client speaks; the language-scoped
+   * fields (opening dialogues / linguistic style samples / filler words) then
+   * take a `languageId` and are generated natively in that language — one call
+   * per language, so a brief saying "speaks English, Hindi and Marathi" fills
+   * three language tabs instead of one. `language_voices` casts one voice per
+   * spoken language from the catalog, against the brief and the persona the
+   * wizard just generated, filling the mandatory Language-Voice mapping that
+   * those languages are otherwise unreachable through at runtime.
+   *
+   * `options.usageMetadata` is for server-side callers (Course Copilot's
+   * AgentBuilderChainService): it is merged with `{ field }` onto the usage
+   * row so a course's spend can be summed per session. The HTTP route never
+   * passes it, and without it the call is made exactly as before.
+   */
+  async generateAgentBuilderField(
+    dto: GenerateAgentBuilderFieldDto,
+    options?: { usageMetadata?: Record<string, any> },
+  ): Promise<GenerateAgentBuilderFieldResponseDto> {
+    const { field, actorDescription, competency, agentTestCases, model } = dto;
+
+    const numKnowledgeSources = dto.numKnowledgeSources ?? 3;
+    // The chain's second stage: what the foundation fields settled rides
+    // along on the brief itself rather than in a new template variable, so it
+    // reaches every prompt — including a prompt row edited in Prompt
+    // Management before this existed, which would silently drop an unknown
+    // placeholder.
+    const established = ignoresEstablishedContext(field)
+      ? ''
+      : this.formatEstablishedContext(dto.establishedContext);
+    const variables: Record<string, string> = {
+      actorDescription: established
+        ? `${actorDescription ?? ''}\n\n${established}`
+        : (actorDescription ?? ''),
+      competency: competency ?? '',
+      agentTestCases: agentTestCases ?? '',
+      numKnowledgeSources: String(numKnowledgeSources),
+    };
+
+    // Language plumbing. `spoken_languages` reads the whole catalog and picks
+    // the subset the brief says the client speaks; the language-scoped fields
+    // are each told the ONE language to write in. Every other field is
+    // language-agnostic and skips the catalog query entirely.
+    let catalog: ScenarioVoiceLanguage[] = [];
+    if (
+      field === AgentBuilderField.SPOKEN_LANGUAGES ||
+      field === AgentBuilderField.LANGUAGE_VOICES ||
+      isLanguageScopedAgentBuilderField(field)
+    ) {
+      catalog = await this.getAgentBuilderLanguageCatalog();
+    }
+    if (field === AgentBuilderField.SPOKEN_LANGUAGES) {
+      variables.availableLanguages = catalog
+        .map(
+          (lang) =>
+            `- ${lang.language_id} | ${lang.label} | ${this.languageLocale(lang)}`,
+        )
+        .join('\n');
+    } else if (field === AgentBuilderField.LANGUAGE_VOICES) {
+      catalog = this.voiceCastingCatalog(catalog, dto.languageIds);
+      variables.voiceCandidates = this.formatVoiceCandidates(catalog);
+      variables.personaGender = dto.personaGender?.trim() ?? '';
+      variables.personaAge =
+        typeof dto.personaAge === 'number' ? String(dto.personaAge) : '';
+    } else if (isLanguageScopedAgentBuilderField(field)) {
+      const language = this.resolveAgentBuilderLanguage(
+        catalog,
+        dto.languageId,
+      );
+      variables.languageName = language.label;
+      variables.languageCode = language.code;
+    }
+
+    // The prompt-file basename equals the enum value; toPromptCode maps it to
+    // src/prompts/agent_builder/<field>.txt (editable in Prompt Management).
+    const promptCode = toPromptCode('agent_builder', field);
+    // Prose/HTML fields come back as plain text; structured fields as JSON.
+    const expectJson =
+      field === AgentBuilderField.TITLE ||
+      field === AgentBuilderField.PERSONA ||
+      field === AgentBuilderField.KNOWLEDGE_SOURCES ||
+      field === AgentBuilderField.STATES ||
+      field === AgentBuilderField.LINGUISTIC_STYLE_SAMPLES ||
+      field === AgentBuilderField.ALLOWED_FILLER_WORDS ||
+      field === AgentBuilderField.SPOKEN_LANGUAGES ||
+      field === AgentBuilderField.LANGUAGE_VOICES;
+
+    // The prompt row's own model/temperature is honoured inside the completion
+    // layer (the wizard sends none); an explicit request override still wins.
+    // Two shapes on purpose: the wizard's call keeps its original arguments
+    // exactly, and only a caller with metadata to attribute adds the trailing
+    // task + options pair.
+    const raw = options?.usageMetadata
+      ? await this.autofillService.generateContentFromPrompt(
+          promptCode,
+          variables,
+          expectJson,
+          model,
+          dto.temperature,
+          dto.provider,
+          LlmTask.AUTOFILL_AGENT_FIELD,
+          { usageMetadata: { ...options.usageMetadata, field } },
+        )
+      : await this.autofillService.generateContentFromPrompt(
+          promptCode,
+          variables,
+          expectJson,
+          model,
+          dto.temperature,
+          dto.provider,
+        );
+
+    if (field === AgentBuilderField.SPOKEN_LANGUAGES) {
+      return { field, value: this.parseSpokenLanguages(raw, catalog) };
+    }
+    if (field === AgentBuilderField.LANGUAGE_VOICES) {
+      return { field, value: this.parseLanguageVoices(raw, catalog) };
+    }
+    return { field, value: this.parseAgentBuilderField(field, raw) };
+  }
+
+  /**
+   * Render the chain's first-stage output as a block appended to the brief.
+   * Labelled as already decided so the model treats it as fact to build on,
+   * not a suggestion to rewrite; blank when nothing usable was established
+   * (a failed or cleared foundation field just means that stage-two field
+   * generates from the brief alone, as it did before chaining).
+   */
+  private formatEstablishedContext(context?: EstablishedContextDto): string {
+    if (!context) return '';
+    const lines: string[] = [];
+    const persona = context.persona;
+    if (persona) {
+      const personaFacts = [
+        persona.name?.trim() && `Name: ${persona.name.trim()}`,
+        typeof persona.age === 'number' && `Age: ${persona.age}`,
+        persona.gender?.trim() && `Gender: ${persona.gender.trim()}`,
+        persona.profession?.trim() &&
+          `Profession: ${persona.profession.trim()}`,
+        persona.currentLocation?.trim() &&
+          `Lives in: ${persona.currentLocation.trim()}`,
+      ].filter((fact): fact is string => Boolean(fact));
+      if (personaFacts.length > 0) {
+        lines.push(`The client — ${personaFacts.join('; ')}.`);
+      }
+    }
+    const challenge = htmlToPlainText(context.challengeDescription);
+    if (challenge) {
+      lines.push(`The challenge in this session: ${challenge}`);
+    }
+    if (lines.length === 0) return '';
+    return [
+      'Already established for this scenario (treat as fact; stay consistent with it and do not contradict or rename anything here):',
+      ...lines.map((line) => `- ${line}`),
+    ].join('\n');
+  }
+
+  /**
+   * The language catalog the copilot generates against: exactly the active,
+   * voiced languages the studio renders tabs for (see
+   * getScenarioVoiceLanguagesForAdmin), so a generated language is always one
+   * the trainer can then see and edit.
+   */
+  private getAgentBuilderLanguageCatalog(): Promise<ScenarioVoiceLanguage[]> {
+    return this.getScenarioVoiceLanguagesForAdmin(true, true) as Promise<
+      ScenarioVoiceLanguage[]
+    >;
+  }
+
+  /** BCP-47 locale for a catalog row, preferring translationCode over value. */
+  private languageLocale(lang: ScenarioVoiceLanguage): string {
+    return (lang.translationCode || lang.value || '').trim();
+  }
+
+  /**
+   * The catalog's English row, else its first row — the studio's own primary
+   * resolution (useResolvedPrimaryLanguageId) mirrored server-side, so an
+   * unknown/absent languageId degrades to the language the wizard used to
+   * generate before it was language-aware rather than to nothing.
+   */
+  private primaryCatalogLanguage(
+    catalog: ScenarioVoiceLanguage[],
+  ): ScenarioVoiceLanguage | undefined {
+    return (
+      catalog.find(
+        (lang) =>
+          this.languageLocale(lang).toLowerCase().startsWith('en') ||
+          lang.label?.trim().toLowerCase() === 'english',
+      ) ?? catalog[0]
+    );
+  }
+
+  /** Resolve the requested languageId to a name + locale for the prompt. */
+  private resolveAgentBuilderLanguage(
+    catalog: ScenarioVoiceLanguage[],
+    languageId?: string,
+  ): { label: string; code: string } {
+    const requested = (languageId ?? '').trim();
+    const match =
+      (requested
+        ? catalog.find((lang) => String(lang.language_id) === requested)
+        : undefined) ?? this.primaryCatalogLanguage(catalog);
+    // No catalog at all (no voiced languages configured): keep the pre-
+    // language-aware behaviour of writing English rather than an empty slot.
+    return {
+      label: match?.label?.trim() || 'English',
+      code: match ? this.languageLocale(match) || 'en' : 'en',
+    };
+  }
+
+  /**
+   * Coerce the `spoken_languages` response into the catalog rows the wizard
+   * fans out over. Filtering the catalog BY the returned ids validates them,
+   * drops duplicates and hallucinated ids, and keeps the studio's own tab
+   * order; an unusable answer falls back to the primary (English) language so
+   * the wizard still generates one full set.
+   */
+  private parseSpokenLanguages(
+    raw: string,
+    catalog: ScenarioVoiceLanguage[],
+  ): { languageId: string; label: string; code: string }[] {
+    const parsed = this.parseFirstJsonObject(raw);
+    let ids: unknown[] = [];
+    if (Array.isArray(parsed)) {
+      ids = parsed;
+    } else if (Array.isArray(parsed?.languageIds)) {
+      ids = parsed.languageIds;
+    } else if (parsed && typeof parsed === 'object') {
+      const arrayValue = Object.values(parsed).find((v) => Array.isArray(v));
+      if (Array.isArray(arrayValue)) ids = arrayValue;
+    }
+    const wanted = new Set(
+      ids
+        .filter((id) => typeof id === 'string' || typeof id === 'number')
+        .map((id) => String(id).trim())
+        .filter(Boolean),
+    );
+    let matched = catalog.filter((lang) =>
+      wanted.has(String(lang.language_id)),
+    );
+    // One variant per language. A catalog can voice several regional variants
+    // of the same language (English (India) / (UK) / (US) all carry locale
+    // `en`), and a brief saying "speaks English" invites the model to pick all
+    // of them — three identical tabs and three times the calls. The prompt asks
+    // for one; this makes it so, keeping the first in the studio's tab order.
+    const seenBaseLocales = new Set<string>();
+    matched = matched.filter((lang) => {
+      const base = this.languageLocale(lang).split('-')[0].toLowerCase();
+      if (!base) return true;
+      if (seenBaseLocales.has(base)) return false;
+      seenBaseLocales.add(base);
+      return true;
+    });
+    if (matched.length === 0) {
+      const primary = this.primaryCatalogLanguage(catalog);
+      matched = primary ? [primary] : [];
+    }
+    return matched.slice(0, MAX_SPOKEN_LANGUAGES).map((lang) => ({
+      languageId: String(lang.language_id),
+      label: lang.label,
+      code: this.languageLocale(lang),
+    }));
+  }
+
+  /**
+   * The languages `language_voices` casts for: the requested ids (normally the
+   * ones `spoken_languages` answered), narrowed to those that actually have
+   * voices. Requesting nothing offers the whole catalog rather than nothing, so
+   * a caller that skipped language detection still gets a usable mapping.
+   */
+  private voiceCastingCatalog(
+    catalog: ScenarioVoiceLanguage[],
+    languageIds?: string[],
+  ): ScenarioVoiceLanguage[] {
+    const wanted = new Set(
+      (languageIds ?? []).map((id) => String(id ?? '').trim()).filter(Boolean),
+    );
+    const scoped =
+      wanted.size > 0
+        ? catalog.filter((lang) => wanted.has(String(lang.language_id)))
+        : catalog;
+    return scoped.filter((lang) => (lang.voices ?? []).length > 0);
+  }
+
+  /**
+   * The candidate block the casting prompt reads. Gender and age are printed
+   * even when blank — a voice nobody recorded a gender for is a real option the
+   * prompt is told to rank above a mismatch, so hiding the gap would make it
+   * indistinguishable from a match.
+   */
+  private formatVoiceCandidates(catalog: ScenarioVoiceLanguage[]): string {
+    return catalog
+      .map((lang) => {
+        const rows = (lang.voices ?? [])
+          .map((voice) => {
+            const gender = (voice as { gender?: string }).gender ?? '';
+            const age = (voice as { age?: string }).age ?? '';
+            const provider = (voice as { provider?: string }).provider ?? '';
+            return `  - ${voice.id} | ${voice.name} | ${provider} | ${gender} | ${age}`;
+          })
+          .join('\n');
+        return `language_id ${lang.language_id} (${lang.label}):\n${rows}`;
+      })
+      .join('\n');
+  }
+
+  /**
+   * Coerce the `language_voices` response into resolved picks. Every voice id
+   * is checked against the voices of the language it was returned under, so a
+   * hallucinated id — or one borrowed from another language, which would
+   * dispatch the wrong TTS entirely — is dropped rather than saved. A language
+   * the model skipped is simply absent; the wizard fills those gaps itself.
+   */
+  private parseLanguageVoices(
+    raw: string,
+    catalog: ScenarioVoiceLanguage[],
+  ): {
+    languageId: string;
+    languageLabel: string;
+    voiceId: string;
+    voiceName: string;
+    voiceGender: string;
+  }[] {
+    const parsed = this.parseFirstJsonObject(raw);
+    const map: Record<string, unknown> =
+      parsed && typeof parsed.voices === 'object' && parsed.voices !== null
+        ? (parsed.voices as Record<string, unknown>)
+        : parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : {};
+
+    // Key leniency, not politeness: gpt-5-mini answered `"Language 1"` against
+    // an earlier candidate heading rather than `"1"`, which a strict lookup
+    // silently turned into "the model picked nothing". Match the bare id, the
+    // digits inside a decorated key, or the language's own label.
+    const findRequested = (
+      languageId: string,
+      label: string,
+    ): unknown | undefined => {
+      if (languageId in map) return map[languageId];
+      const wantedLabel = label.trim().toLowerCase();
+      for (const [key, value] of Object.entries(map)) {
+        const trimmed = key.trim();
+        if (trimmed.toLowerCase() === wantedLabel) return value;
+        const digits = trimmed.match(/\d+/g);
+        if (digits?.length === 1 && digits[0] === languageId) return value;
+      }
+      return undefined;
+    };
+
+    return catalog.flatMap((lang) => {
+      const languageId = String(lang.language_id);
+      const requested = findRequested(languageId, lang.label ?? '');
+      if (typeof requested !== 'string' || !requested.trim()) return [];
+      const voice = (lang.voices ?? []).find(
+        (candidate) => candidate.id === requested.trim(),
+      );
+      if (!voice) return [];
+      return [
+        {
+          languageId,
+          languageLabel: lang.label,
+          voiceId: voice.id,
+          voiceName: voice.name,
+          voiceGender: (voice as { gender?: string }).gender ?? '',
+        },
+      ];
+    });
+  }
+
+  /**
+   * Best-effort JSON parse of a model response. Tries a direct parse first (the
+   * common case — expectJson responses are clean single objects/arrays), then
+   * falls back to slicing the outermost `{ … }` when the model wraps the object
+   * in prose. Returns the parsed value (object or array) or null.
+   */
+  private parseFirstJsonObject(raw: string): any {
+    return parseFirstJsonObject(raw);
+  }
+
+  /** Coerce a V2 field's raw model output into the shape the studio form expects. */
+  private parseAgentBuilderField(
+    field: AgentBuilderField,
+    raw: string,
+  ): unknown {
+    switch (field) {
+      case AgentBuilderField.ROLE_INSTRUCTION:
+      case AgentBuilderField.CHALLENGE_DESCRIPTION:
+      case AgentBuilderField.BACKSTORY:
+      case AgentBuilderField.OPENING_STATEMENTS:
+      case AgentBuilderField.REMINDERS:
+        return raw.trim();
+
+      case AgentBuilderField.TITLE: {
+        const parsed = this.parseFirstJsonObject(raw);
+        if (parsed && typeof parsed.title === 'string' && parsed.title.trim()) {
+          return parsed.title.trim();
+        }
+        // Fallback if the model ignored the JSON contract: take the first
+        // non-empty line and strip wrapping quotes, so a stray prose response
+        // still yields a usable title rather than a wall of text.
+        const firstLine = raw
+          .split('\n')
+          .map((l) => l.trim())
+          .find((l) => l.length > 0);
+        return (firstLine ?? raw.trim()).replace(/^["']|["']$/g, '').trim();
+      }
+
+      case AgentBuilderField.PERSONA: {
+        const p = this.parseFirstJsonObject(raw) ?? {};
+        const allowedGenders = new Set(['male', 'female', 'non-binary']);
+        const genderRaw =
+          typeof p.gender === 'string' ? p.gender.trim().toLowerCase() : '';
+        const ageNum =
+          typeof p.age === 'number'
+            ? p.age
+            : typeof p.age === 'string' && p.age.trim() !== ''
+              ? Number(p.age)
+              : NaN;
+        // Clamp to the documented 5–100 range the persona prompt asks for;
+        // out-of-range / non-numeric values are dropped rather than written.
+        const age = Number.isFinite(ageNum) ? Math.round(ageNum) : NaN;
+        return {
+          name: typeof p.name === 'string' ? p.name.trim() : undefined,
+          age: age >= 5 && age <= 100 ? age : undefined,
+          gender: allowedGenders.has(genderRaw) ? genderRaw : undefined,
+          profession:
+            typeof p.profession === 'string' ? p.profession.trim() : undefined,
+          currentLocation:
+            typeof p.currentLocation === 'string'
+              ? p.currentLocation.trim()
+              : undefined,
+        };
+      }
+
+      case AgentBuilderField.KNOWLEDGE_SOURCES: {
+        const parsed = this.parseFirstJsonObject(raw);
+        // Prefer the documented `{ sources: [...] }`, but tolerate the model
+        // returning a bare array or wrapping under a different key, so a minor
+        // structural deviation doesn't silently drop all knowledge sources.
+        let sources: any[] = [];
+        if (Array.isArray(parsed)) {
+          sources = parsed;
+        } else if (Array.isArray(parsed?.sources)) {
+          sources = parsed.sources;
+        } else if (parsed && typeof parsed === 'object') {
+          const arrayValue = Object.values(parsed).find((v) =>
+            Array.isArray(v),
+          );
+          if (Array.isArray(arrayValue)) sources = arrayValue;
+        }
+        return sources
+          .map((s: any) => ({
+            title: typeof s?.title === 'string' ? s.title.trim() : '',
+            content: typeof s?.content === 'string' ? s.content.trim() : '',
+          }))
+          .filter(
+            (s: { title: string; content: string }) =>
+              s.title.length > 0 && s.content.length > 0,
+          );
+      }
+
+      case AgentBuilderField.STATES: {
+        const parsed = this.parseFirstJsonObject(raw);
+        // Prefer the documented `{ states: [...] }`, but tolerate a bare array
+        // or the model wrapping the list under a different key — same leniency
+        // as knowledge_sources. buildGeneratedStates then drops incomplete
+        // entries and assigns ids + contiguous score bands.
+        let items: any[] = [];
+        if (Array.isArray(parsed)) {
+          items = parsed;
+        } else if (Array.isArray(parsed?.states)) {
+          items = parsed.states;
+        } else if (parsed && typeof parsed === 'object') {
+          const arrayValue = Object.values(parsed).find((v) =>
+            Array.isArray(v),
+          );
+          if (Array.isArray(arrayValue)) items = arrayValue;
+        }
+        return buildGeneratedStates(items);
+      }
+
+      case AgentBuilderField.LINGUISTIC_STYLE_SAMPLES: {
+        return this.parseStringListField(raw, 'samples');
+      }
+
+      case AgentBuilderField.ALLOWED_FILLER_WORDS: {
+        return this.parseStringListField(raw, 'fillers');
+      }
+
+      default:
+        return raw.trim();
+    }
+  }
+
+  /**
+   * Shared lenient parser for fields whose contract is `{ <key>: string[] }` —
+   * tolerates a bare array or the model wrapping the list under a different
+   * key, same leniency as knowledge_sources/states. Drops non-string /
+   * empty-after-trim entries.
+   */
+  private parseStringListField(raw: string, key: string): string[] {
+    const parsed = this.parseFirstJsonObject(raw);
+    let items: any[] = [];
+    if (Array.isArray(parsed)) {
+      items = parsed;
+    } else if (Array.isArray(parsed?.[key])) {
+      items = parsed[key];
+    } else if (parsed && typeof parsed === 'object') {
+      const arrayValue = Object.values(parsed).find((v) => Array.isArray(v));
+      if (Array.isArray(arrayValue)) items = arrayValue;
+    }
+    return items
+      .filter((s): s is string => typeof s === 'string')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+
+  private getLanguageNameFromCode(code: string): string {
+    const languageNames: Record<string, string> = {
+      en: 'English',
+      'en-IN': 'English (India)',
+      'en-US': 'English (United States)',
+      'en-GB': 'English (UK)',
+      ml: 'Malayalam',
+      'ml-IN': 'Malayalam',
+      hi: 'Hindi',
+      'hi-IN': 'Hindi',
+      bn: 'Bengali',
+      'bn-IN': 'Bengali',
+      ta: 'Tamil',
+      'ta-IN': 'Tamil',
+      te: 'Telugu',
+      'te-IN': 'Telugu',
+      kn: 'Kannada',
+      'kn-IN': 'Kannada',
+      mr: 'Marathi',
+      'mr-IN': 'Marathi',
+      gu: 'Gujarati',
+      'gu-IN': 'Gujarati',
+      pa: 'Punjabi',
+      'pa-IN': 'Punjabi',
+      ur: 'Urdu',
+      'ur-IN': 'Urdu',
+      or: 'Odia',
+      'or-IN': 'Odia',
+      as: 'Assamese',
+      'as-IN': 'Assamese',
+    };
+    return languageNames[code] ?? languageNames[code?.split('-')[0]] ?? code;
+  }
+}

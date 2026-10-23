@@ -1,0 +1,361 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { LoggerService } from 'src/logger/logger.service';
+
+import { RoadmapAllocation } from '../entity/roadmap-allocation.entity';
+import { RoadmapOpportunity } from '../entity/roadmap-opportunity.entity';
+import { largestRemainderSplit } from '../util/largest-remainder.util';
+import {
+  isReshapeableStage,
+  unreshapeableMessage,
+} from '../util/roadmap-stage.util';
+import {
+  MergeOpportunitiesDto,
+  SplitPartDto,
+} from '../dto/roadmap-opportunity.dto';
+import { RoadmapVectorService } from './roadmap-vector.service';
+import { RoadmapNotificationService } from './roadmap-notification.service';
+
+/**
+ * Split and merge: reshaping opportunities after people have already voted on them.
+ *
+ * WHY THIS IS A SERVICE TRANSACTION AND NOT plpgsql. The source implemented both as
+ * SECURITY DEFINER functions for exactly one reason, stated in its own schema comment: the
+ * `write allocs` RLS policy only let a user touch their OWN allocation rows, so an admin could
+ * not redistribute everyone else's votes from the browser. ally-be IS the trusted writer, so
+ * that constraint is gone — and what remained of the plpgsql was pure downside: logic invisible
+ * to code review, untestable in Jest, versioned in a migration instead of next to the entities,
+ * and needing the `app.bypass_stage_check` GUC hack to defeat its own trigger.
+ *
+ * The source's temp tables (_split_src, _merge_rollup) were snapshots so the function could
+ * mutate `allocations` while iterating it. TypeORM's find() already materialises rows into JS
+ * before we mutate, so the snapshot is free.
+ *
+ * THE INVARIANT BOTH OPERATIONS PRESERVE: for every (user, period) pair, the total votes that
+ * user had cast across the affected opportunities is identical before and after. Votes are
+ * never created or destroyed. Both are covered by randomised conservation tests.
+ */
+@Injectable()
+export class RoadmapSplitMergeService {
+  private readonly logger = LoggerService.getInstance(
+    RoadmapSplitMergeService.name,
+  );
+
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly vectorService: RoadmapVectorService,
+    private readonly notifications: RoadmapNotificationService,
+  ) {}
+
+  /**
+   * Split one opportunity into N parts, redistributing every contributor's votes by weight.
+   *
+   * Exactly one part must carry the source's id — that part is KEPT (and reworded) rather than
+   * recreated, so its comments, its history, and any external link to /?opportunity=<id> survive.
+   */
+  async split(
+    actingUserId: number,
+    sourceId: string,
+    parts: SplitPartDto[],
+  ): Promise<{ partIds: string[] }> {
+    this.validateSplit(sourceId, parts);
+    const weights = parts.map((p) => p.weight);
+
+    const partIds = await this.dataSource.transaction(async (manager) => {
+      // Lock the source so two concurrent splits cannot both read the same allocations and
+      // each redistribute them.
+      const source = await manager.findOne(RoadmapOpportunity, {
+        where: { id: sourceId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!source)
+        throw new NotFoundException(`Opportunity ${sourceId} not found`);
+
+      // Checked INSIDE the transaction, after the pessimistic lock. Checking before opening one
+      // would race a concurrent stage change: the source could be marked released between the
+      // read and the redistribution, and the split would land on a shipped record anyway.
+      this.assertReshapeable('split', [source]);
+
+      // 1. Snapshot the allocations BEFORE touching anything, in a deterministic lock order.
+      const original = await manager
+        .createQueryBuilder(RoadmapAllocation, 'a')
+        .setLock('pessimistic_write')
+        .where('a."opportunityId" = :sourceId', { sourceId })
+        .orderBy('a."userId"', 'ASC')
+        .addOrderBy('a."periodKey"', 'ASC')
+        .getMany();
+
+      // 2. Resolve every part to an id, preserving the caller's order so it lines up with
+      //    `weights`.
+      const ids: string[] = [];
+      for (const part of parts) {
+        if (part.id) {
+          await manager.update(RoadmapOpportunity, part.id, {
+            description: part.description.trim(),
+            updatedBy: actingUserId,
+          });
+          ids.push(part.id);
+        } else {
+          const created = await manager.save(
+            manager.create(RoadmapOpportunity, {
+              description: part.description.trim(),
+              type: source.type,
+              stage: source.stage,
+              productGoal: source.productGoal,
+              owner: source.owner,
+              // The original author keeps authorship of the ideas their opportunity became.
+              createdBy: source.createdBy,
+              updatedBy: actingUserId,
+              // Always null: assertReshapeable above has already refused a RELEASED source, so
+              // there is no ship date to inherit and none is being stamped here. See the note on
+              // ROADMAP_UNRESHAPEABLE_STAGES before relaxing that guard.
+              releasedAt: null,
+              prd: null,
+              // The images stay on the source. Same reasoning as `prd`: a split says "this was
+              // several things", and copying one screenshot onto four parts makes three of them
+              // carry evidence for something they are no longer about. Re-attaching to the part
+              // that needs it is a paste of a URL; un-attaching from three is four edits.
+              referenceImages: [],
+            }),
+          );
+          ids.push(created.id);
+        }
+      }
+
+      // 3. Redistribute. ORDER MATTERS: delete every original allocation row FIRST, then
+      //    insert the new ones. Otherwise the monthly-cap trigger sees a transient state where
+      //    a user holds their original votes AND their new shares — over 100 — and rejects a
+      //    legitimate split. (The source dodged this with set_config('app.bypass_stage_check');
+      //    we simply never create the invalid intermediate state.)
+      await manager.delete(RoadmapAllocation, { opportunityId: sourceId });
+
+      for (const row of original) {
+        const shares = largestRemainderSplit(row.votes, weights);
+
+        // Vote-conservation guard. largestRemainderSplit is exact by construction, so this
+        // firing means the util was changed and a test was not — fail loudly inside the
+        // transaction rather than silently losing someone's votes.
+        const total = shares.reduce((a, b) => a + b, 0);
+        if (total !== row.votes) {
+          throw new Error(
+            `Split would not conserve votes for user ${row.userId} in ${row.periodKey}: ` +
+              `${row.votes} became ${total}`,
+          );
+        }
+
+        for (const [index, votes] of shares.entries()) {
+          if (votes <= 0) continue;
+          await manager.save(
+            manager.create(RoadmapAllocation, {
+              userId: row.userId,
+              opportunityId: ids[index],
+              periodKey: row.periodKey,
+              votes,
+            }),
+          );
+        }
+      }
+
+      return ids;
+    });
+
+    // Re-index outside the transaction: the kept part's description changed and every new part
+    // is unknown to the vector store.
+    for (const id of partIds) await this.vectorService.indexQuietly(id);
+
+    this.notifications.emit({
+      kind: 'ROADMAP_INVALIDATED',
+      actorId: actingUserId,
+      reason: 'split',
+    });
+    this.logger.info(
+      `[ROADMAP] Split ${sourceId} into ${partIds.length} parts by user ${actingUserId}`,
+    );
+    return { partIds };
+  }
+
+  /**
+   * Fold several opportunities into one, summing each contributor's votes per (user, period)
+   * and moving comments across. Sources are soft-deleted, so release notes that snapshotted
+   * their ids still resolve.
+   */
+  async merge(
+    actingUserId: number,
+    dto: MergeOpportunitiesDto,
+  ): Promise<{ primaryId: string }> {
+    const sourceIds = [...new Set(dto.sourceIds)].filter(
+      (id) => id !== dto.primaryId,
+    );
+    if (sourceIds.length === 0) {
+      throw new BadRequestException(
+        'A merge needs at least one source opportunity other than the primary',
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const primary = await manager.findOne(RoadmapOpportunity, {
+        where: { id: dto.primaryId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!primary) {
+        throw new NotFoundException(`Opportunity ${dto.primaryId} not found`);
+      }
+
+      const sources = await manager
+        .createQueryBuilder(RoadmapOpportunity, 'o')
+        .setLock('pessimistic_write')
+        .where('o.id IN (:...sourceIds)', { sourceIds })
+        .orderBy('o.id', 'ASC')
+        .getMany();
+      if (sources.length !== sourceIds.length) {
+        const found = new Set(sources.map((s) => s.id));
+        throw new NotFoundException(
+          `Not found or already merged: ${sourceIds.filter((id) => !found.has(id)).join(', ')}`,
+        );
+      }
+
+      // EVERY participant, not just the survivor. A released source is the worse case of the
+      // two: the merge would soft-delete a shipped record and move its votes onto something
+      // else, so what shipped stops existing on the board it shipped from.
+      this.assertReshapeable('merge', [primary, ...sources]);
+
+      const allIds = [dto.primaryId, ...sourceIds];
+
+      // Roll up per (user, period) across the primary AND every source.
+      const rows = await manager
+        .createQueryBuilder(RoadmapAllocation, 'a')
+        .setLock('pessimistic_write')
+        .where('a."opportunityId" IN (:...allIds)', { allIds })
+        .orderBy('a."userId"', 'ASC')
+        .addOrderBy('a."periodKey"', 'ASC')
+        .getMany();
+
+      const rollup = new Map<string, number>();
+      let totalBefore = 0;
+      for (const row of rows) {
+        const key = `${row.userId}|${row.periodKey}`;
+        rollup.set(key, (rollup.get(key) ?? 0) + row.votes);
+        totalBefore += row.votes;
+      }
+
+      // Same ordering rule as split: clear first, then write, so the cap trigger never sees a
+      // user holding their votes on two opportunities at once.
+      await manager.query(
+        `DELETE FROM roadmap_allocations WHERE "opportunityId" = ANY($1::uuid[])`,
+        [allIds],
+      );
+
+      let totalAfter = 0;
+      for (const [key, votes] of rollup) {
+        const [userIdRaw, periodKey] = key.split('|');
+
+        // No fixed-cap sanity check here anymore: under the vote-grant ledger a user's
+        // cumulative spend keeps accruing (daily + monthly grants), so there's no longer a
+        // ceiling a rollup total could be compared against. The real invariant — this
+        // operation cannot create or destroy votes — is the totalAfter/totalBefore assertion
+        // below; that one still holds exactly as before.
+        totalAfter += votes;
+        await manager.save(
+          manager.create(RoadmapAllocation, {
+            userId: Number(userIdRaw),
+            opportunityId: dto.primaryId,
+            periodKey,
+            votes,
+          }),
+        );
+      }
+
+      // The invariant, asserted. Unreachable given the guard above; kept because it is the one
+      // number the whole feature depends on.
+      if (totalAfter !== totalBefore) {
+        throw new Error(
+          `Merge did not conserve votes: ${totalBefore} before, ${totalAfter} after`,
+        );
+      }
+
+      // Move comments to the survivor.
+      await manager.query(
+        `UPDATE roadmap_opportunity_comments SET "opportunityId" = $1, "updatedAt" = now()
+          WHERE "opportunityId" = ANY($2::uuid[])`,
+        [dto.primaryId, sourceIds],
+      );
+
+      if (dto.description) {
+        await manager.update(RoadmapOpportunity, dto.primaryId, {
+          description: dto.description.trim(),
+          updatedBy: actingUserId,
+        });
+      }
+
+      await manager.softDelete(RoadmapOpportunity, sourceIds);
+    });
+
+    // Every source must leave the vector index, or duplicate-detection keeps proposing
+    // opportunities that no longer exist.
+    for (const id of sourceIds) await this.vectorService.removeQuietly(id);
+    if (dto.description) await this.vectorService.indexQuietly(dto.primaryId);
+
+    this.notifications.emit({
+      kind: 'ROADMAP_INVALIDATED',
+      actorId: actingUserId,
+      reason: 'merge',
+    });
+    this.logger.info(
+      `[ROADMAP] Merged ${sourceIds.length} opportunities into ${dto.primaryId} by user ${actingUserId}`,
+    );
+    return { primaryId: dto.primaryId };
+  }
+
+  /**
+   * Refuse to reshape anything already released or archived.
+   *
+   * Throws a 409 rather than filtering the offenders out and proceeding: a merge that quietly
+   * dropped two of its five rows would report success while leaving the manager to discover the
+   * board did not do what they asked. The whole operation is the unit.
+   */
+  private assertReshapeable(
+    operation: 'split' | 'merge',
+    rows: RoadmapOpportunity[],
+  ): void {
+    const offenders = rows.filter((row) => !isReshapeableStage(row.stage));
+    if (offenders.length === 0) return;
+    throw new ConflictException(
+      unreshapeableMessage(
+        operation,
+        offenders.map(({ id, stage }) => ({ id, stage })),
+      ),
+    );
+  }
+
+  /** Validated before opening a transaction, so a bad request costs nothing. */
+  private validateSplit(sourceId: string, parts: SplitPartDto[]): void {
+    if (!Array.isArray(parts) || parts.length < 2) {
+      throw new BadRequestException('A split needs at least 2 parts');
+    }
+    const carryingSourceId = parts.filter((p) => p.id === sourceId);
+    if (carryingSourceId.length !== 1) {
+      throw new BadRequestException(
+        'Exactly one part must carry the original opportunity id',
+      );
+    }
+    if (parts.some((p) => p.id && p.id !== sourceId)) {
+      throw new BadRequestException(
+        'Only the original opportunity may carry an id; new parts must omit it',
+      );
+    }
+    const weights = parts.map((p) => p.weight);
+    if (weights.some((w) => !Number.isFinite(w) || w < 0)) {
+      throw new BadRequestException(
+        'Every weight must be a non-negative number',
+      );
+    }
+    if (weights.reduce((a, b) => a + b, 0) <= 0) {
+      throw new BadRequestException('Weights must sum to more than 0');
+    }
+  }
+}

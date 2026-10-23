@@ -1,0 +1,351 @@
+import { CohortModule } from 'src/cohort/cohort.module';
+import { forwardRef, Module } from '@nestjs/common';
+import { LanguageModule } from '../language/language.module';
+import { LearnController } from './controller/learn.controller';
+import { ScenarioService } from './service/scenario.service';
+import { Scenarios } from './entity/scenarios.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScenarioSessionService } from './service/scenario-session.service';
+import { ScenarioSessions } from './entity/scenario-sessions.entity';
+import { ScenarioSessionRepository } from './repository/scenario-session.repository';
+import { ScenarioSessionMessagesRepository } from './repository/scenario-session-messages.repository';
+import { LiveKitModule } from 'src/livekit/livekit.module';
+import { ScenarioSessionFeedbacks } from './entity/scenario-session-feedbacks.entity';
+import { ScenarioSessionLifecycleEvent } from './entity/scenario-session-lifecycle-event.entity';
+import { ScenarioEvents } from './entity/scenario-events.entity';
+import { SessionEventModule } from 'src/session-event/session-event.module';
+import { AiModule } from 'src/ai/ai.module';
+import { ScenarioSessionMessages } from './entity/scenario-session-messages.entity';
+import { LearnMessageAndEventConsumer } from './consumer/learn-message-and-event.consumer';
+import { LearnMessageProcessor } from './processor/learn-message.processor';
+import { LearnEventProcessor } from './processor/learn-event.processor';
+import { ScenarioSessionEvents } from './entity/scenario-session-events.entity';
+import { ScenariosRepository } from './repository/scenario.repository';
+import { ScenarioVersion } from './entity/scenario-version.entity';
+import { PreviewMonologueRun } from './entity/preview-monologue-run.entity';
+import { PreviewMonologueService } from './service/preview-monologue.service';
+import { LlmModule } from 'src/llm/llm.module';
+import { ScenarioVersionRepository } from './repository/scenario-version.repository';
+import { ScenarioVersionService } from './service/scenario-version.service';
+import { ScenarioVoices } from './entity/scenario-voices.entity';
+import { ScenarioVoicesRepository } from './repository/scenario-voices.repository';
+import { SttConfigsRepository } from './repository/stt-configs.repository';
+import { SttConfigService } from './service/stt-config.service';
+import { LlmConfigsRepository } from './repository/llm-configs.repository';
+import { LlmConfigService } from './service/llm-config.service';
+import { ElevenLabsVoiceSyncService } from './service/elevenlabs-voice-sync.service';
+import { TtsCatalogService } from './service/tts-catalog.service';
+import { VideoActorCatalogService } from './service/video-actor-catalog.service';
+import { ElevenLabsVoiceSchedulerRegistrationService } from './service/elevenlabs-voice-scheduler-registration.service';
+import { LanguagesRepository } from '../language/repository/languages.repository';
+import { SimulationCreditsController } from './controller/simulation-credits.controller';
+import { SimulationCreditsService } from './service/simulation-credits.service';
+import { SimulationCreditsRepository } from './repository/simulation-credits.repository';
+import { SimulationCredits } from 'src/learn/entity/simulation-credits.entity';
+import { UserModule } from 'src/user/user.module';
+import { AwsModule } from 'src/aws/aws.module';
+import { ScenarioEventsRepository } from './repository/scenario-events.repository';
+import { ScenarioSharedService } from './service/scenario-shared.service';
+import { ScenarioTenantService } from './service/scenario-tenant.service';
+import { ScenarioTenantRepository } from './repository/scenario-tenant.repository';
+import { TenantModule } from 'src/tenant/tenant.module';
+import { TenantsRepository } from 'src/tenant/repository/tenant.repository';
+import { ScenarioTenantValidationShared } from './service/scenario-tenant-validation-shared';
+import { ScenarioPathModule } from 'src/scenario-path/scenario-path.module';
+import { TriggerWarningsService } from './service/trigger-warnings.service';
+import { TriggerWarningsRepository } from './repository/trigger-warnings.repository';
+import { TriggerWarnings } from './entity/trigger-warnings.entity';
+import { ScenarioTriggerWarnings } from './entity/scenario-trigger-warnings.entity';
+import { ScenarioTranslationsRepository } from './repository/scenario-translations.repository';
+import { SessionEventTranslationsRepository } from 'src/session-event/repository/session-event-translation.repository';
+import { ScenarioEventsTranslationsRepository } from './repository/scenario-events-translations.repository';
+import { ScenarioSessionReviewModule } from 'src/scenario-session-review/scenario-session-review.module';
+import { ConversationalGuardrailsModule } from 'src/conversational-guardrails/conversational-guardrails.module';
+import { CaseModule } from 'src/case/case.module';
+import { TrackModule } from 'src/track/track.module';
+import { ScenarioSessionDetailsRepository } from './repository/scenario-session-details.repository';
+import { ScenarioReportModule } from 'src/scenario-report/scenario-report.module';
+import { ScenarioSessionTags } from './entity/scenario-session-tags.entity';
+import { ScenarioSessionMessageTags } from './entity/scenario-session-message-tags.entity';
+import { ScenarioSessionTagsRepository } from './repository/scenario-session-tags.repository';
+import { Behavior } from './entity/behavior.entity';
+import { FillerTag } from './entity/filler-tag.entity';
+import { ScenarioBehaviorInstruction } from './entity/scenario-behavior-instruction.entity';
+import { ScenarioBehaviorInstructionBehavior } from './entity/scenario-behavior-instruction-behavior.entity';
+import { BehaviorController } from './controller/behavior.controller';
+import { FillerTagController } from './controller/filler-tag.controller';
+import { BehaviorService } from './service/behavior.service';
+import { FillerTagService } from './service/filler-tag.service';
+import { BehaviorRepository } from './repository/behavior.repository';
+import { FillerTagRepository } from './repository/filler-tag.repository';
+import { ScenarioBehaviorInstructionService } from './service/scenario-behavior-instruction.service';
+import { ScenarioBehaviorInstructionRepository } from './repository/scenario-behavior-instruction.repository';
+import { ScenarioBehaviorInstructionBehaviorRepository } from './repository/scenario-behavior-instruction-behavior.repository';
+import { PromptModule } from 'src/prompt/prompt.module';
+import { AiChatModule } from 'src/ai-chat/ai-chat.module';
+import { ScenarioSessionChat } from './entity/scenario-session-chat.entity';
+import { ScenarioSessionChatMessage } from './entity/scenario-session-chat-message.entity';
+import { ScenarioSessionChatRepository } from './repository/scenario-session-chat.repository';
+import { ScenarioSessionChatMessageRepository } from './repository/scenario-session-chat-message.repository';
+import { ScenarioSessionContextProvider } from './service/scenario-session-context.provider';
+import { ScenarioSessionChatService } from './service/scenario-session-chat.service';
+import { ScenarioSessionChatController } from './controller/scenario-session-chat.controller';
+import { BehaviorInstructionProcessor } from './processor/behavior-instruction.processor';
+import { TurnMetricsProcessor } from './processor/turn-metrics.processor';
+import { StartMetricsProcessor } from './processor/start-metrics.processor';
+import { LlmUsageProcessor } from './processor/llm-usage.processor';
+import { SessionMemoryProcessor } from './processor/session-memory.processor';
+import { SupervisorNoteProcessor } from './processor/supervisor-note.processor';
+import { RetrievalLogProcessor } from 'src/knowledge-base/processor/retrieval-log.processor';
+import { WmRecallProcessor } from './processor/wm-recall.processor';
+import { WmRecallSelection } from './entity/wm-recall-selection.entity';
+import { KbRetrievalRepository } from 'src/knowledge-base/repository/kb-retrieval.repository';
+import { LlmUsageModule } from 'src/analytics/llm-usage.module';
+import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { ScenarioSessionBehaviorInstructions } from './entity/scenario-session-behavior-instructions.entity';
+import { Competency } from './entity/competency.entity';
+import { CompetencyRepository } from './repository/competency.repository';
+import { CompetencyService } from './service/competency.service';
+import { CompetencyController } from './controller/competency.controller';
+import { CompetencyCluster } from './entity/competency-cluster.entity';
+import { CompetencyClusterMember } from './entity/competency-cluster-member.entity';
+import { CompetencyClusterRepository } from './repository/competency-cluster.repository';
+import { CompetencyClusterMemberRepository } from './repository/competency-cluster-member.repository';
+import { CompetencyClusterService } from './service/competency-cluster.service';
+import { CompetencyClusterController } from './controller/competency-cluster.controller';
+import { AgentTestCase } from './entity/agent-test-case.entity';
+import { AgentTestCaseRepository } from './repository/agent-test-case.repository';
+import { AgentTestCaseService } from './service/agent-test-case.service';
+import { ScenarioSessionEvaluationService } from './service/scenario-session-evaluation.service';
+import { ActorEvaluationCatchupSchedulerRegistrationService } from './service/actor-evaluation-catchup-scheduler-registration.service';
+import { StuckSessionSweeperSchedulerRegistrationService } from './service/stuck-session-sweeper-scheduler-registration.service';
+import { UnfinalisedSessionSweeperSchedulerRegistrationService } from './service/unfinalised-session-sweeper-scheduler-registration.service';
+import { ScenarioAutoVersionSchedulerRegistrationService } from './service/scenario-auto-version-scheduler-registration.service';
+import { ScenarioSessionEvaluationWebhookController } from './controller/scenario-session-evaluation-webhook.controller';
+import { RoomMetadataWebhookController } from './controller/room-metadata-webhook.controller';
+import { LearnRoomMetadata } from './entity/learn-room-metadata.entity';
+import { LearnerSupervisorMemory } from './entity/learner-supervisor-memory.entity';
+import { LearnerSupervisorMemoryService } from './service/learner-supervisor-memory.service';
+import { User } from 'src/user/entity/user.entity';
+import { RoomMetadataStoreService } from './service/room-metadata-store.service';
+import { AgentTestCaseController } from './controller/agent-test-case.controller';
+import { CompetencyBehavior } from './entity/competency-behavior.entity';
+import { CompetencyBehaviorRepository } from './repository/competency-behavior.repository';
+import { BehaviorTranslation } from './entity/behavior-translation.entity';
+import { ScenarioBehaviorInstructionTranslation } from './entity/scenario-behavior-instruction-translation.entity';
+import { BehaviorTranslationRepository } from './repository/behavior-translation.repository';
+import { ScenarioBehaviorInstructionTranslationRepository } from './repository/scenario-behavior-instruction-translation.repository';
+import { BehaviorTranslationService } from './service/behavior-translation.service';
+import { ScenarioBehaviorInstructionTranslationService } from './service/scenario-behavior-instruction-translation.service';
+import { BehaviorInstructionTranslationService } from './service/behavior-instruction-translation.service';
+import { AutofillService } from './service/autofill.service';
+import { AgentBuilderChainService } from './service/agent-builder-chain.service';
+import { ScenarioTranslationGateway } from './gateway/scenario-translation.gateway';
+import { ScenarioTranslationNotificationService } from './service/scenario-translation-notification.service';
+
+import { AuditModule } from 'src/audit/audit.module';
+import { ScenarioSessionRecording } from './entity/scenario-session-recording.entity';
+import { ScenarioSessionRecordingRepository } from './repository/scenario-session-recording.repository';
+import { ScenarioSessionRecordingController } from './controller/scenario-session-recording.controller';
+import { ScenarioSessionRecordingService } from './service/scenario-session-recording.service';
+import { TranscriptTranslationModule } from 'src/transcript-translation/transcript-translation.module';
+import { SettingsModule } from 'src/settings/settings.module';
+
+@Module({
+  imports: [
+    // Languages now point at an llm_models catalog row; the resolver needs to
+    // read it when assembling session metadata.
+    LlmModule,
+    CohortModule,
+    TypeOrmModule.forFeature([
+      WmRecallSelection,
+      Scenarios,
+      PreviewMonologueRun,
+      ScenarioSessions,
+      ScenarioEvents,
+      ScenarioSessionFeedbacks,
+      ScenarioSessionLifecycleEvent,
+      ScenarioSessionMessages,
+      ScenarioSessionEvents,
+      ScenarioVoices,
+      SimulationCredits,
+      TriggerWarnings,
+      ScenarioTriggerWarnings,
+      ScenarioSessionTags,
+      ScenarioSessionMessageTags,
+      Behavior,
+      FillerTag,
+      ScenarioBehaviorInstruction,
+      ScenarioBehaviorInstructionBehavior,
+      ScenarioSessionChat,
+      ScenarioSessionChatMessage,
+      ScenarioSessionBehaviorInstructions,
+      Competency,
+      CompetencyBehavior,
+      CompetencyCluster,
+      CompetencyClusterMember,
+      AgentTestCase,
+      BehaviorTranslation,
+      ScenarioBehaviorInstructionTranslation,
+      AuditModule,
+      ScenarioSessionRecording,
+      ScenarioVersion,
+      LearnRoomMetadata,
+      LearnerSupervisorMemory,
+      User,
+    ]),
+    forwardRef(() => LiveKitModule),
+    SessionEventModule,
+    TenantModule,
+    forwardRef(() => AiModule),
+    forwardRef(() => UserModule),
+    AwsModule,
+    forwardRef(() => ScenarioPathModule),
+    LanguageModule,
+    forwardRef(() => ScenarioSessionReviewModule),
+    forwardRef(() => ConversationalGuardrailsModule),
+    forwardRef(() => CaseModule),
+    forwardRef(() => TrackModule),
+    forwardRef(() => PromptModule),
+    ScenarioReportModule,
+    forwardRef(() => ConversationalGuardrailsModule),
+    AiChatModule,
+    AuditModule,
+    LlmUsageModule,
+    LlmAgentModule,
+    TranscriptTranslationModule,
+    // forwardRef: SettingsModule -> (forwardRef) UserModule -> (forwardRef)
+    // LearnModule already forms a cycle; this edge closes it, so it needs
+    // forwardRef too or Nest resolves an undefined module at load time.
+    forwardRef(() => SettingsModule),
+  ],
+  controllers: [
+    LearnController,
+    SimulationCreditsController,
+    BehaviorController,
+    FillerTagController,
+    ScenarioSessionChatController,
+    CompetencyController,
+    CompetencyClusterController,
+    AgentTestCaseController,
+    ScenarioSessionRecordingController,
+    ScenarioSessionEvaluationWebhookController,
+    RoomMetadataWebhookController,
+  ],
+  providers: [
+    ScenarioService,
+    PreviewMonologueService,
+    ScenarioVersionService,
+    ScenarioVersionRepository,
+    ScenarioSessionService,
+    LearnerSupervisorMemoryService,
+    ScenarioSessionRepository,
+    ScenarioSessionMessagesRepository,
+    ScenariosRepository,
+    LearnMessageAndEventConsumer,
+    LearnMessageProcessor,
+    LearnEventProcessor,
+    BehaviorInstructionProcessor,
+    TurnMetricsProcessor,
+    StartMetricsProcessor,
+    LlmUsageProcessor,
+    SessionMemoryProcessor,
+    SupervisorNoteProcessor,
+    RetrievalLogProcessor,
+    WmRecallProcessor,
+    KbRetrievalRepository,
+    ScenarioVoicesRepository,
+    SttConfigsRepository,
+    SttConfigService,
+    LlmConfigsRepository,
+    LlmConfigService,
+    ElevenLabsVoiceSyncService,
+    TtsCatalogService,
+    VideoActorCatalogService,
+    ElevenLabsVoiceSchedulerRegistrationService,
+    LanguagesRepository,
+    SimulationCreditsService,
+    SimulationCreditsRepository,
+    ScenarioEventsRepository,
+    ScenarioSharedService,
+    RoomMetadataStoreService,
+    ScenarioTenantService,
+    ScenarioTenantRepository,
+    ScenarioTenantValidationShared,
+    TenantsRepository,
+    TriggerWarningsRepository,
+    TriggerWarningsService,
+    ScenariosRepository,
+    ScenarioTranslationsRepository,
+    SessionEventTranslationsRepository,
+    ScenarioEventsTranslationsRepository,
+    ScenarioSessionDetailsRepository,
+    ScenarioSessionTagsRepository,
+    BehaviorService,
+    FillerTagService,
+    BehaviorRepository,
+    FillerTagRepository,
+    ScenarioBehaviorInstructionService,
+    ScenarioBehaviorInstructionRepository,
+    ScenarioBehaviorInstructionBehaviorRepository,
+    ScenarioSessionChatRepository,
+    ScenarioSessionChatMessageRepository,
+    ScenarioSessionContextProvider,
+    ScenarioSessionChatService,
+    CompetencyService,
+    CompetencyRepository,
+    CompetencyBehaviorRepository,
+    CompetencyClusterService,
+    CompetencyClusterRepository,
+    CompetencyClusterMemberRepository,
+    AgentTestCaseService,
+    AgentTestCaseRepository,
+    ScenarioSessionEvaluationService,
+    ActorEvaluationCatchupSchedulerRegistrationService,
+    StuckSessionSweeperSchedulerRegistrationService,
+    UnfinalisedSessionSweeperSchedulerRegistrationService,
+    ScenarioAutoVersionSchedulerRegistrationService,
+    BehaviorTranslationRepository,
+    ScenarioBehaviorInstructionTranslationRepository,
+    BehaviorInstructionTranslationService,
+    BehaviorTranslationService,
+    ScenarioBehaviorInstructionTranslationService,
+    AutofillService,
+    AgentBuilderChainService,
+    ScenarioSessionRecordingRepository,
+    ScenarioSessionRecordingService,
+    ScenarioTranslationNotificationService,
+    ScenarioTranslationGateway,
+  ],
+  exports: [
+    LearnMessageProcessor,
+    LearnEventProcessor,
+    BehaviorInstructionProcessor,
+    TurnMetricsProcessor,
+    StartMetricsProcessor,
+    LlmUsageProcessor,
+    SessionMemoryProcessor,
+    SupervisorNoteProcessor,
+    RetrievalLogProcessor,
+    WmRecallProcessor,
+    ScenarioSessionService,
+    SimulationCreditsService,
+    ScenarioSharedService,
+    ScenarioService,
+    ScenarioTenantService,
+    ScenarioSessionRecordingService,
+    // Exported for LlmPreviewModule, which resolves a config by id before
+    // calling the provider.
+    LlmConfigService,
+    // Exported for SessionEventModule's EventBuilderService, which runs the
+    // same per-field prompt-render-and-complete path against its own prompts.
+    AutofillService,
+    // Exported for CourseCopilotModule, which builds each new roleplay a
+    // course needs through the Agent Builder field chain, server-side.
+    AgentBuilderChainService,
+    // Exported for CourseCopilotModule: the interview grounds outcomes and
+    // annotation labels in each competency's helpful/unhelpful behaviours.
+    CompetencyService,
+  ],
+})
+export class LearnModule {}

@@ -1,0 +1,679 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource, In } from 'typeorm';
+
+import { LoggerService } from 'src/logger/logger.service';
+import { computeCostUsd } from 'src/analytics/constants/llm-pricing.constants';
+import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
+import {
+  BUG_FIX_SESSION_JOB_TIMEOUT_MINUTES,
+  BUG_HUNT_RUN_RECONCILE_GRACE_MINUTES,
+  BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES,
+} from '../constants/bug-fix-session.constants';
+import { providerForModel } from 'src/llm-agent/service/agent-llm.factory';
+import { LlmTask } from 'src/learn/enum/llm-task.enum';
+
+import { BugHunterNotificationService } from './bug-hunter-notification.service';
+import { BugHunterFinderDataService } from './bug-hunter-finder-data.service';
+import { GithubActionsService } from 'src/github/service/github-actions.service';
+import {
+  runFailed,
+  runFoundBugs,
+  stuckOnRepo,
+} from '../constants/bug-hunter-voice';
+import { BugHunterNotificationLevel } from '../enum/bug-hunter-notification.enum';
+
+import { BugHuntRun } from '../entity/bug-hunt-run.entity';
+import { BugHuntEvent } from '../entity/bug-hunt-event.entity';
+import { BugHunterSettings } from '../entity/bug-hunter-settings.entity';
+import { BugHuntRunRepository } from '../repository/bug-hunt-run.repository';
+import { BugHuntEventRepository } from '../repository/bug-hunt-event.repository';
+import { BugHunterSettingsRepository } from '../repository/bug-hunter-settings.repository';
+import {
+  DecisionOwner,
+  DecisionPoint,
+} from '../type/bug-hunter-orchestrator.type';
+import { BugHuntRunStatus, BugHuntTrigger } from '../enum/bug-hunt-run.enum';
+import { BugHuntEventStage } from '../enum/bug-hunt-event.enum';
+import { BugHunterMode } from '../enum/bug-finding.enum';
+import { BugCaseBudgetService } from './bug-case-budget.service';
+
+/**
+ * Owns the kill switch, the run lifecycle, and the event transcript.
+ *
+ * The workflow pipeline itself (`.claude/workflows/bug-hunt.mjs`) runs outside
+ * this process — an external Claude Code agent, not an in-process job — so
+ * every step it takes is reported back here over this module's HTTP surface
+ * rather than by calling these methods directly in-process. This service is
+ * the single place that decides what "a run" and "an event" mean; the
+ * pipeline is just a caller.
+ */
+@Injectable()
+export class BugHunterService {
+  private readonly logger = LoggerService.getInstance(BugHunterService.name);
+
+  constructor(
+    private readonly settingsRepository: BugHunterSettingsRepository,
+    private readonly runRepository: BugHuntRunRepository,
+    private readonly eventRepository: BugHuntEventRepository,
+    private readonly notificationService: BugHunterNotificationService,
+    private readonly dataSource: DataSource,
+    private readonly llmUsageService: LlmUsageService,
+    private readonly github: GithubActionsService,
+    private readonly finderDataService: BugHunterFinderDataService,
+    private readonly budgetService: BugCaseBudgetService,
+  ) {}
+
+  // ── kill switch ──────────────────────────────────────────────────────────
+
+  getSettings(): Promise<BugHunterSettings> {
+    return this.settingsRepository.getSettings();
+  }
+
+  /**
+   * Flips the switch and logs it as a timeline event with `runId = null`, so
+   * the on/off history is visible in the same place as run activity — a
+   * SUPER_DUPER_ADMIN reviewing "why did nothing run last night" sees the
+   * mode change right next to the skipped run it explains.
+   */
+  /** An admin hands a decision point to the other owner, or back to the default (OPP-0783). */
+  async setDecisionOwner(
+    point: DecisionPoint,
+    owner: DecisionOwner | null,
+    updatedBy: number,
+  ): Promise<BugHunterSettings> {
+    const settings = await this.settingsRepository.setDecisionOwner(
+      point,
+      owner,
+      updatedBy,
+    );
+    await this.eventRepository.save(
+      this.eventRepository.create({
+        runId: null,
+        stage: BugHuntEventStage.SETTINGS_CHANGED,
+        summary: owner
+          ? `Decision point ${point} handed to the ${owner} by user ${updatedBy}`
+          : `Decision point ${point} back to its default owner, by user ${updatedBy}`,
+        payload: { point, owner, updatedBy },
+      }),
+    );
+    return settings;
+  }
+
+  async setMode(
+    mode: BugHunterMode,
+    updatedBy: number,
+  ): Promise<BugHunterSettings> {
+    const settings = await this.settingsRepository.setMode(mode, updatedBy);
+    await this.eventRepository.save(
+      this.eventRepository.create({
+        runId: null,
+        stage: BugHuntEventStage.SETTINGS_CHANGED,
+        summary: `Bug Hunter mode set to ${mode.toUpperCase()} by user ${updatedBy}`,
+        payload: { mode, updatedBy },
+      }),
+    );
+    return settings;
+  }
+
+  /**
+   * Both trigger paths call this FIRST. OFF means off for every trigger — no
+   * "scheduled paused but manual still works" — so a run that finds the
+   * switch off does zero further work: it records exactly one event and
+   * exits without spending any tokens. MANUAL and AI both return the mode so
+   * the pipeline knows, once Discover/Verify are done, whether a
+   * verify-confirmed finding may go straight to the Fix stage (AI) or must
+   * wait at PENDING_APPROVAL for an admin (MANUAL) — see bug-hunt.mjs.
+   */
+  async requireEnabledOrRecordSkip(
+    trigger: BugHuntTrigger,
+    repo: string,
+  ): Promise<BugHunterMode | null> {
+    const settings = await this.getSettings();
+    if (settings.mode !== BugHunterMode.OFF) return settings.mode;
+
+    const run = await this.runRepository.save(
+      this.runRepository.create({
+        trigger,
+        repo,
+        status: BugHuntRunStatus.SKIPPED_DISABLED,
+        finishedAt: new Date(),
+      }),
+    );
+    await this.eventRepository.save(
+      this.eventRepository.create({
+        runId: run.id,
+        repo,
+        stage: BugHuntEventStage.SKIPPED_DISABLED,
+        summary: 'Bug Hunter is off — run skipped with zero token spend.',
+      }),
+    );
+    return null;
+  }
+
+  /**
+   * The nightly cron's second gate, after the kill switch: a repo with no new
+   * commits since its last completed sweep has nothing new for the
+   * code-review or test/lint finders to look at, so paying for a full agent
+   * session over it is pure waste. Only ever applies to
+   * `BugHuntTrigger.SCHEDULED` — a human pressing "Start a sweep", or a fix
+   * session dispatched for one already-known bug, is an explicit ask and
+   * always runs regardless of how quiet the repo has been.
+   *
+   * Deliberately narrow: a repo with an external production signal
+   * (`BugHunterFinderDataService.hasExternalSignal` — a CloudWatch log group
+   * today, or ally-web's PostHog exceptions) is NEVER skipped this way,
+   * because a real production issue — a bad rollback, an upstream outage, a
+   * client-side regression — can appear with no matching commit, and there is
+   * no anomaly threshold here (yet) to tell a real spike from ordinary
+   * background noise. Widening this to those repos needs that threshold built
+   * first, not just this check relaxed.
+   *
+   * Also deliberately does not gate on pending human-reported bugs: those
+   * already exist as their own `bug_findings` row the moment they're filed
+   * (see `BugHunterFinderDataService`'s doc), so a skipped sweep does not hide
+   * one — it only delays the finder step that classifies which repo it
+   * belongs to until the next sweep that actually runs.
+   */
+  async requireWorthSweepingOrRecordSkip(
+    trigger: BugHuntTrigger,
+    repo: string,
+  ): Promise<boolean> {
+    if (trigger !== BugHuntTrigger.SCHEDULED) return true;
+    if (this.finderDataService.hasExternalSignal(repo)) return true;
+
+    const lastSweep = await this.runRepository.findLastCompleted(repo);
+    if (!lastSweep) return true;
+
+    const since = lastSweep.finishedAt ?? lastSweep.createdAt;
+    const hasCommits = await this.github.hasCommitsSince(repo, since);
+    if (hasCommits) return true;
+
+    const run = await this.runRepository.save(
+      this.runRepository.create({
+        trigger,
+        repo,
+        status: BugHuntRunStatus.SKIPPED_QUIET,
+        finishedAt: new Date(),
+      }),
+    );
+    await this.eventRepository.save(
+      this.eventRepository.create({
+        runId: run.id,
+        repo,
+        stage: BugHuntEventStage.SKIPPED_QUIET,
+        summary: `No commits on master since the last sweep (${since.toISOString()}) — skipped with zero token spend.`,
+      }),
+    );
+    return false;
+  }
+
+  // ── run lifecycle ────────────────────────────────────────────────────────
+
+  async startRun(trigger: BugHuntTrigger, repo: string): Promise<BugHuntRun> {
+    return this.runRepository.save(
+      this.runRepository.create({ trigger, repo }),
+    );
+  }
+
+  /** Merge keys into a run's metadata scratchpad — the stage services' notes to themselves. */
+  async setRunMetadata(
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    const run = await this.getRun(id);
+    await this.runRepository.update(id, {
+      metadata: { ...(run.metadata ?? {}), ...patch } as Record<string, any>,
+    });
+  }
+
+  async getRun(id: string): Promise<BugHuntRun> {
+    const run = await this.runRepository.findOne({ where: { id } });
+    if (!run) throw new NotFoundException(`Bug hunt run ${id} not found`);
+    return run;
+  }
+
+  /**
+   * For `BugFindingService.enrich`'s batched model/engine lookup — one query
+   * for a whole page of findings rather than one per row. Missing ids are
+   * silently absent from the result rather than throwing, since a page of
+   * findings routinely references runs that no longer matter to look up.
+   */
+  getRunsByIds(ids: string[]): Promise<BugHuntRun[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.runRepository.find({ where: { id: In(ids) } });
+  }
+
+  listRuns(limit = 50): Promise<BugHuntRun[]> {
+    return this.runRepository.listRecent(limit);
+  }
+  async getRunWithEvents(
+    id: string,
+  ): Promise<{ run: BugHuntRun; events: BugHuntEvent[] }> {
+    const run = await this.getRun(id);
+    const events = await this.eventRepository.listForRun(id);
+    return { run, events };
+  }
+
+  listEventsSince(
+    runId: string,
+    afterCreatedAt: Date,
+    afterId?: string,
+  ): Promise<BugHuntEvent[]> {
+    return this.eventRepository.listSince(runId, afterCreatedAt, afterId);
+  }
+
+  /** Every event reported about one finding, across however many runs — the drawer's timeline. */
+  listEventsForFinding(findingId: string): Promise<BugHuntEvent[]> {
+    return this.eventRepository.listForFinding(findingId);
+  }
+
+  /**
+   * Appends one transcript row. `runId` must belong to a RUNNING run — a
+   * pipeline reporting into a run that already closed almost always means two
+   * overlapping invocations for the same repo, which the rate-limit/lock the
+   * pipeline itself holds should already prevent; this is the backstop.
+   */
+  async appendEvent(params: {
+    runId: string;
+    repo?: string;
+    stage: BugHuntEventStage;
+    summary: string;
+    payload?: Record<string, any>;
+    suggestionId?: string;
+    findingId?: string;
+  }): Promise<BugHuntEvent> {
+    const run = await this.getRun(params.runId);
+
+    const event = await this.eventRepository.save(
+      this.eventRepository.create({
+        runId: params.runId,
+        repo: params.repo ?? run.repo,
+        stage: params.stage,
+        summary: params.summary,
+        payload: params.payload,
+        suggestionId: params.suggestionId,
+        findingId: params.findingId,
+      }),
+    );
+
+    if (params.stage === BugHuntEventStage.ESCALATED) {
+      await this.notificationService.notify({
+        level: BugHunterNotificationLevel.ACTION_NEEDED,
+        ...stuckOnRepo(run.repo, params.summary),
+        findingId: params.findingId,
+        runId: run.id,
+        repo: run.repo,
+      });
+    }
+
+    // Meter the case file's budget (OPP-0775). Not awaited: an event that
+    // cannot be charged is still an event, and `charge` swallows its own
+    // failures.
+    if (params.findingId) {
+      if (params.stage === BugHuntEventStage.FIX_ATTEMPT) {
+        void this.budgetService.charge(params.findingId, 'attempts', 1);
+      } else if (params.stage === BugHuntEventStage.ESCALATED) {
+        void this.budgetService.charge(params.findingId, 'escalations', 1);
+      }
+    }
+
+    return event;
+  }
+
+  /**
+   * Appends an event about one finding that is NOT tied to a live run.
+   *
+   * `appendEvent` above deliberately refuses to write into a closed run, which
+   * is right for pipeline reporting but wrong for the release lifecycle: an
+   * admin presses "Release to production" hours or days after the run that
+   * produced the fix has closed, and the reconcile task lands `released` later
+   * still. Those events carry `runId = null` and a `findingId`, exactly like
+   * `SETTINGS_CHANGED` does, so the drawer's per-finding timeline still reads
+   * continuously while no closed run is retroactively edited.
+   */
+  appendFindingEvent(params: {
+    findingId: string;
+    repo?: string | null;
+    stage: BugHuntEventStage;
+    summary: string;
+    payload?: Record<string, any>;
+  }): Promise<BugHuntEvent> {
+    return this.eventRepository.save(
+      this.eventRepository.create({
+        runId: null,
+        repo: params.repo ?? null,
+        stage: params.stage,
+        summary: params.summary,
+        payload: params.payload,
+        findingId: params.findingId,
+      }),
+    );
+  }
+
+  /**
+   * Closes a run: stamps totals, snapshots cost from `llm_usage`, and — for
+   * anything other than a clean success with zero findings — posts a summary
+   * to the Bug Hunter inbox. A healthy, empty night stays quiet by design (see
+   * the plan's "pull, not push" note); FAILED and any run with escalations
+   * always post.
+   */
+  /**
+   * Closes runs that stopped reporting — the run-level counterpart of
+   * BugFixSessionService.reconcile, which exists for findings but never did
+   * for runs.
+   *
+   * A sweep or fix session ends with `POST runs/:id/close`, and the workflow
+   * has a gate that closes the run if the CLI exits without doing so. Neither
+   * fires when the job itself dies: GitHub cancels a job at its
+   * `timeout-minutes`, a runner is lost, a workflow is cancelled by hand. The
+   * run then sat at RUNNING indefinitely, the profile card said "Working" for
+   * days, and the shift log showed a sweep still going on a night long over.
+   *
+   * The cutoff is the job's own budget plus a grace period, per trigger: a
+   * run older than its ceiling cannot still be running, because the runner
+   * that was executing it no longer exists. Closed as FAILED with an error
+   * event saying why, through `closeRun` so the usual notification fires and
+   * cost is snapshotted; `foundCount` is what the run actually filed before
+   * it stopped, so the scorecard does not lose those bugs.
+   */
+  async reconcileStaleRuns(now: Date = new Date()): Promise<number> {
+    const running = await this.runRepository.listRunning();
+    let closed = 0;
+    for (const run of running) {
+      const budgetMinutes =
+        run.trigger === BugHuntTrigger.FIX_SESSION
+          ? BUG_FIX_SESSION_JOB_TIMEOUT_MINUTES
+          : BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES;
+      const ceilingMs =
+        (budgetMinutes + BUG_HUNT_RUN_RECONCILE_GRACE_MINUTES) * 60_000;
+      const ageMs = now.getTime() - run.createdAt.getTime();
+      if (ageMs < ceilingMs) continue;
+
+      try {
+        const ageMinutes = Math.round(ageMs / 60_000);
+        const message = `Run stopped reporting: ${ageMinutes} minutes since it started, past its ${budgetMinutes}-minute job budget. The runner is gone, so nothing more will arrive; closed by the reconcile task.`;
+        await this.appendEvent({
+          runId: run.id,
+          repo: run.repo,
+          stage: BugHuntEventStage.ERROR,
+          summary: message,
+          payload: { reconciled: true, ageMinutes, budgetMinutes },
+        });
+        const foundCount = await this.countFindingsForRun(run.id);
+        await this.closeRun(
+          run.id,
+          BugHuntRunStatus.FAILED,
+          {
+            foundCount,
+            autoMergedCount: 0,
+            prOpenedCount: 0,
+            dismissedCount: 0,
+          },
+          message,
+        );
+        closed += 1;
+      } catch (error) {
+        this.logger.warn(
+          `Could not reconcile stale run ${run.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    return closed;
+  }
+
+  /** Findings a run filed — what it "turned up" before it stopped. */
+  private async countFindingsForRun(runId: string): Promise<number> {
+    const [row] = await this.dataSource.query<{ count: string }[]>(
+      `SELECT COUNT(*) AS count FROM bug_findings WHERE run_id = $1`,
+      [runId],
+    );
+    return Number(row?.count ?? 0);
+  }
+
+  async closeRun(
+    id: string,
+    status: BugHuntRunStatus.COMPLETED | BugHuntRunStatus.FAILED,
+    totals: {
+      foundCount: number;
+      autoMergedCount: number;
+      prOpenedCount: number;
+      dismissedCount: number;
+    },
+    errorMessage?: string,
+  ): Promise<BugHuntRun> {
+    const run = await this.getRun(id);
+    const usage = await this.snapshotUsage(id);
+
+    await this.runRepository.update(id, {
+      status,
+      finishedAt: new Date(),
+      ...totals,
+      totalTokenCostUsd: usage.costUsd.toFixed(4),
+      totalInputTokens: usage.totalInputTokens,
+      totalOutputTokens: usage.totalOutputTokens,
+      ...(errorMessage
+        ? { metadata: { ...run.metadata, errorMessage } as Record<string, any> }
+        : {}),
+    });
+    const closed = await this.getRun(id);
+
+    // Minutes against the bug's budget, for the one kind of run that works on
+    // one bug (OPP-0775). A sweep's time is the sweep's, not any finding's.
+    if (run.trigger === BugHuntTrigger.FIX_SESSION) {
+      const minutes = (Date.now() - run.createdAt.getTime()) / 60_000;
+      void this.budgetService.chargeRun(id, 'minutes', minutes);
+    }
+
+    const escalated = (await this.eventRepository.listForRun(id)).some(
+      (e) => e.stage === BugHuntEventStage.ESCALATED,
+    );
+    const noteworthy =
+      status === BugHuntRunStatus.FAILED || escalated || totals.foundCount > 0;
+    if (noteworthy) {
+      await this.notificationService.notify({
+        level:
+          status === BugHuntRunStatus.FAILED
+            ? BugHunterNotificationLevel.PROBLEM
+            : BugHunterNotificationLevel.INFO,
+        ...(status === BugHuntRunStatus.FAILED
+          ? runFailed(closed.repo, totals, closed.totalTokenCostUsd)
+          : runFoundBugs(closed.repo, totals, closed.totalTokenCostUsd)),
+        runId: closed.id,
+        repo: closed.repo,
+      });
+    }
+
+    return closed;
+  }
+
+  /**
+   * Attaches a run's REAL per-model token usage — reported by the GitHub
+   * Actions runner after `claude -p --output-format json` finishes — as
+   * `llm_usage` rows tagged `LlmTask.BUG_HUNTER` + `metadata.runId`, then
+   * re-derives `totalTokenCostUsd`/`totalInputTokens`/`totalOutputTokens` from
+   * `snapshotUsage` so this stays the only function that turns `llm_usage`
+   * rows into those columns.
+   *
+   * Deliberately does NOT require `RUNNING` status the way `appendEvent`
+   * does: this always arrives after the pipeline's own `/close` call already
+   * closed the run, so attaching cost to an already-closed run is the normal
+   * case, not a race to guard against. Best-effort, same contract as
+   * `LlmUsageService.record` — a CI cost-reporting step must never fail the
+   * runner's job.
+   */
+  async recordActualCost(
+    runId: string,
+    params: {
+      modelUsage: {
+        model: string;
+        inputTokens: number;
+        outputTokens: number;
+        cacheReadInputTokens?: number;
+        cacheCreationInputTokens?: number;
+      }[];
+      cliReportedCostUsd?: number;
+    },
+  ): Promise<void> {
+    try {
+      const run = await this.getRun(runId);
+
+      await Promise.all(
+        (params.modelUsage || [])
+          .filter((m) => m.inputTokens > 0 || m.outputTokens > 0)
+          .map((m) =>
+            this.llmUsageService.record({
+              // Per MODEL, not per engine: one run's modelUsage mixes vendors
+              // (a Claude-engine run spawns Gemini subagents and vice versa),
+              // so labelling every row with the run's engine put
+              // gemini-2.5-* spend under 'anthropic'. The engine is only the
+              // fallback for an id whose shape names no provider.
+              provider:
+                providerForModel(m.model) ??
+                (run.engine === 'gemini' ? 'gemini' : 'anthropic'),
+              model: m.model,
+              task: LlmTask.BUG_HUNTER,
+              promptTokens: m.inputTokens,
+              completionTokens: m.outputTokens,
+              cachedTokens: m.cacheReadInputTokens,
+              cacheCreationTokens: m.cacheCreationInputTokens,
+              metadata: { runId },
+            }),
+          ),
+      );
+
+      const usage = await this.snapshotUsage(runId);
+      // Accumulate rather than overwrite: `recordActualCost` normally fires
+      // once per run, but a manually re-run CI job replays this step against
+      // the same runId — overwriting would silently drop the first attempt's
+      // real spend from the figure the admin UI prefers (see runCostUsd).
+      const priorCliReportedCostUsd =
+        Number(run.metadata?.cliReportedCostUsd) || 0;
+      const cliReportedCostUsd =
+        params.cliReportedCostUsd != null
+          ? priorCliReportedCostUsd + params.cliReportedCostUsd
+          : undefined;
+      await this.runRepository.update(runId, {
+        totalTokenCostUsd: usage.costUsd.toFixed(4),
+        totalInputTokens: usage.totalInputTokens,
+        totalOutputTokens: usage.totalOutputTokens,
+        metadata: {
+          ...run.metadata,
+          ...(cliReportedCostUsd != null ? { cliReportedCostUsd } : {}),
+        } as Record<string, any>,
+      });
+
+      // Dollars against the bug's budget (OPP-0775): the CLI's own figure for
+      // this call when it gave one, else what this call added to the token
+      // estimate. Only a fix-session run spends on one bug.
+      if (run.trigger === BugHuntTrigger.FIX_SESSION) {
+        const delta =
+          params.cliReportedCostUsd ??
+          Math.max(0, usage.costUsd - Number(run.totalTokenCostUsd || 0));
+        void this.budgetService.chargeRun(runId, 'usd', delta);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record actual bug-hunt cost for run ${runId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Attaches which CLI/model actually ran this run — reported by the CI
+   * workflow right after it resolves `GET pipeline/models`, since ally-be
+   * itself never learns this at dispatch time (see the entity's own doc
+   * comment). Best-effort, same contract as `recordActualCost`: a CI
+   * reporting step must never fail the runner's job over this.
+   */
+  async recordResolvedModel(
+    runId: string,
+    params: { engine: string; model: string },
+  ): Promise<void> {
+    try {
+      await this.runRepository.update(runId, {
+        engine: params.engine,
+        model: params.model,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record resolved model for run ${runId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Sums estimated USD cost and raw token counts from `llm_usage` rows tagged
+   * for this run (`metadata->>'runId'`), grouped by model so each model's own
+   * rate applies to the cost side — mirrors PlatformAnalyticsRepository's
+   * by-name query-builder pattern over `llm_usage` rather than pulling in the
+   * whole LlmUsageRepository for one grouped sum.
+   */
+  private async snapshotUsage(runId: string): Promise<{
+    costUsd: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+  }> {
+    try {
+      const rows: {
+        model: string;
+        promptTokens: string;
+        completionTokens: string;
+        cacheReadTokens: string;
+        cacheCreationTokens: string;
+      }[] = await this.dataSource
+        .createQueryBuilder()
+        .select('lu.model', 'model')
+        .addSelect('COALESCE(SUM(lu."promptTokens"), 0)', 'promptTokens')
+        .addSelect(
+          'COALESCE(SUM(lu."completionTokens"), 0)',
+          'completionTokens',
+        )
+        .addSelect('COALESCE(SUM(lu."cachedTokens"), 0)', 'cacheReadTokens')
+        .addSelect(
+          'COALESCE(SUM(lu."cacheCreationTokens"), 0)',
+          'cacheCreationTokens',
+        )
+        .from('llm_usage', 'lu')
+        .where(`lu.metadata ->> 'runId' = :runId`, { runId })
+        .groupBy('lu.model')
+        .getRawMany();
+
+      return rows.reduce(
+        (totals, row) => {
+          const promptTokens = Number(row.promptTokens);
+          const completionTokens = Number(row.completionTokens);
+          const { costUsd } = computeCostUsd(
+            row.model,
+            promptTokens,
+            completionTokens,
+            {
+              cacheReadTokens: Number(row.cacheReadTokens ?? 0),
+              cacheCreationTokens: Number(row.cacheCreationTokens ?? 0),
+            },
+          );
+          return {
+            costUsd: totals.costUsd + costUsd,
+            totalInputTokens: totals.totalInputTokens + promptTokens,
+            totalOutputTokens: totals.totalOutputTokens + completionTokens,
+          };
+        },
+        { costUsd: 0, totalInputTokens: 0, totalOutputTokens: 0 },
+      );
+    } catch (error) {
+      // Best-effort, same contract as LlmUsageService.record: cost visibility
+      // must never fail a run close.
+      this.logger.warn(
+        `Failed to snapshot bug-hunt usage for run ${runId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return { costUsd: 0, totalInputTokens: 0, totalOutputTokens: 0 };
+    }
+  }
+}

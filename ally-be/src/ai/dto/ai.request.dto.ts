@@ -1,0 +1,287 @@
+import { ScribeSessionMode } from 'src/common/constants/chat.constants';
+import { LlmTask } from 'src/learn/enum/llm-task.enum';
+import { WorkerType } from 'src/user/enum/user.enum';
+
+export type PromptOverride =
+  | string
+  | {
+      prompt: string;
+      availableVariables?: (
+        | string
+        | { name: string; label?: string; required?: boolean }
+      )[];
+      /** Prompt-level LLM provider override, honored by ally-ai. */
+      provider?: string;
+      /** Prompt-level LLM model override (OpenAI/Gemini), honored by ally-ai. */
+      model?: string;
+      /** Prompt-level LLM sampling temperature override (0–2), honored by ally-ai. */
+      temperature?: number;
+    };
+
+export type GenerateSummaryRequest = {
+  chat_history: MessageRequest[];
+  prompts?: Record<string, PromptOverride>;
+  mode?: ScribeSessionMode;
+  keys?: string[];
+  key_descriptions?: Record<string, string>;
+};
+
+export type MessageRequest = {
+  role: string;
+  content: string;
+  start_time?: number;
+  end_time?: number;
+  /**
+   * CLIENT turns only: the learner talked over this reply, so `content` holds
+   * only the part that reached TTS before it stopped — a PREFIX of what the
+   * model produced, not the whole utterance. Measured across judged turns, a cut
+   * turn keeps ~36% of the generated characters against ~107% on an uncut one.
+   *
+   * Undefined means unknown — an older worker, or a COUNSELOR turn — and is
+   * deliberately distinct from false, which is a worker that looked and found
+   * the turn completed.
+   */
+  interrupted?: boolean;
+  /**
+   * Which KIND of client utterance this line is: 'reply' (the real generated
+   * reply), 'filler' (a thinking filler — a short back-channel spoken while the
+   * reply was still forming) or 'interim' (a non-committal holding reply).
+   *
+   * All three arrive as CLIENT lines and one turn can emit all three in a row,
+   * so without this they are indistinguishable except by position — and
+   * position stops being reliable the moment a continuation filler plays. The
+   * values match `metadata.firstAudioSource` on the turn-metrics row.
+   *
+   * Undefined means unknown (an older worker, or a COUNSELOR turn) and is
+   * deliberately distinct from 'reply': treating that silence as a real reply
+   * would mislabel every filler already in the backlog.
+   */
+  utterance_kind?: string;
+};
+
+export type EnhanceTextRequest = {
+  content: string;
+  prompts?: Record<string, PromptOverride>;
+};
+
+export type Chat = {
+  role: string;
+  content: string;
+};
+
+export type IdentifySpeakersRequest = {
+  chat_history: Chat[];
+  prompts?: Record<string, PromptOverride>;
+};
+
+export type TagPositivityRatingsRequest = {
+  tags: string[];
+  prompts?: Record<string, PromptOverride>;
+};
+
+export interface AddReferenceDocumentRequest {
+  document_id: string;
+  heading: string;
+  content: string;
+  category: string;
+  tags?: string[];
+  tenant_id: string;
+}
+
+export interface SearchReferenceDocumentsRequest {
+  query: string;
+  limit?: number;
+  document_ids?: string[];
+  filters?: {
+    category?: string;
+    tags?: string[];
+    tenant_id?: string;
+  };
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface UpdateReferenceDocumentRequest {
+  heading?: string;
+  content?: string;
+  category?: string;
+  tags?: string[];
+}
+
+export interface GetReferenceDocumentRequest {
+  document_id: string;
+}
+
+export interface DeleteReferenceDocumentRequest {
+  document_id: string;
+}
+
+export interface TranscribeAudioRequest {
+  presigned_url: string;
+  chat_id: number;
+  sample_rate: number;
+  prompts?: Record<string, PromptOverride>;
+  mode?: ScribeSessionMode;
+}
+
+export interface ScenarioReportGenerateRequest {
+  prompt: string;
+  turns: number;
+  language: string;
+  scenario_id: number;
+  report_id: string;
+  metadata: Record<string, any>;
+  // promptCode of the transcript-evaluator variant to run. When set, ai-learn
+  // resolves the evaluator (LLM-judge) system prompt from this variant's
+  // dashboard text instead of the default evaluator template. Undefined uses
+  // the default evaluator.
+  evaluator_prompt_code?: string;
+}
+
+/** One agent test case the actor is scored against (sent to the LLM judge). */
+export interface ActorGoalEvaluationGoal {
+  id: string;
+  title: string;
+  category: string;
+  description?: string | null;
+}
+
+/** A single transcript turn for the actor evaluation. */
+export interface ActorGoalEvaluationTurn {
+  /** 'assistant' = the roleplay actor; 'user' = the trainee/counselor. */
+  role: 'assistant' | 'user';
+  content: string;
+}
+
+/**
+ * Request to ai-learn to evaluate the roleplay ACTOR agent of a real session
+ * against the configured agent test cases. ai-learn runs the LLM judge over
+ * the transcript and webhooks per-goal scores + feedback back to ally-be.
+ */
+export interface ActorGoalEvaluationRequest {
+  scenario_session_id: string;
+  transcript: ActorGoalEvaluationTurn[];
+  goals: ActorGoalEvaluationGoal[];
+  /** Session language (id or code) for the judge prompt; optional. */
+  language?: string;
+}
+
+export type ScenarioEvaluationChatMessage = {
+  id: string;
+  role: string;
+  content: string;
+  start_time?: number | null;
+  end_time?: number | null;
+};
+
+export type ScenarioEvaluationRequest = {
+  chat_history: ScenarioEvaluationChatMessage[];
+  need_memory: boolean;
+  previous_memory: string | null;
+  memory_prompt: string | null;
+  prompts?: Record<string, PromptOverride>;
+  enable_recommendations?: boolean;
+  language_code?: string | null;
+  /**
+   * The learner's worker type. Sets the register, depth and expectations of the
+   * supervisor note only — never the skill_coverage scores, which stay on one
+   * fixed standard so they remain comparable across an organisation.
+   * Unset falls back to LAY on the ally-ai side.
+   */
+  worker_type?: WorkerType | null;
+  /** The learner's first name, so the note can address them directly. */
+  learner_name?: string | null;
+  /**
+   * What the supervisor carries forward about THIS LEARNER from previous
+   * debriefs. Distinct from `previous_memory`, which is about the client/case.
+   */
+  supervisor_memory?: string | null;
+  /**
+   * Behaviours this specific scenario is configured to reward (its
+   * SHOULD_DO behavior instructions). Additional scenario-specific context
+   * for the supervisor note — never the skill_coverage
+   * scores, which stay on one fixed standard.
+   */
+  helpful_behaviours?: string[];
+  /**
+   * Behaviours this specific scenario is configured to flag (its
+   * SHOULD_NOT_DO behavior instructions). Same scope as `helpful_behaviours`.
+   */
+  unhelpful_behaviours?: string[];
+  /**
+   * The coaching hints the supervisor sent this learner DURING the session (live
+   * supervisor notes, in order). Lets the debrief pick up a thread the learner
+   * already saw instead of repeating it cold. Null when the scenario had live
+   * notes switched off, which is the default.
+   */
+  live_notes?: string[] | null;
+  /**
+   * The scenario session being debriefed. ally-ai stamps it on the usage rows
+   * it emits while serving this request, so the debrief's AI spend lands on
+   * the session's cost rather than in an unattributable platform bucket.
+   * Optional: an older ally-ai ignores it.
+   */
+  scenario_session_id?: string | null;
+  /**
+   * The llm_usage label ally-ai records this call under, when it is not the
+   * default `scenario_evaluation`. Sent only by the per-language re-evaluation,
+   * so the cost of serving a debrief in several languages is its own line.
+   * Omitted (not null) on the default path; an ally-ai that predates the
+   * field ignores it and records the default label. ally-ai accepts only
+   * 'scenario_evaluation' | 'scenario_evaluation_language' here and returns a
+   * 422 for anything else, so do not widen this type casually.
+   */
+  usage_task?: LlmTask.SCENARIO_EVALUATION_LANGUAGE;
+};
+
+// ── Product Roadmap semantic duplicate detection (ally-ai / Weaviate) ────────
+// snake_case on the wire, matching the reference-document precedent.
+
+/**
+ * Upsert one opportunity's vector. The Weaviate object uuid IS `opportunity_id`, so this is
+ * idempotent by construction and there is no create/update split.
+ *
+ * NOTE the description is sent for EMBEDDING only — ally-ai does not persist it. Duplicating
+ * opportunity text into Weaviate would need a write on every description edit, and any missed
+ * write would feed a stale description into the LLM's duplicate judgement. ally-be already has
+ * every description in hand when it runs that step.
+ */
+export interface RoadmapOpportunityUpsertRequest {
+  opportunity_id: string;
+  description: string;
+  product_goal: string;
+}
+
+export interface AgentMemoryUpsertRequest {
+  memory_id: string;
+  /** The entry text, embedded but never stored on ally-ai's side. */
+  body: string;
+  /** Whose notebook: bug_hunter or builder. */
+  agent: string;
+}
+
+export interface AgentMemorySearchRequest {
+  query: string;
+  agent: string;
+  /** Default 10, max 50. ally-be asks for more than it shows because it narrows by repo and status afterwards. */
+  limit?: number;
+  /** Minimum cosine similarity, default 0.3. ally-be applies its own configured floor on top. */
+  threshold?: number;
+}
+
+export interface RoadmapOpportunityBulkUpsertRequest {
+  items: RoadmapOpportunityUpsertRequest[];
+}
+
+export interface RoadmapSimilarOpportunitiesRequest {
+  description: string;
+  /** Optional scoping to one product goal. */
+  product_goal?: string;
+  /** Default 20 (source: match_count). */
+  limit?: number;
+  /**
+   * Default 0.5. Calibrated for Voyage voyage-3-large at 1024 dimensions in the standalone
+   * app; needs re-calibrating for OpenAI text-embedding-3-small at 1536.
+   */
+  threshold?: number;
+}

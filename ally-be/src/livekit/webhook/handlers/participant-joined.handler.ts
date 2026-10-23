@@ -1,0 +1,326 @@
+import { Injectable } from '@nestjs/common';
+import { LiveKitService } from '../../service/livekit.service';
+import { LoggerService } from 'src/logger/logger.service';
+import { ParticipantInfo_Kind } from '@livekit/protocol';
+import { ScenarioSessionService } from 'src/learn/service/scenario-session.service';
+import { ScenarioSessionLifecycleEventType } from 'src/learn/entity/scenario-session-lifecycle-event.entity';
+import { AppConfigService } from 'src/config/config.service';
+import { generateAudioStorageKey } from 'src/common/util/audio.util';
+import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
+import { convertTimestampNsToDate } from 'src/common/util/date.util';
+import { ScenarioInteractionMode } from 'src/learn/enum/scenario-interaction-mode.enum';
+
+export interface ParticipantJoinedEvent {
+  event: 'participant_joined';
+  room: {
+    name: string;
+    sid: string;
+    creation_time: number;
+    empty_timeout: number;
+    max_participants: number;
+    num_participants: number;
+    num_publishers: number;
+    active_recording: boolean;
+    metadata: string;
+  };
+  participant: {
+    sid: string;
+    identity: string;
+    name: string;
+    metadata: string;
+    joined_at: number;
+    version: number;
+    kind: number;
+    permission: {
+      can_subscribe: boolean;
+      can_publish: boolean;
+      can_publish_data: boolean;
+      hidden: boolean;
+      recorder: boolean;
+    };
+  };
+  id: string;
+  created_at: number;
+}
+
+@Injectable()
+export class ParticipantJoinedHandler {
+  private readonly logger = new LoggerService(ParticipantJoinedHandler.name);
+  // Tracks rooms with an in-flight dispatch. We own the safety timer so it can
+  // be cancelled when the dispatch resolves and so re-adding replaces (rather
+  // than stacks) timers. Previously this was a Set<string> with a fire-and-
+  // forget setTimeout, which leaked the room key if the timeout was delayed
+  // and the dispatch never resolved.
+  private static dispatchesInProgress = new Map<string, NodeJS.Timeout>();
+  private static recordingsInProgress = new Set<string>();
+  private static readonly DISPATCH_TTL_MS = 30_000;
+
+  private static addInProgress(roomName: string): void {
+    const existing =
+      ParticipantJoinedHandler.dispatchesInProgress.get(roomName);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      ParticipantJoinedHandler.dispatchesInProgress.delete(roomName);
+    }, ParticipantJoinedHandler.DISPATCH_TTL_MS);
+    if (typeof timer.unref === 'function') timer.unref();
+    ParticipantJoinedHandler.dispatchesInProgress.set(roomName, timer);
+  }
+
+  private static removeInProgress(roomName: string): void {
+    const timer = ParticipantJoinedHandler.dispatchesInProgress.get(roomName);
+    if (timer) clearTimeout(timer);
+    ParticipantJoinedHandler.dispatchesInProgress.delete(roomName);
+  }
+
+  constructor(
+    private readonly liveKitService: LiveKitService,
+    private readonly scenarioSessionService: ScenarioSessionService,
+    private readonly scenarioSharedService: ScenarioSharedService,
+    private readonly configService: AppConfigService,
+  ) {}
+
+  async handle(event: ParticipantJoinedEvent): Promise<void> {
+    try {
+      this.logger.info(
+        `Processing participant_joined event ${JSON.stringify(event)} for ${event.participant.identity} in room ${event.room.name}`,
+      );
+
+      const roomName = event.room.name;
+
+      if (event.participant.kind === ParticipantInfo_Kind.AGENT) {
+        // Agent joined the room - clean up both tracking sets
+        ParticipantJoinedHandler.removeInProgress(roomName);
+        this.liveKitService.clearProactiveDispatch(roomName);
+
+        // Record AGENT_JOINED for the session timeline. Its absence is the
+        // signal that the agent never joined (the AssignmentTimeoutError hang).
+        const agentSessionId =
+          this.scenarioSessionService.sessionIdFromRoomName(roomName);
+        if (agentSessionId) {
+          void this.scenarioSessionService.recordLifecycleEvent(
+            agentSessionId,
+            ScenarioSessionLifecycleEventType.AGENT_JOINED,
+            new Date(),
+            { identity: event.participant.identity },
+          );
+        }
+      }
+
+      if (event.participant.kind !== ParticipantInfo_Kind.AGENT) {
+        // If human joins, check if we should dispatch an agent
+
+        // 1. Check local "in progress" set to avoid rapid-fire double dispatches (race condition fix)
+        if (ParticipantJoinedHandler.dispatchesInProgress.has(roomName)) {
+          this.logger.info(
+            `Agent dispatch already in progress for room ${roomName}, skipping.`,
+          );
+          return;
+        }
+
+        // 2. Check if a proactive dispatch is already in flight or the agent has
+        //    physically joined. The service-level flag covers the race window where
+        //    the agent was dispatched but hasn't appeared in listParticipants() yet.
+        let agentAlreadyPresent =
+          this.liveKitService.isProactiveDispatchPending(roomName);
+
+        if (!agentAlreadyPresent) {
+          try {
+            const participants =
+              await this.liveKitService.listParticipants(roomName);
+            agentAlreadyPresent = participants.some(
+              (p) => p.kind === ParticipantInfo_Kind.AGENT,
+            );
+          } catch (listError) {
+            this.logger.error(
+              `Failed to check existing participants in room ${roomName}: ${listError.message}`,
+            );
+            // Proceed with dispatch as fallback if check fails
+          }
+        }
+
+        // Resolve session and record startedAt regardless of whether we dispatch —
+        // proactive dispatch skips the normal dispatch path but startedAt must
+        // still be persisted when the human actually joins.
+        let scenarioSessionStartedAt = new Date();
+        const isPreviewRoom = roomName.startsWith('preview');
+        const scenarioSession = isPreviewRoom
+          ? null
+          : await this.scenarioSessionService.getScenarioSessionByRoomId(
+              roomName,
+            );
+
+        if (scenarioSession) {
+          void this.scenarioSessionService.recordLifecycleEvent(
+            scenarioSession.id,
+            ScenarioSessionLifecycleEventType.PARTICIPANT_JOINED,
+            new Date(),
+            { identity: event.participant.identity },
+          );
+        }
+
+        // V2V test sessions are always recorded (the audio is the point of the
+        // test); real sessions stay behind the feature flag. A text-chat
+        // session never is: its room carries no audio, so an egress would bill
+        // for an empty file, and the typed transcript is already the record.
+        const isV2VTest = scenarioSession?.metadata?.v2vTest === true;
+        const isTextChat =
+          scenarioSession?.interactionMode === ScenarioInteractionMode.TEXT;
+        if (
+          scenarioSession &&
+          !isTextChat &&
+          (this.configService.featureFlag.scenarioSessionAudioRecording ||
+            isV2VTest)
+        ) {
+          const { bucket, region, accessKey, secret } =
+            this.configService.scenarioSessionAudioStorage;
+          if (!bucket || !region || !accessKey || !secret) {
+            this.logger.error(
+              'Scenario session audio storage configuration is missing',
+            );
+            return;
+          }
+
+          // Check both local "in progress" set and database to avoid duplicate recordings
+          if (ParticipantJoinedHandler.recordingsInProgress.has(roomName)) {
+            this.logger.info(
+              `Recording already in progress for room ${roomName}, skipping.`,
+            );
+            return;
+          }
+
+          const existingRecording =
+            await this.scenarioSharedService.getScenarioSessionRecordingBySessionId(
+              scenarioSession.id,
+            );
+          if (existingRecording) {
+            this.logger.info(
+              `Recording already exists for session ${scenarioSession.id}, skipping.`,
+            );
+            return;
+          }
+
+          const filepath = generateAudioStorageKey({
+            key: roomName,
+            extension: 'ogg',
+            prefix: 'recordings',
+          });
+          if (!event.room.active_recording) {
+            try {
+              ParticipantJoinedHandler.recordingsInProgress.add(roomName);
+              const egressInfo =
+                await this.liveKitService.startRoomCompositeEgress({
+                  roomName,
+                  filepath,
+                  bucket,
+                  region,
+                  accessKey,
+                  secret,
+                });
+              this.logger.info(`Audio recording started for room ${roomName}`);
+              void this.scenarioSessionService.recordLifecycleEvent(
+                scenarioSession.id,
+                ScenarioSessionLifecycleEventType.RECORDING_STARTED,
+                new Date(),
+                { egressId: egressInfo.egressId },
+              );
+
+              if (egressInfo.startedAt) {
+                scenarioSessionStartedAt = convertTimestampNsToDate(
+                  egressInfo.startedAt,
+                );
+              }
+
+              const savedRecording =
+                await this.scenarioSharedService.saveScenarioSessionRecording({
+                  scenarioSessionId: scenarioSession.id,
+                  storageKey: filepath,
+                  tenantId: scenarioSession.tenantId,
+                  egressId: egressInfo.egressId,
+                });
+              this.logger.info(
+                `Scenario session recording saved: ${savedRecording.id}`,
+              );
+            } catch (egressError) {
+              this.logger.error(
+                `Failed to start audio recording for room ${roomName}: ${egressError.message}`,
+              );
+            } finally {
+              ParticipantJoinedHandler.recordingsInProgress.delete(roomName);
+            }
+          }
+        }
+
+        if (scenarioSession && !scenarioSession.startedAt) {
+          await this.scenarioSessionService.updateScenarioSession(
+            scenarioSession.id,
+            {
+              startedAt: scenarioSessionStartedAt,
+            },
+          );
+        }
+
+        // Agent was pre-dispatched — nothing left to do.
+        if (agentAlreadyPresent) {
+          this.logger.info(
+            `Agent already present in room ${roomName} (proactive dispatch), skipping re-dispatch`,
+          );
+          return;
+        }
+
+        // Mark dispatch as in-progress BEFORE awaiting the dispatch call.
+        // addInProgress owns the safety timer (TTL) so we don't leak handles.
+        ParticipantJoinedHandler.addInProgress(roomName);
+
+        let metadata: any = {};
+        const participantIdentity = this.configService.livekit.agentName;
+
+        if (event.room.metadata && event.room.metadata.trim() !== '') {
+          metadata = JSON.parse(event.room.metadata);
+        } else {
+          this.logger.info(
+            'Room metadata is empty or null, using default values',
+          );
+        }
+
+        const conversationStartedAt = new Date(
+          scenarioSession?.startedAt ?? scenarioSessionStartedAt,
+        ).toISOString();
+
+        if (!metadata.scenarioSession) {
+          metadata.scenarioSession = {};
+        }
+        metadata.scenarioSession.conversationStartedAt = conversationStartedAt;
+        this.logger.info(`Parsed metadata: ${JSON.stringify(metadata)}`);
+
+        try {
+          await this.liveKitService.agentDispatch(
+            roomName,
+            participantIdentity,
+            JSON.stringify(metadata),
+          );
+          this.logger.info(
+            `Successfully dispatched agent for participant ${participantIdentity} in room ${roomName}`,
+          );
+          if (scenarioSession) {
+            void this.scenarioSessionService.recordLifecycleEvent(
+              scenarioSession.id,
+              ScenarioSessionLifecycleEventType.AGENT_DISPATCHED,
+              new Date(),
+              { via: 'fallback', agentName: participantIdentity },
+            );
+          }
+        } catch (dispatchError) {
+          // If dispatch fails, clear it from in-progress so we can retry on next join
+          ParticipantJoinedHandler.removeInProgress(roomName);
+          throw dispatchError;
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error handling participant_joined event: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+}

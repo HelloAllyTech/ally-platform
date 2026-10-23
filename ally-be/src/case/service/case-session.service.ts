@@ -1,0 +1,658 @@
+import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { LoggerService } from 'src/logger/logger.service';
+import { CaseSessionRepository } from '../repository/case-session.repository';
+import { CaseSessionFilterOptions } from '../type/case-session-items.type';
+import { CaseSessionsResponseDto } from '../dto/case-session.dto';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { CaseSharedService } from './case-shared.service';
+import { CaseSortBy, CaseStatus } from '../type/cases.type';
+import { SessionItemStatus } from 'src/common/type/common.type';
+import { meetsMinimumScore } from 'src/common/util/progression.util';
+import { CaseSessionItemRepository } from '../repository/case-session-item.repository';
+import { DataSource, EntityManager } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CaseSession } from '../entity/case-session.entity';
+import { CaseSessionItem } from '../entity/case-session-item.entity';
+import { GetUpcomingCaseItemResponseDto } from '../dto/get-case.dto';
+import { AppConfigService } from 'src/config/config.service';
+import { SharedLanguageService } from 'src/language/service/shared-language.service';
+import {
+  buildAvailableLanguagesMap,
+  getDistinctScenarioLanguageIds,
+  getDistinctScenarioVoiceIds,
+  getLanguageVoiceIds,
+} from 'src/common/util/language-availability.util';
+import { PostHog } from 'posthog-node';
+import { userDistinctId } from 'src/posthog/posthog.util';
+import {
+  CASE_ANALYTICS_EVENTS,
+  PATHWAY_ANALYTICS_EVENTS,
+} from '../constants/case-analytics.constants';
+
+@Injectable()
+export class CaseSessionService {
+  private readonly logger = LoggerService.getInstance(CaseSessionService.name);
+  constructor(
+    private readonly caseSessionRepository: CaseSessionRepository,
+    private readonly caseSharedService: CaseSharedService,
+    private readonly caseSessionItemRepository: CaseSessionItemRepository,
+    private readonly dataSource: DataSource,
+    private readonly configService: AppConfigService,
+    private readonly sharedLanguageService: SharedLanguageService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly cohortVisibilityService: CohortVisibilityService,
+    private readonly posthog: PostHog,
+  ) {}
+
+  async getUserCases(
+    filters?: CaseSessionFilterOptions,
+  ): Promise<CaseSessionsResponseDto> {
+    const userId = ExecutionManager.getUserId();
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    // `null` means this learner is in no cohort — the "Unassigned" audience,
+    // which restrictions can target. Not a signal to skip filtering.
+    const cohortId = await this.cohortVisibilityService.resolveUserCohortId(
+      Number(userId),
+    );
+
+    const cases = await this.caseSharedService.getCasesWithSession({
+      userId: Number(userId),
+      tenantId,
+      cohortScope: { cohortId },
+      limit: filters?.limit,
+      offset: filters?.offset,
+      sortBy: filters?.sortBy as CaseSortBy | undefined,
+      order: filters?.order,
+      status: CaseStatus.ACTIVE,
+    });
+
+    const { data, count } = cases;
+
+    const formattedData = data.map((caseData) => {
+      let { title, description } = caseData;
+
+      if (
+        filters?.languageCode &&
+        caseData.translations &&
+        caseData.translations[filters.languageCode]
+      ) {
+        title = caseData.translations[filters.languageCode].title || title;
+        description =
+          caseData.translations[filters.languageCode].description ||
+          description;
+      }
+
+      return {
+        id: caseData.id,
+        title,
+        description,
+        coverImageUrl: caseData.coverImageUrl,
+        totalScenarios: caseData.totalScenarios,
+        completedScenarios: caseData.session?.completedScenarios,
+      };
+    });
+
+    return {
+      data: formattedData,
+      count,
+    };
+  }
+
+  async getUserCaseItems(caseId: string, languageCode?: string) {
+    const userId = ExecutionManager.getUserId();
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const caseData = await this.caseSharedService.getActiveCaseById(caseId);
+    if (!caseData) {
+      throw new NotFoundException('Case not found');
+    }
+    const caseWithScenarios = await this.caseSharedService.getCaseWithScenarios(
+      caseId,
+      tenantId,
+      languageCode,
+    );
+
+    // Only languages whose voice Studio still shows as configured.
+    const activeVoices =
+      await this.sharedLanguageService.getActiveScenarioVoices(
+        getDistinctScenarioVoiceIds(caseWithScenarios.scenarios),
+      );
+    const languageIds = getDistinctScenarioLanguageIds(
+      caseWithScenarios.scenarios,
+      activeVoices,
+    );
+
+    const languages = languageIds.length
+      ? await this.sharedLanguageService.getLanguagesByIds(languageIds)
+      : [];
+
+    const availableLanguagesMap = buildAvailableLanguagesMap(languages);
+
+    const caseSession = await this.caseSessionRepository.findOne({
+      where: { caseId, userId: Number(userId) },
+    });
+
+    if (!caseSession) {
+      return {
+        ...caseWithScenarios,
+        completedScenarios: 0,
+        completedAt: null,
+        caseSessionId: null,
+        scenarios: caseWithScenarios.scenarios.map((scenario) => {
+          const languageVoiceIds = getLanguageVoiceIds(
+            scenario?.metadata?.languageVoices,
+            activeVoices,
+          );
+          delete scenario?.metadata?.languageVoices;
+          return {
+            ...scenario,
+            sessionId: null,
+            status:
+              scenario.order > 1
+                ? SessionItemStatus.LOCKED
+                : SessionItemStatus.UNLOCKED,
+            availableLanguages: languageVoiceIds.length
+              ? languageVoiceIds
+                  .map((languageId) => availableLanguagesMap.get(languageId))
+                  .filter(Boolean)
+              : null,
+          };
+        }),
+      };
+    }
+
+    const caseSessionItems = await this.caseSessionItemRepository.find({
+      where: { caseSessionId: caseSession.id },
+    });
+
+    const sessionItemsMap = new Map(
+      caseSessionItems.map((item) => [item.caseItemId, item]),
+    );
+
+    return {
+      ...caseWithScenarios,
+      completedScenarios: caseSession.completedScenarios,
+      completedAt: caseSession.completedAt,
+      caseSessionId: caseSession.id,
+      scenarios: caseWithScenarios.scenarios.map((scenario) => {
+        const caseSessionItem = sessionItemsMap.get(scenario.id);
+        const languageVoiceIds = getLanguageVoiceIds(
+          scenario?.metadata?.languageVoices,
+          activeVoices,
+        );
+        delete scenario?.metadata?.languageVoices;
+        return {
+          ...scenario,
+          availableLanguages: languageVoiceIds.length
+            ? languageVoiceIds
+                .map((languageId) => availableLanguagesMap.get(languageId))
+                .filter(Boolean)
+            : null,
+          sessionId: caseSessionItem?.id,
+          status: caseSessionItem?.status || SessionItemStatus.LOCKED,
+        };
+      }),
+    };
+  }
+
+  async createUserCaseSession(caseId: string) {
+    const userId = ExecutionManager.getUserId();
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    const existingCaseSession = await this.getUserCaseSessionByCaseId(caseId);
+    if (existingCaseSession?.id) {
+      this.logger.error(
+        `Case session already exists for userId: ${userId} and caseId: ${caseId}`,
+      );
+      throw new BadRequestException('Case session already exists');
+    }
+
+    const { caseSessionItemId, totalSteps } = await this.dataSource.transaction(
+      async (entityManager: EntityManager) => {
+        const caseSessionRepo = entityManager.getRepository(CaseSession);
+        const caseSessionItemRepo =
+          entityManager.getRepository(CaseSessionItem);
+        const caseSessionEntityInstance = caseSessionRepo.create({
+          caseId,
+          userId: Number(userId),
+          startedAt: new Date(),
+          completedScenarios: 0,
+        });
+        const caseSession = await caseSessionRepo.save(
+          caseSessionEntityInstance,
+        );
+        const caseItems = await this.caseSharedService.getCaseItems(caseId);
+        if (!caseItems || caseItems.length === 0) {
+          this.logger.error(
+            `Error: No case items available for userId: ${userId} and caseId: ${caseId}`,
+          );
+          throw new BadRequestException(
+            'No sub simulations available for this case',
+          );
+        }
+        //Taking the first element as the list is sorted by order
+        const caseSessionItemEntityInstance = caseSessionItemRepo.create({
+          caseSessionId: caseSession.id,
+          caseItemId: caseItems[0].id,
+          userId: Number(userId),
+          status: SessionItemStatus.UNLOCKED,
+        });
+        const caseSessionItem = await caseSessionItemRepo.save(
+          caseSessionItemEntityInstance,
+        );
+        return {
+          caseSessionItemId: caseSessionItem.id,
+          totalSteps: caseItems.length,
+        };
+      },
+    );
+
+    await this.capturePathwayStarted(Number(userId), caseId, totalSteps);
+
+    return { caseSessionItemId };
+  }
+
+  async getUserCaseSessionByCaseId(caseId: string) {
+    const userId = ExecutionManager.getUserId();
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    return this.caseSessionRepository.findOne({
+      where: { caseId, userId: Number(userId) },
+    });
+  }
+
+  async getCaseSessionByCaseId(caseId: string) {
+    return this.caseSessionRepository.findOne({
+      where: { caseId },
+    });
+  }
+
+  async getNextCaseItem(
+    scenarioSessionId: string,
+  ): Promise<GetUpcomingCaseItemResponseDto | null> {
+    const currentScenarioSession =
+      await this.caseSharedService.getScenarioSessionById(scenarioSessionId);
+    const caseSessionItemId = currentScenarioSession?.caseSessionItemId;
+    if (!caseSessionItemId) {
+      this.logger.info(
+        `Case session item not found for scenarioSessionId: ${scenarioSessionId}`,
+      );
+      return null;
+    }
+    const sessionGlimpse =
+      await this.caseSharedService.getSessionGlimpseByScenarioSessionId(
+        scenarioSessionId,
+      );
+
+    const userId = ExecutionManager.getUserId();
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    const currentCaseSessionItem = await this.caseSessionItemRepository.findOne(
+      {
+        where: { id: caseSessionItemId, userId: Number(userId) },
+      },
+    );
+    if (!currentCaseSessionItem) {
+      this.logger.error(
+        `Error: Case session item not found for userId: ${userId} and caseSessionItemId: ${caseSessionItemId}`,
+      );
+      throw new BadRequestException('Case session item not found');
+    }
+    const currentCaseItem = await this.caseSharedService.getCaseItemById(
+      currentCaseSessionItem.caseItemId,
+    );
+    let currentScenarioData;
+    if (currentCaseItem?.scenarioId) {
+      currentScenarioData = await this.caseSharedService.getScenarioDataById(
+        currentCaseItem?.scenarioId,
+      );
+    }
+    const currentCaseSession = await this.caseSessionRepository.findOne({
+      where: {
+        caseId: currentCaseItem?.caseId,
+        userId: Number(userId),
+      },
+    });
+
+    const currentSession = {
+      scenarioId: currentScenarioData?.id,
+      title: currentScenarioData?.title,
+      description: currentScenarioData?.description,
+      coverImageUrl: currentScenarioData?.coverImageUrl,
+      coverVideoUrl: currentScenarioData?.coverVideoUrl,
+      caseSessionItemStatus: currentCaseSessionItem?.status,
+      caseSessionItemId: currentCaseSessionItem?.id,
+      transitionMessageTitle: currentCaseItem?.messageTitle,
+      transitionMessageContent: currentCaseItem?.messageContent,
+      isCaseSessionCompleted: !!currentCaseSession?.completedAt,
+      eventStatus: currentScenarioSession?.eventStatus,
+      sessionGlimpse,
+    };
+    if (
+      currentCaseSessionItem?.status !== SessionItemStatus.COMPLETED ||
+      !!currentCaseSession?.completedAt
+    ) {
+      return {
+        currentSession,
+      };
+    }
+
+    const nextScenarioData =
+      await this.caseSharedService.getNextScenarioDataByCaseItemId(
+        currentCaseSessionItem?.caseItemId,
+      );
+    let nextCaseSessionItem;
+    if (nextScenarioData?.caseItem?.id) {
+      nextCaseSessionItem = await this.caseSessionItemRepository.findOne({
+        where: {
+          caseItemId: nextScenarioData?.caseItem?.id,
+          userId: Number(userId),
+        },
+      });
+    }
+
+    const upcomingScenario = nextScenarioData
+      ? {
+          id: nextScenarioData?.scenario?.id,
+          title: nextScenarioData?.scenario?.title,
+          description: nextScenarioData?.scenario?.description,
+          coverImageUrl: nextScenarioData?.scenario?.coverImageUrl,
+          coverVideoUrl: nextScenarioData?.scenario?.coverVideoUrl,
+          caseSessionItemStatus: nextCaseSessionItem?.status,
+          order: nextScenarioData?.caseItem?.order,
+          caseSessionItemId: nextCaseSessionItem?.id,
+        }
+      : undefined;
+
+    return {
+      currentSession,
+      upcomingScenario,
+    };
+  }
+
+  async handleEndCaseSession({
+    caseSessionItemId,
+    score,
+    callDuration = 0,
+  }: {
+    caseSessionItemId: string;
+    score?: number;
+    callDuration: number;
+  }) {
+    const userId = ExecutionManager.getUserId();
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+    const callDurationInSeconds = (callDuration ?? 0) / 1000;
+    const callDurationRequiredForCompletionInSeconds =
+      this.configService.cases.caseItemMinDurationForCompletion ?? 0;
+    if (callDurationInSeconds < callDurationRequiredForCompletionInSeconds) {
+      this.logger.info(
+        `Call duration ${callDurationInSeconds} is less than required ${callDurationRequiredForCompletionInSeconds} for caseSessionItemId: ${caseSessionItemId}`,
+      );
+      return;
+    }
+
+    const currentCaseSessionItem = await this.caseSessionItemRepository.findOne(
+      {
+        where: { id: caseSessionItemId },
+      },
+    );
+    if (!currentCaseSessionItem) {
+      this.logger.error(
+        `Case session item not found for caseSessionItemId: ${caseSessionItemId}`,
+      );
+      throw new BadRequestException('Case session item not found');
+    }
+
+    if (currentCaseSessionItem.status === SessionItemStatus.COMPLETED) {
+      this.logger.info(
+        `Case session item already completed for caseSessionItemId: ${caseSessionItemId}`,
+      );
+      return;
+    }
+
+    const currentCaseItem = await this.caseSharedService.getCaseItemById(
+      currentCaseSessionItem.caseItemId,
+    );
+    if (!currentCaseItem) {
+      this.logger.error(
+        `Error: Case item not found for caseSessionItemId: ${caseSessionItemId}`,
+      );
+      throw new BadRequestException('Case item not found');
+    }
+
+    // Score below a configured minimum -> cant make the session complete.
+    // A minimum of 0 is the unconfigured default and never gates; see
+    // meetsMinimumScore. (This check also used to miss the NULL case, so an
+    // unset column coerced to 0 in the comparison and gated negative scores.)
+    if (!meetsMinimumScore(score, currentCaseItem?.minimumScore)) {
+      this.logger.info(
+        `Score ${score} is less than minimum score ${currentCaseItem?.minimumScore} for caseSessionItemId: ${caseSessionItemId}`,
+      );
+      return;
+    }
+
+    const currentCaseSession = await this.caseSessionRepository.findOne({
+      where: { id: currentCaseSessionItem.caseSessionId },
+    });
+    if (!currentCaseSession) {
+      this.logger.error(
+        `Error: Case session not found for caseSessionItemId: ${caseSessionItemId}`,
+      );
+      throw new BadRequestException('Case session not found');
+    }
+
+    let completedCaseSessionId: string | null = null;
+    await this.dataSource.transaction(async (entityManager: EntityManager) => {
+      const caseSessionItemRepo = entityManager.getRepository(CaseSessionItem);
+      const caseSessionRepo = entityManager.getRepository(CaseSession);
+
+      await caseSessionItemRepo.update(currentCaseSessionItem.id, {
+        status: SessionItemStatus.COMPLETED,
+      });
+      this.logger.info(
+        `Updated case session item status to COMPLETED for caseSessionItemId: ${caseSessionItemId}`,
+      );
+
+      const nextCaseItem =
+        await this.caseSharedService.getNextCaseItemByCurrentItemId(
+          currentCaseSessionItem.caseItemId,
+        );
+
+      // All sub items are complete
+      if (!nextCaseItem) {
+        await caseSessionRepo.update(currentCaseSession.id, {
+          completedAt: new Date(),
+          completedScenarios: (currentCaseSession?.completedScenarios ?? 0) + 1,
+        });
+        completedCaseSessionId = currentCaseSession.id;
+        this.logger.info(
+          `Updated case session to completed for caseSessionId: ${currentCaseSession.id}`,
+        );
+        return;
+      }
+      await caseSessionRepo.update(currentCaseSession.id, {
+        completedScenarios: (currentCaseSession?.completedScenarios ?? 0) + 1,
+      });
+      const nextCaseSessionItem = await this.caseSessionItemRepository.findOne({
+        where: {
+          caseItemId: nextCaseItem?.id,
+          userId: Number(userId),
+        },
+      });
+
+      // If no entry created for next case item, create one
+      // Wouldn't reach ideally
+      if (!nextCaseSessionItem?.id) {
+        // No entry created for next scenario
+        const nextSessionItemEntity = caseSessionItemRepo.create({
+          caseSessionId: currentCaseSession.id,
+          caseItemId: nextCaseItem.id,
+          userId: Number(userId),
+          status: SessionItemStatus.UNLOCKED,
+        });
+        await caseSessionItemRepo.save(nextSessionItemEntity);
+        this.logger.info(
+          `Created and unlocked next case session item for caseSessionItemId: ${caseSessionItemId}`,
+        );
+        return;
+      }
+      return;
+    });
+
+    await this.capturePathwayEvent(
+      Number(userId),
+      PATHWAY_ANALYTICS_EVENTS.STEP_COMPLETED,
+      currentCaseSession.caseId,
+      {
+        step_number: currentCaseItem.order,
+        step_simulation_id: String(currentCaseItem.scenarioId),
+      },
+    );
+
+    // Emitted after commit so listeners (e.g. Track 2.0 case-in-track
+    // progression) read the completed state. Best-effort — must never break
+    // the case flow.
+    if (completedCaseSessionId) {
+      try {
+        this.eventEmitter.emit('case.session.completed', {
+          caseSessionId: completedCaseSessionId,
+          userId: Number(userId),
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to emit case.session.completed for ${completedCaseSessionId}: ${error}`,
+        );
+      }
+
+      await this.captureCaseCompleted(
+        Number(userId),
+        currentCaseSession.caseId,
+        (currentCaseSession.completedScenarios ?? 0) + 1,
+      );
+
+      await this.capturePathwayEvent(
+        Number(userId),
+        PATHWAY_ANALYTICS_EVENTS.COMPLETED,
+        currentCaseSession.caseId,
+        {
+          total_steps: (currentCaseSession.completedScenarios ?? 0) + 1,
+          // `startedAt` is nullable on the entity but always stamped by
+          // `createUserCaseSession`; a session without one predates that and
+          // reports no duration rather than a nonsense one.
+          completion_time_seconds: currentCaseSession.startedAt
+            ? Math.round(
+                (Date.now() - currentCaseSession.startedAt.getTime()) / 1000,
+              )
+            : undefined,
+        },
+      );
+    }
+  }
+
+  /**
+   * `case.completed` — the learner has finished every simulation in this case at
+   * least once. Fired only from the branch that has no next case item, which is
+   * the same condition that stamps `completedAt`, so it cannot fire twice for a
+   * session: a second attempt at an already-COMPLETED session item returns long
+   * before the transaction.
+   *
+   * `completedScenarios` is read from the row loaded before the transaction and
+   * incremented by one here rather than re-read, because the update above wrote
+   * exactly that value. Wholly guarded — analytics must never fail a learner's
+   * case completion.
+   */
+  private async captureCaseCompleted(
+    userId: number,
+    caseId: string,
+    completedSimulationCount: number,
+  ): Promise<void> {
+    try {
+      const caseItems = await this.caseSharedService.getCaseItems(caseId);
+      this.posthog.capture({
+        distinctId: userDistinctId(userId),
+        event: CASE_ANALYTICS_EVENTS.COMPLETED,
+        properties: {
+          case_id: caseId,
+          completed_simulation_count: completedSimulationCount,
+          total_simulation_count: caseItems.length,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to capture ${CASE_ANALYTICS_EVENTS.COMPLETED} in PostHog for caseId ${caseId}: ${error}`,
+      );
+    }
+  }
+
+  /**
+   * A pathway is a case, so `pathway_id` is the case id on every event. Wholly
+   * guarded — analytics must never fail a learner's progress through it.
+   */
+  private async capturePathwayEvent(
+    userId: number,
+    event: string,
+    caseId: string,
+    properties: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      this.posthog.capture({
+        distinctId: userDistinctId(userId),
+        event,
+        properties: { pathway_id: caseId, ...properties },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to capture ${event} in PostHog for caseId ${caseId}: ${error}`,
+      );
+    }
+  }
+
+  /**
+   * `pathway.started` — the learner committed to working through the pathway,
+   * which is the moment the case session is created rather than the moment its
+   * detail page is opened. The title lookup lives inside the guard so a missing
+   * or unreadable case costs the event, not the session.
+   */
+  private async capturePathwayStarted(
+    userId: number,
+    caseId: string,
+    totalSteps: number,
+  ): Promise<void> {
+    try {
+      const caseData = await this.caseSharedService.getActiveCaseById(caseId);
+      await this.capturePathwayEvent(
+        userId,
+        PATHWAY_ANALYTICS_EVENTS.STARTED,
+        caseId,
+        { pathway_name: caseData?.title, total_steps: totalSteps },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to capture ${PATHWAY_ANALYTICS_EVENTS.STARTED} in PostHog for caseId ${caseId}: ${error}`,
+      );
+    }
+  }
+}

@@ -1,0 +1,1390 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
+import { CallDetailsService } from '../call-details.service';
+import { CallDetailsRepository } from '../../repository/call-details.repository';
+import { ChatRepository } from '../../repository/chat.repository';
+import { MessageService } from '../message.service';
+import { CryptoService } from '../../../common/service/crypto.service';
+import { AppConfigService } from '../../../config/config.service';
+import { AiService } from '../../../ai/service/ai.service';
+import { RedisService } from '../../../redis/service/redis.service';
+import { BroadcastMessageService } from '../../../audio/service/broadcast-message.service';
+import { StreamFileProcessorService } from '../../../audio/service/stream-file-processor.service';
+import { ExecutionManager } from '../../../common/execution/execution-manager';
+import {
+  AudioChatProvider,
+  AudioChatPlatform,
+  ScribeSessionMode,
+} from '../../../common/constants/chat.constants';
+import { ForbiddenException } from '../../../exception/custom.exception';
+import { TIME } from '../../../common/constants/time.constants';
+import {
+  Chat,
+  ChatStatus,
+  ChatSummaryStatus,
+} from 'src/chat/entity/chat.entity';
+import { MessageType } from 'src/chat/entity/message.entity';
+import { FlattenedSummaryNotePayloadCamelCase } from 'src/chat/type/call.details.type';
+import { CallDetails } from 'src/chat/entity/call.details.entity';
+import { CustomFieldsService } from '../../../custom-fields/service/custom-fields.service';
+import { ChatAudioUploadsService } from '../../../audio/service/chat-audio-uploads.service';
+import { ChatSummaryAttemptService } from '../chat-summary-attempt.service';
+
+describe('CallDetailsService', () => {
+  let service: CallDetailsService;
+  let callDetailsRepository: CallDetailsRepository;
+  let chatRepository: ChatRepository;
+  let messageService: MessageService;
+  let cryptoService: CryptoService;
+  let aiService: AiService;
+  let cache: RedisService;
+  let broadcastMessageService: BroadcastMessageService;
+  let streamFileProcessorService: StreamFileProcessorService;
+  let audioUploadsService: jest.Mocked<ChatAudioUploadsService>;
+
+  const mockChat: Chat = {
+    id: 1,
+    clientId: 100,
+    counselorId: 200,
+    status: ChatStatus.ACTIVE,
+    summaryStatus: ChatSummaryStatus.PENDING,
+    startedAt: new Date('2024-01-01T10:00:00Z'),
+    endedAt: new Date('2024-01-01T10:30:00Z'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    tenantId: 'test-tenant',
+    externalId: undefined,
+    archivedAt: undefined,
+  };
+
+  const mockCallDetails: CallDetails = {
+    id: 1,
+    chatId: 1,
+    startTime: new Date('2024-01-01T10:00:00Z'),
+    endTime: new Date('2024-01-01T10:30:00Z'),
+    callDuration: 1800,
+    callInfo: {
+      provider: AudioChatProvider.WEBRTC,
+      platform: AudioChatPlatform.WEB,
+      mode: ScribeSessionMode.SCRIBE,
+      pauseChat: false,
+    },
+    summary: {
+      callId: '1',
+      callDuration: 1800,
+      callDate: '2024-01-01',
+      callTime: '10:00:00',
+      clientId: '100',
+      counsellor: 'Test Counselor',
+      callType: 'Regular',
+      age: 25,
+      gender: 'Male',
+      profession: 'Engineer',
+      relationshipStatus: 'Single',
+      languages: [],
+      location: 'Test City',
+      codeOfConcern: 'Anxiety',
+      sessionSummary: 'Test summary',
+      counselingProcessFlow: 'Test flow',
+      keyConcerns: 'Test concerns',
+      subjectiveObservations: 'Test observations',
+      objectiveObservations: 'Test objective',
+      assessment: 'Test assessment',
+      dominantFeelings: 'Test feelings',
+      issuesWorkedOn: 'Test issues',
+      keyTherapeuticTechniques: 'Test techniques',
+      referralsProvided: null,
+      homework: 'Test homework',
+      planForNextCall: 'Test plan',
+      tags: [
+        { tag: 'tag1', positivity_rating: 0.8 },
+        { tag: 'tag2', positivity_rating: 0.6 },
+      ],
+      listeningShare: 0.5,
+      reflectiveQuestionsAsked: 5,
+      openEndedQuestionsAsked: 3,
+      emotionalLift: 'Positive',
+      callQuality: 5,
+      newCallFollowUp: 'Follow up notes',
+    },
+    noOfNudges: 2,
+    noOfStages: 3,
+    transcript: 'Test transcript',
+    tenantId: 'test-tenant',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockMessages = [
+    {
+      id: 1,
+      chatId: 1,
+      senderId: 100,
+      content: 'Hello, I need help',
+      type: MessageType.TEXT,
+      createdAt: new Date('2024-01-01T10:00:00Z'),
+    },
+    {
+      id: 2,
+      chatId: 1,
+      senderId: 200,
+      content: 'How can I assist you?',
+      type: MessageType.TEXT,
+      createdAt: new Date('2024-01-01T10:01:00Z'),
+    },
+    {
+      id: 3,
+      chatId: 1,
+      senderId: 200,
+      content: 'Test nudge content',
+      type: MessageType.NUDGE,
+      createdAt: new Date('2024-01-01T10:02:00Z'),
+    },
+    {
+      id: 4,
+      chatId: 1,
+      senderId: 200,
+      content: 'Assessment',
+      type: MessageType.STAGE,
+      createdAt: new Date('2024-01-01T10:03:00Z'),
+    },
+  ];
+
+  beforeEach(async () => {
+    // Mock ExecutionManager
+    jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue('test-tenant');
+    jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue('200');
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CallDetailsService,
+        {
+          provide: CallDetailsRepository,
+          useValue: {
+            findOne: jest.fn(),
+            update: jest.fn(),
+            save: jest.fn(),
+            mergeSummary: jest.fn(),
+            mergeSummaryOrCreate: jest.fn().mockResolvedValue({
+              created: false,
+            }),
+          },
+        },
+        {
+          provide: ChatRepository,
+          useValue: {
+            findOne: jest.fn(),
+            save: jest.fn(),
+            update: jest.fn(),
+            find: jest.fn(),
+          },
+        },
+        {
+          provide: MessageService,
+          useValue: {
+            getMessageByChatId: jest.fn(),
+            getChatHistoryForAIService: jest.fn(),
+          },
+        },
+        {
+          provide: CryptoService,
+          useValue: {
+            encrypt: jest.fn((data) => Promise.resolve(`encrypted_${data}`)),
+            decrypt: jest.fn((data) =>
+              Promise.resolve(data.replace('encrypted_', '')),
+            ),
+          },
+        },
+        {
+          provide: AppConfigService,
+          useValue: {
+            phiData: {
+              phiDataEncryptionKey: 'test-key',
+            },
+          },
+        },
+        {
+          provide: AiService,
+          useValue: {
+            generateSummaryAndTags: jest.fn(),
+            generateTagPositivityRatings: jest.fn().mockResolvedValue({
+              tags: [],
+            }),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            set: jest.fn(),
+            get: jest.fn(),
+            del: jest.fn(),
+            hincrBy: jest.fn(),
+            hgetAll: jest.fn(),
+          },
+        },
+        {
+          provide: BroadcastMessageService,
+          useValue: {
+            broadcastChatEndedEvent: jest.fn(),
+          },
+        },
+        {
+          provide: StreamFileProcessorService,
+          useValue: {
+            endCallStream: jest.fn(),
+          },
+        },
+        {
+          provide: CustomFieldsService,
+          useValue: {
+            getAiDefinitions: jest.fn().mockResolvedValue([]),
+            upsertValuesInternal: jest.fn(),
+          },
+        },
+        {
+          provide: ChatAudioUploadsService,
+          useValue: {
+            cleanupStoredAudio: jest.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: ChatSummaryAttemptService,
+          useValue: { recordAttempt: jest.fn().mockResolvedValue(undefined) },
+        },
+      ],
+    }).compile();
+
+    service = module.get<CallDetailsService>(CallDetailsService);
+    callDetailsRepository = module.get<CallDetailsRepository>(
+      CallDetailsRepository,
+    );
+    chatRepository = module.get<ChatRepository>(ChatRepository);
+    messageService = module.get<MessageService>(MessageService);
+    cryptoService = module.get<CryptoService>(CryptoService);
+    aiService = module.get<AiService>(AiService);
+    cache = module.get<RedisService>(RedisService);
+    broadcastMessageService = module.get<BroadcastMessageService>(
+      BroadcastMessageService,
+    );
+    streamFileProcessorService = module.get<StreamFileProcessorService>(
+      StreamFileProcessorService,
+    );
+    audioUploadsService = module.get(
+      ChatAudioUploadsService,
+    ) as jest.Mocked<ChatAudioUploadsService>;
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('handleChatEnded', () => {
+    it('should handle WEBRTC chat ended successfully', async () => {
+      const webrtcCallDetails = {
+        ...mockCallDetails,
+        callInfo: { provider: AudioChatProvider.WEBRTC },
+      };
+
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(webrtcCallDetails as any);
+      jest
+        .spyOn(service, 'updateSummaryAndTags')
+        .mockResolvedValue(undefined as any);
+      jest
+        .spyOn(service, 'updateMessageStatistics')
+        .mockResolvedValue(undefined as any);
+
+      await service.handleChatEnded(mockChat);
+
+      expect(callDetailsRepository.findOne).toHaveBeenCalledWith({
+        where: { chatId: 1, tenantId: 'test-tenant' },
+      });
+      expect(service.updateSummaryAndTags).toHaveBeenCalledWith(mockChat);
+      expect(service.updateMessageStatistics).toHaveBeenCalledWith(
+        mockChat,
+        webrtcCallDetails,
+      );
+      expect(
+        broadcastMessageService.broadcastChatEndedEvent,
+      ).toHaveBeenCalled();
+    });
+
+    it('should handle MICROPHONE provider chat ended', async () => {
+      const micCallDetails = {
+        ...mockCallDetails,
+        callInfo: { provider: AudioChatProvider.MICROPHONE },
+      };
+
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(micCallDetails as any);
+
+      await service.handleChatEnded(mockChat);
+
+      expect(streamFileProcessorService.endCallStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 1,
+          provider: AudioChatProvider.MICROPHONE,
+        }),
+      );
+      expect(
+        broadcastMessageService.broadcastChatEndedEvent,
+      ).toHaveBeenCalled();
+    });
+
+    it('should handle EXOTEL_CONFERENCE_CALL provider', async () => {
+      const exotelCallDetails = {
+        ...mockCallDetails,
+        callInfo: { provider: AudioChatProvider.EXOTEL_CONFERENCE_CALL },
+      };
+
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(exotelCallDetails as any);
+
+      await service.handleChatEnded(mockChat);
+
+      expect(streamFileProcessorService.endCallStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 1,
+          provider: AudioChatProvider.EXOTEL_CONFERENCE_CALL,
+        }),
+      );
+    });
+
+    it('should handle OZONETEL provider', async () => {
+      const ozonetelCallDetails = {
+        ...mockCallDetails,
+        callInfo: { provider: AudioChatProvider.OZONETEL },
+      };
+
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(ozonetelCallDetails as any);
+
+      await service.handleChatEnded(mockChat);
+
+      expect(
+        broadcastMessageService.broadcastChatEndedEvent,
+      ).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateSummaryAndTags', () => {
+    it('should update summary and tags with encryption', async () => {
+      const mockSummary: FlattenedSummaryNotePayloadCamelCase = {
+        callId: '1',
+        callDuration: 1800,
+        callDate: '2024-01-01',
+        callTime: '10:00:00',
+        clientId: '100',
+        counsellor: 'Test Counselor',
+        callType: 'Regular',
+        age: 25,
+        gender: 'Male',
+        profession: 'Engineer',
+        relationshipStatus: 'Single',
+        languages: [],
+        location: 'Test City',
+        codeOfConcern: 'Anxiety',
+        sessionSummary: 'Test summary',
+        counselingProcessFlow: 'Test flow',
+        keyConcerns: 'Test concerns',
+        subjectiveObservations: 'Test observations',
+        objectiveObservations: 'Test objective',
+        assessment: 'Test assessment',
+        dominantFeelings: 'Test feelings',
+        issuesWorkedOn: 'Test issues',
+        keyTherapeuticTechniques: 'Test techniques',
+        referralsProvided: null,
+        homework: 'Test homework',
+        planForNextCall: 'Test plan',
+        tags: [{ tag: 'tag1', positivity_rating: 0.8 }],
+        listeningShare: 0.5,
+        reflectiveQuestionsAsked: 5,
+        openEndedQuestionsAsked: 3,
+        emotionalLift: 'Positive',
+        callQuality: 5,
+        newCallFollowUp: 'Follow up notes',
+      };
+
+      jest.spyOn(service, 'generateSummary').mockResolvedValue(mockSummary);
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateSummaryAndTags(mockChat);
+
+      expect(service.generateSummary).toHaveBeenCalledWith(1);
+      expect(cryptoService.encrypt).toHaveBeenCalledWith(
+        'Test summary',
+        'test-key',
+      );
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1 },
+        {
+          summary: {
+            ...mockSummary,
+            mode: ScribeSessionMode.SCRIBE,
+            sessionSummary: 'encrypted_Test summary',
+          },
+        },
+      );
+    });
+
+    it('should handle empty summary', async () => {
+      jest.spyOn(service, 'generateSummary').mockResolvedValue(undefined);
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateSummaryAndTags(mockChat);
+
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1 },
+        { summary: { mode: ScribeSessionMode.SCRIBE } },
+      );
+    });
+  });
+
+  describe('updateCallMetadata', () => {
+    it('should update call metadata with calculated duration', async () => {
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateCallMetadata(mockChat as any);
+
+      expect(callDetailsRepository.findOne).toHaveBeenCalledWith({
+        where: { chatId: 1, tenantId: 'test-tenant' },
+      });
+      expect(callDetailsRepository.update).toHaveBeenCalled();
+    });
+
+    it('should update call metadata with provided duration', async () => {
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateCallMetadata(mockChat as any, 3600);
+
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1 },
+        expect.objectContaining({
+          callDuration: 3600,
+        }),
+      );
+    });
+
+    it('should handle call details not found', async () => {
+      jest.spyOn(callDetailsRepository, 'findOne').mockResolvedValue(null);
+
+      await service.updateCallMetadata(mockChat as any);
+
+      expect(callDetailsRepository.findOne).toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully', async () => {
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockRejectedValue(new Error('Database error'));
+
+      await service.updateCallMetadata(mockChat as any);
+
+      // Should not throw, just log error
+      expect(callDetailsRepository.findOne).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateMessageStatistics', () => {
+    it('should calculate and update message statistics', async () => {
+      jest.spyOn(messageService, 'getMessageByChatId').mockResolvedValue({
+        messages: mockMessages as any,
+        count: mockMessages.length,
+      });
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      jest.spyOn(cache, 'hgetAll').mockResolvedValue({});
+      jest.spyOn(cache, 'del').mockResolvedValue(undefined);
+
+      await service.updateMessageStatistics(mockChat);
+
+      expect(messageService.getMessageByChatId).toHaveBeenCalledWith(1, {
+        sortBy: 'createdAt',
+        order: 'ASC',
+      });
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1 },
+        expect.objectContaining({
+          noOfNudges: 1,
+          noOfStages: 1,
+          transcript: expect.stringContaining('encrypted_'),
+          callInfo: expect.objectContaining({
+            clientTalkingPercentage: expect.any(Number),
+            counselorTalkingPercentage: expect.any(Number),
+            clientWordCount: expect.any(Number),
+            counselorWordCount: expect.any(Number),
+          }),
+        }),
+      );
+      expect(cache.del).toHaveBeenCalledWith('call:1:word-count');
+    });
+
+    it('should handle word count by language', async () => {
+      jest.spyOn(messageService, 'getMessageByChatId').mockResolvedValue({
+        messages: mockMessages as any,
+        count: mockMessages.length,
+      });
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      jest
+        .spyOn(cache, 'hgetAll')
+        .mockResolvedValue({ english: '50', hindi: '30' });
+      jest.spyOn(cache, 'del').mockResolvedValue(undefined);
+
+      await service.updateMessageStatistics(mockChat);
+
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1 },
+        expect.objectContaining({
+          callInfo: expect.objectContaining({
+            wordCountByLanguage: { english: 50, hindi: 30 },
+          }),
+        }),
+      );
+    });
+
+    it('should format dictation mode transcript as a single paragraph', async () => {
+      jest.spyOn(messageService, 'getMessageByChatId').mockResolvedValue({
+        messages: mockMessages as any,
+        count: mockMessages.length,
+      });
+      jest.spyOn(callDetailsRepository, 'findOne').mockResolvedValue({
+        ...mockCallDetails,
+        callInfo: {
+          ...mockCallDetails.callInfo,
+          mode: ScribeSessionMode.DICTATION,
+        },
+      } as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      jest.spyOn(cache, 'hgetAll').mockResolvedValue({});
+      jest.spyOn(cache, 'del').mockResolvedValue(undefined);
+
+      await service.updateMessageStatistics(mockChat);
+
+      expect(cryptoService.encrypt).toHaveBeenCalledWith(
+        'Hello, I need help How can I assist you?',
+        'test-key',
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      jest
+        .spyOn(messageService, 'getMessageByChatId')
+        .mockRejectedValue(new Error('Database error'));
+
+      const result = await service.updateMessageStatistics(mockChat);
+
+      expect(result).toBeUndefined();
+      expect(callDetailsRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generateSummary', () => {
+    it('should generate summary from AI service', async () => {
+      const mockAiResponse = {
+        session_summary: 'AI generated summary',
+        tags: ['tag1', 'tag2'],
+        call_quality: 5,
+      };
+
+      // Mock the getChatById method to return mockChat
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+      jest
+        .spyOn(messageService, 'getChatHistoryForAIService')
+        .mockResolvedValue([]);
+      jest
+        .spyOn(aiService, 'generateSummaryAndTags')
+        .mockResolvedValue(mockAiResponse as any);
+
+      const result = await service.generateSummary(1);
+
+      expect(messageService.getChatHistoryForAIService).toHaveBeenCalledWith(
+        1,
+        {
+          sortBy: 'createdAt',
+          order: 'ASC',
+        },
+      );
+      expect(aiService.generateSummaryAndTags).toHaveBeenCalled();
+      expect(result).toEqual({
+        sessionSummary: 'AI generated summary',
+        tags: ['tag1', 'tag2'],
+        callQuality: 5,
+      });
+    });
+  });
+
+  describe('updateCallDetails', () => {
+    it('should update call details with encrypted summary', async () => {
+      const summary: FlattenedSummaryNotePayloadCamelCase = {
+        callId: '1',
+        callDuration: 1800,
+        callDate: '2024-01-01',
+        callTime: '10:00:00',
+        clientId: '100',
+        counsellor: 'Test Counselor',
+        callType: 'Regular',
+        age: 25,
+        gender: 'Male',
+        profession: 'Engineer',
+        relationshipStatus: 'Single',
+        languages: [],
+        location: 'Test City',
+        codeOfConcern: 'Anxiety',
+        sessionSummary: 'Test summary',
+        counselingProcessFlow: 'Test flow',
+        keyConcerns: 'Test concerns',
+        subjectiveObservations: 'Test observations',
+        objectiveObservations: 'Test objective',
+        assessment: 'Test assessment',
+        dominantFeelings: 'Test feelings',
+        issuesWorkedOn: 'Test issues',
+        keyTherapeuticTechniques: 'Test techniques',
+        referralsProvided: null,
+        homework: 'Test homework',
+        planForNextCall: 'Test plan',
+        tags: [{ tag: 'tag1', positivity_rating: 0.8 }],
+        listeningShare: 0.5,
+        reflectiveQuestionsAsked: 5,
+        openEndedQuestionsAsked: 3,
+        emotionalLift: 'Positive',
+        callQuality: 5,
+        newCallFollowUp: 'Follow up notes',
+      };
+
+      // Mock the getChatById method to return mockChat
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateCallDetails(1, summary);
+
+      expect(cryptoService.encrypt).toHaveBeenCalledWith(
+        'Test summary',
+        'test-key',
+      );
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        {
+          ...summary,
+          sessionSummary: 'encrypted_Test summary',
+        },
+      );
+    });
+
+    it('clears the FAILED/retryable state when a failed-summary chat is manually edited', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue({
+        id: 1,
+        tenantId: 'test-tenant',
+        counselorId: 200,
+        summaryStatus: ChatSummaryStatus.FAILED,
+        metadata: { summaryRetryable: true, correlationId: 'c1' },
+      } as unknown as Chat);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      const chatUpdate = jest
+        .spyOn(chatRepository, 'update')
+        .mockResolvedValue({} as any);
+
+      await service.updateCallDetails(1, {
+        sessionSummary: 'hand written',
+      } as any);
+
+      expect(chatUpdate).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          summaryStatus: ChatSummaryStatus.SUCCESS,
+          metadata: expect.objectContaining({
+            summaryRetryable: false,
+            correlationId: 'c1',
+          }),
+        }),
+      );
+    });
+
+    it('does not change status when editing an already-successful chat', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue({
+        id: 1,
+        tenantId: 'test-tenant',
+        counselorId: 200,
+        summaryStatus: ChatSummaryStatus.SUCCESS,
+        metadata: {},
+      } as unknown as Chat);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      const chatUpdate = jest
+        .spyOn(chatRepository, 'update')
+        .mockResolvedValue({} as any);
+
+      await service.updateCallDetails(1, { sessionSummary: 'edit' } as any);
+
+      expect(chatUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should handle summary without sessionSummary', async () => {
+      const summary: any = {
+        callId: '1',
+        callDuration: 1800,
+        callDate: '2024-01-01',
+        callTime: '10:00:00',
+        clientId: '100',
+        counsellor: 'Test Counselor',
+        callType: 'Regular',
+        age: 25,
+        gender: 'Male',
+        profession: 'Engineer',
+        relationshipStatus: 'Single',
+        languages: [],
+        location: 'Test City',
+        codeOfConcern: 'Anxiety',
+        sessionSummary: undefined,
+        counselingProcessFlow: 'Test flow',
+        keyConcerns: 'Test concerns',
+        subjectiveObservations: 'Test observations',
+        objectiveObservations: 'Test objective',
+        assessment: 'Test assessment',
+        dominantFeelings: 'Test feelings',
+        issuesWorkedOn: 'Test issues',
+        keyTherapeuticTechniques: 'Test techniques',
+        referralsProvided: null,
+        homework: 'Test homework',
+        planForNextCall: 'Test plan',
+        tags: [{ tag: 'tag1', positivity_rating: 0.8 }],
+        listeningShare: 0.5,
+        reflectiveQuestionsAsked: 5,
+        openEndedQuestionsAsked: 3,
+        emotionalLift: 'Positive',
+        callQuality: 5,
+        newCallFollowUp: 'Follow up notes',
+      };
+
+      // Mock the getChatById method to return mockChat
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateCallDetails(1, summary);
+
+      expect(cryptoService.encrypt).not.toHaveBeenCalled();
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        summary,
+      );
+    });
+
+    it('sends only the edited keys as a patch, leaving the rest to the merge', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+
+      // A partial payload — what an autosave sends. The service must forward it
+      // as-is rather than expanding it into a whole-summary replace, so the
+      // untouched (AI-generated) keys survive in the database.
+      await service.updateCallDetails(1, { keyConcerns: 'edited' } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        { keyConcerns: 'edited' },
+      );
+    });
+
+    it('passes an explicit null through so a cleared field is cleared', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+
+      await service.updateCallDetails(1, { homework: null } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        { homework: null },
+      );
+    });
+
+    it('logs when the call_details row had to be created to hold the edit', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+      (
+        callDetailsRepository.mergeSummaryOrCreate as jest.Mock
+      ).mockResolvedValueOnce({ created: true });
+      const warn = jest.spyOn((service as any).logger, 'warn');
+
+      await service.updateCallDetails(1, { keyConcerns: 'edited' } as any);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('had no call_details row'),
+      );
+    });
+
+    it('throws when the chat is not the caller’s, without writing', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(
+        service.updateCallDetails(1, { keyConcerns: 'edited' } as any),
+      ).rejects.toThrow(NotFoundException);
+      expect(callDetailsRepository.mergeSummaryOrCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateCallDetails - tag rating is off the save path', () => {
+    beforeEach(() => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue({ summary: { tags: [] } } as any);
+      (callDetailsRepository as any).mergeSummary = jest
+        .fn()
+        .mockResolvedValue(1);
+    });
+
+    it('stores tags typed as bare names immediately, with a neutral rating', async () => {
+      await service.updateCallDetails(1, { tags: ['Anxiety', 'Grief'] } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        {
+          tags: [
+            { tag: 'Anxiety', positivity_rating: 3 },
+            { tag: 'Grief', positivity_rating: 3 },
+          ],
+        },
+      );
+    });
+
+    it('never calls the rating LLM on the save path', async () => {
+      // The wedged AI service used to hold scribe saves open for minutes and,
+      // on failure, wipe the tags. Nothing on this path may touch it.
+      await service.updateCallDetails(1, { tags: ['Anxiety'] } as any);
+
+      expect(aiService.generateTagPositivityRatings).not.toHaveBeenCalled();
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledTimes(
+        1,
+      );
+    });
+
+    it('keeps a rating a tag already had instead of resetting it to neutral', async () => {
+      jest.spyOn(callDetailsRepository, 'findOne').mockResolvedValue({
+        summary: { tags: [{ tag: 'Anxiety', positivity_rating: 1 }] },
+      } as any);
+
+      await service.updateCallDetails(1, { tags: ['Anxiety', 'Grief'] } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        {
+          tags: [
+            { tag: 'Anxiety', positivity_rating: 1 },
+            { tag: 'Grief', positivity_rating: 3 },
+          ],
+        },
+      );
+    });
+
+    it('clears the tags when an empty list is sent', async () => {
+      await service.updateCallDetails(1, { tags: [] } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        { tags: [] },
+      );
+      expect(aiService.generateTagPositivityRatings).not.toHaveBeenCalled();
+    });
+
+    it('ignores a malformed tags value rather than wiping the stored tags', async () => {
+      await service.updateCallDetails(1, {
+        tags: 'not-a-list',
+        keyConcerns: 'edited',
+      } as any);
+
+      const [, , patch] = (
+        callDetailsRepository.mergeSummaryOrCreate as jest.Mock
+      ).mock.calls[0];
+      expect(patch).toEqual({ tags: 'not-a-list', keyConcerns: 'edited' });
+      expect(aiService.generateTagPositivityRatings).not.toHaveBeenCalled();
+    });
+
+    it('keeps a rating the caller supplied, so an older web build still works', async () => {
+      // The deployed web build resolves ratings itself and sends Tag[]. Dropping
+      // its rating would look like ratings had silently stopped updating.
+      await service.updateCallDetails(1, {
+        tags: [{ tag: 'Anxiety', positivity_rating: 5 }],
+      } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        { tags: [{ tag: 'Anxiety', positivity_rating: 5 }] },
+      );
+    });
+
+    it('leaves a stored tag that predates ratings exactly as it is', async () => {
+      jest.spyOn(callDetailsRepository, 'findOne').mockResolvedValue({
+        summary: { tags: [{ tag: 'Anxiety' }] },
+      } as any);
+
+      await service.updateCallDetails(1, { tags: ['Anxiety'] } as any);
+
+      // No positivity_rating invented for it — that would change how the chip
+      // renders for every legacy session.
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        { tags: [{ tag: 'Anxiety' }] },
+      );
+    });
+
+    it('de-duplicates and trims tag names', async () => {
+      await service.updateCallDetails(1, {
+        tags: [' Anxiety ', 'Anxiety', ''],
+      } as any);
+
+      expect(callDetailsRepository.mergeSummaryOrCreate).toHaveBeenCalledWith(
+        1,
+        'test-tenant',
+        { tags: [{ tag: 'Anxiety', positivity_rating: 3 }] },
+      );
+    });
+  });
+
+  describe('updateCallInfo', () => {
+    it('should update call info successfully', async () => {
+      const callInfoDto = { summaryName: 'Updated Summary Name' };
+
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+
+      await service.updateCallInfo(1, callInfoDto, mockChat);
+
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1, tenantId: 'test-tenant' },
+        {
+          callInfo: {
+            ...mockCallDetails.callInfo,
+            summaryName: 'Updated Summary Name',
+          },
+        },
+      );
+    });
+
+    it('should throw ForbiddenException when user is not authenticated', async () => {
+      jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue(undefined);
+
+      await expect(
+        service.updateCallInfo(1, { summaryName: 'Test' }, mockChat),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when user is not the counselor', async () => {
+      jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue('999');
+
+      await expect(
+        service.updateCallInfo(1, { summaryName: 'Test' }, mockChat),
+      ).rejects.toThrow(
+        'You are not authorized to update call info for this chat',
+      );
+    });
+
+    it('should throw NotFoundException when call details not found', async () => {
+      jest.spyOn(callDetailsRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(
+        service.updateCallInfo(1, { summaryName: 'Test' }, mockChat),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('incrementWordCountByLanguage', () => {
+    it('should increment word count for a language', async () => {
+      jest.spyOn(cache, 'hincrBy').mockResolvedValue(10);
+
+      const result = await service.incrementWordCountByLanguage(
+        1,
+        'english',
+        5,
+      );
+
+      expect(cache.hincrBy).toHaveBeenCalledWith(
+        'call:1:word-count',
+        'english',
+        5,
+      );
+      expect(result).toBe(10);
+    });
+  });
+
+  describe('decryptCallDetails', () => {
+    it('should decrypt transcript and summary', async () => {
+      const encryptedCallDetails = {
+        ...mockCallDetails,
+        transcript: 'encrypted_Test transcript',
+        summary: {
+          sessionSummary: 'encrypted_Test summary',
+        },
+      };
+
+      const result = await service.decryptCallDetails(
+        encryptedCallDetails as any,
+      );
+
+      expect(cryptoService.decrypt).toHaveBeenCalledWith(
+        'encrypted_Test transcript',
+        'test-key',
+      );
+      expect(cryptoService.decrypt).toHaveBeenCalledWith(
+        'encrypted_Test summary',
+        'test-key',
+      );
+      expect(result?.transcript).toBe('Test transcript');
+      expect(result?.summary?.sessionSummary).toBe('Test summary');
+    });
+
+    it('should return undefined for null call details', async () => {
+      const result = await service.decryptCallDetails(null);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle decryption errors gracefully', async () => {
+      const encryptedCallDetails = {
+        ...mockCallDetails,
+        transcript: 'encrypted_Test transcript',
+      };
+
+      jest
+        .spyOn(cryptoService, 'decrypt')
+        .mockRejectedValue(new Error('Decryption failed'));
+
+      const result = await service.decryptCallDetails(
+        encryptedCallDetails as any,
+      );
+
+      expect(result?.transcript).toBe('');
+    });
+  });
+
+  describe('pauseOrResumeChat', () => {
+    it('should pause chat successfully', async () => {
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      jest.spyOn(cache, 'set').mockResolvedValue(undefined);
+
+      await service.pauseOrResumeChat(1, true);
+
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1, tenantId: 'test-tenant' },
+        {
+          callInfo: {
+            ...mockCallDetails.callInfo,
+            pauseChat: true,
+          },
+        },
+      );
+      expect(cache.set).toHaveBeenCalledWith(
+        'chat-paused-1',
+        'true',
+        TIME.DAY_IN_SECONDS,
+      );
+    });
+
+    it('should resume chat successfully', async () => {
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(mockCallDetails as any);
+      jest.spyOn(callDetailsRepository, 'update').mockResolvedValue({} as any);
+      jest.spyOn(cache, 'set').mockResolvedValue(undefined);
+
+      await service.pauseOrResumeChat(1, false);
+
+      expect(callDetailsRepository.update).toHaveBeenCalledWith(
+        { chatId: 1, tenantId: 'test-tenant' },
+        {
+          callInfo: {
+            ...mockCallDetails.callInfo,
+            pauseChat: false,
+          },
+        },
+      );
+      expect(cache.set).toHaveBeenCalledWith(
+        'chat-paused-1',
+        'false',
+        TIME.DAY_IN_SECONDS,
+      );
+    });
+
+    it('should throw NotFoundException when call details not found', async () => {
+      jest.spyOn(callDetailsRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(service.pauseOrResumeChat(1, true)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('isChatPaused', () => {
+    it('should return cached pause status', async () => {
+      jest.spyOn(cache, 'get').mockResolvedValue('true');
+
+      const result = await service.isChatPaused(1);
+
+      expect(result).toBe(true);
+      expect(cache.get).toHaveBeenCalledWith('chat-paused-1');
+      expect(callDetailsRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should fetch from database and cache when not in cache', async () => {
+      const pausedCallDetails = {
+        ...mockCallDetails,
+        callInfo: { ...mockCallDetails.callInfo, pauseChat: true },
+      };
+
+      jest.spyOn(cache, 'get').mockResolvedValue(null);
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(pausedCallDetails as any);
+      jest.spyOn(cache, 'set').mockResolvedValue(undefined);
+
+      const result = await service.isChatPaused(1);
+
+      expect(result).toBe(true);
+      expect(callDetailsRepository.findOne).toHaveBeenCalledWith({
+        where: { chatId: 1, tenantId: 'test-tenant' },
+      });
+      expect(cache.set).toHaveBeenCalledWith(
+        'chat-paused-1',
+        'true',
+        TIME.DAY_IN_SECONDS,
+      );
+    });
+
+    it('should return undefined when pause status is not set', async () => {
+      const unpausedCallDetails = {
+        ...mockCallDetails,
+        callInfo: { provider: AudioChatProvider.WEBRTC },
+      };
+
+      jest.spyOn(cache, 'get').mockResolvedValue(null);
+      jest
+        .spyOn(callDetailsRepository, 'findOne')
+        .mockResolvedValue(unpausedCallDetails as any);
+
+      const result = await service.isChatPaused(1);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('convertToCamelCase', () => {
+    it('should convert snake_case keys to camelCase', () => {
+      const input = {
+        session_summary: 'Test',
+        call_quality: 5,
+        nested_object: {
+          inner_key: 'value',
+        },
+      };
+
+      const result = service['convertToCamelCase'](input);
+
+      expect(result).toEqual({
+        sessionSummary: 'Test',
+        callQuality: 5,
+        nestedObject: {
+          innerKey: 'value',
+        },
+      });
+    });
+
+    it('should handle arrays', () => {
+      const input = [{ user_name: 'John' }, { user_name: 'Jane' }];
+
+      const result = service['convertToCamelCase'](input);
+
+      expect(result).toEqual([{ userName: 'John' }, { userName: 'Jane' }]);
+    });
+
+    it('should handle primitive values', () => {
+      expect(service['convertToCamelCase']('string')).toBe('string');
+      expect(service['convertToCamelCase'](123)).toBe(123);
+      expect(service['convertToCamelCase'](true)).toBe(true);
+      expect(service['convertToCamelCase'](null)).toBe(null);
+    });
+  });
+
+  describe('getChatById', () => {
+    it('should get chat by id', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+
+      const result = await service['getChatById'](1);
+
+      expect(chatRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 1, tenantId: 'test-tenant' },
+      });
+      expect(result).toEqual(mockChat);
+    });
+
+    it('should return null when chat not found', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(null);
+
+      const result = await service['getChatById'](999);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('retrySummary', () => {
+    const failedChat = {
+      id: 55,
+      tenantId: 'test-tenant',
+      counselorId: 200,
+      summaryStatus: ChatSummaryStatus.FAILED,
+      metadata: { summaryRetryable: true, summaryRetryAttempts: 1 },
+    } as unknown as Chat;
+
+    it('regenerates from the transcript and marks SUCCESS on success', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(failedChat);
+      jest
+        .spyOn(messageService, 'getChatHistoryForAIService')
+        .mockResolvedValue([{ content: 'hi' }] as any);
+      jest
+        .spyOn(service as any, 'regenerateSummaryFromTranscript')
+        .mockResolvedValue(undefined);
+      const update = jest
+        .spyOn(chatRepository, 'update')
+        .mockResolvedValue({} as any);
+
+      const result = await service.retrySummary(55);
+
+      expect(result.success).toBe(true);
+      expect(update).toHaveBeenLastCalledWith(
+        55,
+        expect.objectContaining({
+          summaryStatus: ChatSummaryStatus.SUCCESS,
+          metadata: expect.objectContaining({ summaryRetryable: false }),
+        }),
+      );
+      // Recording is dropped once the summary is final.
+      expect(audioUploadsService.cleanupStoredAudio).toHaveBeenCalledWith(55);
+    });
+
+    it('signals needsReprocess when there is no transcript to summarise from', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(failedChat);
+      jest
+        .spyOn(messageService, 'getChatHistoryForAIService')
+        .mockResolvedValue([] as any);
+      const regen = jest.spyOn(
+        service as any,
+        'regenerateSummaryFromTranscript',
+      );
+
+      const result = await service.retrySummary(55);
+
+      expect(result.needsReprocess).toBe(true);
+      expect(result.success).toBe(false);
+      expect(regen).not.toHaveBeenCalled();
+    });
+
+    it('keeps it retryable and increments attempts on failure', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(failedChat);
+      jest
+        .spyOn(messageService, 'getChatHistoryForAIService')
+        .mockResolvedValue([{ content: 'hi' }] as any);
+      jest
+        .spyOn(service as any, 'regenerateSummaryFromTranscript')
+        .mockRejectedValue(new Error('llm down'));
+      const update = jest
+        .spyOn(chatRepository, 'update')
+        .mockResolvedValue({} as any);
+
+      const result = await service.retrySummary(55);
+
+      expect(result.success).toBe(false);
+      expect(update).toHaveBeenLastCalledWith(
+        55,
+        expect.objectContaining({
+          summaryStatus: ChatSummaryStatus.FAILED,
+          metadata: expect.objectContaining({
+            summaryRetryable: true,
+            summaryRetryAttempts: 2, // was 1, incremented
+          }),
+        }),
+      );
+      // Recording is kept so the next retry can still recover.
+      expect(audioUploadsService.cleanupStoredAudio).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when the summary already succeeded', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue({
+        ...failedChat,
+        summaryStatus: ChatSummaryStatus.SUCCESS,
+      } as unknown as Chat);
+      const regen = jest.spyOn(
+        service as any,
+        'regenerateSummaryFromTranscript',
+      );
+
+      const result = await service.retrySummary(55);
+
+      expect(result.success).toBe(true);
+      expect(regen).not.toHaveBeenCalled();
+    });
+
+    it('throws when the chat is not found', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(service.retrySummary(404)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('retryFailedSummaries (cron)', () => {
+    it('runs a retry for each retryable chat', async () => {
+      const chats = [
+        { id: 1, tenantId: 't', counselorId: 200, metadata: {} },
+        { id: 2, tenantId: 't', counselorId: 201, metadata: {} },
+      ] as unknown as Chat[];
+      jest.spyOn(chatRepository, 'find').mockResolvedValue(chats);
+      const runRetry = jest
+        .spyOn(service as any, 'runSummaryRetry')
+        .mockResolvedValue({ success: true, message: 'ok' });
+      const setCtx = jest.spyOn(ExecutionManager, 'setAuthContext');
+
+      await service.retryFailedSummaries();
+
+      expect(runRetry).toHaveBeenCalledTimes(2);
+      expect(setCtx).toHaveBeenCalledWith('200', 't');
+      expect(setCtx).toHaveBeenCalledWith('201', 't');
+    });
+
+    it('does nothing when there are no retryable chats', async () => {
+      jest.spyOn(chatRepository, 'find').mockResolvedValue([]);
+      const runRetry = jest.spyOn(service as any, 'runSummaryRetry');
+
+      await service.retryFailedSummaries();
+
+      expect(runRetry).not.toHaveBeenCalled();
+    });
+  });
+});

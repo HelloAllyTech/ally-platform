@@ -1,0 +1,503 @@
+import axios from 'axios';
+
+import { AppConfigService } from 'src/config/config.service';
+
+import { GithubActionsService } from '../github-actions.service';
+
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+const mockLogger = { warn: jest.fn(), error: jest.fn(), log: jest.fn() };
+jest.mock('src/logger/logger.service', () => ({
+  LoggerService: { getInstance: jest.fn(() => mockLogger) },
+}));
+
+describe('GithubActionsService.hasCommitsSince', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'helloallytech',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('is true when master has at least one commit since the given time', async () => {
+    mockedAxios.get.mockResolvedValue({ data: [{ sha: 'abc123' }] });
+
+    const result = await service.hasCommitsSince(
+      'ally-web',
+      new Date('2026-09-14T00:00:00.000Z'),
+    );
+
+    expect(result).toBe(true);
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      'https://api.github.com/repos/helloallytech/ally-web/commits',
+      expect.objectContaining({
+        params: {
+          sha: 'master',
+          since: '2026-09-14T00:00:00.000Z',
+          per_page: 1,
+        },
+      }),
+    );
+  });
+
+  it('is false when the compare comes back empty', async () => {
+    mockedAxios.get.mockResolvedValue({ data: [] });
+
+    const result = await service.hasCommitsSince(
+      'ally-web',
+      new Date('2026-09-14T00:00:00.000Z'),
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('fails open (true) on a GitHub error, rather than silently skipping every sweep forever', async () => {
+    mockedAxios.get.mockRejectedValue(new Error('rate limited'));
+
+    const result = await service.hasCommitsSince(
+      'ally-web',
+      new Date('2026-09-14T00:00:00.000Z'),
+    );
+
+    expect(result).toBe(true);
+  });
+});
+
+/**
+ * Choosing the next release tag.
+ *
+ * ally-web carries three independently-released apps in one repo, so its tags
+ * interleave three prefixes. Its first 100 — GitHub's first page — are ALL
+ * `helpline-v*`, so a single-page read found no `admin-v*` whatsoever, fell
+ * into the "never released" branch and proposed `admin-v0.0.1` for an app on
+ * 1.88. The release workflow's version validation rejected it, which is the
+ * only reason that was a failed release rather than a catastrophic one.
+ */
+describe('GithubActionsService.nextPatchTag', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'helloallytech',
+  } as unknown as AppConfigService;
+
+  const page = (names: string[]) => ({ data: names.map((name) => ({ name })) });
+  const filler = (n: number) =>
+    Array.from({ length: n }, (_, i) => `helpline-v1.0.${i}`);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('bumps the patch of the highest matching tag', async () => {
+    mockedAxios.get.mockResolvedValueOnce(
+      page(['admin-v1.88.0', 'admin-v1.9.0', 'helpline-v2.0.0']) as any,
+    );
+
+    await expect(service.nextPatchTag('ally-web', 'admin-v')).resolves.toBe(
+      'admin-v1.88.1',
+    );
+  });
+
+  /** The real failure: a full first page carrying none of the prefix. */
+  it('reads past a full page of other prefixes', async () => {
+    mockedAxios.get
+      .mockResolvedValueOnce(page(filler(100)) as any)
+      .mockResolvedValueOnce(page(['admin-v1.88.0']) as any);
+
+    await expect(service.nextPatchTag('ally-web', 'admin-v')).resolves.toBe(
+      'admin-v1.88.1',
+    );
+    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+  });
+
+  /** A genuinely unreleased prefix — provable, because the page came back short. */
+  it('proposes a first release only when it has seen every tag', async () => {
+    mockedAxios.get.mockResolvedValueOnce(page(['helpline-v1.0.0']) as any);
+
+    await expect(service.nextPatchTag('ally-web', 'admin-v')).resolves.toBe(
+      'admin-v0.0.1',
+    );
+  });
+
+  /**
+   * The distinction that matters. "No tag with this prefix" and "I did not look
+   * far enough" produce the same empty list and mean opposite things, so they
+   * must not share an answer.
+   */
+  it('refuses to guess when there are still tags it has not read', async () => {
+    mockedAxios.get.mockResolvedValue(page(filler(100)) as any);
+
+    await expect(service.nextPatchTag('ally-web', 'admin-v')).rejects.toThrow(
+      /Refusing to guess/,
+    );
+  });
+
+  it('does not confuse a longer prefix for a shorter one', async () => {
+    mockedAxios.get.mockResolvedValueOnce(
+      page(['admin-v1.5.0', 'v9.9.9']) as any,
+    );
+
+    await expect(service.nextPatchTag('ally-be', 'v')).resolves.toBe('v9.9.10');
+  });
+});
+
+/**
+ * The difference between "no checks" and "I could not see the checks".
+ *
+ * Both calls used to swallow their error into an empty list, so a 403 from a
+ * token without Checks permission on one repo produced a confident
+ * `state: 'none'` — a commit with four green checks reported as one nobody had
+ * verified. Everything that waits for green then waits forever, and the merge
+ * button blames CI for what is a token problem. ally-mobile#104 sat in exactly
+ * that state with every check passing.
+ */
+describe('GithubActionsService.getCheckRollup', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'helloallytech',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  const checkRuns = (runs: unknown[]) => ({ data: { check_runs: runs } });
+  const statuses = (rows: unknown[]) => ({ data: { statuses: rows } });
+
+  it('reads a green commit as success', async () => {
+    mockedAxios.get
+      .mockResolvedValueOnce(
+        checkRuns([
+          { name: 'Jest', status: 'completed', conclusion: 'success' },
+          { name: 'Typecheck', status: 'completed', conclusion: 'success' },
+        ]),
+      )
+      .mockResolvedValueOnce(statuses([]));
+
+    expect(await service.getCheckRollup('ally-mobile', 'sha')).toEqual({
+      state: 'success',
+      failed: [],
+      total: 2,
+    });
+  });
+
+  const refused = (status: number) =>
+    Object.assign(new Error(`HTTP ${status}`), { response: { status } });
+
+  /** Answers by URL, since the fallback's calls interleave with the others. */
+  const byUrl = (routes: Record<string, () => Promise<unknown>>) =>
+    mockedAxios.get.mockImplementation((url: string) => {
+      const key = Object.keys(routes).find((path) => url.endsWith(path));
+      return key ? (routes[key]() as any) : Promise.reject(refused(500));
+    });
+
+  it('says nothing rather than "none" when the checks cannot be read', async () => {
+    byUrl({
+      '/check-runs': () => Promise.reject(refused(404)),
+      '/status': () => Promise.resolve(statuses([])),
+      '/actions/runs': () => Promise.reject(refused(403)),
+    });
+
+    // Null, not { state: 'none' }: callers treat null as "could not read" and
+    // refuse to act, which is the only safe reading of an unanswered question.
+    expect(await service.getCheckRollup('ally-mobile', 'sha')).toBeNull();
+  });
+
+  it('reads the Actions jobs when a fine-grained token is refused the checks API', async () => {
+    // ally-mobile#114: four green checks, a private repo, and a token that
+    // cannot be granted Checks.
+    byUrl({
+      '/check-runs': () => Promise.reject(refused(403)),
+      '/status': () => Promise.resolve(statuses([])),
+      '/actions/runs': () =>
+        Promise.resolve({ data: { workflow_runs: [{ id: 1 }, { id: 2 }] } }),
+      '/actions/runs/1/jobs': () =>
+        Promise.resolve({
+          data: {
+            jobs: [
+              { name: 'Jest', status: 'completed', conclusion: 'success' },
+              { name: 'Typecheck', status: 'completed', conclusion: 'success' },
+            ],
+          },
+        }),
+      '/actions/runs/2/jobs': () =>
+        Promise.resolve({
+          data: {
+            jobs: [
+              { name: 'docs-guard', status: 'in_progress', conclusion: null },
+            ],
+          },
+        }),
+    });
+
+    expect(await service.getCheckRollup('ally-mobile', 'sha')).toEqual({
+      state: 'pending',
+      failed: [],
+      total: 3,
+    });
+  });
+
+  it('names a failed Actions job read through the fallback', async () => {
+    byUrl({
+      '/check-runs': () => Promise.reject(refused(403)),
+      '/status': () => Promise.resolve(statuses([])),
+      '/actions/runs': () =>
+        Promise.resolve({ data: { workflow_runs: [{ id: 1 }] } }),
+      '/actions/runs/1/jobs': () =>
+        Promise.resolve({
+          data: {
+            jobs: [
+              { name: 'Jest', status: 'completed', conclusion: 'failure' },
+            ],
+          },
+        }),
+    });
+
+    const rollup = await service.getCheckRollup('ally-mobile', 'sha');
+
+    expect(rollup?.state).toBe('failure');
+    expect(rollup?.failed).toEqual(['Jest']);
+  });
+
+  it('does not fall back on errors other than a refusal', async () => {
+    byUrl({
+      '/check-runs': () => Promise.reject(refused(502)),
+      '/status': () => Promise.resolve(statuses([])),
+    });
+
+    expect(await service.getCheckRollup('ally-mobile', 'sha')).toBeNull();
+    expect(mockedAxios.get).not.toHaveBeenCalledWith(
+      expect.stringMatching(/actions\/runs$/),
+      expect.anything(),
+    );
+  });
+
+  it('still reports a genuinely unchecked commit as none', async () => {
+    mockedAxios.get
+      .mockResolvedValueOnce(checkRuns([]))
+      .mockResolvedValueOnce(statuses([]));
+
+    expect(await service.getCheckRollup('ally-mobile', 'sha')).toEqual({
+      state: 'none',
+      failed: [],
+      total: 0,
+    });
+  });
+
+  it('names what failed, so the reason reaches a person', async () => {
+    mockedAxios.get
+      .mockResolvedValueOnce(
+        checkRuns([
+          { name: 'Jest', status: 'completed', conclusion: 'failure' },
+        ]),
+      )
+      .mockResolvedValueOnce(statuses([]));
+
+    const rollup = await service.getCheckRollup('ally-mobile', 'sha');
+
+    expect(rollup?.state).toBe('failure');
+    expect(rollup?.failed).toEqual(['Jest']);
+  });
+});
+
+describe('GithubActionsService.findRunSince', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'helloallytech',
+  } as unknown as AppConfigService;
+  const since = new Date('2026-10-14T08:54:00Z');
+  const run = (id: number, createdAt: string, conclusion: string | null) => ({
+    id,
+    html_url: `https://github.com/r/${id}`,
+    status: conclusion ? 'completed' : 'in_progress',
+    conclusion,
+    created_at: createdAt,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('finds a builder.yml run started by an issue, not only by a dispatch', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: { workflow_runs: [run(7, '2026-10-14T08:54:09Z', null)] },
+    } as any);
+
+    const found = await service.findRunSince({
+      repo: 'ally-mobile',
+      workflow: 'builder.yml',
+      since,
+      event: 'issues',
+    });
+
+    expect(found?.id).toBe('7');
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      expect.stringContaining('actions/workflows/builder.yml/runs'),
+      expect.objectContaining({
+        params: expect.objectContaining({ event: 'issues' }),
+      }),
+    );
+  });
+
+  it('passes over runs whose job was skipped (every other comment and label)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        workflow_runs: [
+          run(5, '2026-10-14T08:54:05Z', 'skipped'),
+          run(6, '2026-10-14T08:55:00Z', null),
+        ],
+      },
+    } as any);
+
+    const found = await service.findRunSince({
+      repo: 'ally-mobile',
+      workflow: 'builder.yml',
+      since,
+      event: 'issue_comment',
+    });
+
+    expect(found?.id).toBe('6');
+  });
+
+  it('still defaults to dispatched runs', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: { workflow_runs: [] },
+    } as any);
+
+    await service.findRunSince({ repo: 'ally-be', workflow: 'x.yml', since });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        params: expect.objectContaining({ event: 'workflow_dispatch' }),
+      }),
+    );
+  });
+});
+
+describe('GithubActionsService.deleteBranch', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'helloallytech',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('deletes the ref, encoding each path segment but keeping the slashes', async () => {
+    mockedAxios.delete.mockResolvedValue({ status: 204, data: '' });
+
+    expect(
+      await service.deleteBranch('ally-be', 'bughunter/fix-malformed json'),
+    ).toEqual({ outcome: 'deleted', message: null });
+    expect(mockedAxios.delete).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /repos\/helloallytech\/ally-be\/git\/refs\/heads\/bughunter\/fix-malformed%20json$/,
+      ),
+      expect.anything(),
+    );
+  });
+
+  it('reports a branch that is already gone as already_gone, not a failure — the agent and the server race for the same delete', async () => {
+    mockedAxios.delete.mockRejectedValue(
+      Object.assign(new Error('Unprocessable'), {
+        response: {
+          status: 422,
+          data: { message: 'Reference does not exist' },
+        },
+      }),
+    );
+
+    expect(await service.deleteBranch('ally-be', 'bughunter/x')).toEqual({
+      outcome: 'already_gone',
+      message: 'Reference does not exist',
+    });
+    expect(mockLogger.warn).not.toHaveBeenCalled();
+  });
+
+  it('refuses the default branches without calling GitHub, whatever the caller asks', async () => {
+    for (const name of ['master', 'main', 'refs/heads/master', ' Main ']) {
+      const result = await service.deleteBranch('ally-be', name);
+      expect(result.outcome).toBe('refused');
+    }
+    expect(mockedAxios.delete).not.toHaveBeenCalled();
+  });
+
+  it('returns failed, with a warning, on any other error instead of throwing', async () => {
+    mockedAxios.delete.mockRejectedValue(
+      Object.assign(new Error('boom'), {
+        response: { status: 500, data: { message: 'Server Error' } },
+      }),
+    );
+
+    expect(await service.deleteBranch('ally-be', 'bughunter/x')).toEqual({
+      outcome: 'failed',
+      message: 'Server Error',
+    });
+    expect(mockLogger.warn).toHaveBeenCalled();
+  });
+});
+
+describe('GithubActionsService.getPullRequest', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'helloallytech',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('names the head branch and tells a same-repo head from a fork', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        merged: true,
+        html_url: 'https://github.com/helloallytech/ally-be/pull/1',
+        merged_at: '2026-10-01T06:00:00Z',
+        state: 'closed',
+        closed_at: '2026-10-01T06:00:00Z',
+        head: {
+          sha: 'abc',
+          ref: 'bughunter/fix-x',
+          repo: { full_name: 'HelloAllyTech/ally-be' },
+        },
+        base: { repo: { full_name: 'helloallytech/ally-be' } },
+      },
+    });
+    const same = await service.getPullRequest('ally-be', 1);
+    expect(same).toMatchObject({
+      headRef: 'bughunter/fix-x',
+      headIsFork: false,
+    });
+
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        merged: false,
+        state: 'open',
+        head: {
+          sha: 'abc',
+          ref: 'feature',
+          repo: { full_name: 'someone/ally-be' },
+        },
+        base: { repo: { full_name: 'helloallytech/ally-be' } },
+      },
+    });
+    const fork = await service.getPullRequest('ally-be', 2);
+    expect(fork).toMatchObject({ headRef: 'feature', headIsFork: true });
+  });
+});

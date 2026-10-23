@@ -1,0 +1,2007 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { UserService } from '../user.service';
+import { User } from 'src/user/entity/user.entity';
+import { QueueService } from 'src/queue/service/queue.service';
+import { RedisService } from 'src/redis/service/redis.service';
+import { UserRole } from 'src/common/constants/user.constants';
+import { UserStatus } from 'src/user/constants/user-status.constants';
+import { ChatStatus } from 'src/chat/entity/chat.entity';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { TenantService } from 'src/tenant/service/tenant.service';
+import { UserRepository } from 'src/user/repository/user.repository';
+import { GroupService } from 'src/authorization/service/group.service';
+import { SimulationCreditsService } from 'src/learn/service/simulation-credits.service';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { UserGroupService } from 'src/authorization/service/user-group.service';
+import { GroupRepository } from 'src/authorization/repository/group.repository';
+import { UserGroupRepository } from 'src/authorization/repository/user-group.repository';
+import { UpdateUserPreferencesDto } from 'src/user/dto/update-user-prefernces.dto';
+import { UserPreferencesRepository } from 'src/user/repository/user-prefernces.repository';
+import { AppConfigService } from 'src/config/config.service';
+import { S3Service } from 'src/aws/service/s3.service';
+import {
+  ProfileImageUploadContentType,
+  WorkerType,
+} from 'src/user/enum/user.enum';
+import { AdminTenantService } from '../admin-tenant.service';
+import { PermissionsService } from 'src/authorization/service/permissions.service';
+import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { DataSource, In } from 'typeorm';
+import { PostHog } from 'posthog-node';
+
+jest.mock('src/common/execution/execution-manager', () => ({
+  ExecutionManager: {
+    getTenantId: jest.fn(),
+    getUserId: jest.fn(),
+  },
+}));
+
+jest.mock('src/audit/service/audit-logger.service', () => ({
+  AuditLoggerService: {
+    getInstance: jest.fn().mockReturnValue({
+      log: jest.fn(),
+    }),
+  },
+}));
+
+describe('UserService', () => {
+  let service: UserService;
+  let mockUsersRepository: any;
+  let mockGroupRepository: any;
+  let mockUserGroupRepository: any;
+  let mockQueueService: any;
+  let mockCache: any;
+  let mockTenantService: any;
+  let mockQueryBuilder: any;
+  let mockGroupService: any;
+  let mockUsersGroupService: any;
+  let mockSimulationCreditsService: any;
+  let mockConfigService: any;
+  let mockS3Service: any;
+  let mockAdminTenantService: any;
+  let mockPermissionsService: any;
+  let mockDataSource: any;
+  let mockTxnUserRepo: any;
+  let mockTxnUserGroupRepo: any;
+
+  const mockUser: User = {
+    id: 1,
+    name: 'Test User',
+    email: 'test@example.com',
+    phone: '+1234567890',
+    status: UserStatus.ACTIVE,
+    username: 'testuser',
+    tenantId: 'test-tenant',
+    externalId: 'ext-123',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: undefined,
+    updatedBy: undefined,
+    suspendedBy: undefined,
+    suspendedAt: undefined,
+    termsAndAgreementApproved: false,
+    termsAndAgreementApprovedAt: undefined,
+    profileImageUrl: null as any,
+  } as unknown as User;
+
+  const mockChat = {
+    id: 1,
+    clientId: 1,
+    counselorId: 2,
+    roomId: 1,
+    status: ChatStatus.PAUSED,
+    startedAt: new Date(),
+    endedAt: undefined,
+    tenantId: 'test-tenant',
+    summaryStatus: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as any;
+
+  const mockUserPreferencesRepository = {
+    upsertUserPreferences: jest.fn(),
+    getUserPreferencesByUserId: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    mockQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      leftJoinAndMapMany: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+      getRawMany: jest.fn(),
+      getCount: jest.fn(),
+    };
+
+    mockUsersRepository = {
+      getAllUsers: jest.fn(),
+      getUserCountByTenantIds: jest.fn(),
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+      exists: jest.fn(),
+      createQueryBuilder: jest.fn(() => mockQueryBuilder),
+      getWaitingClients: jest.fn(),
+      getWaitingList: jest.fn(),
+      getCounselorNames: jest.fn(),
+      query: jest.fn(),
+    };
+
+    mockGroupRepository = {
+      find: jest.fn(),
+    };
+
+    mockUserGroupRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+
+    mockQueueService = {
+      getWaitingClients: jest.fn(),
+    };
+
+    mockCache = {
+      get: jest.fn(),
+      set: jest.fn(),
+    };
+
+    mockGroupService = {
+      getUserRolesByUserId: jest.fn(),
+    };
+
+    mockTenantService = {
+      findById: jest.fn(),
+    };
+
+    mockUsersGroupService = {
+      getUserGroupsByUserIds: jest.fn(),
+    };
+
+    mockSimulationCreditsService = {
+      updateSimulationCredits: jest.fn(),
+    };
+
+    mockConfigService = {
+      s3: {
+        assetsBucket: 'test-assets-bucket',
+      },
+      aws: {
+        region: 'ap-south-1',
+      },
+    };
+
+    mockS3Service = {
+      sanitizeFileName: jest.fn((name: string) => name),
+      generatePresignedUrl: jest.fn(),
+      deleteObject: jest.fn(),
+    };
+
+    mockAdminTenantService = {
+      getTenantsForAdmin: jest.fn(),
+    };
+
+    mockPermissionsService = {
+      isMultiTenantAdmin: jest.fn().mockResolvedValue(false),
+      getUserPermissions: jest.fn().mockResolvedValue([]),
+    };
+
+    // Transaction manager exposes per-entity repositories; getRepository is
+    // routed by entity name so bulkAddUsers can resolve User vs UserGroup.
+    mockTxnUserRepo = {
+      create: jest.fn((data) => data),
+      save: jest.fn((user) => Promise.resolve({ id: 2, ...user })),
+    };
+    mockTxnUserGroupRepo = {
+      create: jest.fn((data) => data),
+      save: jest.fn((data) => Promise.resolve(data)),
+    };
+    mockDataSource = {
+      transaction: jest.fn((cb) =>
+        cb({
+          getRepository: (entity: any) =>
+            entity?.name === 'UserGroup'
+              ? mockTxnUserGroupRepo
+              : mockTxnUserRepo,
+        }),
+      ),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UserService,
+        {
+          provide: PostHog,
+          useValue: { capture: jest.fn(), alias: jest.fn() },
+        },
+        { provide: getRepositoryToken(User), useValue: mockUsersRepository },
+        { provide: GroupRepository, useValue: mockGroupRepository },
+        { provide: UserGroupRepository, useValue: mockUserGroupRepository },
+        { provide: QueueService, useValue: mockQueueService },
+        { provide: RedisService, useValue: mockCache },
+        { provide: TenantService, useValue: mockTenantService },
+        { provide: UserRepository, useValue: mockUsersRepository },
+        { provide: GroupService, useValue: mockGroupService },
+        { provide: UserGroupService, useValue: mockUsersGroupService },
+        {
+          provide: SimulationCreditsService,
+          useValue: mockSimulationCreditsService,
+        },
+        {
+          provide: UserPreferencesRepository,
+          useValue: mockUserPreferencesRepository,
+        },
+        { provide: AppConfigService, useValue: mockConfigService },
+        { provide: S3Service, useValue: mockS3Service },
+        { provide: AdminTenantService, useValue: mockAdminTenantService },
+        { provide: PermissionsService, useValue: mockPermissionsService },
+        { provide: DataSource, useValue: mockDataSource },
+      ],
+    }).compile();
+
+    service = module.get<UserService>(UserService);
+    (ExecutionManager.getTenantId as jest.Mock).mockReturnValue('test-tenant');
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    (ExecutionManager.getUserId as jest.Mock).mockReturnValue(undefined);
+  });
+
+  describe('get', () => {
+    it('should return user when found', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      const result = await service.get(1);
+      expect(result).toEqual(mockUser);
+      expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 1, tenantId: 'test-tenant' },
+      });
+    });
+
+    it('should return null when user not found', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      const result = await service.get(1);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getUsersByIds', () => {
+    it('should return users by ids', async () => {
+      const ids = [1, 2];
+      const users = [mockUser];
+      mockUsersRepository.find.mockResolvedValue(users);
+      const result = await service.getUsersByIds(ids);
+      expect(result).toEqual(users);
+      expect(mockUsersRepository.find).toHaveBeenCalledWith({
+        where: {
+          id: expect.any(Object),
+          tenantId: 'test-tenant',
+        },
+      });
+    });
+  });
+
+  describe('getWaitingList', () => {
+    it('should return empty result when no waiting clients', async () => {
+      mockQueueService.getWaitingClients.mockResolvedValue([]);
+      const result = await service.getWaitingList();
+      expect(result).toEqual({ total_waiting: 0, clients: [] });
+    });
+
+    it('should return formatted waiting list when clients exist', async () => {
+      const waitingClients = [{ clientId: 1 }];
+      const usersWithChats = [{ ...mockUser, chat: [mockChat] }];
+      mockQueueService.getWaitingClients.mockResolvedValue(waitingClients);
+      mockUsersRepository.getWaitingList.mockResolvedValue(usersWithChats);
+      const result = await service.getWaitingList();
+      expect(result.totalWaiting).toBe(1);
+      expect((result.clients[0].chat as { chatId: number }).chatId).toBe(
+        mockChat.id,
+      );
+    });
+  });
+
+  describe('getMinimalUserInfo', () => {
+    it('should return null when user is null', async () => {
+      const result = await service.getMinimalUserInfo(null);
+      expect(result).toBeNull();
+    });
+
+    it('should return user info with ADMIN role', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.ADMIN },
+        { id: 2, name: UserRole.CLIENT },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.role).toBe(UserRole.ADMIN);
+    });
+
+    it('should prefer SUPER_DUPER_ADMIN over ADMIN', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.ADMIN },
+        { id: 2, name: UserRole.SUPER_DUPER_ADMIN },
+        { id: 3, name: UserRole.LEARNER },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.role).toBe(UserRole.SUPER_DUPER_ADMIN);
+    });
+
+    it('should prefer SUPER_ADMIN over ADMIN', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.ADMIN },
+        { id: 2, name: UserRole.SUPER_ADMIN },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.role).toBe(UserRole.SUPER_ADMIN);
+    });
+
+    it('should return user info with COUNSELOR role when no ADMIN', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.COUNSELOR },
+        { id: 2, name: UserRole.CLIENT },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.role).toBe(UserRole.COUNSELOR);
+    });
+
+    it('should return first role when no ADMIN or COUNSELOR', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.role).toBe(UserRole.CLIENT);
+    });
+
+    // Clients gate the admin console on `roles`, because the collapsed `role`
+    // reports LEARNER for a user holding [MULTI_TENANT_ADMIN, LEARNER].
+    it('should return every role held alongside the collapsed one', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.MULTI_TENANT_ADMIN },
+        { id: 2, name: UserRole.LEARNER },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.roles).toEqual([
+        UserRole.MULTI_TENANT_ADMIN,
+        UserRole.LEARNER,
+      ]);
+    });
+
+    // mockUser carries no `metadata` at all, which is the "never self-declared,
+    // never backfilled" case every pre-existing account starts from.
+    it('should resolve workerType to LAY when metadata has none', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      const result = await service.getMinimalUserInfo(mockUser);
+      expect(result && result.workerType).toBe(WorkerType.LAY);
+    });
+
+    it('should resolve an admin-assigned workerType from metadata', async () => {
+      mockGroupService.getUserRolesByUserId.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      const userWithWorkerType = {
+        ...mockUser,
+        metadata: { workerType: WorkerType.EXPERIENCED_PROFESSIONAL },
+      };
+      const result = await service.getMinimalUserInfo(userWithWorkerType);
+      expect(result && result.workerType).toBe(
+        WorkerType.EXPERIENCED_PROFESSIONAL,
+      );
+    });
+  });
+
+  describe('getCounselorNames', () => {
+    it('should return counselor names with pagination', async () => {
+      mockUsersRepository.getCounselorNames.mockResolvedValue({
+        counselors: [
+          { id: '1', name: 'Counselor 1' },
+          { id: '2', name: 'Counselor 2' },
+        ],
+        count: 2,
+      });
+
+      const result = await service.getCounselorNames(10, 0);
+
+      expect(result.data).toHaveLength(2);
+      expect(result.count).toBe(2);
+      expect(mockUsersRepository.getCounselorNames).toHaveBeenCalledWith(
+        10,
+        0,
+        undefined,
+      );
+    });
+
+    it('should call offset when offset is greater than 0', async () => {
+      mockUsersRepository.getCounselorNames.mockResolvedValue({
+        counselors: [{ id: '1', name: 'Counselor 1' }],
+        count: 1,
+      });
+
+      await service.getCounselorNames(10, 10);
+
+      expect(mockUsersRepository.getCounselorNames).toHaveBeenCalledWith(
+        10,
+        10,
+        undefined,
+      );
+    });
+
+    it('should filter counselors by search term', async () => {
+      mockUsersRepository.getCounselorNames.mockResolvedValue({
+        counselors: [{ id: '1', name: 'John Counselor' }],
+        count: 1,
+      });
+
+      await service.getCounselorNames(undefined, undefined, 'John');
+
+      expect(mockUsersRepository.getCounselorNames).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+        'John',
+      );
+    });
+
+    it('should trim search term before filtering', async () => {
+      mockUsersRepository.getCounselorNames.mockResolvedValue({
+        counselors: [],
+        count: 0,
+      });
+
+      await service.getCounselorNames(undefined, undefined, '  John  ');
+
+      expect(mockUsersRepository.getCounselorNames).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+        '  John  ',
+      );
+    });
+  });
+
+  describe('getUserByExternalId', () => {
+    it('should return user by external id', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      const result = await service.getUserByExternalId('ext-123');
+      expect(result).toEqual(mockUser);
+      expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+        where: { externalId: 'ext-123', tenantId: 'test-tenant' },
+      });
+    });
+  });
+
+  describe('getAllUsers', () => {
+    it('should transform users with roles and credits correctly', async () => {
+      const mockResult = {
+        users: [
+          {
+            user_id: 1,
+            user_name: 'Test User',
+            user_email: 'test@example.com',
+            user_username: 'testuser',
+            user_externalId: 'ext-123',
+            user_status: UserStatus.ACTIVE,
+            user_role: UserRole.CLIENT,
+            user_metadata: {},
+            tenant_name: 'Test Tenant',
+            user_tenant_id: 'test-tenant',
+            user_createdAt: new Date(),
+            user_updatedAt: new Date(),
+            simulation_credit_limit: 100,
+            simulation_consumed_credits: 25,
+          },
+        ],
+        count: 1,
+      };
+      mockUsersRepository.getAllUsers.mockResolvedValue(mockResult);
+      mockUsersGroupService.getUserGroupsByUserIds.mockResolvedValue([
+        { userId: 1, roles: ['CLIENT', 'ADMIN'] },
+      ]);
+
+      const result = await service.getAllUsers({});
+
+      expect(result.data[0].name).toBe('Test User');
+      expect(result.data[0].roles).toEqual(['CLIENT', 'ADMIN']);
+      expect(result.data[0].creditLimit).toBe(100);
+      expect(result.data[0].consumedCredits).toBe(25);
+      expect(result.count).toBe(1);
+      expect(mockUsersGroupService.getUserGroupsByUserIds).toHaveBeenCalledWith(
+        [1],
+      );
+    });
+
+    it('should resolve workerType per user, defaulting to LAY when unset', async () => {
+      mockUsersRepository.getAllUsers.mockResolvedValue({
+        users: [
+          {
+            user_id: 1,
+            user_name: 'No Worker Type',
+            user_metadata: {},
+            user_tenant_id: 'test-tenant',
+          },
+          {
+            user_id: 2,
+            user_name: 'Has Worker Type',
+            user_metadata: { workerType: WorkerType.EARLY_PROFESSIONAL },
+            user_tenant_id: 'test-tenant',
+          },
+        ],
+        count: 2,
+      });
+      mockUsersGroupService.getUserGroupsByUserIds.mockResolvedValue([]);
+
+      const result = await service.getAllUsers({});
+
+      expect(result.data[0].workerType).toBe(WorkerType.LAY);
+      expect(result.data[1].workerType).toBe(WorkerType.EARLY_PROFESSIONAL);
+    });
+
+    it('should return empty array when no users found', async () => {
+      mockUsersRepository.getAllUsers.mockResolvedValue({
+        users: [],
+        count: 0,
+      });
+      const result = await service.getAllUsers({});
+      expect(result.data).toEqual([]);
+      expect(result.count).toBe(0);
+      expect(
+        mockUsersGroupService.getUserGroupsByUserIds,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should filter by mapped tenants for MULTI_TENANT_ADMIN', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+      mockAdminTenantService.getTenantsForAdmin.mockResolvedValue({
+        data: [{ id: 'tenant-1' }, { id: 'tenant-2' }],
+      });
+      mockUsersRepository.getAllUsers.mockResolvedValue({
+        users: [],
+        count: 0,
+      });
+
+      await service.getAllUsers({ tenantIds: 'tenant-1,tenant-3' });
+
+      expect(mockAdminTenantService.getTenantsForAdmin).toHaveBeenCalledWith(
+        123,
+      );
+      expect(mockUsersRepository.getAllUsers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantIds: 'tenant-1',
+        }),
+        true,
+      );
+    });
+
+    it('should restrict to nothing if MULTI_TENANT_ADMIN has no mapped tenants', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+      mockAdminTenantService.getTenantsForAdmin.mockResolvedValue({
+        data: [],
+      });
+      mockUsersRepository.getAllUsers.mockResolvedValue({
+        users: [],
+        count: 0,
+      });
+
+      await service.getAllUsers({});
+
+      expect(mockUsersRepository.getAllUsers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantIds: '00000000-0000-0000-0000-000000000000',
+        }),
+        true,
+      );
+    });
+
+    describe('includePlatformAdmins', () => {
+      beforeEach(() => {
+        mockUsersRepository.getAllUsers.mockResolvedValue({
+          users: [],
+          count: 0,
+        });
+      });
+
+      it('stops excluding platform admins for a super duper admin', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.VIEW_SUPER_DUPER_ADMINS,
+        ]);
+
+        await service.getAllUsers({ includePlatformAdmins: true });
+
+        expect(mockUsersRepository.getAllUsers).toHaveBeenCalledWith(
+          expect.objectContaining({ includePlatformAdmins: true }),
+          false,
+        );
+      });
+
+      it('rejects the flag for a caller who cannot manage the tier', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.VIEW_USERS,
+        ]);
+
+        await expect(
+          service.getAllUsers({ includePlatformAdmins: true }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockUsersRepository.getAllUsers).not.toHaveBeenCalled();
+      });
+
+      it('keeps excluding them when the flag is absent', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+
+        await service.getAllUsers({});
+
+        expect(
+          mockPermissionsService.getUserPermissions,
+        ).not.toHaveBeenCalled();
+        expect(mockUsersRepository.getAllUsers).toHaveBeenCalledWith(
+          expect.anything(),
+          true,
+        );
+      });
+    });
+  });
+
+  describe('updateUser', () => {
+    it('should update user successfully', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+      const result = await service.updateUser(1, { name: 'Updated' } as any);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should set updatedBy when userId is available', async () => {
+      const userId = '789';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.updateUser(1, { name: 'Updated' } as any);
+
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'Updated',
+          updatedBy: 789,
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when user not found', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.updateUser(1, { name: 'Updated' } as any),
+      ).rejects.toThrow('User with ID 1 not found');
+    });
+
+    it('should throw BadRequestException when email already exists', async () => {
+      const existingUser = { ...mockUser, id: 2 };
+      mockUsersRepository.findOne
+        .mockResolvedValueOnce(mockUser)
+        .mockResolvedValueOnce(existingUser);
+      await expect(
+        service.updateUser(1, { email: 'existing@example.com' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when externalId already exists', async () => {
+      const existingUserWithExternalId = {
+        ...mockUser,
+        id: 2,
+        externalId: 'existing-ext',
+      };
+
+      mockUsersRepository.findOne
+        .mockResolvedValueOnce(mockUser)
+        .mockResolvedValueOnce(existingUserWithExternalId);
+
+      await expect(
+        service.updateUser(1, { externalId: 'existing-ext' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow updating email to same value', async () => {
+      mockUsersRepository.findOne.mockReset();
+      mockUsersRepository.findOne.mockResolvedValueOnce(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.updateUser(1, {
+        email: mockUser.email,
+      } as any);
+
+      expect(result).toEqual({ success: true });
+      expect(mockUsersRepository.findOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('should allow updating externalId to same value', async () => {
+      mockUsersRepository.findOne.mockReset();
+      mockUsersRepository.findOne.mockResolvedValueOnce(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.updateUser(1, {
+        externalId: mockUser.externalId,
+      } as any);
+
+      expect(result).toEqual({ success: true });
+      expect(mockUsersRepository.findOne).toHaveBeenCalledTimes(2);
+      expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
+    });
+
+    it('should throw BadRequestException when MULTI_TENANT_ADMIN attempts to update user', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+      await expect(
+        service.updateUser(1, { name: 'Updated' } as any),
+      ).rejects.toThrow('User is not authorized to update user');
+    });
+  });
+
+  describe('updateUserStatus', () => {
+    it('should update user status successfully', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+      const result = await service.updateUserStatus(1, UserStatus.SUSPENDED);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should set updatedBy when userId is available', async () => {
+      const userId = '101';
+      const suspendedUser = { ...mockUser, status: UserStatus.SUSPENDED };
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(suspendedUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.updateUserStatus(1, UserStatus.ACTIVE);
+
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          status: UserStatus.ACTIVE,
+          updatedBy: 101,
+        }),
+      );
+    });
+
+    it('should set suspendedBy and suspendedAt when status is SUSPENDED and userId is available', async () => {
+      const userId = '202';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.updateUserStatus(1, UserStatus.SUSPENDED);
+
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          status: UserStatus.SUSPENDED,
+          updatedBy: 202,
+          suspendedBy: 202,
+          suspendedAt: expect.any(Date),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when user not found', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.updateUserStatus(1, UserStatus.SUSPENDED),
+      ).rejects.toThrow('User with ID 1 not found');
+    });
+
+    it('should throw BadRequestException when status is same', async () => {
+      mockUsersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        status: UserStatus.ACTIVE,
+      });
+
+      await expect(
+        service.updateUserStatus(1, UserStatus.ACTIVE),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // The target-user lookup behind updateUser / updateUserStatus is scoped by
+  // the caller's reach, not blindly by id. `edit:user` / `edit:user:status`
+  // are platform-tier permissions, so cross-tenant reach is correct for an
+  // unrestricted platform admin — but a tenant-restricted one (any
+  // `admin_tenants` row) must stay inside their granted tenants, and a caller
+  // without SYSTEM_ACCESS must stay inside their own.
+  describe('admin user-management tenant scope', () => {
+    /** The `where` the target-user lookup actually ran with. */
+    const firstLookupWhere = () =>
+      mockUsersRepository.findOne.mock.calls[0][0].where;
+
+    describe('updateUserStatus', () => {
+      it('should pin a tenant-restricted platform admin to their granted tenants', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+        mockAdminTenantService.getTenantsForAdmin.mockResolvedValue({
+          data: [{ id: 'tenant-a' }, { id: 'tenant-b' }],
+          count: 2,
+        });
+        mockUsersRepository.findOne.mockResolvedValue(mockUser);
+        mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+        await service.updateUserStatus(1, UserStatus.SUSPENDED);
+
+        expect(firstLookupWhere()).toEqual({
+          id: 1,
+          tenantId: In(['tenant-a', 'tenant-b']),
+        });
+      });
+
+      it('should not suspend a user in a tenant the restricted admin was never granted', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+        mockAdminTenantService.getTenantsForAdmin.mockResolvedValue({
+          data: [{ id: 'tenant-a' }],
+          count: 1,
+        });
+        // The id exists, but in tenant-b — the scoped lookup misses it.
+        mockUsersRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateUserStatus(1, UserStatus.SUSPENDED),
+        ).rejects.toThrow('User with ID 1 not found');
+        expect(mockUsersRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('should reach no user at all when a restricted admin has no live granted tenants', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+        mockAdminTenantService.getTenantsForAdmin.mockResolvedValue({
+          data: [],
+          count: 0,
+        });
+
+        await expect(
+          service.updateUserStatus(1, UserStatus.SUSPENDED),
+        ).rejects.toThrow('User with ID 1 not found');
+        // Never even asks the DB — an empty scope cannot match anything.
+        expect(mockUsersRepository.findOne).not.toHaveBeenCalled();
+        expect(mockUsersRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('should leave an unrestricted SYSTEM_ACCESS caller reaching every tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.SYSTEM_ACCESS,
+        ]);
+        mockUsersRepository.findOne.mockResolvedValue({
+          ...mockUser,
+          tenantId: 'some-other-tenant',
+        });
+        mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+        const result = await service.updateUserStatus(1, UserStatus.SUSPENDED);
+
+        expect(result).toEqual({ success: true });
+        expect(firstLookupWhere()).toEqual({ id: 1 });
+      });
+
+      it('should clamp a caller without SYSTEM_ACCESS to their own tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER_STATUS,
+        ]);
+        mockUsersRepository.findOne.mockResolvedValue(mockUser);
+        mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+        await service.updateUserStatus(1, UserStatus.SUSPENDED);
+
+        expect(firstLookupWhere()).toEqual({
+          id: 1,
+          tenantId: In(['test-tenant']),
+        });
+      });
+
+      it('should reach no user when there is no caller and no tenant context', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue(undefined);
+        (ExecutionManager.getTenantId as jest.Mock).mockReturnValue(undefined);
+
+        await expect(
+          service.updateUserStatus(1, UserStatus.SUSPENDED),
+        ).rejects.toThrow('User with ID 1 not found');
+        expect(mockUsersRepository.findOne).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('updateUser', () => {
+      it('should leave an unrestricted SYSTEM_ACCESS caller reaching every tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.SYSTEM_ACCESS,
+        ]);
+        mockUsersRepository.findOne.mockResolvedValue({
+          ...mockUser,
+          tenantId: 'some-other-tenant',
+        });
+        mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+        const result = await service.updateUser(1, { name: 'Updated' } as any);
+
+        expect(result).toEqual({ success: true });
+        expect(firstLookupWhere()).toEqual({ id: 1 });
+      });
+
+      it('should clamp a caller without SYSTEM_ACCESS to their own tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+        mockUsersRepository.findOne.mockResolvedValue(mockUser);
+        mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+        await service.updateUser(1, { name: 'Updated' } as any);
+
+        expect(firstLookupWhere()).toEqual({
+          id: 1,
+          tenantId: In(['test-tenant']),
+        });
+      });
+
+      it('should not update a user outside the caller tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+        // The id exists, but in another tenant — the scoped lookup misses it.
+        mockUsersRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateUser(1, { name: 'Updated' } as any),
+        ).rejects.toThrow('User with ID 1 not found');
+        expect(mockUsersRepository.update).not.toHaveBeenCalled();
+      });
+    });
+    // The create paths take their tenant from the request body, so the check
+    // is on the named tenant rather than on a lookup. A tenant-restricted
+    // platform admin is turned away wholesale before this (see the addUser /
+    // bulkAddUsers rejection tests) — what is asserted here is that everyone
+    // else can only name a tenant they actually have reach over.
+    describe('provisioning scope', () => {
+      const newUser = {
+        email: 'new@example.com',
+        name: 'New User',
+        roles: [UserRole.CLIENT],
+        tenantId: 'test-tenant',
+      };
+
+      beforeEach(() => {
+        // No account on this email/phone yet.
+        mockUsersRepository.findOne.mockResolvedValue(null);
+        mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+        mockUsersRepository.create.mockImplementation((data: any) => data);
+        mockUsersRepository.save.mockImplementation((user: any) =>
+          Promise.resolve({ id: 2, ...user }),
+        );
+        mockGroupRepository.find.mockResolvedValue([]);
+      });
+
+      it('should let an unrestricted SYSTEM_ACCESS caller provision any tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.SYSTEM_ACCESS,
+        ]);
+        mockTenantService.findById.mockResolvedValue({ id: 'other-tenant' });
+
+        const result = await service.addUser({
+          ...newUser,
+          tenantId: 'other-tenant',
+        } as any);
+
+        expect(result.tenantId).toBe('other-tenant');
+      });
+
+      it('should refuse a caller without SYSTEM_ACCESS naming another tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+
+        await expect(
+          service.addUser({ ...newUser, tenantId: 'other-tenant' } as any),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockUsersRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('should still let a caller without SYSTEM_ACCESS provision their own tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+
+        const result = await service.addUser(newUser as any);
+
+        expect(result.tenantId).toBe('test-tenant');
+      });
+
+      it('should refuse a platform role before ever reaching the tenant clamp', async () => {
+        // rejectPlatformManagedRoles is the actual boundary here — it runs
+        // before assertTenantProvisionable, so a platform role in the body
+        // is refused on its own terms (BadRequestException naming the right
+        // endpoint), not reinterpreted as a tenant-scope violation.
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+
+        await expect(
+          service.addUser({
+            ...newUser,
+            tenantId: 'other-tenant',
+            roles: [UserRole.SUPER_ADMIN],
+          } as any),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockUsersRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('should still clamp an ordinary role to the tenant once the platform-role guard passes', async () => {
+        // With no platform role in the body, the tenant clamp is the next —
+        // and only remaining — line of defence.
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+
+        await expect(
+          service.addUser({
+            ...newUser,
+            tenantId: 'other-tenant',
+            roles: [UserRole.CLIENT],
+          } as any),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockUsersRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('should refuse a bulk create into another tenant', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.EDIT_USER,
+        ]);
+
+        await expect(
+          service.bulkAddUsers({
+            emails: ['a@example.com'],
+            roles: [UserRole.CLIENT],
+            tenantId: 'other-tenant',
+          } as any),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      });
+
+      it('should refuse a bulk create by a tenant-restricted platform admin', async () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+        await expect(
+          service.bulkAddUsers({
+            emails: ['a@example.com'],
+            roles: [UserRole.CLIENT],
+            tenantId: 'test-tenant',
+          } as any),
+        ).rejects.toThrow('User is not authorized to add user');
+        expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      });
+    });
+
+    // Platform-tier roles (PLATFORM_ADMIN and the three retired tiers it
+    // replaces) have their own dedicated path — /v1/platform-admins, with its
+    // own admin_user_management toggle and tenant-allowlist checks — that a
+    // bulk user importer can't satisfy. rejectPlatformManagedRoles is what
+    // actually keeps them out of these two generic create paths; the added
+    // EDIT_USER_ROLE permission requirement is defence in depth for a future
+    // role grant, not the boundary itself (every current EDIT_USER_ROLE
+    // holder already has unrestricted platform reach).
+    describe('platform-managed roles', () => {
+      const provisionableCaller = () => {
+        (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+        mockPermissionsService.getUserPermissions.mockResolvedValue([
+          PERMISSIONS.SYSTEM_ACCESS,
+        ]);
+      };
+
+      it.each([
+        UserRole.PLATFORM_ADMIN,
+        UserRole.SUPER_ADMIN,
+        UserRole.SUPER_DUPER_ADMIN,
+        UserRole.MULTI_TENANT_ADMIN,
+      ])('should refuse to create a user with the %s role', async (role) => {
+        provisionableCaller();
+        mockUsersRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.addUser({
+            email: 'new@example.com',
+            name: 'New User',
+            tenantId: 'test-tenant',
+            roles: [role],
+          } as any),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockUsersRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('should refuse the whole request when only one role in a mixed array is platform-managed', async () => {
+        provisionableCaller();
+        mockUsersRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.addUser({
+            email: 'new@example.com',
+            name: 'New User',
+            tenantId: 'test-tenant',
+            roles: [UserRole.CLIENT, UserRole.SUPER_ADMIN],
+          } as any),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockUsersRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('should name the platform-admins endpoint in the rejection message', async () => {
+        provisionableCaller();
+        mockUsersRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.addUser({
+            email: 'new@example.com',
+            name: 'New User',
+            tenantId: 'test-tenant',
+            roles: [UserRole.PLATFORM_ADMIN],
+          } as any),
+        ).rejects.toThrow('/v1/platform-admins');
+      });
+
+      it('should refuse a bulk create carrying a platform role', async () => {
+        provisionableCaller();
+        mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+
+        await expect(
+          service.bulkAddUsers({
+            emails: ['a@example.com'],
+            roles: [UserRole.SUPER_ADMIN],
+            tenantId: 'test-tenant',
+          } as any),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      });
+
+      it('should still allow ordinary roles through for a provisionable caller', async () => {
+        provisionableCaller();
+        mockUsersRepository.findOne.mockResolvedValue(null);
+        mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+        mockUsersRepository.create.mockImplementation((data: any) => data);
+        mockUsersRepository.save.mockImplementation((user: any) =>
+          Promise.resolve({ id: 2, ...user }),
+        );
+        mockGroupRepository.find.mockResolvedValue([
+          { id: 1, name: UserRole.ADMIN },
+        ]);
+
+        const result = await service.addUser({
+          email: 'new@example.com',
+          name: 'New User',
+          tenantId: 'test-tenant',
+          roles: [UserRole.ADMIN],
+        } as any);
+
+        expect(result.email).toBe('new@example.com');
+        expect(mockUsersRepository.save).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('setWorkerType', () => {
+    it('should persist the worker type while preserving other metadata keys', async () => {
+      const userWithMetadata = {
+        ...mockUser,
+        metadata: { onboardingComplete: true },
+      };
+      mockUsersRepository.findOne.mockResolvedValue(userWithMetadata);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.setWorkerType(
+        1,
+        WorkerType.EARLY_PROFESSIONAL,
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 1, tenantId: 'test-tenant' },
+      });
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          metadata: {
+            onboardingComplete: true,
+            workerType: WorkerType.EARLY_PROFESSIONAL,
+          },
+        }),
+      );
+    });
+
+    it('should set updatedBy when userId is available', async () => {
+      const userId = '303';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.setWorkerType(1, WorkerType.LAY);
+
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ updatedBy: 303 }),
+      );
+    });
+
+    it('should throw NotFoundException when the user is not found in the caller tenant', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      await expect(service.setWorkerType(1, WorkerType.LAY)).rejects.toThrow(
+        'User with ID 1 not found',
+      );
+      expect(mockUsersRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when MULTI_TENANT_ADMIN attempts to set worker type', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+      await expect(service.setWorkerType(1, WorkerType.LAY)).rejects.toThrow(
+        'User is not authorized to update user',
+      );
+      expect(mockUsersRepository.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('bulkSetWorkerType', () => {
+    it('should apply the worker type to every listed id, preserving other metadata', async () => {
+      const userA = { ...mockUser, id: 1, metadata: { note: 'a' } };
+      const userB = { ...mockUser, id: 2, metadata: null };
+      mockUsersRepository.find.mockResolvedValue([userA, userB]);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.bulkSetWorkerType(
+        [1, 2],
+        WorkerType.EXPERIENCED_PROFESSIONAL,
+      );
+
+      expect(result).toEqual({ updated: 2 });
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          metadata: {
+            note: 'a',
+            workerType: WorkerType.EXPERIENCED_PROFESSIONAL,
+          },
+        }),
+      );
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({
+          metadata: { workerType: WorkerType.EXPERIENCED_PROFESSIONAL },
+        }),
+      );
+    });
+
+    it('should reject the whole batch when an id does not belong to the caller tenant', async () => {
+      // Only one of the two requested ids resolved under the tenant-scoped
+      // lookup — the other belongs to a different tenant or does not exist.
+      mockUsersRepository.find.mockResolvedValue([{ ...mockUser, id: 1 }]);
+
+      await expect(
+        service.bulkSetWorkerType([1, 2], WorkerType.LAY),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockUsersRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('should dedupe repeated ids before checking tenant membership', async () => {
+      mockUsersRepository.find.mockResolvedValue([{ ...mockUser, id: 1 }]);
+
+      const result = await service.bulkSetWorkerType([1, 1], WorkerType.LAY);
+
+      expect(result).toEqual({ updated: 1 });
+      expect(mockUsersRepository.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw BadRequestException when MULTI_TENANT_ADMIN attempts a bulk set', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+      await expect(
+        service.bulkSetWorkerType([1, 2], WorkerType.LAY),
+      ).rejects.toThrow('User is not authorized to update user');
+      expect(mockUsersRepository.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addUser', () => {
+    it('should create user and assign roles successfully', async () => {
+      const userData = {
+        email: 'new@example.com',
+        phone: '+9876543210',
+        name: 'New User',
+        password: 'password123',
+        roles: [UserRole.CLIENT],
+        tenantId: 'test-tenant',
+        username: 'newuser',
+      };
+      const savedUser = { ...mockUser, id: 2, ...userData };
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      mockUsersRepository.create.mockReturnValue(savedUser);
+      mockUsersRepository.save.mockResolvedValue(savedUser);
+      mockGroupRepository.find.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      mockUserGroupRepository.create.mockReturnValue({ userId: 2, groupId: 1 });
+      mockUserGroupRepository.save.mockResolvedValue([
+        { userId: 2, groupId: 1 },
+      ]);
+
+      const result = await service.addUser(userData as any);
+
+      expect(result.id).toBe(2);
+      expect(result.email).toBe(userData.email);
+      expect(mockUserGroupRepository.save).toHaveBeenCalled();
+      expect(
+        mockSimulationCreditsService.updateSimulationCredits,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should set createdBy and updatedBy when userId is available', async () => {
+      const userId = '303';
+      const userData = {
+        email: 'new@example.com',
+        phone: '+9876543210',
+        name: 'New User',
+        password: 'password123',
+        roles: [UserRole.CLIENT],
+        tenantId: 'test-tenant',
+        username: 'newuser',
+      };
+      const savedUser = { ...mockUser, id: 2, ...userData };
+
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      mockUsersRepository.create.mockReturnValue(savedUser);
+      mockUsersRepository.save.mockResolvedValue(savedUser);
+      mockGroupRepository.find.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      mockUserGroupRepository.create.mockReturnValue({ userId: 2, groupId: 1 });
+      mockUserGroupRepository.save.mockResolvedValue([
+        { userId: 2, groupId: 1 },
+      ]);
+
+      await service.addUser(userData as any);
+
+      expect(mockUsersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 303,
+          updatedBy: 303,
+        }),
+      );
+    });
+
+    it('should create user with simulation credits when provided', async () => {
+      const userData = {
+        email: 'new@example.com',
+        phone: '+9876543210',
+        name: 'New User',
+        password: 'password123',
+        roles: [UserRole.CLIENT],
+        tenantId: 'test-tenant',
+        username: 'newuser',
+        simulationCreditLimit: 100,
+      };
+      const savedUser = { ...mockUser, id: 2, ...userData };
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      mockUsersRepository.create.mockReturnValue(savedUser);
+      mockUsersRepository.save.mockResolvedValue(savedUser);
+      mockGroupRepository.find.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      mockUserGroupRepository.create.mockReturnValue({ userId: 2, groupId: 1 });
+      mockUserGroupRepository.save.mockResolvedValue([
+        { userId: 2, groupId: 1 },
+      ]);
+      mockSimulationCreditsService.updateSimulationCredits.mockResolvedValue(
+        {},
+      );
+
+      const result = await service.addUser(userData as any);
+
+      expect(result.id).toBe(2);
+      expect(
+        mockSimulationCreditsService.updateSimulationCredits,
+      ).toHaveBeenCalledWith({
+        userId: 2,
+        creditLimit: 100,
+      });
+    });
+
+    it('should throw BadRequestException when email already exists', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      await expect(
+        service.addUser({
+          email: 'test@example.com',
+          roles: [UserRole.CLIENT],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when phone already exists', async () => {
+      mockUsersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        email: 'different@example.com',
+      });
+      await expect(
+        service.addUser({
+          phone: '+1234567890',
+          email: 'new@example.com',
+          roles: [UserRole.CLIENT],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when tenant is not provided', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.addUser({
+          email: 'test@example.com',
+          phone: '+1234567890',
+          roles: [UserRole.CLIENT],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when tenant is invalid', async () => {
+      // An unrestricted caller, so the request gets past the provisioning
+      // scope check and reaches the tenant-existence check under test.
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+      mockPermissionsService.getUserPermissions.mockResolvedValue([
+        PERMISSIONS.SYSTEM_ACCESS,
+      ]);
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      mockTenantService.findById.mockResolvedValue(null);
+      await expect(
+        service.addUser({
+          tenantId: 'invalid-tenant',
+          email: 'test@example.com',
+          phone: '+1234567890',
+          roles: [UserRole.CLIENT],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when externalId already exists in tenant', async () => {
+      mockUsersRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockUser);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      await expect(
+        service.addUser({
+          email: 'new@example.com',
+          phone: '+1234567890',
+          tenantId: 'test-tenant',
+          externalId: 'existing-ext',
+          roles: [UserRole.CLIENT],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should use email as username when username not provided', async () => {
+      const userData = {
+        email: 'new@example.com',
+        phone: '+9876543210',
+        name: 'New User',
+        roles: [UserRole.CLIENT],
+        tenantId: 'test-tenant',
+      };
+      const savedUser = { ...mockUser, id: 2, username: userData.email };
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      mockUsersRepository.create.mockReturnValue(savedUser);
+      mockUsersRepository.save.mockResolvedValue(savedUser);
+      mockGroupRepository.find.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+      mockUserGroupRepository.create.mockReturnValue({ userId: 2, groupId: 1 });
+      mockUserGroupRepository.save.mockResolvedValue([
+        { userId: 2, groupId: 1 },
+      ]);
+
+      await service.addUser(userData as any);
+
+      expect(mockUsersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          username: userData.email,
+        }),
+      );
+    });
+
+    it('should throw BadRequestException when MULTI_TENANT_ADMIN attempts to add user', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+      await expect(
+        service.addUser({ email: 'new@example.com', roles: [] } as any),
+      ).rejects.toThrow('User is not authorized to add user');
+    });
+  });
+
+  describe('isValidUser', () => {
+    it('should return true when user exists', async () => {
+      mockUsersRepository.exists.mockResolvedValue(true);
+      const result = await service.isValidUser(1);
+      expect(result).toBe(true);
+      expect(mockUsersRepository.exists).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
+    });
+
+    it('should return false when user does not exist', async () => {
+      mockUsersRepository.exists.mockResolvedValue(false);
+      const result = await service.isValidUser(999);
+      expect(result).toBe(false);
+      expect(mockUsersRepository.exists).toHaveBeenCalledWith({
+        where: { id: 999 },
+      });
+    });
+  });
+
+  describe('getTermsAndAgreementStatus', () => {
+    it('should return success true when user has approved terms', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      const userWithApproval = { ...mockUser, termsAndAgreementApproved: true };
+      mockUsersRepository.findOne.mockResolvedValue(userWithApproval);
+
+      const result = await service.getTermsAndAgreementStatus();
+
+      expect(result).toEqual({ success: true });
+      expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 123, tenantId: 'test-tenant' },
+      });
+    });
+
+    it('should return success false when user has not approved terms', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.getTermsAndAgreementStatus();
+
+      expect(result).toEqual({ success: false });
+    });
+
+    it('should throw BadRequestException when userId is undefined', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(undefined);
+
+      await expect(service.getTermsAndAgreementStatus()).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.getTermsAndAgreementStatus()).rejects.toThrow(
+        'unauthorized access',
+      );
+    });
+
+    it('should return success false when user not found', async () => {
+      const userId = '123';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.getTermsAndAgreementStatus();
+
+      expect(result).toEqual({ success: false });
+    });
+  });
+
+  describe('approveTermsAndAgreement', () => {
+    it('should approve terms and agreement successfully', async () => {
+      const userId = '456';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+      mockCache.set.mockResolvedValue(undefined);
+
+      const result = await service.approveTermsAndAgreement();
+
+      expect(result).toEqual({ success: true });
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(mockUser.id, {
+        termsAndAgreementApproved: true,
+        termsAndAgreementApprovedAt: expect.any(Date),
+      });
+      expect(mockCache.set).toHaveBeenCalledWith(
+        'user:terms:456',
+        'true',
+        1800,
+      );
+    });
+
+    it('should throw BadRequestException when user not found', async () => {
+      const userId = '456';
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(userId);
+      mockUsersRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.approveTermsAndAgreement()).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.approveTermsAndAgreement()).rejects.toThrow(
+        'User not found',
+      );
+    });
+  });
+
+  describe('UserPreferences', () => {
+    const mockUserPreferences = {
+      id: 1,
+      userId: 1,
+      tenantId: 'tenant123',
+      data: { default_language_id: 1 },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockUpdateUserPreferencesDto: UpdateUserPreferencesDto = {
+      default_language_id: 2,
+    };
+
+    const mockUserPreferencesRepositoryLocal = {
+      upsertUserPreferences: jest.fn(),
+      getUserPreferencesByUserId: jest.fn(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (service as any).userPreferencesRepository =
+        mockUserPreferencesRepositoryLocal;
+    });
+
+    describe('updateUserPreferences', () => {
+      it('should update user preferences successfully', async () => {
+        const userId = 1;
+        mockUserPreferencesRepositoryLocal.upsertUserPreferences.mockResolvedValue(
+          {
+            generatedMaps: [mockUserPreferences],
+          },
+        );
+
+        const result = await service.updateUserPreferences(
+          userId,
+          'tenant123',
+          mockUpdateUserPreferencesDto,
+        );
+
+        expect(
+          mockUserPreferencesRepositoryLocal.upsertUserPreferences,
+        ).toHaveBeenCalledWith(
+          userId,
+          'tenant123',
+          mockUpdateUserPreferencesDto,
+        );
+        expect(result).toEqual({ success: true });
+      });
+
+      it('should throw an error when updating preferences fails', async () => {
+        const userId = 1;
+        const error = new Error('Database error');
+        mockUserPreferencesRepositoryLocal.upsertUserPreferences.mockRejectedValue(
+          error,
+        );
+
+        await expect(
+          service.updateUserPreferences(
+            userId,
+            'tenant123',
+            mockUpdateUserPreferencesDto,
+          ),
+        ).rejects.toThrow(error);
+      });
+    });
+
+    describe('getUserPreferences', () => {
+      it('should get user preferences successfully', async () => {
+        const userId = 1;
+        mockUserPreferencesRepositoryLocal.getUserPreferencesByUserId.mockResolvedValue(
+          mockUserPreferences.data,
+        );
+
+        const result = await service.getUserPreferences(userId);
+
+        expect(
+          mockUserPreferencesRepositoryLocal.getUserPreferencesByUserId,
+        ).toHaveBeenCalledWith(userId);
+        expect(result).toEqual(mockUserPreferences.data);
+      });
+
+      it('should return null when user preferences are not found', async () => {
+        const userId = 999;
+        mockUserPreferencesRepositoryLocal.getUserPreferencesByUserId.mockResolvedValue(
+          null,
+        );
+
+        const result = await service.getUserPreferences(userId);
+
+        expect(
+          mockUserPreferencesRepositoryLocal.getUserPreferencesByUserId,
+        ).toHaveBeenCalledWith(userId);
+        expect(result).toBeNull();
+      });
+
+      it('should throw an error when getting preferences fails', async () => {
+        const userId = 1;
+        const error = new Error('Database error');
+        mockUserPreferencesRepositoryLocal.getUserPreferencesByUserId.mockRejectedValue(
+          error,
+        );
+
+        await expect(service.getUserPreferences(userId)).rejects.toThrow(error);
+      });
+    });
+  });
+
+  describe('getPresignedUrlForProfileImage', () => {
+    it('should return presignedUrl and profileImageUrl', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+      mockS3Service.generatePresignedUrl.mockResolvedValue(
+        'https://presigned.url',
+      );
+
+      const dto = {
+        fileName: 'pic.png',
+        fileSize: 1000,
+        contentType: ProfileImageUploadContentType.PNG,
+      };
+
+      const res = await service.getPresignedUrlForProfileImage(dto as any);
+
+      expect(res.presignedUrl).toBe('https://presigned.url');
+      expect(res.profileImageUrl).toContain(
+        'https://test-assets-bucket.s3.ap-south-1.amazonaws.com/',
+      );
+      expect(mockS3Service.generatePresignedUrl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bucket: 'test-assets-bucket',
+          operation: 'put',
+          expiresIn: 600,
+          contentType: dto.contentType,
+        }),
+      );
+    });
+
+    it('should throw BadRequestException when userId missing', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(undefined);
+
+      const dto = {
+        fileName: 'pic.png',
+        fileSize: 1000,
+        contentType: ProfileImageUploadContentType.PNG,
+      };
+
+      await expect(
+        service.getPresignedUrlForProfileImage(dto as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw for invalid file type', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+
+      const dto = {
+        fileName: 'pic.exe',
+        fileSize: 1000,
+        contentType: 'application/x-msdownload',
+      };
+
+      await expect(
+        service.getPresignedUrlForProfileImage(dto as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when file size > 2MB', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+
+      const dto = {
+        fileName: 'pic.png',
+        fileSize: 2 * 1024 * 1024 + 1,
+        contentType: ProfileImageUploadContentType.PNG,
+      };
+
+      await expect(
+        service.getPresignedUrlForProfileImage(dto as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('uploadProfileImage', () => {
+    it('should update profileImageUrl and return success true', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('1');
+
+      mockUsersRepository.findOne.mockResolvedValue(mockUser);
+      mockUsersRepository.create.mockReturnValue({
+        ...mockUser,
+        profileImageUrl: 'https://cdn/new.png',
+      });
+      mockUsersRepository.save.mockResolvedValue(undefined);
+
+      const res = await service.uploadProfileImage({
+        profileImageUrl: 'https://cdn/new.png',
+      } as any);
+
+      expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
+      expect(mockUsersRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileImageUrl: 'https://cdn/new.png',
+        }),
+      );
+      expect(res).toEqual({ success: true });
+    });
+
+    it('should throw when userId missing', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(undefined);
+
+      await expect(
+        service.uploadProfileImage({ profileImageUrl: 'x' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when user not found', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('1');
+      mockUsersRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.uploadProfileImage({ profileImageUrl: 'x' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('bulkAddUsers', () => {
+    const bulkData = {
+      emails: ['a@example.com', 'b@example.com'],
+      roles: [UserRole.CLIENT],
+      tenantId: 'test-tenant',
+    };
+
+    beforeEach(() => {
+      mockUsersRepository.find.mockResolvedValue([]);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      mockGroupRepository.find.mockResolvedValue([
+        { id: 1, name: UserRole.CLIENT },
+      ]);
+    });
+
+    it('should create all users with blank name and profileCompleted=false', async () => {
+      const result = await service.bulkAddUsers(bulkData as any);
+
+      expect(result.created).toBe(2);
+      expect(result.users).toHaveLength(2);
+      expect(mockTxnUserRepo.create).toHaveBeenCalledTimes(2);
+      expect(mockTxnUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'a@example.com',
+          name: '',
+          profileCompleted: false,
+          username: 'a@example.com',
+          status: UserStatus.ACTIVE,
+        }),
+      );
+      // Group membership assigned per user.
+      expect(mockTxnUserGroupRepo.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('should reject the batch when an email is already registered', async () => {
+      mockUsersRepository.find.mockResolvedValue([{ email: 'a@example.com' }]);
+
+      await expect(service.bulkAddUsers(bulkData as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      // All-or-nothing: no transaction (and therefore no writes) attempted.
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject the batch when emails are duplicated within the request', async () => {
+      await expect(
+        service.bulkAddUsers({
+          ...bulkData,
+          emails: ['dup@example.com', 'DUP@example.com'],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject when caller is a multi-tenant admin', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('5');
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+      await expect(service.bulkAddUsers(bulkData as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject when tenant is invalid', async () => {
+      mockTenantService.findById.mockResolvedValue(null);
+
+      await expect(service.bulkAddUsers(bulkData as any)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should apply simulation credits to each created user when provided', async () => {
+      mockSimulationCreditsService.updateSimulationCredits.mockResolvedValue(
+        {},
+      );
+
+      await service.bulkAddUsers({
+        ...bulkData,
+        simulationCreditLimit: 50,
+      } as any);
+
+      expect(
+        mockSimulationCreditsService.updateSimulationCredits,
+      ).toHaveBeenCalledTimes(2);
+      expect(
+        mockSimulationCreditsService.updateSimulationCredits,
+      ).toHaveBeenCalledWith(expect.objectContaining({ creditLimit: 50 }));
+    });
+  });
+
+  describe('completeProfile', () => {
+    it('should set name and flip profileCompleted', async () => {
+      mockUsersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        profileCompleted: false,
+      });
+      mockUsersRepository.update.mockResolvedValue({ affected: 1 });
+
+      const result = await service.completeProfile(1, { name: 'Jane Doe' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockUsersRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'Jane Doe',
+          profileCompleted: true,
+        }),
+      );
+    });
+
+    it('should throw when user not found', async () => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.completeProfile(1, { name: 'Jane Doe' }),
+      ).rejects.toThrow();
+    });
+
+    it('should reject a phone already used by another user', async () => {
+      mockUsersRepository.findOne
+        .mockResolvedValueOnce({ ...mockUser, profileCompleted: false })
+        .mockResolvedValueOnce({ ...mockUser, id: 99 });
+
+      await expect(
+        service.completeProfile(1, { name: 'Jane', phone: '+1999' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+});

@@ -1,0 +1,178 @@
+/** Language-glossary constants (LANGUAGE_GLOSSARY_DESIGN.md §4-§5). */
+
+/**
+ * Hard cap on the compiled Tier 0 (injectionMode='always') block, in
+ * o200k_base tokens. Publish is blocked when the language's always-set would
+ * exceed this — the cap is enforced at authoring time, never truncated
+ * silently at runtime. Chars are not the unit: Indic scripts inflate 2–4×.
+ */
+export const TIER0_TOKEN_CAP = 2000;
+
+/** Registry prompt that generates a language's draft glossary (seeded by migration). */
+export const GLOSSARY_GENERATION_PROMPT_CODE = 'glossary_generation';
+
+/**
+ * Fixed compile order for Tier 0 sections; codes not listed sort after these,
+ * alphabetically. Order is deterministic so the system-prompt prefix stays
+ * stable across turns (prompt-cache friendly).
+ */
+export const GLOSSARY_SECTION_ORDER = [
+  'core_style',
+  'pronouns_kinship',
+  'code_mixing',
+] as const;
+
+/** Max entries accepted per section in one upsert (sanity bound, not a product limit). */
+export const MAX_GLOSSARY_ENTRIES_PER_SECTION = 200;
+
+/** Registry prompt that consolidates judge error annotations into proposed entries. */
+export const GLOSSARY_CONSOLIDATION_PROMPT_CODE = 'glossary_consolidation';
+
+/** Registry prompt that pairs agent-over-used (bookish) words with their
+ * colloquial equivalents — the lexeme-mining job (lexeme-mining.util). */
+export const GLOSSARY_LEXEME_PAIRING_PROMPT_CODE = 'glossary_lexeme_pairing';
+
+/** Lexeme mining reads judged sessions this far back. Wider than the
+ * consolidation window because the per-language corpora are thin (Tamil
+ * traffic stopped 2026-08-03; Hindi has ~100 judged sessions in 150 days). */
+export const LEXEME_MINING_WINDOW_DAYS = 150;
+
+/** Most-recent judged sessions read per mining run (bounds the DB read). */
+export const LEXEME_MINING_SESSION_CAP = 400;
+
+/** Candidates sent to the pairing prompt per run. */
+export const LEXEME_MINING_TOP_K = 40;
+
+/** The on-demand section mined pairs are queued into when a language has no
+ * on-demand `general_vocabulary` (GlossaryLexemeMiningService.pickTargetSection). */
+export const LEXEME_SECTION_CODE = 'everyday_words';
+
+/** Glossary background-job records (GlossaryJobService) live this long in
+ * Redis, in seconds. */
+export const GLOSSARY_JOB_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * A glossary job still `running` after this long was lost (its task restarted
+ * or was replaced by a deploy mid-run) and is reported as failed. A run takes
+ * about a minute; the per-language lock expires at the same bound, so a lost
+ * run never blocks the next one for longer than this.
+ */
+export const GLOSSARY_JOB_STALE_SECONDS = 15 * 60;
+
+/** Candidates per pairing call; chunks run in parallel so one run stays
+ * inside the API gateway's request timeout. */
+export const LEXEME_PAIRING_CHUNK = 10;
+
+/**
+ * Judge dimensions the consolidation loop mines. Style/lexicon dimensions plus
+ * `fluency`, which is admitted ONLY through the systematicity gate (the same
+ * grammatical category recurring ≥ GLOSSARY_SYSTEMATIC_MIN times) — one-off
+ * grammar slips are model competence; a recurring pattern is a correctable
+ * rule. coherence/understanding stay excluded outright.
+ */
+export const GLOSSARY_CONSOLIDATION_DIMENSIONS = [
+  'register',
+  'dialect_lexicon',
+  'colloquialness',
+  'codeswitch',
+  'persona_social',
+  'fluency',
+] as const;
+
+/** Cluster support floor (construct-class pipeline). Below this, a candidate
+ * never reaches the LLM — no single-anecdote rules (adaptive: singletons pass
+ * while a language has <20 unconsumed annotations, so thin languages don't stall). */
+export const GLOSSARY_MIN_CLUSTER_SUPPORT = 2;
+
+/** Same-category recurrences before a fluency (grammar) error counts as systematic. */
+export const GLOSSARY_SYSTEMATIC_MIN = 5;
+
+/** Learner-corpus occurrences of an avoid-term above which the entry is
+ * CONTRADICTED (the population itself says the word — don't fight real usage). */
+export const GLOSSARY_LEXICAL_CONTRADICTION_MIN = 5;
+
+/** Tier scoring: severity-weighted error mass counts this much per weighted
+ * unit relative to one corpus term occurrence. Severity weights follow the
+ * platform's read-time convention (minor 1 / major 5 / critical 10). */
+export const TIER_ERROR_MASS_WEIGHT = 20;
+export const TIER_SEVERITY_WEIGHTS: Record<string, number> = {
+  minor: 1,
+  major: 5,
+  critical: 10,
+};
+
+/** Density band around the knapsack cut inside which a section keeps its
+ * current tier — prevents cycle-to-cycle tier flapping. */
+export const TIER_HYSTERESIS = 0.15;
+
+/**
+ * Most-recent UNCONSUMED annotations considered per consolidation run (keeps
+ * the prompt bounded). The consumed-set is excluded in SQL before this limit
+ * applies — capping the recent rows and dropping consumed ones afterwards let
+ * consumed rows spend the whole budget, which stalled the loop entirely
+ * (see `unconsumedAnnotationsQuery`).
+ */
+export const GLOSSARY_CONSOLIDATION_ANNOTATION_LIMIT = 200;
+
+/**
+ * How far back the consolidation read reaches.
+ *
+ * A glossary rule goes into the agent's every-turn prompt, so the evidence
+ * behind it has to describe the agent we ship NOW. An unbounded read does not:
+ * measured 2026-09-02, the unconsumed pool stretched back to 2026-04-06 and
+ * spanned two different agent LLMs per language, so 1,044 annotations would
+ * have written today's prompt from a retired model's mistakes.
+ *
+ * 90 days deliberately matches the scheduler's own worklist window
+ * (`queryCandidateLanguages`) — a language qualifies for consolidation on
+ * 90-day-recent annotations, so those are the annotations it should mine.
+ *
+ * Annotations older than this are never mined and stay permanently unconsumed;
+ * that is intended, not a leak. Rows with a NULL `occurredAt` (none exist in
+ * production) cannot satisfy a recency test and are excluded by the same token.
+ */
+export const GLOSSARY_CONSOLIDATION_RECENCY_DAYS = 90;
+
+/** Registry prompt that adjudicates queued proposals (seeded by migration). */
+export const GLOSSARY_ADJUDICATION_PROMPT_CODE = 'glossary_adjudication';
+
+/**
+ * Proposals sent to the adjudicator in one call. Small on purpose: the
+ * adjudicator must weigh each proposal against the existing glossary, and a
+ * long list invites it to skim. Batches beyond this are adjudicated in
+ * successive calls.
+ */
+export const GLOSSARY_ADJUDICATION_BATCH = 25;
+
+/**
+ * Consecutive passes that must agree before an unattended REJECT is applied.
+ *
+ * Rejecting consumes a proposal's annotations, so nothing re-derives the rule:
+ * a reject is permanent while an accept is revertible through the batch
+ * record. The adjudicator is not stable enough for that asymmetry to be safe
+ * on a single reading — measured 2026-09-02, one Tamil proposal was accepted
+ * at 15:00 and rejected at 16:00 on identical input. Two consecutive votes
+ * separate a clear-cut reject, which repeats, from a coin-flip, which does
+ * not; the coin-flip lands in `deferred` instead of being destroyed.
+ */
+export const GLOSSARY_REJECT_VOTES_REQUIRED = 2;
+
+/**
+ * Ceiling on the exponential wait before a DEFERRED proposal is re-adjudicated,
+ * in hours. Matches the weekly consolidation cadence: a proposal nothing can
+ * decide should be reconsidered no more often than new evidence arrives.
+ *
+ * A deferral leaves the entry `PROPOSED`, so without a backoff the hourly
+ * scheduler re-sends it to gemini-2.5-pro every hour, forever, for an outcome
+ * that cannot change until something else does — and the adjudication prompt
+ * deliberately routes uncertainty here ("an omitted proposal is held for a
+ * human, and that is a safe outcome"), so the stuck set only grows. Measured
+ * 2026-09-03: three Tamil proposals deferred on the Tier 0 cap, each re-billed
+ * ~168 times a week with the full glossary in the prompt.
+ *
+ * Backoff doubles per CONSECUTIVE deferral for the same reason and resets when
+ * the reason changes, so a transient provider error retries within the hour
+ * while a cap breach settles to weekly. Nothing is dropped: the proposal stays
+ * queued and visible, it is just not re-asked at a rate that cannot pay off.
+ */
+export const GLOSSARY_DEFER_BACKOFF_MAX_HOURS = 168;

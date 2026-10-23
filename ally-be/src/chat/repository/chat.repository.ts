@@ -1,0 +1,519 @@
+import { Injectable } from '@nestjs/common';
+import { Chat, ChatStatus } from '../entity/chat.entity';
+import {
+  DataSource,
+  EntityManager,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
+import { UpdateChatInput } from '../type/chat.type';
+import { CounselorStatsQueryDto } from 'src/analytics/dto/analytics.dto';
+import { CallDetails } from '../entity/call.details.entity';
+import { User } from 'src/user/entity/user.entity';
+import {
+  CallLogFilters,
+  CallLogSortBy,
+  FieldFilter,
+  SortOrder,
+} from '../dto/call-log.request.dto';
+import { CallLogsParams } from '../type/call.details.type';
+import { CustomFieldDefinition } from '../../custom-fields/entity/custom-field-definition.entity';
+import { applyFieldFilters } from '../util/field-filter-query';
+
+@Injectable()
+export class ChatRepository extends Repository<Chat> {
+  constructor(private dataSource: DataSource) {
+    super(Chat, dataSource.createEntityManager());
+  }
+
+  /**
+   * Loads the CustomFieldDefinitions referenced by the requested field
+   * filters (tenant-scoped) so applyFieldFilters can build a type-correct
+   * predicate for each. Returns an empty map when there are no filters.
+   */
+  private async loadFilterDefinitions(
+    tenantId: string,
+    fieldFilters?: FieldFilter[],
+  ): Promise<Map<string, CustomFieldDefinition>> {
+    const ids = [
+      ...new Set((fieldFilters ?? []).map((f) => f.fieldDefinitionId)),
+    ];
+    if (ids.length === 0) return new Map();
+
+    const defs = await this.dataSource
+      .getRepository(CustomFieldDefinition)
+      .createQueryBuilder('d')
+      .where('d.id IN (:...ids)', { ids })
+      .andWhere('d.tenantId = :tenantId', { tenantId })
+      .andWhere('d.isActive = true')
+      .getMany();
+
+    return new Map(defs.map((d) => [d.id, d]));
+  }
+
+  async getCallLogsQuery(
+    params: CallLogsParams,
+  ): Promise<{ data: Chat[]; count: number }> {
+    const query = this.createQueryBuilder('chat')
+      .leftJoinAndMapOne(
+        'chat.details',
+        CallDetails,
+        'details',
+        'details.chatId = chat.id',
+      )
+      .leftJoinAndMapOne(
+        'chat.client',
+        User,
+        'client',
+        'client.id = chat.clientId',
+      )
+      .leftJoinAndMapMany(
+        'chat.customFieldValues',
+        'chat_custom_field_values',
+        'cfv',
+        'cfv.chatId = chat.id',
+      );
+
+    query.where('chat.counselorId = :counselorId', {
+      counselorId: params.counselorId,
+    });
+
+    // Use take/skip (not limit/offset) so pagination counts unique chats. The
+    // leftJoinAndMapMany on customFieldValues produces N rows per chat; raw
+    // SQL LIMIT would cap at N rows then dedup, returning fewer than the
+    // requested page size and hiding chats from later pages.
+    if (params.limit) {
+      query.take(params.limit);
+    }
+    if (params.offset) {
+      query.skip(params.offset);
+    }
+    if (params.sortBy) {
+      const sortOrder =
+        params.order === 'ASC' || params.order === 'DESC'
+          ? (params.order as SortOrder)
+          : SortOrder.DESC;
+      this.applySorting(query, params.sortBy as CallLogSortBy, sortOrder);
+    }
+
+    query.andWhere('chat.tenantId = :tenantId', { tenantId: params.tenantId });
+    query.andWhere('chat.status = :status', { status: ChatStatus.ENDED });
+    if (params.archive) {
+      if (params.archive === 'true') {
+        query.andWhere('chat.archivedAt IS NOT NULL');
+      } else {
+        query.andWhere('chat.archivedAt IS NULL');
+      }
+    }
+    if (params.callName) {
+      query.andWhere(`details."callInfo"->>'summaryName' ILIKE :callName`, {
+        callName: `%${params.callName}%`,
+      });
+    }
+
+    // Built-in column filters (date/duration/tags/mode/status/channel) — same
+    // helpers the admin query uses, so behaviour stays consistent across views.
+    const builtInFilters: CallLogFilters = {
+      startDate: params.startDate,
+      endDate: params.endDate,
+      minDuration: params.minDuration,
+      maxDuration: params.maxDuration,
+      tags: params.tags,
+      mode: params.mode,
+      status: params.status,
+      source: params.source,
+    };
+    this.applyDateFilters(query, builtInFilters);
+    this.applyDurationFilters(query, builtInFilters);
+    this.applyTagFilters(query, builtInFilters);
+    this.applyModeStatusSourceFilters(query, builtInFilters);
+
+    const definitionMap = await this.loadFilterDefinitions(
+      params.tenantId,
+      params.fieldFilters,
+    );
+    applyFieldFilters(
+      query,
+      params.fieldFilters,
+      definitionMap,
+      params.tenantId,
+    );
+
+    const [data, count] = await query.getManyAndCount();
+    return { data, count };
+  }
+
+  async getAdminCallLogsQuery(
+    tenantId: string,
+    filters: CallLogFilters,
+  ): Promise<{ data: Chat[]; count: number }> {
+    const query = this.createQueryBuilder('chat')
+      .leftJoinAndMapOne(
+        'chat.details',
+        CallDetails,
+        'details',
+        'details.chatId = chat.id',
+      )
+      .leftJoinAndMapOne(
+        'chat.client',
+        User,
+        'client',
+        'client.id = chat.clientId',
+      )
+      .leftJoinAndMapOne(
+        'chat.counselor',
+        User,
+        'counselor',
+        'counselor.id = chat.counselorId',
+      )
+      .leftJoinAndMapMany(
+        'chat.customFieldValues',
+        'chat_custom_field_values',
+        'cfv',
+        'cfv.chatId = chat.id',
+      );
+
+    // Only show ENDED calls for admin call logs
+    query.andWhere('chat.status = :status', { status: ChatStatus.ENDED });
+    if (filters.archive) {
+      if (filters.archive === 'true') {
+        query.andWhere('chat.archivedAt IS NOT NULL');
+      } else {
+        query.andWhere('chat.archivedAt IS NULL');
+      }
+    }
+
+    this.applyStringFilters(query, filters);
+    this.applyIdFilters(query, filters);
+    this.applyDateFilters(query, filters);
+    this.applyDurationFilters(query, filters);
+    this.applyQualityFilters(query, filters);
+    this.applyTagFilters(query, filters);
+    this.applyModeStatusSourceFilters(query, filters);
+
+    const definitionMap = await this.loadFilterDefinitions(
+      tenantId,
+      filters.fieldFilters,
+    );
+    applyFieldFilters(query, filters.fieldFilters, definitionMap, tenantId);
+
+    query.andWhere('chat.tenant_id = :tenantId', { tenantId });
+
+    // See getCallLogsQuery for why take/skip instead of limit/offset.
+    if (filters.limit) query.take(filters.limit);
+    if (filters.offset) query.skip(filters.offset);
+
+    this.applySorting(
+      query,
+      (filters.sortBy as CallLogSortBy) || CallLogSortBy.START_DATE,
+      (filters.order as SortOrder) || SortOrder.DESC,
+    );
+
+    const [data, count] = await query.getManyAndCount();
+    return { data, count };
+  }
+
+  private applyStringFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    if (filters.counselorName) {
+      query.andWhere('counselor.name ILIKE :counselorName', {
+        counselorName: `%${filters.counselorName}%`,
+      });
+    }
+    if (filters.callName) {
+      query.andWhere(`details."callInfo"->>'summaryName' ILIKE :callName`, {
+        callName: `%${filters.callName}%`,
+      });
+    }
+  }
+
+  private applyIdFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    if (filters.counselorIds) {
+      const ids = filters.counselorIds
+        .split(',')
+        .map((id) => parseInt(id.trim()))
+        .filter((id) => !isNaN(id));
+
+      if (ids.length > 0) {
+        query.andWhere('chat.counselorId IN (:...counselorIds)', {
+          counselorIds: ids,
+        });
+      }
+    }
+  }
+
+  private applyDateFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    if (filters.startDate) {
+      query.andWhere('chat.startedAt >= :startDate', {
+        startDate: new Date(filters.startDate),
+      });
+    }
+    if (filters.endDate) {
+      query.andWhere('chat.startedAt <= :endDate', {
+        endDate: new Date(filters.endDate),
+      });
+    }
+  }
+
+  private applyDurationFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    if (filters.minDuration !== undefined) {
+      query.andWhere('details.callDuration >= :minDuration', {
+        minDuration: filters.minDuration,
+      });
+    }
+    if (filters.maxDuration !== undefined) {
+      query.andWhere('details.callDuration <= :maxDuration', {
+        maxDuration: filters.maxDuration,
+      });
+    }
+  }
+
+  private applyQualityFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    if (filters.minQualityScore !== undefined) {
+      query.andWhere(
+        "CAST(details.summary->>'callQuality' AS NUMERIC) >= :minQualityScore",
+        {
+          minQualityScore: filters.minQualityScore,
+        },
+      );
+    }
+    if (filters.maxQualityScore !== undefined) {
+      query.andWhere(
+        "CAST(details.summary->>'callQuality' AS NUMERIC) <= :maxQualityScore",
+        {
+          maxQualityScore: filters.maxQualityScore,
+        },
+      );
+    }
+  }
+
+  private applyTagFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    query.andWhere(
+      "(details.summary->'tags' IS NULL OR jsonb_typeof(details.summary->'tags') = 'array')",
+    );
+
+    if (filters.tags) {
+      const tags = filters.tags.split(',').map((tag) => tag.trim());
+      query.andWhere(
+        "EXISTS (SELECT 1 FROM jsonb_array_elements(details.summary->'tags') AS tag WHERE tag->>'tag' = ANY(:tags))",
+        { tags },
+      );
+    }
+  }
+
+  /**
+   * Filters on the built-in Mode / Status / Channel columns. The client sends
+   * the display groups (matching the chips), which map to the underlying
+   * enum/JSON values:
+   *  - mode:   SCRIBE (also null) | DICTATION            (callInfo->>'mode')
+   *  - status: SUCCESS | PROCESSING (PENDING/IN_PROGRESS) | FAILED | NO_AUDIO
+   *  - source: LIVE (anything but AUDIO_UPLOAD, incl null) | UPLOAD
+   */
+  private applyModeStatusSourceFilters(
+    query: SelectQueryBuilder<Chat>,
+    filters: CallLogFilters,
+  ) {
+    if (filters.mode) {
+      const modes = filters.mode.split(',').map((m) => m.trim());
+      const clauses: string[] = [];
+      if (modes.includes('SCRIBE')) {
+        clauses.push(
+          `(details."callInfo"->>'mode' = 'SCRIBE' OR details."callInfo"->>'mode' IS NULL)`,
+        );
+      }
+      if (modes.includes('DICTATION')) {
+        clauses.push(`details."callInfo"->>'mode' = 'DICTATION'`);
+      }
+      if (clauses.length > 0) {
+        query.andWhere(`(${clauses.join(' OR ')})`);
+      }
+    }
+
+    if (filters.status) {
+      const groups = filters.status.split(',').map((s) => s.trim());
+      const statusValues: string[] = [];
+      if (groups.includes('SUCCESS')) statusValues.push('SUCCESS');
+      if (groups.includes('PROCESSING'))
+        statusValues.push('PENDING', 'IN_PROGRESS');
+      if (groups.includes('FAILED')) statusValues.push('FAILED');
+      if (groups.includes('NO_AUDIO')) statusValues.push('NO_AUDIO');
+      if (statusValues.length > 0) {
+        query.andWhere('chat.summaryStatus IN (:...summaryStatuses)', {
+          summaryStatuses: statusValues,
+        });
+      }
+    }
+
+    if (filters.source) {
+      const sources = filters.source.split(',').map((s) => s.trim());
+      const clauses: string[] = [];
+      if (sources.includes('UPLOAD')) {
+        clauses.push(`details."callInfo"->>'provider' = 'AUDIO_UPLOAD'`);
+      }
+      if (sources.includes('LIVE')) {
+        clauses.push(
+          `details."callInfo"->>'provider' IS DISTINCT FROM 'AUDIO_UPLOAD'`,
+        );
+      }
+      if (clauses.length > 0) {
+        query.andWhere(`(${clauses.join(' OR ')})`);
+      }
+    }
+  }
+
+  private applySorting(
+    query: SelectQueryBuilder<Chat>,
+    sortBy: CallLogSortBy,
+    order: SortOrder = SortOrder.DESC,
+  ) {
+    const sortOrder = order as 'ASC' | 'DESC';
+
+    switch (sortBy) {
+      case CallLogSortBy.ID:
+        query.orderBy('chat.id', sortOrder);
+        break;
+      case CallLogSortBy.COUNSELOR_NAME:
+        query.orderBy('counselor.name', sortOrder);
+        break;
+      case CallLogSortBy.CLIENT_ID:
+        query.orderBy('chat.clientId', sortOrder);
+        break;
+      case CallLogSortBy.CALL_DURATION:
+        query.orderBy('details.callDuration', sortOrder);
+        break;
+      case CallLogSortBy.START_DATE:
+        query.orderBy('chat.startedAt', sortOrder);
+        break;
+      case CallLogSortBy.QUALITY_SCORE:
+        query.orderBy(
+          "CAST(details.summary->>'callQuality' AS NUMERIC)",
+          sortOrder,
+        );
+        break;
+      case CallLogSortBy.TAGS:
+        query.orderBy("details.summary->'tags'->0->>'tag'", sortOrder);
+        break;
+      case CallLogSortBy.CREATED_AT:
+      default:
+        query.orderBy('chat.createdAt', sortOrder);
+        break;
+    }
+  }
+
+  async getCounselorStatsRaw(
+    queryParams: CounselorStatsQueryDto,
+    userId: number,
+  ): Promise<any> {
+    const query = this.createQueryBuilder('chat')
+      .innerJoin('users', 'user', 'user.id = chat.counselorId')
+      .innerJoin('call_details', 'callDetails', 'callDetails.chatId = chat.id')
+      .select('user.name', 'counselorName')
+      .addSelect(
+        `SUM(("callDetails"."callInfo" ->> 'clientTalkingTime')::float)`,
+        'counselorListeningDuration',
+      )
+      .addSelect(
+        `SUM(("callDetails"."callInfo" ->> 'counselorTalkingTime')::float)`,
+        'counselorSharingDuration',
+      )
+      .where(`callDetails.callInfo ->> 'clientTalkingTime' IS NOT NULL`)
+      .andWhere(`(callDetails.callInfo ->> 'clientTalkingTime')::float > 0`)
+      .andWhere(`callDetails.callInfo ->> 'counselorTalkingTime' IS NOT NULL`)
+      .andWhere(`(callDetails.callInfo ->> 'counselorTalkingTime')::float >= 0`)
+      .groupBy('user.name')
+      .orderBy('user.name', 'ASC');
+
+    if (queryParams.startDate && queryParams.endDate) {
+      const startDateTime = `${queryParams.startDate} 00:00:00`;
+      const endDateTime = `${queryParams.endDate} 23:59:59`;
+      query.andWhere('"chat"."startedAt" BETWEEN :startDate AND :endDate', {
+        startDate: startDateTime,
+        endDate: endDateTime,
+      });
+    } else if (queryParams.startDate) {
+      const startDateTime = `${queryParams.startDate} 00:00:00`;
+      query.andWhere('"chat"."startedAt" >= :startDate', {
+        startDate: startDateTime,
+      });
+    } else if (queryParams.endDate) {
+      const endDateTime = `${queryParams.endDate} 23:59:59`;
+      query.andWhere('"chat"."startedAt" <= :endDate', {
+        endDate: endDateTime,
+      });
+    }
+
+    query.andWhere('user.id = :userId', { userId });
+
+    return query.getRawOne();
+  }
+
+  async findChatWithDetails(
+    id: number,
+    tenantId: string,
+  ): Promise<(Chat & { details: CallDetails }) | null> {
+    const chat = await this.createQueryBuilder('chat')
+      .leftJoinAndMapOne(
+        'chat.details',
+        CallDetails,
+        'details',
+        'details.chatId = chat.id',
+      )
+      .where('chat.id = :id', { id })
+      .andWhere('chat.tenantId = :tenantId', { tenantId })
+      .getOne();
+
+    return chat as (Chat & { details: CallDetails }) | null;
+  }
+
+  async updateChat(
+    chatId: number,
+    input: UpdateChatInput,
+    em?: EntityManager,
+  ): Promise<boolean> {
+    const chatRepo = em
+      ? em.getRepository(Chat)
+      : this.dataSource.getRepository(Chat);
+
+    const updateData = Object.fromEntries(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      Object.entries(input).filter(([key, value]) => value !== undefined),
+    );
+
+    if (Object.keys(updateData).length === 0) {
+      return false;
+    }
+
+    const result = await chatRepo.update(chatId, updateData);
+    return result.affected !== 0;
+  }
+
+  async deleteChat(
+    id: number,
+    tenantId: string,
+    em?: EntityManager,
+  ): Promise<boolean> {
+    const chatRepo = em
+      ? em.getRepository(Chat)
+      : this.dataSource.getRepository(Chat);
+
+    const result = await chatRepo.delete({ id, tenantId });
+    return result.affected !== 0;
+  }
+}

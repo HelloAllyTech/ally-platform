@@ -1,0 +1,608 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import isDuplicateKeyException from 'src/exception/custom.exception';
+import { ScenarioVersion } from '../entity/scenario-version.entity';
+import { Scenarios } from '../entity/scenarios.entity';
+import { ScenarioVersionStatus } from '../enum/scenario-version-status.enum';
+import { ScenarioVersionType } from '../enum/scenario-version-type.enum';
+import { ScenarioVersionRepository } from '../repository/scenario-version.repository';
+import { ScenariosRepository } from '../repository/scenario.repository';
+import { CreateScenarioVersionDto } from '../dto/create-scenario-version.dto';
+import { UpdateScenarioVersionDto } from '../dto/update-scenario-version.dto';
+import { UpdateScenarioDto } from '../dto/update-scenario.dto';
+import { ScenarioService } from './scenario.service';
+import { ScenarioStatus } from '../type/scenario.type';
+import { GetAdminScenarioDto } from '../dto/get-scenario.dto';
+import { PermissionsService } from 'src/authorization/service/permissions.service';
+import { LoggerService } from 'src/logger/logger.service';
+
+/** Column values for a freshly inserted version (see `saveNewVersion`). */
+type NewVersionParams = {
+  scenarioId: number;
+  name?: string;
+  config: Record<string, any>;
+  status: ScenarioVersionStatus;
+  type: ScenarioVersionType;
+  parentVersionId: string | null;
+  createdBy?: number;
+  updatedBy?: number;
+};
+
+/**
+ * Unique index behind "one AUTOMATIC version per parent per calendar day"
+ * (AddScenarioAutoVersionConstraints migration). Violating it means another
+ * run already snapshotted this draft today — a skip, not a failure.
+ */
+const DAILY_AUTO_VERSION_CONSTRAINT = 'idx_scenario_versions_daily_auto_unique';
+
+@Injectable()
+export class ScenarioVersionService {
+  private readonly logger = LoggerService.getInstance(
+    ScenarioVersionService.name,
+  );
+
+  constructor(
+    private readonly scenarioVersionRepository: ScenarioVersionRepository,
+    private readonly scenariosRepository: ScenariosRepository,
+    private readonly scenarioService: ScenarioService,
+    private readonly permissionsService: PermissionsService,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  /**
+   * List versions for a scenario (newest first). Lazily seeds a v1 from the
+   * current live scenario if none exist yet, so scenarios created before
+   * versioning — or via the legacy create path — always have a baseline.
+   */
+  async listVersions(scenarioId: number): Promise<ScenarioVersion[]> {
+    const scenario = await this.requireScenario(scenarioId);
+    const existing =
+      await this.scenarioVersionRepository.listByScenario(scenarioId);
+    if (existing.length > 0) {
+      return this.markLiveVersion(scenario, existing);
+    }
+    await this.ensureInitialVersion(scenario);
+    // Re-read the scenario: ensureInitialVersion may have set publishedVersionId.
+    return this.markLiveVersion(
+      await this.requireScenario(scenarioId),
+      await this.scenarioVersionRepository.listByScenario(scenarioId),
+    );
+  }
+
+  async getVersion(
+    scenarioId: number,
+    versionId: string,
+  ): Promise<ScenarioVersion> {
+    const version = await this.scenarioVersionRepository.findOne({
+      where: { id: versionId, scenarioId },
+    });
+    if (!version) {
+      throw new NotFoundException('Scenario version not found');
+    }
+    return version;
+  }
+
+  /**
+   * Create a new draft. Config is cloned from `fromVersionId`, else from the
+   * published version, else reconstructed from the live scenario state.
+   */
+  async createVersion(
+    scenarioId: number,
+    dto: CreateScenarioVersionDto,
+    userId: number,
+  ): Promise<ScenarioVersion> {
+    const scenario = await this.requireScenario(scenarioId);
+    await this.assertOwnership(scenario, userId);
+
+    let parentVersionId: string | null = null;
+    let config: Record<string, any>;
+
+    if (dto.empty) {
+      // A blank variant authored from scratch (no parent, no cloned data).
+      // mappedEvents:[] (not undefined) marks it as "explicitly no events" so
+      // the editor shows an empty event table rather than falling back to the
+      // live scenario's events.
+      config = { mappedEvents: [] };
+    } else if (dto.fromVersionId) {
+      // Branch: fork an existing version's data into a new draft.
+      const parent = await this.getVersion(scenarioId, dto.fromVersionId);
+      parentVersionId = parent.id;
+      // The live-mirroring version's stored `config` is a seed, not a record:
+      // the studio writes edits straight to the `scenarios` row whenever no
+      // version is explicitly selected, so that config drifts (and for a
+      // never-published scenario is typically the near-empty snapshot taken
+      // the instant the sim first got an id). Rebuild from the live state so
+      // branching it always captures current content instead of forking a
+      // blank. Every OTHER version is authored inside the version system (or
+      // intentionally frozen), so clone it as-is.
+      const liveVersionId = await this.resolveLiveVersionId(scenario);
+      config =
+        parent.status === ScenarioVersionStatus.PUBLISHED ||
+        parent.id === liveVersionId
+          ? await this.buildConfigFromScenario(scenarioId)
+          : (parent.config ?? {});
+    } else {
+      // Default: parent the new draft to the live-mirroring version, and seed
+      // it from the live scenario (whose config is authoritative, see above).
+      parentVersionId = await this.resolveLiveVersionId(scenario);
+      config = await this.buildConfigFromScenario(scenarioId);
+    }
+
+    return this.saveNewVersion({
+      scenarioId,
+      name: dto.name,
+      // Drafts are never themselves live, so force a DRAFT status into the
+      // cloned config to avoid carrying an ACTIVE flag from the parent.
+      config: { ...config, status: ScenarioStatus.DRAFT },
+      status: ScenarioVersionStatus.DRAFT,
+      type: ScenarioVersionType.MANUAL,
+      parentVersionId,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+  }
+
+  /**
+   * Shared insert path for `createVersion` and the daily auto-version job.
+   * `getNextVersionNumber` is a read-then-insert, so two concurrent creates can
+   * pick the same number and collide on the unique (scenarioId, versionNumber)
+   * index. Retry a few times — each attempt recomputes the next number.
+   *
+   * `skipOnConstraint` names a constraint whose violation is a benign no-op
+   * rather than a race worth retrying: the daily job's idempotency index. A
+   * concurrent run that loses that race would otherwise violate the same
+   * constraint on every attempt and surface as an error. Returns null then.
+   */
+  private async saveNewVersion(
+    params: NewVersionParams & { skipOnConstraint: string },
+  ): Promise<ScenarioVersion | null>;
+  private async saveNewVersion(
+    params: NewVersionParams,
+  ): Promise<ScenarioVersion>;
+  private async saveNewVersion(
+    params: NewVersionParams & { skipOnConstraint?: string },
+  ): Promise<ScenarioVersion | null> {
+    const { skipOnConstraint, ...values } = params;
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.dataSource.transaction(async (em) => {
+          const versionNumber =
+            await this.scenarioVersionRepository.getNextVersionNumber(
+              values.scenarioId,
+              em,
+            );
+          const repo = em.getRepository(ScenarioVersion);
+          return repo.save(repo.create({ ...values, versionNumber }));
+        });
+      } catch (error) {
+        if (
+          skipOnConstraint &&
+          isDuplicateKeyException(error, skipOnConstraint)
+        ) {
+          return null;
+        }
+        if (attempt < MAX_ATTEMPTS && isDuplicateKeyException(error)) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Autosave a draft. Writes the snapshot straight to `config`; the live
+   * scenario is untouched until the version is published.
+   */
+  async updateVersion(
+    scenarioId: number,
+    versionId: string,
+    dto: UpdateScenarioVersionDto,
+    userId: number,
+  ): Promise<ScenarioVersion> {
+    const version = await this.getVersion(scenarioId, versionId);
+    await this.assertOwnership(await this.requireScenario(scenarioId), userId);
+
+    // Config edits are draft-only (published/archived snapshots are immutable);
+    // renaming is a label change, allowed on any status.
+    if (dto.config !== undefined) {
+      if (version.status !== ScenarioVersionStatus.DRAFT) {
+        throw new BadRequestException(
+          'Only draft versions can be edited. Branch this version into a new draft to make changes.',
+        );
+      }
+      const config: Record<string, any> = {
+        ...dto.config,
+        status: ScenarioStatus.DRAFT,
+      };
+      // The Advanced Settings events table writes a placeholder row with a
+      // blank id the instant "Add Event" is clicked, before an event is
+      // picked from the dropdown. The client is supposed to filter those out
+      // before autosaving, but if one slips through anyway (closed early,
+      // request race), persisting it permanently disables "Add Event" for
+      // this scenario — the button refuses to add another row while any
+      // existing row has a blank id. Drop them here so a stray client bug
+      // can't wedge the draft.
+      if (Array.isArray(config.mappedEvents)) {
+        config.mappedEvents = config.mappedEvents.filter(
+          (event: any) => typeof event?.id === 'string' && event.id !== '',
+        );
+      }
+      version.config = config;
+    }
+    if (dto.name !== undefined) {
+      version.name = dto.name;
+    }
+    version.updatedBy = userId;
+    return this.scenarioVersionRepository.save(version);
+  }
+
+  async deleteVersion(
+    scenarioId: number,
+    versionId: string,
+    userId: number,
+  ): Promise<boolean> {
+    const version = await this.getVersion(scenarioId, versionId);
+    if (version.status === ScenarioVersionStatus.PUBLISHED) {
+      throw new BadRequestException(
+        'Cannot delete the published version. Publish another version first.',
+      );
+    }
+    // The live-mirroring version is the editor's handle on the live scenario
+    // (see resolveLiveVersionId). Deleting it would leave the live record with
+    // no version representing it, so every remaining version reads as an
+    // isolated draft and the live content becomes unreachable from the panel.
+    const liveVersionId = await this.resolveLiveVersionId(
+      await this.requireScenario(scenarioId),
+    );
+    if (version.id === liveVersionId) {
+      throw new BadRequestException(
+        'Cannot delete the version that mirrors the live simulation.',
+      );
+    }
+    await this.assertOwnership(await this.requireScenario(scenarioId), userId);
+    await this.scenarioVersionRepository.softDelete(version.id);
+    return true;
+  }
+
+  /**
+   * Publish a version: replay its config through the existing updateScenario
+   * fan-out (status forced ACTIVE), mark this version PUBLISHED, archive the
+   * previously-published one, and point the scenario at it.
+   */
+  async publishVersion(
+    scenarioId: number,
+    versionId: string,
+    userId: number,
+  ): Promise<ScenarioVersion> {
+    const scenario = await this.requireScenario(scenarioId);
+    await this.assertOwnership(scenario, userId);
+    const version = await this.getVersion(scenarioId, versionId);
+
+    const config: UpdateScenarioDto = {
+      ...(version.config as UpdateScenarioDto),
+      status: ScenarioStatus.ACTIVE,
+    };
+    const mappedEvents = (version.config as Record<string, any>)?.mappedEvents;
+
+    // Everything publish mutates — the live scenario + related tables, the
+    // event mappings (a separate table), and the version-status/pointer flip —
+    // runs in ONE transaction so a mid-publish failure can't leave the live
+    // scenario half-updated. updateScenario/mapEventsToScenario/
+    // deleteScenarioEvents each accept this manager and skip opening their own
+    // transaction. (Note: updateScenario's translation upserts still run on the
+    // main connection afterwards, as they always have — translations remain
+    // eventually-consistent.)
+    return this.dataSource.transaction(async (em) => {
+      // 1. Materialise the snapshot into the live scenario + related tables.
+      await this.scenarioService.updateScenario(scenarioId, config, userId, em);
+
+      // 2. Full-replace event mappings: delete live events absent from the
+      // draft, upsert the rest. Undefined => never captured (skip, don't
+      // touch live). Empty array => explicitly no events (clear all).
+      if (Array.isArray(mappedEvents)) {
+        const liveEvents =
+          await this.scenarioService.getScenarioEvents(scenarioId);
+        const desiredIds = new Set(
+          mappedEvents.map((e) => e.id ?? e.eventId).filter(Boolean),
+        );
+        const idsToDelete = (liveEvents?.data ?? [])
+          .map((e: Record<string, any>) => e.eventId ?? e.id)
+          .filter((id: string) => id && !desiredIds.has(id));
+        if (idsToDelete.length > 0) {
+          await this.scenarioService.deleteScenarioEvents(
+            { scenarioId, eventIds: idsToDelete },
+            em,
+          );
+        }
+        if (mappedEvents.length > 0) {
+          await this.scenarioService.mapEventsToScenario(
+            { scenarioId, events: mappedEvents },
+            em,
+          );
+        }
+      }
+
+      // 3. Flip version statuses + the live pointer.
+      const versionRepo = em.getRepository(ScenarioVersion);
+      const scenarioRepo = em.getRepository(Scenarios);
+
+      // Demote any other currently-published version of this scenario.
+      await versionRepo.update(
+        { scenarioId, status: ScenarioVersionStatus.PUBLISHED },
+        { status: ScenarioVersionStatus.ARCHIVED, updatedBy: userId },
+      );
+      await versionRepo.update(version.id, {
+        status: ScenarioVersionStatus.PUBLISHED,
+        updatedBy: userId,
+      });
+      await scenarioRepo.update(scenarioId, { publishedVersionId: version.id });
+
+      return versionRepo.findOneOrFail({ where: { id: version.id } });
+    });
+  }
+
+  /**
+   * Seed the baseline v1 from the live scenario. Idempotent: a no-op if a
+   * version already exists. Marked PUBLISHED when the scenario is live so the
+   * scenario's publishedVersionId resolves correctly.
+   */
+  async ensureInitialVersion(scenario: Scenarios): Promise<ScenarioVersion> {
+    const existing = await this.scenarioVersionRepository.findOne({
+      where: { scenarioId: scenario.id },
+    });
+    if (existing) {
+      return existing;
+    }
+    const config = await this.buildConfigFromScenario(scenario.id);
+    const isLive = scenario.status === ScenarioStatus.ACTIVE;
+
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(ScenarioVersion);
+      const version = await repo.save(
+        repo.create({
+          scenarioId: scenario.id,
+          versionNumber: 1,
+          // No code name — the UI shows the auto "v1" label. A name is an
+          // optional admin-supplied code name, not the version number.
+          config,
+          status: isLive
+            ? ScenarioVersionStatus.PUBLISHED
+            : ScenarioVersionStatus.DRAFT,
+          createdBy: scenario.createdBy,
+          updatedBy: scenario.updatedBy ?? scenario.createdBy,
+        }),
+      );
+      if (isLive) {
+        await em
+          .getRepository(Scenarios)
+          .update(scenario.id, { publishedVersionId: version.id });
+      }
+      return version;
+    });
+  }
+
+  /**
+   * Daily job: snapshot every draft scenario directly edited in the preceding
+   * 24 hours into an AUTOMATIC version, so authors who forget to save
+   * manually still get a recoverable point per day.
+   *
+   * Candidates come from `scenarios.updatedAt`, not `scenario_versions`:
+   * ordinary studio authoring writes straight to the live `scenarios` row
+   * (see the ScenarioVersion docblock / resolveLiveVersionId) and never
+   * touches a version row, so keying off version timestamps would miss the
+   * whole of normal editing. The snapshot itself is rebuilt from the live
+   * scenario via `buildConfigFromScenario` — the live-mirroring version's own
+   * `config` is a stale seed, not a record of current content.
+   *
+   * Idempotent per (scenario, parent, calendar day) regardless of
+   * rename/delete of a same-day auto-save, and it will not re-snapshot a
+   * draft that has not been touched since its last auto-save — the lookback
+   * window is rolling 24h while the day key is calendar-based, so without
+   * that second check a single edit late on D-1 would be saved again by the
+   * D run. See `findLatestAutomaticVersion` and the matching DB unique index.
+   *
+   * A single failing scenario is caught and logged so it can't block the rest
+   * of the run.
+   */
+  async createDailyAutomaticVersions(now: Date = new Date()): Promise<number> {
+    const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const dayStart = new Date(now.toISOString().slice(0, 10));
+    const name = `Auto-save ${now.toISOString().slice(0, 10)}`;
+
+    const candidates =
+      await this.scenariosRepository.findDraftsUpdatedSince(since);
+
+    let created = 0;
+    for (const scenario of candidates) {
+      try {
+        // The candidate query already restricts to unpublished (DRAFT)
+        // scenarios, which is what this feature snapshots. The live-mirroring
+        // VERSION's own status is deliberately not checked: a sim that was
+        // published and then moved back to draft still has a PUBLISHED live
+        // version, and its ongoing edits must keep being snapshotted.
+        const liveVersionId = await this.resolveLiveVersionId(scenario);
+        if (!liveVersionId) {
+          continue;
+        }
+
+        const lastAuto =
+          await this.scenarioVersionRepository.findLatestAutomaticVersion(
+            scenario.id,
+            liveVersionId,
+          );
+        if (lastAuto) {
+          // Already snapshotted today.
+          if (lastAuto.createdAt >= dayStart) {
+            continue;
+          }
+          // In-window but unchanged since the last snapshot: the same edit
+          // being seen by two consecutive daily runs, not new work.
+          if (scenario.updatedAt <= lastAuto.createdAt) {
+            continue;
+          }
+        }
+
+        const config = await this.buildConfigFromScenario(scenario.id);
+        const version = await this.saveNewVersion({
+          scenarioId: scenario.id,
+          name,
+          config,
+          status: ScenarioVersionStatus.DRAFT,
+          type: ScenarioVersionType.AUTOMATIC,
+          parentVersionId: liveVersionId,
+          createdBy: scenario.updatedBy ?? scenario.createdBy,
+          updatedBy: scenario.updatedBy ?? scenario.createdBy,
+          skipOnConstraint: DAILY_AUTO_VERSION_CONSTRAINT,
+        });
+        if (version) {
+          created += 1;
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to auto-version scenario ${scenario.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    return created;
+  }
+
+  /**
+   * The version that MIRRORS the live scenario, as opposed to holding an
+   * isolated snapshot of its own.
+   *
+   * The studio only writes to a version's `config` while one is explicitly
+   * selected in the version panel; the rest of the time — which is the whole
+   * of normal authoring — it saves straight to the live `scenarios` row and
+   * its related tables. Exactly one version stands for that live record:
+   *
+   *  - the published version, when the scenario has one; otherwise
+   *  - the auto-seeded baseline (v1, parentless) that `ensureInitialVersion`
+   *    created from the live scenario.
+   *
+   * That version's stored `config` is therefore a seed that goes stale
+   * immediately, and for a never-published scenario it is usually captured the
+   * instant the sim first gets an id (title only) — which is why forking it or
+   * loading it must go through the live scenario, never through `config`.
+   *
+   * Returns null only for a scenario with no versions at all.
+   */
+  async resolveLiveVersionId(scenario: Scenarios): Promise<string | null> {
+    if (scenario.publishedVersionId) {
+      return scenario.publishedVersionId;
+    }
+    const versions = await this.scenarioVersionRepository.listByScenario(
+      scenario.id,
+    );
+    return this.resolveBaselineVersionId(versions);
+  }
+
+  /**
+   * Lowest-numbered parentless version — the `ensureInitialVersion` seed.
+   * Parentless is not enough on its own: a blank version (`empty: true`) is
+   * also parentless by design, so the version NUMBER breaks the tie and v1
+   * always wins.
+   */
+  private resolveBaselineVersionId(
+    versions: ScenarioVersion[] | null | undefined,
+  ): string | null {
+    const baseline = (versions ?? [])
+      .filter((v) => !v.parentVersionId)
+      .sort((a, b) => a.versionNumber - b.versionNumber)[0];
+    return baseline?.id ?? null;
+  }
+
+  /** Stamp the transient `isLive` flag for the client (see the entity). */
+  private markLiveVersion(
+    scenario: Scenarios,
+    versions: ScenarioVersion[],
+  ): ScenarioVersion[] {
+    const liveVersionId =
+      scenario.publishedVersionId ?? this.resolveBaselineVersionId(versions);
+    for (const version of versions) {
+      version.isLive = version.id === liveVersionId;
+    }
+    return versions;
+  }
+
+  /**
+   * Reconstruct an UpdateScenarioDto-shaped config from the live scenario.
+   * Flattens metadata to top level (the form/DTO shape) and pulls related
+   * arrays so a future publish round-trips faithfully.
+   */
+  private async buildConfigFromScenario(
+    scenarioId: number,
+  ): Promise<Record<string, any>> {
+    const admin: GetAdminScenarioDto =
+      await this.scenarioService.getAdminScenario(scenarioId);
+    const metadata = admin.metadata ?? {};
+    // Snapshot the live event mappings (separate table) in the map-events input
+    // shape so the frontend can load them and publish can replay them. `id` is
+    // normalised from `eventId` for the publish path.
+    const eventsResult =
+      await this.scenarioService.getScenarioEvents(scenarioId);
+    const mappedEvents = (eventsResult?.data ?? []).map(
+      (e: Record<string, any>) => ({
+        ...e,
+        id: e.eventId ?? e.id,
+      }),
+    );
+    return {
+      mappedEvents,
+      ...metadata,
+      // Per-language translation content (scenario_translations). Included so
+      // (a) version diffs can attribute per-language opening-statement changes
+      // (language-eval FR18 changed_from_prev) and (b) publish faithfully
+      // round-trips translations instead of silently dropping them.
+      translationOpeningStatements: admin.translationOpeningStatements ?? {},
+      translationDescription: admin.translationDescription ?? {},
+      translationTitle: admin.translationTitle ?? {},
+      translationReminders: admin.translationReminders ?? {},
+      title: admin.title,
+      description: admin.description,
+      prompt: admin.prompt,
+      coverImageUrl: admin.coverImageUrl,
+      coverVideoUrl: admin.coverVideoUrl,
+      isPublic: admin.isPublic,
+      isGlobal: admin.isGlobal,
+      difficultyLevel: admin.difficultyLevel,
+      competencyId: admin.competencyId,
+      category: admin.category,
+      partnerOrgName: admin.partnerOrgName,
+      status: ScenarioStatus.DRAFT,
+      triggerWarningIds: (admin.triggerWarnings ?? []).map((tw: any) =>
+        String(tw.id),
+      ),
+      terminationEvents: admin.terminationEvents ?? [],
+      behaviorInstructions: admin.behaviorInstructions ?? [],
+    };
+  }
+
+  private async requireScenario(scenarioId: number): Promise<Scenarios> {
+    const scenario = await this.scenariosRepository.findOne({
+      where: { id: scenarioId },
+    });
+    if (!scenario) {
+      throw new NotFoundException('Scenario not found');
+    }
+    return scenario;
+  }
+
+  private async assertOwnership(
+    scenario: Scenarios,
+    userId: number,
+  ): Promise<void> {
+    const isMultiTenantAdmin =
+      await this.permissionsService.isMultiTenantAdmin(userId);
+    if (isMultiTenantAdmin && scenario.createdBy !== userId) {
+      throw new ForbiddenException('You can only edit your own roleplays');
+    }
+  }
+}

@@ -1,0 +1,67 @@
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { BaseEntity } from '../../common/entity/base.entity';
+
+// You'll need to create this enum to match the Python ChatStatus
+export enum ChatStatus {
+  STARTED = 'STARTED',
+  ACTIVE = 'ACTIVE',
+  ENDED = 'ENDED',
+  PAUSED = 'PAUSED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum ChatSummaryStatus {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  NO_AUDIO = 'NO_AUDIO',
+}
+
+// TODO: Consider rename table to generic name
+// Currently used to store calls
+@Entity('chats')
+export class Chat extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column()
+  clientId!: number;
+
+  @Column({ nullable: true })
+  counselorId?: number;
+
+  @Column({ default: ChatStatus.ACTIVE })
+  status!: ChatStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  startedAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  endedAt?: Date;
+
+  @Column({ nullable: true })
+  externalId?: string;
+
+  @Column({ default: ChatSummaryStatus.PENDING })
+  summaryStatus!: ChatSummaryStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  archivedAt?: Date;
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: Record<string, any>;
+
+  @Column({ nullable: true })
+  createdBy?: number;
+
+  // First-attempt outcome, written ONCE and never overwritten by a retry — the
+  // health signal that the mutable `summaryStatus` loses once backfill heals a
+  // session. Denormalised from chat_summary_attempts so the common dashboard
+  // queries don't have to join. See ChatSummaryAttempt.
+  @Column({ nullable: true })
+  firstAttemptStatus?: ChatSummaryStatus;
+
+  @Column({ nullable: true })
+  firstFailureStage?: string;
+}

@@ -1,0 +1,83 @@
+import { BaseEntity } from 'src/common/entity/base.entity';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+
+// UNIQUE: one details row per session (migration 1869). Both writers (summary
+// persist + evaluation upsert) rely on this as their ON CONFLICT target —
+// without it, concurrent session-end writers used to insert duplicate rows
+// and the read path mapped an arbitrary one (missing-feedback bug).
+@Index(
+  'scenario_session_details_scenario_session_id_idx',
+  ['scenarioSessionId'],
+  { unique: true },
+)
+@Entity('scenario_session_details')
+export class ScenarioSessionDetails extends BaseEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Column({ type: 'uuid' })
+  scenarioSessionId!: string;
+
+  // MILLISECONDS, net of paused time — every writer persists
+  // `endedAt - startedAt - pausedMs` unconverted. Divide by 1000 before
+  // treating it as seconds (the single-session GET does exactly that in its
+  // response, which is why the API payload reads as seconds while the column
+  // does not).
+  @Column({ type: 'int', nullable: true })
+  callDuration?: number;
+
+  @Column({ type: 'jsonb', nullable: true })
+  summary?: Record<string, any>;
+
+  /**
+   * End-of-session episodic memory emitted by the ally-ai-learn agent
+   * (SQS message_type "session_memory"): the agent's maintained rolling
+   * conversation summary, written in the session language.
+   * {summary, language, messageCount, summarizedMessageCount, receivedAt}.
+   * Preferred over summary.feedback.cumulativeMemory as the case
+   * `previousMemory` source — it exists even when feedback generation
+   * fails, and reflects what the live agent actually tracked.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  sessionMemory?: Record<string, any>;
+
+  // --- Actor-agent evaluation (LLM judge over the real-session transcript,
+  // scored against the superadmin-configured agent test cases). Populated
+  // asynchronously after the session ends via the evaluation webhook. ---
+
+  /** Goal/metric name -> 0-100 score (e.g. {"Build rapport": 82}). */
+  @Column({ type: 'jsonb', nullable: true })
+  metrics?: Record<string, number>;
+
+  /**
+   * Titles of goals the conversation gave no occasion to demonstrate, as
+   * judged per session. Agent test cases are configured globally, so a session
+   * is scored against goals it may never have had a chance to exercise;
+   * without this, those goals dragged `compositeScore` down and the dilution
+   * varied with whatever the superadmin happened to have configured.
+   *
+   * Every goal stays present in `metrics` (Roleplay Logs shows the full
+   * rubric); these titles are the subset excluded from the composite. Null on
+   * rows judged before this existed — treat as "all goals applicable".
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  notApplicableGoals?: string[];
+
+  /**
+   * round(mean(scores of APPLICABLE metrics)); the headline actor-quality
+   * number. Null when no goal was applicable.
+   */
+  @Column({ type: 'int', nullable: true })
+  compositeScore?: number;
+
+  /** Human-readable judge feedback (markdown). */
+  @Column({ type: 'text', nullable: true })
+  evaluationMarkdown?: string;
+
+  /** IN_PROGRESS | COMPLETED | FAILED. */
+  @Column({ nullable: true })
+  evaluationStatus?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  evaluatedAt?: Date;
+}

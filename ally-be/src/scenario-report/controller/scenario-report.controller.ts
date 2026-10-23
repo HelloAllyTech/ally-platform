@@ -1,0 +1,181 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ScenarioReportService } from '../service/scenario-report.service';
+import { ScenarioReport } from '../entity/scenario-report.entity';
+import {
+  CreateScenarioReportDto,
+  CreateScenarioReportResponseDto,
+  ScenarioReportDto,
+  ScenarioReportResponseDto,
+} from '../dto/scenario-report.dto';
+import { ScenarioReportTranscriptResponseDto } from '../dto/scenario-report-transcript.dto';
+import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
+import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { CurrentUser } from 'src/auth/decorators/user.decorator';
+import { TokenUser } from 'src/auth/type/auth.types';
+import { SortOrder, SuccessResponse } from 'src/common/type/common.type';
+
+@ApiTags('Scenario Report')
+@ApiBearerAuth()
+@ApiSecurity('access-token')
+@Controller({
+  path: 'learn/scenarios',
+  version: '1',
+})
+export class ScenarioReportController {
+  constructor(private readonly scenarioReportService: ScenarioReportService) {}
+
+  @Post('/:scenarioId/reports')
+  @ApiOperation({ summary: 'Create a report for a scenario' })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_REPORTS])
+  @ApiResponse({
+    status: 201,
+    description: 'Scenario report created',
+    type: ScenarioReport,
+  })
+  async createScenarioReport(
+    @CurrentUser() tokenUser: TokenUser,
+    @Param('scenarioId') scenarioId: number,
+    @Body() createScenarioReportDto: CreateScenarioReportDto,
+  ): Promise<CreateScenarioReportResponseDto> {
+    return this.scenarioReportService.createScenarioReport(
+      scenarioId,
+      createScenarioReportDto,
+      tokenUser.id,
+    );
+  }
+
+  @Get('/reports/:reportId')
+  @ApiOperation({ summary: 'Get a scenario report by id' })
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_REPORTS])
+  @ApiResponse({
+    status: 200,
+    description: 'Scenario report by id',
+    type: ScenarioReportDto,
+  })
+  async getScenarioReportById(
+    @Param('reportId') reportId: string,
+  ): Promise<ScenarioReportDto> {
+    return this.scenarioReportService.getScenarioReportById(reportId);
+  }
+
+  @Get('/reports/:reportId/transcripts')
+  @ApiOperation({ summary: 'Get transcript for a scenario report' })
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_REPORTS])
+  @ApiResponse({
+    status: 200,
+    description: 'Scenario report transcript by id',
+    type: ScenarioReportTranscriptResponseDto,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description:
+      'Number of records to return. If omitted with offset, returns all.',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: Number,
+    description:
+      'Number of records to skip. If omitted with limit, returns all.',
+  })
+  async getScenarioReportTranscriptById(
+    @Param('reportId') reportId: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
+  ): Promise<ScenarioReportTranscriptResponseDto> {
+    return this.scenarioReportService.getScenarioReportTranscripts(reportId, {
+      limit,
+      offset,
+    });
+  }
+
+  @Get('/:scenarioId/reports')
+  @ApiOperation({ summary: 'Get all reports for a scenario' })
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_REPORTS])
+  @ApiResponse({
+    status: 200,
+    description: 'Scenario reports',
+    type: ScenarioReportResponseDto,
+  })
+  @ApiQuery({
+    name: 'statuses',
+    required: false,
+    type: String,
+    description:
+      'Filter by scenario report status (comma-separated). Valid values: STARTED, IN_PROGRESS, COMPLETED, CANCELLED, FAILED',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of records to return',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: Number,
+    description: 'Number of records to skip',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Field to sort by',
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    type: String,
+    description: 'Sort order: ASC or DESC',
+  })
+  async getScenarioReports(
+    @Param('scenarioId') scenarioId: number,
+    @Query('statuses') statuses?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('order') order?: SortOrder,
+  ): Promise<ScenarioReportResponseDto> {
+    return this.scenarioReportService.getScenarioReports(scenarioId, statuses, {
+      limit,
+      offset,
+      sortBy,
+      order,
+    });
+  }
+
+  @Post('/reports/:reportId/cancel')
+  @ApiOperation({ summary: 'Cancel a scenario report' })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_REPORTS])
+  @ApiResponse({
+    status: 200,
+    description: 'Scenario report cancelled',
+  })
+  async cancelScenarioReport(
+    @Param('reportId') reportId: string,
+    @CurrentUser() tokenUser: TokenUser,
+  ): Promise<SuccessResponse> {
+    return this.scenarioReportService.cancelScenarioReport(
+      reportId,
+      tokenUser.id,
+    );
+  }
+}

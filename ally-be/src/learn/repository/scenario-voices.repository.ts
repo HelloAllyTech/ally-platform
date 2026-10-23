@@ -1,0 +1,272 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource, Raw, Repository, SelectQueryBuilder } from 'typeorm';
+import { ScenarioVoices } from '../entity/scenario-voices.entity';
+import { Pagination } from 'src/common/type/common.type';
+import { ScenarioVoiceSortBy } from '../enum/scenario-voice-sort-by.enum';
+import { Gender } from '../enum/gender.enum';
+
+/**
+ * Sentinel accepted by the `genders` and `ages` filters to mean "this is
+ * missing", which is not a value any row stores.
+ *
+ * Shared by both because it means the same thing in both, and because an admin
+ * looking for gaps to fill wants the same word either way.
+ */
+export const UNSET_GENDER_FILTER = 'unset';
+export const UNSET_AGE_FILTER = UNSET_GENDER_FILTER;
+
+@Injectable()
+export class ScenarioVoicesRepository extends Repository<ScenarioVoices> {
+  constructor(private dataSource: DataSource) {
+    super(ScenarioVoices, dataSource.createEntityManager());
+  }
+
+  async getScenarioVoices(
+    searchName: string | undefined,
+    providers: string | undefined,
+    languageIds: string | undefined,
+    options: Pagination,
+    genders?: string,
+    ages?: string,
+  ): Promise<(ScenarioVoices & { languageLabel: string | null })[]> {
+    const query = this.createQueryBuilder('scenarioVoice')
+      .leftJoin('languages', 'la', 'la.id = scenarioVoice.languageId')
+      .addSelect('la.label', 'languageLabel');
+
+    if (searchName) {
+      query
+        .andWhere(
+          '(scenarioVoice.name ILIKE :searchName OR scenarioVoice.provider ILIKE :searchName)',
+        )
+        .setParameters({
+          searchName: `%${searchName}%`,
+        });
+    }
+
+    if (providers) {
+      const providerList = providers.split(',');
+      query.andWhere('scenarioVoice.provider IN (:...providers)', {
+        providers: providerList,
+      });
+    }
+
+    if (languageIds) {
+      const languageIdList = languageIds.split(',').map((id) => Number(id));
+      query.andWhere('scenarioVoice.languageId IN (:...languageIds)', {
+        languageIds: languageIdList,
+      });
+    }
+
+    // `unset` is not a stored value — it is how the admin dashboard asks for the
+    // rows missing this field. For gender those are the ones that silently drop
+    // their language out of simulation creation; for age they are the ones the
+    // studio's picker cannot order.
+    //
+    // A blank string counts as missing, not just SQL NULL. Clearing a field in
+    // the panel removes the key, but a config edited as raw JSON can leave `""`
+    // behind, and an `IS NULL` test alone would hide those from the very filter
+    // meant to find them.
+    this.applyConfigFilter(query, 'gender', genders);
+    this.applyConfigFilter(query, 'age', ages);
+
+    this.applySorting(query, options);
+    this.applyPagination(query, options);
+
+    const rows = await query.getRawAndEntities();
+    return rows.entities.map((entity, i) => ({
+      ...entity,
+      languageLabel: rows.raw[i]?.languageLabel ?? null,
+    }));
+  }
+
+  /**
+   * Narrow on an optional `config` field that an admin fills in by hand.
+   *
+   * Case-insensitive because these values are not reliably normalised, and
+   * whitespace-tolerant for the same reason.
+   */
+  private applyConfigFilter(
+    query: SelectQueryBuilder<ScenarioVoices>,
+    key: 'gender' | 'age',
+    csv?: string,
+  ): void {
+    if (!csv) return;
+
+    const requested = csv
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    if (!requested.length) return;
+
+    const wantsUnset = requested.includes(UNSET_GENDER_FILTER);
+    const named = requested.filter((value) => value !== UNSET_GENDER_FILTER);
+
+    // Distinct parameter names per key, or a second call would clobber the first.
+    const param = `${key}Values`;
+    const stored = `LOWER(TRIM(scenarioVoice.config ->> '${key}'))`;
+    const isMissing = `(scenarioVoice.config ->> '${key}' IS NULL OR TRIM(scenarioVoice.config ->> '${key}') = '')`;
+
+    if (wantsUnset && named.length) {
+      query.andWhere(`(${stored} IN (:...${param}) OR ${isMissing})`, {
+        [param]: named,
+      });
+    } else if (wantsUnset) {
+      query.andWhere(isMissing);
+    } else {
+      query.andWhere(`${stored} IN (:...${param})`, { [param]: named });
+    }
+  }
+
+  private applySorting(
+    query: SelectQueryBuilder<ScenarioVoices>,
+    options: Pagination,
+  ) {
+    const sortColumn = this.getValidatedSortColumn(
+      options.sortBy || 'createdAt',
+    );
+    if (sortColumn) {
+      query.orderBy(`scenarioVoice.${sortColumn}`, options.order || 'ASC');
+    }
+  }
+
+  private getValidatedSortColumn(sortBy?: string): string | null {
+    if (!sortBy) {
+      return ScenarioVoiceSortBy.CREATED_AT;
+    }
+    const validColumns = Object.values(ScenarioVoiceSortBy);
+    return validColumns.includes(sortBy as ScenarioVoiceSortBy)
+      ? sortBy
+      : ScenarioVoiceSortBy.CREATED_AT;
+  }
+
+  private applyPagination(
+    query: SelectQueryBuilder<ScenarioVoices>,
+    options: Pagination,
+  ) {
+    if (options.offset) {
+      query.offset(options.offset);
+    }
+    if (options.limit) {
+      query.limit(options.limit);
+    }
+  }
+
+  async getLanguagesWithVoices(active?: boolean, voicesNeeded?: boolean) {
+    // When voicesNeeded is false: return ALL active languages (including those with no voices)
+    // so users can create the first voice for a new language in the Create Voice form.
+    // When voicesNeeded is true: return only languages that have at least one scenario voice.
+    const requiresVoices = voicesNeeded === true;
+
+    const query = this.createQueryBuilder()
+      .select('la.id', 'language_id')
+      .addSelect('la.value', 'value')
+      .addSelect('la.label', 'label')
+      .addSelect('la.translationCode', 'translationCode')
+      // gender/age come from config so the studio's voice picker can group and
+      // label options (provider → gender) instead of showing one flat list.
+      .addSelect(
+        voicesNeeded
+          ? `jsonb_agg(DISTINCT jsonb_build_object('id', sv.id, 'name', sv.name, 'provider', sv.provider, 'gender', LOWER(sv.config ->> 'gender'), 'age', sv.config ->> 'age'))`
+          : `'[]'::jsonb`,
+        'voices',
+      )
+      .from('languages', 'la')
+      .leftJoin('scenario_voices', 'sv', 'la.id = sv.languageId');
+
+    if (active !== undefined) {
+      query.where('la.active = :active', { active });
+      if (requiresVoices) {
+        query.andWhere('sv.active = :active', { active });
+        query.andWhere('sv.id IS NOT NULL');
+      }
+    } else {
+      query.where('la.active = true');
+      if (requiresVoices) {
+        query.andWhere('sv.active = true');
+        query.andWhere('sv.id IS NOT NULL');
+      }
+    }
+
+    if (requiresVoices) {
+      query
+        .groupBy('la.id, la.value, la.label, la.translationCode')
+        .having('COUNT(sv.id) > 0');
+    } else {
+      query.groupBy('la.id, la.value, la.label, la.translationCode');
+    }
+
+    const rows = await query.getRawMany();
+
+    if (!rows) {
+      return [];
+    }
+
+    return rows.map((r) => ({
+      language_id: Number(r.language_id),
+      value: r.value,
+      label: r.label,
+      translationCode: r.translationCode ?? '',
+      voices: typeof r.voices === 'string' ? JSON.parse(r.voices) : r.voices,
+    }));
+  }
+
+  async getLanguagesForScenario(active?: boolean, hasVoices?: boolean) {
+    const query = this.createQueryBuilder()
+      .select('CAST(la.id AS INTEGER)', 'language_id')
+      .addSelect('la.value', 'value')
+      .addSelect('la.label', 'label')
+      .addSelect('la.active', 'active')
+      .addSelect('la.translationCode', 'translationCode')
+      // IMPORTANT: start from the languages table so `la` refers to languages
+      .from('languages', 'la')
+      .leftJoin('scenario_voices', 'sv', 'sv.languageId = la.id');
+
+    // always dedupe by language
+    query.groupBy('la.id, la.value, la.label');
+
+    // hasVoices filter (both male & female)
+    if (hasVoices) {
+      query
+        .andWhere(`sv.config->>'gender' IN ('male', 'female')`)
+        .having(`COUNT(DISTINCT LOWER(sv.config->>'gender')) = 2`);
+    }
+
+    // active filter — pass boolean (or cast if your column is text)
+    if (active !== undefined) {
+      query.andWhere('la.active = :active', { active });
+    } else {
+      query.andWhere('la.active = true');
+    }
+
+    return await query.getRawMany();
+  }
+
+  async getVoiceWithLanguageCode(voiceId: string) {
+    return this.createQueryBuilder('sv')
+      .select('sv.id', 'id')
+      .addSelect('sv.name', 'name')
+      .addSelect('sv.provider', 'provider')
+      .addSelect('sv.config', 'config')
+      .addSelect('sv.languageId', 'languageId')
+      .addSelect('la.value', 'languageCode')
+      .innerJoin('languages', 'la', 'la.id = sv.languageId')
+      .where('sv.id = :voiceId', { voiceId })
+      .getRawOne();
+  }
+
+  async getFallbackVoice(languageId: number, gender: string) {
+    return await this.findOne({
+      select: ['id', 'name', 'config'],
+      where: {
+        languageId,
+        ...(gender !== Gender.NON_BINARY
+          ? {
+              config: Raw((alias) => `${alias} ->> 'gender' = :gender`, {
+                gender,
+              }),
+            }
+          : {}),
+      },
+    });
+  }
+}

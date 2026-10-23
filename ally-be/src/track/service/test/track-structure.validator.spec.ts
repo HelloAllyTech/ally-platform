@@ -1,0 +1,1015 @@
+import { BadRequestException } from '@nestjs/common';
+import {
+  computeStructuralSignature,
+  validateTrackStructure,
+} from '../track-structure.validator';
+import { TrackItemType } from '../../type/track.type';
+import { UpsertTrackSectionDto } from '../../dto/upsert-track-structure.dto';
+
+function baseSections(): UpsertTrackSectionDto[] {
+  return [
+    {
+      title: 'Section 1',
+      order: 1,
+      items: [
+        {
+          type: TrackItemType.ARTICLE,
+          order: 1,
+          title: 'Article',
+          content: { html: '<p>hi</p>' },
+        },
+        {
+          type: TrackItemType.ROLEPLAY,
+          order: 2,
+          title: 'Roleplay',
+          scenarioId: 1,
+        },
+      ],
+    },
+  ];
+}
+
+function gameItem(overrides: Record<string, any> = {}) {
+  return {
+    type: TrackItemType.GAME,
+    order: 1,
+    title: 'Breather',
+    content: { gameKey: 'TREX_RUNNER', intro: 'Shake that call off.' },
+    ...overrides,
+  };
+}
+
+function quizItem(overrides: Record<string, any> = {}) {
+  return {
+    type: TrackItemType.QUIZ,
+    order: 1,
+    title: 'Quiz',
+    content: {
+      settings: { passScore: 70 },
+      questions: [
+        {
+          id: 'q1',
+          type: 'mcq_single',
+          prompt: 'Pick',
+          options: [
+            { id: 'a', text: 'A' },
+            { id: 'b', text: 'B' },
+          ],
+          correctOptionIds: ['a'],
+        },
+      ],
+      ...overrides,
+    },
+  } as any;
+}
+
+function videoItem(overrides: Record<string, any> = {}) {
+  return {
+    type: TrackItemType.VIDEO,
+    order: 1,
+    title: 'Video',
+    content: {
+      source: 's3',
+      url: 'https://example.com/video.mp4',
+      durationSeconds: 120,
+      ...overrides,
+    },
+  } as any;
+}
+
+function mcqInterjection(overrides: Record<string, any> = {}) {
+  return {
+    id: 'int1',
+    timestampSeconds: 10,
+    question: {
+      id: 'q1',
+      type: 'mcq_single',
+      prompt: 'Pick',
+      options: [
+        { id: 'a', text: 'A' },
+        { id: 'b', text: 'B' },
+      ],
+      correctOptionIds: ['a'],
+    },
+    ...overrides,
+  };
+}
+
+describe('validateTrackStructure', () => {
+  it('accepts a valid tree', () => {
+    expect(() => validateTrackStructure(baseSections())).not.toThrow();
+  });
+
+  it('rejects non-sequential section orders', () => {
+    const sections = baseSections();
+    sections[0].order = 3;
+    expect(() => validateTrackStructure(sections)).toThrow(BadRequestException);
+  });
+
+  it('rejects duplicate item orders within a section', () => {
+    const sections = baseSections();
+    sections[0].items[1].order = 1;
+    expect(() => validateTrackStructure(sections)).toThrow(BadRequestException);
+  });
+
+  it('rejects a roleplay item without a scenario', () => {
+    const sections = baseSections();
+    delete sections[0].items[1].scenarioId;
+    expect(() => validateTrackStructure(sections)).toThrow(
+      /must reference a scenario/,
+    );
+  });
+
+  it('rejects an empty article', () => {
+    const sections = baseSections();
+    sections[0].items[0].content = { html: '   ' };
+    expect(() => validateTrackStructure(sections)).toThrow(/must have content/);
+  });
+
+  it('rejects a quiz whose correct option id is unknown', () => {
+    const sections: UpsertTrackSectionDto[] = [
+      {
+        title: 'S',
+        order: 1,
+        items: [quizItem()],
+      },
+    ];
+    (sections[0].items[0].content as any).questions[0].correctOptionIds = [
+      'zzz',
+    ];
+    expect(() => validateTrackStructure(sections)).toThrow(/correct option id/);
+  });
+
+  it('rejects a fill-blank template missing its token', () => {
+    const sections: UpsertTrackSectionDto[] = [
+      { title: 'S', order: 1, items: [quizItem()] },
+    ];
+    (sections[0].items[0].content as any).questions = [
+      {
+        id: 'q1',
+        type: 'fill_blank',
+        prompt: '',
+        template: 'no token here',
+        blanks: [{ id: 'b1', acceptedAnswers: ['x'] }],
+      },
+    ];
+    expect(() => validateTrackStructure(sections)).toThrow(/token/);
+  });
+
+  it('rejects an ordering question whose correctOrder is not a permutation', () => {
+    const sections: UpsertTrackSectionDto[] = [
+      { title: 'S', order: 1, items: [quizItem()] },
+    ];
+    (sections[0].items[0].content as any).questions = [
+      {
+        id: 'q1',
+        type: 'ordering',
+        prompt: 'Order',
+        items: [
+          { id: 'i1', text: '1' },
+          { id: 'i2', text: '2' },
+        ],
+        correctOrder: ['i1', 'i1'],
+      },
+    ];
+    expect(() => validateTrackStructure(sections)).toThrow(/permutation/);
+  });
+});
+
+describe('computeStructuralSignature', () => {
+  it('is stable across content-safe edits', () => {
+    const before = baseSections();
+    before[0].id = 's1';
+    before[0].items[0].id = 'i1';
+    before[0].items[1].id = 'i2';
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].title = 'Renamed section';
+    after[0].items[0].title = 'Renamed article';
+    after[0].items[0].content = { html: '<p>rewritten body</p>' };
+    expect(computeStructuralSignature(after)).toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('changes when items are reordered', () => {
+    const before = baseSections();
+    before[0].id = 's1';
+    before[0].items[0].id = 'i1';
+    before[0].items[1].id = 'i2';
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].order = 2;
+    after[0].items[1].order = 1;
+    expect(computeStructuralSignature(after)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('changes when a quiz answer key changes', () => {
+    const before: UpsertTrackSectionDto[] = [
+      { id: 's1', title: 'S', order: 1, items: [{ ...quizItem(), id: 'i1' }] },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.questions[0].correctOptionIds = ['b'];
+    expect(computeStructuralSignature(after)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('is stable when only a question explanation changes', () => {
+    const before: UpsertTrackSectionDto[] = [
+      { id: 's1', title: 'S', order: 1, items: [{ ...quizItem(), id: 'i1' }] },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.questions[0].explanation = 'new explanation';
+    expect(computeStructuralSignature(after)).toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('changes when a video interjection answer key changes', () => {
+    const before: UpsertTrackSectionDto[] = [
+      {
+        id: 's1',
+        title: 'S',
+        order: 1,
+        items: [
+          {
+            ...videoItem({ interjections: [mcqInterjection()] }),
+            id: 'i1',
+          },
+        ],
+      },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.interjections[0].question.correctOptionIds = [
+      'b',
+    ];
+    expect(computeStructuralSignature(after)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('is stable when only an interjection question prompt/explanation changes', () => {
+    const before: UpsertTrackSectionDto[] = [
+      {
+        id: 's1',
+        title: 'S',
+        order: 1,
+        items: [
+          {
+            ...videoItem({ interjections: [mcqInterjection()] }),
+            id: 'i1',
+          },
+        ],
+      },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.interjections[0].question.prompt =
+      'Reworded prompt';
+    after[0].items[0].content.interjections[0].question.explanation =
+      'new explanation';
+    expect(computeStructuralSignature(after)).toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('changes when the game an item runs is swapped', () => {
+    const before: UpsertTrackSectionDto[] = [
+      { id: 's1', title: 'S', order: 1, items: [{ ...gameItem(), id: 'i1' }] },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.gameKey = 'SOMETHING_ELSE';
+    expect(computeStructuralSignature(after)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('is stable when only the game intro changes', () => {
+    const before: UpsertTrackSectionDto[] = [
+      { id: 's1', title: 'S', order: 1, items: [{ ...gameItem(), id: 'i1' }] },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.intro = 'Reworded framing.';
+    expect(computeStructuralSignature(after)).toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('changes when the breathing exercise configuration changes', () => {
+    const before: UpsertTrackSectionDto[] = [
+      {
+        id: 's1',
+        title: 'S',
+        order: 1,
+        items: [
+          {
+            type: TrackItemType.GAME,
+            id: 'i1',
+            order: 1,
+            title: 'B',
+            content: {
+              gameKey: 'BREATHING_EXERCISE',
+              breathingExercise: {
+                inhale: 4,
+                holdIn: 4,
+                exhale: 4,
+                holdOut: 4,
+                cycles: 4,
+                inhaleText: 'In',
+                holdInText: 'Hold',
+                exhaleText: 'Out',
+                holdOutText: 'Hold',
+              },
+            },
+          },
+        ],
+      },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.breathingExercise.cycles = 5;
+    expect(computeStructuralSignature(after)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+
+    const after2 = JSON.parse(JSON.stringify(before));
+    after2[0].items[0].content.breathingExercise.inhale = 5;
+    expect(computeStructuralSignature(after2)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+});
+
+describe('validateTrackStructure - game', () => {
+  const wrap = (item: any): UpsertTrackSectionDto[] => [
+    { title: 'S', order: 1, items: [item] },
+  ];
+
+  const breathingExerciseItem = (content: Record<string, any> = {}) => ({
+    type: TrackItemType.GAME,
+    order: 1,
+    title: 'Breathing',
+    content: {
+      gameKey: 'BREATHING_EXERCISE',
+      breathingExercise: {
+        inhale: 4,
+        holdIn: 4,
+        exhale: 4,
+        holdOut: 4,
+        cycles: 4,
+        inhaleText: 'Inhale',
+        holdInText: 'Hold',
+        exhaleText: 'Exhale',
+        holdOutText: 'Hold',
+        ...content,
+      },
+    },
+  });
+
+  it('accepts a game with a known key', () => {
+    expect(() => validateTrackStructure(wrap(gameItem()))).not.toThrow();
+  });
+
+  it('accepts a valid breathing exercise', () => {
+    expect(() =>
+      validateTrackStructure(wrap(breathingExerciseItem())),
+    ).not.toThrow();
+  });
+
+  it('rejects a breathing exercise missing its configuration', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap({
+          type: TrackItemType.GAME,
+          order: 1,
+          title: 'G',
+          content: { gameKey: 'BREATHING_EXERCISE' },
+        }),
+      ),
+    ).toThrow(/missing the breathing exercise configuration/);
+  });
+
+  it('rejects non-positive durations in a breathing exercise', () => {
+    expect(() =>
+      validateTrackStructure(wrap(breathingExerciseItem({ inhale: 0 }))),
+    ).toThrow(/inhale duration must be a positive number/);
+    expect(() =>
+      validateTrackStructure(wrap(breathingExerciseItem({ holdIn: -1 }))),
+    ).toThrow(/holdIn duration must be a positive number/);
+  });
+
+  it('rejects non-integer or non-positive cycles', () => {
+    expect(() =>
+      validateTrackStructure(wrap(breathingExerciseItem({ cycles: 0 }))),
+    ).toThrow(/cycles must be a positive integer/);
+    expect(() =>
+      validateTrackStructure(wrap(breathingExerciseItem({ cycles: 4.5 }))),
+    ).toThrow(/cycles must be a positive integer/);
+  });
+
+  it('rejects empty instructional texts', () => {
+    expect(() =>
+      validateTrackStructure(wrap(breathingExerciseItem({ inhaleText: '' }))),
+    ).toThrow(/inhaleText cannot be empty/);
+    expect(() =>
+      validateTrackStructure(
+        wrap(breathingExerciseItem({ holdOutText: '   ' })),
+      ),
+    ).toThrow(/holdOutText cannot be empty/);
+  });
+
+  it('accepts a game with no intro at all', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(gameItem({ content: { gameKey: 'TREX_RUNNER' } })),
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects a game with no game selected', () => {
+    expect(() =>
+      validateTrackStructure(wrap(gameItem({ content: {} }))),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects a game key the learner app cannot serve', () => {
+    expect(() =>
+      validateTrackStructure(wrap(gameItem({ content: { gameKey: 'PONG' } }))),
+    ).toThrow(BadRequestException);
+  });
+
+  it('never carries a completion threshold — games do not gate', () => {
+    // Guards the product rule in game.type.ts: an author cannot smuggle a
+    // score gate in through completionCriteria, because nothing reads it.
+    const item = gameItem({ completionCriteria: { minScore: 500 } });
+    expect(() => validateTrackStructure(wrap(item))).not.toThrow();
+  });
+});
+
+describe('validateTrackStructure - video interjections', () => {
+  const wrap = (item: any): UpsertTrackSectionDto[] => [
+    { title: 'S', order: 1, items: [item] },
+  ];
+
+  it('accepts a video with a valid MCQ interjection', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(videoItem({ interjections: [mcqInterjection()] })),
+      ),
+    ).not.toThrow();
+  });
+
+  it('accepts a video with no interjections at all', () => {
+    expect(() => validateTrackStructure(wrap(videoItem()))).not.toThrow();
+  });
+
+  it('rejects interjections on a non-S3 video source', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            source: 'youtube',
+            interjections: [mcqInterjection()],
+          }),
+        ),
+      ),
+    ).toThrow(/uploaded \(S3\) video/);
+  });
+
+  it('rejects duplicate interjection ids', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            interjections: [
+              mcqInterjection({ id: 'dup' }),
+              mcqInterjection({ id: 'dup', timestampSeconds: 20 }),
+            ],
+          }),
+        ),
+      ),
+    ).toThrow(/duplicate id/i);
+  });
+
+  it('rejects a negative timestamp', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            interjections: [mcqInterjection({ timestampSeconds: -1 })],
+          }),
+        ),
+      ),
+    ).toThrow(/timestampSeconds/);
+  });
+
+  it('rejects a timestamp beyond the video duration', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            durationSeconds: 60,
+            interjections: [mcqInterjection({ timestampSeconds: 61 })],
+          }),
+        ),
+      ),
+    ).toThrow(/duration/);
+  });
+
+  it('rejects an open-ended interjection question', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            interjections: [
+              mcqInterjection({
+                question: {
+                  id: 'q1',
+                  type: 'open_ended',
+                  prompt: 'Explain',
+                  rubric: { guidance: 'Be thorough', maxScore: 10 },
+                },
+              }),
+            ],
+          }),
+        ),
+      ),
+    ).toThrow(/open-ended/);
+  });
+
+  it('delegates to the shared quiz-question validator for an invalid interjection question', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            interjections: [
+              mcqInterjection({
+                question: {
+                  id: 'q1',
+                  type: 'mcq_single',
+                  prompt: 'Pick',
+                  options: [
+                    { id: 'a', text: 'A' },
+                    { id: 'b', text: 'B' },
+                  ],
+                  correctOptionIds: [],
+                },
+              }),
+            ],
+          }),
+        ),
+      ),
+    ).toThrow(/exactly one correct option/);
+  });
+});
+
+describe('validateTrackStructure - inline article questions', () => {
+  const wrap = (item: any): UpsertTrackSectionDto[] => [
+    { title: 'S', order: 1, items: [item] },
+  ];
+
+  const mcq = (overrides: Record<string, any> = {}) => ({
+    id: 'q1',
+    type: 'mcq_single',
+    prompt: 'Which one?',
+    options: [
+      { id: 'a', text: 'A' },
+      { id: 'b', text: 'B' },
+    ],
+    correctOptionIds: ['a'],
+    ...overrides,
+  });
+
+  const articleItem = (content: Record<string, any>) => ({
+    type: TrackItemType.ARTICLE,
+    order: 1,
+    title: 'Article',
+    content,
+  });
+
+  it('accepts an article with a placed question', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<p>Read this.</p><div data-ally-question="q1"></div>',
+            questions: [mcq()],
+          }),
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it('accepts an article with no questions at all', () => {
+    expect(() =>
+      validateTrackStructure(wrap(articleItem({ html: '<p>hi</p>' }))),
+    ).not.toThrow();
+  });
+
+  it('rejects a question that is never placed in the article', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(articleItem({ html: '<p>Read this.</p>', questions: [mcq()] })),
+      ),
+    ).toThrow(/not placed anywhere/);
+  });
+
+  it('rejects the same question placed twice', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html:
+              '<div data-ally-question="q1"></div><p>x</p>' +
+              '<div data-ally-question="q1"></div>',
+            questions: [mcq()],
+          }),
+        ),
+      ),
+    ).toThrow(/more than once/);
+  });
+
+  it('rejects a placeholder whose question no longer exists', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html:
+              '<div data-ally-question="q1"></div>' +
+              '<div data-ally-question="ghost"></div>',
+            questions: [mcq()],
+          }),
+        ),
+      ),
+    ).toThrow(/no longer exists/);
+  });
+
+  it('rejects a placeholder in an article with no questions', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(articleItem({ html: '<div data-ally-question="q1"></div>' })),
+      ),
+    ).toThrow(/no question to put in it/);
+  });
+
+  it('rejects duplicate question ids', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<div data-ally-question="q1"></div>',
+            questions: [mcq(), mcq()],
+          }),
+        ),
+      ),
+    ).toThrow(/duplicate id/);
+  });
+
+  it('rejects a question type other than single-answer MCQ', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<div data-ally-question="q1"></div>',
+            questions: [
+              {
+                id: 'q1',
+                type: 'true_false',
+                prompt: 'T?',
+                correctAnswer: true,
+              },
+            ],
+          }),
+        ),
+      ),
+    ).toThrow(/only single-answer multiple choice/);
+  });
+
+  it('rejects a question with no correct option marked', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<div data-ally-question="q1"></div>',
+            questions: [mcq({ correctOptionIds: [] })],
+          }),
+        ),
+      ),
+    ).toThrow(/exactly one correct option/);
+  });
+
+  it('caps the number of questions in one article', () => {
+    const questions = Array.from({ length: 11 }, (_, i) =>
+      mcq({ id: `q${i}` }),
+    );
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: questions
+              .map((q) => `<div data-ally-question="${q.id}"></div>`)
+              .join(''),
+            questions,
+          }),
+        ),
+      ),
+    ).toThrow(/at most 10 questions/);
+  });
+
+  it('treats deleting an article question as a structural change', () => {
+    const before: UpsertTrackSectionDto[] = [
+      {
+        id: 's1',
+        title: 'S',
+        order: 1,
+        items: [
+          {
+            ...articleItem({
+              html:
+                '<div data-ally-question="q1"></div>' +
+                '<div data-ally-question="q2"></div>',
+              questions: [mcq(), mcq({ id: 'q2' })],
+            }),
+            id: 'i1',
+          } as any,
+        ],
+      },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.questions.pop();
+    after[0].items[0].content.html = '<div data-ally-question="q1"></div>';
+    expect(computeStructuralSignature(after)).not.toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+
+  it('treats rewriting the article prose as content-safe', () => {
+    const before: UpsertTrackSectionDto[] = [
+      {
+        id: 's1',
+        title: 'S',
+        order: 1,
+        items: [
+          {
+            ...articleItem({
+              html: '<p>Old</p><div data-ally-question="q1"></div>',
+              questions: [mcq()],
+            }),
+            id: 'i1',
+          } as any,
+        ],
+      },
+    ];
+    const after = JSON.parse(JSON.stringify(before));
+    after[0].items[0].content.html =
+      '<p>Completely rewritten</p><div data-ally-question="q1"></div>';
+    after[0].items[0].content.questions[0].prompt = 'Reworded?';
+    expect(computeStructuralSignature(after)).toEqual(
+      computeStructuralSignature(before),
+    );
+  });
+});
+
+describe('validateTrackStructure - article resources', () => {
+  const wrap = (item: any): UpsertTrackSectionDto[] => [
+    { title: 'S', order: 1, items: [item] },
+  ];
+
+  const resource = (overrides: Record<string, any> = {}) => ({
+    id: 'r1',
+    title: 'A curated reading',
+    url: 'https://example.com/reading',
+    ...overrides,
+  });
+
+  const articleItem = (content: Record<string, any>) => ({
+    type: TrackItemType.ARTICLE,
+    order: 1,
+    title: 'Article',
+    content,
+  });
+
+  it('accepts an article with no resources at all', () => {
+    expect(() =>
+      validateTrackStructure(wrap(articleItem({ html: '<p>hi</p>' }))),
+    ).not.toThrow();
+  });
+
+  it('accepts an article with valid resources', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<p>hi</p>',
+            resources: [resource(), resource({ id: 'r2' })],
+          }),
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects a resource with a missing title', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<p>hi</p>',
+            resources: [resource({ title: '  ' })],
+          }),
+        ),
+      ),
+    ).toThrow(/missing title/);
+  });
+
+  it('rejects a non-http(s) resource URL', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<p>hi</p>',
+            resources: [resource({ url: 'javascript:alert(1)' })],
+          }),
+        ),
+      ),
+    ).toThrow(/only http\(s\) links/);
+  });
+
+  it('rejects a malformed resource URL', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<p>hi</p>',
+            resources: [resource({ url: 'not a url' })],
+          }),
+        ),
+      ),
+    ).toThrow(/not a valid URL/);
+  });
+
+  it('rejects duplicate resource ids', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          articleItem({
+            html: '<p>hi</p>',
+            resources: [resource(), resource()],
+          }),
+        ),
+      ),
+    ).toThrow(/duplicate id/);
+  });
+
+  it('caps the number of resources in one article', () => {
+    const resources = Array.from({ length: 11 }, (_, i) =>
+      resource({ id: `r${i}` }),
+    );
+    expect(() =>
+      validateTrackStructure(
+        wrap(articleItem({ html: '<p>hi</p>', resources })),
+      ),
+    ).toThrow(/at most 10 resources/);
+  });
+});
+
+describe('validateTrackStructure - question media', () => {
+  const wrap = (item: any): UpsertTrackSectionDto[] => [
+    { title: 'S', order: 1, items: [item] },
+  ];
+
+  const withMedia = (media: any) =>
+    quizItem({
+      questions: [
+        {
+          id: 'q1',
+          type: 'mcq_single',
+          prompt: 'What do you see?',
+          options: [
+            { id: 'a', text: 'A' },
+            { id: 'b', text: 'B' },
+          ],
+          correctOptionIds: ['a'],
+          media,
+        },
+      ],
+    });
+
+  const image = {
+    kind: 'image',
+    source: 's3',
+    url: 'https://bucket.s3.ap-south-1.amazonaws.com/track-media/question_image/1-x.png',
+    alt: 'A swollen left ankle',
+  };
+
+  it('accepts a question with no media (the overwhelmingly common case)', () => {
+    expect(() => validateTrackStructure(wrap(quizItem()))).not.toThrow();
+  });
+
+  it('accepts an uploaded image with a description', () => {
+    expect(() => validateTrackStructure(wrap(withMedia(image)))).not.toThrow();
+  });
+
+  it('accepts an uploaded video', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          withMedia({
+            kind: 'video',
+            source: 's3',
+            url: 'https://bucket.s3.ap-south-1.amazonaws.com/track-media/question_video/1-x.mp4',
+          }),
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it('accepts an embedded video URL', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          withMedia({
+            kind: 'video',
+            source: 'youtube',
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          }),
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects an unknown media kind', () => {
+    expect(() =>
+      validateTrackStructure(wrap(withMedia({ ...image, kind: 'audio' }))),
+    ).toThrow(/image or a video/);
+  });
+
+  it('rejects an unknown media source', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(withMedia({ ...image, kind: 'video', source: 'tiktok' })),
+      ),
+    ).toThrow(/unknown source/);
+  });
+
+  it('rejects media with no URL', () => {
+    expect(() =>
+      validateTrackStructure(wrap(withMedia({ ...image, url: '  ' }))),
+    ).toThrow(/missing its URL/);
+  });
+
+  it('rejects a non-https URL, including a javascript: payload', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(withMedia({ ...image, url: 'javascript:alert(1)' })),
+      ),
+    ).toThrow(/https link/);
+    expect(() =>
+      validateTrackStructure(
+        wrap(withMedia({ ...image, url: 'http://example.com/x.png' })),
+      ),
+    ).toThrow(/https link/);
+  });
+
+  it('rejects an image claiming a third-party video host', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          withMedia({
+            kind: 'image',
+            source: 'youtube',
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          }),
+        ),
+      ),
+    ).toThrow(/must be an uploaded file/);
+  });
+
+  it('rejects an over-long media description', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(withMedia({ ...image, alt: 'x'.repeat(301) })),
+      ),
+    ).toThrow(/300 characters or fewer/);
+  });
+
+  // Media lives on QuizQuestionBase, so the two non-quiz surfaces that carry a
+  // QuizQuestion have to be gated by the same rule — otherwise a bad payload
+  // simply picks a different door.
+  it('applies the same rule to a video interjection question', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(
+          videoItem({
+            interjections: [
+              mcqInterjection({
+                question: {
+                  ...mcqInterjection().question,
+                  media: { ...image, url: 'javascript:alert(1)' },
+                },
+              }),
+            ],
+          }),
+        ),
+      ),
+    ).toThrow(/https link/);
+  });
+});

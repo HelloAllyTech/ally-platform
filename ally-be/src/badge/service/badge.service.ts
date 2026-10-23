@@ -1,0 +1,916 @@
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadgeRepository } from '../repository/badge.repository';
+import {
+  CreateBadgeDto,
+  CreateBadgeResponseDto,
+  CreateBadgesBatchDto,
+  CreateBadgesBatchResponseDto,
+  UpdateBadgeDto,
+} from '../dto/badge.dto';
+import { Badge } from '../entity/badge.entity';
+import { BadgeUser } from '../entity/badge-user.entity';
+import { BadgeGroup } from '../entity/badge-group.entity';
+import {
+  BADGE_MANDATORY_FIELDS,
+  BadgeStatus,
+  BadgeLockStatus,
+  BadgeViewedStatus,
+  BadgeVisibilityType,
+  BadgeCategory,
+} from '../constants/badge.constants';
+import { DataSource, In } from 'typeorm';
+import { TenantService } from 'src/tenant/service/tenant.service';
+import { BadgeUserService } from './badge-user.service';
+import { BadgeTenantService } from './badge-tenant.service';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { groupAndSortBadgesByCategory } from '../util/badge.util';
+import {
+  GroupedUserAvailableBadges,
+  MarkBadgeViewedResponse,
+  TenantBadgeResponse,
+  UserAvailableBadge,
+  UserBadgeResponse,
+} from '../type/badge-response.type';
+import { NotFoundException } from 'src/exception/custom.exception';
+import { BadgeUserRepository } from '../repository/badge-user.repository';
+import { GroupRepository } from 'src/authorization/repository/group.repository';
+import { BadgeGroupRepository } from '../repository/badge-group.repository';
+import { BadgeTenant } from '../entity/badge-tenant.entity';
+import { AppConfigService } from 'src/config/config.service';
+import { S3Service } from 'src/aws/service/s3.service';
+import { BadgeImageUploadRequestDto } from '../dto/badge-image-upload-request.dto';
+import { BadgeImageUploadResponseDto } from '../dto/badge-image-upload-response.dto';
+import { BadgeImageUploadContentType } from '../enum/badge-image-upload-content-type.enum';
+import { DeleteBadgeImageDto } from '../dto/delete-badge-image.dto';
+import { BadgeFilterDto } from '../dto/badge-filter.dto';
+import { Pagination } from 'src/common/type/common.type';
+import { OpenAITranslationsService } from 'src/common/service/openai-translation.service';
+import { SharedLanguageService } from 'src/language/service/shared-language.service';
+import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
+import { BadgeTranslatableFields } from '../type/badge.type';
+import { ELIGBLE_APP_LANGUAGES } from 'src/common/constants/translation.constants';
+
+@Injectable()
+export class BadgeService {
+  private readonly logger = new Logger(BadgeService.name);
+
+  constructor(
+    private readonly badgeRepository: BadgeRepository,
+    private readonly badgeUserService: BadgeUserService,
+    private readonly badgeTenantService: BadgeTenantService,
+    private readonly dataSource: DataSource,
+    private readonly tenantService: TenantService,
+    private readonly badgeUserRepository: BadgeUserRepository,
+    private readonly groupRepository: GroupRepository,
+    private readonly badgeGroupRepository: BadgeGroupRepository,
+    private readonly configService: AppConfigService,
+    private readonly s3Service: S3Service,
+    private readonly openaiTranslationsService: OpenAITranslationsService,
+    private readonly sharedLanguageService: SharedLanguageService,
+    private readonly scenarioSharedService: ScenarioSharedService,
+  ) {}
+
+  async createBadge(
+    createBadgeDto: CreateBadgeDto,
+  ): Promise<CreateBadgeResponseDto> {
+    const userId = Number(ExecutionManager.getUserId());
+    if (!userId) {
+      throw new BadRequestException('User not found');
+    }
+
+    await this.validateCreateBadgeDto(createBadgeDto);
+
+    return await this.dataSource.transaction(async (entityManager) => {
+      const badgeRepo = entityManager.getRepository(Badge);
+      const badgeGroupRepo = entityManager.getRepository(BadgeGroup);
+
+      const badge = badgeRepo.create({
+        ...createBadgeDto,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+
+      const savedBadge = await badgeRepo.save(badge);
+
+      this.createBadgeTranslations(savedBadge.id, {
+        name: savedBadge.name,
+        description: savedBadge.description,
+      });
+
+      if (createBadgeDto.groupIds && createBadgeDto.groupIds.length > 0) {
+        const badgeGroups = createBadgeDto.groupIds.map((groupId) =>
+          badgeGroupRepo.create({
+            badgeId: savedBadge.id,
+            groupId,
+          }),
+        );
+        await badgeGroupRepo.save(badgeGroups);
+      }
+
+      if (savedBadge.status === BadgeStatus.ACTIVE) {
+        // Run background job to assign badge to tenants and award badge to users
+        this.badgeTenantService
+          .assignBadgeToTenants(savedBadge, createBadgeDto.tenantIds)
+          .then((assignedTenantIds) => {
+            if (assignedTenantIds && assignedTenantIds.length > 0) {
+              this.badgeUserService.awardBadgeToUsersByTenant(
+                savedBadge,
+                assignedTenantIds,
+              );
+            }
+          });
+      }
+      return { id: savedBadge.id };
+    });
+  }
+
+  async createBadgesBatch(
+    createBadgesBatchDto: CreateBadgesBatchDto,
+  ): Promise<CreateBadgesBatchResponseDto> {
+    const { badges } = createBadgesBatchDto;
+
+    const userId = Number(ExecutionManager.getUserId());
+    if (!userId) {
+      throw new BadRequestException('User not found');
+    }
+
+    // 1. Validate all badges upfront (outside transaction)
+    await this.validateBadgesBatch(badges);
+
+    // 2. Single transaction for all inserts
+    const savedBadges = await this.dataSource.transaction(
+      async (entityManager) => {
+        const badgeRepo = entityManager.getRepository(Badge);
+        const badgeGroupRepo = entityManager.getRepository(BadgeGroup);
+
+        // Bulk insert badges
+        const badgeEntities = badges.map((dto) =>
+          badgeRepo.create({
+            ...dto,
+            createdBy: userId,
+            updatedBy: userId,
+          }),
+        );
+        const inserted = await badgeRepo.save(badgeEntities);
+
+        inserted.forEach((badge) => {
+          this.createBadgeTranslations(badge.id, {
+            name: badge.name,
+            description: badge.description,
+          });
+        });
+
+        // Bulk insert badge-group mappings
+        const allBadgeGroups: BadgeGroup[] = [];
+        inserted.forEach((badge, index) => {
+          const groupIds = badges[index].groupIds ?? [];
+          groupIds.forEach((groupId) => {
+            allBadgeGroups.push(
+              badgeGroupRepo.create({ badgeId: badge.id, groupId }),
+            );
+          });
+        });
+        if (allBadgeGroups.length > 0) {
+          await badgeGroupRepo.save(allBadgeGroups);
+        }
+
+        return inserted;
+      },
+    );
+
+    // 3. Trigger async jobs for active badges (after transaction commits)
+    for (let i = 0; i < savedBadges.length; i++) {
+      const badge = savedBadges[i];
+      if (badge.status === BadgeStatus.ACTIVE) {
+        this.badgeTenantService
+          .assignBadgeToTenants(badge, badges[i].tenantIds)
+          .then((assignedTenantIds) => {
+            if (assignedTenantIds && assignedTenantIds.length > 0) {
+              this.badgeUserService.awardBadgeToUsersByTenant(
+                badge,
+                assignedTenantIds,
+              );
+            }
+          });
+      }
+    }
+
+    return { ids: savedBadges.map((b) => b.id) };
+  }
+
+  private async validateBadgesBatch(badges: CreateBadgeDto[]): Promise<void> {
+    // Validate mandatory fields for each badge
+    for (const badge of badges) {
+      this.validateMandatoryFieldsForActiveStatus(
+        badge,
+        badge.status ?? BadgeStatus.ACTIVE,
+      );
+    }
+
+    // Collect all unique tenant/group IDs and validate once
+    const allTenantIds = [...new Set(badges.flatMap((b) => b.tenantIds ?? []))];
+    const allGroupIds = [...new Set(badges.flatMap((b) => b.groupIds ?? []))];
+    await this.validateTenantAndGroupIds(
+      allTenantIds.length > 0 ? allTenantIds : undefined,
+      allGroupIds.length > 0 ? allGroupIds : undefined,
+    );
+  }
+
+  private validateMandatoryFieldsForActiveStatus(
+    badgeData: Partial<CreateBadgeDto & Badge>,
+    targetStatus: BadgeStatus,
+  ): void {
+    if (targetStatus === BadgeStatus.ACTIVE) {
+      const missingFields = BADGE_MANDATORY_FIELDS.filter(
+        (field) => !badgeData[field as keyof typeof badgeData],
+      );
+      if (missingFields.length > 0) {
+        throw new BadRequestException(
+          `The following required fields are missing for ACTIVE badge: ${missingFields.join(', ')}`,
+        );
+      }
+    }
+  }
+
+  private async validateTenantAndGroupIds(
+    tenantIds?: string[],
+    groupIds?: number[],
+  ): Promise<void> {
+    if (groupIds && groupIds.length > 0) {
+      const groups = await this.groupRepository.getAll({
+        where: { id: In(groupIds) },
+      });
+
+      if (groups.length !== groupIds.length) {
+        throw new NotFoundException(`One or more groups not found`);
+      }
+    }
+    if (tenantIds && tenantIds.length > 0) {
+      const tenantResults = await Promise.all(
+        tenantIds.map(async (tenantId) => ({
+          tenantId,
+          tenant: await this.tenantService.findById(tenantId),
+        })),
+      );
+
+      const invalidTenantIds = tenantResults
+        .filter((result) => !result.tenant)
+        .map((result) => result.tenantId);
+      if (invalidTenantIds.length > 0) {
+        throw new NotFoundException(`One or more tenants not found`);
+      }
+    }
+  }
+
+  private async validateCreateBadgeDto(
+    createBadgeDto: CreateBadgeDto,
+  ): Promise<void> {
+    this.validateMandatoryFieldsForActiveStatus(
+      createBadgeDto,
+      createBadgeDto.status ?? BadgeStatus.ACTIVE,
+    );
+    await this.validateTenantAndGroupIds(
+      createBadgeDto.tenantIds,
+      createBadgeDto.groupIds,
+    );
+  }
+
+  private async validateUpdateBadgeDto(
+    badge: Badge,
+    updateBadgeDto: UpdateBadgeDto,
+  ): Promise<void> {
+    // Validate status transition: cannot change from ACTIVE to DRAFT
+    if (
+      updateBadgeDto.status === BadgeStatus.DRAFT &&
+      badge.status === BadgeStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Cannot change badge status from ACTIVE to DRAFT',
+      );
+    }
+
+    // Block achievementParams changes if badge is ACTIVE
+    if (
+      badge.status === BadgeStatus.ACTIVE &&
+      (updateBadgeDto.achievementParams !== undefined ||
+        updateBadgeDto.category !== undefined)
+    ) {
+      throw new BadRequestException(
+        `Cannot modify ${updateBadgeDto.achievementParams !== undefined ? 'achievement parameters' : 'category'} for an active badge`,
+      );
+    }
+
+    // Validate tenantIds and groupIds
+    await this.validateTenantAndGroupIds(
+      updateBadgeDto.tenantIds,
+      updateBadgeDto.groupIds,
+    );
+
+    // Validate mandatory fields for ACTIVE status (check merged badge data)
+    const targetStatus = updateBadgeDto.status ?? badge.status;
+
+    // Get current groupIds from badge_groups table if not provided in update
+    let currentGroupIds: number[] | undefined;
+    if (updateBadgeDto.groupIds === undefined) {
+      const badgeGroups = await this.badgeGroupRepository.findByBadgeId(
+        badge.id,
+      );
+      currentGroupIds = badgeGroups.map((badgeGroup) => badgeGroup.groupId);
+    }
+
+    const mergedBadgeData = {
+      ...badge,
+      ...updateBadgeDto,
+      groupIds: updateBadgeDto.groupIds ?? currentGroupIds,
+    };
+    this.validateMandatoryFieldsForActiveStatus(mergedBadgeData, targetStatus);
+  }
+
+  async getUserBadges(
+    userId: number,
+    viewedStatus?: BadgeViewedStatus,
+    enableGroupFilter: boolean = false,
+    languageCode?: string,
+  ): Promise<UserBadgeResponse> {
+    const badges = await this.badgeRepository.getUserBadges(
+      userId,
+      viewedStatus,
+      enableGroupFilter,
+      languageCode,
+    );
+    const formattedBadges = badges.map((badge) => {
+      let { name, description } = badge;
+
+      if (
+        languageCode &&
+        badge.translations &&
+        badge.translations[languageCode]
+      ) {
+        name = badge.translations[languageCode].name || name;
+        description =
+          badge.translations[languageCode].description || description;
+      }
+
+      delete badge?.translations;
+      return {
+        ...badge,
+        name,
+        description,
+      };
+    });
+
+    return {
+      data: formattedBadges,
+    };
+  }
+
+  async getBadgesByUserIdList(userIds: number[]) {
+    return await this.badgeRepository.getBadgesByUserIds(userIds);
+  }
+
+  async getUserBadgeCount(
+    userId: number,
+    viewedStatus?: BadgeViewedStatus,
+  ): Promise<number> {
+    return this.badgeRepository.getUserBadgeCount(userId, viewedStatus);
+  }
+
+  async getFormattedUserAvailableBadges(
+    userId: number,
+    languageCode?: string,
+  ): Promise<GroupedUserAvailableBadges[]> {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      return [];
+    }
+
+    // Get all badges assigned to the tenant
+    const tenantBadges = await this.badgeRepository.getBadgesForTenant(
+      tenantId,
+      languageCode,
+    );
+
+    if (tenantBadges.length === 0) {
+      return [];
+    }
+
+    // Get badge IDs that the user has access to through their groups
+    const supportedUserGroupBadgeIds =
+      await this.badgeRepository.getBadgeIdsForUserGroups(userId);
+
+    const awardedBadges = await this.badgeUserRepository.find({
+      where: {
+        userId,
+      },
+    });
+    const awardedBadgeMap = new Map(
+      awardedBadges.map((badge) => [badge.badgeId, badge.viewedStatus]),
+    );
+
+    // Filter tenant badges to only include those the user has access to and set the viewedStatus and lockStatus
+    const availableBadges: UserAvailableBadge[] = tenantBadges
+      .filter((badge) =>
+        supportedUserGroupBadgeIds.some((id) => id === badge.id),
+      )
+      .map((badge) => {
+        let { name, description } = badge;
+
+        if (
+          languageCode &&
+          badge.translations &&
+          badge.translations[languageCode]
+        ) {
+          name = badge.translations[languageCode].name || name;
+          description =
+            badge.translations[languageCode].description || description;
+        }
+
+        return {
+          ...badge,
+          name,
+          description,
+          viewedStatus: awardedBadgeMap.get(badge.id) ?? null,
+          lockStatus: awardedBadgeMap.has(badge.id)
+            ? BadgeLockStatus.UNLOCKED
+            : BadgeLockStatus.LOCKED,
+        };
+      });
+
+    // Group badges by category and sort by achievementParams.count
+    return groupAndSortBadgesByCategory(availableBadges);
+  }
+
+  async markBadgeAsViewed(
+    userId: number,
+    badgeId: string,
+  ): Promise<MarkBadgeViewedResponse> {
+    const badgeUser = await this.badgeUserRepository.findOne({
+      where: {
+        userId,
+        badgeId,
+      },
+    });
+
+    if (!badgeUser) {
+      throw new NotFoundException('Badge not found for user');
+    }
+
+    badgeUser.viewedStatus = BadgeViewedStatus.VIEWED;
+    await this.badgeUserRepository.save(badgeUser);
+
+    return {
+      badgeId,
+      viewedStatus: BadgeViewedStatus.VIEWED,
+    };
+  }
+
+  async getAllBadges(
+    pagination: Pagination,
+    filter?: BadgeFilterDto,
+  ): Promise<{ data: (Badge & { roles: string[] })[]; count: number }> {
+    const [data, count] = await this.badgeRepository.getAllBadges(
+      pagination,
+      filter,
+    );
+
+    if (data.length === 0) {
+      return { data: [], count };
+    }
+
+    const badgeIds = data.map((b) => b.id);
+    const badgeIdToRoles =
+      await this.badgeGroupRepository.getGroupNamesByBadgeIds(badgeIds);
+
+    const badgeWithRoles = data.map((badge) => ({
+      ...badge,
+      roles: badgeIdToRoles.get(badge.id) ?? [],
+    }));
+
+    return { data: badgeWithRoles, count };
+  }
+
+  async updateBadge(
+    badgeId: string,
+    updateBadgeDto: UpdateBadgeDto,
+  ): Promise<boolean> {
+    const userId = Number(ExecutionManager.getUserId());
+    if (!userId) {
+      throw new BadRequestException('User not found');
+    }
+
+    const badge = await this.badgeRepository.findOne({
+      where: { id: badgeId },
+    });
+    if (!badge) {
+      throw new NotFoundException('Badge not found');
+    }
+
+    await this.validateUpdateBadgeDto(badge, updateBadgeDto);
+
+    return await this.dataSource.transaction(async (entityManager) => {
+      const badgeRepo = entityManager.getRepository(Badge);
+      const badgeGroupRepo = entityManager.getRepository(BadgeGroup);
+
+      // 1. Update badge fields
+      const updateData = this.buildBadgeUpdateData(updateBadgeDto, userId);
+
+      if (updateData?.name || updateData?.description) {
+        this.createBadgeTranslations(badgeId, {
+          name: updateData.name ?? badge.name,
+          description: updateData.description ?? badge.description,
+        });
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await badgeRepo.update(badgeId, updateData);
+      }
+
+      // 2. Handle group updates if provided
+      if (updateBadgeDto.groupIds !== undefined) {
+        const existingGroups = await badgeGroupRepo.find({
+          where: { badgeId },
+        });
+        const currentGroupIds = existingGroups.map((g) => g.groupId);
+
+        const currentSet = new Set(currentGroupIds);
+        const targetSet = new Set(updateBadgeDto.groupIds);
+
+        const groupIdsToRemove = currentGroupIds.filter(
+          (id) => !targetSet.has(id),
+        );
+        const groupIdsToAdd = updateBadgeDto.groupIds.filter(
+          (id) => !currentSet.has(id),
+        );
+
+        if (groupIdsToRemove.length > 0) {
+          await badgeGroupRepo.softDelete({
+            badgeId,
+            groupId: In(groupIdsToRemove),
+          });
+        }
+
+        if (groupIdsToAdd.length > 0) {
+          const badgeGroups = groupIdsToAdd.map((groupId) =>
+            badgeGroupRepo.create({ badgeId, groupId }),
+          );
+          await badgeGroupRepo.save(badgeGroups);
+        }
+      }
+
+      // 3. If status is/becomes ACTIVE, handle tenant assignments and visibility changes
+      const targetStatus = updateBadgeDto.status ?? badge.status;
+      if (targetStatus === BadgeStatus.ACTIVE) {
+        const updatedBadge = Object.assign({}, badge, updateData) as Badge;
+
+        // If badge was not active before, assign to tenants and award
+        if (badge.status !== BadgeStatus.ACTIVE) {
+          this.badgeTenantService
+            .assignBadgeToTenants(updatedBadge, updateBadgeDto.tenantIds)
+            .then((assignedTenantIds) => {
+              if (assignedTenantIds && assignedTenantIds.length > 0) {
+                this.badgeUserService.awardBadgeToUsersByTenant(
+                  updatedBadge,
+                  assignedTenantIds,
+                );
+              }
+            });
+        } else if (
+          updateBadgeDto.visibilityType !== undefined ||
+          updateBadgeDto.tenantIds !== undefined
+        ) {
+          // Badge was already active, handle visibility changes and tenant updates
+          const newVisibility = updateBadgeDto.visibilityType;
+          const currentVisibility = badge.visibilityType;
+
+          const currentTenantIds =
+            await this.badgeTenantService.getTenantIdsForBadge(badgeId);
+
+          // Determine target tenants based on new visibility
+          let targetTenantIds: string[];
+          if (
+            newVisibility !== undefined &&
+            currentVisibility !== newVisibility &&
+            newVisibility === BadgeVisibilityType.PUBLIC // Private -> Public
+          ) {
+            targetTenantIds = (await this.tenantService.findAll()).map(
+              (tenant) => tenant.id,
+            );
+          } else if (
+            (newVisibility ?? currentVisibility) ===
+              BadgeVisibilityType.PRIVATE &&
+            updateBadgeDto.tenantIds
+          ) {
+            targetTenantIds = updateBadgeDto.tenantIds;
+          } else if (
+            newVisibility !== undefined &&
+            currentVisibility !== newVisibility &&
+            newVisibility === BadgeVisibilityType.PRIVATE // Public -> Private
+          ) {
+            targetTenantIds = []; // Remove from all tenants
+          } else {
+            targetTenantIds = currentTenantIds; // No change
+          }
+
+          const targetTenantIdSet = new Set(targetTenantIds);
+
+          // Calculate tenants to remove and add
+          const tenantIdsToRemove = currentTenantIds.filter(
+            (id) => !targetTenantIdSet.has(id),
+          );
+          const tenantIdsToAdd = targetTenantIds.filter(
+            (id) => !currentTenantIds.includes(id),
+          );
+
+          this.logger.log(
+            `Removing badge ${badgeId} from tenants: ${tenantIdsToRemove.join(', ')}`,
+          );
+
+          // Apply removals
+          if (tenantIdsToRemove.length > 0) {
+            await Promise.all([
+              this.badgeTenantService.removeBadgeFromTenants(
+                badgeId,
+                tenantIdsToRemove,
+                userId,
+                entityManager,
+              ),
+              this.badgeUserService.removeBadgeUsersForTenants(
+                badgeId,
+                tenantIdsToRemove,
+                entityManager,
+              ),
+            ]);
+          }
+
+          // Apply additions
+          if (tenantIdsToAdd.length > 0) {
+            await this.badgeTenantService.updateBadgeTenants(
+              badgeId,
+              tenantIdsToAdd,
+              entityManager,
+            );
+            this.badgeUserService.awardBadgeToUsersByTenant(
+              updatedBadge,
+              tenantIdsToAdd,
+            );
+          }
+        }
+      }
+
+      return true;
+    });
+  }
+
+  async removeBadgeAndUsersFromTenants(
+    badgeId: string,
+    tenantIds: string[],
+    userId: number,
+  ): Promise<void> {
+    await this.badgeTenantService.removeBadgeFromTenants(
+      badgeId,
+      tenantIds,
+      userId,
+    );
+    await this.badgeUserService.removeBadgeUsersForTenants(badgeId, tenantIds);
+  }
+
+  async deleteBadge(badgeId: string): Promise<boolean> {
+    const badge = await this.badgeRepository.findOne({
+      where: { id: badgeId },
+    });
+    if (!badge) {
+      throw new NotFoundException('Badge not found');
+    }
+
+    return await this.dataSource.transaction(async (entityManager) => {
+      // Soft-delete related records
+      await entityManager.getRepository(BadgeTenant).softDelete({ badgeId });
+      await entityManager.getRepository(BadgeUser).softDelete({ badgeId });
+      await entityManager.getRepository(BadgeGroup).softDelete({ badgeId });
+
+      // Soft-delete the badge
+      await entityManager.getRepository(Badge).softDelete(badgeId);
+
+      return true;
+    });
+  }
+
+  async deleteBadgesBatch(badgeIds: string[]): Promise<boolean> {
+    if (badgeIds.length === 0) {
+      throw new BadRequestException('No badge IDs provided');
+    }
+
+    const badges = await this.badgeRepository.find({
+      where: { id: In(badgeIds) },
+    });
+    if (badges.length !== badgeIds.length) {
+      throw new NotFoundException('One or more badges not found');
+    }
+
+    return await this.dataSource.transaction(async (entityManager) => {
+      await entityManager
+        .getRepository(BadgeTenant)
+        .softDelete({ badgeId: In(badgeIds) });
+      await entityManager
+        .getRepository(BadgeUser)
+        .softDelete({ badgeId: In(badgeIds) });
+      await entityManager
+        .getRepository(BadgeGroup)
+        .softDelete({ badgeId: In(badgeIds) });
+      await entityManager.getRepository(Badge).softDelete({ id: In(badgeIds) });
+      return true;
+    });
+  }
+
+  private buildBadgeUpdateData(
+    updateBadgeDto: UpdateBadgeDto,
+    userId: number,
+  ): Partial<Badge> {
+    const updateData: Partial<Badge> = {};
+    if (updateBadgeDto.name !== undefined)
+      updateData.name = updateBadgeDto.name;
+    if (updateBadgeDto.description !== undefined)
+      updateData.description = updateBadgeDto.description;
+    if (updateBadgeDto.imageUrl !== undefined)
+      updateData.imageUrl = updateBadgeDto.imageUrl;
+    if (updateBadgeDto.status !== undefined)
+      updateData.status = updateBadgeDto.status;
+    if (updateBadgeDto.visibilityType !== undefined)
+      updateData.visibilityType = updateBadgeDto.visibilityType;
+    if (updateBadgeDto.category !== undefined)
+      updateData.category = updateBadgeDto.category;
+    if (updateBadgeDto.achievementParams !== undefined)
+      updateData.achievementParams = updateBadgeDto.achievementParams;
+    updateData.updatedBy = userId;
+    return updateData;
+  }
+
+  async getPaginatedBadgesForTenant(
+    tenantId: string,
+    pagination?: Pagination & { search?: string },
+  ): Promise<{ data: TenantBadgeResponse[] }> {
+    const [data] = await this.badgeRepository.getPaginatedBadgesForTenant(
+      tenantId,
+      pagination,
+    );
+    return { data };
+  }
+
+  /**
+   * Get badges that are available to a tenant
+   */
+  async getBadgesForTenant(tenantId: string): Promise<TenantBadgeResponse[]> {
+    return this.badgeRepository.getBadgesForTenant(tenantId);
+  }
+
+  async getAvailableUnawardedBadges(
+    userId: number,
+    category?: BadgeCategory,
+  ): Promise<TenantBadgeResponse[]> {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      return [];
+    }
+
+    // Get all badges assigned to the tenant
+    const tenantBadges =
+      await this.badgeRepository.getBadgesForTenant(tenantId);
+
+    if (tenantBadges.length === 0) {
+      return [];
+    }
+
+    // Get badge IDs that the user has access to through their groups
+    const supportedUserGroupBadgeIds =
+      await this.badgeRepository.getBadgeIdsForUserGroups(userId);
+
+    const awardedBadges = await this.badgeUserRepository.find({
+      where: {
+        userId,
+      },
+    });
+    const awardedBadgeIds = new Set(
+      awardedBadges.map((badge) => badge.badgeId),
+    );
+
+    // Filter tenant badges to only include those the user has access to and is not awarded currently
+    return tenantBadges.filter(
+      (badge) =>
+        supportedUserGroupBadgeIds.some((id) => id === badge.id) &&
+        !awardedBadgeIds.has(badge.id) &&
+        (category ? badge.category === category : true),
+    );
+  }
+
+  async getUnawardedBadgesForUserRole(
+    userId: number,
+    groupId: number,
+    tenantId?: string,
+  ): Promise<Badge[]> {
+    return this.badgeRepository.getUnawardedBadgesForUserRole(
+      userId,
+      groupId,
+      tenantId,
+    );
+  }
+
+  async getPresignedUrlForBadgeImage(
+    badgeImageUploadRequestDto: BadgeImageUploadRequestDto,
+  ): Promise<BadgeImageUploadResponseDto> {
+    const bucket = this._validateAndRetrieveBucket();
+
+    if (
+      !Object.values(BadgeImageUploadContentType).includes(
+        badgeImageUploadRequestDto.contentType,
+      )
+    ) {
+      throw new BadRequestException('Invalid file type');
+    }
+
+    const { presignedUrl, imageUrl } =
+      await this.s3Service.getPresignedUrlForImageUpload(
+        bucket,
+        'badges',
+        badgeImageUploadRequestDto.fileName,
+        badgeImageUploadRequestDto.fileSize,
+        badgeImageUploadRequestDto.contentType,
+      );
+
+    return { presignedUrl, imageUrl };
+  }
+
+  async deleteBadgeImage(deleteBadgeImageDto: DeleteBadgeImageDto) {
+    const bucket = this._validateAndRetrieveBucket();
+    return this.s3Service.deleteS3Image(bucket, deleteBadgeImageDto.imageUrl);
+  }
+
+  private _validateAndRetrieveBucket() {
+    const bucket = this.configService.s3.assetsBucket;
+    if (!bucket) {
+      throw new Error('S3 bucket name for assetsBucket is not defined');
+    }
+    return bucket;
+  }
+
+  private async createBadgeTranslations(
+    badgeId: string,
+    badgeData: BadgeTranslatableFields,
+  ) {
+    const validLanguageIds: number[] =
+      await this.scenarioSharedService.getUniqueLanguagesFromScenarioTranslations();
+
+    if (!validLanguageIds || validLanguageIds.length === 0) {
+      return;
+    }
+
+    let languageCodes =
+      await this.sharedLanguageService.getValidLanguageCodes(validLanguageIds);
+
+    languageCodes = languageCodes?.filter((languageCode) => {
+      return ELIGBLE_APP_LANGUAGES.includes(languageCode);
+    });
+
+    if (!languageCodes || languageCodes.length === 0) {
+      return;
+    }
+
+    const translated =
+      await this.openaiTranslationsService.translateObjectToLanguages(
+        badgeData,
+        languageCodes,
+        'openai_translation_speech_reexpression_user',
+      );
+
+    if (translated) {
+      await this.badgeRepository.update(badgeId, {
+        translations: translated,
+      } as any);
+    }
+  }
+
+  async makeTranslationsForBadges() {
+    const badges = await this.badgeRepository.find({
+      select: ['id', 'name', 'description'],
+    });
+
+    for (const badge of badges) {
+      const translations =
+        await this.openaiTranslationsService.translateObjectToLanguages(
+          {
+            name: badge.name,
+            description: badge.description,
+          },
+          ELIGBLE_APP_LANGUAGES,
+          'openai_translation_speech_reexpression_user',
+        );
+
+      if (translations) {
+        await this.badgeRepository.update(badge.id, {
+          translations,
+        } as any);
+      }
+    }
+
+    return true;
+  }
+}

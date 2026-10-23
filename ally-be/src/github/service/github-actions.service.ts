@@ -1,0 +1,1685 @@
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import axios, { AxiosError } from 'axios';
+
+import { LoggerService } from 'src/logger/logger.service';
+import { AppConfigService } from 'src/config/config.service';
+
+/** The subset of a GitHub Actions run this module cares about. */
+export interface WorkflowRun {
+  id: string;
+  htmlUrl: string;
+  status: 'queued' | 'in_progress' | 'completed' | string;
+  /** Null until `status` is `completed`. */
+  conclusion: string | null;
+  createdAt: Date;
+}
+
+/** A successful run with both ends of it — when it started and when it finished. */
+export interface CompletedRun {
+  id: string;
+  htmlUrl: string;
+  startedAt: Date;
+  finishedAt: Date;
+}
+
+/**
+ * What a merged pull request was about: its words, not its merge state.
+ * Separate from `PullRequestInfo` so the Bug Hunter/Builder polling paths keep
+ * reading the small payload they always have.
+ */
+export interface PullRequestSummary {
+  title: string;
+  body: string | null;
+  headRef: string | null;
+  mergeCommitSha: string | null;
+  mergedAt: Date | null;
+  authorLogin: string | null;
+}
+
+/** The commits and files between two refs. */
+export interface CommitComparison {
+  commits: { sha: string; message: string; authorLogin: string | null }[];
+  files: string[];
+  /** GitHub caps a comparison at 250 commits and 300 files. */
+  truncated: boolean;
+}
+
+/** The subset of a GitHub pull request this module cares about. */
+/** Branches `deleteBranch` refuses to touch, whoever asks. */
+const PROTECTED_BRANCHES = new Set(['master', 'main', 'develop', 'production']);
+
+export interface PullRequestInfo {
+  merged: boolean;
+  htmlUrl: string;
+  mergedAt: Date | null;
+  /** open | closed. A PR closed without merging is a rejection, not a pass. */
+  state: string;
+  /** When GitHub closed it, merged or not. Null while open. */
+  closedAt: Date | null;
+  /** Head commit sha — what a CI rollup is actually about. */
+  headSha: string | null;
+  /**
+   * GitHub's own summary of why a merge is or is not possible: `clean`,
+   * `behind`, `blocked`, `dirty`, `unstable`, or `unknown` while GitHub is
+   * still computing it. `behind` is the one Builder can do something about.
+   */
+  mergeableState: string | null;
+  /**
+   * The head branch's name (`bughunter/fix-…`), so a caller that merged the PR
+   * can delete the branch it came from. Null when GitHub did not say.
+   */
+  headRef: string | null;
+  /**
+   * True when the head lives in a different repository than the base — a
+   * fork. Nothing here may delete a branch it does not own, so callers skip
+   * branch deletion when this is set.
+   */
+  headIsFork: boolean;
+  /** Lines added and removed, and files changed, as GitHub counts them. Null when GitHub did not say. */
+  additions: number | null;
+  deletions: number | null;
+  changedFiles: number | null;
+}
+
+/**
+ * What a branch's protection requires, read from both the classic
+ * protection API and rulesets (a repo may use either). `source` says which
+ * answered; `none` means neither protects the branch.
+ */
+export interface BranchProtectionSummary {
+  reviewsRequired: number;
+  requiredChecks: string[];
+  source: 'classic' | 'ruleset' | 'both' | 'none';
+}
+
+/** A pull request, as returned by the list-all endpoint. */
+export interface PullRequestFromList {
+  htmlUrl: string;
+  headRef: string | null;
+  /** The rest is what the PR review sense (OPP-0785) needs to decide whether, and which head, to review. */
+  number: number | null;
+  headSha: string | null;
+  baseRef: string | null;
+  authorLogin: string | null;
+  title: string | null;
+  body: string | null;
+  draft: boolean;
+  updatedAt: Date | null;
+}
+
+/** What became of a branch-delete request — see `deleteBranch`. */
+export type BranchDeleteOutcome =
+  | 'deleted'
+  | 'already_gone'
+  | 'refused'
+  | 'failed';
+
+/**
+ * The combined state of every check on a commit, as one word.
+ *
+ * GitHub reports checks per run; what a reader (and an auto-fix decision)
+ * wants is "is this branch red". `failure` wins over everything because one
+ * failing required check blocks a merge regardless of what else passed.
+ */
+export interface CheckRollup {
+  /** success | failure | pending | none */
+  state: string;
+  /** Names of the checks that failed, for the fix prompt to reproduce. */
+  failed: string[];
+  total: number;
+}
+
+/**
+ * Who wrote a commit.
+ *
+ * Two names because they answer differently. `login` is the GitHub ACCOUNT the
+ * commit is attributed to and is the one worth matching a bot against — but it
+ * is null whenever the commit's email is not linked to an account, which is
+ * ordinary for a CI-authored or a locally-configured git identity. `name` is
+ * the git author line, always there, and is the fallback.
+ */
+export interface CommitAuthor {
+  login: string | null;
+  name: string | null;
+  /**
+   * The commit's parent shas.
+   *
+   * Carried because a branch brought up to date with master is a merge commit
+   * whose FIRST parent is the head that was already reviewed. That lineage is
+   * what lets an approval survive an update Builder performed itself, on
+   * branches where protection dismisses stale reviews.
+   */
+  parents: string[];
+}
+
+/** A review comment or review verdict left on a pull request by a person. */
+export interface PullRequestFeedback {
+  /** GitHub's own id, so re-reading the PR cannot duplicate a row. */
+  externalId: string;
+  kind: 'review_comment' | 'review';
+  author: string;
+  body: string;
+  path?: string | null;
+  line?: number | null;
+  /** For a review: APPROVED | CHANGES_REQUESTED | COMMENTED. */
+  state?: string | null;
+  createdAt: Date | null;
+}
+
+/**
+ * A deliberately small GitHub REST client — five calls, nothing more.
+ *
+ * Bug Hunter is the only caller, so this lives in the module rather than
+ * `src/github/`: pulling in Octokit for five endpoints would add a dependency
+ * (and its ESM/CJS interop problem — see ally-be/CLAUDE.md) to earn nothing.
+ * Everything here uses the same plain `axios` the AI service already uses for
+ * its outbound calls.
+ *
+ * ## Why dispatching is asymmetric
+ *
+ * `POST /actions/workflows/{file}/dispatches` answers **204 No Content**: it
+ * tells you the dispatch was accepted and nothing about the run it created.
+ * There is no run id to correlate on. `findRunSince` closes that gap by
+ * listing the workflow's recent runs and taking the newest one created at or
+ * after the dispatch instant — which is why callers must record
+ * `dispatchedAt` at dispatch time and why the reconcile task, not the
+ * dispatching request, is what resolves a run id.
+ */
+@Injectable()
+export class GithubActionsService {
+  private readonly logger = LoggerService.getInstance(
+    GithubActionsService.name,
+  );
+
+  constructor(private readonly configService: AppConfigService) {}
+
+  /** False when no token is configured — every caller must refuse cleanly rather than 500. */
+  get isConfigured(): boolean {
+    return Boolean(this.configService.githubToken);
+  }
+
+  /**
+   * Consecutive calls rejected as unauthorised, and when the run of them began.
+   *
+   * A token that expires does not announce itself. Every call starts returning
+   * 401, each caller catches its own failure and logs a `warn`, and the polling
+   * loops above them keep reporting that they completed — so the platform goes
+   * quiet while looking healthy. One expiry cost a whole afternoon before
+   * anyone read the right log line.
+   *
+   * Counting it here rather than in each caller is the only place that sees
+   * every call. A single 401 is not news — a repository can be missing, a
+   * fine-grained token can lack one scope — but a run of them across different
+   * endpoints is a credential, not a permission.
+   */
+  private authFailures = 0;
+  private authFailingSince: Date | null = null;
+
+  get credentialHealth(): { failures: number; since: Date | null } {
+    return { failures: this.authFailures, since: this.authFailingSince };
+  }
+
+  /** Every request funnels its outcome through here, success or failure. */
+  private noteAuthOutcome(error?: unknown): void {
+    const status = (error as AxiosError | undefined)?.response?.status;
+    if (status === 401) {
+      if (!this.authFailures) this.authFailingSince = new Date();
+      this.authFailures += 1;
+      return;
+    }
+    // Anything that is not an auth rejection proves the credential works —
+    // including a 404, which is a live token being told no.
+    if (error === undefined || status) {
+      this.authFailures = 0;
+      this.authFailingSince = null;
+    }
+  }
+
+  private get headers(): Record<string, string> {
+    return {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${this.configService.githubToken}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+  }
+
+  private url(repo: string, path: string): string {
+    return `https://api.github.com/repos/${this.configService.githubOrg}/${repo}/${path}`;
+  }
+
+  /**
+   * Fires a `workflow_dispatch`. Resolves to the instant GitHub accepted it —
+   * the correlation key `findRunSince` needs, taken from our own clock a beat
+   * BEFORE the request so clock skew can only ever widen the search window,
+   * never exclude our own run from it.
+   */
+  async dispatchWorkflow(params: {
+    repo: string;
+    workflow: string;
+    ref: string;
+    inputs: Record<string, string>;
+  }): Promise<Date> {
+    this.requireConfigured();
+    const dispatchedAt = new Date();
+    try {
+      await axios.post(
+        this.url(
+          params.repo,
+          `actions/workflows/${params.workflow}/dispatches`,
+        ),
+        { ref: params.ref, inputs: params.inputs },
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return dispatchedAt;
+    } catch (error) {
+      throw this.toReadableError(
+        error,
+        `Could not dispatch ${params.workflow} in ${params.repo}`,
+      );
+    }
+  }
+
+  /**
+   * The run this dispatch created, or null if GitHub hasn't registered it yet
+   * (routinely the case for the first several seconds — the caller should
+   * treat null as "check again later", never as failure).
+   *
+   * Takes the OLDEST qualifying run rather than the newest: if a second
+   * dispatch landed while we were waiting, the earlier one is ours.
+   */
+  async findRunSince(params: {
+    repo: string;
+    workflow: string;
+    since: Date;
+    /**
+     * The event that started the run. A Builder `builder.yml` run starts on
+     * `issues` or `issue_comment`, never `workflow_dispatch`, so filtering on
+     * the dispatch event never found one.
+     */
+    event?: string;
+  }): Promise<WorkflowRun | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(params.repo, `actions/workflows/${params.workflow}/runs`),
+        {
+          headers: this.headers,
+          params: { event: params.event ?? 'workflow_dispatch', per_page: 30 },
+          timeout: 15_000,
+        },
+      );
+      const candidates = (data?.workflow_runs ?? [])
+        .map((run: any) => this.toWorkflowRun(run))
+        .filter((run: WorkflowRun) => run.createdAt >= params.since)
+        // A workflow whose job condition is false still records a run, as
+        // `skipped`: `builder.yml` does so for every comment and every other
+        // label in the repo. Those are not the run anyone is looking for.
+        .filter((run: WorkflowRun) => run.conclusion !== 'skipped')
+        .sort(
+          (a: WorkflowRun, b: WorkflowRun) =>
+            a.createdAt.getTime() - b.createdAt.getTime(),
+        );
+      return candidates[0] ?? null;
+    } catch (error) {
+      // Correlation is best-effort by design: a failure here costs the drawer
+      // a "watch it work" link, and must never fail the caller's own work.
+      this.logger.warn(
+        `Could not list runs for ${params.workflow} in ${params.repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Did a run of this workflow SUCCEED after the given moment?
+   *
+   * Distinct from `findRunSince`, which correlates a dispatch we just made and
+   * therefore wants the oldest qualifying run whatever its outcome. This asks a
+   * question about the world: has this thing been released since then, by
+   * anyone — Builder, a person, another automation.
+   *
+   * No `event` filter, deliberately. `findRunSince` restricts to
+   * `workflow_dispatch` because it is looking for its own dispatch; a release
+   * cut by hand is exactly as real, and excluding it would answer "no" about a
+   * deploy that plainly happened.
+   */
+  async findSuccessfulRunSince(params: {
+    repo: string;
+    workflow: string;
+    since: Date;
+  }): Promise<WorkflowRun | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(params.repo, `actions/workflows/${params.workflow}/runs`),
+        {
+          headers: this.headers,
+          params: { status: 'success', per_page: 30 },
+          timeout: 15_000,
+        },
+      );
+      const candidates = (data?.workflow_runs ?? [])
+        .map((run: any) => this.toWorkflowRun(run))
+        .filter(
+          (run: WorkflowRun) =>
+            run.conclusion === 'success' && run.createdAt >= params.since,
+        )
+        .sort(
+          (a: WorkflowRun, b: WorkflowRun) =>
+            a.createdAt.getTime() - b.createdAt.getTime(),
+        );
+      return candidates[0] ?? null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list successful runs for ${params.workflow} in ${params.repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * A pull request's current merge state, straight from GitHub — the check
+   * nothing else in this module performs. `merged` is only ever true once
+   * GitHub itself reports it, whichever way the PR was actually merged (the
+   * fix agent's own `gh pr merge --admin`, or a human merging it by hand in
+   * GitHub's review UI, which this module otherwise never hears about).
+   */
+  async getPullRequest(
+    repo: string,
+    number: number,
+  ): Promise<PullRequestInfo | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, `pulls/${number}`), {
+        headers: this.headers,
+        timeout: 15_000,
+      });
+      this.noteAuthOutcome();
+      return {
+        merged: Boolean(data?.merged),
+        htmlUrl: data?.html_url,
+        mergedAt: data?.merged_at ? new Date(data.merged_at) : null,
+        state: String(data?.state ?? 'open'),
+        closedAt: data?.closed_at ? new Date(data.closed_at) : null,
+        headSha: data?.head?.sha ? String(data.head.sha) : null,
+        mergeableState: data?.mergeable_state
+          ? String(data.mergeable_state)
+          : null,
+        headRef: data?.head?.ref ? String(data.head.ref) : null,
+        headIsFork: Boolean(
+          data?.head?.repo?.full_name &&
+          data?.base?.repo?.full_name &&
+          String(data.head.repo.full_name).toLowerCase() !==
+            String(data.base.repo.full_name).toLowerCase(),
+        ),
+        additions: typeof data?.additions === 'number' ? data.additions : null,
+        deletions: typeof data?.deletions === 'number' ? data.deletions : null,
+        changedFiles:
+          typeof data?.changed_files === 'number' ? data.changed_files : null,
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read PR #${number} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * What a branch's protection requires, from classic protection and from
+   * rulesets together (OPP-0759). A 404 on the classic endpoint means "not
+   * protected that way", not an error. Null only when GitHub cannot be read
+   * at all, which a caller must treat as unknown rather than unprotected.
+   */
+  async getBranchProtection(
+    repo: string,
+    branch = 'master',
+  ): Promise<BranchProtectionSummary | null> {
+    this.requireConfigured();
+    let reviews = 0;
+    const checks = new Set<string>();
+    let classic = false;
+    let ruleset = false;
+    try {
+      try {
+        const { data } = await axios.get(
+          this.url(repo, `branches/${branch}/protection`),
+          { headers: this.headers, timeout: 15_000 },
+        );
+        classic = true;
+        reviews = Math.max(
+          reviews,
+          Number(
+            data?.required_pull_request_reviews
+              ?.required_approving_review_count ?? 0,
+          ) || 0,
+        );
+        for (const c of data?.required_status_checks?.contexts ?? [])
+          checks.add(String(c));
+      } catch (error) {
+        if (
+          (error as { response?: { status?: number } })?.response?.status !==
+          404
+        )
+          throw error;
+      }
+      const { data: rules } = await axios.get(
+        this.url(repo, `rules/branches/${branch}`),
+        { headers: this.headers, timeout: 15_000 },
+      );
+      for (const rule of (rules ?? []) as Record<string, any>[]) {
+        if (rule?.type === 'pull_request') {
+          ruleset = true;
+          reviews = Math.max(
+            reviews,
+            Number(rule?.parameters?.required_approving_review_count ?? 0) || 0,
+          );
+        } else if (rule?.type === 'required_status_checks') {
+          ruleset = true;
+          for (const c of rule?.parameters?.required_status_checks ?? [])
+            if (c?.context) checks.add(String(c.context));
+        }
+      }
+      this.noteAuthOutcome();
+      return {
+        reviewsRequired: reviews,
+        requiredChecks: [...checks].sort(),
+        source:
+          classic && ruleset
+            ? 'both'
+            : classic
+              ? 'classic'
+              : ruleset
+                ? 'ruleset'
+                : 'none',
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read ${branch} protection on ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Every open pull request in a repository.
+   *
+   * Only what the Bug Hunter reconcile loop needs: the branch name, to find the
+   * one that belongs to a given bug. O(n) in the number of open PRs, which is
+   * never high enough to be a problem.
+   */
+  async listPullRequests(repo: string): Promise<PullRequestFromList[] | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, `pulls`), {
+        headers: this.headers,
+        timeout: 15_000,
+        params: { state: 'open', per_page: 100 },
+      });
+      this.noteAuthOutcome();
+      return (data ?? []).map((pr: any) => ({
+        htmlUrl: pr?.html_url ? String(pr.html_url) : '',
+        headRef: pr?.head?.ref ? String(pr.head.ref) : null,
+        number: typeof pr?.number === 'number' ? pr.number : null,
+        headSha: pr?.head?.sha ? String(pr.head.sha) : null,
+        baseRef: pr?.base?.ref ? String(pr.base.ref) : null,
+        authorLogin: pr?.user?.login ? String(pr.user.login) : null,
+        title: pr?.title ? String(pr.title) : null,
+        body: typeof pr?.body === 'string' ? pr.body : null,
+        draft: Boolean(pr?.draft),
+        updatedAt: pr?.updated_at ? new Date(pr.updated_at) : null,
+      }));
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list pull requests in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Which files a pull request changed.
+   *
+   * Needed to tell which deployable a merged pull request belongs to: on
+   * `ally-web`, three independently-released apps live in one repo and only the
+   * paths distinguish them.
+   *
+   * Capped at 300 files across three pages. A pull request larger than that is
+   * not one an automatic release should reason about anyway, and the caller
+   * treats a truncated list as ambiguous rather than releasing on a partial
+   * view — which is why this reports `truncated` instead of quietly returning
+   * what it managed to read.
+   */
+  async listPullRequestFiles(
+    repo: string,
+    number: number,
+  ): Promise<{ files: string[]; truncated: boolean }> {
+    this.requireConfigured();
+    const files: string[] = [];
+    try {
+      for (let page = 1; page <= 3; page += 1) {
+        const { data } = await axios.get(
+          this.url(repo, `pulls/${number}/files`),
+          {
+            headers: this.headers,
+            timeout: 15_000,
+            params: { per_page: 100, page },
+          },
+        );
+        const batch = (data ?? []) as { filename?: string }[];
+        for (const entry of batch) {
+          if (entry?.filename) files.push(String(entry.filename));
+        }
+        if (batch.length < 100) return { files, truncated: false };
+      }
+      return { files, truncated: true };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list files on ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      // An empty list with `truncated` set: "we do not know", which the caller
+      // must not read as "this pull request changed nothing".
+      return { files, truncated: true };
+    }
+  }
+
+  /**
+   * Brings a pull request's branch up to date with its base.
+   *
+   * `PUT .../update-branch`, which **merges** the base into the head branch
+   * rather than rebasing it. That is the whole reason this is safe to do
+   * automatically, and it is the same reasoning `builder-fix-prompt.ts` states
+   * as a rule for the agent: never force-push, never rebase, never amend. A
+   * rebase rewrites every commit on the branch, which destroys a reviewer's
+   * place in the diff and orphans any comment anchored to a line — and they
+   * will not be told why. A merge commit costs one extra node in the history
+   * and breaks nothing.
+   *
+   * `expected_head_sha` makes it a compare-and-swap: if anything landed on the
+   * branch between reading it and calling this, GitHub answers 422 and nothing
+   * happens. Without it, a person pushing at the same moment gets a merge
+   * commit dropped on top of work Builder never saw.
+   *
+   * Returns rather than throws, like everything else here: "the base moved
+   * again" is an ordinary race that the next reconcile tick resolves.
+   */
+  async updatePullRequestBranch(
+    repo: string,
+    number: number,
+    expectedHeadSha: string,
+  ): Promise<{ updated: boolean; message: string | null }> {
+    this.requireConfigured();
+    try {
+      await axios.put(
+        this.url(repo, `pulls/${number}/update-branch`),
+        { expected_head_sha: expectedHeadSha },
+        { headers: this.headers, timeout: 30_000 },
+      );
+      return { updated: true, message: null };
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ??
+        (error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `Could not update the branch of ${repo}#${number}: ${message}`,
+      );
+      return { updated: false, message };
+    }
+  }
+
+  /**
+   * Submits an approving review, as the platform's own GitHub token.
+   *
+   * ## Why this is the piece that was missing
+   *
+   * `master` on the protected repos requires an approving review, and the bot
+   * that opens the pull requests holds only `write`. Nothing in the system ever
+   * submitted an approval, so every Builder pull request — however green, and
+   * however thoroughly reviewed — needed a human to click Approve, or an admin
+   * to override the protection outright. `mergePullRequest` refuses to force,
+   * correctly, which left the override as the only route.
+   *
+   * ## What the approval actually asserts
+   *
+   * That Builder's own review agent read the finished diff and reported no
+   * findings, with CI green. That is a real, auditable statement, and the body
+   * says so in those words rather than "LGTM" — anyone reading the pull request
+   * should be able to tell instantly that a machine approved it and on what
+   * basis.
+   *
+   * It is not a claim that a human looked. The caller gates on a setting that
+   * is off by default, so turning this on is a deliberate act.
+   *
+   * ## Why it can work at all
+   *
+   * GitHub refuses to let an author approve their own pull request. This runs
+   * as the server's token, which is a different identity from the runner's bot
+   * that opened the PR — the same asymmetry `mergePullRequest` relies on. If
+   * that ever stops being true, GitHub answers 422 and the message is returned
+   * verbatim rather than swallowed, because "we cannot approve our own PRs" is
+   * something the admin needs to read, not a silent no-op.
+   */
+  async approvePullRequest(
+    repo: string,
+    number: number,
+    body: string,
+  ): Promise<{ approved: boolean; message: string | null }> {
+    this.requireConfigured();
+    try {
+      await axios.post(
+        this.url(repo, `pulls/${number}/reviews`),
+        { event: 'APPROVE', body },
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return { approved: true, message: null };
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ??
+        (error instanceof Error ? error.message : String(error));
+      this.logger.warn(`Could not approve ${repo}#${number}: ${message}`);
+      return { approved: false, message };
+    }
+  }
+
+  /**
+   * Merges a pull request, as the platform's own GitHub token.
+   *
+   * ## Why this exists at all
+   *
+   * The bot account that opens a fix PR holds `write` on the three protected
+   * repos, and their `master` requires an approving review — so the fix
+   * agent's own `gh pr merge --admin` cannot land anything there. In practice
+   * that made every backend and frontend fix end at a green PR with a human
+   * going to GitHub to merge it: 89 of the 122 bot PRs merged so far were
+   * clicked through by hand, almost all within the hour. The review was never
+   * the cost; the trip was.
+   *
+   * So this merges as the SERVER's token (the same one that dispatches
+   * production releases, which necessarily has more rights than the bot), at
+   * an admin's explicit request, from the Bug Hunter drawer. The decision
+   * stays human and is recorded; only the errand is removed.
+   *
+   * ## Why it does not force
+   *
+   * `merge_method: squash` and nothing else — no `--admin` equivalent, no
+   * bypass. The caller checks the rollup first, and if GitHub still refuses
+   * (a required review missing, a branch behind, a check that went red in the
+   * meantime) that refusal is surfaced verbatim rather than worked around.
+   * A one-click merge that could push past a red gate would be a worse thing
+   * than the errand it replaces.
+   *
+   * Returns GitHub's own message on refusal instead of throwing, because
+   * "Base branch was modified" and "At least 1 approving review is required"
+   * are both things the admin can act on and neither is an outage.
+   */
+  async mergePullRequest(
+    repo: string,
+    number: number,
+    commitTitle?: string,
+  ): Promise<{ merged: boolean; message: string | null }> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.put(
+        this.url(repo, `pulls/${number}/merge`),
+        {
+          merge_method: 'squash',
+          ...(commitTitle ? { commit_title: commitTitle } : {}),
+        },
+        { headers: this.headers, timeout: 30_000 },
+      );
+      return {
+        merged: Boolean(data?.merged),
+        message: data?.message ? String(data.message) : null,
+      };
+    } catch (error) {
+      // 405 (not mergeable) and 409 (head changed) are the expected refusals
+      // and both carry a message worth showing; anything else is logged and
+      // reported the same way, since the admin's next move is identical.
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ??
+        (error instanceof Error ? error.message : String(error));
+      this.logger.warn(`Could not merge PR #${number} in ${repo}: ${message}`);
+      return { merged: false, message };
+    }
+  }
+
+  /**
+   * Delete a branch after its pull request merged (OPP-0750).
+   *
+   * Every merge path Bug Hunter has — the agent's own `gh pr merge`, the
+   * admin's Merge button here, and a human merging in GitHub's review UI
+   * that `reconcilePrOpenedFindings` later notices — used to leave the
+   * `bughunter/…` branch behind, because no repo has GitHub's own
+   * "automatically delete head branches" switched on and nothing else
+   * cleaned up. This is the explicit delete those paths call, so the
+   * behaviour does not depend on a repository setting staying set.
+   *
+   * Refuses the default branches outright whatever the caller says, and a
+   * 422 "Reference does not exist" is reported as `already_gone` rather than
+   * a failure: the agent's `--delete-branch` and this call race, and the
+   * second one losing is the expected outcome, not an error. Never throws —
+   * a merge has already happened by the time this runs, and a cleanup
+   * failure must not turn a landed fix into a 500.
+   */
+  async deleteBranch(
+    repo: string,
+    branch: string,
+  ): Promise<{ outcome: BranchDeleteOutcome; message: string | null }> {
+    const name = branch.trim().replace(/^refs\/heads\//, '');
+    if (!name || PROTECTED_BRANCHES.has(name.toLowerCase())) {
+      return {
+        outcome: 'refused',
+        message: `refusing to delete branch "${branch}"`,
+      };
+    }
+    this.requireConfigured();
+    try {
+      await axios.delete(
+        this.url(
+          repo,
+          `git/refs/heads/${name
+            .split('/')
+            .map((segment) => encodeURIComponent(segment))
+            .join('/')}`,
+        ),
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return { outcome: 'deleted', message: null };
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ??
+        (error instanceof Error ? error.message : String(error));
+      if (status === 422 || status === 404) {
+        return { outcome: 'already_gone', message };
+      }
+      this.logger.warn(
+        `Could not delete branch ${name} in ${repo}: ${message}`,
+      );
+      return { outcome: 'failed', message };
+    }
+  }
+
+  /**
+   * Who authored a commit — used to tell Builder's own pushes from a person's.
+   *
+   * Returns `null` for "could not tell", which callers must NOT collapse into
+   * "not a bot": the two mean different things, and a caller that writes a
+   * decision to the database on a failed lookup makes a transient GitHub
+   * outage permanent. See `BuilderPullRequestService.ingestFeedback`, which
+   * skips the tick rather than guessing.
+   */
+  async getCommitAuthor(
+    repo: string,
+    sha: string,
+  ): Promise<CommitAuthor | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, `commits/${sha}`), {
+        headers: this.headers,
+        timeout: 15_000,
+      });
+      return {
+        login: data?.author?.login ? String(data.author.login) : null,
+        name: data?.commit?.author?.name
+          ? String(data.commit.author.name)
+          : null,
+        parents: Array.isArray(data?.parents)
+          ? data.parents
+              .map((parent: { sha?: string }) => String(parent?.sha ?? ''))
+              .filter(Boolean)
+          : [],
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read the author of ${repo}@${sha}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Whether `master` has any commit after `since` — the signal a quiet-night
+   * sweep uses to decide there is nothing new for its code-review/test-lint
+   * finders to look at. `per_page=1` on purpose: this only ever needs a
+   * yes/no, never a count or the commits themselves. Fails OPEN (true) rather
+   * than closed on any GitHub error — a sweep that runs on a genuinely quiet
+   * night wastes some tokens; a sweep that silently never runs because this
+   * call started failing loses findings with nobody watching for it.
+   */
+  /**
+   * The commits on master since `since`, newest first, up to one page: sha,
+   * message, author login. The revert watch reads these for `Revert "…"`
+   * titles. Throws on a GitHub error — the caller decides what a blind
+   * read means, and here it means "try again next hour".
+   */
+  async listCommitsSince(
+    repo: string,
+    since: Date,
+  ): Promise<{ sha: string; message: string; authorLogin: string | null }[]> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, 'commits'), {
+        headers: this.headers,
+        params: { sha: 'master', since: since.toISOString(), per_page: 100 },
+        timeout: 20_000,
+      });
+      this.noteAuthOutcome();
+      return ((data ?? []) as any[]).map((c) => ({
+        sha: String(c?.sha ?? ''),
+        message: String(c?.commit?.message ?? ''),
+        authorLogin: c?.author?.login ? String(c.author.login) : null,
+      }));
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      throw error;
+    }
+  }
+
+  async hasCommitsSince(repo: string, since: Date): Promise<boolean> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, 'commits'), {
+        headers: this.headers,
+        params: { sha: 'master', since: since.toISOString(), per_page: 1 },
+        timeout: 15_000,
+      });
+      return Array.isArray(data) && data.length > 0;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not check ${repo} for commits since ${since.toISOString()}, assuming there are some: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return true;
+    }
+  }
+
+  /**
+   * Whether CI is green on a commit, as one verdict plus the names of what
+   * failed.
+   *
+   * Reads both APIs on purpose: `check-runs` covers GitHub Actions, and the
+   * older `status` API covers anything reporting commit statuses instead. A
+   * repo using only one of them would look like it had no CI at all if we read
+   * only the other, and "no CI" is indistinguishable from "green" to a caller
+   * deciding whether to auto-fix.
+   */
+  async getCheckRollup(repo: string, ref: string): Promise<CheckRollup | null> {
+    this.requireConfigured();
+    try {
+      // A read that failed is NOT a commit with no checks, and the difference
+      // decides whether anything downstream may proceed.
+      //
+      // Both calls used to swallow their error into an empty list, so a 403
+      // from a token without Checks permission on one repo produced total = 0
+      // and a confident `state: 'none'` — a commit with four green checks
+      // reported as a commit nobody had verified. Everything that waits for
+      // green then waits forever: the review agent stands down, approval never
+      // comes, and the merge button refuses with "no checks at all", which is
+      // the one message guaranteed to send a reader looking at CI rather than
+      // at the token. ally-mobile#104 sat in that state with all four checks
+      // passing.
+      //
+      // Null is the honest answer and callers already handle it: reconcile
+      // leaves the last known status alone, and mergePullRequest says it will
+      // not merge blind rather than inventing a verdict.
+      const [checks, statuses] = await Promise.all([
+        axios
+          .get(this.url(repo, `commits/${ref}/check-runs`), {
+            headers: this.headers,
+            timeout: 15_000,
+          })
+          .then((response) => response.data?.check_runs ?? [])
+          .catch((error) => {
+            // A fine-grained token cannot be granted Checks at all, so on a
+            // private repo (ally-mobile, ally-ai-learn) this read is refused
+            // however the token is set up — ally-mobile#114 sat green and
+            // unread. Every check those repos run is an Actions job, and the
+            // Actions API takes the `Actions: read` a fine-grained token can
+            // have. Any other failure still fails the whole read.
+            const status = (error as AxiosError)?.response?.status;
+            if (status !== 403 && status !== 404) throw error;
+            return this.checkRunsFromActions(repo, ref);
+          }),
+        axios
+          .get(this.url(repo, `commits/${ref}/status`), {
+            headers: this.headers,
+            timeout: 15_000,
+          })
+          .then((response) => response.data?.statuses ?? []),
+      ]);
+
+      const failed: string[] = [];
+      let pending = 0;
+      let total = 0;
+
+      for (const run of checks) {
+        total += 1;
+        const status = String(run?.status ?? '');
+        const conclusion = String(run?.conclusion ?? '');
+        if (status !== 'completed') {
+          pending += 1;
+        } else if (
+          // `neutral`, `skipped` and `cancelled` are not failures: a skipped
+          // job is a job somebody deliberately did not need to run.
+          [
+            'failure',
+            'timed_out',
+            'action_required',
+            'startup_failure',
+          ].includes(conclusion)
+        ) {
+          failed.push(String(run?.name ?? 'unnamed check'));
+        }
+      }
+
+      for (const status of statuses) {
+        total += 1;
+        const state = String(status?.state ?? '');
+        if (state === 'pending') pending += 1;
+        else if (state === 'failure' || state === 'error') {
+          failed.push(String(status?.context ?? 'unnamed status'));
+        }
+      }
+
+      const state = !total
+        ? 'none'
+        : failed.length
+          ? 'failure'
+          : pending
+            ? 'pending'
+            : 'success';
+      return { state, failed, total };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read checks for ${repo}@${ref}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The tail of each failed check's log on a commit, by check name — what a
+   * fix request needs so the agent fixes the actual error instead of spending
+   * a turn finding it ("Lint & format failed" said nothing about which file).
+   *
+   * Actions check runs share their id with the job, so the job log is one
+   * request. Timestamps and colour codes are stripped; error-looking lines are
+   * kept first, then the last lines of the log, capped at `maxChars`. Best
+   * effort throughout: a check whose log cannot be read is left out.
+   */
+  async failedCheckExcerpts(
+    repo: string,
+    ref: string,
+    maxChars = 2_500,
+  ): Promise<Record<string, string>> {
+    this.requireConfigured();
+    const excerpts: Record<string, string> = {};
+    let runs: any[] = [];
+    try {
+      const { data } = await axios.get(
+        this.url(repo, `commits/${ref}/check-runs`),
+        { headers: this.headers, timeout: 15_000 },
+      );
+      runs = data?.check_runs ?? [];
+    } catch {
+      return excerpts;
+    }
+    for (const run of runs) {
+      if (!['failure', 'timed_out'].includes(String(run?.conclusion))) continue;
+      try {
+        const { data } = await axios.get(
+          this.url(repo, `actions/jobs/${run.id}/logs`),
+          {
+            headers: this.headers,
+            timeout: 20_000,
+            responseType: 'text',
+            maxRedirects: 5,
+          },
+        );
+        const lines = String(data)
+          .split('\n')
+          .map((line) =>
+            line
+              .replace(/\x1b\[[0-9;]*m/g, '')
+              .replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z\s?/, '')
+              .trimEnd(),
+          )
+          .filter(
+            (line) =>
+              line &&
+              !/^##\[(group|endgroup)\]|^\[command\]|npm warn|DeprecationWarning|git config|safe\.directory/.test(
+                line,
+              ),
+          );
+        const errors = lines.filter((line) =>
+          /error|fail|✖|×|\[warn\]|increased|expected|received/i.test(line),
+        );
+        const tail = lines.slice(-30);
+        const picked = [...new Set([...errors.slice(-25), ...tail])].join('\n');
+        excerpts[String(run.name)] =
+          picked.length > maxChars ? picked.slice(-maxChars) : picked;
+      } catch {
+        // left out: an unreadable log must not block the feedback itself
+      }
+    }
+    return excerpts;
+  }
+
+  /**
+   * The Actions jobs that ran on a commit, shaped like check runs (name,
+   * status, conclusion) — what the checks API reports for them, read through
+   * the API a fine-grained token can reach. Only the latest attempt of each
+   * job, as the checks API shows.
+   */
+  private async checkRunsFromActions(
+    repo: string,
+    ref: string,
+  ): Promise<Array<{ name: string; status: string; conclusion: string }>> {
+    const { data } = await axios.get(this.url(repo, 'actions/runs'), {
+      headers: this.headers,
+      params: { head_sha: ref, per_page: 100 },
+      timeout: 15_000,
+    });
+    const jobs = await Promise.all(
+      (data?.workflow_runs ?? []).map(async (run: any) => {
+        const { data: page } = await axios.get(
+          this.url(repo, `actions/runs/${run.id}/jobs`),
+          {
+            headers: this.headers,
+            params: { filter: 'latest', per_page: 100 },
+            timeout: 15_000,
+          },
+        );
+        return page?.jobs ?? [];
+      }),
+    );
+    return jobs.flat().map((job: any) => ({
+      name: String(job?.name ?? ''),
+      status: String(job?.status ?? ''),
+      conclusion: String(job?.conclusion ?? ''),
+    }));
+  }
+
+  /**
+   * Human feedback on a pull request: inline review comments and review
+   * verdicts, newest first.
+   *
+   * Both carry GitHub's own ids so a caller can upsert rather than duplicate —
+   * this is polled on a timer, so every read sees everything again.
+   */
+  async listPullRequestFeedback(
+    repo: string,
+    number: number,
+  ): Promise<PullRequestFeedback[]> {
+    this.requireConfigured();
+    const feedback: PullRequestFeedback[] = [];
+
+    try {
+      const { data } = await axios.get(
+        this.url(repo, `pulls/${number}/comments`),
+        { headers: this.headers, timeout: 15_000, params: { per_page: 100 } },
+      );
+      for (const comment of data ?? []) {
+        feedback.push({
+          externalId: String(comment?.id),
+          kind: 'review_comment',
+          author: String(comment?.user?.login ?? 'unknown'),
+          body: String(comment?.body ?? ''),
+          path: comment?.path ? String(comment.path) : null,
+          line: Number.isFinite(comment?.line) ? Number(comment.line) : null,
+          createdAt: comment?.created_at ? new Date(comment.created_at) : null,
+        });
+      }
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read review comments on ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    try {
+      const { data } = await axios.get(
+        this.url(repo, `pulls/${number}/reviews`),
+        { headers: this.headers, timeout: 15_000, params: { per_page: 100 } },
+      );
+      for (const review of data ?? []) {
+        const state = String(review?.state ?? '');
+        // An approval with no words is not feedback to act on.
+        if (state === 'APPROVED' && !String(review?.body ?? '').trim())
+          continue;
+        feedback.push({
+          externalId: String(review?.id),
+          kind: 'review',
+          author: String(review?.user?.login ?? 'unknown'),
+          body: String(review?.body ?? ''),
+          state,
+          createdAt: review?.submitted_at
+            ? new Date(review.submitted_at)
+            : null,
+        });
+      }
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read reviews on ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return feedback;
+  }
+
+  /**
+   * Reply in the thread of a review comment, so the person who raised it sees
+   * the answer where they asked rather than as a new top-level comment.
+   */
+  /**
+   * Submits a review on a pull request as a COMMENT, never an approval or a
+   * request for changes (OPP-0785): Bug Hunter speaks, the merge stays the
+   * person's. File-level comments carry a path and no line, so a finding
+   * that names a file lands beside it without needing a diff position.
+   * Returns the review's URL, or null when GitHub refused.
+   */
+  async createPullRequestReview(
+    repo: string,
+    number: number,
+    review: {
+      commitId: string;
+      body: string;
+      comments?: { path: string; body: string }[];
+    },
+  ): Promise<string | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.post(
+        this.url(repo, `pulls/${number}/reviews`),
+        {
+          commit_id: review.commitId,
+          event: 'COMMENT',
+          body: review.body,
+          comments: (review.comments ?? []).map((c) => ({
+            path: c.path,
+            body: c.body,
+            subject_type: 'file',
+          })),
+        },
+        { headers: this.headers, timeout: 20_000 },
+      );
+      this.noteAuthOutcome();
+      return data?.html_url ? String(data.html_url) : null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not post a review on ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  async replyToReviewComment(
+    repo: string,
+    number: number,
+    commentId: string,
+    body: string,
+  ): Promise<string | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.post(
+        this.url(repo, `pulls/${number}/comments/${commentId}/replies`),
+        { body },
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return data?.html_url ? String(data.html_url) : null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not reply to comment ${commentId} on ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * A top-level comment on a pull request.
+   *
+   * `issues/{n}/comments`, not `pulls/{n}/comments`: the latter is the
+   * *review* comment endpoint and requires a file path, a commit sha and a
+   * diff position. A PR's conversation tab is an issue thread, and this is the
+   * endpoint that writes to it.
+   *
+   * Returns null rather than throwing on failure, like the rest of this class:
+   * a comment that could not be posted must never fail the thing it was
+   * commenting on.
+   */
+  /**
+   * Opens an issue — how Builder hands a repo's slice of an approved design to
+   * the `builder.yml` workflow in that repo, which runs opencode on it. Throws
+   * rather than returning null: a build whose issue was never created has
+   * nothing running, and the caller fails the run with the reason.
+   */
+  async createIssue(
+    repo: string,
+    params: { title: string; body: string; labels?: string[] },
+  ): Promise<{ number: number; htmlUrl: string; labels: string[] }> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.post(
+        this.url(repo, 'issues'),
+        { title: params.title, body: params.body, labels: params.labels ?? [] },
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return {
+        number: Number(data.number),
+        htmlUrl: String(data.html_url),
+        // GitHub silently drops labels on a new issue when the token may
+        // create issues but not triage them, so the caller checks these.
+        labels: ((data.labels ?? []) as { name?: string }[])
+          .map((label) => String(label?.name ?? ''))
+          .filter(Boolean),
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      throw error;
+    }
+  }
+
+  /** Adds labels to an issue; returns the issue's labels afterwards. */
+  async addIssueLabels(
+    repo: string,
+    number: number,
+    labels: string[],
+  ): Promise<string[]> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.post(
+        this.url(repo, `issues/${number}/labels`),
+        { labels },
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return ((data ?? []) as { name?: string }[])
+        .map((label) => String(label?.name ?? ''))
+        .filter(Boolean);
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not label ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
+    }
+  }
+
+  /** Closes an issue as not planned — a build that was stopped. Throws on failure. */
+  async closeIssue(repo: string, number: number): Promise<void> {
+    this.requireConfigured();
+    try {
+      await axios.patch(
+        this.url(repo, `issues/${number}`),
+        { state: 'closed', state_reason: 'not_planned' },
+        { headers: this.headers, timeout: 15_000 },
+      );
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      throw this.toReadableError(error, `Could not close ${repo}#${number}`);
+    }
+  }
+
+  async createIssueComment(
+    repo: string,
+    number: number,
+    body: string,
+  ): Promise<string | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.post(
+        this.url(repo, `issues/${number}/comments`),
+        { body },
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return data?.html_url ? String(data.html_url) : null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not comment on ${repo}#${number}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Cancels a running workflow — `POST /actions/runs/{run_id}/cancel`. This is
+   * the actual compute/token saving behind "Stop fix session": the workflow's
+   * `timeout-minutes: 60` cap otherwise runs to completion regardless of the
+   * finding's own status in our DB.
+   *
+   * GitHub 409s cancelling a run that has already completed (or is already
+   * cancelling); callers should treat that as fine, not fatal — see
+   * `BugFixSessionService.cancelFixSession`, which must land the finding at
+   * CANCELLED either way.
+   */
+  async cancelRun(repo: string, runId: string): Promise<void> {
+    this.requireConfigured();
+    try {
+      await axios.post(
+        this.url(repo, `actions/runs/${runId}/cancel`),
+        undefined,
+        { headers: this.headers, timeout: 15_000 },
+      );
+    } catch (error) {
+      throw this.toReadableError(
+        error,
+        `Could not cancel run ${runId} in ${repo}`,
+      );
+    }
+  }
+
+  async getRun(repo: string, runId: string): Promise<WorkflowRun | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(repo, `actions/runs/${runId}`),
+        { headers: this.headers, timeout: 15_000 },
+      );
+      return this.toWorkflowRun(data);
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read run ${runId} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The next patch version for a tag prefix — `v1.4.1` → `v1.4.2`.
+   *
+   * Always a patch bump, never minor or major: this ships one bug fix, and
+   * every one of these release workflows rejects a tag that isn't strictly
+   * newer than the latest existing one, so the version must be derived from
+   * what is actually on the remote rather than from anything stored here.
+   * Falls back to `{prefix}0.0.1` for a repo with no matching tag yet.
+   */
+  async nextPatchTag(repo: string, tagPrefix: string): Promise<string> {
+    this.requireConfigured();
+    const pattern = new RegExp(
+      `^${tagPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)\\.(\\d+)\\.(\\d+)$`,
+    );
+    try {
+      // Paged, because one page is not the repo. ally-web carries three
+      // independently-released apps in one repo, and its first 100 tags are
+      // ALL `helpline-v*` — so a single-page read found no `admin-v*` at all,
+      // fell through to the "never released" branch below, and proposed
+      // `admin-v0.0.1` for an app on 1.88. The release workflow rejected it,
+      // which is the only reason this was a failed release rather than a
+      // catastrophic one.
+      const versions: number[][] = [];
+      let sawEveryTag = false;
+      for (let page = 1; page <= 10; page += 1) {
+        const { data } = await axios.get(this.url(repo, 'tags'), {
+          headers: this.headers,
+          params: { per_page: 100, page },
+          timeout: 15_000,
+        });
+        const batch = (data ?? []) as { name?: string }[];
+        for (const tag of batch) {
+          const match = pattern.exec(tag?.name ?? '');
+          if (match) {
+            versions.push([
+              Number(match[1]),
+              Number(match[2]),
+              Number(match[3]),
+            ]);
+          }
+        }
+        if (batch.length < 100) {
+          sawEveryTag = true;
+          break;
+        }
+      }
+
+      if (versions.length === 0) {
+        // "No tag with this prefix" and "I did not look far enough" produce
+        // the same empty list and mean opposite things, so they are not
+        // allowed to share an answer. Only the first — provable because the
+        // last page came back short — is a genuine first release.
+        if (!sawEveryTag) {
+          throw new Error(
+            `Found no ${tagPrefix}* tags in ${repo} within 10 pages, and there are more to read. ` +
+              'Refusing to guess a version rather than proposing a first release for something already released.',
+          );
+        }
+        return `${tagPrefix}0.0.1`;
+      }
+
+      const [major, minor, patch] = versions.sort(
+        (a: number[], b: number[]) => b[0] - a[0] || b[1] - a[1] || b[2] - a[2],
+      )[0];
+      return `${tagPrefix}${major}.${minor}.${patch + 1}`;
+    } catch (error) {
+      throw this.toReadableError(
+        error,
+        `Could not read existing ${tagPrefix}* tags in ${repo}`,
+      );
+    }
+  }
+
+  /**
+   * A merged pull request's title, description and branch — what product
+   * updates need to understand a change. Null when GitHub cannot be read.
+   */
+  async getPullRequestSummary(
+    repo: string,
+    number: number,
+  ): Promise<PullRequestSummary | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, `pulls/${number}`), {
+        headers: this.headers,
+        timeout: 15_000,
+      });
+      this.noteAuthOutcome();
+      return {
+        title: String(data?.title ?? ''),
+        body: typeof data?.body === 'string' ? data.body : null,
+        headRef: data?.head?.ref ? String(data.head.ref) : null,
+        mergeCommitSha: data?.merge_commit_sha
+          ? String(data.merge_commit_sha)
+          : null,
+        mergedAt: data?.merged_at ? new Date(data.merged_at) : null,
+        authorLogin: data?.user?.login ? String(data.user.login) : null,
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read PR #${number} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The commits (with full messages) and changed files between two refs.
+   *
+   * A third of Ally's landings are direct pushes, not pull requests, and a push
+   * is only ever described by the commits in its range — this is how product
+   * updates read one. `base` may be a parent reference (`<sha>^`), which the
+   * changelog notifier writes when a push has no usable `before`.
+   */
+  async compareCommits(
+    repo: string,
+    base: string,
+    head: string,
+  ): Promise<CommitComparison | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(repo, `compare/${base}...${head}`),
+        { headers: this.headers, timeout: 20_000 },
+      );
+      this.noteAuthOutcome();
+      const commits = ((data?.commits ?? []) as any[]).map((commit) => ({
+        sha: String(commit?.sha ?? ''),
+        message: String(commit?.commit?.message ?? ''),
+        authorLogin: commit?.author?.login ? String(commit.author.login) : null,
+      }));
+      const files = ((data?.files ?? []) as any[])
+        .map((file) => (file?.filename ? String(file.filename) : null))
+        .filter((file): file is string => Boolean(file));
+      const totalCommits = Number(data?.total_commits ?? commits.length);
+      return {
+        commits,
+        files,
+        truncated: commits.length < totalCommits || files.length >= 300,
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not compare ${base}...${head} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Every successful run of a workflow started at or after `since`, oldest
+   * first — a release history, for deciding when merged changes went live.
+   *
+   * `findSuccessfulRunSince` answers "has it shipped yet" for one change; this
+   * answers it for hundreds at once from one listing. Pages until it passes
+   * `since` or reaches `maxPages`. Null when GitHub cannot be read at all, which
+   * a caller must treat as "unknown" rather than "never released".
+   */
+  async listSuccessfulRuns(params: {
+    repo: string;
+    workflow: string;
+    since: Date;
+    maxPages?: number;
+  }): Promise<CompletedRun[] | null> {
+    this.requireConfigured();
+    const runs: CompletedRun[] = [];
+    const maxPages = params.maxPages ?? 10;
+    try {
+      for (let page = 1; page <= maxPages; page += 1) {
+        const { data } = await axios.get(
+          this.url(params.repo, `actions/workflows/${params.workflow}/runs`),
+          {
+            headers: this.headers,
+            params: {
+              status: 'success',
+              per_page: 100,
+              page,
+              created: `>=${params.since.toISOString().slice(0, 10)}`,
+            },
+            timeout: 15_000,
+          },
+        );
+        this.noteAuthOutcome();
+        const batch = (data?.workflow_runs ?? []) as any[];
+        for (const run of batch) {
+          if (run?.conclusion !== 'success') continue;
+          const startedAt = new Date(run.run_started_at ?? run.created_at);
+          if (startedAt < params.since) continue;
+          runs.push({
+            id: String(run.id),
+            htmlUrl: run.html_url,
+            startedAt,
+            finishedAt: new Date(run.updated_at ?? run.created_at),
+          });
+        }
+        if (batch.length < 100) break;
+      }
+      return runs.sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list the release history of ${params.workflow} in ${params.repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  private toWorkflowRun(run: any): WorkflowRun {
+    return {
+      id: String(run.id),
+      htmlUrl: run.html_url,
+      status: run.status,
+      conclusion: run.conclusion ?? null,
+      createdAt: new Date(run.created_at),
+    };
+  }
+
+  private requireConfigured(): void {
+    if (this.isConfigured) return;
+    throw new ServiceUnavailableException(
+      // Deliberately names no caller: this client is shared (Bug Hunter and
+      // Builder both dispatch through it), and an error telling a Builder
+      // user that "Bug Hunter cannot dispatch" sends them to the wrong tab.
+      'GITHUB_TOKEN is not configured on this environment, so workflows cannot be dispatched.',
+    );
+  }
+
+  /**
+   * GitHub's own error text is far more useful to an admin than a generic 502
+   * ("workflow does not have workflow_dispatch trigger", "Resource not
+   * accessible by integration"), so it is surfaced rather than swallowed.
+   */
+  private toReadableError(error: unknown, prefix: string): Error {
+    const axiosError = error as AxiosError<{ message?: string }>;
+    const detail =
+      axiosError?.response?.data?.message ??
+      (error instanceof Error ? error.message : String(error));
+    const status = axiosError?.response?.status;
+    this.noteAuthOutcome(error);
+    this.logger.error(`${prefix}: ${status ?? ''} ${detail}`);
+    return new ServiceUnavailableException(`${prefix}: ${detail}`);
+  }
+}

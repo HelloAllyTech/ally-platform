@@ -1,0 +1,30 @@
+FROM node:24-alpine
+
+WORKDIR /app
+
+RUN mkdir -p /tmp/audio_storage
+
+RUN mkdir -p /mnt/audio_storage
+
+COPY package*.json ./
+
+# Install build dependencies for native modules (bcrypt)
+RUN apk add --no-cache python3 make g++ ffmpeg
+
+# Install dependencies fresh in the container
+RUN npm install
+
+COPY . .
+
+# Dev entrypoint runs migrations before app starts (so PromptsSyncService has correct schema)
+COPY docker-entrypoint.dev.sh ./
+
+# A cold `nest build` (no incremental cache, e.g. right after a fresh Docker
+# volume) exceeds Node's default ~2GB heap cap and OOMs.
+ENV NODE_OPTIONS=--max-old-space-size=4096
+RUN npm run build
+
+EXPOSE 8000
+
+ENTRYPOINT ["sh", "./docker-entrypoint.dev.sh"]
+CMD ["npm", "run", "start:dev"]

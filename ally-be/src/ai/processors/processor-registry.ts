@@ -1,0 +1,94 @@
+import { Injectable } from '@nestjs/common';
+import { IEventProcessor } from './base-processor.interface';
+import { TranscribeResultProcessor } from './transcribe-result.processor';
+import { UnknownEventProcessor } from './unknown-event.processor';
+import { LoggerService } from '../../logger/logger.service';
+import { LearnMessageProcessor } from '../../learn/processor/learn-message.processor';
+import { LearnEventProcessor } from '../../learn/processor/learn-event.processor';
+import { BehaviorInstructionProcessor } from 'src/learn/processor/behavior-instruction.processor';
+import { TurnMetricsProcessor } from 'src/learn/processor/turn-metrics.processor';
+import { StartMetricsProcessor } from 'src/learn/processor/start-metrics.processor';
+import { LlmUsageProcessor } from 'src/learn/processor/llm-usage.processor';
+import { SessionMemoryProcessor } from 'src/learn/processor/session-memory.processor';
+import { SupervisorNoteProcessor } from 'src/learn/processor/supervisor-note.processor';
+import { RetrievalLogProcessor } from 'src/knowledge-base/processor/retrieval-log.processor';
+import { WmRecallProcessor } from 'src/learn/processor/wm-recall.processor';
+
+@Injectable()
+export class ProcessorRegistry {
+  private readonly logger = LoggerService.getInstance(ProcessorRegistry.name);
+  private readonly processors: Map<string, IEventProcessor> = new Map();
+
+  constructor(
+    private readonly transcribeResultProcessor: TranscribeResultProcessor,
+    private readonly learnMessageProcessor: LearnMessageProcessor,
+    private readonly learnEventProcessor: LearnEventProcessor,
+    private readonly unknownEventProcessor: UnknownEventProcessor,
+    private readonly behaviorInstructionProcessor: BehaviorInstructionProcessor,
+    private readonly turnMetricsProcessor: TurnMetricsProcessor,
+    private readonly startMetricsProcessor: StartMetricsProcessor,
+    private readonly llmUsageProcessor: LlmUsageProcessor,
+    private readonly sessionMemoryProcessor: SessionMemoryProcessor,
+    private readonly supervisorNoteProcessor: SupervisorNoteProcessor,
+    private readonly retrievalLogProcessor: RetrievalLogProcessor,
+    private readonly wmRecallProcessor: WmRecallProcessor,
+  ) {
+    this.registerProcessors();
+  }
+
+  private registerProcessors(): void {
+    this.registerProcessor(this.transcribeResultProcessor);
+    this.registerProcessor(this.learnMessageProcessor);
+    this.registerProcessor(this.learnEventProcessor);
+    this.registerProcessor(this.behaviorInstructionProcessor);
+    this.registerProcessor(this.turnMetricsProcessor);
+    this.registerProcessor(this.startMetricsProcessor);
+    this.registerProcessor(this.llmUsageProcessor);
+    this.registerProcessor(this.sessionMemoryProcessor);
+    this.registerProcessor(this.supervisorNoteProcessor);
+    this.registerProcessor(this.retrievalLogProcessor);
+    this.registerProcessor(this.wmRecallProcessor);
+
+    this.logger.info(`Registered ${this.processors.size} event processors`);
+  }
+
+  private registerProcessor(processor: IEventProcessor): void {
+    this.processors.set(processor.getEventType(), processor);
+    this.logger.debug(`Registered processor for: ${processor.getEventType()}`);
+  }
+
+  public getProcessor(eventType: string): IEventProcessor | undefined {
+    return this.processors.get(eventType);
+  }
+
+  public async processEvent(eventType: string, data: any): Promise<void> {
+    const processor = this.getProcessor(eventType);
+
+    if (processor) {
+      await processor.process(data);
+    } else {
+      await this.unknownEventProcessor.process({ eventType, eventData: data });
+    }
+  }
+
+  public getRegisteredEventTypes(): string[] {
+    return Array.from(this.processors.keys());
+  }
+
+  public getProcessorHealth(): Record<string, boolean> {
+    const health: Record<string, boolean> = {};
+
+    for (const [eventType, processor] of this.processors) {
+      health[eventType] = processor !== undefined;
+    }
+
+    return health;
+  }
+
+  public registerCustomProcessor(processor: IEventProcessor): void {
+    this.registerProcessor(processor);
+    this.logger.info(
+      `Registered custom processor for: ${processor.getEventType()}`,
+    );
+  }
+}

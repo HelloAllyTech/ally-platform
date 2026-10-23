@@ -1,0 +1,219 @@
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  AnalyticsRange,
+  AnalyticsScopingDto,
+  AnalyticsWindowDto,
+  AnalyticsWindowQueryDto,
+} from './platform-analytics.dto';
+
+/**
+ * Scribe-session analytics (super-admin, platform-wide / cross-tenant). These
+ * metrics are derived from the `chats` table (real counselor sessions that get
+ * transcribed + summarised), as opposed to the AI/simulation analytics which
+ * are derived from `scenario_sessions`. Time window selected via `range`:
+ * 30d -> daily buckets, 90d -> weekly, 12m -> monthly.
+ */
+export class ScribeAnalyticsQueryDto extends AnalyticsWindowQueryDto {}
+
+/** A single point on a count-over-time trend. */
+export class ScribeTrendPointDto {
+  @ApiProperty({ description: 'Bucket start (yyyy-mm-dd)' }) bucket!: string;
+  @ApiProperty() count!: number;
+}
+
+/** A labelled count for a breakdown (donut/bar). */
+export class ScribeCountDto {
+  @ApiProperty() key!: string;
+  @ApiProperty() count!: number;
+}
+
+export class ScribeOverviewSummaryDto {
+  @ApiProperty({ description: 'All scribe sessions created in the window' })
+  totalSessions!: number;
+  @ApiProperty({ description: 'summarised OK / (summarised OK + failed), %' })
+  successRatePct!: number;
+  @ApiProperty({ description: 'PENDING + IN_PROGRESS (still being processed)' })
+  processing!: number;
+  @ApiProperty({ description: 'Sessions with no audio to summarise' })
+  noAudio!: number;
+  @ApiProperty({ description: 'Sessions whose summary ended in FAILED' })
+  failed!: number;
+}
+
+export class ScribeOverviewResponseDto {
+  @ApiProperty() range!: AnalyticsRange;
+  @ApiProperty({ enum: ['day', 'week', 'month', 'quarter'] }) bucket!: string;
+
+  @ApiProperty({
+    type: AnalyticsWindowDto,
+    description: 'The resolved window, for on-surface labelling and exports',
+  })
+  window!: AnalyticsWindowDto;
+
+  @ApiProperty({ type: AnalyticsScopingDto })
+  scoping!: AnalyticsScopingDto;
+
+  @ApiProperty({ type: ScribeOverviewSummaryDto })
+  summary!: ScribeOverviewSummaryDto;
+
+  @ApiProperty({
+    type: ScribeOverviewSummaryDto,
+    nullable: true,
+    description:
+      'Same scalars over the equal-length preceding window, present only when ' +
+      '`compare=prev` — the basis a KPI delta is stated against.',
+  })
+  previous!: ScribeOverviewSummaryDto | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Label for `previous`, e.g. "previous 30 days"',
+  })
+  previousLabel!: string | null;
+  @ApiProperty({
+    type: [ScribeTrendPointDto],
+    description: 'Scribe sessions created per bucket (gap-filled).',
+  })
+  sessionsTrend!: ScribeTrendPointDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description: 'Sessions by summaryStatus (SUCCESS/FAILED/...).',
+  })
+  outcomeBreakdown!: ScribeCountDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description:
+      'Sessions by note mode (SCRIBE vs DICTATION) — the summary style, ' +
+      'independent of how the audio was captured.',
+  })
+  modeBreakdown!: ScribeCountDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description:
+      'Sessions by capture method (upload = uploaded file, live = streamed ' +
+      'via mic/telephony, unknown = provider not recorded).',
+  })
+  captureBreakdown!: ScribeCountDto[];
+}
+
+/** A single point on the summary-failure-rate trend. */
+export class ScribeFailureRatePointDto {
+  @ApiProperty({ description: 'Bucket start (yyyy-mm-dd)' }) bucket!: string;
+  @ApiProperty({ description: 'Sessions that ended FAILED in this bucket' })
+  failed!: number;
+  @ApiProperty({ description: 'Terminal sessions (SUCCESS + FAILED)' })
+  terminal!: number;
+  @ApiProperty({
+    description: 'failed / terminal (final, post-backfill), 0..1',
+  })
+  failureRate!: number;
+  @ApiProperty({
+    description:
+      'Sessions whose FIRST attempt failed in this bucket (write-once; only ' +
+      'sessions created after attempt-tracking rollout).',
+  })
+  firstAttemptFailed!: number;
+  @ApiProperty({
+    description: 'First-attempt terminal sessions (SUCCESS+FAILED)',
+  })
+  firstAttemptTerminal!: number;
+  @ApiProperty({
+    description: 'first-attempt failed / first-attempt terminal, 0..1',
+  })
+  firstAttemptFailureRate!: number;
+}
+
+/** One phase on the drop-off funnel. */
+export class ScribePhaseFunnelPointDto {
+  @ApiProperty({ description: 'Phase key in ladder order' }) phase!: string;
+  @ApiProperty({ description: 'Sessions that reached AT LEAST this phase' })
+  reached!: number;
+  @ApiProperty({
+    description: 'Sessions whose furthest phase was exactly this',
+  })
+  stoppedHere!: number;
+}
+
+/** Per-STT-provider try/success/fail over the per-attempt provider trail. */
+export class ScribeProviderStatDto {
+  @ApiProperty() provider!: string;
+  @ApiProperty({ description: 'Times this provider was tried' }) tried!: number;
+  @ApiProperty({ description: 'Times it produced a transcript' }) ok!: number;
+  @ApiProperty({ description: 'Times it failed / returned empty' })
+  failed!: number;
+}
+
+export class ScribeFailureSummaryDto {
+  @ApiProperty({
+    description: 'Terminal sessions in window (SUCCESS + FAILED)',
+  })
+  totalTerminal!: number;
+  @ApiProperty() totalFailed!: number;
+  @ApiProperty({ description: 'failed / terminal across the window, %' })
+  failureRatePct!: number;
+  @ApiProperty({ description: '% of failures still flagged retryable' })
+  retryableSharePct!: number;
+  @ApiProperty({ description: '% of failures caused by the summary timeout' })
+  timeoutSharePct!: number;
+}
+
+export class ScribeSummaryFailureResponseDto {
+  @ApiProperty() range!: AnalyticsRange;
+  @ApiProperty({ enum: ['day', 'week', 'month', 'quarter'] }) bucket!: string;
+
+  @ApiProperty({
+    type: AnalyticsWindowDto,
+    description: 'The resolved window, for on-surface labelling and exports',
+  })
+  window!: AnalyticsWindowDto;
+  @ApiProperty({ type: ScribeFailureSummaryDto })
+  summary!: ScribeFailureSummaryDto;
+  @ApiProperty({ type: [ScribeFailureRatePointDto] })
+  failureRateTrend!: ScribeFailureRatePointDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description:
+      'Unified per-failure classification (one bucket per failure): audio ' +
+      'lifecycle state (upload never finalized / failed / cleared) first, then ' +
+      'the pipeline signal (timeout / transcription / summarization / ' +
+      'dead-letter), else the raw error text.',
+  })
+  failureBreakdown!: ScribeCountDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description:
+      'Failed sessions by note mode (SCRIBE vs DICTATION). Independent of how ' +
+      'audio was captured — a live session can carry either mode.',
+  })
+  failuresByMode!: ScribeCountDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description:
+      'Failed sessions by capture method (upload = uploaded file, live = ' +
+      'streamed via mic/telephony). This is the dimension the durable-capture ' +
+      'bug tracks.',
+  })
+  failuresByCaptureMethod!: ScribeCountDto[];
+  @ApiProperty({
+    type: [ScribePhaseFunnelPointDto],
+    description:
+      'Pipeline drop-off funnel: how many sessions reached each phase and ' +
+      'where they stopped. Replaces the flat failure breakdown. Only covers ' +
+      'sessions instrumented after the attempt-tracking rollout.',
+  })
+  phaseFunnel!: ScribePhaseFunnelPointDto[];
+  @ApiProperty({
+    type: [ScribeProviderStatDto],
+    description:
+      'Per-STT-provider try/success/fail over the per-attempt provider trail ' +
+      '(populated once ally-ai emits it).',
+  })
+  sttProviderStats!: ScribeProviderStatDto[];
+  @ApiProperty({
+    type: [ScribeCountDto],
+    description:
+      'Successful summaries by LLM model (populated once ally-ai emits it).',
+  })
+  summaryModelStats!: ScribeCountDto[];
+}

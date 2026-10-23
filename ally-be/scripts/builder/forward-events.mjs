@@ -1,0 +1,382 @@
+#!/usr/bin/env node
+/**
+ * Relay a coding engine's streaming output to ally-be as build events, and
+ * pass it through unchanged.
+ *
+ * This is what makes the admin feed read like a live terminal rather than a
+ * log that appears at the end. It is also the ONLY place that understands an
+ * engine's native output shape — everything downstream (the event schema, the
+ * pipeline endpoints, the UI) is engine-neutral, so a second engine is a
+ * second `normalise` function here and nothing else.
+ *
+ * Two rules govern the whole file:
+ *
+ *  1. **Telemetry must never fail a build.** Every network call swallows its
+ *     own errors. Losing the live feed is a degraded experience; killing a
+ *     ninety-minute build because a POST timed out is a disaster.
+ *  2. **stdin is passed through byte-for-byte.** The cost step reads the
+ *     engine's final result object from the same stream, and a forwarder that
+ *     consumed it would break billing.
+ *
+ * Zero dependencies: this runs on a bare runner before any `npm ci`.
+ */
+
+import { createInterface } from 'node:readline';
+import { writeFileSync } from 'node:fs';
+
+const API_URL = process.env.ALLY_BE_API_URL;
+const API_KEY = process.env.ALLY_BE_API_KEY;
+const RUN_ID = process.env.BUILDER_RUN_ID;
+
+const resultOutIndex = process.argv.indexOf('--result-out');
+const RESULT_OUT = resultOutIndex > -1 ? process.argv[resultOutIndex + 1] : null;
+// Where to write the opencode session id the moment it is first seen, rather
+// than at the end with the result: run-engine.sh's live steer relay needs it
+// while the phase is still running, to inject a correction into it.
+const sessionOutIndex = process.argv.indexOf('--session-out');
+const SESSION_OUT = sessionOutIndex > -1 ? process.argv[sessionOutIndex + 1] : null;
+
+/** Flush on either bound, whichever comes first. */
+const FLUSH_INTERVAL_MS = 2000;
+const FLUSH_SIZE = 20;
+/** Mirrors BUILDER_EVENT_BATCH_MAX in builder.constants.ts — the server 400s above it. */
+const MAX_BATCH = 100;
+const MAX_RETRIES = 3;
+/** Keep any single payload well under the server's own 8KB cap. */
+const MAX_FIELD_CHARS = 4000;
+
+const queue = [];
+let flushing = false;
+let lastResult = null;
+
+const truncate = (value) => {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? null);
+  if (!text) return text;
+  return text.length > MAX_FIELD_CHARS
+    ? `${text.slice(0, MAX_FIELD_CHARS)}\n…[truncated]`
+    : text;
+};
+
+
+/* ── opencode ────────────────────────────────────────────────────────────── */
+
+// Its cost arrives per STEP, not once at the end.
+//
+// A run emits a `step_finish` for every model round, each carrying that
+// round's tokens and its own dollar figure, and there is no terminal frame
+// summing them. Reading only the last one would price a four-step run as one
+// step — so they accumulate here, and the totals are written out when the
+// stream closes.
+//
+// The dollars are opencode's own, not a rate card, so the budget ceiling reads
+// measured spend and an unpriced model cannot silently read as free.
+let opencodeCost = 0;
+let opencodeTokens = { input: 0, output: 0, cached: 0 };
+let opencodeSawStep = false;
+// The session this phase ran in. opencode stamps it on every event, and a
+// later phase can continue it instead of starting cold — see run-engine.sh.
+let opencodeSessionId = null;
+// The assistant's prose, accumulated across the phase. See the text branch.
+let opencodeText = '';
+
+const normaliseOpencode = (record) => {
+  const part = record?.part ?? {};
+  if (!opencodeSessionId && typeof record?.sessionID === 'string') {
+    opencodeSessionId = record.sessionID;
+    if (SESSION_OUT) {
+      try {
+        writeFileSync(SESSION_OUT, opencodeSessionId);
+      } catch {
+        // Telemetry must never fail a build; the relay simply has no session.
+      }
+    }
+  }
+
+  if (record?.type === 'text' && part.text?.trim()) {
+    // Kept as well as relayed. run-engine.sh reads the planner's ```plan block
+    // and the verifier's ```json verdict out of `result` in the file this
+    // forwarder writes, and opencode has no terminal frame carrying the
+    // assistant's prose — so without this buffer that field was absent and
+    // both parsers read nothing.
+    //
+    // What that cost is worth stating plainly: the plan event was never
+    // posted, so the coder, the remediation prompt and every resume read an
+    // empty plan; and the verdict parser, which answers "pass" when it cannot
+    // find a block (deliberately, so a reviewer's plumbing cannot fail a
+    // build), therefore answered "pass" every single time. The independent
+    // verifier has been decorative on every opencode run since the move.
+    //
+    // Unbounded on purpose. Both parsers take the LAST fenced block, so the
+    // tail is what matters and truncating the head would be safe — but the
+    // verdict is the one thing in this file worth spending memory on being
+    // sure about.
+    opencodeText += `${part.text}\n`;
+    return [{ type: 'text', payload: { text: truncate(part.text) } }];
+  }
+
+  if (record?.type === 'tool_use') {
+    const name = String(part.tool ?? 'tool');
+    const state = part.state ?? {};
+    const input = state.input ?? {};
+    const events = [];
+
+    // Shapes read from a real run, not from documentation: `part.tool` is the
+    // name, `part.state.input` the arguments and `part.state.output` the
+    // result, all on ONE event. The feed shows a call and a result, so both
+    // are forwarded from it.
+    if (typeof input.filePath === 'string' || typeof input.path === 'string') {
+      const wrote = 'content' in input;
+      const edited = 'oldString' in input || 'old_string' in input;
+      if (wrote || edited) {
+        events.push({
+          type: 'file_edit',
+          payload: {
+            path: String(input.filePath ?? input.path),
+            operation: edited ? 'edit' : 'write',
+            oldText: truncate(input.oldString ?? input.old_string ?? ''),
+            newText: truncate(input.newString ?? input.new_string ?? input.content ?? ''),
+          },
+        });
+      }
+    }
+
+    // opencode's own checklist. The lead keeps its plan with `todowrite`, not
+    // our `todo` tool, and the build page's checklist is driven by `todo`
+    // events alone — so on a multi-agent run it stayed empty while the lead
+    // worked through a list nobody could see. Same whole-list shape as ours;
+    // cancelled items are dropped rather than shown as done.
+    if (name === 'todowrite' && Array.isArray(input.todos)) {
+      const STATUS = { pending: 'pending', in_progress: 'in_progress', completed: 'done' };
+      events.push({
+        type: 'todo',
+        payload: {
+          // Numbered by position in the full list, before cancelled items
+          // drop out, so an item's id does not change when one above it is
+          // cancelled.
+          items: input.todos
+            .map((todo, index) => ({
+              id: String(todo?.id ?? index + 1),
+              text: truncate(String(todo?.content ?? '')),
+              status: STATUS[todo?.status],
+            }))
+            .filter((item) => item.status),
+        },
+      });
+    }
+
+    if (!events.length || events.every((event) => event.type === 'todo')) {
+      events.push({
+        type: 'tool_call',
+        payload: {
+          name,
+          summary: truncate(
+            input.command ?? input.filePath ?? input.path ?? input.pattern ?? '',
+          ),
+        },
+      });
+    }
+
+    if (state.output !== undefined || state.status === 'error') {
+      events.push({
+        type: 'tool_result',
+        payload: {
+          // `status` is the tool's own verdict. An `invalid` tool — the model
+          // reaching for something a denied agent was never offered — comes
+          // back completed with an error in its output, which is a refusal
+          // worth showing rather than a failure worth hiding.
+          isError: state.status === 'error',
+          text: truncate(String(state.output ?? '')),
+        },
+      });
+    }
+
+    return events;
+  }
+
+  if (record?.type === 'step_finish') {
+    opencodeSawStep = true;
+    opencodeCost += Number(part.cost ?? 0) || 0;
+    const tokens = part.tokens ?? {};
+    opencodeTokens = {
+      input: opencodeTokens.input + (Number(tokens.input ?? 0) || 0),
+      output: opencodeTokens.output + (Number(tokens.output ?? 0) || 0),
+      cached: opencodeTokens.cached + (Number(tokens.cache?.read ?? 0) || 0),
+    };
+    return [];
+  }
+
+  if (record?.type === 'error') {
+    const detail =
+      record.error?.data?.message ?? record.error?.name ?? 'unknown error';
+    return [{ type: 'text', payload: { text: truncate(`[opencode] ${detail}`) } }];
+  }
+
+  // `step_start` and anything else carry nothing a person watching needs.
+  return [];
+};
+
+/** Called when the stream ends: opencode has no terminal result frame. */
+const finaliseOpencode = () => {
+  if (!opencodeSawStep) return;
+  lastResult = {
+    // The field run-engine.sh parses the plan and the verdict out of. Named
+    // `result` because that is what the other engines' terminal frame called
+    // it, and what every reader here already expects.
+    result: opencodeText.trim(),
+    usage: {
+      input_tokens: opencodeTokens.input,
+      output_tokens: opencodeTokens.output,
+      cached_tokens: opencodeTokens.cached,
+    },
+    // Rounded the way the rate-card path rounds, so a run's cost reads the
+    // same whichever engine produced it.
+    total_cost_usd: Math.round(opencodeCost * 1e6) / 1e6,
+    duration_ms: null,
+    num_turns: null,
+    // Handed back so the next coding attempt can continue this conversation
+    // rather than re-deriving the codebase from nothing.
+    session_id: opencodeSessionId,
+  };
+};
+
+/**
+ * One engine record → zero or more builder events.
+ *
+ * Returns an array because a single assistant message can carry both prose and
+ * several tool calls, and the feed shows them as separate rows.
+ */
+const normalise = (record) => normaliseOpencode(record);
+
+const post = async (events) => {
+  if (!API_URL || !API_KEY || !RUN_ID || !events.length) return;
+
+  const body = JSON.stringify({ events });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/builder/pipeline/runs/${RUN_ID}/events`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY,
+          },
+          body,
+        },
+      );
+      if (response.ok) return;
+      // 5xx might fix itself; a 4xx is our own bug and usually will not. But
+      // "usually" cost us: a batch over the server's 100-event cap answers 400,
+      // and dropping it silently loses the gate_result that `/complete {done}`
+      // refuses to finish without. One retry, so a transient 4xx (an expired
+      // token being refreshed, a cap we have since chunked under) gets a second
+      // chance without turning a real bug into three pointless round trips.
+      if (response.status < 500 && attempt >= 2) return;
+    } catch {
+      // Network blip — fall through to the retry.
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+  }
+  // Out of retries. Dropped on purpose: see rule 1 at the top.
+};
+
+const flush = async () => {
+  if (flushing || !queue.length) return;
+  flushing = true;
+  try {
+    // In chunks the server will accept. ally-be rejects a batch over
+    // BUILDER_EVENT_BATCH_MAX (100) with a 400, so draining the whole queue at
+    // once meant that a busy phase — exactly when events pile up past 100 while
+    // a flush is in flight — silently dropped the lot. A dropped `gate_result`
+    // is not cosmetic: it is the evidence `/complete {done}` refuses to finish
+    // without, so telemetry loss was failing runs whose gate had genuinely
+    // passed. Chunking here is the fix; the single 4xx retry in `post` is the
+    // belt to this pair of braces.
+    while (queue.length) {
+      await post(queue.splice(0, MAX_BATCH));
+    }
+  } finally {
+    flushing = false;
+  }
+};
+
+const timer = setInterval(() => {
+  void flush();
+}, FLUSH_INTERVAL_MS);
+// Do not hold the process open on the interval alone.
+timer.unref?.();
+
+const readline = createInterface({ input: process.stdin, crlfDelay: Infinity });
+
+// ── The passthrough, with a lid on it ───────────────────────────────────────
+//
+// Every line is still relayed, but a line repeated back to back is counted
+// rather than reprinted. One Gemini run wrote `Aborted()` 1,028,203 times
+// after its shell tool rejected a command, producing a million-line workflow
+// log that took minutes to fetch and buried everything the run actually did.
+//
+// Consecutive-only, deliberately. A repeat counter that remembered every line
+// ever seen would collapse legitimate recurrence — the same test name across
+// rounds, the same file read twice — and the thing worth suppressing is a tight
+// loop, which is always consecutive.
+let lastLine = null;
+let repeats = 0;
+
+const flushRepeats = () => {
+  if (repeats > 0) {
+    process.stdout.write(
+      `  … previous line repeated ${repeats} more time${repeats === 1 ? '' : 's'}\n`,
+    );
+    repeats = 0;
+  }
+};
+
+readline.on('line', (line) => {
+  // Pass through first and unconditionally, so a parse failure below can
+  // never cost the downstream consumer its data.
+  if (line === lastLine) {
+    repeats += 1;
+  } else {
+    flushRepeats();
+    process.stdout.write(`${line}\n`);
+    lastLine = line;
+  }
+
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('{')) return;
+
+  let record;
+  try {
+    record = JSON.parse(trimmed);
+  } catch {
+    return;
+  }
+
+  try {
+    queue.push(...normalise(record));
+  } catch {
+    // A shape we did not anticipate is not worth stopping for.
+    return;
+  }
+
+  if (queue.length >= FLUSH_SIZE) {
+    void flush();
+  }
+});
+
+readline.on('close', async () => {
+  clearInterval(timer);
+  // A run that ended mid-repeat still says how many it swallowed.
+  flushRepeats();
+  // opencode reports its cost per step and never sums them, so the totals are
+  // only complete once the stream is.
+  finaliseOpencode();
+  await flush();
+  if (RESULT_OUT && lastResult) {
+    try {
+      writeFileSync(RESULT_OUT, JSON.stringify(lastResult));
+    } catch {
+      // The cost step degrades to "no cost reported" rather than failing.
+    }
+  }
+});

@@ -1,0 +1,354 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
+import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
+import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { UpsertGlossarySectionDto } from '../dto/glossary-section.dto';
+import { LanguageGlossaryService } from '../service/language-glossary.service';
+import { GlossaryAdherenceService } from '../service/glossary-adherence.service';
+import { GlossaryAdjudicationService } from '../service/glossary-adjudication.service';
+import { GlossaryLexemeMiningService } from '../service/glossary-lexeme-mining.service';
+import { GlossaryJobService } from '../service/glossary-job.service';
+
+@ApiTags('Language')
+@ApiBearerAuth()
+@ApiSecurity('access-token')
+@Controller({
+  path: 'language',
+  version: '1',
+})
+export class LanguageGlossaryController {
+  constructor(
+    private readonly glossaryService: LanguageGlossaryService,
+    private readonly adherenceService: GlossaryAdherenceService,
+    private readonly adjudicationService: GlossaryAdjudicationService,
+    private readonly lexemeMiningService: GlossaryLexemeMiningService,
+    private readonly jobs: GlossaryJobService,
+  ) {}
+
+  @ApiOperation({
+    summary: 'List glossary sections for a language (with token counts)',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_ADMIN_LANGUAGES])
+  @Get(':id/glossary')
+  async listSections(@Param('id') id: number) {
+    return this.glossaryService.listSections(Number(id));
+  }
+
+  @ApiOperation({
+    summary: 'Create or update a glossary section (draft edit)',
+    description:
+      "Pass profileId to target ONE variety profile's overlay instead of the " +
+      'global section. Consolidation creates overlay sections, so without it ' +
+      'the loop could produce sections no authoring endpoint could edit or ' +
+      're-tier.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Put(':id/glossary/:sectionCode')
+  async upsertSection(
+    @Param('id') id: number,
+    @Param('sectionCode') sectionCode: string,
+    @Body() dto: UpsertGlossarySectionDto,
+    @Query('profileId') profileId?: string,
+  ) {
+    return this.glossaryService.upsertSection(
+      Number(id),
+      sectionCode,
+      dto,
+      undefined,
+      profileId || null,
+    );
+  }
+
+  @ApiOperation({ summary: 'Publish a glossary section (Tier 0 cap enforced)' })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/:sectionCode/publish')
+  async publishSection(
+    @Param('id') id: number,
+    @Param('sectionCode') sectionCode: string,
+    @Query('profileId') profileId?: string,
+  ) {
+    return this.glossaryService.publishSection(
+      Number(id),
+      sectionCode,
+      undefined,
+      profileId || null,
+    );
+  }
+
+  @ApiOperation({ summary: 'Archive a glossary section' })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/:sectionCode/archive')
+  async archiveSection(
+    @Param('id') id: number,
+    @Param('sectionCode') sectionCode: string,
+    @Query('profileId') profileId?: string,
+  ) {
+    return this.glossaryService.archiveSection(
+      Number(id),
+      sectionCode,
+      undefined,
+      profileId || null,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Generate a draft glossary for a language (seed job, drafts only)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/generate')
+  async generateDraftGlossary(@Param('id') id: number) {
+    return this.glossaryService.generateDraftGlossary(Number(id));
+  }
+
+  @ApiOperation({
+    summary:
+      'Backfill draft glossaries (all active non-English languages, or the given ids)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post('glossary/backfill')
+  async backfillGlossaries(@Body() body?: { languageIds?: number[] }) {
+    return this.glossaryService.backfillGlossaries(body?.languageIds);
+  }
+
+  @ApiOperation({
+    summary:
+      'Scan recent sessions of a language for glossary avoid-list violations',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/adherence/backfill')
+  async backfillAdherence(
+    @Param('id') id: number,
+    @Body() body?: { sinceDays?: number; limit?: number },
+  ) {
+    return this.adherenceService.backfillLanguage(Number(id), body);
+  }
+
+  @ApiOperation({
+    summary:
+      'Glossary adherence rollup across every language with scanned sessions',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_ADMIN_LANGUAGES])
+  @Get('glossary/adherence/overview')
+  async adherenceOverview() {
+    return this.adherenceService.languageSummaryOverview();
+  }
+
+  @ApiOperation({
+    summary:
+      'Glossary adherence rollup for a language (violation rates, top terms)',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_ADMIN_LANGUAGES])
+  @Get(':id/glossary/adherence')
+  async adherenceSummary(@Param('id') id: number) {
+    return this.adherenceService.languageSummary(Number(id));
+  }
+
+  @ApiOperation({
+    summary: 'Accept a consolidation proposal (appends to content)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/:sectionCode/proposals/:entryId/accept')
+  async acceptProposal(
+    @Param('id') id: number,
+    @Param('sectionCode') sectionCode: string,
+    @Param('entryId') entryId: string,
+    @Query('profileId') profileId?: string,
+  ) {
+    return this.glossaryService.acceptProposal(
+      Number(id),
+      sectionCode,
+      entryId,
+      undefined,
+      profileId || null,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'Start an adjudication run over the queued proposals for a language (AI review)',
+    description:
+      'Returns 202 with a job id at once; poll GET ' +
+      ':id/glossary/proposals/adjudicate/:jobId for the verdicts (the run ' +
+      'outlived the 60 s load-balancer timeout on Tamil). Decides every ' +
+      'proposal awaiting review: accepts language rules, rejects ' +
+      'persona/behaviour rules, restatements and rules that fight real usage, ' +
+      'and DEFERS anything the Tier 0 token cap will not fit or the ' +
+      'adjudicator was unsure about. Rule form is checked deterministically ' +
+      'first — a substitution buried in an example line is rejected without a ' +
+      'model call, because that shape measured 4% agent compliance. Pass ' +
+      'apply=false to preview the verdicts without applying. 409 while another ' +
+      'adjudication run for the same language is in progress.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/proposals/adjudicate')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async adjudicateProposals(
+    @Param('id') id: number,
+    @Query('apply') apply?: string,
+  ) {
+    const languageId = Number(id);
+    await this.glossaryService.assertLanguageExists(languageId);
+    const options = { apply: apply !== 'false' };
+    return this.jobs.start('adjudication', languageId, options, () =>
+      this.adjudicationService.adjudicateLanguage(languageId, options),
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Poll an adjudication run',
+    description:
+      "status is 'running', 'succeeded' (with the verdicts as result) or " +
+      "'failed' (with error). A run still running after 15 minutes is " +
+      'reported as failed. Records expire after 24 hours.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Get(':id/glossary/proposals/adjudicate/:jobId')
+  async getAdjudicationJob(
+    @Param('id') id: number,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.jobs.get('adjudication', Number(id), jobId);
+  }
+
+  @ApiOperation({ summary: 'Reject a consolidation proposal' })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/:sectionCode/proposals/:entryId/reject')
+  async rejectProposal(
+    @Param('id') id: number,
+    @Param('sectionCode') sectionCode: string,
+    @Param('entryId') entryId: string,
+    @Query('profileId') profileId?: string,
+  ) {
+    return this.glossaryService.rejectProposal(
+      Number(id),
+      sectionCode,
+      entryId,
+      undefined,
+      profileId || null,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'Consolidate judge error annotations into glossary entries. Default: ' +
+      'PROPOSED for review; autoAccept=true publishes survivors immediately ' +
+      '(rollback via the batch endpoints)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/consolidate')
+  async consolidateGlossary(
+    @Param('id') id: number,
+    @Body() body?: { autoAccept?: boolean },
+  ) {
+    return this.glossaryService.consolidateGlossary(Number(id), undefined, {
+      autoAccept: body?.autoAccept === true,
+      trigger: 'manual',
+    });
+  }
+
+  @ApiOperation({
+    summary:
+      'Start a bookish-word mining run: pair words the agent over-uses (vs ' +
+      'counsellor speech, echoes removed) with colloquial equivalents',
+    description:
+      'Returns 202 with a job id at once; the run takes about a minute. Poll ' +
+      'GET :id/glossary/lexeme-mining/:jobId for the result. Defaults to ' +
+      'dryRun=true, which writes nothing. dryRun=false queues the surviving ' +
+      'pairs as PROPOSED entries in a consolidation batch (rollback via the ' +
+      'batch endpoints). Never auto-accepts — but an adjudication scheduler in ' +
+      'apply mode will decide queued proposals on its next pass. 409 while ' +
+      'another run for the same language is in progress.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/lexeme-mining')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async startLexemeMining(
+    @Param('id') id: number,
+    @Body()
+    body?: {
+      dryRun?: boolean;
+      sinceDays?: number;
+      sessionCap?: number;
+      topK?: number;
+    },
+  ) {
+    const positive = (v: unknown, max: number) =>
+      typeof v === 'number' && Number.isInteger(v) && v > 0
+        ? Math.min(v, max)
+        : undefined;
+    return this.lexemeMiningService.startJob(Number(id), {
+      dryRun: body?.dryRun !== false,
+      sinceDays: positive(body?.sinceDays, 365),
+      sessionCap: positive(body?.sessionCap, 1000),
+      topK: positive(body?.topK, 80),
+    });
+  }
+
+  @ApiOperation({
+    summary: 'Poll a lexeme-mining run',
+    description:
+      "status is 'running', 'succeeded' (with result) or 'failed' (with " +
+      'error). A run still running after 15 minutes is reported as failed. ' +
+      'Records expire after 24 hours.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Get(':id/glossary/lexeme-mining/:jobId')
+  async getLexemeMiningJob(
+    @Param('id') id: number,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.lexemeMiningService.getJob(Number(id), jobId);
+  }
+
+  @ApiOperation({
+    summary:
+      'Recompute Tier 0 / Tier 1 assignment (value-per-token knapsack; ' +
+      'pinned sections untouched). apply=false returns the plan without applying',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/retier')
+  async retierGlossary(
+    @Param('id') id: number,
+    @Body() body?: { apply?: boolean },
+  ) {
+    return this.glossaryService.retierGlossary(Number(id), {
+      apply: body?.apply !== false,
+    });
+  }
+
+  @ApiOperation({ summary: 'List consolidation batches (newest first)' })
+  @AuthPermissions([PERMISSIONS.VIEW_ADMIN_LANGUAGES])
+  @Get(':id/glossary/consolidation-batches')
+  async listConsolidationBatches(@Param('id') id: number) {
+    return this.glossaryService.listConsolidationBatches(Number(id));
+  }
+
+  @ApiOperation({
+    summary:
+      'Roll back one consolidation batch: removes its accepted lines from ' +
+      'section content and rejects its entries (their annotations stay consumed)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LANGUAGE])
+  @Post(':id/glossary/consolidation-batches/:batchId/rollback')
+  async rollbackConsolidationBatch(
+    @Param('id') id: number,
+    @Param('batchId') batchId: string,
+  ) {
+    return this.glossaryService.rollbackConsolidationBatch(Number(id), batchId);
+  }
+}

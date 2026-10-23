@@ -1,0 +1,1144 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { PlatformAnalyticsService } from '../platform-analytics.service';
+import { DriftJudgeService } from '../drift-judge.service';
+import {
+  PlatformAnalyticsRepository,
+  VOICE_LATENCY_BY_SCENARIO_LIMIT,
+} from '../../repository/platform-analytics.repository';
+import { LlmUsageRepository } from '../../repository/llm-usage.repository';
+import { DriftAnalyticsRepository } from '../../repository/drift-analytics.repository';
+
+jest.mock('src/logger/logger.service', () => ({
+  LoggerService: {
+    getInstance: jest.fn().mockReturnValue({
+      info: jest.fn(),
+      error: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+    }),
+  },
+}));
+
+/**
+ * Fixed "now" = Wednesday 2024-06-12T12:00:00Z. For range='30d' this yields:
+ *   windowStart      = 2024-05-14 (today - 29d)
+ *   endExclusive     = 2024-06-13 (start of tomorrow)
+ *   weekly axis      = 2024-05-13, 05-20, 05-27, 06-03, 06-10  (Mondays)
+ *   daily axis       = 2024-05-14 .. 2024-06-12 (30 days)
+ */
+const FIXED_NOW = new Date('2024-06-12T12:00:00.000Z');
+const WEEKLY_AXIS = [
+  '2024-05-13',
+  '2024-05-20',
+  '2024-05-27',
+  '2024-06-03',
+  '2024-06-10',
+];
+
+describe('PlatformAnalyticsService', () => {
+  let service: PlatformAnalyticsService;
+  let repo: jest.Mocked<PlatformAnalyticsRepository>;
+  let llmUsageRepo: jest.Mocked<LlmUsageRepository>;
+
+  beforeEach(async () => {
+    jest.useFakeTimers().setSystemTime(FIXED_NOW);
+
+    const mockRepo: Partial<jest.Mocked<PlatformAnalyticsRepository>> = {
+      getNewUsersByBucket: jest.fn().mockResolvedValue([]),
+      getUserCountBefore: jest.fn().mockResolvedValue(0),
+      getTotalUsers: jest.fn().mockResolvedValue(0),
+      getDailyActivityPairs: jest.fn().mockResolvedValue([]),
+      getSimulationsCompletedByBucket: jest.fn().mockResolvedValue([]),
+      getActivePairsWithCreatedAtByBucket: jest.fn().mockResolvedValue([]),
+      getDataFloor: jest
+        .fn()
+        .mockResolvedValue(new Date('2023-03-15T00:00:00.000Z')),
+      getUsersByRole: jest.fn().mockResolvedValue([]),
+      getActiveUserCountSince: jest.fn().mockResolvedValue(0),
+      getReturningActiveUserCountSince: jest.fn().mockResolvedValue(0),
+      getCompletedSimsSince: jest.fn().mockResolvedValue(0),
+      getVoiceLatencyByBucket: jest.fn().mockResolvedValue([]),
+      getVoiceLatencyByLanguage: jest.fn().mockResolvedValue([]),
+      getVoiceLatencyByVoiceModel: jest.fn().mockResolvedValue([]),
+      getVoiceLatencyDataFloor: jest
+        .fn()
+        .mockResolvedValue(new Date('2024-02-10T08:30:00.000Z')),
+      getVoiceLatencyOverall: jest.fn().mockResolvedValue({
+        turns: 0,
+        avgMs: null,
+        p50Ms: null,
+        p95Ms: null,
+      }),
+      getVoiceLatencyBySessions: jest
+        .fn()
+        .mockResolvedValue({ rows: [], total: 0 }),
+      getVoiceLatencySessionsSummary: jest.fn().mockResolvedValue({
+        sessionCount: 0,
+        turnCount: 0,
+        avgResponseLatencyMs: null,
+        p50ResponseLatencyMs: null,
+        p95ResponseLatencyMs: null,
+        avgEouDelayMs: null,
+        avgSttFinalizeMs: null,
+        avgLlmTtftMs: null,
+        avgTtsTtfbMs: null,
+        avgOrchestrationMs: null,
+        avgLlmResponseMs: null,
+        avgBranchingMs: null,
+        avgKnowledgeRetrievalMs: null,
+        avgProcessEventsMs: null,
+        avgBehaviorsMs: null,
+        interruptedTurns: 0,
+        llmTimedOutTurns: 0,
+      }),
+      getVoiceLatencyByScenario: jest.fn().mockResolvedValue([]),
+      getAgentJoinReliabilityByBucket: jest.fn().mockResolvedValue([]),
+      getSuspectedFreezeByBucket: jest.fn().mockResolvedValue([]),
+      getSessionOutcomeMix: jest
+        .fn()
+        .mockResolvedValue({ completed: 0, noConversation: 0, inProgress: 0 }),
+    };
+
+    // Drift aggregations live in DriftAnalyticsRepository and drift backfill is
+    // delegated to DriftJudgeService; these tests cover the overview/latency
+    // aggregations, so stubs are enough to satisfy the constructor.
+    const mockDriftRepo: Partial<jest.Mocked<DriftAnalyticsRepository>> = {
+      getDriftRateByLanguage: jest.fn().mockResolvedValue([]),
+      getDriftRateByDimension: jest.fn().mockResolvedValue([]),
+      getDriftAttributionMix: jest.fn().mockResolvedValue([]),
+      getDriftFailureModeBreakdown: jest.fn().mockResolvedValue([]),
+      getDriftSessionCountsBy: jest.fn().mockResolvedValue([]),
+      getFirstDriftTurnHistogram: jest.fn().mockResolvedValue([]),
+      getDriftTrend: jest.fn().mockResolvedValue([]),
+    };
+
+    const mockDriftJudge: Partial<jest.Mocked<DriftJudgeService>> = {
+      startBackfill: jest.fn(),
+      getJob: jest.fn(),
+    };
+
+    const mockLlmUsageRepo: Partial<jest.Mocked<LlmUsageRepository>> = {
+      getTokenUsageByModelAndTask: jest.fn().mockResolvedValue([]),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PlatformAnalyticsService,
+        { provide: PlatformAnalyticsRepository, useValue: mockRepo },
+        { provide: DriftAnalyticsRepository, useValue: mockDriftRepo },
+        { provide: DriftJudgeService, useValue: mockDriftJudge },
+        { provide: LlmUsageRepository, useValue: mockLlmUsageRepo },
+      ],
+    }).compile();
+
+    service = module.get(PlatformAnalyticsService);
+    repo = module.get(PlatformAnalyticsRepository);
+    llmUsageRepo = module.get(LlmUsageRepository);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  describe('userGrowth', () => {
+    it('zero-fills the weekly axis and accumulates from the baseline', async () => {
+      repo.getUserCountBefore.mockResolvedValue(100);
+      repo.getNewUsersByBucket.mockResolvedValue([
+        { bucket: '2024-05-13', newUsers: 2 },
+        { bucket: '2024-06-10', newUsers: 3 },
+      ]);
+
+      const { userGrowth } = await service.getOverview({ range: '30d' });
+
+      expect(userGrowth.map((p) => p.date)).toEqual(WEEKLY_AXIS);
+      expect(userGrowth).toEqual([
+        { date: '2024-05-13', newUsers: 2, cumulativeUsers: 102 },
+        { date: '2024-05-20', newUsers: 0, cumulativeUsers: 102 },
+        { date: '2024-05-27', newUsers: 0, cumulativeUsers: 102 },
+        { date: '2024-06-03', newUsers: 0, cumulativeUsers: 102 },
+        { date: '2024-06-10', newUsers: 3, cumulativeUsers: 105 },
+      ]);
+    });
+  });
+
+  describe('activeUsers DAU/WAU/MAU', () => {
+    it('rolls trailing 7-/30-day distinct counts per day', async () => {
+      // user 1: active 05-20 and 06-12; user 2: active 06-10
+      repo.getDailyActivityPairs.mockResolvedValue([
+        { day: '2024-05-20', counselorId: 1 },
+        { day: '2024-06-10', counselorId: 2 },
+        { day: '2024-06-12', counselorId: 1 },
+      ]);
+
+      const { activeUsers } = await service.getOverview({ range: '30d' });
+
+      expect(activeUsers).toHaveLength(30);
+      expect(activeUsers[0].date).toBe('2024-05-14');
+      expect(activeUsers[activeUsers.length - 1].date).toBe('2024-06-12');
+
+      const byDate = new Map(activeUsers.map((p) => [p.date, p]));
+
+      // Last day: DAU counts only 06-12; WAU(06-06..06-12)={1,2}; MAU(05-14..06-12)={1,2}
+      expect(byDate.get('2024-06-12')).toEqual({
+        date: '2024-06-12',
+        dau: 1,
+        wau: 2,
+        mau: 2,
+      });
+
+      // 06-11: no activity that day, but trailing windows still see recent users
+      expect(byDate.get('2024-06-11')).toEqual({
+        date: '2024-06-11',
+        dau: 0,
+        wau: 1, // only user 2 (06-10) within 06-05..06-11
+        mau: 2, // user 1 (05-20) + user 2 (06-10) within 05-13..06-11
+      });
+    });
+  });
+
+  describe('retention', () => {
+    it('labels weekly-active users new vs returning by account-creation week', async () => {
+      repo.getActivePairsWithCreatedAtByBucket.mockResolvedValue([
+        // active in week 05-13, account created same week -> new
+        { bucket: '2024-05-13', counselorId: 1, userCreatedAt: '2024-05-15' },
+        // active in week 06-10, account created same week -> new
+        { bucket: '2024-06-10', counselorId: 2, userCreatedAt: '2024-06-11' },
+        // active in week 06-10, account created long ago -> returning
+        { bucket: '2024-06-10', counselorId: 3, userCreatedAt: '2024-01-01' },
+      ]);
+
+      const { retention } = await service.getOverview({ range: '30d' });
+
+      expect(retention.map((p) => p.bucket)).toEqual(WEEKLY_AXIS);
+      expect(retention).toEqual([
+        { bucket: '2024-05-13', newUsers: 1, returningUsers: 0 },
+        { bucket: '2024-05-20', newUsers: 0, returningUsers: 0 },
+        { bucket: '2024-05-27', newUsers: 0, returningUsers: 0 },
+        { bucket: '2024-06-03', newUsers: 0, returningUsers: 0 },
+        { bucket: '2024-06-10', newUsers: 1, returningUsers: 1 },
+      ]);
+    });
+
+    it('labels new vs returning against the REQUESTED grain, not the week', async () => {
+      // Same three users, read monthly. User 1 (created 2024-05-15) is active in
+      // May and was created in May, so monthly it is "new" — where weekly it
+      // depended on which week the account was opened. The split is a property
+      // of the bucket, so it has to be recomputed at the bucket's grain rather
+      // than carried over from the weekly answer.
+      repo.getActivePairsWithCreatedAtByBucket.mockResolvedValue([
+        { bucket: '2024-05-01', counselorId: 1, userCreatedAt: '2024-05-28' },
+        { bucket: '2024-06-01', counselorId: 2, userCreatedAt: '2024-06-11' },
+        { bucket: '2024-06-01', counselorId: 3, userCreatedAt: '2024-01-01' },
+      ]);
+
+      const { retention } = await service.getOverview({
+        range: '30d',
+        bucket: 'month',
+      });
+
+      expect(repo.getActivePairsWithCreatedAtByBucket).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+        'month',
+      );
+      expect(retention).toEqual([
+        { bucket: '2024-05-01', newUsers: 1, returningUsers: 0 },
+        { bucket: '2024-06-01', newUsers: 1, returningUsers: 1 },
+      ]);
+    });
+  });
+
+  describe('simulationsCompleted', () => {
+    it('zero-fills the weekly axis', async () => {
+      repo.getSimulationsCompletedByBucket.mockResolvedValue([
+        { bucket: '2024-06-10', count: 5 },
+      ]);
+
+      const { simulationsCompleted } = await service.getOverview({
+        range: '30d',
+      });
+
+      expect(simulationsCompleted).toEqual([
+        { bucket: '2024-05-13', count: 0 },
+        { bucket: '2024-05-20', count: 0 },
+        { bucket: '2024-05-27', count: 0 },
+        { bucket: '2024-06-03', count: 0 },
+        { bucket: '2024-06-10', count: 5 },
+      ]);
+    });
+
+    it('honours an explicit bucket instead of always aggregating by week', async () => {
+      // This series was hard-coded to ISO weeks whatever the client asked for,
+      // so a monthly request silently got a weekly chart.
+      repo.getSimulationsCompletedByBucket.mockResolvedValue([
+        { bucket: '2024-06-01', count: 9 },
+      ]);
+
+      const { simulationsCompleted } = await service.getOverview({
+        range: '30d',
+        bucket: 'month',
+      });
+
+      expect(repo.getSimulationsCompletedByBucket).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+        'month',
+      );
+      expect(simulationsCompleted).toEqual([
+        { bucket: '2024-05-01', count: 0 },
+        { bucket: '2024-06-01', count: 9 },
+      ]);
+    });
+  });
+
+  describe('summary', () => {
+    it('computes the retention rate as returning / active * 100', async () => {
+      repo.getTotalUsers.mockResolvedValue(100);
+      repo.getActiveUserCountSince.mockResolvedValue(10);
+      repo.getReturningActiveUserCountSince.mockResolvedValue(4);
+      repo.getCompletedSimsSince.mockResolvedValue(7);
+      repo.getUsersByRole.mockResolvedValue([
+        { role: 'LEARNER', count: 80 },
+        { role: 'SUPER_ADMIN', count: 2 },
+      ]);
+
+      const { summary, usersByRole } = await service.getOverview({
+        range: '30d',
+      });
+
+      expect(summary).toEqual({
+        totalUsers: 100,
+        activeUsers: 10,
+        simulationsCompleted: 7,
+        retentionRatePct: 40,
+      });
+      expect(usersByRole).toEqual([
+        { role: 'LEARNER', count: 80 },
+        { role: 'SUPER_ADMIN', count: 2 },
+      ]);
+    });
+
+    it('reports 0% retention when there are no active users', async () => {
+      repo.getActiveUserCountSince.mockResolvedValue(0);
+      repo.getReturningActiveUserCountSince.mockResolvedValue(0);
+
+      const { summary } = await service.getOverview({ range: '30d' });
+
+      expect(summary.retentionRatePct).toBe(0);
+    });
+  });
+
+  describe('range -> bucket mapping', () => {
+    it('uses monthly buckets for the 12m range', async () => {
+      await service.getOverview({ range: '12m' });
+      expect(repo.getNewUsersByBucket).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+        'month',
+      );
+    });
+
+    it('uses weekly buckets for the 90d range', async () => {
+      await service.getOverview({ range: '90d' });
+      expect(repo.getNewUsersByBucket).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+        'week',
+      );
+    });
+  });
+
+  describe("range='all'", () => {
+    it('starts the window at the measured data floor and buckets by month', async () => {
+      const result = await service.getOverview({ range: 'all' });
+
+      expect(repo.getDataFloor).toHaveBeenCalled();
+      expect(result.window).toMatchObject({
+        from: '2023-03-15', // the mocked floor, not a guessed epoch
+        to: '2024-06-12',
+        label: 'All time',
+        bucket: 'month',
+        allTime: true,
+      });
+      expect(repo.getNewUsersByBucket).toHaveBeenCalledWith(
+        new Date('2023-03-15T00:00:00.000Z'),
+        new Date('2024-06-13T00:00:00.000Z'),
+        'month',
+      );
+    });
+
+    it('does not measure the data floor for any other range', async () => {
+      await service.getOverview({ range: '30d' });
+      expect(repo.getDataFloor).not.toHaveBeenCalled();
+    });
+
+    it('flags the in-progress bucket so surfaces can leave it off a plot', async () => {
+      const { window } = await service.getOverview({ range: 'all' });
+      // June 2024 contains the fixed "today" and is therefore still accruing.
+      expect(window.inProgressBucket).toBe('2024-06-01');
+    });
+
+    it('returns no comparison basis even when compare=prev is asked for', async () => {
+      // Nothing precedes the platform's first row, so a delta against the
+      // "previous period" would report growth from zero for every KPI.
+      const result = await service.getOverview({
+        range: 'all',
+        compare: 'prev',
+      });
+
+      expect(result.previous).toBeNull();
+      expect(result.previousLabel).toBeNull();
+    });
+
+    it('still compares equal-length windows for a bounded range', async () => {
+      const result = await service.getOverview({
+        range: '30d',
+        compare: 'prev',
+      });
+
+      expect(result.previousLabel).toBe('previous 30 days');
+      expect(result.previous).not.toBeNull();
+    });
+
+    it('fetches the data floor when range is "all" even with a "from" date', async () => {
+      await service.getOverview({
+        range: 'all',
+        from: '2024-01-01',
+        to: '2024-02-01',
+      });
+      expect(repo.getDataFloor).toHaveBeenCalled();
+    });
+
+    it('rejects range=all on an endpoint with no data floor', async () => {
+      // Token consumption resolves a calendar window only; answering "all time"
+      // there would mean inventing a start date.
+      await expect(
+        service.getTokenConsumption({ range: 'all' }),
+      ).rejects.toThrow(/range=all is not supported/);
+    });
+  });
+
+  describe('getVoiceLatency', () => {
+    it('defaults to daily buckets for the 30d range over the 30-day window', async () => {
+      await service.getVoiceLatency({ range: '30d' });
+
+      expect(repo.getVoiceLatencyByBucket).toHaveBeenCalledWith(
+        new Date('2024-05-14T00:00:00.000Z'), // today - 29d
+        new Date('2024-06-13T00:00:00.000Z'), // start of tomorrow
+        'day',
+        undefined, // no language filter
+      );
+    });
+
+    it('defaults to weekly buckets for the 90d range', async () => {
+      await service.getVoiceLatency({ range: '90d' });
+
+      const [start, end, bucket] = repo.getVoiceLatencyByBucket.mock.calls[0];
+      expect(bucket).toBe('week');
+      expect(start).toEqual(new Date('2024-03-15T00:00:00.000Z')); // today - 89d
+      expect(end).toEqual(new Date('2024-06-13T00:00:00.000Z'));
+    });
+
+    it('defaults to monthly buckets for the 12m range', async () => {
+      await service.getVoiceLatency({ range: '12m' });
+      expect(repo.getVoiceLatencyByBucket).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+        'month',
+        undefined, // no language filter
+      );
+    });
+
+    it('opens range=all on the first turn metric, not a guessed epoch', async () => {
+      await service.getVoiceLatency({ range: 'all', bucket: 'month' });
+
+      expect(repo.getVoiceLatencyDataFloor).toHaveBeenCalledTimes(1);
+      const [start, end, bucket] = repo.getVoiceLatencyByBucket.mock.calls[0];
+      expect(start).toEqual(new Date('2024-02-10T00:00:00.000Z'));
+      expect(end).toEqual(new Date('2024-06-13T00:00:00.000Z'));
+      expect(bucket).toBe('month');
+    });
+
+    it('skips the floor query for a windowed range', async () => {
+      await service.getVoiceLatency({ range: '30d' });
+      expect(repo.getVoiceLatencyDataFloor).not.toHaveBeenCalled();
+    });
+
+    it('honours an explicit bucket override while keeping the range window', async () => {
+      await service.getVoiceLatency({ range: '12m', bucket: 'week' });
+
+      const [start, , bucket] = repo.getVoiceLatencyByBucket.mock.calls[0];
+      // bucket overridden, but the window is still the 12-month range start.
+      expect(bucket).toBe('week');
+      expect(start).toEqual(new Date('2023-07-01T00:00:00.000Z'));
+    });
+
+    it('passes repo points through and includes the range, bucket and target', async () => {
+      const points = [
+        {
+          bucket: '2024-06-10',
+          source: 'pipeline',
+          turns: 12,
+          avgMs: 4858,
+          p50Ms: 4200,
+          p95Ms: 8046,
+          avgLlmTtftMs: 1200,
+          p50LlmTtftMs: 1100,
+          p95LlmTtftMs: 2400,
+          avgCacheHitRatePct: 78,
+          // A masked bucket: most turns were fronted by a filler, so avgMs is
+          // the wait-to-any-voice and avgReplyLatencyMs is the pipeline's own.
+          firstAudioFillerTurns: 5,
+          firstAudioOpenerBridgeTurns: 2,
+          firstAudioInterimTurns: 2,
+          firstAudioBridgeTurns: 0,
+          firstAudioReplyTurns: 3,
+          firstAudioUnknownTurns: 0,
+          avgFirstAudioFillerMs: 480,
+          avgFirstAudioOpenerBridgeMs: 350,
+          avgFirstAudioInterimMs: 900,
+          avgFirstAudioBridgeMs: null,
+          avgFirstAudioReplyMs: 5200,
+          avgReplyLatencyMs: 5100,
+          p50ReplyLatencyMs: 4600,
+          p95ReplyLatencyMs: 8300,
+        },
+        {
+          bucket: '2024-06-10',
+          source: 'transcript',
+          turns: 4,
+          avgMs: 4421,
+          p50Ms: 4000,
+          p95Ms: 6597,
+          avgLlmTtftMs: null,
+          p50LlmTtftMs: null,
+          p95LlmTtftMs: null,
+          avgCacheHitRatePct: null,
+          // Transcript-derived rows carry no provenance at all.
+          firstAudioFillerTurns: 0,
+          firstAudioOpenerBridgeTurns: 0,
+          firstAudioInterimTurns: 0,
+          firstAudioBridgeTurns: 0,
+          firstAudioReplyTurns: 0,
+          firstAudioUnknownTurns: 4,
+          avgFirstAudioFillerMs: null,
+          avgFirstAudioOpenerBridgeMs: null,
+          avgFirstAudioInterimMs: null,
+          avgFirstAudioBridgeMs: null,
+          avgFirstAudioReplyMs: null,
+          avgReplyLatencyMs: null,
+          p50ReplyLatencyMs: null,
+          p95ReplyLatencyMs: null,
+        },
+      ];
+      repo.getVoiceLatencyByBucket.mockResolvedValue(points);
+
+      const result = await service.getVoiceLatency({ range: '90d' });
+
+      expect(result.window).toMatchObject({
+        from: '2024-03-15',
+        to: '2024-06-12',
+        label: 'Last 90 days',
+        days: 90,
+        bucket: 'week',
+      });
+      expect(result).toMatchObject({
+        range: '90d',
+        bucket: 'week',
+        targetMs: 4000,
+        llmTtftTargetMs: 1500,
+        points,
+        byLanguage: [],
+        byVoiceModel: [],
+      });
+    });
+
+    it('includes the per-voice-model first-audio split over the same window and language as the trend', async () => {
+      const byVoiceModel = [
+        {
+          ttsModel: 'cartesia/sonic-2',
+          turns: 120,
+          fillerTurns: 60,
+          openerBridgeTurns: 10,
+          interimTurns: 20,
+          bridgeTurns: 0,
+          replyTurns: 30,
+          unknownTurns: 0,
+          p50FirstAudioMs: 900,
+          p50ReplyLatencyMs: 3200,
+        },
+        {
+          // Generative voice: no spoken masking, so everything is reply-first.
+          ttsModel: 'elevenlabs/eleven_v3',
+          turns: 40,
+          fillerTurns: 0,
+          openerBridgeTurns: 0,
+          interimTurns: 0,
+          bridgeTurns: 0,
+          replyTurns: 40,
+          unknownTurns: 0,
+          p50FirstAudioMs: 3400,
+          p50ReplyLatencyMs: 3400,
+        },
+        {
+          ttsModel: 'unknown',
+          turns: 15,
+          fillerTurns: 0,
+          openerBridgeTurns: 0,
+          interimTurns: 0,
+          bridgeTurns: 0,
+          replyTurns: 0,
+          unknownTurns: 15,
+          p50FirstAudioMs: 2000,
+          p50ReplyLatencyMs: null,
+        },
+      ];
+      repo.getVoiceLatencyByVoiceModel.mockResolvedValue(byVoiceModel);
+
+      const result = await service.getVoiceLatency({
+        range: '30d',
+        language: 'hi-IN',
+      });
+
+      const [trendStart, trendEnd, , trendLanguage] =
+        repo.getVoiceLatencyByBucket.mock.calls[0];
+      expect(repo.getVoiceLatencyByVoiceModel).toHaveBeenCalledWith(
+        trendStart,
+        trendEnd,
+        trendLanguage,
+      );
+      expect(trendLanguage).toBe('hi-IN');
+      expect(result.byVoiceModel).toEqual(byVoiceModel);
+    });
+
+    it('includes the language breakdown alongside the bucketed trend', async () => {
+      const byLanguage = [
+        {
+          language: 'en',
+          turns: 100,
+          avgMs: 900,
+          p95Ms: 1600,
+          avgSttFinalizeMs: 250,
+        },
+        {
+          language: 'hi-IN',
+          turns: 40,
+          avgMs: 1200,
+          p95Ms: 2100,
+          avgSttFinalizeMs: null,
+        },
+      ];
+      repo.getVoiceLatencyByLanguage.mockResolvedValue(byLanguage);
+
+      const result = await service.getVoiceLatency({ range: '30d' });
+
+      expect(repo.getVoiceLatencyByLanguage).toHaveBeenCalledWith(
+        new Date('2024-05-14T00:00:00.000Z'),
+        new Date('2024-06-13T00:00:00.000Z'),
+      );
+      expect(result.byLanguage).toEqual(byLanguage);
+    });
+
+    it('includes the whole-window overall KPI figure alongside the trend', async () => {
+      repo.getVoiceLatencyOverall.mockResolvedValue({
+        turns: 5000,
+        avgMs: 4700,
+        p50Ms: 4300,
+        p95Ms: 8100,
+      });
+
+      const result = await service.getVoiceLatency({ range: '90d' });
+
+      expect(result.overall).toEqual({
+        turns: 5000,
+        avgMs: 4700,
+        p50Ms: 4300,
+        p95Ms: 8100,
+      });
+    });
+
+    it('resolves the overall KPI over the SAME window/language as the trend', async () => {
+      await service.getVoiceLatency({ range: '90d', language: 'hi-IN' });
+
+      const [trendStart, trendEnd, , trendLanguage] =
+        repo.getVoiceLatencyByBucket.mock.calls[0];
+      expect(repo.getVoiceLatencyOverall).toHaveBeenCalledWith(
+        trendStart,
+        trendEnd,
+        trendLanguage,
+      );
+      expect(repo.getVoiceLatencyOverall).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+        'hi-IN',
+      );
+    });
+
+    it('defaults to zero turns and null latencies with nothing in the window', async () => {
+      const result = await service.getVoiceLatency({ range: '30d' });
+
+      expect(result.overall).toEqual({
+        turns: 0,
+        avgMs: null,
+        p50Ms: null,
+        p95Ms: null,
+      });
+    });
+  });
+
+  describe('getVoiceLatencySessions', () => {
+    it('resolves the default 90d window and forwards scenarioId/language/pagination', async () => {
+      await service.getVoiceLatencySessions({
+        scenarioId: 42,
+        language: 'ta-IN',
+        limit: 10,
+        offset: 20,
+      });
+
+      expect(repo.getVoiceLatencyBySessions).toHaveBeenCalledWith(
+        42,
+        'ta-IN',
+        new Date('2024-03-15T00:00:00.000Z'),
+        new Date('2024-06-13T00:00:00.000Z'),
+        10,
+        20,
+      );
+    });
+
+    it('defaults limit/offset when not provided', async () => {
+      await service.getVoiceLatencySessions({ scenarioId: 7 });
+
+      const [, , , , limit, offset] =
+        repo.getVoiceLatencyBySessions.mock.calls[0];
+      expect(limit).toBe(25);
+      expect(offset).toBe(0);
+    });
+
+    it('coerces raw string aggregates to numbers and passes through pagination total', async () => {
+      repo.getVoiceLatencyBySessions.mockResolvedValue({
+        rows: [
+          {
+            scenarioSessionId: 'sess-1',
+            occurredAt: '2024-06-01T00:00:00.000Z',
+            turnCount: '12',
+            avgResponseLatencyMs: '9680',
+            p50ResponseLatencyMs: '10037',
+            p95ResponseLatencyMs: '26305',
+            avgEouDelayMs: '1333',
+            avgSttFinalizeMs: null,
+            avgLlmTtftMs: '9680',
+            avgTtsTtfbMs: '1881',
+            avgOrchestrationMs: '31',
+            avgLlmResponseMs: '1200',
+            avgBranchingMs: '0',
+            avgKnowledgeRetrievalMs: '2413',
+            avgProcessEventsMs: '2554',
+            avgBehaviorsMs: '1534',
+            interruptedTurns: '1',
+            llmTimedOutTurns: '0',
+          },
+        ],
+        total: 1,
+      });
+
+      const result = await service.getVoiceLatencySessions({
+        scenarioId: 42,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.data[0]).toEqual({
+        scenarioSessionId: 'sess-1',
+        occurredAt: '2024-06-01T00:00:00.000Z',
+        turnCount: 12,
+        avgResponseLatencyMs: 9680,
+        p50ResponseLatencyMs: 10037,
+        p95ResponseLatencyMs: 26305,
+        avgEouDelayMs: 1333,
+        avgSttFinalizeMs: null,
+        avgLlmTtftMs: 9680,
+        avgTtsTtfbMs: 1881,
+        avgOrchestrationMs: 31,
+        avgLlmResponseMs: 1200,
+        avgBranchingMs: 0,
+        avgKnowledgeRetrievalMs: 2413,
+        avgProcessEventsMs: 2554,
+        avgBehaviorsMs: 1534,
+        interruptedTurns: 1,
+        llmTimedOutTurns: 0,
+      });
+    });
+  });
+
+  describe('getVoiceLatencySessionsSummary', () => {
+    it('resolves the default 90d window and forwards scenarioId/language', async () => {
+      await service.getVoiceLatencySessionsSummary({
+        scenarioId: 42,
+        language: 'kn-IN',
+      });
+
+      expect(repo.getVoiceLatencySessionsSummary).toHaveBeenCalledWith(
+        42,
+        'kn-IN',
+        new Date('2024-03-15T00:00:00.000Z'),
+        new Date('2024-06-13T00:00:00.000Z'),
+      );
+    });
+
+    it('coerces raw aggregates to numbers', async () => {
+      repo.getVoiceLatencySessionsSummary.mockResolvedValue({
+        sessionCount: '100',
+        turnCount: '450',
+        avgResponseLatencyMs: '12723',
+        p50ResponseLatencyMs: '10037',
+        p95ResponseLatencyMs: '26305',
+        avgEouDelayMs: '1333',
+        avgSttFinalizeMs: null,
+        avgLlmTtftMs: '9680',
+        avgTtsTtfbMs: '1881',
+        avgOrchestrationMs: '31',
+        avgLlmResponseMs: '1200',
+        avgBranchingMs: '0',
+        avgKnowledgeRetrievalMs: '2413',
+        avgProcessEventsMs: '2554',
+        avgBehaviorsMs: '1534',
+        interruptedTurns: '2',
+        llmTimedOutTurns: '1',
+      });
+
+      const result = await service.getVoiceLatencySessionsSummary({
+        scenarioId: 42,
+      });
+
+      expect(result).toMatchObject({
+        sessionCount: 100,
+        turnCount: 450,
+        avgResponseLatencyMs: 12723,
+        avgLlmTtftMs: 9680,
+        avgTtsTtfbMs: 1881,
+        avgSttFinalizeMs: null,
+        interruptedTurns: 2,
+        llmTimedOutTurns: 1,
+      });
+    });
+  });
+
+  describe('getVoiceLatencyByScenario', () => {
+    it('resolves the default 90d window and forwards language', async () => {
+      await service.getVoiceLatencyByScenario({ language: 'ta-IN' });
+
+      expect(repo.getVoiceLatencyByScenario).toHaveBeenCalledWith(
+        new Date('2024-03-15T00:00:00.000Z'),
+        new Date('2024-06-13T00:00:00.000Z'),
+        'ta-IN',
+      );
+    });
+
+    it('coerces raw string aggregates to numbers, per row', async () => {
+      repo.getVoiceLatencyByScenario.mockResolvedValue([
+        {
+          scenarioId: 42,
+          scenarioTitle: 'Guide Kavya through a difficult conversation',
+          occurredAt: '2026-08-20T09:15:00.000Z',
+          turnCount: '210',
+          avgResponseLatencyMs: '9680',
+          p50ResponseLatencyMs: '10037',
+          p95ResponseLatencyMs: '26305',
+          avgEouDelayMs: '1333',
+          avgSttFinalizeMs: null,
+          avgLlmTtftMs: '9680',
+          avgTtsTtfbMs: '1881',
+          avgOrchestrationMs: '31',
+          avgLlmResponseMs: '1200',
+          avgBranchingMs: '0',
+          avgKnowledgeRetrievalMs: '2413',
+          avgProcessEventsMs: '2554',
+          avgBehaviorsMs: '1534',
+          interruptedTurns: '1',
+          llmTimedOutTurns: '0',
+        },
+      ]);
+
+      const result = await service.getVoiceLatencyByScenario({});
+
+      expect(result.truncated).toBe(false);
+      expect(result.rows[0]).toEqual({
+        scenarioId: 42,
+        scenarioTitle: 'Guide Kavya through a difficult conversation',
+        occurredAt: '2026-08-20T09:15:00.000Z',
+        turnCount: 210,
+        avgResponseLatencyMs: 9680,
+        p50ResponseLatencyMs: 10037,
+        p95ResponseLatencyMs: 26305,
+        avgEouDelayMs: 1333,
+        avgSttFinalizeMs: null,
+        avgLlmTtftMs: 9680,
+        avgTtsTtfbMs: 1881,
+        avgOrchestrationMs: 31,
+        avgLlmResponseMs: 1200,
+        avgBranchingMs: 0,
+        avgKnowledgeRetrievalMs: 2413,
+        avgProcessEventsMs: 2554,
+        avgBehaviorsMs: 1534,
+        interruptedTurns: 1,
+        llmTimedOutTurns: 0,
+      });
+    });
+
+    it('flags truncated when the repo returns exactly the defensive cap, without dropping rows silently', async () => {
+      const capRow = {
+        scenarioId: 0,
+        scenarioTitle: 'x',
+        occurredAt: '2026-08-20T09:15:00.000Z',
+        turnCount: 1,
+        avgResponseLatencyMs: 1000,
+        p50ResponseLatencyMs: 1000,
+        p95ResponseLatencyMs: 1000,
+        avgEouDelayMs: null,
+        avgSttFinalizeMs: null,
+        avgLlmTtftMs: null,
+        avgTtsTtfbMs: null,
+        avgOrchestrationMs: null,
+        avgLlmResponseMs: null,
+        avgBranchingMs: null,
+        avgKnowledgeRetrievalMs: null,
+        avgProcessEventsMs: null,
+        avgBehaviorsMs: null,
+        interruptedTurns: 0,
+        llmTimedOutTurns: 0,
+      };
+      repo.getVoiceLatencyByScenario.mockResolvedValue(
+        Array.from({ length: VOICE_LATENCY_BY_SCENARIO_LIMIT }, (_, i) => ({
+          ...capRow,
+          scenarioId: i,
+        })),
+      );
+
+      const result = await service.getVoiceLatencyByScenario({});
+
+      expect(result.rows).toHaveLength(VOICE_LATENCY_BY_SCENARIO_LIMIT);
+      expect(result.truncated).toBe(true);
+    });
+  });
+
+  describe('getTokenConsumption', () => {
+    it('queries the [start, end) window for the range', async () => {
+      await service.getTokenConsumption({ range: '30d' });
+
+      expect(llmUsageRepo.getTokenUsageByModelAndTask).toHaveBeenCalledWith(
+        new Date('2024-05-14T00:00:00.000Z'), // today - 29d
+        new Date('2024-06-13T00:00:00.000Z'), // start of tomorrow
+      );
+    });
+
+    it('computes estimated USD cost per service and flags unpriced rows', async () => {
+      llmUsageRepo.getTokenUsageByModelAndTask.mockResolvedValue([
+        {
+          service: 'llm',
+          model: 'gpt-4o-mini', // 0.15 / 0.60 per 1M
+          provider: 'openai',
+          task: 'summary',
+          promptTokens: 1_000_000,
+          completionTokens: 1_000_000,
+          totalTokens: 2_000_000,
+          cachedTokens: 0,
+          audioMs: 0,
+          characters: 0,
+          calls: 10,
+        },
+        {
+          service: 'stt',
+          model: 'nova-3', // deepgram 0.0077/min
+          provider: 'deepgram',
+          task: 'agent_stt',
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          cachedTokens: 0,
+          audioMs: 600_000, // 10 minutes → 0.077
+          characters: 0,
+          calls: 5,
+        },
+        {
+          service: 'tts',
+          model: 'aura', // deepgram 15/1M chars
+          provider: 'deepgram',
+          task: 'agent_tts',
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          cachedTokens: 0,
+          audioMs: 0,
+          characters: 1_000_000, // → 15
+          calls: 5,
+        },
+        {
+          service: 'llm',
+          model: 'mystery-model', // no pricing entry
+          provider: 'x',
+          task: 'nudge',
+          promptTokens: 500_000,
+          completionTokens: 0,
+          totalTokens: 500_000,
+          cachedTokens: 0,
+          audioMs: 0,
+          characters: 0,
+          calls: 2,
+        },
+      ]);
+
+      const result = await service.getTokenConsumption({ range: '30d' });
+
+      expect(result.range).toBe('30d');
+      const byModel = Object.fromEntries(
+        result.points.map((p) => [p.model, p]),
+      );
+      expect(byModel['gpt-4o-mini']).toMatchObject({
+        service: 'llm',
+        estimatedCostUsd: 0.75, // 0.15 + 0.60
+        priced: true,
+      });
+      expect(byModel['nova-3']).toMatchObject({
+        service: 'stt',
+        estimatedCostUsd: 0.08, // 10 min × 0.0077 = 0.077 → round2 0.08
+        priced: true,
+      });
+      expect(byModel['aura']).toMatchObject({
+        service: 'tts',
+        estimatedCostUsd: 15, // 1M chars × 15/1M
+        priced: true,
+      });
+      expect(byModel['mystery-model']).toMatchObject({
+        estimatedCostUsd: 0,
+        priced: false,
+        totalTokens: 500_000, // quantities preserved even when unpriced
+      });
+      expect(result.totalEstimatedCostUsd).toBe(15.83); // 0.75 + 0.08 + 15
+    });
+
+    it('prices Gemini thinking and cached prompt tokens from the usage row', async () => {
+      llmUsageRepo.getTokenUsageByModelAndTask.mockResolvedValue([
+        {
+          service: 'llm',
+          model: 'gemini-2.5-pro', // 1.25 in / 10 out / 0.125 cached per 1M
+          provider: 'gemini',
+          task: 'drift_judge',
+          promptTokens: 1_000_000,
+          completionTokens: 100_000,
+          // 400k thinking tokens, visible only in the total.
+          totalTokens: 1_500_000,
+          // Half the prompt served from cache.
+          cachedTokens: 500_000,
+          audioMs: 0,
+          characters: 0,
+          calls: 10,
+        },
+      ]);
+
+      const result = await service.getTokenConsumption({ range: '30d' });
+
+      // 500k fresh × 1.25 + 500k cached × 0.125 + (100k + 400k) out × 10
+      // = 0.625 + 0.0625 + 5 = 5.6875, rounded to 5.69
+      expect(result.points[0]).toMatchObject({
+        estimatedCostUsd: 5.69,
+        priced: true,
+      });
+    });
+  });
+
+  describe('conversationDrift — scenario version slice', () => {
+    let driftRepo: jest.Mocked<DriftAnalyticsRepository>;
+    beforeEach(() => {
+      driftRepo = service['driftRepo'] as jest.Mocked<DriftAnalyticsRepository>;
+    });
+
+    it('compares versions when a scenarioId is set, ignoring the version filter', async () => {
+      driftRepo.getDriftRateByDimension.mockImplementation(
+        async (_f, dimension) =>
+          dimension === 'scenarioVersion'
+            ? [{ key: 'v2', totalSessions: 4, driftedSessions: 1 }]
+            : [],
+      );
+
+      const result = await service.getConversationDrift('90d', {
+        scenarioId: 7,
+        scenarioVersionId: 'ver-123',
+      });
+
+      expect(result.driftRateByScenarioVersion).toEqual([
+        { key: 'v2', totalSessions: 4, driftedSessions: 1, driftRate: 0.25 },
+      ]);
+      // The comparison must span ALL versions of the scenario, so the
+      // scenarioVersionId filter is dropped for the scenarioVersion dimension.
+      expect(driftRepo.getDriftRateByDimension).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scenarioId: 7,
+          scenarioVersionId: undefined,
+        }),
+        'scenarioVersion',
+      );
+    });
+
+    it('skips the version comparison entirely when no scenarioId is set', async () => {
+      driftRepo.getDriftRateByDimension.mockResolvedValue([]);
+
+      const result = await service.getConversationDrift('90d', {});
+
+      expect(result.driftRateByScenarioVersion).toEqual([]);
+      const dims = driftRepo.getDriftRateByDimension.mock.calls.map(
+        ([, dimension]) => dimension,
+      );
+      expect(dims).not.toContain('scenarioVersion');
+    });
+  });
+
+  describe('getAgentJoinReliability', () => {
+    it('computes failureRatePct per bucket and guards divide-by-zero', async () => {
+      (repo.getAgentJoinReliabilityByBucket as jest.Mock).mockResolvedValue([
+        {
+          bucket: '2026-07-01',
+          totalSessions: 10,
+          joinFailures: 3,
+          midSessionDrops: 1,
+          joinLatencyP50Sec: 2,
+          joinLatencyP95Sec: 8,
+        },
+        {
+          bucket: '2026-07-02',
+          totalSessions: 0,
+          joinFailures: 0,
+          midSessionDrops: 0,
+          joinLatencyP50Sec: null,
+          joinLatencyP95Sec: null,
+        },
+      ]);
+      (repo.getSessionOutcomeMix as jest.Mock).mockResolvedValue({
+        completed: 7,
+        noConversation: 3,
+        inProgress: 1,
+      });
+      // 2 freezes out of 8 conversations in the first bucket -> 25%.
+      (repo.getSuspectedFreezeByBucket as jest.Mock).mockResolvedValue([
+        { bucket: '2026-07-01', conversations: 8, suspectedFreezes: 2 },
+      ]);
+
+      const result = await service.getAgentJoinReliability({ range: '30d' });
+
+      const b1 = result.points.find((p) => p.bucket === '2026-07-01')!;
+      const b2 = result.points.find((p) => p.bucket === '2026-07-02')!;
+      expect(b1.failureRatePct).toBe(30);
+      expect(b2.failureRatePct).toBe(0); // no divide-by-zero
+      expect(b1.midSessionDrops).toBe(1);
+      // freeze merge by bucket + rate computation
+      expect(b1.conversations).toBe(8);
+      expect(b1.suspectedFreezes).toBe(2);
+      expect(b1.freezeRatePct).toBe(25);
+      expect(b2.freezeRatePct).toBe(0); // bucket with no freeze data
+      expect(result.outcomeMix).toEqual({
+        completed: 7,
+        noConversation: 3,
+        inProgress: 1,
+      });
+    });
+  });
+});

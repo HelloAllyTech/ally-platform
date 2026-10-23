@@ -1,0 +1,1238 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource, ObjectLiteral, SelectQueryBuilder } from 'typeorm';
+import {
+  ListRoleplaySessionLogsQueryDto,
+  RoleplaySessionLogSortBy,
+} from '../dto/roleplay-session-logs.dto';
+import { SortOrder } from '../../common/type/common.type';
+
+/** A flat list row as returned by the raw query (camelCase aliases). */
+export interface RoleplaySessionLogRawRow {
+  id: string;
+  counselorId: number | string;
+  counselorName: string | null;
+  counselorEmail: string | null;
+  tenantId: string;
+  orgName: string | null;
+  scenarioId: number | string;
+  scenarioTitle: string | null;
+  status: string;
+  /** Derived session outcome (see RoleplaySessionOutcome). */
+  outcome: string;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  score: number | string | null;
+  platform: string | null;
+  /** Display label of the session's language (e.g. 'English'), resolved via `languages`. */
+  language: string | null;
+  callDuration: number | string | null;
+  totalPausedMs: number | string | null;
+  createdAt: Date;
+  /** True when this session was started by the super-admin V2V test tool. */
+  isV2VTest: boolean;
+  /** Detail-only enrichments (present on `findOne`, absent on `list`). */
+  scenarioVersionId?: string | null;
+  voiceId?: string | null;
+  compositeScore?: number | string | null;
+  evalMetrics?: Record<string, number> | null;
+  /** Goal titles excluded from the composite as inapplicable; null pre-feature. */
+  notApplicableGoals?: string[] | null;
+  evaluationMarkdown?: string | null;
+  evaluationStatus?: string | null;
+  evaluatedAt?: Date | null;
+}
+
+/** One usage bucket for a session, grouped by (service, provider, model). */
+export interface RoleplaySessionUsageRow {
+  scenarioSessionId: string;
+  service: string;
+  provider: string;
+  model: string;
+  promptTokens: number | string;
+  completionTokens: number | string;
+  totalTokens: number | string;
+  cachedTokens: number | string;
+  audioMs: number | string;
+  characters: number | string;
+  calls: number | string;
+}
+
+/** Aggregated per-session voice-pipeline latency + quality (one row). */
+export interface RoleplaySessionLatencyRow {
+  turnCount: number | string;
+  avgResponseLatencyMs: number | string | null;
+  p50ResponseLatencyMs: number | string | null;
+  p95ResponseLatencyMs: number | string | null;
+  avgEouDelayMs: number | string | null;
+  avgSttFinalizeMs: number | string | null;
+  avgLlmTtftMs: number | string | null;
+  avgTtsTtfbMs: number | string | null;
+  avgOrchestrationMs: number | string | null;
+  avgLlmResponseMs: number | string | null;
+  avgProsodyMs: number | string | null;
+  avgBranchingMs: number | string | null;
+  avgKnowledgeRetrievalMs: number | string | null;
+  avgProcessEventsMs: number | string | null;
+  avgBehaviorsMs: number | string | null;
+  interruptedTurns: number | string;
+  llmTimedOutTurns: number | string;
+  prosodySkippedTurns: number | string;
+}
+
+/** One Tier 1 glossary section's retrieval-hit count within a session. */
+export interface RoleplaySessionGlossarySectionHitRow {
+  sectionCode: string;
+  count: number | string;
+}
+
+/**
+ * Session-level glossary delivery + retrieval activity, aggregated from the
+ * worker's echoed provenance (`scenario_session_start_metrics.metadata.glossary`)
+ * and per-turn Tier 1 selections (`scenario_session_turn_metrics.metadata.glossary_selected`).
+ */
+export interface RoleplaySessionGlossaryActivityRow {
+  /** Raw `{tier0_chars, tier1_sections, versions, tier0_tokens}` from the
+   * latest start_metrics row; null when this session never received a
+   * glossary (English, no published glossary, or predates this instrumentation). */
+  glossaryMeta: Record<string, any> | null;
+  totalTurns: number | string;
+  turnsWithGlossaryRetrieval: number | string;
+  sectionHitCounts: RoleplaySessionGlossarySectionHitRow[];
+}
+
+/**
+ * Cross-tenant (platform-wide) reads of roleplay sessions for the super-admin
+ * "Roleplay Session Logs" view. Uses a `DataSource`-backed query builder rather
+ * than the tenant-scoped `ScenarioSessionRepository` because these queries span
+ * `scenario_sessions`, `users`, `scenarios` and `tenants` and are deliberately
+ * NOT scoped to a tenant — mirroring the super-admin analytics pattern in
+ * {@link PlatformAnalyticsRepository}.
+ *
+ * Admin-Studio preview runs are never persisted (they only ever create
+ * ephemeral `preview-*` LiveKit rooms), and local-dev seed fixtures use
+ * `seed-room-*` room ids; both are excluded here so only genuine end-user
+ * roleplays surface.
+ */
+@Injectable()
+export class RoleplaySessionLogsRepository {
+  constructor(private readonly dataSource: DataSource) {}
+
+  private static readonly SORT_COLUMNS: Record<
+    RoleplaySessionLogSortBy,
+    string
+  > = {
+    [RoleplaySessionLogSortBy.CREATED_AT]: 'ss."createdAt"',
+    [RoleplaySessionLogSortBy.STARTED_AT]: 'ss."startedAt"',
+    [RoleplaySessionLogSortBy.ENDED_AT]: 'ss."endedAt"',
+    [RoleplaySessionLogSortBy.SCORE]: 'ss."score"',
+    [RoleplaySessionLogSortBy.STATUS]: 'ss."status"',
+  };
+
+  /**
+   * Derived per-session outcome, richer than the binary ACTIVE|ENDED status.
+   * ACTIVE -> IN_PROGRESS; ENDED with >=1 transcript message -> COMPLETED;
+   * ENDED with none -> NO_CONVERSATION (surfaces "agent never joined" / empty
+   * sessions). A correlated EXISTS keeps it a per-row check. Both
+   * scenario_session_messages."scenarioSessionId" and scenario_sessions.id are
+   * uuid, so they are compared directly (a `::text` cast would raise
+   * `operator does not exist: uuid = text`).
+   */
+  private static readonly OUTCOME_EXPR = `
+    CASE
+      WHEN ss."status" = 'ACTIVE' THEN 'IN_PROGRESS'
+      WHEN EXISTS (
+        SELECT 1 FROM scenario_session_messages ssm
+        WHERE ssm."scenarioSessionId" = ss.id
+      ) THEN 'COMPLETED'
+      ELSE 'NO_CONVERSATION'
+    END`;
+
+  /**
+   * Applies the shared filters (exclusions + user filters) to a query that has
+   * already FROM `scenario_sessions ss` and joined `users u` + `scenarios scn`.
+   * Kept in one place so the list query and the count query stay in lockstep.
+   */
+  private applyFilters(
+    qb: SelectQueryBuilder<ObjectLiteral>,
+    filters: ListRoleplaySessionLogsQueryDto,
+  ): void {
+    // Exclude non-user rows: Admin-Studio previews (never persisted, defensive)
+    // and local-dev seed fixtures.
+    qb.where(`ss."roomId" NOT LIKE 'preview-%'`).andWhere(
+      `ss."roomId" NOT LIKE 'seed-room-%'`,
+    );
+
+    if (filters.status) {
+      qb.andWhere('ss."status" = :status', { status: filters.status });
+    }
+
+    if (filters.tenantId) {
+      qb.andWhere('ss."tenant_id" = :tenantId', { tenantId: filters.tenantId });
+    }
+
+    if (filters.language) {
+      qb.andWhere('lang."value" = :language', { language: filters.language });
+    }
+
+    if (filters.search) {
+      qb.andWhere(
+        '(u."name" ILIKE :search OR u."email" ILIKE :search OR scn."title" ILIKE :search)',
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    if (filters.dateFrom) {
+      qb.andWhere(`COALESCE(ss."startedAt", ss."createdAt") >= :dateFrom`, {
+        dateFrom: filters.dateFrom,
+      });
+    }
+
+    if (filters.dateTo) {
+      qb.andWhere(`COALESCE(ss."startedAt", ss."createdAt") <= :dateTo`, {
+        dateTo: filters.dateTo,
+      });
+    }
+
+    if (filters.isV2VTest === true) {
+      qb.andWhere(`(ss.metadata->>'v2vTest')::boolean = true`);
+    } else if (filters.isV2VTest === false) {
+      qb.andWhere(
+        `COALESCE((ss.metadata->>'v2vTest')::boolean, false) = false`,
+      );
+    }
+  }
+
+  /** Paginated, filtered, cross-tenant list of roleplay sessions + total count. */
+  async list(
+    filters: ListRoleplaySessionLogsQueryDto,
+  ): Promise<{ rows: RoleplaySessionLogRawRow[]; total: number }> {
+    const sortBy = filters.sortBy ?? RoleplaySessionLogSortBy.CREATED_AT;
+    const order: 'ASC' | 'DESC' =
+      filters.order === SortOrder.ASC ? 'ASC' : 'DESC';
+    const limit = filters.limit ?? 25;
+    const offset = filters.offset ?? 0;
+
+    const dataQb = this.dataSource
+      .createQueryBuilder()
+      .select('ss."id"', 'id')
+      .addSelect('ss."counselorId"', 'counselorId')
+      .addSelect('u."name"', 'counselorName')
+      .addSelect('u."email"', 'counselorEmail')
+      .addSelect('ss."tenant_id"', 'tenantId')
+      .addSelect('t."name"', 'orgName')
+      .addSelect('ss."scenarioId"', 'scenarioId')
+      .addSelect('scn."title"', 'scenarioTitle')
+      .addSelect('ss."status"', 'status')
+      .addSelect(RoleplaySessionLogsRepository.OUTCOME_EXPR, 'outcome')
+      .addSelect('ss."startedAt"', 'startedAt')
+      .addSelect('ss."endedAt"', 'endedAt')
+      .addSelect('ss."score"', 'score')
+      .addSelect(`ss.metadata->>'platform'`, 'platform')
+      .addSelect(`COALESCE(lang."label", lang."value")`, 'language')
+      .addSelect('d."callDuration"', 'callDuration')
+      .addSelect('ss."totalPausedMs"', 'totalPausedMs')
+      .addSelect('ss."createdAt"', 'createdAt')
+      .addSelect(
+        `COALESCE((ss.metadata->>'v2vTest')::boolean, false)`,
+        'isV2VTest',
+      )
+      .from('scenario_sessions', 'ss')
+      .leftJoin('users', 'u', 'u.id = ss."counselorId"')
+      .leftJoin('scenarios', 'scn', 'scn.id = ss."scenarioId"')
+      // scenario_sessions.tenant_id is varchar (BaseEntity), tenants.id is uuid.
+      // Compare as text so a non-uuid tenant_id (e.g. legacy/seed data) simply
+      // fails to match instead of raising a cast error for the whole query.
+      .leftJoin('tenants', 't', 't.id::text = ss."tenant_id"')
+      .leftJoin(
+        'scenario_session_details',
+        'd',
+        'd."scenarioSessionId"::uuid = ss.id',
+      )
+      // Resolve the session's configured language id (metadata) to a label.
+      .leftJoin(
+        'languages',
+        'lang',
+        `lang.id = NULLIF(ss.metadata->>'languageId', '')::int`,
+      );
+
+    this.applyFilters(dataQb, filters);
+
+    dataQb
+      .orderBy(
+        RoleplaySessionLogsRepository.SORT_COLUMNS[sortBy],
+        order,
+        'NULLS LAST',
+      )
+      .addOrderBy('ss."id"', 'ASC')
+      .limit(limit)
+      .offset(offset);
+
+    const rows = await dataQb.getRawMany<RoleplaySessionLogRawRow>();
+
+    // Count query mirrors the same FROM/JOIN/WHERE (joins to users/scenarios are
+    // needed because `search` filters on them); no select shaping or paging.
+    const countQb = this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)::int', 'count')
+      .from('scenario_sessions', 'ss')
+      .leftJoin('users', 'u', 'u.id = ss."counselorId"')
+      .leftJoin('scenarios', 'scn', 'scn.id = ss."scenarioId"')
+      .leftJoin(
+        'languages',
+        'lang',
+        `lang.id = NULLIF(ss.metadata->>'languageId', '')::int`,
+      );
+
+    this.applyFilters(countQb, filters);
+
+    const countRow = await countQb.getRawOne<{ count: number }>();
+
+    return { rows, total: Number(countRow?.count) || 0 };
+  }
+
+  /** Single session core row (cross-tenant), or null when not found. */
+  async findOne(id: string): Promise<RoleplaySessionLogRawRow | null> {
+    const row = await this.dataSource
+      .createQueryBuilder()
+      .select('ss."id"', 'id')
+      .addSelect('ss."counselorId"', 'counselorId')
+      .addSelect('u."name"', 'counselorName')
+      .addSelect('u."email"', 'counselorEmail')
+      .addSelect('ss."tenant_id"', 'tenantId')
+      .addSelect('t."name"', 'orgName')
+      .addSelect('ss."scenarioId"', 'scenarioId')
+      .addSelect('scn."title"', 'scenarioTitle')
+      .addSelect('ss."status"', 'status')
+      .addSelect(RoleplaySessionLogsRepository.OUTCOME_EXPR, 'outcome')
+      .addSelect('ss."startedAt"', 'startedAt')
+      .addSelect('ss."endedAt"', 'endedAt')
+      .addSelect('ss."score"', 'score')
+      .addSelect(`ss.metadata->>'platform'`, 'platform')
+      .addSelect('d."callDuration"', 'callDuration')
+      .addSelect('ss."totalPausedMs"', 'totalPausedMs')
+      .addSelect('ss."createdAt"', 'createdAt')
+      .addSelect(
+        `COALESCE((ss.metadata->>'v2vTest')::boolean, false)`,
+        'isV2VTest',
+      )
+      .addSelect('ss."scenarioVersionId"', 'scenarioVersionId')
+      .addSelect(`COALESCE(lang."label", lang."value")`, 'language')
+      .addSelect(`ss.metadata->>'voiceId'`, 'voiceId')
+      .addSelect('d."compositeScore"', 'compositeScore')
+      .addSelect('d."metrics"', 'evalMetrics')
+      .addSelect('d."notApplicableGoals"', 'notApplicableGoals')
+      .addSelect('d."evaluationMarkdown"', 'evaluationMarkdown')
+      .addSelect('d."evaluationStatus"', 'evaluationStatus')
+      .addSelect('d."evaluatedAt"', 'evaluatedAt')
+      .from('scenario_sessions', 'ss')
+      .leftJoin('users', 'u', 'u.id = ss."counselorId"')
+      .leftJoin('scenarios', 'scn', 'scn.id = ss."scenarioId"')
+      // scenario_sessions.tenant_id is varchar (BaseEntity), tenants.id is uuid.
+      // Compare as text so a non-uuid tenant_id (e.g. legacy/seed data) simply
+      // fails to match instead of raising a cast error for the whole query.
+      .leftJoin('tenants', 't', 't.id::text = ss."tenant_id"')
+      .leftJoin(
+        'scenario_session_details',
+        'd',
+        'd."scenarioSessionId"::uuid = ss.id',
+      )
+      // Resolve the session's configured language id (metadata) to a label.
+      .leftJoin(
+        'languages',
+        'lang',
+        `lang.id = NULLIF(ss.metadata->>'languageId', '')::int`,
+      )
+      .where('ss.id = :id', { id })
+      .getRawOne<RoleplaySessionLogRawRow>();
+
+    return row ?? null;
+  }
+
+  /** Post-session summary jsonb for a session, if any. */
+  async findSummary(id: string): Promise<Record<string, any> | null> {
+    const row = await this.dataSource
+      .createQueryBuilder()
+      .select('d."summary"', 'summary')
+      .from('scenario_session_details', 'd')
+      .where('d."scenarioSessionId"::uuid = :id', { id })
+      .getRawOne<{ summary: Record<string, any> | null }>();
+
+    return row?.summary ?? null;
+  }
+
+  /**
+   * The client's per-turn internal monologue, if the session recorded one.
+   *
+   * Written by ally-ai-learn's working memory into the end-of-session
+   * `session_memory` message, which lands whole in
+   * `scenario_session_details.sessionMemory` — `structured` is a passthrough
+   * dict on our side, so this reads a key nothing else here knows about rather
+   * than requiring a column or a migration.
+   *
+   * Returns [] rather than null when absent: a session that predates the
+   * feature and one whose client never spoke are the same thing to a reader,
+   * and the panel renders its own empty state either way.
+   */
+  async findInternalMonologue(id: string): Promise<Record<string, any>[]> {
+    const row = await this.dataSource
+      .createQueryBuilder()
+      .select(
+        `d."sessionMemory"->'structured'->'client_working_memory'->'monologue'`,
+        'monologue',
+      )
+      .from('scenario_session_details', 'd')
+      .where('d."scenarioSessionId"::uuid = :id', { id })
+      .getRawOne<{ monologue: Record<string, any>[] | null }>();
+
+    return Array.isArray(row?.monologue) ? row!.monologue! : [];
+  }
+
+  /**
+   * The configuration a session actually ran under (PRD FR15) — the prompt
+   * versions, scenario/metadata version, and the effective LLM settings
+   * (provider/model/generation params). All of this was captured at generation
+   * time: prompt versions + scenario version on scenario_sessions, and
+   * provider/model + gen params on scenario_session_turn_metrics. Read-only;
+   * nothing new is recorded. Effective LLM values use mode() across the
+   * session's turns (constant per session in practice; mode is robust if not).
+   */
+  async findRunConfig(id: string): Promise<{
+    scenarioVersion: {
+      id: string;
+      versionNumber: number | null;
+      name: string | null;
+    } | null;
+    promptVersions: Record<string, unknown> | null;
+    selectedMainPromptCode: string | null;
+    mainPromptVariant: string | null;
+    llmProvider: string | null;
+    llmModel: string | null;
+    temperature: number | null;
+    topP: number | null;
+    maxTokens: number | null;
+    sttProvider: string | null;
+    sttModel: string | null;
+  } | null> {
+    const rows = await this.dataSource.query(
+      `SELECT
+         ss."scenarioVersionId"          AS scenario_version_id,
+         sv."versionNumber"              AS scenario_version_number,
+         sv."name"                       AS scenario_version_name,
+         ss.metadata->'promptVersions'   AS prompt_versions,
+         ss.metadata->>'selectedMainPromptCode' AS selected_main_prompt_code,
+         ss.metadata->>'mainPromptVariant'      AS main_prompt_variant,
+         lang."sttProviderConfig"->>'provider'          AS stt_provider,
+         lang."sttProviderConfig"->'config'->>'model'   AS stt_model,
+         (SELECT mode() WITHIN GROUP (ORDER BY m."llmProvider")
+            FROM scenario_session_turn_metrics m
+            WHERE m."scenarioSessionId" = ss.id
+              AND m."llmProvider" IS NOT NULL)                 AS llm_provider,
+         (SELECT mode() WITHIN GROUP (ORDER BY m."llmModel")
+            FROM scenario_session_turn_metrics m
+            WHERE m."scenarioSessionId" = ss.id
+              AND m."llmModel" IS NOT NULL)                    AS llm_model,
+         (SELECT mode() WITHIN GROUP (ORDER BY (m.metadata->>'temperature'))
+            FROM scenario_session_turn_metrics m
+            WHERE m."scenarioSessionId" = ss.id
+              AND m.metadata->>'temperature' IS NOT NULL)      AS temperature,
+         (SELECT mode() WITHIN GROUP (ORDER BY (m.metadata->>'topP'))
+            FROM scenario_session_turn_metrics m
+            WHERE m."scenarioSessionId" = ss.id
+              AND m.metadata->>'topP' IS NOT NULL)             AS top_p,
+         (SELECT mode() WITHIN GROUP (ORDER BY (m.metadata->>'maxTokens'))
+            FROM scenario_session_turn_metrics m
+            WHERE m."scenarioSessionId" = ss.id
+              AND m.metadata->>'maxTokens' IS NOT NULL)        AS max_tokens
+       FROM scenario_sessions ss
+       LEFT JOIN scenario_versions sv ON sv.id = ss."scenarioVersionId"
+       LEFT JOIN languages lang
+         ON lang.id = NULLIF(ss.metadata->>'languageId', '')::int
+       WHERE ss.id = $1`,
+      [id],
+    );
+    const r = rows?.[0];
+    if (!r) return null;
+    const num = (v: unknown): number | null =>
+      v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v);
+    return {
+      scenarioVersion: r.scenario_version_id
+        ? {
+            id: r.scenario_version_id,
+            versionNumber:
+              r.scenario_version_number == null
+                ? null
+                : Number(r.scenario_version_number),
+            name: r.scenario_version_name ?? null,
+          }
+        : null,
+      promptVersions: r.prompt_versions ?? null,
+      selectedMainPromptCode: r.selected_main_prompt_code ?? null,
+      mainPromptVariant: r.main_prompt_variant ?? null,
+      llmProvider: r.llm_provider ?? null,
+      llmModel: r.llm_model ?? null,
+      temperature: num(r.temperature),
+      topP: num(r.top_p),
+      maxTokens: num(r.max_tokens),
+      sttProvider: r.stt_provider ?? null,
+      sttModel: r.stt_model ?? null,
+    };
+  }
+
+  /** Scored/triggered events for a session, oldest first, with the event name. */
+  async findEvents(id: string): Promise<
+    Array<{
+      id: string;
+      eventId: string;
+      eventName: string | null;
+      occurredAt: Date;
+      score: number | string | null;
+      emoji: string | null;
+      message: string | null;
+    }>
+  > {
+    return this.dataSource
+      .createQueryBuilder()
+      .select('e."id"', 'id')
+      .addSelect('e."eventId"', 'eventId')
+      .addSelect('se."name"', 'eventName')
+      .addSelect('e."occurredAt"', 'occurredAt')
+      .addSelect('e."score"', 'score')
+      .addSelect('e."emoji"', 'emoji')
+      .addSelect('e."message"', 'message')
+      .from('scenario_session_events', 'e')
+      .leftJoin('session_events', 'se', 'se.id = e."eventId"')
+      .where('e."scenarioSessionId"::uuid = :id', { id })
+      .andWhere('e."autoTerminationStatus" = false')
+      .orderBy('e."occurredAt"', 'ASC')
+      .getRawMany();
+  }
+
+  /**
+   * Infrastructure lifecycle timeline for a session, oldest first (room
+   * created, agent dispatched/joined, participant joined, recording started,
+   * room finished). Powers the session-detail timeline; an absent AGENT_JOINED
+   * row is the "agent never joined" signal.
+   */
+  async findLifecycleEvents(id: string): Promise<
+    Array<{
+      id: string;
+      type: string;
+      occurredAt: Date;
+      detail: Record<string, any> | null;
+    }>
+  > {
+    return this.dataSource
+      .createQueryBuilder()
+      .select('l."id"', 'id')
+      .addSelect('l."type"', 'type')
+      .addSelect('l."occurredAt"', 'occurredAt')
+      .addSelect('l."detail"', 'detail')
+      .from('scenario_session_lifecycle_events', 'l')
+      .where('l."scenarioSessionId" = :id', { id })
+      .orderBy('l."occurredAt"', 'ASC')
+      .addOrderBy('l."createdAt"', 'ASC')
+      .getRawMany();
+  }
+
+  /**
+   * Freeze signals for one session: did it have an agent turn, and did it end
+   * on a human turn the agent never answered (the last transcript message is
+   * the learner's)? The service combines this with the LLM-timeout turn count
+   * to flag a suspected mid-session freeze. All ids are uuid (no casts).
+   */
+  async getFreezeSignals(
+    id: string,
+  ): Promise<{ hasAgentTurn: boolean; endedOnUnansweredHumanTurn: boolean }> {
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        EXISTS (
+          SELECT 1 FROM scenario_session_messages m
+          WHERE m."scenarioSessionId" = ss.id AND m."senderId" <> ss."counselorId"
+        ) AS has_agent,
+        COALESCE((
+          SELECT m."senderId" = ss."counselorId"
+          FROM scenario_session_messages m
+          WHERE m."scenarioSessionId" = ss.id
+          ORDER BY m."startSeconds" DESC NULLS LAST, m."createdAt" DESC
+          LIMIT 1
+        ), false) AS last_is_human
+      FROM scenario_sessions ss
+      WHERE ss.id = $1::uuid
+      `,
+      [id],
+    );
+    const r = (rows[0] ?? {}) as Record<string, unknown>;
+    return {
+      hasAgentTurn: r.has_agent === true,
+      endedOnUnansweredHumanTurn: r.last_is_human === true,
+    };
+  }
+
+  /** Transcript turns for a session, ordered by playback position then time. */
+  async findTranscript(id: string): Promise<
+    Array<{
+      id: number;
+      senderId: number;
+      content: string;
+      startSeconds: number | null;
+      endSeconds: number | null;
+      createdAt: Date;
+    }>
+  > {
+    return this.dataSource
+      .createQueryBuilder()
+      .select('m."id"', 'id')
+      .addSelect('m."senderId"', 'senderId')
+      .addSelect('m."content"', 'content')
+      .addSelect('m."startSeconds"', 'startSeconds')
+      .addSelect('m."endSeconds"', 'endSeconds')
+      .addSelect('m."createdAt"', 'createdAt')
+      .from('scenario_session_messages', 'm')
+      .where('m."scenarioSessionId" = :id', { id })
+      .orderBy('m."startSeconds"', 'ASC', 'NULLS LAST')
+      .addOrderBy('m."createdAt"', 'ASC')
+      .getRawMany();
+  }
+
+  /**
+   * AI usage for one or more sessions, grouped by (session, service, provider,
+   * model). Mirrors {@link LlmUsageRepository.getTokenUsageByModelAndTask} but
+   * keyed per session via the `scenarioSessionId` correlation column. The
+   * service prices these rows (LLM/STT/TTS) and rolls them up. Returns [] for an
+   * empty id list (TypeORM's `IN (:...ids)` rejects an empty array).
+   */
+  async getUsageBySessions(ids: string[]): Promise<RoleplaySessionUsageRow[]> {
+    if (ids.length === 0) return [];
+    return this.dataSource
+      .createQueryBuilder()
+      .select('lu."scenarioSessionId"', 'scenarioSessionId')
+      .addSelect('lu.service', 'service')
+      .addSelect('lu.provider', 'provider')
+      .addSelect('lu.model', 'model')
+      .addSelect('COALESCE(SUM(lu."promptTokens"), 0)::bigint', 'promptTokens')
+      .addSelect(
+        'COALESCE(SUM(lu."completionTokens"), 0)::bigint',
+        'completionTokens',
+      )
+      .addSelect('COALESCE(SUM(lu."totalTokens"), 0)::bigint', 'totalTokens')
+      .addSelect('COALESCE(SUM(lu."cachedTokens"), 0)::bigint', 'cachedTokens')
+      .addSelect('COALESCE(SUM(lu."audioMs"), 0)::bigint', 'audioMs')
+      .addSelect('COALESCE(SUM(lu."characters"), 0)::bigint', 'characters')
+      .addSelect('COUNT(*)::int', 'calls')
+      .from('llm_usage', 'lu')
+      .where('lu."scenarioSessionId" IN (:...ids)', { ids })
+      .groupBy('lu."scenarioSessionId"')
+      .addGroupBy('lu.service')
+      .addGroupBy('lu.provider')
+      .addGroupBy('lu.model')
+      .getRawMany<RoleplaySessionUsageRow>();
+  }
+
+  /** Convenience: usage buckets for a single session. */
+  async getUsageBySession(id: string): Promise<RoleplaySessionUsageRow[]> {
+    return this.getUsageBySessions([id]);
+  }
+
+  /**
+   * Per-session voice-pipeline latency + quality, aggregated over
+   * `scenario_session_turn_metrics` (source='pipeline' only — never mix the
+   * transcript-derived estimates). Mirrors the percentile pattern in
+   * {@link PlatformAnalyticsRepository.getVoiceLatencyByBucket}. Always returns
+   * one row; `turnCount` is 0 when the session has no pipeline turns.
+   */
+  async getLatencyBySession(id: string): Promise<RoleplaySessionLatencyRow> {
+    const row = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)::int', 'turnCount')
+      .addSelect(
+        'round(avg(m."responseLatencyMs"))::int',
+        'avgResponseLatencyMs',
+      )
+      .addSelect(
+        `round(percentile_cont(0.5) WITHIN GROUP ` +
+          `(ORDER BY m."responseLatencyMs"))::int`,
+        'p50ResponseLatencyMs',
+      )
+      .addSelect(
+        `round(percentile_cont(0.95) WITHIN GROUP ` +
+          `(ORDER BY m."responseLatencyMs"))::int`,
+        'p95ResponseLatencyMs',
+      )
+      .addSelect('round(avg(m."eouDelayMs"))::int', 'avgEouDelayMs')
+      .addSelect('round(avg(m."sttFinalizeMs"))::int', 'avgSttFinalizeMs')
+      .addSelect('round(avg(m."llmTtftMs"))::int', 'avgLlmTtftMs')
+      .addSelect('round(avg(m."ttsTtfbMs"))::int', 'avgTtsTtfbMs')
+      .addSelect('round(avg(m."orchestrationMs"))::int', 'avgOrchestrationMs')
+      .addSelect('round(avg(m."llmResponseMs"))::int', 'avgLlmResponseMs')
+      .addSelect('round(avg(m."prosodyMs"))::int', 'avgProsodyMs')
+      .addSelect('round(avg(m."branchingMs"))::int', 'avgBranchingMs')
+      .addSelect(
+        'round(avg(m."knowledgeRetrievalMs"))::int',
+        'avgKnowledgeRetrievalMs',
+      )
+      .addSelect('round(avg(m."processEventsMs"))::int', 'avgProcessEventsMs')
+      .addSelect('round(avg(m."behaviorsMs"))::int', 'avgBehaviorsMs')
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN m."interrupted" THEN 1 ELSE 0 END), 0)::int',
+        'interruptedTurns',
+      )
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN m."llmTimedOut" THEN 1 ELSE 0 END), 0)::int',
+        'llmTimedOutTurns',
+      )
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN m."prosodySkipped" THEN 1 ELSE 0 END), 0)::int',
+        'prosodySkippedTurns',
+      )
+      .from('scenario_session_turn_metrics', 'm')
+      .where('m."scenarioSessionId" = :id', { id })
+      .andWhere(`m."source" = 'pipeline'`)
+      .getRawOne<RoleplaySessionLatencyRow>();
+
+    // getRawOne over an aggregate always returns a row; fall back defensively.
+    return (
+      row ?? {
+        turnCount: 0,
+        avgResponseLatencyMs: null,
+        p50ResponseLatencyMs: null,
+        p95ResponseLatencyMs: null,
+        avgEouDelayMs: null,
+        avgSttFinalizeMs: null,
+        avgLlmTtftMs: null,
+        avgTtsTtfbMs: null,
+        avgOrchestrationMs: null,
+        avgLlmResponseMs: null,
+        avgProsodyMs: null,
+        avgBranchingMs: null,
+        avgKnowledgeRetrievalMs: null,
+        avgProcessEventsMs: null,
+        avgBehaviorsMs: null,
+        interruptedTurns: 0,
+        llmTimedOutTurns: 0,
+        prosodySkippedTurns: 0,
+      }
+    );
+  }
+
+  /**
+   * Session-level glossary activity (LANGUAGE_GLOSSARY_DESIGN.md §10): what
+   * the worker echoed at session start (Tier 0/1 sizes and the exact section
+   * versions served) plus per-turn Tier 1 retrieval hits. `glossaryMeta` is
+   * null for English sessions, sessions whose language has no published
+   * glossary, or sessions that predate this instrumentation. `source =
+   * 'pipeline'` matches {@link getLatencyBySession}'s turn denominator.
+   */
+  async getGlossaryActivity(
+    id: string,
+  ): Promise<RoleplaySessionGlossaryActivityRow> {
+    const [startRows, turnsRows, sectionHitCounts] = await Promise.all([
+      this.dataSource.query<{ glossaryMeta: Record<string, any> | null }[]>(
+        `SELECT metadata->'glossary' AS "glossaryMeta"
+         FROM scenario_session_start_metrics
+         WHERE "scenarioSessionId" = $1
+         ORDER BY "createdAt" DESC
+         LIMIT 1`,
+        [id],
+      ),
+      this.dataSource.query<
+        { totalTurns: number; turnsWithGlossaryRetrieval: number }[]
+      >(
+        `SELECT
+           COUNT(*)::int AS "totalTurns",
+           COUNT(*) FILTER (
+             WHERE jsonb_array_length(COALESCE(metadata->'glossary_selected', '[]'::jsonb)) > 0
+           )::int AS "turnsWithGlossaryRetrieval"
+         FROM scenario_session_turn_metrics
+         WHERE "scenarioSessionId" = $1 AND source = 'pipeline'`,
+        [id],
+      ),
+      this.dataSource.query<RoleplaySessionGlossarySectionHitRow[]>(
+        `SELECT elem AS "sectionCode", COUNT(*)::int AS "count"
+         FROM scenario_session_turn_metrics m,
+              jsonb_array_elements_text(COALESCE(m.metadata->'glossary_selected', '[]'::jsonb)) AS elem
+         WHERE m."scenarioSessionId" = $1 AND m.source = 'pipeline'
+         GROUP BY elem
+         ORDER BY "count" DESC`,
+        [id],
+      ),
+    ]);
+
+    return {
+      glossaryMeta: startRows[0]?.glossaryMeta ?? null,
+      totalTurns: turnsRows[0]?.totalTurns ?? 0,
+      turnsWithGlossaryRetrieval: turnsRows[0]?.turnsWithGlossaryRetrieval ?? 0,
+      sectionHitCounts,
+    };
+  }
+
+  /** LiveKit egress recording pointer for a session, if one exists. */
+  async getRecordingBySession(
+    id: string,
+  ): Promise<{ storageKey: string; egressId: string } | null> {
+    const row = await this.dataSource
+      .createQueryBuilder()
+      .select('r."storageKey"', 'storageKey')
+      .addSelect('r."egressId"', 'egressId')
+      .from('scenario_session_recordings', 'r')
+      .where('r."scenarioSessionId" = :id', { id })
+      .getRawOne<{ storageKey: string; egressId: string }>();
+
+    return row ?? null;
+  }
+
+  /**
+   * All superadmin-configured agent test cases (global; not tenant-scoped).
+   * These are the rubric the roleplay actor is scored against, shown alongside
+   * the per-session evaluation.
+   */
+  async findAgentTestCases(): Promise<
+    Array<{
+      id: string;
+      title: string;
+      tags: string[];
+      description: string | null;
+    }>
+  > {
+    return this.dataSource
+      .createQueryBuilder()
+      .select('g."id"', 'id')
+      .addSelect('g."title"', 'title')
+      .addSelect('g."tags"', 'tags')
+      .addSelect('g."description"', 'description')
+      .from('agent_test_cases', 'g')
+      .orderBy('g."title"', 'ASC')
+      .getRawMany();
+  }
+
+  /**
+   * Latest language-quality judgment for a session: the session-denominator
+   * row, its error annotations, and the AI-turn ordinal → message-id mapping.
+   *
+   * The mapping query MUST mirror the transcript build used at judge time
+   * (drift-judge.repository buildTranscript: AI turns ordered by
+   * COALESCE(startSeconds, 0), id) — annotation turnIndex values were assigned
+   * against that ordering, and the detail page's own transcript query orders
+   * slightly differently (NULLS LAST), so ordinals are resolved here, not
+   * client-side.
+   */
+  async findLanguageJudgment(id: string): Promise<{
+    session: {
+      judgeModel: string;
+      judgePromptVersion: string;
+      turnsJudged: number;
+      turnsGarbled: number;
+      scriptFidelityPct: number | null;
+      roundTripWerPct: number | null;
+    };
+    annotations: Array<{
+      turnIndex: number;
+      layer: string;
+      dimension: string;
+      category: string;
+      severity: string;
+      isolationBasis: string | null;
+      inputGarbled: string | null;
+      conditionedOut: boolean;
+      evidenceQuote: string | null;
+      reasoning: string | null;
+    }>;
+    aiMessageIds: number[];
+  } | null> {
+    const sessionRow = await this.dataSource
+      .createQueryBuilder()
+      .select('j."id"', 'judgmentId')
+      .addSelect('j."judgeModel"', 'judgeModel')
+      .addSelect('j."judgePromptVersion"', 'judgePromptVersion')
+      .addSelect('j."turnsJudged"', 'turnsJudged')
+      .addSelect('j."turnsGarbled"', 'turnsGarbled')
+      .addSelect('j."scriptFidelityPct"', 'scriptFidelityPct')
+      .addSelect('j."roundTripWerPct"', 'roundTripWerPct')
+      .from('language_judgment_sessions', 'j')
+      .where('j."scenarioSessionId" = :id', { id })
+      .orderBy('j."updatedAt"', 'DESC')
+      .limit(1)
+      .getRawOne<{
+        judgmentId: string;
+        judgeModel: string;
+        judgePromptVersion: string;
+        turnsJudged: number | string;
+        turnsGarbled: number | string;
+        scriptFidelityPct: number | string | null;
+        roundTripWerPct: number | string | null;
+      }>();
+    if (!sessionRow) return null;
+
+    const annotations = await this.dataSource
+      .createQueryBuilder()
+      .select('a."turnIndex"', 'turnIndex')
+      .addSelect('a."layer"', 'layer')
+      .addSelect('a."dimension"', 'dimension')
+      .addSelect('a."category"', 'category')
+      .addSelect('a."severity"', 'severity')
+      .addSelect('a."isolationBasis"', 'isolationBasis')
+      .addSelect('a."inputGarbled"', 'inputGarbled')
+      .addSelect('a."conditionedOut"', 'conditionedOut')
+      .addSelect('a."evidenceQuote"', 'evidenceQuote')
+      .addSelect('a."reasoning"', 'reasoning')
+      .from('language_error_annotations', 'a')
+      .where('a."sessionJudgmentId" = :jid', { jid: sessionRow.judgmentId })
+      .orderBy('a."turnIndex"', 'ASC')
+      .getRawMany();
+
+    const aiMessageIds = await this.findAiMessageIdsInJudgeOrder(id);
+
+    return {
+      session: {
+        judgeModel: sessionRow.judgeModel,
+        judgePromptVersion: sessionRow.judgePromptVersion,
+        turnsJudged: Number(sessionRow.turnsJudged),
+        turnsGarbled: Number(sessionRow.turnsGarbled),
+        scriptFidelityPct:
+          sessionRow.scriptFidelityPct == null
+            ? null
+            : Number(sessionRow.scriptFidelityPct),
+        roundTripWerPct:
+          sessionRow.roundTripWerPct == null
+            ? null
+            : Number(sessionRow.roundTripWerPct),
+      },
+      annotations: annotations.map((a) => ({
+        turnIndex: Number(a.turnIndex),
+        layer: a.layer,
+        dimension: a.dimension,
+        category: a.category,
+        severity: a.severity,
+        isolationBasis: a.isolationBasis ?? null,
+        inputGarbled: a.inputGarbled ?? null,
+        conditionedOut: Boolean(a.conditionedOut),
+        evidenceQuote: a.evidenceQuote ?? null,
+        reasoning: a.reasoning ?? null,
+      })),
+      aiMessageIds,
+    };
+  }
+
+  /**
+   * AI-turn message ids in the ORDER THE JUDGES SAW THEM
+   * (drift-judge.repository buildTranscript: COALESCE(startSeconds,0), id).
+   * Array index = judge turnIndex. Shared by the language and drift readers.
+   */
+  private async findAiMessageIdsInJudgeOrder(id: string): Promise<number[]> {
+    const rows: { id: number | string }[] = await this.dataSource.query(
+      `SELECT id FROM scenario_session_messages
+        WHERE "scenarioSessionId" = $1 AND "senderId" = -1
+        ORDER BY COALESCE("startSeconds", 0), id`,
+      [id],
+    );
+    return rows.map((m) => Number(m.id));
+  }
+
+  /**
+   * Latest conversation-drift judgment for a session (turn_drift_judgment):
+   * session rollup + per-turn labels, with the turnIndex → message-id mapping
+   * resolved the same way as the language judgment. Closes the gap where
+   * drift was aggregate-only and invisible on the session that produced it.
+   */
+  async findDriftJudgment(id: string): Promise<{
+    judgeModel: string;
+    judgePromptVersion: string;
+    sessionDrifted: boolean | null;
+    firstDriftTurn: number | null;
+    turns: Array<{
+      turnIndex: number;
+      messageId: number | null;
+      coherence: string | null;
+      topicLabel: string | null;
+      inCharacter: boolean | null;
+      counselorUtteranceGarbled: string | null;
+      sttErrorType: string | null;
+      aiReplyFailureMode: string | null;
+      rootAttribution: string | null;
+      reasoning: string | null;
+    }>;
+  } | null> {
+    const latest = await this.dataSource
+      .createQueryBuilder()
+      .select('j."judgeModel"', 'judgeModel')
+      .addSelect('j."judgePromptVersion"', 'judgePromptVersion')
+      .from('turn_drift_judgment', 'j')
+      .where('j."scenarioSessionId" = :id', { id })
+      .orderBy('j."updatedAt"', 'DESC')
+      .limit(1)
+      .getRawOne<{ judgeModel: string; judgePromptVersion: string }>();
+    if (!latest) return null;
+
+    const rows = await this.dataSource
+      .createQueryBuilder()
+      .select('j."turnIndex"', 'turnIndex')
+      .addSelect('j."coherence"', 'coherence')
+      .addSelect('j."topicLabel"', 'topicLabel')
+      .addSelect('j."inCharacter"', 'inCharacter')
+      .addSelect('j."counselorUtteranceGarbled"', 'counselorUtteranceGarbled')
+      .addSelect('j."sttErrorType"', 'sttErrorType')
+      .addSelect('j."aiReplyFailureMode"', 'aiReplyFailureMode')
+      .addSelect('j."rootAttribution"', 'rootAttribution')
+      .addSelect('j."reasoning"', 'reasoning')
+      .addSelect('j."sessionDrifted"', 'sessionDrifted')
+      .addSelect('j."firstDriftTurn"', 'firstDriftTurn')
+      .from('turn_drift_judgment', 'j')
+      .where('j."scenarioSessionId" = :id', { id })
+      .andWhere('j."judgeModel" = :jm', { jm: latest.judgeModel })
+      .andWhere('j."judgePromptVersion" = :jpv', {
+        jpv: latest.judgePromptVersion,
+      })
+      .orderBy('j."turnIndex"', 'ASC')
+      .getRawMany();
+    if (!rows.length) return null;
+
+    const aiMessageIds = await this.findAiMessageIdsInJudgeOrder(id);
+
+    return {
+      judgeModel: latest.judgeModel,
+      judgePromptVersion: latest.judgePromptVersion,
+      sessionDrifted: rows[0].sessionDrifted ?? null,
+      firstDriftTurn:
+        rows[0].firstDriftTurn != null ? Number(rows[0].firstDriftTurn) : null,
+      turns: rows.map((r) => ({
+        turnIndex: Number(r.turnIndex),
+        messageId: aiMessageIds[Number(r.turnIndex)] ?? null,
+        coherence: r.coherence ?? null,
+        topicLabel: r.topicLabel ?? null,
+        inCharacter: r.inCharacter ?? null,
+        counselorUtteranceGarbled: r.counselorUtteranceGarbled ?? null,
+        sttErrorType: r.sttErrorType ?? null,
+        aiReplyFailureMode: r.aiReplyFailureMode ?? null,
+        rootAttribution: r.rootAttribution ?? null,
+        reasoning: r.reasoning ?? null,
+      })),
+    };
+  }
+
+  /** Most recent post-session learner feedback for a session, if any. */
+  async getFeedbackBySession(id: string): Promise<{
+    rating: number | string;
+    feedback: string | null;
+    tags: string[] | null;
+  } | null> {
+    const row = await this.dataSource
+      .createQueryBuilder()
+      .select('f."rating"', 'rating')
+      .addSelect('f."feedback"', 'feedback')
+      .addSelect('f."tags"', 'tags')
+      .from('scenario_session_feedbacks', 'f')
+      .where('f."scenarioSessionId" = :id', { id })
+      .orderBy('f."createdAt"', 'DESC')
+      .limit(1)
+      .getRawOne<{
+        rating: number | string;
+        feedback: string | null;
+        tags: string[] | null;
+      }>();
+
+    return row ?? null;
+  }
+
+  /**
+   * Per-session read of the five weak-performing metrics.
+   *
+   * The dashboard tab aggregates these across sessions; this is the same
+   * measures for ONE session, so a reader who spots a bad bucket on the tab can
+   * open a session and see the turns behind it. Single write path, two read
+   * surfaces — same arrangement as the language/drift panels above.
+   *
+   * Everything here is counting: the judge labels were assigned when the
+   * session was judged, and nothing in this query asks a model for anything.
+   * Rates are left to the caller so an empty session renders as "no data"
+   * rather than as a clean 0%.
+   */
+  async findWeakMetrics(
+    id: string,
+    params: {
+      rePromptGapSeconds: number;
+      stasisJaccard: number;
+      stasisMinWordLength: number;
+    },
+  ): Promise<{
+    judgedTurns: number;
+    repetitionTurns: number;
+    longestRepeatRun: number;
+    roleSlipTurns: number;
+    roleInversionTurns: number;
+    clienthoodLabelledTurns: number;
+    solutionsOffered: number;
+    resistanceBriefed: boolean | null;
+    inappropriateStasisTurns: number;
+    progressionLabelledTurns: number;
+    unresponsiveTurns: number;
+    outOfCharacterTurns: number;
+    staleAiPairs: number;
+    comparableAiPairs: number;
+    counselorTurns: number;
+    rePrompts: number;
+    aiTurns: number;
+    counsellorDirectedQuestions: number;
+    understandingWeighted: number;
+    registerWeighted: number;
+    colloquialWeighted: number;
+    lexiconWeighted: number;
+    languageTurnsJudged: number;
+    feedbackQuotes: number;
+    feedbackQuotesUnmatched: number;
+    positives: number;
+    improvements: number;
+    hasSkillCoverage: boolean;
+    interruptedTurns: number;
+    pipelineTurns: number;
+  } | null> {
+    const rows = await this.dataSource.query(
+      `WITH drift AS (
+         SELECT j."turnIndex" AS ti,
+                (j."aiReplyFailureMode" = 'repetition') AS rep,
+                (j."aiReplyFailureMode" = 'role_slip') AS slip,
+                (j."aiReplyFailureMode" IN ('wrong_intent','context_lockin')) AS unresponsive,
+                (j."inCharacter" IS FALSE) AS ooc,
+                -- v2 labels. NULL on a session judged before the v2 rubric, which
+                -- is why each has its own labelled-turn denominator below: an
+                -- unlabelled turn must not dilute the rate toward zero.
+                j."roleInversion" AS inversion,
+                j."solutionsOffered" AS solutions,
+                j."resistanceBriefed" AS resistant,
+                j."introducedNewInformation" AS new_info,
+                j."stuckIsAppropriate" AS stuck_ok
+           FROM turn_drift_judgment j
+          WHERE j."scenarioSessionId" = $1
+       ), islands AS (
+         SELECT ti, rep, ti - ROW_NUMBER() OVER (PARTITION BY rep ORDER BY ti) AS grp
+           FROM drift
+       ), runs AS (
+         SELECT COUNT(*) AS run_len FROM islands WHERE rep GROUP BY grp
+       ), ai AS (
+         SELECT m."createdAt" AS ts, m.content,
+                ROW_NUMBER() OVER (ORDER BY m."createdAt", m.id) AS rn,
+                ARRAY(
+                  SELECT DISTINCT w FROM unnest(
+                    regexp_split_to_array(
+                      lower(regexp_replace(m.content, '[^[:alnum:][:space:]]', '', 'g')),
+                      '\\s+')
+                  ) w WHERE length(w) > $4
+                ) AS ws
+           FROM scenario_session_messages m
+          WHERE m."scenarioSessionId" = $1 AND m."senderId" = -1
+            AND length(btrim(m.content)) > 40
+       ), ai_all AS (
+         -- Every AI turn, unfiltered. The ai CTE above drops turns under 40
+         -- chars so the stasis comparison is not dominated by one-word replies;
+         -- the question-rate denominator must not inherit that, or this panel
+         -- and the dashboard would report different rates for the same session.
+         SELECT m.content
+           FROM scenario_session_messages m
+          WHERE m."scenarioSessionId" = $1 AND m."senderId" = -1
+       ), ai_pairs AS (
+         SELECT a.ws, LEAD(a.ws) OVER (ORDER BY a.rn) AS next_ws FROM ai a
+       ), sim AS (
+         SELECT CASE WHEN array_length(ws,1) > 2 AND array_length(next_ws,1) > 2
+                  THEN (SELECT COUNT(*) FROM unnest(ws) x WHERE x = ANY(next_ws))::numeric
+                       / GREATEST(array_length(ws,1), array_length(next_ws,1))
+                  ELSE NULL END AS jaccard
+           FROM ai_pairs
+       ), ordered AS (
+         SELECT (m."senderId" = -1) AS is_ai, m."startSeconds" AS ss, m."endSeconds" AS es,
+                ROW_NUMBER() OVER (ORDER BY COALESCE(m."startSeconds",0), m."createdAt", m.id) AS rn
+           FROM scenario_session_messages m
+          WHERE m."scenarioSessionId" = $1 AND m."startSeconds" IS NOT NULL
+       ), paired AS (
+         SELECT o.*, LEAD(o.is_ai) OVER (ORDER BY o.rn) AS next_is_ai,
+                LEAD(o.ss) OVER (ORDER BY o.rn) AS next_ss
+           FROM ordered o
+       ), lang AS (
+         SELECT
+           SUM(CASE a."severity" WHEN 'minor' THEN 1 WHEN 'major' THEN 5
+                                 WHEN 'critical' THEN 10 ELSE 1 END)
+             FILTER (WHERE a."dimension" = 'understanding' AND a."conditionedOut" = false) AS understanding,
+           SUM(CASE a."severity" WHEN 'minor' THEN 1 WHEN 'major' THEN 5
+                                 WHEN 'critical' THEN 10 ELSE 1 END)
+             FILTER (WHERE a."dimension" = 'register') AS register,
+           SUM(CASE a."severity" WHEN 'minor' THEN 1 WHEN 'major' THEN 5
+                                 WHEN 'critical' THEN 10 ELSE 1 END)
+             FILTER (WHERE a."dimension" = 'colloquialness') AS colloquial,
+           SUM(CASE a."severity" WHEN 'minor' THEN 1 WHEN 'major' THEN 5
+                                 WHEN 'critical' THEN 10 ELSE 1 END)
+             FILTER (WHERE a."dimension" = 'dialect_lexicon') AS lexicon
+           FROM language_error_annotations a WHERE a."scenarioSessionId" = $1
+       ), lang_den AS (
+         SELECT COALESCE(SUM(s."turnsJudged"), 0) AS turns
+           FROM language_judgment_sessions s WHERE s."scenarioSessionId" = $1
+       ), fb AS (
+         SELECT d.summary->'feedback' AS feedback FROM scenario_session_details d
+          WHERE d."scenarioSessionId" = $1 AND d.summary ? 'feedback' LIMIT 1
+       ), fb_items AS (
+         SELECT item FROM fb, LATERAL (
+           SELECT jsonb_array_elements_text(fb.feedback->'positives') AS item
+           UNION ALL
+           SELECT jsonb_array_elements_text(fb.feedback->'improvements')
+         ) x WHERE jsonb_typeof(fb.feedback) = 'object'
+       ), fb_quotes AS (
+         SELECT (regexp_matches(item, '"([^"]{25,})"', 'g'))[1] AS quote FROM fb_items
+       ), body AS (
+         SELECT lower(string_agg(m.content, ' ')) AS txt
+           FROM scenario_session_messages m WHERE m."scenarioSessionId" = $1
+       ), tm AS (
+         SELECT COUNT(*) FILTER (WHERE t."interrupted") AS interrupted,
+                COUNT(*) AS total
+           FROM scenario_session_turn_metrics t
+          WHERE t."scenarioSessionId" = $1 AND t.source = 'pipeline'
+       )
+       SELECT
+         (SELECT COUNT(*) FROM drift)::int AS "judgedTurns",
+         (SELECT COUNT(*) FILTER (WHERE rep) FROM drift)::int AS "repetitionTurns",
+         COALESCE((SELECT MAX(run_len) FROM runs), 0)::int AS "longestRepeatRun",
+         (SELECT COUNT(*) FILTER (WHERE slip) FROM drift)::int AS "roleSlipTurns",
+         (SELECT COUNT(*) FILTER (WHERE inversion IS TRUE) FROM drift)::int
+           AS "roleInversionTurns",
+         (SELECT COUNT(*) FILTER (WHERE inversion IS NOT NULL) FROM drift)::int
+           AS "clienthoodLabelledTurns",
+         COALESCE((SELECT SUM(solutions) FROM drift), 0)::int AS "solutionsOffered",
+         (SELECT bool_or(resistant) FROM drift) AS "resistanceBriefed",
+         (SELECT COUNT(*) FILTER (WHERE new_info IS FALSE AND stuck_ok IS FALSE)
+            FROM drift)::int AS "inappropriateStasisTurns",
+         (SELECT COUNT(*) FILTER (WHERE new_info IS NOT NULL) FROM drift)::int
+           AS "progressionLabelledTurns",
+         (SELECT COUNT(*) FILTER (WHERE unresponsive) FROM drift)::int AS "unresponsiveTurns",
+         (SELECT COUNT(*) FILTER (WHERE ooc) FROM drift)::int AS "outOfCharacterTurns",
+         (SELECT COUNT(*) FILTER (WHERE jaccard >= $3) FROM sim)::int AS "staleAiPairs",
+         (SELECT COUNT(*) FILTER (WHERE jaccard IS NOT NULL) FROM sim)::int AS "comparableAiPairs",
+         (SELECT COUNT(*) FILTER (WHERE NOT is_ai) FROM paired)::int AS "counselorTurns",
+         (SELECT COUNT(*) FILTER (
+            WHERE NOT is_ai AND next_is_ai IS FALSE AND (next_ss - es) > $2
+          ) FROM paired)::int AS "rePrompts",
+         (SELECT COUNT(*) FROM ai_all)::int AS "aiTurns",
+         (SELECT COUNT(*) FROM ai_all
+           WHERE content LIKE '%?%' AND content ~* '\\y(you|your|yourself)\\y'
+         )::int AS "counsellorDirectedQuestions",
+         COALESCE((SELECT understanding FROM lang), 0)::int AS "understandingWeighted",
+         COALESCE((SELECT register FROM lang), 0)::int AS "registerWeighted",
+         COALESCE((SELECT colloquial FROM lang), 0)::int AS "colloquialWeighted",
+         COALESCE((SELECT lexicon FROM lang), 0)::int AS "lexiconWeighted",
+         (SELECT turns FROM lang_den)::int AS "languageTurnsJudged",
+         (SELECT COUNT(*) FROM fb_quotes)::int AS "feedbackQuotes",
+         (SELECT COUNT(*) FROM fb_quotes q
+           WHERE NOT EXISTS (
+             SELECT 1 FROM body b WHERE b.txt IS NOT NULL
+               AND position(lower(q.quote) IN b.txt) > 0)
+         )::int AS "feedbackQuotesUnmatched",
+         COALESCE((SELECT jsonb_array_length(feedback->'positives') FROM fb), 0)::int AS positives,
+         COALESCE((SELECT jsonb_array_length(feedback->'improvements') FROM fb), 0)::int AS improvements,
+         COALESCE((SELECT (feedback ? 'skillCoverage') FROM fb), false) AS "hasSkillCoverage",
+         COALESCE((SELECT interrupted FROM tm), 0)::int AS "interruptedTurns",
+         COALESCE((SELECT total FROM tm), 0)::int AS "pipelineTurns"`,
+      [
+        id,
+        params.rePromptGapSeconds,
+        params.stasisJaccard,
+        params.stasisMinWordLength,
+      ],
+    );
+    return rows?.[0] ?? null;
+  }
+}

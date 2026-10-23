@@ -1,0 +1,945 @@
+import { BranchingScenarioContent } from '../type/branching.type';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource, In, QueryFailedError } from 'typeorm';
+import * as sanitizeHtml from 'sanitize-html';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { SuccessResponse } from 'src/common/type/common.type';
+import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
+import { ScenarioStatus } from 'src/learn/type/scenario.type';
+import { CaseSharedService } from 'src/case/service/case-shared.service';
+import { Competency } from 'src/learn/entity/competency.entity';
+import { TenantService } from 'src/tenant/service/tenant.service';
+import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+import { LoggerService } from 'src/logger/logger.service';
+import { Track } from '../entity/track.entity';
+import { applyPromptHtml, storedPromptsOf } from '../util/prompt-html.util';
+import { TrackItem } from '../entity/track-item.entity';
+import { TrackSection } from '../entity/track-section.entity';
+import { TrackTenant } from '../entity/track-tenant.entity';
+import { TrackRepository } from '../repository/track.repository';
+import { TrackEnrollmentRepository } from '../repository/track-enrollment.repository';
+import {
+  TrackFilterOptions,
+  TrackItemType,
+  TrackStatus,
+} from '../type/track.type';
+import { QuizContent } from '../type/quiz.type';
+import {
+  AnnotationContent,
+  AnnotationRevealKey,
+} from '../type/annotation.type';
+import {
+  TRACK_DEFAULT_ANNOTATION_FALSE_POSITIVE_PENALTY,
+  TRACK_DEFAULT_ANNOTATION_PASS_SCORE,
+  TRACK_DEFAULT_QUIZ_PASS_SCORE,
+  TRACK_DEFAULT_VIDEO_WATCH_PCT,
+  TRACK_REQUIRED_FIELDS_FOR_PUBLISH,
+} from '../constants/track.constant';
+import {
+  CreateTrackDto,
+  TrackSummaryResponseDto,
+} from '../dto/create-track.dto';
+import { UpdateTrackDto } from '../dto/update-track.dto';
+import {
+  UpsertTrackItemDto,
+  UpsertTrackSectionDto,
+  UpsertTrackStructureDto,
+} from '../dto/upsert-track-structure.dto';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  computeStructuralSignature,
+  validateTrackStructure,
+} from './track-structure.validator';
+import { sanitizeDeep } from '../util/sanitize-structure.util';
+import {
+  normaliseTrackCompetencyIds,
+  resolveTrackCompetencyIds,
+} from '../util/track-competency.util';
+import {
+  normaliseTrackLandingPage,
+  remapLandingPageSections,
+} from '../util/track-landing-page.util';
+import { TrackSharedService, TrackWithStructure } from './track-shared.service';
+import { TrackTranslationService } from './track-translation.service';
+
+@Injectable()
+export class TrackService {
+  private readonly logger = LoggerService.getInstance(TrackService.name);
+
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly trackRepository: TrackRepository,
+    private readonly trackEnrollmentRepository: TrackEnrollmentRepository,
+    private readonly trackSharedService: TrackSharedService,
+    private readonly scenarioSharedService: ScenarioSharedService,
+    private readonly caseSharedService: CaseSharedService,
+    private readonly tenantService: TenantService,
+    private readonly trackTranslationService: TrackTranslationService,
+    private readonly tenantScopeService: TenantScopeService,
+  ) {}
+
+  /**
+   * A track is global content: the same row is served to every organization
+   * it is assigned to. A platform admin restricted to some organizations may
+   * therefore change only tracks they created — the rule roleplays already
+   * follow (ScenarioService) — and may not make one global, which assigns it
+   * to every organization at once. Everyone else is unaffected.
+   *
+   * Called by the admin controller ahead of every route that changes an
+   * existing track, its structure or its translations.
+   */
+  async assertCallerMayEdit(trackId: string): Promise<void> {
+    const userId = this.getUserId();
+    if (!(await this.tenantScopeService.isRestricted(userId))) {
+      return;
+    }
+    const track = await this.trackRepository.findOne({
+      where: { id: trackId },
+      select: ['id', 'createdBy'],
+    });
+    if (!track) {
+      throw new NotFoundException('Track not found');
+    }
+    if (track.createdBy !== userId) {
+      throw new ForbiddenException('You can only edit your own courses');
+    }
+  }
+
+  /**
+   * DELETE /tracks/media takes a bare file URL, so an organization-restricted
+   * admin could otherwise delete media from any course on the platform. Refuse
+   * a file that is still referenced by a course — its card, sections, items or
+   * translations — or a library template they did not create. An unreferenced
+   * upload (one they replaced or abandoned) stays theirs to clean up.
+   */
+  async assertCallerMayDeleteMedia(url: string): Promise<void> {
+    const userId = this.getUserId();
+    if (!(await this.tenantScopeService.isRestricted(userId))) {
+      return;
+    }
+    const owners: { createdBy: number | null }[] = await this.dataSource.query(
+      `SELECT t."createdBy" FROM tracks t
+         WHERE position($1 in row_to_json(t)::text) > 0
+       UNION ALL
+       SELECT t."createdBy" FROM track_sections s
+         JOIN tracks t ON t.id = s."trackId"
+         WHERE position($1 in row_to_json(s)::text) > 0
+       UNION ALL
+       SELECT t."createdBy" FROM track_items i
+         JOIN tracks t ON t.id = i."trackId"
+         WHERE position($1 in row_to_json(i)::text) > 0
+       UNION ALL
+       SELECT t."createdBy" FROM track_translations tr
+         JOIN tracks t ON t.id = tr."trackId"
+         WHERE position($1 in row_to_json(tr)::text) > 0
+       UNION ALL
+       SELECT c.created_by AS "createdBy" FROM track_component_templates c
+         WHERE position($1 in row_to_json(c)::text) > 0`,
+      [url],
+    );
+    if (owners.some((owner) => owner.createdBy !== userId)) {
+      throw new ForbiddenException(
+        'This file is still used by a course you cannot edit',
+      );
+    }
+  }
+
+  async assertCallerMayMakeGlobal(isGlobal?: boolean): Promise<void> {
+    if (isGlobal !== true) {
+      return;
+    }
+    if (await this.tenantScopeService.isRestricted(this.getUserId())) {
+      throw new ForbiddenException(
+        'Organization-restricted admins cannot make a course available to every organization',
+      );
+    }
+  }
+
+  async getTracks(filters?: TrackFilterOptions) {
+    if (filters?.tenantId) {
+      const tenant = await this.tenantService.findById(filters.tenantId);
+      if (!tenant) {
+        throw new NotFoundException('Tenant not found');
+      }
+    }
+    const result = await this.trackRepository.getAllTracks(filters);
+
+    const tracks = result.data.map((track: any) => {
+      const { trackTenant, ...trackData } = track;
+      return {
+        id: trackData.id,
+        title: trackData.title,
+        description: trackData.description,
+        coverImageUrl: trackData.coverImageUrl,
+        status: trackData.status,
+        isGlobal: trackData.isGlobal,
+        isPublicView: trackData.isPublicView ?? false,
+        totalItems: trackData.totalItems,
+        estimatedDurationMinutes: trackData.estimatedDurationMinutes,
+        isAssignedToTenant: filters?.tenantId ? !!trackTenant : undefined,
+        updatedAt: trackData.updatedAt,
+      };
+    });
+
+    return { data: tracks, count: result.count };
+  }
+
+  async getTrackById(id: string): Promise<TrackWithStructure> {
+    return this.trackSharedService.getTrackWithStructure(id);
+  }
+
+  async createTrack(
+    createTrackDto: CreateTrackDto,
+  ): Promise<TrackSummaryResponseDto> {
+    const status = createTrackDto.status ?? TrackStatus.DRAFT;
+    if (status === TrackStatus.ACTIVE) {
+      throw new BadRequestException(
+        'A track must be created as a draft and published once it has content.',
+      );
+    }
+    const userId = this.getUserId();
+    const competencyIds = await this.resolveCompetencyIds(
+      createTrackDto.competencyIds,
+      null,
+    );
+
+    const track = await this.trackRepository.save({
+      title: createTrackDto.title,
+      description: this.sanitizeDescription(createTrackDto.description),
+      coverImageUrl: createTrackDto.coverImageUrl,
+      isGlobal: createTrackDto.isGlobal ?? false,
+      isPublicView: createTrackDto.isPublicView ?? false,
+      status,
+      estimatedDurationMinutes: createTrackDto.estimatedDurationMinutes,
+      competencyIds,
+      landingPage: createTrackDto.landingPage
+        ? normaliseTrackLandingPage(createTrackDto.landingPage)
+        : null,
+      ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
+    });
+
+    if (track.isGlobal) {
+      await this.syncGlobalTenants(track.id, true);
+    }
+    // No translation on create: a new course has no languages selected and no
+    // content yet. Translation starts when the trainer picks its languages.
+    this.logger.info(`Track ${track.id} created`);
+    return this.toSummary(track);
+  }
+
+  async updateTrack(
+    id: string,
+    updateTrackDto: UpdateTrackDto,
+  ): Promise<TrackSummaryResponseDto> {
+    const track = await this.trackRepository.findOne({ where: { id } });
+    if (!track) {
+      throw new NotFoundException('Track not found');
+    }
+    const targetStatus = updateTrackDto.status ?? track.status;
+
+    if (
+      track.status === TrackStatus.ACTIVE &&
+      targetStatus === TrackStatus.DRAFT
+    ) {
+      const hasEnrollments =
+        await this.trackEnrollmentRepository.existsForTrack(id);
+      if (hasEnrollments) {
+        throw new BadRequestException(
+          'This track cannot be moved back to draft because learners are enrolled in it. Archive it instead.',
+        );
+      }
+    }
+
+    if (
+      targetStatus === TrackStatus.ACTIVE &&
+      track.status !== TrackStatus.ACTIVE
+    ) {
+      await this.validateTrackForPublish(id, {
+        ...track,
+        ...updateTrackDto,
+        // The DTO's landing page is input-shaped, and publishing never reads it.
+        landingPage: track.landingPage,
+      });
+    }
+
+    const userId = this.getUserId();
+
+    const updatePayload: Partial<Track> = {
+      title: updateTrackDto.title ?? track.title,
+      coverImageUrl: updateTrackDto.coverImageUrl ?? track.coverImageUrl,
+      isGlobal: updateTrackDto.isGlobal ?? track.isGlobal,
+      isPublicView: updateTrackDto.isPublicView ?? track.isPublicView,
+      estimatedDurationMinutes:
+        updateTrackDto.estimatedDurationMinutes ??
+        track.estimatedDurationMinutes,
+      status: targetStatus,
+    };
+
+    if (userId) {
+      updatePayload.updatedBy = userId;
+    }
+
+    if ('description' in updateTrackDto) {
+      updatePayload.description = this.sanitizeDescription(
+        updateTrackDto.description,
+      );
+    }
+
+    // Absent key = leave the tag alone (the list page's publish/unpublish
+    // toggle sends only status and title); null or [] = clear it.
+    if (updateTrackDto.competencyIds !== undefined) {
+      updatePayload.competencyIds = await this.resolveCompetencyIds(
+        updateTrackDto.competencyIds,
+        track.competencyIds,
+      );
+    }
+
+    // Same rule for the landing page: an absent key leaves it alone (the list
+    // page's publish toggle must not wipe a story), null clears it, and an
+    // object is normalised to the full stored shape.
+    if (updateTrackDto.landingPage !== undefined) {
+      updatePayload.landingPage = updateTrackDto.landingPage
+        ? normaliseTrackLandingPage(updateTrackDto.landingPage)
+        : null;
+    }
+
+    await this.trackRepository.update(id, updatePayload);
+
+    if (
+      updateTrackDto.isGlobal !== undefined &&
+      updateTrackDto.isGlobal !== track.isGlobal
+    ) {
+      await this.syncGlobalTenants(id, updateTrackDto.isGlobal);
+    }
+
+    // Re-anchor every language against the new English: unedited fields
+    // re-translate, hand-edited ones are flagged for the trainer, and a
+    // language only loses its published status if a scoring field moved.
+    await this.syncTranslationsToSource(id);
+
+    const updated = await this.trackRepository.findOne({ where: { id } });
+    this.logger.info(`Track ${id} updated`);
+    return this.toSummary(updated!);
+  }
+
+  /**
+   * Whole-tree upsert of sections+items: ids present = update, absent =
+   * create, missing = soft delete. Structural edits are rejected once the
+   * track has enrollments (learner progress rows point at stable item ids) —
+   * content-safe edits (titles, article html, prompt text, explanations)
+   * remain allowed.
+   */
+  async upsertStructure(
+    id: string,
+    dto: UpsertTrackStructureDto,
+  ): Promise<SuccessResponse> {
+    const track = await this.trackRepository.findOne({ where: { id } });
+    if (!track) {
+      throw new NotFoundException('Track not found');
+    }
+
+    const existing = await this.trackSharedService.getTrackWithStructure(id);
+
+    this.addMissingQuizOptionIds(dto.sections);
+    this.sanitizeStructure(dto.sections);
+    this.applyPromptHtml(dto.sections, existing);
+    validateTrackStructure(dto.sections);
+    this.applyContentDefaults(dto.sections);
+    await this.validateReferences(dto.sections);
+
+    const existingSectionIds = new Set(existing.sections.map((s) => s.id));
+    const existingItemIds = new Set(
+      existing.sections.flatMap((s) => s.items.map((i) => i.id)),
+    );
+
+    // Incoming ids must belong to this track.
+    for (const section of dto.sections) {
+      if (section.id && !existingSectionIds.has(section.id)) {
+        throw new BadRequestException(
+          `Section ${section.id} does not belong to this track`,
+        );
+      }
+      for (const item of section.items) {
+        if (item.id && !existingItemIds.has(item.id)) {
+          throw new BadRequestException(
+            `Item ${item.id} does not belong to this track`,
+          );
+        }
+      }
+    }
+
+    const hasEnrollments =
+      await this.trackEnrollmentRepository.existsForTrack(id);
+    if (hasEnrollments) {
+      const existingSignature = computeStructuralSignature(
+        this.toUpsertShape(existing),
+      );
+      const incomingSignature = computeStructuralSignature(dto.sections);
+      if (existingSignature !== incomingSignature) {
+        throw new ConflictException(
+          'Learners are enrolled in this track, so its structure is locked. Duplicate the track to restructure it, then publish the copy.',
+        );
+      }
+    }
+
+    const totalItems = dto.sections.reduce(
+      (sum, section) => sum + section.items.length,
+      0,
+    );
+    const userId = this.getUserId();
+
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        const sectionRepo = manager.getRepository(TrackSection);
+        const itemRepo = manager.getRepository(TrackItem);
+
+        const incomingSectionIds = dto.sections
+          .map((s) => s.id)
+          .filter((sid): sid is string => !!sid);
+        const incomingItemIds = dto.sections
+          .flatMap((s) => s.items.map((i) => i.id))
+          .filter((iid): iid is string => !!iid);
+
+        const removedSectionIds = [...existingSectionIds].filter(
+          (sid) => !incomingSectionIds.includes(sid),
+        );
+        const removedItemIds = [...existingItemIds].filter(
+          (iid) => !incomingItemIds.includes(iid),
+        );
+        if (removedSectionIds.length > 0) {
+          await sectionRepo.softDelete({ id: In(removedSectionIds) });
+        }
+        if (removedItemIds.length > 0) {
+          await itemRepo.softDelete({ id: In(removedItemIds) });
+        }
+
+        // `idx_track_sections_track_id_order` / `idx_track_items_section_id_order`
+        // are non-deferred unique indexes: Postgres checks them per statement, not
+        // at commit. If a section/item's order shifted (e.g. a component was
+        // inserted or removed earlier in the section), the final order values are
+        // unique, but updating rows one at a time in array order can transiently
+        // collide with another row that still holds its old value. Detach existing
+        // rows to negative placeholder orders first so no intermediate state can
+        // clash, then apply the real target orders below.
+        const existingSectionUpdates = dto.sections.filter((s) => s.id);
+        for (const [idx, section] of existingSectionUpdates.entries()) {
+          await sectionRepo.update(section.id!, { order: -(idx + 1) });
+        }
+        for (const section of dto.sections) {
+          const existingItemUpdates = section.items.filter((i) => i.id);
+          for (const [idx, item] of existingItemUpdates.entries()) {
+            await itemRepo.update(item.id!, { order: -(idx + 1) });
+          }
+        }
+
+        for (const section of dto.sections) {
+          const savedSection = await sectionRepo.save({
+            ...(section.id ? { id: section.id } : {}),
+            trackId: id,
+            title: section.title,
+            description: section.description,
+            order: section.order,
+          });
+          for (const item of section.items) {
+            await itemRepo.save({
+              ...(item.id ? { id: item.id } : {}),
+              trackId: id,
+              trackSectionId: savedSection.id,
+              type: item.type,
+              order: item.order,
+              title: item.title,
+              description: item.description,
+              scenarioId:
+                item.type === TrackItemType.ROLEPLAY ? item.scenarioId : null,
+              caseId: item.type === TrackItemType.CASE ? item.caseId : null,
+              content: item.content ?? null,
+              completionCriteria: item.completionCriteria ?? null,
+              // Omitted by a client that predates discussions: leave it alone.
+              ...(item.hasDiscussion !== undefined
+                ? { hasDiscussion: item.hasDiscussion }
+                : {}),
+            } as Partial<TrackItem>);
+          }
+        }
+
+        await manager.getRepository(Track).update(id, {
+          totalItems,
+          ...(userId ? { updatedBy: userId } : {}),
+        });
+      });
+    } catch (err) {
+      if (err instanceof QueryFailedError) {
+        this.logger.error(`Track ${id} structure save failed: ${err.message}`);
+        throw new BadRequestException(
+          `Could not save the course structure: ${err.message}`,
+        );
+      }
+      throw err;
+    }
+
+    // Structure edits are the big source change: a reworded question, a new
+    // option, a deleted section all move or orphan translations.
+    await this.syncTranslationsToSource(id);
+
+    this.logger.info(`Track ${id} structure saved (${totalItems} items)`);
+    return { success: true };
+  }
+
+  async deleteTrack(id: string): Promise<SuccessResponse> {
+    const track = await this.trackRepository.findOne({ where: { id } });
+    if (!track) {
+      throw new NotFoundException('Track not found');
+    }
+    const hasEnrollments =
+      await this.trackEnrollmentRepository.existsForTrack(id);
+    if (hasEnrollments) {
+      throw new BadRequestException(
+        'Cannot delete a track with enrolled learners. Archive it instead.',
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Track).softDelete(id);
+      await manager.getRepository(TrackSection).softDelete({ trackId: id });
+      await manager.getRepository(TrackItem).softDelete({ trackId: id });
+      await manager.getRepository(TrackTenant).softDelete({ trackId: id });
+    });
+    this.logger.info(`Track ${id} deleted`);
+    return { success: true };
+  }
+
+  async duplicateTrack(id: string): Promise<TrackSummaryResponseDto> {
+    const source = await this.trackSharedService.getTrackWithStructure(id);
+    const userId = this.getUserId();
+
+    return this.dataSource.transaction(async (manager) => {
+      const trackRepo = manager.getRepository(Track);
+      const sectionRepo = manager.getRepository(TrackSection);
+      const itemRepo = manager.getRepository(TrackItem);
+
+      const newTrack = await trackRepo.save({
+        title: `Copy of ${source.title}`,
+        description: source.description,
+        coverImageUrl: source.coverImageUrl,
+        status: TrackStatus.DRAFT,
+        isGlobal: source.isGlobal,
+        // A copy starts private: sharing a course publicly is a decision made
+        // about that course, and the copy has a different link anyway.
+        isPublicView: false,
+        totalItems: source.totalItems,
+        estimatedDurationMinutes: source.estimatedDurationMinutes,
+        translations: source.translations,
+        // The copy teaches what the original teaches until its author says
+        // otherwise; dropping the tag would silently switch the copy's Course
+        // impact reading to the derived roleplay set.
+        competencyIds: normaliseTrackCompetencyIds(source.competencyIds),
+        ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
+      });
+
+      // Old section id -> the copy's, so the landing page's chapters and hard
+      // call can be re-pointed once every section exists.
+      const sectionIdMap = new Map<string, string>();
+
+      for (const section of source.sections) {
+        const newSection = await sectionRepo.save({
+          trackId: newTrack.id,
+          title: section.title,
+          description: section.description,
+          order: section.order,
+          translations: section.translations,
+        });
+        sectionIdMap.set(section.id, newSection.id);
+        if (section.items.length > 0) {
+          await itemRepo.save(
+            section.items.map((item) => ({
+              trackId: newTrack.id,
+              trackSectionId: newSection.id,
+              type: item.type,
+              order: item.order,
+              title: item.title,
+              description: item.description,
+              scenarioId: item.scenarioId,
+              caseId: item.caseId,
+              content: item.content,
+              completionCriteria: item.completionCriteria,
+              translations: item.translations,
+              hasDiscussion: item.hasDiscussion,
+            })),
+          );
+        }
+      }
+
+      // The copy keeps the story, pointed at its own sections. It stays private
+      // (isPublicView above), so the story is invisible until its author
+      // publishes the link.
+      if (source.landingPage) {
+        await trackRepo.update(newTrack.id, {
+          landingPage: remapLandingPageSections(
+            source.landingPage,
+            sectionIdMap,
+          ),
+        });
+      }
+
+      if (newTrack.isGlobal) {
+        const tenants = await this.tenantService.findAll();
+        const tenantRepo = manager.getRepository(TrackTenant);
+        await tenantRepo.save(
+          tenants.map((tenant) =>
+            tenantRepo.create({ trackId: newTrack.id, tenantId: tenant.id }),
+          ),
+        );
+      }
+
+      this.logger.info(`Track ${id} duplicated as ${newTrack.id}`);
+      return this.toSummary(newTrack);
+    });
+  }
+
+  /**
+   * Re-anchors every selected language after the English source changed.
+   *
+   * Awaited rather than fired off, so a trainer who saves and immediately
+   * reloads the translations panel sees the new review state instead of a stale
+   * one. The LLM work it may kick off is itself asynchronous.
+   *
+   * Never allowed to fail a source save: the course edit is what the trainer
+   * asked for, and a translation bookkeeping problem must not roll it back.
+   */
+  private async syncTranslationsToSource(trackId: string): Promise<void> {
+    try {
+      await this.trackTranslationService.handleSourceChanged(trackId);
+    } catch (error) {
+      this.logger.error(
+        `Track ${trackId}: failed to sync translations after a source edit: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  private async validateTrackForPublish(
+    id: string,
+    trackData: Partial<Track>,
+  ): Promise<void> {
+    const missingFields = TRACK_REQUIRED_FIELDS_FOR_PUBLISH.filter(
+      (field) => !trackData[field as keyof Track],
+    );
+    if (missingFields.length > 0) {
+      throw new BadRequestException(
+        `The following required fields are missing: ${missingFields.join(', ')}`,
+      );
+    }
+
+    const structure = await this.trackSharedService.getTrackWithStructure(id);
+    if (structure.sections.length === 0) {
+      throw new BadRequestException(
+        'A track must contain at least one section to be published.',
+      );
+    }
+    for (const section of structure.sections) {
+      if (section.items.length === 0) {
+        throw new BadRequestException(
+          `Section "${section.title}" must contain at least one component to be published.`,
+        );
+      }
+    }
+    await this.validateReferences(this.toUpsertShape(structure));
+  }
+
+  /** Verify scenario/case references exist and are active. */
+  private async validateReferences(
+    sections: UpsertTrackSectionDto[],
+  ): Promise<void> {
+    const items = sections.flatMap((s) => s.items);
+    const scenarioIds = [
+      ...new Set(
+        items
+          .filter((i) => i.type === TrackItemType.ROLEPLAY && i.scenarioId)
+          .map((i) => i.scenarioId!),
+      ),
+    ];
+    if (scenarioIds.length > 0) {
+      const scenarios = await this.scenarioSharedService.getScenarioByIds(
+        scenarioIds,
+        { status: ScenarioStatus.ACTIVE },
+      );
+      const foundIds = new Set(scenarios.map((s) => s.id));
+      const missing = scenarioIds.filter((sid) => !foundIds.has(sid));
+      if (missing.length > 0) {
+        throw new BadRequestException(
+          `Invalid or inactive scenario IDs: ${missing.join(', ')}`,
+        );
+      }
+    }
+
+    const caseIds = [
+      ...new Set(
+        items
+          .filter((i) => i.type === TrackItemType.CASE && i.caseId)
+          .map((i) => i.caseId!),
+      ),
+    ];
+    for (const caseId of caseIds) {
+      const caseEntity = await this.caseSharedService.getActiveCaseById(caseId);
+      if (!caseEntity) {
+        throw new BadRequestException(`Invalid or inactive case ID: ${caseId}`);
+      }
+    }
+  }
+
+  /**
+   * Validates and normalises a requested course competency tag. New ids must
+   * be existing shared competencies (custom ones are private and never read by
+   * Course impact); ids the course already carries are kept, or dropped once
+   * their competency is deleted — see resolveTrackCompetencyIds. One lookup for
+   * the whole selection rather than one per id.
+   */
+  private async resolveCompetencyIds(
+    requested: string[] | null | undefined,
+    stored: string[] | null | undefined,
+  ): Promise<string[] | null> {
+    const ids = normaliseTrackCompetencyIds(requested);
+    if (!ids) return null;
+    const found = await this.dataSource.getRepository(Competency).find({
+      where: { id: In(ids) },
+      select: { id: true, isCustom: true },
+    });
+    const resolved = resolveTrackCompetencyIds({
+      requested: ids,
+      stored,
+      found,
+    });
+    if (resolved.rejected.length > 0) {
+      throw new BadRequestException(
+        `Invalid competency IDs (a course can only be tagged with existing, shared competencies): ${resolved.rejected.join(', ')}`,
+      );
+    }
+    return resolved.ids;
+  }
+
+  /** Strips characters Postgres rejects in text/jsonb (NUL bytes, lone surrogates) from free text. */
+  private sanitizeStructure(sections: UpsertTrackSectionDto[]): void {
+    for (const section of sections) {
+      section.title = sanitizeDeep(section.title);
+      if (section.description !== undefined) {
+        section.description = sanitizeDeep(section.description);
+      }
+      for (const item of section.items) {
+        item.title = sanitizeDeep(item.title);
+        if (item.description !== undefined) {
+          item.description = sanitizeDeep(item.description);
+        }
+        if (item.content !== undefined) {
+          item.content = sanitizeDeep(item.content);
+        }
+      }
+    }
+  }
+
+  private addMissingQuizOptionIds(sections: UpsertTrackSectionDto[]): void {
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.type === TrackItemType.QUIZ && item.content) {
+          const quiz = item.content as QuizContent;
+          if (quiz.questions) {
+            for (const question of quiz.questions) {
+              if ('options' in question && question.options) {
+                for (const option of question.options) {
+                  if (!option.id) {
+                    option.id = uuidv4();
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Fill in completion-criteria defaults and keep the graded components'
+   * passScore mirrored onto completionCriteria.
+   */
+  /**
+   * Sanitizes each prompt's rich text and keeps its plain `prompt` in step
+   * (see `applyPromptHtml`). Must run before validation, and needs what is
+   * stored so a plain-text-only edit is not reverted by stale HTML.
+   */
+  private applyPromptHtml(
+    sections: UpsertTrackSectionDto[],
+    existing: TrackWithStructure,
+  ): void {
+    const storedItems = new Map(
+      existing.sections.flatMap((s) => s.items.map((i) => [i.id, i] as const)),
+    );
+    for (const section of sections) {
+      for (const item of section.items) {
+        const before = item.id ? storedItems.get(item.id) : undefined;
+        applyPromptHtml(
+          item.type,
+          item.content,
+          before && before.type === item.type
+            ? storedPromptsOf(before.type, before.content)
+            : undefined,
+        );
+      }
+    }
+  }
+
+  private applyContentDefaults(sections: UpsertTrackSectionDto[]): void {
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.type === TrackItemType.QUIZ && item.content) {
+          const quiz = item.content as QuizContent;
+          quiz.settings.passScore =
+            quiz.settings.passScore ?? TRACK_DEFAULT_QUIZ_PASS_SCORE;
+          item.completionCriteria = {
+            ...item.completionCriteria,
+            passScore: quiz.settings.passScore,
+          };
+        }
+        if (item.type === TrackItemType.ANNOTATED_ARTIFACT && item.content) {
+          const annotation = item.content as AnnotationContent;
+          annotation.settings = {
+            ...annotation.settings,
+            passScore:
+              annotation.settings?.passScore ??
+              TRACK_DEFAULT_ANNOTATION_PASS_SCORE,
+            falsePositivePenalty:
+              annotation.settings?.falsePositivePenalty ??
+              TRACK_DEFAULT_ANNOTATION_FALSE_POSITIVE_PENALTY,
+            revealKey:
+              annotation.settings?.revealKey ??
+              AnnotationRevealKey.AFTER_PASS_OR_LAST_ATTEMPT,
+          };
+          item.completionCriteria = {
+            ...item.completionCriteria,
+            passScore: annotation.settings.passScore,
+          };
+        }
+        if (item.type === TrackItemType.BRANCHING_SCENARIO && item.content) {
+          const scenario = item.content as BranchingScenarioContent;
+          const passScore = scenario.settings?.passScore ?? 0;
+          item.completionCriteria = {
+            ...item.completionCriteria,
+            passScore: passScore || undefined,
+          };
+        }
+        if (item.type === TrackItemType.VIDEO) {
+          item.completionCriteria = {
+            ...item.completionCriteria,
+            watchPct:
+              item.completionCriteria?.watchPct ??
+              TRACK_DEFAULT_VIDEO_WATCH_PCT,
+          };
+        }
+      }
+    }
+  }
+
+  private toUpsertShape(
+    structure: TrackWithStructure,
+  ): UpsertTrackSectionDto[] {
+    return structure.sections.map((section) => ({
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      order: section.order,
+      items: section.items.map(
+        (item) =>
+          ({
+            id: item.id,
+            type: item.type,
+            order: item.order,
+            title: item.title,
+            description: item.description,
+            scenarioId: item.scenarioId ?? undefined,
+            caseId: item.caseId ?? undefined,
+            content: item.content as Record<string, any> | undefined,
+            completionCriteria: item.completionCriteria ?? undefined,
+            hasDiscussion: item.hasDiscussion,
+          }) as UpsertTrackItemDto,
+      ),
+    }));
+  }
+
+  private toSummary(track: Track): TrackSummaryResponseDto {
+    return {
+      id: track.id,
+      title: track.title,
+      description: track.description,
+      coverImageUrl: track.coverImageUrl,
+      status: track.status,
+      competencyIds: track.competencyIds ?? null,
+      isPublicView: track.isPublicView ?? false,
+    };
+  }
+
+  private getUserId(): number | undefined {
+    const userIdStr = ExecutionManager.getUserId();
+    return userIdStr ? Number(userIdStr) : undefined;
+  }
+
+  private async syncGlobalTenants(
+    trackId: string,
+    isGlobal: boolean,
+  ): Promise<void> {
+    const tenants = await this.tenantService.findAll();
+    const tenantIds = tenants.map((tenant) => tenant.id);
+    const tenantRepo = this.dataSource.getRepository(TrackTenant);
+    if (isGlobal) {
+      await tenantRepo.delete({ trackId });
+      await tenantRepo.save(
+        tenantIds.map((tenantId) => tenantRepo.create({ trackId, tenantId })),
+      );
+    } else {
+      await tenantRepo.delete({ trackId, tenantId: In(tenantIds) });
+    }
+  }
+
+  private sanitizeDescription(
+    description: string | null | undefined,
+  ): string | null | undefined {
+    if (description === null || description === undefined) {
+      return description;
+    }
+
+    // To preserve paragraphs from plain text, convert newlines to <br>
+    // if the text does not appear to contain any HTML.
+    const mayBePlainText = !/<\/?[a-z][\s\S]*>/i.test(description);
+    const processed = mayBePlainText
+      ? description.replace(/\r\n?|\n/g, '<br>')
+      : description;
+
+    return sanitizeHtml(processed, {
+      allowedTags: [
+        'p',
+        'b',
+        'i',
+        'u',
+        'ul',
+        'ol',
+        'li',
+        'a',
+        'br',
+        'strong',
+        'em',
+        's',
+        'h1',
+        'h2',
+        'h3',
+        'blockquote',
+        'hr',
+      ],
+      allowedAttributes: {
+        a: ['href'],
+      },
+    });
+  }
+}

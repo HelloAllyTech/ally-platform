@@ -1,0 +1,1477 @@
+import { In, Not, IsNull } from 'typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { LoggerService } from 'src/logger/logger.service';
+import { ScenariosRepository } from '../repository/scenario.repository';
+import { Scenarios } from '../entity/scenarios.entity';
+import { ScenarioSessionRepository } from '../repository/scenario-session.repository';
+import { ScenarioSessions } from '../entity/scenario-sessions.entity';
+import { ScenarioFilters } from '../type/scenario-filter.type';
+import { GetAdminScenarioDto, GetScenarioDto } from '../dto/get-scenario.dto';
+import { ScenarioTranslationsRepository } from '../repository/scenario-translations.repository';
+import { Pagination } from 'src/common/type/common.type';
+import { ScenarioSessionMessagesRepository } from '../repository/scenario-session-messages.repository';
+import { ScenarioSessionMessages } from '../entity/scenario-session-messages.entity';
+import { ScenarioSessionDetailsRepository } from '../repository/scenario-session-details.repository';
+import { ScenarioSessionDetails } from '../entity/scenario-session-details.entity';
+import {
+  ALLY_AI_LEARN_PROMPT_PREFIX,
+  SCENARIO_SESSION_TRANSLATABLE_FIELDS,
+  STT_LLM_PROVIDER_CONFIG,
+  SKILL_ICONS_S3_PREFIX,
+} from '../constants/scenario-session.constants';
+import { AppConfigService } from 'src/config/config.service';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { getScenarioStateConfigByDifficultyLevel } from '../util/scenario-state.util';
+import {
+  CreateRoomMetadataOptions,
+  ScenarioDifficultyLevel,
+} from '../type/scenario.type';
+import { LanguageCode } from '../type/scenario-language-voice.type';
+import { LanguageCode as LanguageValueCode } from '../enum/scenario-language';
+import { SessionEvents } from 'src/session-event/entity/session-events.entity';
+import { ScenarioVoices } from '../entity/scenario-voices.entity';
+import { ScenarioVoicesRepository } from '../repository/scenario-voices.repository';
+import { SttConfigsRepository } from '../repository/stt-configs.repository';
+import { LlmConfigsRepository } from '../repository/llm-configs.repository';
+import { SessionEventDetectionType } from 'src/session-event/enum/session-event-detection.enum';
+import { extractEventIds } from 'src/session-event/util/session-event.util';
+import {
+  DEPRECATED_EVENT_DETECTION_TYPES,
+  MAX_COMBINATION_EVENT_DEPTH,
+} from 'src/session-event/constants/event.constant';
+import { SharedLanguageService } from 'src/language/service/shared-language.service';
+import { DEFAULT_LANGUAGE_CODE } from 'src/language/constants/language.constant';
+import { SessionEventSharedService } from 'src/session-event/service/session-event-shared.service';
+import { ScenarioBehaviorInstructionRepository } from '../repository/scenario-behavior-instruction.repository';
+import { ScenarioBehaviorInstructionBehaviorRepository } from '../repository/scenario-behavior-instruction-behavior.repository';
+import { formattedScenarioBehaviorInstructionsResponse } from '../util/scenario-behavior-instructions.util';
+import { Behavior } from '../entity/behavior.entity';
+import { BehaviorRepository } from '../repository/behavior.repository';
+import { BehaviorInstructionWithBehaviorsDto } from '../dto/behavior-instruction-response.dto';
+import { ConversationalGuardrailsService } from 'src/conversational-guardrails/service/conversational-guardrails.service';
+import {
+  getActiveScenarioMandatoryFields,
+  hydrateAdminScenarioFromVersionConfig,
+  collectProviderConfigIds,
+  isEnglishLanguage,
+  resolveSessionLlmConfig,
+  resolveSessionSttConfig,
+  shouldServeMultilingual,
+} from '../util/scenario.util';
+import { LlmModelsRepository } from 'src/llm/repository/llm-models.repository';
+import { ScenarioVersionRepository } from '../repository/scenario-version.repository';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+import { PromptTranslationService } from 'src/prompt/service/prompt-translation.service';
+import { Languages } from 'src/language/entity/languages.entity';
+import { LanguageGlossaryService } from 'src/language/service/language-glossary.service';
+import { ScenarioSessionSkillsResponseDto } from '../dto/scenario-session-skills-response.dto';
+import {
+  ScenarioEvaluationEmotionalMovementItem,
+  ScenarioEvaluationSkillCoverageItem,
+} from 'src/ai/dto/ai.response.dto';
+import { formatBehaviorInstructionsForLivekitMetadata } from '../util/scenario-behavior-instructions.util';
+import { BehaviorInstructionCategory } from '../enum/behavior-instruction.enum';
+import { CompetencyService } from './competency.service';
+import { S3Service } from 'src/aws/service/s3.service';
+import { htmlToPlainText } from 'src/common/util/sanitize-html.util';
+import { ScenarioSessionRecordingRepository } from '../repository/scenario-session-recording.repository';
+import { ScenarioSessionRecording } from '../entity/scenario-session-recording.entity';
+import { SettingsService } from 'src/settings/service/settings.service';
+import { ScenarioInteractionMode } from '../enum/scenario-interaction-mode.enum';
+
+/**
+ * scenario_translations.metadata.openingStatements may be string[] (current) or a legacy /
+ * externally-written string. Session merge accepts both; admin must normalize so tabs hydrate.
+ */
+function normalizeTranslationOpeningStatementsLines(raw: unknown): string[] {
+  if (raw == null) {
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((l) => String(l).trim()).filter((l) => l.length > 0);
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+  }
+  return [];
+}
+
+function parseScenarioTranslationMetadata(
+  metadata: unknown,
+): Record<string, unknown> {
+  if (metadata == null) {
+    return {};
+  }
+  if (typeof metadata === 'string') {
+    try {
+      const parsed = JSON.parse(metadata) as unknown;
+      return typeof parsed === 'object' &&
+        parsed !== null &&
+        !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof metadata === 'object' && !Array.isArray(metadata)) {
+    return metadata as Record<string, unknown>;
+  }
+  return {};
+}
+
+@Injectable()
+export class ScenarioSharedService {
+  private readonly logger = LoggerService.getInstance(
+    ScenarioSharedService.name,
+  );
+  constructor(
+    private readonly scenariosRepository: ScenariosRepository,
+    private readonly scenarioVersionRepository: ScenarioVersionRepository,
+    private scenarioSessionRepository: ScenarioSessionRepository,
+    private scenarioTranslationsRepository: ScenarioTranslationsRepository,
+    private scenarioSessionMessagesRepository: ScenarioSessionMessagesRepository,
+    private scenarioSessionDetailsRepository: ScenarioSessionDetailsRepository,
+    private scenarioVoiceRepository: ScenarioVoicesRepository,
+    private sttConfigsRepository: SttConfigsRepository,
+    private llmConfigsRepository: LlmConfigsRepository,
+    private llmModelsRepository: LlmModelsRepository,
+    private scenarioSessionRecordingRepository: ScenarioSessionRecordingRepository,
+    private sessionEventSharedService: SessionEventSharedService,
+    private sharedLanguageService: SharedLanguageService,
+    private scenarioBehaviorInstructionRepository: ScenarioBehaviorInstructionRepository,
+    private scenarioBehaviorInstructionBehaviorRepository: ScenarioBehaviorInstructionBehaviorRepository,
+    private behaviorRepository: BehaviorRepository,
+    private conversationalGuardrailsService: ConversationalGuardrailsService,
+    private promptSharedService: PromptSharedService,
+    private promptTranslationService: PromptTranslationService,
+    private languageGlossaryService: LanguageGlossaryService,
+    private competencyService: CompetencyService,
+    private configService: AppConfigService,
+    private s3Service: S3Service,
+    private settingsService: SettingsService,
+  ) {}
+
+  async getScenarioByIds(
+    scenarioIds: number[],
+    filters?: ScenarioFilters,
+  ): Promise<Scenarios[]> {
+    return this.scenariosRepository.findBy({
+      id: In(scenarioIds),
+      ...(filters?.status && { status: In([filters.status]) }),
+    });
+  }
+
+  async getScenarioWithTriggerWarningsByIds(
+    scenarioIds: number[],
+  ): Promise<GetScenarioDto[]> {
+    return this.scenariosRepository.getScenarioWithTriggerWarningsByIds(
+      scenarioIds,
+    );
+  }
+
+  async getScenarioById(scenarioId: number): Promise<Scenarios | null> {
+    return this.scenariosRepository.findOne({
+      where: { id: scenarioId },
+    });
+  }
+
+  hasAllActiveScenarioMandatoryFields(item: any): boolean {
+    const metadata = item.scenario_metadata ?? item.metadata ?? {};
+    const ACTIVE_SCENARIO_MANDATORY_FIELDS = getActiveScenarioMandatoryFields();
+
+    const missingFields = ACTIVE_SCENARIO_MANDATORY_FIELDS.filter((field) => {
+      if (field === 'behaviorInstructions') {
+        const instructions =
+          item.behaviorInstructions ?? item.scenario_behaviorInstructions;
+        return (
+          !instructions ||
+          (Array.isArray(instructions) && instructions.length === 0)
+        );
+      }
+      const value = metadata[field] ?? item[`scenario_${field}`] ?? item[field];
+
+      if (value === null || value === undefined) return true;
+      if (typeof value === 'string' && value.trim() === '') return true;
+      if (Array.isArray(value) && value.length === 0) return true;
+
+      return false;
+    });
+
+    if (missingFields.length > 0) {
+      this.logger.warn(
+        `Missing mandatory fields for scenario ${item?.scenario_id ?? item?.id ?? 'unknown'}: ${missingFields.join(', ')}`,
+      );
+    }
+
+    return missingFields.length === 0;
+  }
+
+  async getScenarioSessionById(
+    scenarioSessionId: string,
+  ): Promise<ScenarioSessions | null> {
+    return this.scenarioSessionRepository.findOne({
+      where: { id: scenarioSessionId },
+    });
+  }
+
+  async getScenarioSessionForUser(
+    scenarioSessionId: string,
+    userId: number,
+  ): Promise<ScenarioSessions | null> {
+    return this.scenarioSessionRepository.findOne({
+      where: { id: scenarioSessionId, counselorId: userId },
+    });
+  }
+
+  async getUniqueLanguagesFromScenarioTranslations(): Promise<number[]> {
+    return this.scenarioTranslationsRepository.getUniqueLanguagesFromScenarioTranslations();
+  }
+
+  async getMessagesByScenarioSessionId(
+    scenarioSessionId: string,
+    pagination: Pagination,
+  ): Promise<{
+    messages: ScenarioSessionMessages[];
+    count: number;
+  }> {
+    const [messages, count] =
+      await this.scenarioSessionMessagesRepository.getMessagesByScenarioSessionId(
+        scenarioSessionId,
+        pagination,
+      );
+
+    return { messages, count };
+  }
+
+  async getMessagesByIds(
+    messageIds: number[],
+  ): Promise<ScenarioSessionMessages[]> {
+    if (!messageIds) {
+      return [];
+    }
+    return this.scenarioSessionMessagesRepository.find({
+      where: { id: In(messageIds) },
+    });
+  }
+  async getPreviousScenarioSessionByCaseSessionItemId(
+    caseSessionItemId: string,
+  ) {
+    return this.scenarioSessionRepository.findOne({
+      where: { caseSessionItemId, score: Not(IsNull()) },
+      order: { score: 'DESC' },
+    });
+  }
+
+  async getScenarioSessionDetailsByScenarioSessionId(
+    scenarioSessionId: string,
+  ) {
+    return this.scenarioSessionDetailsRepository.findOne({
+      where: { scenarioSessionId },
+    });
+  }
+
+  /**
+   * The two memory sources on a details row, by preference: the agent's own
+   * end-of-session memory (sessionMemory.summary, exists even when feedback
+   * generation failed) then the legacy feedback cumulativeMemory. Shared by
+   * the case and track previous-memory read paths.
+   */
+  extractSessionMemory(
+    details: ScenarioSessionDetails | null | undefined,
+  ): string | null {
+    const agentMemory = details?.sessionMemory?.summary;
+    if (typeof agentMemory === 'string' && agentMemory.trim()) {
+      return agentMemory.trim();
+    }
+    const cumulativeMemory = details?.summary?.feedback?.cumulativeMemory;
+    return typeof cumulativeMemory === 'string' && cumulativeMemory.trim()
+      ? cumulativeMemory.trim()
+      : null;
+  }
+
+  /**
+   * Track read path: memory of the learner's most recent ended session for
+   * one track item progress row (a replayed item resolves to the latest
+   * attempt that actually left a memory).
+   */
+  async getLatestSessionMemoryByTrackItemProgressId(
+    trackItemProgressId: string,
+  ): Promise<string | null> {
+    const sessions = await this.scenarioSessionRepository.find({
+      where: { trackItemProgressId, endedAt: Not(IsNull()) },
+      order: { endedAt: 'DESC' },
+      take: 3,
+    });
+    for (const session of sessions) {
+      const details = await this.getScenarioSessionDetailsByScenarioSessionId(
+        session.id,
+      );
+      const memory = this.extractSessionMemory(details);
+      if (memory) return memory;
+    }
+    return null;
+  }
+
+  /**
+   * Track read path: id of the learner's most recent ended session for one
+   * track item progress row, so a completed roleplay item can link straight
+   * to its full session log (a replay resolves to the latest attempt).
+   */
+  async getLatestScenarioSessionIdByTrackItemProgressId(
+    trackItemProgressId: string,
+  ): Promise<string | null> {
+    const session = await this.scenarioSessionRepository.findOne({
+      where: { trackItemProgressId, endedAt: Not(IsNull()) },
+      order: { endedAt: 'DESC' },
+    });
+    return session?.id ?? null;
+  }
+
+  async getSessionGlimpseByScenarioSessionId(
+    scenarioSessionId: string,
+  ): Promise<string | null> {
+    const scenarioSessionDetails =
+      await this.scenarioSessionDetailsRepository.findOne({
+        where: { scenarioSessionId },
+      });
+    if (!scenarioSessionDetails) {
+      throw new NotFoundException('Scenario session details not found');
+    }
+    return scenarioSessionDetails.summary?.feedback?.sessionGlimpse;
+  }
+
+  // Used for scenario report generation. `scenarioOverride` lets a draft
+  // version's hydrated config drive the run instead of the live scenario;
+  // when omitted, behaviour is unchanged (reads the live scenario).
+  async createMetadataForScenario(
+    scenarioId: number,
+    languageId: number,
+    scenarioOverride?: GetAdminScenarioDto,
+  ): Promise<Record<string, any>> {
+    const scenario =
+      scenarioOverride ?? (await this.getAdminScenario(scenarioId));
+
+    const { enLanguageDetails, languageDetails } =
+      await this.getLanguageDetailsForScenarioSession(languageId);
+
+    // Check if language is not English
+    const isOtherLanguage =
+      languageId && enLanguageDetails && languageId !== enLanguageDetails.id;
+
+    // If language is not English, get translated session events
+    const sessionEvents = isOtherLanguage
+      ? await this.sessionEventSharedService.getSessionEventsTranslationsByScenarioId(
+          scenarioId,
+          languageId,
+        )
+      : await this.sessionEventSharedService.getSessionEventsByScenarioId(
+          scenarioId,
+        );
+
+    // Update termination (Translated Version) event if language is not English
+    if (
+      isOtherLanguage &&
+      scenario?.terminationEvents &&
+      scenario?.terminationEvents?.length > 0
+    ) {
+      const terminationEvents = scenario?.terminationEvents?.map(
+        (termEvent) => {
+          const translatedTerminationEvent = sessionEvents.find(
+            (event) => event.id === termEvent?.eventId,
+          );
+          if (translatedTerminationEvent)
+            return {
+              ...translatedTerminationEvent,
+              eventId: translatedTerminationEvent?.id,
+              autoTerminationStatus: true,
+            };
+          return termEvent;
+        },
+      );
+      scenario.terminationEvents = terminationEvents;
+    }
+
+    // To add language and languageId to scenario metadata
+    if (scenario?.metadata) {
+      scenario.metadata.language =
+        languageDetails?.value ?? DEFAULT_LANGUAGE_CODE;
+      scenario.metadata.languageId = languageId ?? enLanguageDetails?.id;
+
+      // Added defaultLanguageId to metadata to avoid database calls and use it for translation checks in createRoomMetadata.
+      scenario.metadata.defaultLanguageId = enLanguageDetails?.id;
+    }
+
+    return this.createRoomMetadata({
+      scenario,
+      sessionEvents,
+      languageDetails,
+    });
+  }
+
+  async createRoomMetadata(options: CreateRoomMetadataOptions) {
+    const {
+      scenario,
+      sessionEvents,
+      languageDetails,
+      previousMemory,
+      interactionMode,
+    } = options;
+    const {
+      metadata,
+      terminationEvents,
+      behaviorInstructions: scenarioBehaviorInstructions,
+      ...scenarioDataWithoutMetadata
+    } = scenario;
+
+    const behaviorInstructions =
+      scenarioBehaviorInstructions ??
+      (await this.getBehaviorInstructionsByScenarioId(scenario.id));
+    const formattedBehaviorInstructionForMetadata =
+      formatBehaviorInstructionsForLivekitMetadata(behaviorInstructions ?? []);
+
+    const { voiceId, promptData } = await this.getScenarioTranslationData(
+      {
+        ...metadata,
+        title: scenario.title,
+        description: scenario.description,
+      },
+      scenario.id,
+    );
+
+    const languageCode = metadata?.language as LanguageCode;
+
+    // Turn-endpointing bounds are a single global, always-on admin setting
+    // (promoted from the deleted per-simulation EXPERIMENT(turn-endpointing)
+    // override) — read fresh each call, same as Terms/Privacy, and always
+    // wins over whatever may still be sitting in scenario.metadata for older
+    // rows that predate the removal.
+    const turnEndpointingSettings =
+      await this.settingsService.getTurnEndpointingSettings();
+    promptData.turnMinEndpointingDelay =
+      turnEndpointingSettings.turnMinEndpointingDelay;
+    promptData.turnMaxEndpointingDelay =
+      turnEndpointingSettings.turnMaxEndpointingDelay;
+
+    // Pre-format previousMemory into the final sentence here so the
+    // ai-learn prompt template can substitute `{previous_memory}`
+    // verbatim with no conditional wrapper. Either we send a complete
+    // "You remember from your last session: …" block or an empty
+    // string — keeps the template body identical for session-1 and
+    // session-N+1 cases.
+    if (previousMemory && previousMemory.trim()) {
+      promptData.previousMemory = `You remember from your last session: ${previousMemory.trim()}.`;
+    } else {
+      promptData.previousMemory = '';
+    }
+
+    if (scenario?.prompt) {
+      promptData.roleInstructions = scenario.prompt;
+    }
+
+    // {competency} in the actor/evaluator prompts is a display string. With a
+    // cluster selected the simulation covers several competencies, so name all
+    // of them rather than silently dropping to the first — a prompt claiming
+    // one competency's name for a roleplay that assesses a dozen is worse than
+    // no value at all.
+    const competencyNames = (
+      scenario?.competencies?.length
+        ? scenario.competencies
+        : scenario?.competency
+          ? [scenario.competency]
+          : []
+    )
+      .map((competency) => competency?.name)
+      .filter((name): name is string => Boolean(name?.trim()));
+    if (competencyNames.length > 0) {
+      promptData.competency = competencyNames.join(', ');
+    }
+
+    // Drop per-language maps; learn payload uses same key as scenario API but
+    // carries the active language's value only (see create-scenario DTO).
+    delete promptData.allowedFillerWords;
+    delete promptData.languageCharacteristics;
+    // Server-side gate only — the agent keys off the glossary fields
+    // themselves, so don't ship the toggle.
+    delete promptData.languageGlossaryEnabled;
+
+    // Human-readable language name (e.g. "Tamil (India)") — gives the LLM a far
+    // stronger dialect signal than the bare BCP-47 code alone.
+    if (languageDetails?.label) {
+      promptData.languageLabel = languageDetails.label;
+    }
+
+    // Tier 0 language-glossary style card (LANGUAGE_GLOSSARY_DESIGN.md §5.1):
+    // compiled from published always-sections, language-level, ~1-2k tokens.
+    // Publishing a section is the per-language rollout gate — no published
+    // content, no block. `languageGlossaryEnabled` is now DEFAULT ON
+    // (fail-and-fix-early rollout, validated via automated v2v baselines);
+    // an explicit false is the per-simulation escape hatch, editable by
+    // SUPER_DUPER_ADMIN only (enforced in ScenarioService create/update).
+    // English sessions skip entirely; a glossary failure never blocks a session.
+    const languageGlossaryEnabled = metadata?.languageGlossaryEnabled !== false;
+    if (
+      languageGlossaryEnabled &&
+      languageDetails?.id &&
+      !languageDetails.value?.startsWith('en')
+    ) {
+      // Variety-profile overlay (RSI loop): the session's tenant may be
+      // attached to a variety profile, in which case all three glossary
+      // reads serve the merged view (global + that profile's overlays,
+      // overlay winning on sectionCode). Unattached tenants get global only.
+      let glossaryProfileId: string | null = null;
+      try {
+        glossaryProfileId =
+          await this.languageGlossaryService.resolveProfileIdForTenant(
+            languageDetails.id,
+            ExecutionManager.getTenantId(),
+          );
+      } catch (error) {
+        this.logger.warn(
+          `[GLOSSARY] profile resolution failed for language ${languageDetails.id}; serving global glossary: ${error}`,
+        );
+      }
+
+      try {
+        const glossary =
+          await this.languageGlossaryService.resolveTier0Glossary(
+            languageDetails.id,
+            glossaryProfileId,
+          );
+        if (glossary) {
+          promptData.languageGlossary = glossary;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[GLOSSARY] Tier 0 resolution failed for language ${languageDetails.id}; serving without glossary: ${error}`,
+        );
+      }
+
+      // Tier 1 (LANGUAGE_GLOSSARY_DESIGN.md §5.2): published retrieved-mode
+      // sections join the agent's knowledge-retrieval title selection. Titles
+      // are prefixed so the selector (and logs) can tell glossary sections
+      // from scenario knowledge; retrievalHint rides along as the "when to
+      // pull this" trigger description.
+      try {
+        const tier1 = await this.languageGlossaryService.resolveTier1Sections(
+          languageDetails.id,
+          glossaryProfileId,
+        );
+        if (tier1.length > 0) {
+          const label = languageDetails.label || 'Language';
+          promptData.glossarySections = tier1.map((s) => ({
+            ...s,
+            title: `[${label} glossary] ${s.title}`,
+          }));
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[GLOSSARY] Tier 1 resolution failed for language ${languageDetails.id}; serving without glossary sections: ${error}`,
+        );
+      }
+
+      // Runtime word swaps (glossary-swap.util): the subset of published rules
+      // the agent enforces on its own output, so the counsellor hears the
+      // colloquial form even when the model slips into the literary one.
+      try {
+        const swaps = await this.languageGlossaryService.resolveGlossarySwaps(
+          languageDetails.id,
+          languageDetails.value,
+          glossaryProfileId,
+        );
+        if (swaps.length > 0) {
+          promptData.glossarySwaps = swaps;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[GLOSSARY] swap resolution failed for language ${languageDetails.id}; serving without runtime swaps: ${error}`,
+        );
+      }
+
+      // Glossary provenance for analytics: published section versions (both
+      // tiers) + Tier 0 token cost. The worker echoes this through
+      // start_metrics, so judged outcomes join to the exact glossary a
+      // session ran with (sections publish incrementally — dates can't).
+      try {
+        const glossaryMeta =
+          await this.languageGlossaryService.resolveGlossaryMeta(
+            languageDetails.id,
+            glossaryProfileId,
+          );
+        if (glossaryMeta) {
+          promptData.glossaryMeta = glossaryMeta;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[GLOSSARY] meta resolution failed for language ${languageDetails.id}; serving without glossary provenance: ${error}`,
+        );
+      }
+    }
+
+    if (metadata?.languageId) {
+      const samples =
+        metadata?.linguisticStyleSamples?.[String(metadata.languageId)];
+      if (samples && Array.isArray(samples)) {
+        promptData.languageDialogueSamples = samples;
+      }
+
+      const fillers =
+        metadata?.allowedFillerWords?.[String(metadata.languageId)];
+      if (fillers && Array.isArray(fillers)) {
+        const cleaned = fillers
+          .map((f) => (typeof f === 'string' ? f.trim() : ''))
+          .filter((f) => f.length > 0);
+        if (cleaned.length > 0) {
+          promptData.allowedFillerWords = cleaned;
+        }
+      }
+
+      // Free-text per-language style guidance for this scenario, authored in
+      // studio (e.g. "Speaks simple, colloquial Chennai Tamil; code-mixes with
+      // English"). Optional; defaults to blank. Shape mirrors the sibling maps
+      // above — keyed by languageId, scoped to the active language only.
+      const characteristics =
+        metadata?.languageCharacteristics?.[String(metadata.languageId)];
+      if (typeof characteristics === 'string') {
+        const trimmed = characteristics.trim();
+        if (trimmed.length > 0) {
+          promptData.languageCharacteristics = trimmed;
+        }
+      }
+    }
+
+    const translatedDescription =
+      scenarioDataWithoutMetadata?.translationDescription?.[
+        metadata?.languageId
+      ];
+    promptData.description =
+      translatedDescription != null
+        ? htmlToPlainText(translatedDescription)
+        : scenarioDataWithoutMetadata.description;
+    delete scenarioDataWithoutMetadata.translationDescription;
+
+    // Pre-compute helpful/unhelpful behaviour lists so ai-learn reads them
+    // directly instead of filtering behaviorInstructions by category each turn.
+    promptData.helpfulBehaviours = formattedBehaviorInstructionForMetadata
+      .filter((b) => b.category === BehaviorInstructionCategory.SHOULD_DO)
+      .flatMap((b) => b.behaviors);
+    promptData.unhelpfulBehaviours = formattedBehaviorInstructionForMetadata
+      .filter((b) => b.category === BehaviorInstructionCategory.SHOULD_NOT_DO)
+      .flatMap((b) => b.behaviors);
+
+    // Pre-sort states by scoreLower (ascending) so ai-learn's per-turn resolver
+    // can skip re-sorting. The starting state is emergent (the resolver opens
+    // in whichever range contains score 0), so there is no defaultStateId to
+    // pre-compute.
+    if (Array.isArray(promptData.states) && promptData.states.length > 0) {
+      promptData.states = [...promptData.states].sort(
+        (a: any, b: any) => (a.scoreLower ?? 0) - (b.scoreLower ?? 0),
+      );
+    }
+
+    // Memory locks ride on knowledge sources as `unlocksFromStateId`. Send the
+    // key only when it is set: ally-ai-learn builds from before this field
+    // typed these entries as Dict[str, str], so a null would fail the whole
+    // scenario parse on an agent that has not been redeployed yet.
+    if (Array.isArray(promptData.knowledgeSources)) {
+      promptData.knowledgeSources = promptData.knowledgeSources.map(
+        (source: any) => {
+          if (!source || typeof source !== 'object') return source;
+          const { unlocksFromStateId, ...rest } = source;
+          return unlocksFromStateId ? { ...rest, unlocksFromStateId } : rest;
+        },
+      );
+    }
+
+    const scenarioData = {
+      ...scenarioDataWithoutMetadata,
+      // Ensure we have values even if not translated
+      title: promptData?.title || scenario.title,
+      description:
+        promptData?.description || scenarioDataWithoutMetadata.description,
+      promptData: promptData,
+    };
+    const scenarioVoice = await this.getScenarioVoice(voiceId);
+
+    const triggerEvents = new Set<string>();
+    const eventMap = new Map<string, SessionEvents>();
+    // SENTENCE_SIMILARITY/SEMANTIC_SIMILARITY are deprecated — excluded from
+    // the LiveKit room metadata payload entirely (not just blocked at
+    // creation), both to stop them firing for scenarios that already have
+    // them configured and to trim payload size (room metadata has a known
+    // 64KB LiveKit cap and history of blowing the dispatch window — see
+    // ROOM_METADATA_WARN_BYTES below). Tracked by id so auto-termination
+    // references to a now-excluded event can also be dropped, avoiding a
+    // dangling pointer (see autoTerminationEvents below).
+    const deprecatedEventIds = new Set<string>();
+
+    // Add initial session events to the map
+    sessionEvents.forEach((event) => {
+      if (DEPRECATED_EVENT_DETECTION_TYPES.includes(event.detectionType)) {
+        deprecatedEventIds.add(event.id);
+        return;
+      }
+      triggerEvents.add(event.id);
+      eventMap.set(event.id, event);
+    });
+
+    // Add termination event ID to be fetched if needed
+    const idsToProcess = new Set<string>();
+    if (terminationEvents && terminationEvents?.length > 0) {
+      terminationEvents.forEach((termEvent) => {
+        if (
+          termEvent?.eventId &&
+          !eventMap.has(termEvent.eventId) &&
+          !deprecatedEventIds.has(termEvent.eventId)
+        ) {
+          idsToProcess.add(termEvent.eventId);
+        }
+      });
+    }
+
+    // Extract all event IDs referenced in combination events (initial pass)
+    sessionEvents.forEach((event) => {
+      if (event.detectionType === SessionEventDetectionType.COMBINATION) {
+        const detectionData = (event as any).data || event.detectionData;
+        const dependentIds = extractEventIds(detectionData?.expression);
+        dependentIds.forEach((id) => {
+          if (!eventMap.has(id) && !deprecatedEventIds.has(id)) {
+            idsToProcess.add(id);
+          }
+        });
+      }
+    });
+
+    // Recursively fetch nested combination events with depth limiting
+    let currentDepth = 0;
+    while (
+      idsToProcess.size > 0 &&
+      currentDepth < MAX_COMBINATION_EVENT_DEPTH
+    ) {
+      const idsToFetch = Array.from(idsToProcess);
+      idsToProcess.clear();
+
+      //TODO: use shared session event service
+      const fetchedEvents =
+        await this.sessionEventSharedService.findByIds(idsToFetch);
+
+      for (const event of fetchedEvents) {
+        if (DEPRECATED_EVENT_DETECTION_TYPES.includes(event.detectionType)) {
+          deprecatedEventIds.add(event.id);
+          continue;
+        }
+        eventMap.set(event.id, event);
+
+        // If the fetched event is also a combination, extract its dependencies
+        if (event.detectionType === SessionEventDetectionType.COMBINATION) {
+          const detectionData = event.detectionData;
+          const childIds = extractEventIds(detectionData?.expression);
+          childIds.forEach((id) => {
+            if (!eventMap.has(id) && !deprecatedEventIds.has(id)) {
+              idsToProcess.add(id);
+            }
+          });
+        }
+      }
+
+      currentDepth++;
+    }
+
+    if (idsToProcess.size > 0 && currentDepth >= MAX_COMBINATION_EVENT_DEPTH) {
+      this.logger.warn(
+        `Maximum combination event depth (${MAX_COMBINATION_EVENT_DEPTH}) exceeded while resolving events`,
+      );
+    }
+
+    // Enhance all events with dependentEvents for combination events
+    const allEvents = Array.from(eventMap.values()).map((event) => {
+      const detectionData = (event as any).data || event.detectionData;
+      if (event.detectionType === SessionEventDetectionType.COMBINATION) {
+        const detectionData = (event as any).data || event.detectionData;
+        const dependentEvents = extractEventIds(detectionData?.expression);
+
+        return {
+          ...event,
+          data: {
+            ...detectionData,
+            dependentEvents,
+          },
+          detectionData: undefined,
+        };
+      }
+
+      return {
+        ...event,
+        detectionData: undefined,
+        data: { ...detectionData },
+      };
+    });
+
+    // Drop any termination reference whose target event was excluded above
+    // for being a deprecated type — otherwise ai-learn would receive a
+    // terminationEvent pointing at an id absent from `events` entirely.
+    const autoTerminationEvents = terminationEvents
+      ?.filter(
+        (termEvent) =>
+          !termEvent?.eventId || !deprecatedEventIds.has(termEvent.eventId),
+      )
+      .map((termEvent) => {
+        return {
+          id: termEvent?.eventId,
+          terminationMessage: termEvent?.message,
+        };
+      });
+
+    const stateConfig = getScenarioStateConfigByDifficultyLevel(
+      scenario.difficultyLevel as ScenarioDifficultyLevel,
+    );
+    const formattedStateInstructions = stateConfig.map((state) => ({
+      stateId: state.stateId,
+      scoreUpper: state.scoreRange.max,
+      scoreLower: state.scoreRange.min,
+    }));
+
+    const guardrails =
+      await this.conversationalGuardrailsService.getRandomGuardrailsForSession(
+        scenario.id,
+        metadata?.optGuardrails,
+      );
+
+    const prompts = await this.getPromptsForScenarioSession(
+      languageDetails,
+      metadata?.mainPromptVariantByLanguage as
+        | Record<string, string>
+        | undefined,
+    );
+    scenarioData.promptData.prompts = prompts;
+
+    // Resolve the STT registry rows this session might need — the simulation's
+    // pick for this language and the language's own default — in one query.
+    const sessionLanguageId = languageDetails?.id ?? metadata?.languageId;
+    const [sttRegistryById, llmRegistryById, llmCatalogById] =
+      await Promise.all([
+        this.sttConfigsRepository.findMapByIds(
+          collectProviderConfigIds(
+            metadata?.sttConfigByLanguage as
+              | Record<string, any>
+              | null
+              | undefined,
+            sessionLanguageId,
+            languageDetails?.sttConfigId,
+          ),
+        ),
+        this.llmConfigsRepository.findMapByIds(
+          collectProviderConfigIds(null, null, languageDetails?.llmConfigId),
+        ),
+        // The catalog model this language runs, which outranks the llm_configs
+        // row. One row, so a findOne rather than a map lookup would do — a map
+        // keeps the resolver's signature uniform with the other rungs.
+        this.llmModelsRepository.findMapByIds(
+          languageDetails?.llmModelId ? [languageDetails.llmModelId] : [],
+        ),
+      ]);
+
+    const roomMetadata = {
+      version: '1.0',
+      tenantId: ExecutionManager.getTenantId(),
+      environment: this.configService.livekit.environment,
+      scenario: {
+        ...scenarioData,
+        // Surface metadata flags the agent reads top-level (raw.get(...)).
+        // pauseEnabled drives the agent's defense-in-depth pause gate.
+        pauseEnabled: metadata?.pauseEnabled,
+        voice: scenarioVoice,
+        ...(metadata?.language && {
+          languageCode: languageCode,
+        }),
+        // This language's simulation-level pick wins over the language's own
+        // default, which wins over the pre-registry jsonb column, which wins
+        // over the platform default (see resolveSessionSttConfig).
+        stt: resolveSessionSttConfig(
+          metadata?.sttConfigByLanguage as
+            | Record<string, any>
+            | null
+            | undefined,
+          sessionLanguageId,
+          sttRegistryById,
+          languageDetails,
+          STT_LLM_PROVIDER_CONFIG.stt,
+        ),
+        // No per-simulation layer here (see resolveSessionLlmConfig): a prompt's
+        // model override outranks this, so a simulation-level picker would be
+        // silently defeated. Language default → legacy column → platform default.
+        llm: resolveSessionLlmConfig(
+          llmRegistryById,
+          languageDetails,
+          STT_LLM_PROVIDER_CONFIG.llm,
+          llmCatalogById,
+        ),
+        events: allEvents,
+        triggerEvents: Array.from(triggerEvents),
+        autoTerminationEvents,
+        stateInstructions: formattedStateInstructions,
+        guardrailsPrompt: guardrails.prompt,
+        guardrails: guardrails.items,
+        behaviorInstructions: formattedBehaviorInstructionForMetadata,
+        // Only a text session carries the key; ally-ai-learn treats its absence
+        // as VOICE, so nothing about a voice envelope changes.
+        ...(interactionMode === ScenarioInteractionMode.TEXT && {
+          interactionMode,
+        }),
+      },
+    };
+
+    // Size of the FULL envelope, which is not necessarily what LiveKit gets.
+    //
+    // This used to warn against LiveKit's 64 KiB room-metadata cap from here,
+    // and that reading stopped being true when LEARN_METADATA_FETCH_ENABLED
+    // shipped: `prepareRoomMetadata` now stores this envelope and puts a ~223
+    // byte fetch pointer on the room and the dispatch. So on a fetch-enabled
+    // deployment this line was reporting 96-144 KB "against a 65536 cap" for a
+    // payload that never goes near LiveKit — a warning for a failure that
+    // cannot happen, on every single session.
+    //
+    // That is worse than no log. It cost an investigation on 2026-09-17: the
+    // number was read as the room metadata, made the leading suspect for an
+    // unrelated avatar timeout, and sent the search to the wrong service.
+    //
+    // So the cap belongs where the payload is chosen, and it now lives in
+    // `RoomMetadataStoreService.prepareRoomMetadata`, which knows which of the
+    // two is going on the room. What is left here is the envelope's own size,
+    // which is still worth seeing — it is the row written to learn_room_metadata
+    // and the body the agent fetches over HTTP — reported as INFO, because
+    // large is normal for it and nothing is at risk.
+    const envelopeBytes = Buffer.byteLength(
+      JSON.stringify(roomMetadata),
+      'utf8',
+    );
+    this.logger.info(
+      `[ROOM_METADATA_SIZE] full envelope ${envelopeBytes} bytes scenario=${scenario.id} ` +
+        `(stored and fetched by the agent; the LiveKit cap is checked against the ` +
+        `room payload in prepareRoomMetadata)`,
+    );
+
+    return roomMetadata;
+  }
+
+  async getScenarioVoice(id: string): Promise<ScenarioVoices> {
+    const scenarioVoice = await this.scenarioVoiceRepository.findOne({
+      where: { id },
+    });
+
+    if (!scenarioVoice) {
+      throw new NotFoundException('Scenario voice not found');
+    }
+
+    return scenarioVoice;
+  }
+
+  async getVoiceWithLanguageCode(voiceId: string) {
+    const voice =
+      await this.scenarioVoiceRepository.getVoiceWithLanguageCode(voiceId);
+
+    if (!voice) {
+      throw new NotFoundException('Scenario voice not found');
+    }
+
+    return {
+      ...voice,
+      config:
+        typeof voice.config === 'string'
+          ? JSON.parse(voice.config)
+          : voice.config,
+    };
+  }
+
+  private async getScenarioTranslationData(metadata: any, scenarioId: number) {
+    const { voiceId, languageId, language, defaultLanguageId, ...promptData } =
+      metadata ?? {};
+
+    const langIsEnglish = isEnglishLanguage(
+      languageId,
+      language,
+      defaultLanguageId,
+    );
+
+    // No language selected at all — there is nothing more specific to look
+    // up. Note this is narrower than langIsEnglish: English has its own
+    // regional variants (en-IN, en-GB, en-US) that can each carry distinct
+    // opening dialogue via scenario_translations, so a specific language is
+    // never assumed to already match the raw scenario metadata just because
+    // isEnglishLanguage treats it as "English" — only a missing language does.
+    if (!languageId) {
+      return {
+        langIsEnglish,
+        voiceId,
+        promptData: {
+          ...promptData,
+          languageId,
+          language,
+        },
+      };
+    }
+
+    // Fetch a per-language override for this scenario, if one exists.
+    const translations = await this.scenarioTranslationsRepository.findOne({
+      select: ['id', 'metadata'],
+      where: { scenarioId, languageId },
+    });
+
+    if (translations?.metadata) {
+      // Accept either object or JSON-string metadata
+      let translationMetadata: Record<string, any> = {};
+      if (typeof translations.metadata === 'string') {
+        try {
+          translationMetadata = JSON.parse(translations.metadata);
+        } catch {
+          // malformed JSON — skip applying translation (or log if desired)
+          translationMetadata = {};
+        }
+      } else if (typeof translations.metadata === 'object') {
+        translationMetadata = translations.metadata;
+      }
+
+      // Apply only the translatable fields if present
+      for (const field of SCENARIO_SESSION_TRANSLATABLE_FIELDS) {
+        if (
+          Object.prototype.hasOwnProperty.call(translationMetadata, field) &&
+          translationMetadata[field] != null &&
+          translationMetadata[field] !== ''
+        ) {
+          promptData[field] = translationMetadata[field];
+        }
+      }
+    }
+
+    return {
+      langIsEnglish,
+      voiceId,
+      promptData: {
+        ...promptData,
+        languageId,
+        language,
+      },
+    };
+  }
+
+  async getLanguageDetailsForScenarioSession(languageId: number | undefined) {
+    // Pin the canonical English row to en-IN by `value` (unique). Looking up
+    // by translationCode='en' is ambiguous now that en-IN, en-GB, and en-US
+    // all share that code — Postgres heap order would decide the winner and
+    // mis-classify en-IN sessions as "non-English" when the wrong row is
+    // returned.
+    const enLanguageDetails =
+      await this.sharedLanguageService.getLanguageByValue(
+        LanguageValueCode.EN_IN,
+      );
+
+    if (!languageId) {
+      return {
+        enLanguageDetails: enLanguageDetails,
+        languageDetails: null,
+      };
+    }
+
+    const languageDetails = await this.sharedLanguageService.getLanguagesByIds([
+      languageId,
+    ]);
+
+    return {
+      enLanguageDetails: enLanguageDetails,
+      languageDetails:
+        languageDetails && languageDetails.length > 0
+          ? languageDetails[0]
+          : null,
+    };
+  }
+
+  async getAdminScenario(id: number): Promise<GetAdminScenarioDto> {
+    const result = await this.scenariosRepository.getAdminScenarioById(id);
+
+    if (!result) {
+      throw new NotFoundException('Scenario not found');
+    }
+
+    // Hydrate the full selection. `competencyIds` is the source of truth (a
+    // cluster pick lands here already expanded); a scenario saved before it
+    // existed has only the scalar, so fall back to that. `competency` stays
+    // populated as the first entry for readers that predate the array.
+    const competencyIds = result?.competencyIds?.length
+      ? result.competencyIds
+      : result?.competencyId
+        ? [result.competencyId]
+        : [];
+    if (competencyIds.length > 0) {
+      // A deleted competency should not 404 the whole simulation, so a missing
+      // one is dropped rather than thrown.
+      const competencies = (
+        await Promise.all(
+          competencyIds.map((id) =>
+            this.competencyService.getCompetency(id).catch(() => null),
+          ),
+        )
+      ).filter((competency) => competency !== null);
+      result.competencies = competencies;
+      result.competency = competencies[0];
+    }
+
+    const behaviorInstructions =
+      await this.getBehaviorInstructionsByScenarioId(id);
+    if (behaviorInstructions) {
+      result.behaviorInstructions = behaviorInstructions;
+    }
+
+    if (result?.terminationEvents && result?.terminationEvents?.length > 0) {
+      const terminationEvents = await Promise.all(
+        result.terminationEvents.map(async (event) => {
+          if (event.eventId) {
+            const eventDetails =
+              await this.sessionEventSharedService.findSessionEventById(
+                event.eventId,
+              );
+            return { ...event, name: eventDetails?.name };
+          }
+          return event;
+        }),
+      );
+      result.terminationEvents = terminationEvents;
+    }
+
+    const translationRows =
+      await this.scenarioTranslationsRepository.getScenarioTranslationsByScenarioId(
+        id,
+      );
+    const translationOpeningStatements: Record<string, string[]> = {};
+    const translationDescription: Record<string, string> = {};
+    const translationTitle: Record<string, string> = {};
+    const translationReminders: Record<string, string[]> = {};
+    for (const row of translationRows ?? []) {
+      const meta = parseScenarioTranslationMetadata(row.metadata);
+      const cleaned = normalizeTranslationOpeningStatementsLines(
+        meta.openingStatements,
+      );
+      if (cleaned.length > 0) {
+        translationOpeningStatements[String(row.languageId)] = cleaned;
+      }
+      const desc = meta.description;
+      if (typeof desc === 'string' && desc.trim().length > 0) {
+        translationDescription[String(row.languageId)] = desc;
+      }
+      const title = meta.title;
+      if (typeof title === 'string' && title.trim().length > 0) {
+        translationTitle[String(row.languageId)] = title;
+      }
+      const cleanedReminders = normalizeTranslationOpeningStatementsLines(
+        meta.reminders,
+      );
+      if (cleanedReminders.length > 0) {
+        translationReminders[String(row.languageId)] = cleanedReminders;
+      }
+    }
+    const primaryLanguageId =
+      await this.resolveOpeningDialoguePrimaryLanguageId(result.metadata);
+    (result as GetAdminScenarioDto).translationOpeningStatements =
+      translationOpeningStatements;
+    (result as GetAdminScenarioDto).openingDialoguePrimaryLanguageId =
+      primaryLanguageId;
+    (result as GetAdminScenarioDto).translationDescription =
+      translationDescription;
+    (result as GetAdminScenarioDto).challengeDescriptionPrimaryLanguageId =
+      primaryLanguageId;
+    (result as GetAdminScenarioDto).translationTitle = translationTitle;
+    (result as GetAdminScenarioDto).translationReminders = translationReminders;
+    (result as GetAdminScenarioDto).remindersPrimaryLanguageId =
+      primaryLanguageId;
+
+    return result;
+  }
+
+  /**
+   * Build a form-shaped admin scenario from a saved version's config, overlaid
+   * on the live scenario. Used to run a draft version's report/preview without
+   * publishing it. Throws if the version doesn't belong to the scenario.
+   */
+  async buildScenarioOverrideFromVersion(
+    scenarioId: number,
+    versionId: string,
+    base?: GetAdminScenarioDto,
+  ): Promise<GetAdminScenarioDto> {
+    const version = await this.scenarioVersionRepository.findOne({
+      where: { id: versionId, scenarioId },
+    });
+    if (!version) {
+      throw new NotFoundException('Scenario version not found');
+    }
+    const baseScenario = base ?? (await this.getAdminScenario(scenarioId));
+    return hydrateAdminScenarioFromVersionConfig(
+      baseScenario,
+      version.config ?? {},
+    );
+  }
+
+  async resolveOpeningDialoguePrimaryLanguageId(
+    metadata?: Record<string, any> | null,
+  ): Promise<number | null> {
+    if (metadata?.defaultLanguageId != null) {
+      return Number(metadata.defaultLanguageId);
+    }
+    // Old scenarios (no defaultLanguageId in metadata) had their primary
+    // openingStatements authored under English (India). Pin the fallback to
+    // en-IN by `value` — looking up by translationCode='en' is ambiguous now
+    // that en-IN, en-GB, and en-US all share that code, and which row wins
+    // depends on Postgres heap order.
+    const enIn = await this.sharedLanguageService.getLanguageByValue(
+      LanguageValueCode.EN_IN,
+    );
+    return enIn?.id ?? null;
+  }
+
+  /**
+   * Retrieves all behavior instructions for a scenario along with their associated behaviors.
+   * This method fetches instructions, their behavior mappings, and the full behavior details.
+   *
+   * @param scenarioId - The scenario ID to get behavior instructions for
+   * @returns Response containing behavior instructions with their associated behaviors
+   */
+  async getBehaviorInstructionsByScenarioId(
+    scenarioId: number,
+  ): Promise<BehaviorInstructionWithBehaviorsDto[] | undefined> {
+    const instructions =
+      await this.scenarioBehaviorInstructionRepository.getByScenarioId(
+        scenarioId,
+      );
+
+    if (instructions.length === 0) {
+      return;
+    }
+
+    // Get all instruction IDs to fetch behavior mappings
+    const instructionIds = instructions.map((inst) => inst.id);
+
+    // Get all behavior mappings for these instructions
+    const behaviorMappings =
+      await this.scenarioBehaviorInstructionBehaviorRepository.getByInstructionIds(
+        instructionIds,
+      );
+
+    // Collect all unique behavior IDs
+    const behaviorIds = [
+      ...new Set(behaviorMappings.map((mapping) => mapping.behaviorId)),
+    ];
+
+    // Fetch all behavior entities
+    const behaviors = await this.getBehaviorsByIds(behaviorIds);
+
+    const scenarioInstructionsMap =
+      formattedScenarioBehaviorInstructionsResponse({
+        behaviorInstructions: instructions,
+        behaviorMappings: behaviorMappings,
+        behaviors: behaviors,
+      });
+
+    return scenarioInstructionsMap;
+  }
+
+  async getBehaviorsByIds(ids: string[]): Promise<Behavior[]> {
+    return this.behaviorRepository.getBehaviorsByIds(ids);
+  }
+
+  /**
+   * Get prompts for scenario session metadata.
+   * Only includes prompts with useDashboardOverride=true (enabled from Dashboard).
+   * ally-ai-learn uses metadata prompts when present; otherwise falls back to local .txt.
+   */
+  /**
+   * Resolve the *versions* of the dashboard-override prompts that drive a
+   * scenario session, as { promptCode: currentVersion }. Stamped onto the
+   * session at start so drift analytics can attribute behaviour to a specific
+   * prompt-version experiment. Best-effort: returns {} on any failure (capture
+   * must never block session start).
+   */
+  async getResolvedPromptVersionsForScenarioSession(): Promise<
+    Record<string, number>
+  > {
+    try {
+      const prompts = await this.promptSharedService.getPromptsByOptions({
+        promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
+        useDashboardOverrideOnly: true,
+      });
+      return (prompts ?? []).reduce<Record<string, number>>((acc, p) => {
+        const version = (p as { currentVersion?: number }).currentVersion;
+        if (version != null) {
+          acc[p.promptCode] = version;
+        }
+        return acc;
+      }, {});
+    } catch {
+      return {};
+    }
+  }
+
+  private async getPromptsForScenarioSession(
+    languageDetails?: Languages | null,
+    variantByLanguage?: Record<string, string> | null,
+  ) {
+    const prompts = await this.promptSharedService.getPromptsByOptions({
+      promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
+      useDashboardOverrideOnly: true,
+    });
+
+    if (prompts?.length == 0) {
+      return {};
+    }
+
+    // Only include prompts with non-empty content so ally-ai-learn uses dashboard edits.
+    // Also forwards hasStates so ai-learn knows when to resolve simulation states.
+    const result = prompts.reduce<
+      Record<
+        string,
+        {
+          prompt: string;
+          availableVariables?: (
+            | string
+            | { name: string; label?: string; required?: boolean }
+          )[];
+          hasStates?: boolean;
+          provider?: string;
+          model?: string;
+          temperature?: number;
+        }
+      >
+    >((acc, prompt) => {
+      const content = prompt.prompt?.trim();
+      if (content) {
+        acc[prompt.promptCode] = {
+          prompt: content,
+          availableVariables: prompt.availableVariables || [],
+          hasStates: prompt.hasStates ?? false,
+          // Forward the prompt-level LLM overrides so the voice runtime
+          // (ai-learn's get_prompt_llm_overrides) can honor a per-prompt
+          // provider/model/temperature. Only include when set so the payload
+          // stays clean and the runtime falls back to its code default.
+          ...(prompt.provider ? { provider: prompt.provider } : {}),
+          ...(prompt.model ? { model: prompt.model } : {}),
+          ...(typeof prompt.temperature === 'number'
+            ? { temperature: prompt.temperature }
+            : {}),
+        };
+      }
+      return acc;
+    }, {});
+
+    // Observability: log which shipped prompts carry a per-prompt LLM override,
+    // so the voice runtime's chosen provider/model/temperature is traceable from
+    // the ally-be side (mirrors ai-learn's `[LLM] applying overrides` log).
+    const withOverrides = Object.entries(result)
+      .filter(([, p]) => p.provider || p.model || p.temperature != null)
+      .map(
+        ([code, p]) =>
+          `${code}(provider=${p.provider ?? '-'} model=${p.model ?? '-'} temperature=${p.temperature ?? '-'})`,
+      );
+    this.logger.info(
+      `[SESSION_PROMPTS] shipping ${Object.keys(result).length} prompts to ai-learn; ` +
+        `${withOverrides.length} with LLM override: ${withOverrides.join(', ') || 'none'}`,
+    );
+
+    // For a non-English session, overlay translated bodies where a fresh
+    // translation exists — but ONLY when the simulation opted this language into
+    // the MULTILINGUAL variant. GENERIC (or unset) ships the English body so the
+    // model speaks the target language from the source prompt (today's default).
+    // Anything not translated stays English (ai-learn treats any non-empty body
+    // as authoritative). Skipped entirely for English/default sessions.
+    if (shouldServeMultilingual(languageDetails, variantByLanguage)) {
+      const englishByCode = Object.fromEntries(
+        Object.entries(result).map(([code, value]) => [code, value.prompt]),
+      );
+      const overlaid = await this.promptTranslationService.overlayTranslations(
+        englishByCode,
+        languageDetails!.id!,
+      );
+      for (const code of Object.keys(result)) {
+        const o = overlaid[code];
+        if (!o) continue;
+        if (o.body && o.body !== result[code].prompt) {
+          result[code].prompt = o.body;
+        }
+        // Per-language runtime engine override for the served translated body:
+        // which model runs the main agent for this language. Only set when a
+        // translation was served AND a runtime model is configured.
+        if (o.runtimeModel) {
+          result[code].model = o.runtimeModel;
+          if (o.runtimeProvider) result[code].provider = o.runtimeProvider;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  async getScenarioSessionSkills(
+    scenarioSessionId: string,
+  ): Promise<ScenarioSessionSkillsResponseDto> {
+    const scenarioSessionDetails =
+      await this.scenarioSessionDetailsRepository.findOne({
+        where: { scenarioSessionId },
+      });
+    if (!scenarioSessionDetails) {
+      throw new NotFoundException('Scenario session details not found');
+    }
+    const feedback = scenarioSessionDetails.summary?.feedback;
+    const bucket = this.configService.s3.assetsBucket;
+    const region = this.configService.aws.region;
+    const skillCoverage = (feedback?.skillCoverage ?? []).map(
+      (item: ScenarioEvaluationSkillCoverageItem) => {
+        const iconUrl =
+          bucket && region
+            ? this.s3Service.getS3Url(
+                bucket,
+                region,
+                `${SKILL_ICONS_S3_PREFIX}${item.category}.svg`,
+              )
+            : '';
+        return {
+          category: item.category,
+          percentage: item.percentage,
+          iconUrl,
+        };
+      },
+    );
+    const emotionalMovement = Array.isArray(feedback?.emotionalMovement)
+      ? feedback?.emotionalMovement.map(
+          (item: ScenarioEvaluationEmotionalMovementItem) => ({
+            messageId: item.message_id,
+            level: item.level,
+            startTime: item.start_time,
+          }),
+        )
+      : [];
+    return { skillCoverage, emotionalMovement };
+  }
+
+  async saveScenarioSessionRecording(data: {
+    scenarioSessionId: string;
+    storageKey: string;
+    tenantId: string;
+    egressId: string;
+  }): Promise<ScenarioSessionRecording> {
+    const recording = this.scenarioSessionRecordingRepository.create({
+      scenarioSessionId: data.scenarioSessionId,
+      storageKey: data.storageKey,
+      tenantId: data.tenantId,
+      egressId: data.egressId,
+    });
+
+    return this.scenarioSessionRecordingRepository.save(recording);
+  }
+
+  async getScenarioSessionRecordingBySessionId(
+    scenarioSessionId: string,
+  ): Promise<ScenarioSessionRecording | null> {
+    return this.scenarioSessionRecordingRepository.findOne({
+      where: { scenarioSessionId },
+    });
+  }
+}

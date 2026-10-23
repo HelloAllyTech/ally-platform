@@ -1,0 +1,621 @@
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
+import { LoggerService } from '../../logger/logger.service';
+import { RedisService } from '../../redis/service/redis.service';
+import { PlatformAnalyticsService } from './platform-analytics.service';
+import { FeedbackGroundednessJudgeService } from './feedback-groundedness-judge.service';
+import { LanguageJudgeService } from './language-judge.service';
+import { RagQualityJudgeService } from './rag-quality-judge.service';
+import { RecallQualityJudgeService } from './recall-quality-judge.service';
+import { DriftJudgeRepository } from '../repository/drift-judge.repository';
+import { FeedbackGroundednessRepository } from '../repository/feedback-groundedness.repository';
+import { LanguageJudgeRepository } from '../repository/language-judge.repository';
+import { RagQualityRepository } from '../repository/rag-quality.repository';
+import { RecallQualityRepository } from '../repository/recall-quality.repository';
+import {
+  CATCHUP_HANDOFF_MARGIN_HOURS,
+  LANGUAGE_CATCHUP_WINDOW_DAYS,
+} from '../constants/judge-scheduling.constants';
+import { ScheduledSelection } from '../util/judge-attempts.util';
+
+/**
+ * Drains the judge backlog on its own, so backfilling stops being something a
+ * person has to remember, stay logged in for, and re-issue after every deploy.
+ *
+ * The existing catch-ups keep NEW sessions judged (1-day window, onlyUnjudged).
+ * This is the other half: the historical backlog left by a rubric change or a
+ * newly added judge, which until now was a manual API call holding a token that
+ * expires every fifteen minutes — and which any deploy killed halfway through.
+ *
+ * SHAPE: each tick takes on a BOUNDED CHUNK of the backlog and finishes inside
+ * the tick. Runs used to swallow the whole backlog — hours — which made every
+ * deploy expensive: the process died mid-run, the job record still said
+ * "running", and the service had to infer the death across two ticks before it
+ * could start again. Chunking removes the question rather than answering it
+ * faster. An interrupted chunk costs only the sessions in flight, because the
+ * selectors already exclude everything judged, and the next tick simply asks
+ * for the next chunk.
+ *
+ * A tick that still finds a run in flight does nothing, so an overrunning chunk
+ * cannot stack concurrent judge calls against a service that has already been
+ * taken down once by exactly that.
+ *
+ * It stops on its own. Each family's selector excludes sessions already judged
+ * under the target version, so when the backlog empties the tick finds nothing
+ * eligible and starts nothing. No end date to set, and no cleanup to remember.
+ */
+/**
+ * How far back the drainer will reach.
+ *
+ * Was 30 days, which quietly decided what the dashboard could be asked. Tamil
+ * runs entirely on gpt-4.1-mini and every other language on gpt-4o-mini, so
+ * "Tamil is worse" and "4.1-mini is worse" were the same population and could
+ * not be told apart. The only sessions that break that tie are the same Tamil
+ * cohort's April-May runs, from before the model was pinned — 30 days put them
+ * out of reach.
+ *
+ * 150 days covers the platform's first non-English traffic. Raising it is
+ * self-limiting rather than open-ended: every selector skips sessions already
+ * judged under the target version, so the window only decides how much history
+ * is eligible ONCE. When the backlog empties the tick finds nothing and starts
+ * nothing, and it stays that way.
+ *
+ * Note what this does NOT reach. The drift family runs as a lean top-up that
+ * copies an existing v1 row forward, so it can only extend to sessions that
+ * already carry v1 drift labels — roughly July onward. Older sessions need a
+ * full drift judge, which is a separate pass, not a wider window.
+ */
+const BACKLOG_WINDOW_DAYS = 150;
+
+/**
+ * How many sessions one tick takes on, per family.
+ *
+ * This is what makes the drainer survive a restart, and it replaces detection
+ * with arithmetic. A run used to take the WHOLE backlog — hours — so a deploy
+ * killed it mid-flight and the service then had to work out that a job
+ * reporting "running" was held by a process that no longer existed. That took
+ * two ticks, so a restart cost up to an hour of progress. Three deploys in one
+ * morning cost roughly three hours.
+ *
+ * Sized so a tick's work lands just inside the tick. At 25 it did not: core-ai
+ * finished the chunk in about fifteen minutes and then sat at 1% CPU for the
+ * rest of the half hour, so half of every tick was spent idle. 80 fills the
+ * window at the raised judge ceiling instead of leaving it empty.
+ *
+ * A chunk that dies costs only the sessions in flight, because the selectors
+ * already exclude everything judged: the next tick just asks for the next 80.
+ * Nothing has to notice the death for that to work, which is why this can be
+ * raised for throughput without giving back the restart-resilience it bought.
+ */
+const BACKLOG_CHUNK = 80;
+
+/**
+ * Round-trip WER is topped up in bigger chunks because it does not compete for
+ * the judge ceiling — it is a speech-vendor round trip, bounded separately.
+ */
+const ROUND_TRIP_CHUNK = 40;
+
+/**
+ * The judge versions the backlog is measured against. These are the values a
+ * human would otherwise be typing into the API call, and they are the reason a
+ * run can be resumed safely: "already judged" means judged under THIS pair.
+ */
+const DRIFT_TARGET = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v2' };
+const DRIFT_SOURCE = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' };
+const GROUNDEDNESS_TARGET = {
+  judgeModel: 'gemini-2.5-pro',
+  judgePromptVersion: 'v1',
+};
+
+/**
+ * Language is a FULL re-judge, not a lean top-up, and that is not an oversight.
+ *
+ * The language judge writes a session row plus a set of annotations, and
+ * re-judging DELETEs and re-INSERTs that set — error sets can shrink, so an
+ * upsert would strand rows that the new rubric no longer finds. There is no
+ * per-turn row to top up the way drift has, so obtaining the widened
+ * dialect_lexicon means re-emitting every dimension.
+ *
+ * It is also why this matters more than it looks: the live catch-up judges NEW
+ * sessions under v2 continuously, so the dashboard pins language to v2 and
+ * shows the handful of sessions judged since that deploy — 1,776 annotations of
+ * real history sit under v1, invisible, until the backlog is re-judged into v2.
+ */
+const LANGUAGE_TARGET = {
+  judgeModel: 'gemini-2.5-pro',
+  judgePromptVersion: 'v2',
+};
+
+/**
+ * RAG quality reads a DIFFERENT window from the four roleplay families, so it takes its own.
+ *
+ * Its subject is the corpus and the floor as they are NOW. A retrieval judged from before a
+ * document was uploaded, a chunk profile changed or the floor moved describes a retrieval
+ * layer that no longer exists, and pooled into a rate it drags the current one toward a
+ * configuration nobody is running. Thirty days is also all there is: the log started with the
+ * character corpus.
+ */
+const RAG_QUALITY_WINDOW_DAYS = 30;
+
+/**
+ * A larger chunk than the roleplay families, because a row is far cheaper here: one call over
+ * a query and at most twelve passages, against a whole transcript for the others. The judge
+ * ceiling is still what bounds the fan-out, so this only decides how much of the tick is used.
+ */
+const RAG_QUALITY_CHUNK = 120;
+
+const RAG_QUALITY_TARGET = {
+  judgeModel: 'gemini-2.5-pro',
+  judgePromptVersion: 'v1',
+};
+
+/**
+ * Recall quality reads the SHORTEST window of any family, and that is deliberate.
+ *
+ * There is no history to reach back for: `wm_recall_selections` starts empty, so everything in
+ * it is new data by construction. Seven days keeps it that way — the ranking's weights are the
+ * subject, and a turn judged from before a coefficient changed describes a ranking nobody is
+ * running. When a weight moves, the window rolls past the old regime on its own rather than
+ * averaging the two.
+ */
+const RECALL_QUALITY_WINDOW_DAYS = 7;
+
+/**
+ * Per tick. Smaller than the corpus families because the unit is a TURN, not a session: a
+ * single 30-turn session contributes 30 rows, so a day of real traffic is thousands. This
+ * fills the tick without letting one family monopolise the judge ceiling the other five share.
+ */
+const RECALL_QUALITY_CHUNK = 60;
+
+const RECALL_QUALITY_TARGET = {
+  judgeModel: 'gemini-2.5-pro',
+  judgePromptVersion: 'v1',
+};
+
+/**
+ * Consecutive unproductive runs before this stops trying.
+ *
+ * A drainer that restarts a failing job forever is a way to spend money on
+ * nothing: a 426-session run once failed 426 times inside 25 seconds because an
+ * import was missing, and the backlog it was "draining" never shrank. Three
+ * strikes, then it holds and says so — a human can clear the breaker by fixing
+ * the cause and restarting the service, which is the point at which someone is
+ * looking anyway.
+ */
+const MAX_UNPRODUCTIVE_RUNS = 3;
+
+/**
+ * What every family's selection adds as a scheduled caller: skip subjects the
+ * attempt ledger has given up on or is still backing off. Without it a
+ * failing session reads as unjudged forever, and newest-first puts it back at
+ * the head of the queue on every tick for as long as it stays in the window.
+ */
+const SCHEDULED: ScheduledSelection = { honourAttemptLedger: true };
+
+/**
+ * Language additionally stays out of the live catch-up's window.
+ *
+ * Both used to select the newest unjudged sessions on the same tick, with
+ * nothing in flight to mark them, so every new session was language-judged
+ * twice — the second persist silently replacing the first, both billed. The
+ * catch-up owns the last day (plus a margin, see CATCHUP_HANDOFF_MARGIN_HOURS);
+ * the drainer owns everything older. The other families need no such line:
+ * drift's top-up only reaches sessions that already carry v1 rows, which a
+ * new session never has, and groundedness and recall have no catch-up.
+ */
+const LANGUAGE_SCHEDULED: ScheduledSelection = {
+  ...SCHEDULED,
+  excludeCreatedWithinHours:
+    LANGUAGE_CATCHUP_WINDOW_DAYS * 24 + CATCHUP_HANDOFF_MARGIN_HOURS,
+};
+
+@Injectable()
+export class JudgeBacklogDrainService implements OnModuleInit {
+  private readonly logger = LoggerService.getInstance(
+    JudgeBacklogDrainService.name,
+  );
+
+  constructor(
+    private readonly analytics: PlatformAnalyticsService,
+    private readonly groundedness: FeedbackGroundednessJudgeService,
+    private readonly language: LanguageJudgeService,
+    private readonly ragQuality: RagQualityJudgeService,
+    private readonly recallQuality: RecallQualityJudgeService,
+    private readonly driftRepo: DriftJudgeRepository,
+    private readonly groundednessRepo: FeedbackGroundednessRepository,
+    private readonly languageRepo: LanguageJudgeRepository,
+    private readonly ragQualityRepo: RagQualityRepository,
+    private readonly recallQualityRepo: RecallQualityRepository,
+    private readonly redis: RedisService,
+  ) {}
+
+  onModuleInit(): void {
+    scheduledTaskRegistry.register('30min', 'judge-backlog-drain', async () => {
+      await this.drainDrift();
+      await this.drainGroundedness();
+      await this.drainLanguage();
+      await this.drainRagQuality();
+      await this.drainRecallQuality();
+      await this.drainRoundTripWer();
+    });
+  }
+
+  private stateKey(family: string): string {
+    return `judge:backlog:${family}`;
+  }
+
+  private async readState(family: string): Promise<{
+    jobId?: string;
+    unproductive: number;
+    lastProcessed?: number;
+  }> {
+    const raw = await this.redis.get(this.stateKey(family));
+    if (!raw) return { unproductive: 0 };
+    try {
+      return JSON.parse(raw) as {
+        jobId?: string;
+        unproductive: number;
+        lastProcessed?: number;
+      };
+    } catch {
+      return { unproductive: 0 };
+    }
+  }
+
+  private async writeState(
+    family: string,
+    state: { jobId?: string; unproductive: number; lastProcessed?: number },
+  ): Promise<void> {
+    // No TTL: the breaker count has to outlive a job's own hour-long TTL, or a
+    // failing family would reset itself to zero strikes and loop forever.
+    await this.redis.set(this.stateKey(family), JSON.stringify(state));
+  }
+
+  /**
+   * Decide whether to start another run for a family.
+   *
+   * Returns the updated state rather than acting, so the two families share one
+   * set of rules and the decision is testable without a judge behind it.
+   */
+  private async shouldStart(
+    family: string,
+    lastJob:
+      | { status: string; judged: number; failed: number; processed: number }
+      | undefined,
+    state: { jobId?: string; unproductive: number; lastProcessed?: number },
+  ): Promise<{
+    start: boolean;
+    next: { jobId?: string; unproductive: number; lastProcessed?: number };
+  }> {
+    if (
+      lastJob &&
+      (lastJob.status === 'running' || lastJob.status === 'queued')
+    ) {
+      // "running" is not proof of life. A deploy kills the process holding the
+      // loop WITHOUT updating the record, so a dead job reads as running until
+      // its own TTL expires an hour later — which is exactly the case this
+      // service exists to cover, and it silently did nothing about it.
+      //
+      // Progress is the real signal: a live job advances `processed` well
+      // inside a tick (a judge call is ~60s median), so a run that has not
+      // moved since the previous tick is held by a process that is gone.
+      const advanced = lastJob.processed > (state.lastProcessed ?? -1);
+      if (advanced) {
+        return {
+          start: false,
+          next: { ...state, lastProcessed: lastJob.processed },
+        };
+      }
+      this.logger.warn(
+        `[backlog] ${family} job ${state.jobId} reports running but has not ` +
+          `advanced past ${lastJob.processed} since the last tick — treating ` +
+          `it as dead and starting a fresh run.`,
+      );
+      // Fall through and start again. Restarting is safe: the selectors skip
+      // everything already judged, so a run that was in fact alive would only
+      // repeat work it had not yet reached.
+    }
+
+    if (state.unproductive >= MAX_UNPRODUCTIVE_RUNS) {
+      this.logger.error(
+        `[backlog] ${family} halted after ${state.unproductive} unproductive ` +
+          `runs — judged nothing while failing. Fix the cause and restart the ` +
+          `service to clear this.`,
+      );
+      return { start: false, next: state };
+    }
+
+    // A finished run that judged nothing while failing is the signature of a
+    // broken judge, not an empty backlog — count it against the breaker.
+    const unproductive =
+      lastJob && lastJob.judged === 0 && lastJob.failed > 0
+        ? state.unproductive + 1
+        : 0;
+
+    return { start: true, next: { ...state, unproductive } };
+  }
+
+  private async drainDrift(): Promise<void> {
+    const state = await this.readState('drift');
+    const lastJob = state.jobId
+      ? await this.analytics
+          .getDriftBackfillStatus(state.jobId)
+          .catch(() => undefined)
+      : undefined;
+
+    const { start, next } = await this.shouldStart('drift', lastJob, state);
+    if (!start) {
+      await this.writeState('drift', next);
+      return;
+    }
+
+    // Anything left to do? Ask for ONE eligible session rather than counting the
+    // backlog: this runs every thirty minutes forever, and the answer only ever
+    // decides start-or-not.
+    const eligible = await this.driftRepo.selectSessions({
+      sinceDays: BACKLOG_WINDOW_DAYS,
+      onlyUnjudged: true,
+      unjudgedForVersion: DRIFT_TARGET,
+      judgedForVersion: DRIFT_SOURCE,
+      limit: 1,
+      ...SCHEDULED,
+    });
+    if (eligible.length === 0) {
+      await this.writeState('drift', { unproductive: 0 });
+      return;
+    }
+
+    const job = await this.analytics.startDriftBackfill(
+      BACKLOG_WINDOW_DAYS,
+      true,
+      DRIFT_TARGET,
+      undefined,
+      DRIFT_SOURCE,
+      BACKLOG_CHUNK,
+      SCHEDULED,
+    );
+    await this.writeState('drift', {
+      jobId: job.jobId,
+      unproductive: next.unproductive,
+      lastProcessed: undefined,
+    });
+    this.logger.debug(
+      `[backlog] drift lean top-up started job=${job.jobId} ` +
+        `strikes=${next.unproductive}`,
+    );
+  }
+
+  private async drainLanguage(): Promise<void> {
+    const state = await this.readState('language');
+    const lastJob = state.jobId
+      ? await this.language.getJob(state.jobId).catch(() => undefined)
+      : undefined;
+
+    const { start, next } = await this.shouldStart('language', lastJob, state);
+    if (!start) {
+      await this.writeState('language', next);
+      return;
+    }
+
+    const eligible = await this.languageRepo.selectSessions({
+      sinceDays: BACKLOG_WINDOW_DAYS,
+      onlyUnjudged: true,
+      unjudgedForVersion: LANGUAGE_TARGET,
+      limit: 1,
+      ...LANGUAGE_SCHEDULED,
+    });
+    if (eligible.length === 0) {
+      await this.writeState('language', { unproductive: 0 });
+      return;
+    }
+
+    const job = await this.language.startBackfill(
+      BACKLOG_WINDOW_DAYS,
+      true,
+      LANGUAGE_TARGET,
+      undefined,
+      BACKLOG_CHUNK,
+      LANGUAGE_SCHEDULED,
+    );
+    await this.writeState('language', {
+      jobId: job.jobId,
+      unproductive: next.unproductive,
+      lastProcessed: undefined,
+    });
+    this.logger.debug(
+      `[backlog] language re-judge started job=${job.jobId} strikes=${next.unproductive}`,
+    );
+  }
+
+  private async drainGroundedness(): Promise<void> {
+    const state = await this.readState('groundedness');
+    const lastJob = state.jobId
+      ? await this.groundedness.getJob(state.jobId).catch(() => undefined)
+      : undefined;
+
+    const { start, next } = await this.shouldStart(
+      'groundedness',
+      lastJob,
+      state,
+    );
+    if (!start) {
+      await this.writeState('groundedness', next);
+      return;
+    }
+
+    const eligible = await this.groundednessRepo.selectSessions({
+      sinceDays: BACKLOG_WINDOW_DAYS,
+      unjudgedForVersion: GROUNDEDNESS_TARGET,
+      limit: 1,
+      ...SCHEDULED,
+    });
+    if (eligible.length === 0) {
+      await this.writeState('groundedness', { unproductive: 0 });
+      return;
+    }
+
+    const job = await this.groundedness.startBackfill(
+      BACKLOG_WINDOW_DAYS,
+      GROUNDEDNESS_TARGET,
+      undefined,
+      BACKLOG_CHUNK,
+      SCHEDULED,
+    );
+    await this.writeState('groundedness', {
+      jobId: job.jobId,
+      unproductive: next.unproductive,
+      lastProcessed: undefined,
+    });
+    this.logger.debug(
+      `[backlog] groundedness started job=${job.jobId} strikes=${next.unproductive}`,
+    );
+  }
+
+  /**
+   * Label the retrieval log, so the similarity floor can be chosen from a curve.
+   *
+   * The four families above judge a conversation; this one judges a retrieval, and it is here
+   * for the same reason they are — the alternative was a person remembering to issue an API
+   * call, staying logged in for it, and re-issuing it after every deploy.
+   *
+   * Judgment is what the log has been missing. `kb_retrievals` records what came back and at
+   * what similarity, and similarity turned out not to stand in for usefulness: the character
+   * corpus returned nothing for a query one of its own documents answered under a section
+   * title. Precision at every candidate floor is a scan over these labels joined to that
+   * score, and it can also say that no floor will work for this corpus, which is a conclusion
+   * a better-chosen number could never reach.
+   *
+   * The selection inside the service is balanced across consumers rather than newest-first;
+   * see `selectBalanced` for why that is not optional here.
+   */
+  private async drainRagQuality(): Promise<void> {
+    const state = await this.readState('rag-quality');
+    const lastJob = state.jobId
+      ? await this.ragQuality.getJob(state.jobId).catch(() => undefined)
+      : undefined;
+
+    const { start, next } = await this.shouldStart(
+      'rag-quality',
+      lastJob,
+      state,
+    );
+    if (!start) {
+      await this.writeState('rag-quality', next);
+      return;
+    }
+
+    const eligible = await this.ragQualityRepo.selectRetrievals({
+      sinceDays: RAG_QUALITY_WINDOW_DAYS,
+      unjudgedForVersion: RAG_QUALITY_TARGET,
+      limit: 1,
+    });
+    if (eligible.length === 0) {
+      await this.writeState('rag-quality', { unproductive: 0 });
+      return;
+    }
+
+    const job = await this.ragQuality.startBackfill(
+      RAG_QUALITY_WINDOW_DAYS,
+      RAG_QUALITY_TARGET,
+      undefined,
+      RAG_QUALITY_CHUNK,
+    );
+    await this.writeState('rag-quality', {
+      jobId: job.jobId,
+      unproductive: next.unproductive,
+      lastProcessed: undefined,
+    });
+    this.logger.debug(
+      `[backlog] rag-quality started job=${job.jobId} strikes=${next.unproductive}`,
+    );
+  }
+
+  /**
+   * Judge whether the voice agent's client recalled what each turn called for.
+   *
+   * The sixth family, and the first that judges a TURN rather than a session or a retrieval.
+   * It exists because the recall ranking's five weights were never tunable from anything but
+   * argument: the scores were computed and discarded every turn until the selection log
+   * shipped.
+   *
+   * Nothing here reaches into history. The table it reads began empty, so every row is new
+   * data, and the seven-day window keeps a weight change from being averaged against the
+   * regime it replaced.
+   */
+  private async drainRecallQuality(): Promise<void> {
+    const state = await this.readState('recall-quality');
+    const lastJob = state.jobId
+      ? await this.recallQuality.getJob(state.jobId).catch(() => undefined)
+      : undefined;
+
+    const { start, next } = await this.shouldStart(
+      'recall-quality',
+      lastJob,
+      state,
+    );
+    if (!start) {
+      await this.writeState('recall-quality', next);
+      return;
+    }
+
+    const eligible = await this.recallQualityRepo.selectTurns({
+      sinceDays: RECALL_QUALITY_WINDOW_DAYS,
+      unjudgedForVersion: RECALL_QUALITY_TARGET,
+      limit: 1,
+      ...SCHEDULED,
+    });
+    if (eligible.length === 0) {
+      await this.writeState('recall-quality', { unproductive: 0 });
+      return;
+    }
+
+    const job = await this.recallQuality.startBackfill(
+      RECALL_QUALITY_WINDOW_DAYS,
+      RECALL_QUALITY_TARGET,
+      undefined,
+      RECALL_QUALITY_CHUNK,
+      SCHEDULED,
+    );
+    await this.writeState('recall-quality', {
+      jobId: job.jobId,
+      unproductive: next.unproductive,
+      lastProcessed: undefined,
+    });
+    this.logger.debug(
+      `[backlog] recall-quality started job=${job.jobId} strikes=${next.unproductive}`,
+    );
+  }
+
+  /**
+   * Fill in round-trip WER for judgments that were written without it.
+   *
+   * Kept out of the judging loop and given its own step because it is the only
+   * measurement here that talks to a speech vendor: a TTS call plus an ASR call
+   * per sampled utterance. Inline, a timeout held a judging worker for three
+   * minutes on 37% of sessions — throughput spent on a field that renders as
+   * "not measured" either way.
+   *
+   * No job record and no staleness handling, because it needs none: the
+   * selector only ever returns rows that are still NULL, so an interrupted run
+   * is simply a shorter one and the next tick asks again.
+   */
+  private async drainRoundTripWer(): Promise<void> {
+    try {
+      const { attempted, measured } = await this.language.topUpRoundTripWer(
+        LANGUAGE_TARGET,
+        ROUND_TRIP_CHUNK,
+      );
+      if (attempted > 0) {
+        this.logger.debug(
+          `[backlog] round-trip WER topped up ${measured}/${attempted}`,
+        );
+      }
+    } catch (e) {
+      // Never let a speech-vendor problem stop the judging families that ran
+      // before it on this tick.
+      this.logger.warn(
+        `[backlog] round-trip WER top-up failed: ${(e as Error).message}`,
+      );
+    }
+  }
+}

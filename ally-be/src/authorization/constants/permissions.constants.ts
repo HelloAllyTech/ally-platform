@@ -1,0 +1,832 @@
+const PERMISSIONS = {
+  // === USER MANAGEMENT ===
+  EDIT_USER: 'edit:user',
+  EDIT_USER_ROLE: 'edit:user:role',
+  VIEW_USERS: 'view:users',
+  EDIT_USER_STATUS: 'edit:user:status',
+  VIEW_USER_ROLES: 'view:user:roles',
+  VIEW_USER_TENANT: 'view:user:tenant',
+
+  // === CHAT MANAGEMENT ===
+  VIEW_CHAT: 'view:chat',
+  EDIT_CHAT: 'edit:chat',
+  VIEW_CHAT_COUNSELOR: 'view:chat:counselor',
+  VIEW_CHAT_DETAILS: 'view:chat:details',
+  EDIT_CHAT_NOTE: 'edit:chat:note',
+  DELETE_CHAT: 'delete:chat',
+
+  // === CALL MANAGEMENT ===
+  VIEW_CALL_LOGS: 'view:call:logs',
+  VIEW_CALL_LOGS_SUMMARY: 'view:call:logs-summary',
+  ARCHIVE_CALL_LOG: 'archive:call-log',
+  EDIT_CALL_DETAILS: 'edit:call:details',
+  EDIT_CALL_INFO: 'edit:call:info',
+
+  // Call action permissions (role-specific)
+  EDIT_CALL_END: 'edit:call:end',
+
+  // === MESSAGE MANAGEMENT ===
+  VIEW_MESSAGES: 'view:messages',
+  VIEW_MESSAGE_FEEDBACK: 'view:message:feedback',
+  EDIT_MESSAGE_FEEDBACK: 'edit:message:feedback',
+
+  // === SUMMARY MANAGEMENT ===
+  VIEW_SUMMARY: 'view:summary',
+  EDIT_SUMMARY: 'edit:summary',
+  EXPORT_SUMMARY: 'export:summary', // already present
+  EDIT_SUMMARY_FEEDBACK: 'edit:summary:feedback',
+
+  // === ANALYTICS ===
+  EDIT_ANALYTICS_DASHBOARD: 'edit:analytics:dashboard',
+  VIEW_ANALYTICS_DASHBOARD_URL: 'view:analytics:dashboard-url',
+  VIEW_ANALYTICS_DASHBOARD: 'view:analytics:dashboard',
+
+  // === LEARNING MODULE ===
+  VIEW_SCENARIOS: 'view:scenarios',
+  VIEW_SCENARIO: 'view:scenario',
+  EDIT_SCENARIO: 'edit:scenario',
+  VIEW_SCENARIO_SESSION: 'view:scenario-session',
+  EDIT_SCENARIO_SESSION: 'edit:scenario-session',
+  EDIT_SCENARIO_SESSION_FEEDBACK: 'edit:scenario-session:feedback',
+  VIEW_ADMIN_SCENARIO_SESSION: 'view:admin:scenario-session',
+  VIEW_SCENARIO_SESSION_DETAILS: 'view:scenario-session:details',
+  VIEW_SCENARIO_EVENTS: 'view:scenario-events',
+  EDIT_SCENARIO_MAP_EVENTS: 'edit:scenario-session:map-events',
+  VIEW_SESSION_SCENARIO_MESSAGES: 'view:session-scenario:messages',
+  VIEW_SESSION_SCENARIO_SUMMARY: 'view:scenario-session:summary',
+  DELETE_SCENARIO_SESSION: 'delete:scenario-session',
+  VIEW_SCENARIO_VOICES: 'view:scenario-voices',
+  EDIT_SCENARIO_VOICE: 'edit:scenario-voice',
+  VIEW_ADMIN_SCENARIOS: 'view:admin:scenarios',
+  VIEW_ADMIN_SCENARIO: 'view:admin:scenario',
+  DELETE_ADMIN_SCENARIO: 'delete:admin:scenario',
+  EDIT_SCENARIO_TENANT: 'edit:scenario-tenant',
+  DELETE_SCENARIO_TENANT: 'delete:scenario-tenant',
+  VIEW_ADMIN_SCENARIO_VOICE_LANGUAGES: 'view:admin:scenario-voice-languages',
+  EDIT_USER_PREFERENCES: 'edit:user:preferences',
+  VIEW_USER_PREFERENCES: 'view:user:preferences',
+  EDIT_LANGUAGE: 'edit:admin:language',
+  VIEW_SCENARIO_LANGUAGES: 'view:scenario-languages',
+  VIEW_ADMIN_LANGUAGES: 'view:admin:languages',
+
+  // === SETTINGS ===
+  VIEW_SETTINGS_SUMMARY_FIELDS: 'view:settings:summary-fields',
+  EDIT_SETTINGS_SUMMARY_FIELDS: 'edit:settings:summary-fields',
+  VIEW_SETTINGS_NUDGE_STATUS: 'view:settings:nudge-status',
+  EDIT_SETTINGS_NUDGE_STATUS: 'edit:settings:nudge-status',
+  VIEW_SETTINGS_CHAT_TYPES: 'view:settings:chat-types',
+  EDIT_SETTINGS_CHAT_TYPES: 'edit:settings:chat-types',
+  EDIT_GLOBAL_SETTINGS: 'edit:global-settings',
+
+  // === CUSTOM FIELDS ===
+  VIEW_CUSTOM_FIELD_DEFINITIONS: 'view:custom-field:definitions',
+  MANAGE_CUSTOM_FIELD_DEFINITIONS: 'manage:custom-field:definitions',
+  EDIT_CUSTOM_FIELD_VALUES: 'edit:custom-field:values',
+
+  // === CUSTOM FIELD TYPE SETTINGS ===
+  VIEW_SETTINGS_CUSTOM_FIELD_TYPES: 'view:settings:custom-field-types',
+  EDIT_SETTINGS_CUSTOM_FIELD_TYPES: 'edit:settings:custom-field-types',
+
+  // === TENANT MANAGEMENT ===
+  VIEW_TENANT: 'view:tenant',
+  EDIT_TENANT: 'edit:tenant',
+  VIEW_TENANTS: 'view:tenants',
+
+  // === REFERENCE DOCUMENTS ===
+  VIEW_REFERENCE_DOCUMENT: 'view:reference-document',
+  EDIT_REFERENCE_DOCUMENT: 'edit:reference-document',
+  DELETE_REFERENCE_DOCUMENT: 'delete:reference-document',
+  UPLOAD_REFERENCE_DOCUMENT: 'upload:reference-document',
+  UPDATE_REFERENCE_DOCUMENT_ARCHIVE: 'edit:reference-document:archive',
+
+  // === LIVEKIT ===
+  VIEW_LIVEKIT: 'view:livekit',
+  EDIT_LIVEKIT: 'edit:livekit',
+
+  // === SESSION EVENTS ===
+  EDIT_SESSION_EVENTS: 'edit:session-events',
+  VIEW_SESSION_EVENTS: 'view:session-events',
+  DELETE_SESSION_EVENTS: 'delete:session-events',
+
+  VIEW_COUNSELORS: 'view:counselors',
+  VIEW_TAGS: 'view:tags',
+  EDIT_ENHANCEMENT: 'edit:enhancement',
+  VIEW_CHAT_NUDGE: 'view:chat:nudge',
+  EDIT_TAG_POSITIVITY_RATINGS: 'edit:tag-positivity-ratings',
+
+  // === CLOUD TELEPHONY ===
+  EDIT_CLOUD_TELEPHONY: 'edit:cloud-telephony',
+
+  // UI Specific Permissions
+  VIEW_ANALYTICS: 'view:analytics',
+  // Tenant-admin organization metrics (native dashboard, not Metabase) —
+  // deliberately separate from VIEW_ANALYTICS/VIEW_ANALYTICS_DASHBOARD, which
+  // learners and counselors also hold.
+  VIEW_ORGANIZATION_METRICS: 'view:organization-metrics',
+  VIEW_COMMUNITY: 'view:community',
+
+  // === OZONETEL ===
+  SUBSCRIBE_OZONETEL_EVENTS: 'subscribe:ozonetel:events',
+  UNSUBSCRIBE_OZONETEL_EVENTS: 'unsubscribe:ozonetel:events',
+  PROCESS_OZONETEL_WEBHOOK: 'process:ozonetel:webhook',
+
+  // AUDIO UPLOAD
+  VIEW_AUDIO_UPLOAD: 'view:audio-upload-url',
+  CANCEL_AUDIO_UPLOAD: 'cancel:audio-upload',
+  // === CONTEXT MANAGEMENT ===
+  START_CLOUD_TELEPHONY_CHAT: 'start:cloud-telephony-chat',
+
+  // === SYSTEM ACCESS ===
+  SYSTEM_ACCESS: 'system:access',
+  ORGANIZATION_ACCESS: 'organization:access',
+  IMPERSONATE_USER: 'impersonate:user',
+
+  // === LEARNER ACCESS ===
+  LEARNER_ACCESS: 'learner:access',
+
+  // === COUNSELOR ACCESS ===
+  COUNSELOR_ACCESS: 'counselor:access',
+
+  // === AUDIO CHAT ===
+  START_MICROPHONE_CHAT: 'start:microphone-chat',
+
+  // === PLACES ===
+  VIEW_PLACES: 'view:places',
+
+  // === CHARACTER LIBRARY ===
+  VIEW_SCENARIO_CHARACTER: 'view:scenario-character',
+  EDIT_SCENARIO_CHARACTER: 'edit:scenario-character',
+  DELETE_SCENARIO_CHARACTER: 'delete:scenario-character',
+  CREATE_SCENARIO_CHARACTER: 'create:scenario-character',
+
+  // === PROMPTS ===
+  VIEW_PROMPT: 'view:admin:prompts',
+  EDIT_PROMPT: 'edit:admin:prompts',
+  // Skill experiments (auto-improve) read every tenant's outputs for a skill, so
+  // they sit with EDIT_PROMPT, not VIEW_PROMPT — multi-tenant admins can read a
+  // prompt but must not read other tenants' transcripts through its experiment.
+  VIEW_SKILL_EXPERIMENT: 'view:admin:skill-experiments',
+  EDIT_SKILL_EXPERIMENT: 'edit:admin:skill-experiments',
+
+  VIEW_GUARDRAILS: 'view:admin:guardrails',
+  EDIT_GUARDRAILS: 'edit:admin:guardrails',
+
+  // === CACHE ===
+  VIEW_CACHE: 'view:cache',
+  DELETE_CACHE: 'delete:cache',
+
+  //=== SIMULATION CREDITS ===
+  VIEW_SIMULATION_CREDITS: 'view:simulation-credits',
+  EDIT_SIMULATION_CREDITS: 'edit:simulation-credits',
+
+  // === SCENARIO PATHS ===
+  VIEW_ADMIN_SCENARIO_PATHS: 'view:admin:scenario-paths',
+  VIEW_ADMIN_SCENARIO_PATH: 'view:admin:scenario-path',
+  EDIT_ADMIN_SCENARIO_PATH: 'edit:admin:scenario-path',
+  DELETE_ADMIN_SCENARIO_PATH: 'delete:admin:scenario-path',
+  EDIT_TENANT_SCENARIO_PATH: 'edit:tenant:scenario-path',
+  VIEW_SCENARIO_PATHS: 'view:scenario-paths',
+  VIEW_SCENARIO_PATH: 'view:scenario-path',
+  EDIT_SCENARIO_PATH: 'edit:scenario-path',
+  EDIT_SCENARIO_PATH_TENANT: 'edit:scenario-path-tenant',
+  DELETE_SCENARIO_PATH_TENANT: 'delete:scenario-path-tenant',
+
+  // === COHORTS (a tenant's own MECE grouping of its users) ===
+  // Own-tenant scoped via OwnTenantScopeGuard on every cohort route. VIEW also
+  // gates the cohort member list, which is deliberately a narrow
+  // id/name/email/cohort projection of the tenant's own users rather than the
+  // platform-wide user-management payload behind view:users.
+  VIEW_COHORTS: 'view:cohorts',
+  EDIT_COHORTS: 'edit:cohorts',
+
+  // === CASES ===
+  VIEW_ADMIN_CASES: 'view:admin:cases',
+  VIEW_ADMIN_CASE: 'view:admin:case',
+  EDIT_ADMIN_CASE: 'edit:admin:case',
+  DELETE_ADMIN_CASE: 'delete:admin:case',
+  EDIT_CASE_TENANT: 'edit:case-tenant',
+  VIEW_CASES: 'view:cases',
+  VIEW_CASE: 'view:case',
+  EDIT_CASE: 'edit:case',
+  DELETE_CASE_TENANT: 'delete:case-tenant',
+
+  // === TRACKS (Track 2.0 multi-component learning tracks) ===
+  VIEW_ADMIN_TRACKS: 'view:admin:tracks',
+  VIEW_ADMIN_TRACK: 'view:admin:track',
+  EDIT_ADMIN_TRACK: 'edit:admin:track',
+  DELETE_ADMIN_TRACK: 'delete:admin:track',
+  EDIT_TENANT_TRACK: 'edit:tenant:track',
+  EDIT_TRACK_TENANT: 'edit:track-tenant',
+  DELETE_TRACK_TENANT: 'delete:track-tenant',
+  VIEW_TRACKS: 'view:tracks',
+  VIEW_TRACK: 'view:track',
+  EDIT_TRACK: 'edit:track',
+
+  // === SIMULATION REVIEW ===
+  VIEW_SIMULATION_REVIEW: 'view:simulation-review',
+  EDIT_SIMULATION_REVIEW: 'edit:simulation-review',
+  VIEW_SIMULATION_REVIEWS: 'view:simulation-reviews',
+  VIEW_SIMULATION_REVIEW_THREADS: 'view:simulation-review-threads',
+  EDIT_SIMULATION_REVIEW_THREAD: 'edit:simulation-review-thread',
+  SIMULATION_REVIEWER_ACCESS: 'simulation-reviewer:access',
+
+  // === SCRIBE REVIEW ===
+  VIEW_SCRIBE_REVIEW: 'view:scribe-review',
+  EDIT_SCRIBE_REVIEW: 'edit:scribe-review',
+  VIEW_SCRIBE_REVIEWS: 'view:scribe-reviews',
+  VIEW_SCRIBE_REVIEW_THREADS: 'view:scribe-review-threads',
+  EDIT_SCRIBE_REVIEW_THREAD: 'edit:scribe-review-thread',
+  SCRIBE_REVIEWER_ACCESS: 'scribe-reviewer:access',
+
+  // === EVALUATION ===
+  // Marks the account as an evaluator: the consumer apps show it the extra
+  // evaluation questions attached to particular screens and events. Additive —
+  // it grants nothing else, and every evaluator also holds a normal app role.
+  EVALUATOR_ACCESS: 'evaluator:access',
+
+  // === BADGES ===
+  VIEW_USER_BADGES: 'view:user:badges',
+  EDIT_USER_BADGES: 'edit:user:badges',
+  VIEW_ADMIN_BADGES: 'view:admin:badges',
+  EDIT_ADMIN_BADGES: 'edit:admin:badges',
+  VIEW_ADMIN_BADGES_FOR_SETTING: 'view:admin:badges-for-setting',
+  // Assign/unassign a (global) badge to/from a tenant. Split out from
+  // EDIT_ADMIN_BADGES (which also gates global badge CRUD) so assignment can be
+  // granted without the ability to create/edit/delete global badges.
+  EDIT_BADGE_TENANT: 'edit:badge-tenant',
+
+  // === COMMUNITY ===
+  VIEW_COMMUNITY_LEADERBOARD: 'view:community:leaderboard',
+  VIEW_USER_RANK: 'view:user:rank',
+
+  // === COVER IMAGE LIBRARY ===
+  VIEW_SCENARIO_COVER_IMAGE_LIBRARY: 'view:scenario-cover-image-library',
+  EDIT_SCENARIO_COVER_IMAGE_LIBRARY: 'edit:scenario-cover-image-library',
+  DELETE_SCENARIO_COVER_IMAGE_LIBRARY: 'delete:scenario-cover-image-library',
+  // === COMFORT AUDIO LIBRARY ===
+  VIEW_COMFORT_AUDIO_LIBRARY: 'view:comfort-audio-library',
+  EDIT_COMFORT_AUDIO_LIBRARY: 'edit:comfort-audio-library',
+  DELETE_COMFORT_AUDIO_LIBRARY: 'delete:comfort-audio-library',
+  // === SCENARIO REPORTS ===
+  VIEW_SCENARIO_REPORTS: 'view:scenario-reports',
+  EDIT_SCENARIO_REPORTS: 'edit:scenario-reports',
+
+  // === MULTI-TENANT ADMIN MANAGEMENT ===
+  VIEW_MULTI_TENANT_ADMINS: 'view:multi-tenant-admins',
+  EDIT_MULTI_TENANT_ADMINS: 'edit:multi-tenant-admins',
+
+  // === SUPER DUPER ADMIN MANAGEMENT ===
+  // Granted ONLY to SUPER_DUPER_ADMIN (never SUPER_ADMIN) — the dedicated
+  // surface for listing/promoting/demoting super duper admins. This is the
+  // first intentional divergence between the two super-admin tiers.
+  VIEW_SUPER_DUPER_ADMINS: 'view:super-duper-admins',
+  EDIT_SUPER_DUPER_ADMINS: 'edit:super-duper-admins',
+
+  // === AWS LOGS ===
+  // Granted ONLY to SUPER_DUPER_ADMIN — CloudWatch logs can carry sensitive
+  // request data, so this stays as restricted as the SDA management surface.
+  VIEW_AWS_LOGS: 'view:aws-logs',
+
+  // === MOBILE RELEASES ===
+  // Granted ONLY to SUPER_DUPER_ADMIN — same divergence pattern as
+  // VIEW_AWS_LOGS. Backs the Mobile Releases admin page (ally-mobile CI
+  // build/release status + current app version).
+  VIEW_MOBILE_RELEASES: 'view:mobile-releases',
+  // Narrower than VIEW_MOBILE_RELEASES: dispatches a real production release
+  // pipeline run (scheduled-mobile-release.yml with force: true), so it is
+  // gated separately even though both are SUPER_DUPER_ADMIN-only today.
+  TRIGGER_MOBILE_RELEASES: 'trigger:mobile-releases',
+  // Narrower still: promotes an already-shipped build further into
+  // production (Play Store staged rollout increase, or TestFlight external
+  // promotion) via promote-android-production.yml /
+  // promote-ios-testflight-external.yml. Kept separate from
+  // TRIGGER_MOBILE_RELEASES even though both are SUPER_DUPER_ADMIN-only
+  // today, since these are distinct manual, real-production actions.
+  PROMOTE_MOBILE_RELEASES: 'promote:mobile-releases',
+  // Its own tier, narrower still: submits the current iOS build for Apple's
+  // FULL App Store review (real public distribution, not TestFlight) via
+  // submit-ios-app-store-review.yml. The workflow forces releaseType MANUAL
+  // so approval alone does not release to real users, but the review
+  // submission itself is real and consequential (starts Apple's review
+  // clock). Kept separate from PROMOTE_MOBILE_RELEASES — Android production
+  // promotion and iOS App Store review submission are different actions
+  // with different risk profiles, and separately grantable permissions let
+  // someone be trusted with one but not the other later if that's ever
+  // needed.
+  SUBMIT_APP_STORE_REVIEW: 'submit-app-store-review:mobile-releases',
+
+  // === WHATSAPP Q&A KNOWLEDGE BASE ===
+  // Granted ONLY to SUPER_DUPER_ADMIN. The corpus is what the bot tells mental
+  // healthcare workers, so write access is the ability to change clinical
+  // guidance at scale — and archive/delete is the ability to silently remove it.
+  VIEW_KNOWLEDGE_BASE: 'view:knowledge-base',
+  EDIT_KNOWLEDGE_BASE: 'edit:knowledge-base',
+  UPLOAD_KNOWLEDGE_BASE: 'upload:knowledge-base',
+  EDIT_KNOWLEDGE_BASE_ARCHIVE: 'edit:knowledge-base:archive',
+
+  // === WHATSAPP Q&A BOT ===
+  // Also SUPER_DUPER_ADMIN only. `:conversations` is the most sensitive of these — message bodies
+  // are mental healthcare workers' clinical questions alongside their phone numbers.
+  VIEW_WHATSAPP_BOT: 'view:whatsapp-bot',
+  EDIT_WHATSAPP_BOT: 'edit:whatsapp-bot',
+  VIEW_WHATSAPP_BOT_TEMPLATES: 'view:whatsapp-bot:templates',
+  EDIT_WHATSAPP_BOT_TEMPLATES: 'edit:whatsapp-bot:templates',
+  VIEW_WHATSAPP_BOT_CONVERSATIONS: 'view:whatsapp-bot:conversations',
+  EDIT_WHATSAPP_BOT_CONVERSATIONS: 'edit:whatsapp-bot:conversations',
+  VIEW_WHATSAPP_BOT_UNANSWERED: 'view:whatsapp-bot:unanswered',
+  EDIT_WHATSAPP_BOT_UNANSWERED: 'edit:whatsapp-bot:unanswered',
+  VIEW_WHATSAPP_BOT_ANALYTICS: 'view:whatsapp-bot:analytics',
+
+  // === RUNTIME I18N ===
+  VIEW_I18N_TRANSLATIONS: 'view:admin:i18n-translations',
+  EDIT_I18N_TRANSLATIONS: 'edit:admin:i18n-translations',
+
+  // === TOOLTIPS ===
+  VIEW_TOOLTIPS: 'view:admin:tooltips',
+  EDIT_TOOLTIPS: 'edit:admin:tooltips',
+
+  // === BLOG ===
+  VIEW_BLOGS: 'view:blogs',
+  EDIT_BLOG: 'edit:blog',
+  DELETE_BLOG: 'delete:blog',
+
+  // === AI LAB ===
+  VIEW_AI_LAB: 'view:admin:ai-lab',
+  EDIT_AI_LAB: 'edit:admin:ai-lab',
+  DELETE_AI_LAB: 'delete:admin:ai-lab',
+
+  // === BUILDER ===
+  // Two tiers, not three: VIEW is read-only (someone catching up on a build),
+  // EDIT covers running the interview, editing the PRD and starting or
+  // stopping a build. There is no separate delete — a session is cancelled,
+  // never removed, because its PRs outlive it.
+  VIEW_BUILDER: 'view:admin:builder',
+  EDIT_BUILDER: 'edit:admin:builder',
+
+  // === COURSE COPILOT ===
+  // VIEW reads a session (transcript, blueprint, build state); EDIT runs the
+  // interview, approves blueprints and lets the agent write courses and
+  // roleplays. Like Builder there is no delete — a session is archived, and
+  // the course it made outlives it.
+  VIEW_COURSE_COPILOT: 'view:admin:course-copilot',
+  EDIT_COURSE_COPILOT: 'edit:admin:course-copilot',
+
+  // === PRODUCT ROADMAP ===
+  // Three tiers, because the roadmap is a voting board rather than a CRUD screen:
+  // VIEW is read-only, VOTE adds "participate" (file an opportunity, cast your
+  // monthly votes, comment, keep your own saved views), and EDIT is the management
+  // surface (stages, editing/deleting anyone's opportunity, goals/owners,
+  // split/merge, month-board lane moves, pinning a view for everyone). Opening a
+  // card in Builder is NOT here — it is gated on Builder access (the BUILDER
+  // toggle + EDIT_BUILDER).
+  VIEW_PRODUCT_ROADMAP: 'view:admin:product-roadmap',
+  VOTE_PRODUCT_ROADMAP: 'vote:admin:product-roadmap',
+  EDIT_PRODUCT_ROADMAP: 'edit:admin:product-roadmap',
+
+  // === TEXT HELPLINE ===
+  // Anonymous web "talkers" chat with trained human listeners. Contract:
+  // docs/text-helpline.md §2. Every listener route ALSO requires the tenant's
+  // TEXT_HELPLINE_ENABLED preference (@RequireHelplineEnabled) — a permission
+  // alone never opens the surface.
+  VIEW_HELPLINE_LOBBY: 'view:helpline:lobby',
+  EDIT_HELPLINE_PRESENCE: 'edit:helpline:presence',
+  EDIT_HELPLINE_CLAIM: 'edit:helpline:claim',
+  VIEW_HELPLINE_CHAT: 'view:helpline:chat',
+  EDIT_HELPLINE_MESSAGE: 'edit:helpline:message',
+  EDIT_HELPLINE_END: 'edit:helpline:end',
+  VIEW_HELPLINE_COPILOT: 'view:helpline:copilot',
+  EDIT_HELPLINE_SUMMARY: 'edit:helpline:summary',
+  VIEW_HELPLINE_MONITOR: 'view:helpline:monitor',
+  EDIT_HELPLINE_WHISPER: 'edit:helpline:whisper',
+  EDIT_HELPLINE_TRANSFER: 'edit:helpline:transfer',
+  VIEW_HELPLINE_QA: 'view:helpline:qa',
+  EDIT_HELPLINE_TEAM: 'edit:helpline:team',
+};
+
+/**
+ * The LISTENER group: a trained volunteer or staff member who answers text
+ * helpline chats. Additive — it is granted alongside the account's normal app
+ * role, so it carries only the helpline surface.
+ */
+const LISTENER_PERMISSIONS = [
+  PERMISSIONS.VIEW_HELPLINE_LOBBY,
+  PERMISSIONS.EDIT_HELPLINE_PRESENCE,
+  PERMISSIONS.EDIT_HELPLINE_CLAIM,
+  PERMISSIONS.VIEW_HELPLINE_CHAT,
+  PERMISSIONS.EDIT_HELPLINE_MESSAGE,
+  PERMISSIONS.EDIT_HELPLINE_END,
+  PERMISSIONS.VIEW_HELPLINE_COPILOT,
+  PERMISSIONS.EDIT_HELPLINE_SUMMARY,
+];
+
+/** HELPLINE_SUPERVISOR: everything a listener can do, plus oversight. */
+const HELPLINE_SUPERVISOR_PERMISSIONS = [
+  ...LISTENER_PERMISSIONS,
+  PERMISSIONS.VIEW_HELPLINE_MONITOR,
+  PERMISSIONS.EDIT_HELPLINE_WHISPER,
+  PERMISSIONS.EDIT_HELPLINE_TRANSFER,
+  PERMISSIONS.VIEW_HELPLINE_QA,
+];
+
+const SUPER_ADMIN_PERMISSIONS = [
+  // Full administrative access
+  PERMISSIONS.SYSTEM_ACCESS,
+  PERMISSIONS.EDIT_USER,
+  PERMISSIONS.EDIT_USER_ROLE,
+  PERMISSIONS.VIEW_USERS,
+  PERMISSIONS.EDIT_USER_STATUS,
+  PERMISSIONS.VIEW_USER_ROLES,
+  PERMISSIONS.VIEW_CALL_LOGS,
+  PERMISSIONS.EXPORT_SUMMARY,
+  PERMISSIONS.EDIT_SCENARIO,
+  PERMISSIONS.VIEW_SCENARIO_EVENTS,
+  PERMISSIONS.EDIT_SCENARIO_MAP_EVENTS,
+  PERMISSIONS.VIEW_SETTINGS_SUMMARY_FIELDS,
+  PERMISSIONS.EDIT_SETTINGS_SUMMARY_FIELDS,
+  PERMISSIONS.EDIT_REFERENCE_DOCUMENT,
+  PERMISSIONS.UPDATE_REFERENCE_DOCUMENT_ARCHIVE,
+  PERMISSIONS.VIEW_TENANT,
+  PERMISSIONS.EDIT_TENANT,
+  PERMISSIONS.VIEW_TENANTS,
+  PERMISSIONS.DELETE_REFERENCE_DOCUMENT,
+  PERMISSIONS.UPLOAD_REFERENCE_DOCUMENT,
+  PERMISSIONS.VIEW_LIVEKIT,
+  PERMISSIONS.EDIT_LIVEKIT,
+  PERMISSIONS.EDIT_SESSION_EVENTS,
+  PERMISSIONS.VIEW_SETTINGS_CHAT_TYPES,
+  PERMISSIONS.EDIT_SETTINGS_CHAT_TYPES,
+  PERMISSIONS.EDIT_CLOUD_TELEPHONY,
+  PERMISSIONS.SUBSCRIBE_OZONETEL_EVENTS,
+  PERMISSIONS.UNSUBSCRIBE_OZONETEL_EVENTS,
+  PERMISSIONS.DELETE_SCENARIO_SESSION,
+  PERMISSIONS.VIEW_CACHE,
+  PERMISSIONS.DELETE_CACHE,
+  PERMISSIONS.VIEW_SESSION_EVENTS,
+  PERMISSIONS.VIEW_SCENARIO_VOICES,
+  PERMISSIONS.EDIT_SCENARIO_VOICE,
+  PERMISSIONS.VIEW_SIMULATION_CREDITS,
+  PERMISSIONS.EDIT_SIMULATION_CREDITS,
+  PERMISSIONS.DELETE_SESSION_EVENTS,
+  PERMISSIONS.VIEW_ADMIN_SCENARIOS,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO,
+  PERMISSIONS.DELETE_ADMIN_SCENARIO,
+  PERMISSIONS.EDIT_ANALYTICS_DASHBOARD,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO_PATHS,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO_PATH,
+  PERMISSIONS.EDIT_ADMIN_SCENARIO_PATH,
+  PERMISSIONS.DELETE_ADMIN_SCENARIO_PATH,
+  PERMISSIONS.EDIT_TENANT_SCENARIO_PATH,
+  PERMISSIONS.EDIT_SCENARIO_PATH_TENANT,
+  PERMISSIONS.DELETE_SCENARIO_PATH_TENANT,
+  PERMISSIONS.VIEW_ADMIN_TRACKS,
+  PERMISSIONS.VIEW_ADMIN_TRACK,
+  PERMISSIONS.EDIT_ADMIN_TRACK,
+  PERMISSIONS.DELETE_ADMIN_TRACK,
+  PERMISSIONS.EDIT_TENANT_TRACK,
+  PERMISSIONS.EDIT_TRACK_TENANT,
+  PERMISSIONS.DELETE_TRACK_TENANT,
+  PERMISSIONS.EDIT_SCENARIO_TENANT,
+  PERMISSIONS.DELETE_SCENARIO_TENANT,
+  // Cohorts, so a platform admin can set up or repair a tenant's grouping from
+  // the admin console's org-detail Cohorts tab without impersonating them.
+  PERMISSIONS.VIEW_COHORTS,
+  PERMISSIONS.EDIT_COHORTS,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO_VOICE_LANGUAGES,
+  PERMISSIONS.EDIT_LANGUAGE,
+  PERMISSIONS.VIEW_SCENARIO_LANGUAGES,
+  PERMISSIONS.VIEW_ADMIN_LANGUAGES,
+  PERMISSIONS.VIEW_ADMIN_BADGES,
+  PERMISSIONS.EDIT_ADMIN_BADGES,
+  PERMISSIONS.EDIT_BADGE_TENANT,
+  PERMISSIONS.VIEW_SCENARIO_CHARACTER,
+  PERMISSIONS.EDIT_SCENARIO_CHARACTER,
+  PERMISSIONS.DELETE_SCENARIO_CHARACTER,
+  PERMISSIONS.CREATE_SCENARIO_CHARACTER,
+  PERMISSIONS.VIEW_PROMPT,
+  PERMISSIONS.EDIT_PROMPT,
+  PERMISSIONS.VIEW_SKILL_EXPERIMENT,
+  PERMISSIONS.EDIT_SKILL_EXPERIMENT,
+  PERMISSIONS.VIEW_GUARDRAILS,
+  PERMISSIONS.EDIT_GUARDRAILS,
+  PERMISSIONS.VIEW_SCENARIO_COVER_IMAGE_LIBRARY,
+  PERMISSIONS.EDIT_SCENARIO_COVER_IMAGE_LIBRARY,
+  PERMISSIONS.DELETE_SCENARIO_COVER_IMAGE_LIBRARY,
+  PERMISSIONS.VIEW_COMFORT_AUDIO_LIBRARY,
+  PERMISSIONS.EDIT_COMFORT_AUDIO_LIBRARY,
+  PERMISSIONS.DELETE_COMFORT_AUDIO_LIBRARY,
+  PERMISSIONS.VIEW_SCENARIO_REPORTS,
+  PERMISSIONS.EDIT_SCENARIO_REPORTS,
+  PERMISSIONS.EDIT_GLOBAL_SETTINGS,
+  PERMISSIONS.VIEW_MULTI_TENANT_ADMINS,
+  PERMISSIONS.EDIT_MULTI_TENANT_ADMINS,
+  PERMISSIONS.VIEW_ADMIN_BADGES_FOR_SETTING,
+  PERMISSIONS.IMPERSONATE_USER,
+  PERMISSIONS.VIEW_I18N_TRANSLATIONS,
+  PERMISSIONS.EDIT_I18N_TRANSLATIONS,
+  PERMISSIONS.VIEW_TOOLTIPS,
+  PERMISSIONS.EDIT_TOOLTIPS,
+  PERMISSIONS.VIEW_BLOGS,
+  PERMISSIONS.EDIT_BLOG,
+  PERMISSIONS.DELETE_BLOG,
+  PERMISSIONS.VIEW_AI_LAB,
+  PERMISSIONS.EDIT_AI_LAB,
+  PERMISSIONS.DELETE_AI_LAB,
+  PERMISSIONS.VIEW_BUILDER,
+  PERMISSIONS.EDIT_BUILDER,
+  PERMISSIONS.VIEW_COURSE_COPILOT,
+  PERMISSIONS.EDIT_COURSE_COPILOT,
+  // Product Roadmap: SUPER_ADMIN can see the board and vote on it. The management
+  // surface (EDIT_PRODUCT_ROADMAP) is deliberately withheld here and granted only to
+  // SUPER_DUPER_ADMIN below.
+  PERMISSIONS.VIEW_PRODUCT_ROADMAP,
+  PERMISSIONS.VOTE_PRODUCT_ROADMAP,
+  // start:microphone-chat / start:cloud-telephony-chat are intentionally NOT
+  // granted here — initiating a recording (scribe/dictation/telephony) is a
+  // counsellor capability. A SUPER_ADMIN who is also a counsellor inherits it
+  // via the COUNSELOR group (permissions are unioned across a user's roles).
+  PERMISSIONS.EDIT_USER_PREFERENCES,
+  PERMISSIONS.VIEW_USER_PREFERENCES,
+];
+
+// SUPER_DUPER_ADMIN inherits everything SUPER_ADMIN has (kept as a spread so
+// additions to SUPER_ADMIN flow through automatically), plus the capabilities
+// exclusive to the elevated tier — currently the super-duper-admin management
+// surface (list/promote/demote other super duper admins).
+const SUPER_DUPER_ADMIN_PERMISSIONS = [
+  ...SUPER_ADMIN_PERMISSIONS,
+  PERMISSIONS.VIEW_SUPER_DUPER_ADMINS,
+  PERMISSIONS.EDIT_SUPER_DUPER_ADMINS,
+  // Product Roadmap management: stage transitions, editing/deleting anyone's
+  // opportunity, the goal/owner taxonomy, split/merge, month-board lane moves, opening
+  // a Builder session, and pinning a saved view for everyone. SUPER_ADMIN gets
+  // VIEW + VOTE only (see above).
+  PERMISSIONS.EDIT_PRODUCT_ROADMAP,
+  PERMISSIONS.VIEW_AWS_LOGS,
+  PERMISSIONS.VIEW_MOBILE_RELEASES,
+  PERMISSIONS.TRIGGER_MOBILE_RELEASES,
+  PERMISSIONS.PROMOTE_MOBILE_RELEASES,
+  PERMISSIONS.SUBMIT_APP_STORE_REVIEW,
+  // WhatsApp Q&A knowledge corpus. SDA-only rather than shared with SUPER_ADMIN for the same
+  // reason as VIEW_AWS_LOGS: this is clinical guidance served to workers, and an unreviewed edit
+  // reaches every worker who asks a related question.
+  PERMISSIONS.VIEW_KNOWLEDGE_BASE,
+  PERMISSIONS.EDIT_KNOWLEDGE_BASE,
+  PERMISSIONS.UPLOAD_KNOWLEDGE_BASE,
+  PERMISSIONS.EDIT_KNOWLEDGE_BASE_ARCHIVE,
+  PERMISSIONS.VIEW_WHATSAPP_BOT,
+  PERMISSIONS.EDIT_WHATSAPP_BOT,
+  PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES,
+  PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES,
+  PERMISSIONS.VIEW_WHATSAPP_BOT_CONVERSATIONS,
+  PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS,
+  PERMISSIONS.VIEW_WHATSAPP_BOT_UNANSWERED,
+  PERMISSIONS.EDIT_WHATSAPP_BOT_UNANSWERED,
+  PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS,
+];
+
+const COUNSELOR_PERMISSIONS = [
+  // Core counselor functions
+  PERMISSIONS.VIEW_CHAT,
+  PERMISSIONS.VIEW_CHAT_COUNSELOR,
+  PERMISSIONS.VIEW_CHAT_DETAILS,
+  PERMISSIONS.EDIT_CHAT_NOTE,
+  PERMISSIONS.VIEW_CALL_LOGS,
+  PERMISSIONS.EDIT_CALL_DETAILS,
+  PERMISSIONS.EDIT_CALL_INFO,
+  PERMISSIONS.EDIT_CALL_END,
+  PERMISSIONS.ARCHIVE_CALL_LOG,
+  PERMISSIONS.VIEW_REFERENCE_DOCUMENT,
+  PERMISSIONS.VIEW_MESSAGES,
+  PERMISSIONS.VIEW_MESSAGE_FEEDBACK,
+  PERMISSIONS.EDIT_MESSAGE_FEEDBACK,
+  PERMISSIONS.VIEW_SUMMARY,
+  PERMISSIONS.EDIT_SUMMARY, // old
+  PERMISSIONS.EXPORT_SUMMARY,
+  PERMISSIONS.EDIT_SUMMARY_FEEDBACK,
+  PERMISSIONS.VIEW_SETTINGS_SUMMARY_FIELDS,
+  PERMISSIONS.VIEW_SETTINGS_NUDGE_STATUS,
+  PERMISSIONS.EDIT_SETTINGS_NUDGE_STATUS,
+  PERMISSIONS.VIEW_SETTINGS_CHAT_TYPES,
+  PERMISSIONS.EDIT_ENHANCEMENT,
+  PERMISSIONS.VIEW_CHAT_NUDGE,
+  // Keep these two together. Rating a tag without being able to read the tag
+  // list is not a coherent permission set, and the split cost counsellors their
+  // call-log page: GET /chats/tags 403'd for every one of them until
+  // GrantViewTagsToTagRaters1954000000000.
+  PERMISSIONS.VIEW_TAGS,
+  PERMISSIONS.EDIT_TAG_POSITIVITY_RATINGS,
+
+  PERMISSIONS.VIEW_ANALYTICS,
+  PERMISSIONS.VIEW_COMMUNITY,
+
+  PERMISSIONS.START_CLOUD_TELEPHONY_CHAT,
+  PERMISSIONS.START_MICROPHONE_CHAT,
+  PERMISSIONS.VIEW_ANALYTICS_DASHBOARD_URL,
+  PERMISSIONS.VIEW_ANALYTICS_DASHBOARD,
+  PERMISSIONS.PROCESS_OZONETEL_WEBHOOK,
+  PERMISSIONS.VIEW_PLACES,
+  PERMISSIONS.VIEW_USER_TENANT,
+
+  PERMISSIONS.VIEW_SCRIBE_REVIEW,
+  PERMISSIONS.EDIT_SCRIBE_REVIEW,
+  PERMISSIONS.VIEW_SCRIBE_REVIEW_THREADS,
+  PERMISSIONS.EDIT_SCRIBE_REVIEW_THREAD,
+  PERMISSIONS.COUNSELOR_ACCESS,
+
+  PERMISSIONS.VIEW_CUSTOM_FIELD_DEFINITIONS,
+  PERMISSIONS.EDIT_CUSTOM_FIELD_VALUES,
+  PERMISSIONS.VIEW_SETTINGS_CUSTOM_FIELD_TYPES,
+];
+
+const ADMIN_PERMISSIONS = [
+  // Administrative access to core features
+  PERMISSIONS.ORGANIZATION_ACCESS,
+  PERMISSIONS.VIEW_CHAT_DETAILS,
+  PERMISSIONS.VIEW_CALL_LOGS_SUMMARY,
+  PERMISSIONS.VIEW_MESSAGES,
+  PERMISSIONS.EXPORT_SUMMARY,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO_SESSION,
+  PERMISSIONS.VIEW_SCENARIO_SESSION_DETAILS,
+  PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
+  PERMISSIONS.VIEW_SETTINGS_SUMMARY_FIELDS,
+  PERMISSIONS.VIEW_SETTINGS_NUDGE_STATUS,
+  PERMISSIONS.EDIT_SETTINGS_NUDGE_STATUS,
+  PERMISSIONS.VIEW_SETTINGS_CHAT_TYPES,
+  PERMISSIONS.VIEW_COUNSELORS,
+  PERMISSIONS.VIEW_TAGS,
+  PERMISSIONS.EDIT_TAG_POSITIVITY_RATINGS,
+
+  PERMISSIONS.VIEW_ANALYTICS,
+  PERMISSIONS.VIEW_ORGANIZATION_METRICS,
+  PERMISSIONS.VIEW_COMMUNITY,
+  PERMISSIONS.VIEW_AUDIO_UPLOAD,
+  PERMISSIONS.CANCEL_AUDIO_UPLOAD,
+  PERMISSIONS.DELETE_CHAT,
+  PERMISSIONS.EDIT_REFERENCE_DOCUMENT,
+  PERMISSIONS.VIEW_ANALYTICS_DASHBOARD_URL,
+  PERMISSIONS.VIEW_ANALYTICS_DASHBOARD,
+
+  PERMISSIONS.VIEW_USER_TENANT,
+
+  PERMISSIONS.VIEW_SCRIBE_REVIEW,
+  PERMISSIONS.EDIT_SCRIBE_REVIEW,
+  PERMISSIONS.VIEW_SCRIBE_REVIEW_THREADS,
+  PERMISSIONS.EDIT_SCRIBE_REVIEW_THREAD,
+
+  PERMISSIONS.VIEW_CUSTOM_FIELD_DEFINITIONS,
+  PERMISSIONS.MANAGE_CUSTOM_FIELD_DEFINITIONS,
+  PERMISSIONS.EDIT_CUSTOM_FIELD_VALUES,
+  PERMISSIONS.VIEW_SETTINGS_CUSTOM_FIELD_TYPES,
+
+  // No content-access, badge-assignment, cohort or own-tenant settings grants:
+  // those backed the consumer app's Org. Settings screen, which was removed, and
+  // were revoked by 1974700000000-RevokeTenantAdminOrgSettingsGrants. Tenant
+  // content access is managed from the admin console.
+
+  // Text helpline: team management only. The workspace (lobby, chats, monitor,
+  // QA) belongs to LISTENER / HELPLINE_SUPERVISOR, so an org admin who should
+  // take or supervise chats is given one of those groups like anyone else —
+  // and only then reaches Helpline → Team to staff it. The supervisor set was
+  // granted by 1975750000000 and revoked by
+  // 1976600000000-RevokeTenantAdminHelplineWorkspaceGrants.
+  PERMISSIONS.EDIT_HELPLINE_TEAM,
+
+  // start:microphone-chat / start:cloud-telephony-chat are intentionally NOT
+  // granted here — initiating a recording (scribe/dictation/telephony) is a
+  // counsellor capability. An ADMIN who is also a counsellor inherits it via
+  // the COUNSELOR group (permissions are unioned across a user's roles).
+];
+
+const MULTI_TENANT_ADMIN_PERMISSIONS = [
+  PERMISSIONS.EDIT_SCENARIO,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO,
+  PERMISSIONS.VIEW_ADMIN_SCENARIOS,
+  PERMISSIONS.VIEW_SCENARIO_LANGUAGES,
+  PERMISSIONS.VIEW_SCENARIO_CHARACTER,
+  PERMISSIONS.VIEW_ADMIN_SCENARIO_VOICE_LANGUAGES,
+  // Voice preview (listen to a sample before assigning it to a character) —
+  // the language→voice dropdown itself is populated via
+  // VIEW_ADMIN_SCENARIO_VOICE_LANGUAGES above, but the "play" action hits a
+  // separate endpoint gated by VIEW_SCENARIO_VOICES.
+  PERMISSIONS.VIEW_SCENARIO_VOICES,
+  PERMISSIONS.VIEW_USERS,
+  PERMISSIONS.VIEW_TENANT,
+  PERMISSIONS.EDIT_TENANT,
+  PERMISSIONS.VIEW_TENANTS,
+  PERMISSIONS.EDIT_ANALYTICS_DASHBOARD,
+  PERMISSIONS.EDIT_SCENARIO_REPORTS,
+  PERMISSIONS.VIEW_SCENARIO_REPORTS,
+  PERMISSIONS.EDIT_SCENARIO_TENANT,
+  PERMISSIONS.VIEW_SETTINGS_SUMMARY_FIELDS,
+  PERMISSIONS.VIEW_ADMIN_BADGES_FOR_SETTING,
+  PERMISSIONS.EDIT_ADMIN_BADGES,
+  PERMISSIONS.SYSTEM_ACCESS,
+  PERMISSIONS.DELETE_SCENARIO_TENANT,
+  PERMISSIONS.EDIT_SETTINGS_SUMMARY_FIELDS,
+  PERMISSIONS.VIEW_USER_ROLES,
+  PERMISSIONS.VIEW_SCENARIO_COVER_IMAGE_LIBRARY,
+  PERMISSIONS.EDIT_SCENARIO_COVER_IMAGE_LIBRARY,
+  PERMISSIONS.VIEW_COMFORT_AUDIO_LIBRARY,
+  PERMISSIONS.DELETE_ADMIN_SCENARIO,
+  PERMISSIONS.VIEW_SESSION_EVENTS,
+  // Create/edit of session events is additionally ownership-scoped in
+  // SessionEventService: multi-tenant admins may only edit events they created.
+  PERMISSIONS.EDIT_SESSION_EVENTS,
+  PERMISSIONS.VIEW_SCENARIO_EVENTS,
+  PERMISSIONS.EDIT_SCENARIO_MAP_EVENTS,
+  PERMISSIONS.VIEW_PROMPT,
+  // Cohorts for the tenants this admin manages — same rationale as SUPER_ADMIN.
+  PERMISSIONS.VIEW_COHORTS,
+  PERMISSIONS.EDIT_COHORTS,
+];
+
+const LEARNER_PERMISSIONS = [
+  // Learning focused permissions
+  PERMISSIONS.VIEW_SCENARIOS,
+  PERMISSIONS.VIEW_SCENARIO,
+  PERMISSIONS.VIEW_SCENARIO_SESSION,
+  PERMISSIONS.EDIT_SCENARIO_SESSION,
+  PERMISSIONS.EDIT_SCENARIO_SESSION_FEEDBACK,
+  PERMISSIONS.VIEW_SCENARIO_SESSION_DETAILS,
+  PERMISSIONS.VIEW_SESSION_SCENARIO_MESSAGES,
+
+  PERMISSIONS.VIEW_ANALYTICS,
+  PERMISSIONS.VIEW_ANALYTICS_DASHBOARD,
+  PERMISSIONS.VIEW_ANALYTICS_DASHBOARD_URL,
+  PERMISSIONS.VIEW_SIMULATION_CREDITS,
+  PERMISSIONS.VIEW_SCENARIO_PATHS,
+  PERMISSIONS.VIEW_SCENARIO_PATH,
+  PERMISSIONS.EDIT_SCENARIO_PATH,
+  PERMISSIONS.VIEW_TRACKS,
+  PERMISSIONS.VIEW_TRACK,
+  PERMISSIONS.EDIT_TRACK,
+
+  PERMISSIONS.EDIT_USER_PREFERENCES,
+  PERMISSIONS.VIEW_USER_PREFERENCES,
+  PERMISSIONS.VIEW_SCENARIO_LANGUAGES,
+
+  PERMISSIONS.VIEW_USER_TENANT,
+
+  PERMISSIONS.VIEW_SIMULATION_REVIEW,
+  PERMISSIONS.EDIT_SIMULATION_REVIEW,
+  PERMISSIONS.VIEW_SIMULATION_REVIEW_THREADS,
+  PERMISSIONS.EDIT_SIMULATION_REVIEW_THREAD,
+  PERMISSIONS.LEARNER_ACCESS,
+  PERMISSIONS.VIEW_USER_BADGES,
+  PERMISSIONS.EDIT_USER_BADGES,
+
+  PERMISSIONS.VIEW_COMMUNITY_LEADERBOARD,
+  PERMISSIONS.VIEW_USER_RANK,
+];
+
+const CLIENT_PERMISSIONS = [
+  PERMISSIONS.VIEW_CHAT,
+  PERMISSIONS.EDIT_CHAT,
+  PERMISSIONS.EDIT_CALL_END,
+];
+
+const SIMULATION_REVIEWER_PERMISSIONS = [
+  PERMISSIONS.VIEW_USER_TENANT,
+  PERMISSIONS.VIEW_SIMULATION_REVIEW,
+  PERMISSIONS.VIEW_SIMULATION_REVIEWS,
+  PERMISSIONS.VIEW_SIMULATION_REVIEW_THREADS,
+  PERMISSIONS.EDIT_SIMULATION_REVIEW_THREAD,
+  PERMISSIONS.SIMULATION_REVIEWER_ACCESS,
+  PERMISSIONS.VIEW_USER_BADGES,
+  PERMISSIONS.EDIT_USER_BADGES,
+];
+
+const SCRIBE_REVIEWER_PERMISSIONS = [
+  PERMISSIONS.VIEW_USER_TENANT,
+  PERMISSIONS.VIEW_SCRIBE_REVIEW,
+  PERMISSIONS.VIEW_SCRIBE_REVIEWS,
+  PERMISSIONS.VIEW_SCRIBE_REVIEW_THREADS,
+  PERMISSIONS.EDIT_SCRIBE_REVIEW_THREAD,
+  PERMISSIONS.SCRIBE_REVIEWER_ACCESS,
+];
+
+/**
+ * Deliberately a single permission.
+ *
+ * EVALUATOR is layered on top of an account's real app role (LEARNER,
+ * COUNSELOR, ...), so anything it duplicated from those would be dead weight at
+ * best and a quiet privilege grant at worst. All it has to answer is "does this
+ * person get asked the evaluation questions?".
+ */
+const EVALUATOR_PERMISSIONS = [PERMISSIONS.EVALUATOR_ACCESS];
+
+export {
+  PERMISSIONS,
+  SUPER_ADMIN_PERMISSIONS,
+  SUPER_DUPER_ADMIN_PERMISSIONS,
+  COUNSELOR_PERMISSIONS,
+  ADMIN_PERMISSIONS,
+  MULTI_TENANT_ADMIN_PERMISSIONS,
+  LEARNER_PERMISSIONS,
+  CLIENT_PERMISSIONS,
+  SIMULATION_REVIEWER_PERMISSIONS,
+  SCRIBE_REVIEWER_PERMISSIONS,
+  EVALUATOR_PERMISSIONS,
+  LISTENER_PERMISSIONS,
+  HELPLINE_SUPERVISOR_PERMISSIONS,
+};

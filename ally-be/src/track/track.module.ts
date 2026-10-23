@@ -1,0 +1,121 @@
+import { CohortModule } from 'src/cohort/cohort.module';
+import { forwardRef, Module } from '@nestjs/common';
+import { LearnModule } from 'src/learn/learn.module';
+import { TenantModule } from 'src/tenant/tenant.module';
+import { LanguageModule } from 'src/language/language.module';
+import { AwsModule } from 'src/aws/aws.module';
+import { ImageGenerationModule } from 'src/image-generation/image-generation.module';
+import { CaseModule } from 'src/case/case.module';
+import { PromptModule } from 'src/prompt/prompt.module';
+import { LlmUsageModule } from 'src/analytics/llm-usage.module';
+import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { SkillExperimentModule } from 'src/skill-experiment/skill-experiment.module';
+import { TrackAdminController } from './controller/track-admin.controller';
+import { TrackLearnerController } from './controller/track-learner.controller';
+import { TrackComponentTemplateController } from './controller/track-component-template.controller';
+import { TrackComponentTemplateService } from './service/track-component-template.service';
+import { TrackComponentTemplateRepository } from './repository/track-component-template.repository';
+import { TrackService } from './service/track.service';
+import { TrackSharedService } from './service/track-shared.service';
+import { TrackTenantService } from './service/track-tenant.service';
+import { TrackMediaService } from './service/track-media.service';
+import { TrackCoverImageService } from './service/track-cover-image.service';
+import { TrackProgressService } from './service/track-progress.service';
+import { TrackEnrollmentService } from './service/track-enrollment.service';
+import { TrackResourceEmbedService } from './service/track-resource-embed.service';
+import { TrackQuizService } from './service/track-quiz.service';
+import { TrackQuizLlmGraderService } from './service/track-quiz-llm-grader.service';
+import { TrackAnnotationService } from './service/track-annotation.service';
+import { TrackGameService } from './service/track-game.service';
+import { TrackBucketSortService } from './service/track-bucket-sort.service';
+import { TrackBranchingService } from './service/track-branching.service';
+import { TrackMemoryService } from './service/track-memory.service';
+import { TrackJournalService } from './service/track-journal.service';
+import { TrackProgressDashboardService } from './service/track-progress-dashboard.service';
+import { TrackProgressDashboardRepository } from './repository/track-progress-dashboard.repository';
+import { TrackRepository } from './repository/track.repository';
+import { TrackSectionRepository } from './repository/track-section.repository';
+import { TrackItemRepository } from './repository/track-item.repository';
+import { TrackTenantRepository } from './repository/track-tenant.repository';
+import { TrackEnrollmentRepository } from './repository/track-enrollment.repository';
+import { TrackItemProgressRepository } from './repository/track-item-progress.repository';
+import { TrackQuizAttemptRepository } from './repository/track-quiz-attempt.repository';
+import { TrackAnnotationAttemptRepository } from './repository/track-annotation-attempt.repository';
+import { TrackJournalEntryRepository } from './repository/track-journal-entry.repository';
+import { TrackTranslationRepository } from './repository/track-translation.repository';
+import { TrackTranslationService } from './service/track-translation.service';
+import { TrackTranslationJobService } from './service/track-translation-job.service';
+import { TrackTranslationNotificationService } from './service/track-translation-notification.service';
+import { TrackLocalizationService } from './service/track-localization.service';
+import { TrackTranslationGateway } from './gateway/track-translation.gateway';
+
+@Module({
+  imports: [
+    forwardRef(() => LearnModule),
+    forwardRef(() => CaseModule),
+    TenantModule,
+    LanguageModule,
+    AwsModule,
+    ImageGenerationModule,
+    forwardRef(() => PromptModule),
+    LlmUsageModule,
+    LlmAgentModule,
+    SkillExperimentModule,
+    CohortModule,
+  ],
+  controllers: [
+    TrackAdminController,
+    TrackLearnerController,
+    TrackComponentTemplateController,
+  ],
+  providers: [
+    TrackService,
+    TrackComponentTemplateService,
+    TrackComponentTemplateRepository,
+    TrackSharedService,
+    TrackTenantService,
+    TrackMediaService,
+    TrackCoverImageService,
+    TrackProgressService,
+    TrackEnrollmentService,
+    TrackResourceEmbedService,
+    TrackQuizService,
+    TrackQuizLlmGraderService,
+    TrackAnnotationService,
+    TrackGameService,
+    TrackBranchingService,
+    TrackBucketSortService,
+    TrackMemoryService,
+    TrackJournalService,
+    TrackProgressDashboardService,
+    TrackProgressDashboardRepository,
+    TrackRepository,
+    TrackSectionRepository,
+    TrackItemRepository,
+    TrackTenantRepository,
+    TrackEnrollmentRepository,
+    TrackItemProgressRepository,
+    TrackQuizAttemptRepository,
+    TrackAnnotationAttemptRepository,
+    TrackJournalEntryRepository,
+    TrackTranslationRepository,
+    TrackTranslationService,
+    TrackTranslationJobService,
+    TrackTranslationNotificationService,
+    TrackLocalizationService,
+    TrackTranslationGateway,
+  ],
+  exports: [
+    TrackSharedService,
+    TrackEnrollmentService,
+    TrackProgressService,
+    TrackMemoryService,
+    TrackLocalizationService,
+    // Course Copilot writes courses through the same service the editor uses,
+    // so its output passes the same validator and structural lock.
+    TrackService,
+    TrackTenantService,
+    TrackTranslationService,
+  ],
+})
+export class TrackModule {}

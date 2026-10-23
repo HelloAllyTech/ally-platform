@@ -1,0 +1,154 @@
+/**
+ * Sanitizers for values headed into a PostgreSQL `jsonb` column.
+ *
+ * Why this exists
+ * ---------------
+ * Postgres' `jsonb` type cannot store the C0 control character U+0000
+ * (NULL byte) anywhere inside a string — even nested deep inside an
+ * array or object. Attempting to insert one fails with:
+ *
+ *   ERROR: 22P05 (untranslatable_character)
+ *   DETAIL: \u0000 cannot be converted to text.
+ *
+ * Stray NULL bytes show up in real data from a few sources:
+ *   - LLM/translation output (some models leak control bytes from training data),
+ *   - copy-paste from terminals or PDFs,
+ *   - audio-pipeline transcripts that smuggle in framing bytes.
+ *
+ * The fix is to strip them at the BE write boundary so persistence is
+ * guaranteed safe regardless of upstream provider quirks.
+ *
+ * What gets stripped
+ * ------------------
+ * All C0 control characters (U+0000 – U+001F) EXCEPT the three whitespace
+ * controls that are routinely meaningful in user-facing text:
+ *   - `\t` (U+0009) — tab
+ *   - `\n` (U+000A) — line feed
+ *   - `\r` (U+000D) — carriage return
+ *
+ * U+007F (DEL) is also stripped — it is unprintable and serves no
+ * legitimate purpose in JSON metadata.
+ *
+ * Recursion
+ * ---------
+ * `sanitizeJsonbValue` walks plain objects and arrays so deeply-nested
+ * strings (e.g. `metadata.openingStatements[2]`) are also cleaned. Other
+ * value types (number / boolean / null / undefined / Date / Buffer) pass
+ * through untouched — they cannot carry a NULL byte by definition.
+ */
+
+// Matches any C0 control character (U+0000–U+001F) except TAB / LF / CR,
+// plus DEL (U+007F). Built from explicit hex escapes so the source stays
+// reviewable — embedding raw control bytes in a regex literal confuses
+// editors, diff tools, and copy-paste.
+//
+// Range breakdown:
+//   \x00-\x08  — NUL through BS         (excludes \t = U+0009)
+//   \x0B-\x0C  — VT, FF                 (excludes \n = U+000A)
+//   \x0E-\x1F  — SO through US          (excludes \r = U+000D)
+//   \x7F       — DEL
+
+const UNSAFE_CONTROL_CHAR_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+
+/**
+ * Strip unsafe control characters (NULL byte + other C0 controls + DEL)
+ * from a single string. Returns the same string instance when nothing
+ * changed, so callers that compare references can skip writes.
+ */
+export function stripUnsafeJsonbChars(input: string): string {
+  if (!input) return input;
+  // `String.prototype.replace` with a global regex doesn't carry over
+  // `lastIndex` state (unlike `.test()` / `.exec()`), so it's safe to
+  // call repeatedly. We do an early-out scan via `.search()` (which is
+  // stateless) to avoid building a new string when nothing matches.
+  if (input.search(UNSAFE_CONTROL_CHAR_PATTERN) === -1) return input;
+  return input.replace(UNSAFE_CONTROL_CHAR_PATTERN, '');
+}
+
+/**
+ * Deep-clean any value before it goes into a `jsonb` column.
+ *
+ * - strings   → control chars stripped
+ * - arrays    → each element recursively cleaned (array shape preserved;
+ *               empty / null entries are NOT filtered out — that's a
+ *               higher-level concern handled by `sanitizeJsonbMetadata`).
+ * - objects   → each own enumerable property recursively cleaned. Symbol
+ *               keys and non-plain prototypes (Date, Buffer, etc.) are
+ *               passed through untouched.
+ * - other     → returned as-is.
+ */
+export function sanitizeJsonbValue<T = unknown>(value: T): T {
+  if (typeof value === 'string') {
+    return stripUnsafeJsonbChars(value) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    let mutated = false;
+    const out = (value as unknown[]).map((item) => {
+      const cleaned = sanitizeJsonbValue(item);
+      if (cleaned !== item) mutated = true;
+      return cleaned;
+    });
+    return (mutated ? out : value) as unknown as T;
+  }
+  // Plain objects only — leave Date / Buffer / Map / Set / class instances
+  // alone. We treat `Object.create(null)` as a plain object too.
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    (Object.getPrototypeOf(value) === Object.prototype ||
+      Object.getPrototypeOf(value) === null)
+  ) {
+    let mutated = false;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const cleaned = sanitizeJsonbValue(v);
+      if (cleaned !== v) mutated = true;
+      out[k] = cleaned;
+    }
+    return (mutated ? out : value) as unknown as T;
+  }
+  return value;
+}
+
+/**
+ * Sanitize a top-level metadata object on its way into a `jsonb` column.
+ *
+ * Semantics (matches the legacy private `sanitizeMetadata` used across
+ * scenario / tooltip / behavior translation services, plus deep-cleanup
+ * of nested strings):
+ *   - `null` / `undefined` input → empty object.
+ *   - Top-level `null` / `undefined` values are DROPPED.
+ *   - Top-level string values are control-char stripped AND trimmed; if
+ *     the result is empty the key is dropped.
+ *   - Non-string values (numbers, booleans, arrays, nested objects) are
+ *     passed through `sanitizeJsonbValue` so nested strings inside them
+ *     get their control chars stripped too. Empty arrays / objects are
+ *     preserved (caller intent).
+ *
+ * The trim + drop-empty behavior is intentional at the top level only —
+ * we don't want `openingStatements: ["a", "", "b"]` to silently become
+ * `["a", "b"]`. That kind of array filtering is a domain decision and
+ * stays out of this generic helper.
+ */
+export function sanitizeJsonbMetadata<T extends Record<string, any>>(
+  metadata: T | null | undefined,
+): Partial<T> {
+  if (!metadata || typeof metadata !== 'object') {
+    return {};
+  }
+  const cleaned: Partial<T> = {};
+  for (const key of Object.keys(metadata)) {
+    if (!Object.prototype.hasOwnProperty.call(metadata, key)) continue;
+    const value = (metadata as Record<string, unknown>)[key];
+    if (value === null || value === undefined) continue;
+
+    if (typeof value === 'string') {
+      const trimmed = stripUnsafeJsonbChars(value).trim();
+      if (trimmed === '') continue;
+      cleaned[key as keyof T] = trimmed as T[keyof T];
+    } else {
+      cleaned[key as keyof T] = sanitizeJsonbValue(value) as T[keyof T];
+    }
+  }
+  return cleaned;
+}

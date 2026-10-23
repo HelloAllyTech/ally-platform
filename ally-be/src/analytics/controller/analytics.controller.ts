@@ -1,0 +1,3095 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { AnalyticsService } from '../service/analytics.service';
+import { ActivationAnalyticsService } from '../service/activation-analytics.service';
+import { CoachingLoopAnalyticsService } from '../service/coaching-loop-analytics.service';
+import { CohortAnalyticsService } from '../service/cohort-analytics.service';
+import { CompetencyMapAnalyticsService } from '../service/competency-map-analytics.service';
+import { XpGrowthAnalyticsService } from '../service/xp-growth-analytics.service';
+import { GoalsXpAnalyticsService } from '../service/goals-xp-analytics.service';
+import { CompletionRateAnalyticsService } from '../service/completion-rate-analytics.service';
+import { LanguageMixAnalyticsService } from '../service/language-mix-analytics.service';
+import { OrgHealthAnalyticsService } from '../service/org-health-analytics.service';
+import { OrgSessionDistributionAnalyticsService } from '../service/org-session-distribution-analytics.service';
+import { LearnerKpisAnalyticsService } from '../service/learner-kpis-analytics.service';
+import { ScenarioUsageAnalyticsService } from '../service/scenario-usage-analytics.service';
+import { QualityDistributionAnalyticsService } from '../service/quality-distribution-analytics.service';
+import { ScribeAdoptionAnalyticsService } from '../service/scribe-adoption-analytics.service';
+import { SkillGrowthAnalyticsService } from '../service/skill-growth-analytics.service';
+import { FoundationalSkillsAnalyticsService } from '../service/foundational-skills-analytics.service';
+import {
+  FoundationalSkillsLearnersQueryDto,
+  FoundationalSkillsLearnersResponseDto,
+  FoundationalSkillsProgressQueryDto,
+  FoundationalSkillsProgressResponseDto,
+  FoundationalSkillsBehavioursQueryDto,
+  FoundationalSkillsBehavioursResponseDto,
+  FoundationalSkillsAdvancedBehavioursQueryDto,
+  FoundationalSkillsAdvancedBehavioursResponseDto,
+  FoundationalSkillsQueryDto,
+  FoundationalSkillsResponseDto,
+} from '../dto/foundational-skills-analytics.dto';
+import { FoundationalSkillsBenchmarkAnalyticsService } from '../service/foundational-skills-benchmark.service';
+import {
+  FoundationalSkillsBenchmarkQueryDto,
+  FoundationalSkillsBenchmarkResponseDto,
+} from '../dto/foundational-skills-benchmark.dto';
+import { CourseImpactAnalyticsService } from '../service/course-impact-analytics.service';
+import {
+  CourseImpactQueryDto,
+  CourseImpactResponseDto,
+} from '../dto/course-impact.dto';
+import { EffectivenessAnalyticsService } from '../service/effectiveness-analytics.service';
+import {
+  EffectivenessFunnelQueryDto,
+  EffectivenessFunnelResponseDto,
+  FoundationalSkillsSegmentsQueryDto,
+  FoundationalSkillsSegmentsResponseDto,
+} from '../dto/effectiveness-analytics.dto';
+import { ScenarioEffectivenessAnalyticsService } from '../service/scenario-effectiveness-analytics.service';
+import {
+  ScenarioOpportunityCoverageQueryDto,
+  ScenarioOpportunityCoverageResponseDto,
+  ScenarioRepeatImprovementQueryDto,
+  ScenarioRepeatImprovementResponseDto,
+} from '../dto/scenario-effectiveness-analytics.dto';
+import { PracticeQualityAnalyticsService } from '../service/practice-quality-analytics.service';
+import {
+  PracticeQualityQueryDto,
+  PracticeQualityResponseDto,
+} from '../dto/practice-quality-analytics.dto';
+import { CurriculumAnalyticsService } from '../service/curriculum-analytics.service';
+import {
+  CourseFunnelQueryDto,
+  CourseFunnelResponseDto,
+  QuizOutcomesQueryDto,
+  QuizOutcomesResponseDto,
+  RoleplayGatesQueryDto,
+  RoleplayGatesResponseDto,
+} from '../dto/curriculum-analytics.dto';
+import { FoundationalSkillsEffectivenessService } from '../service/foundational-skills-effectiveness.service';
+import {
+  FoundationalSkillsEffectivenessQueryDto,
+  PracticeProgressionResponseDto,
+  SkillRetentionResponseDto,
+  TimeToCompetenceResponseDto,
+} from '../dto/foundational-skills-effectiveness.dto';
+import { CourseProgressAnalyticsService } from '../service/course-progress-analytics.service';
+import {
+  CourseProgressAnalyticsQueryDto,
+  KnowledgeVsSkillResponseDto,
+  ProgressCurveResponseDto,
+} from '../dto/course-progress-analytics.dto';
+import { ScenarioCalibrationAnalyticsService } from '../service/scenario-calibration-analytics.service';
+import {
+  ScenarioCalibrationQueryDto,
+  ScenarioCalibrationResponseDto,
+  ScenarioProgressionQueryDto,
+  ScenarioProgressionResponseDto,
+} from '../dto/scenario-calibration-analytics.dto';
+import { EffectivenessOrgsAnalyticsService } from '../service/effectiveness-orgs-analytics.service';
+import { MeasurementConvergenceAnalyticsService } from '../service/measurement-convergence-analytics.service';
+import {
+  CostPerImprovementQueryDto,
+  CostPerImprovementResponseDto,
+  EffectivenessOrgsQueryDto,
+  EffectivenessOrgsResponseDto,
+} from '../dto/effectiveness-orgs-analytics.dto';
+import {
+  MeasurementConvergenceQueryDto,
+  MeasurementConvergenceResponseDto,
+} from '../dto/measurement-convergence-analytics.dto';
+import { FeedbackUptakeAnalyticsService } from '../service/feedback-uptake-analytics.service';
+import {
+  FeedbackUptakeQueryDto,
+  FeedbackUptakeResponseDto,
+} from '../dto/feedback-uptake-analytics.dto';
+import { SelfEfficacyAnalyticsService } from '../service/self-efficacy-analytics.service';
+import {
+  SelfEfficacyQueryDto,
+  SelfEfficacyResponseDto,
+} from '../dto/self-efficacy-analytics.dto';
+import { JudgeAgreementAnalyticsService } from '../service/judge-agreement-analytics.service';
+import { JudgeAgreementResponseDto } from '../dto/judge-agreement-analytics.dto';
+import { FoundationalSkillsTransferAnalyticsService } from '../service/foundational-skills-transfer.service';
+import {
+  FoundationalSkillsTransferQueryDto,
+  FoundationalSkillsTransferResponseDto,
+} from '../dto/foundational-skills-transfer.dto';
+import { TrackDropoffAnalyticsService } from '../service/track-dropoff-analytics.service';
+import { UsageLevelAnalyticsService } from '../service/usage-level-analytics.service';
+import { RoleplayVolumeAnalyticsService } from '../service/roleplay-volume-analytics.service';
+import { RoadmapDeliveryAnalyticsService } from '../service/roadmap-delivery-analytics.service';
+import { ShipVolumeAnalyticsService } from '../service/ship-volume-analytics.service';
+import {
+  HighlightsAnalyticsService,
+  withholdPlatformWideHighlights,
+} from '../service/highlights-analytics.service';
+import { ActiveUsersXpAnalyticsService } from '../service/active-users-xp-analytics.service';
+import { XpLevelReachedAnalyticsService } from '../service/xp-level-reached-analytics.service';
+import { BugHunterVolumeAnalyticsService } from '../service/bug-hunter-volume-analytics.service';
+import { XpByTenantAnalyticsService } from '../service/xp-by-tenant-analytics.service';
+import { LanguageAnalyticsService } from '../service/language-analytics.service';
+import { GlossaryEffectAnalyticsService } from '../service/glossary-effect-analytics.service';
+import {
+  GlossaryEffectQueryDto,
+  GlossaryEffectResponseDto,
+} from '../dto/glossary-effect-analytics.dto';
+import {
+  WeakMetricsQueryDto,
+  WeakMetricsResponseDto,
+} from '../dto/weak-metrics.dto';
+import { WeakMetricsAnalyticsService } from '../service/weak-metrics-analytics.service';
+import { FeedbackGroundednessJudgeService } from '../service/feedback-groundedness-judge.service';
+import { RagQualityAnalyticsService } from '../service/rag-quality-analytics.service';
+import { FillerAnalyticsService } from '../service/filler-analytics.service';
+import { FillerJudgeService } from '../service/filler-judge.service';
+import { LanguageJudgeService } from '../service/language-judge.service';
+import { PlatformAnalyticsService } from '../service/platform-analytics.service';
+import { ScribeAnalyticsService } from '../service/scribe-analytics.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import {
+  CreateDashboardDto,
+  DashboardIdParamDto,
+  CounselorStatsQueryDto,
+  CounselorStatsResponseDto,
+  UpdateDashboardDto,
+  DashboardResponseDTO,
+  CreateDashboardResponseDto,
+} from '../dto/analytics.dto';
+import {
+  AgentJoinReliabilityQueryDto,
+  AgentJoinReliabilityResponseDto,
+  AnalyticsOverviewQueryDto,
+  AnalyticsOverviewResponseDto,
+  ConversationDriftQueryDto,
+  ConversationDriftResponseDto,
+  DriftBackfillJobDto,
+  FillerBackfillJobDto,
+  FillerQualityPointDto,
+  FillerQualityQueryDto,
+  LanguageBackfillJobDto,
+  LanguageEvalReferenceDto,
+  LanguageQualityQueryDto,
+  LanguageQualityResponseDto,
+  SetLanguageEvalReferenceDto,
+  StartDriftBackfillDto,
+  StartGroundednessBackfillDto,
+  GroundednessBackfillJobDto,
+  StartFillerBackfillDto,
+  StartLanguageBackfillDto,
+  StartLatencyQueryDto,
+  StartLatencyResponseDto,
+  TokenConsumptionQueryDto,
+  TokenConsumptionResponseDto,
+  VoiceLatencyQueryDto,
+  VoiceLatencyResponseDto,
+  VoiceLatencySessionsQueryDto,
+  VoiceLatencySessionsSummaryQueryDto,
+  ListVoiceLatencySessionsResponseDto,
+  VoiceLatencySessionsSummaryResponseDto,
+  VoiceLatencyByScenarioQueryDto,
+  VoiceLatencyByScenarioResponseDto,
+} from '../dto/platform-analytics.dto';
+import {
+  RagQualityQueryDto,
+  RagQualityResponseDto,
+} from '../dto/rag-quality-analytics.dto';
+import {
+  AnalyticsHighlightsQueryDto,
+  AnalyticsHighlightsResponseDto,
+} from '../dto/highlights-analytics.dto';
+import {
+  CohortRetentionQueryDto,
+  CohortRetentionResponseDto,
+} from '../dto/cohort-analytics.dto';
+import {
+  UsageLevelQueryDto,
+  UsageLevelResponseDto,
+} from '../dto/usage-level-analytics.dto';
+import {
+  XpGrowthQueryDto,
+  XpGrowthResponseDto,
+} from '../dto/xp-growth-analytics.dto';
+import {
+  GoalsXpQueryDto,
+  GoalsXpResponseDto,
+} from '../dto/goals-xp-analytics.dto';
+import {
+  ActiveUsersXpQueryDto,
+  ActiveUsersXpResponseDto,
+} from '../dto/active-users-xp-analytics.dto';
+import {
+  XpLevelReachedQueryDto,
+  XpLevelReachedResponseDto,
+} from '../dto/xp-level-reached-analytics.dto';
+import {
+  BugHunterVolumeQueryDto,
+  BugHunterVolumeResponseDto,
+} from '../dto/bug-hunter-volume-analytics.dto';
+import {
+  XpByTenantQueryDto,
+  XpByTenantResponseDto,
+} from '../dto/xp-by-tenant-analytics.dto';
+import {
+  RoleplayVolumeQueryDto,
+  RoleplayVolumeResponseDto,
+} from '../dto/roleplay-volume-analytics.dto';
+import { RoadmapDeliveryResponseDto } from '../dto/roadmap-delivery-analytics.dto';
+import {
+  ShipVolumeQueryDto,
+  ShipVolumeResponseDto,
+} from '../dto/ship-volume-analytics.dto';
+import {
+  ScribeAnalyticsQueryDto,
+  ScribeOverviewResponseDto,
+  ScribeSummaryFailureResponseDto,
+} from '../dto/scribe-analytics.dto';
+// Endpoints behind the admin "Testing" tab — the staging surface for leadership
+// charts that are candidates for Highlights. Named for what they measure rather
+// than for the tab, so a chart that graduates does not drag a rename with it.
+import {
+  ActivationQueryDto,
+  ActivationResponseDto,
+} from '../dto/activation-analytics.dto';
+import {
+  CompletionRateQueryDto,
+  CompletionRateResponseDto,
+} from '../dto/completion-rate-analytics.dto';
+import {
+  LanguageMixQueryDto,
+  LanguageMixResponseDto,
+} from '../dto/language-mix-analytics.dto';
+import {
+  SkillGrowthLearnerSeriesResponseDto,
+  SkillGrowthLearnersQueryDto,
+  SkillGrowthLearnersResponseDto,
+  SkillGrowthQueryDto,
+  SkillGrowthResponseDto,
+} from '../dto/skill-growth-analytics.dto';
+import {
+  QualityDistributionQueryDto,
+  QualityDistributionResponseDto,
+} from '../dto/quality-distribution-analytics.dto';
+import {
+  CompetencyMapQueryDto,
+  CompetencyMapResponseDto,
+} from '../dto/competency-map-analytics.dto';
+import {
+  TrackDropoffQueryDto,
+  TrackDropoffResponseDto,
+} from '../dto/track-dropoff-analytics.dto';
+import {
+  CoachingLoopQueryDto,
+  CoachingLoopResponseDto,
+} from '../dto/coaching-loop-analytics.dto';
+import {
+  OrgHealthQueryDto,
+  OrgHealthResponseDto,
+} from '../dto/org-health-analytics.dto';
+import {
+  OrgSessionDistributionQueryDto,
+  OrgSessionDistributionResponseDto,
+} from '../dto/org-session-distribution-analytics.dto';
+import {
+  LearnerKpisQueryDto,
+  LearnerKpisResponseDto,
+} from '../dto/learner-kpis-analytics.dto';
+import {
+  ScenarioUsageQueryDto,
+  ScenarioUsageResponseDto,
+} from '../dto/scenario-usage-analytics.dto';
+import {
+  ScribeAdoptionQueryDto,
+  ScribeAdoptionResponseDto,
+} from '../dto/scribe-adoption-analytics.dto';
+import {
+  QualifiedSessionsQueryDto,
+  QualifiedSessionsResponseDto,
+  StickinessQueryDto,
+  StickinessResponseDto,
+} from '../dto/practice-depth-analytics.dto';
+import {
+  OrgEngagementQueryDto,
+  OrgEngagementResponseDto,
+} from '../dto/org-engagement-analytics.dto';
+import {
+  RoleplayCostQueryDto,
+  RoleplayCostResponseDto,
+} from '../dto/roleplay-cost-analytics.dto';
+import {
+  RoleplaySessionCostDetailDto,
+  RoleplaySessionCostQueryDto,
+  RoleplaySessionCostResponseDto,
+} from '../dto/roleplay-session-cost-analytics.dto';
+import {
+  CodingAgentCostQueryDto,
+  CodingAgentCostResponseDto,
+} from '../dto/coding-agent-cost-analytics.dto';
+import {
+  FixSessionEngineCostQueryDto,
+  FixSessionEngineCostResponseDto,
+} from '../dto/fix-session-engine-cost-analytics.dto';
+import {
+  BugAgentPerformanceQueryDto,
+  BugAgentPerformanceResponseDto,
+} from '../dto/bug-agent-performance-analytics.dto';
+import {
+  QualitySentimentQueryDto,
+  QualitySentimentResponseDto,
+} from '../dto/quality-sentiment-analytics.dto';
+import {
+  ChartPreferencesResponseDto,
+  SaveChartPreferencesDto,
+} from '../dto/chart-preference.dto';
+import { PracticeDepthAnalyticsService } from '../service/practice-depth-analytics.service';
+import { OrgEngagementAnalyticsService } from '../service/org-engagement-analytics.service';
+import { RoleplayCostAnalyticsService } from '../service/roleplay-cost-analytics.service';
+import { RoleplaySessionCostAnalyticsService } from '../service/roleplay-session-cost-analytics.service';
+import { XpPerMinuteAnalyticsService } from '../service/xp-per-minute-analytics.service';
+import {
+  XpPerMinuteQueryDto,
+  XpPerMinuteResponseDto,
+} from '../dto/xp-per-minute-analytics.dto';
+import { CodingAgentCostAnalyticsService } from '../service/coding-agent-cost-analytics.service';
+import { FixSessionEngineCostAnalyticsService } from '../service/fix-session-engine-cost-analytics.service';
+import { BugAgentPerformanceAnalyticsService } from '../service/bug-agent-performance-analytics.service';
+import { QualitySentimentAnalyticsService } from '../service/quality-sentiment-analytics.service';
+import { ChartPreferenceService } from '../service/chart-preference.service';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiSecurity,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
+import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+import { OrgScopedRoute } from 'src/auth/decorators/org-scoped-route.decorator';
+import { CallerScopedRoute } from 'src/auth/decorators/caller-scoped-route.decorator';
+import { PlatformWidePermissions } from 'src/auth/decorators/platform-wide.decorator';
+import {
+  ADMIN_ANALYTICS_CHART_REGISTRY,
+  AdminAnalyticsChartEntry,
+} from '../constants/admin-analytics-chart-registry.constants';
+import { AuthRoles } from 'src/auth/decorators/auth-roles.decorator';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { UserRole } from 'src/common/constants/user.constants';
+
+@ApiTags('Analytics')
+@Controller('v1/analytics')
+@ApiBearerAuth()
+@ApiSecurity('access-token')
+export class AnalyticsController {
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly highlightsAnalyticsService: HighlightsAnalyticsService,
+    private readonly cohortAnalyticsService: CohortAnalyticsService,
+    private readonly usageLevelAnalyticsService: UsageLevelAnalyticsService,
+    private readonly xpGrowthAnalyticsService: XpGrowthAnalyticsService,
+    private readonly goalsXpAnalyticsService: GoalsXpAnalyticsService,
+    private readonly activeUsersXpAnalyticsService: ActiveUsersXpAnalyticsService,
+    private readonly xpLevelReachedAnalyticsService: XpLevelReachedAnalyticsService,
+    private readonly bugHunterVolumeAnalyticsService: BugHunterVolumeAnalyticsService,
+    private readonly xpByTenantAnalyticsService: XpByTenantAnalyticsService,
+    private readonly roleplayVolumeAnalyticsService: RoleplayVolumeAnalyticsService,
+    private readonly roadmapDeliveryAnalyticsService: RoadmapDeliveryAnalyticsService,
+    private readonly shipVolumeAnalyticsService: ShipVolumeAnalyticsService,
+    private readonly platformAnalyticsService: PlatformAnalyticsService,
+    private readonly scribeAnalyticsService: ScribeAnalyticsService,
+    private readonly languageJudgeService: LanguageJudgeService,
+    private readonly fillerJudgeService: FillerJudgeService,
+    private readonly fillerAnalyticsService: FillerAnalyticsService,
+    private readonly languageAnalyticsService: LanguageAnalyticsService,
+    private readonly glossaryEffectAnalyticsService: GlossaryEffectAnalyticsService,
+    private readonly weakMetricsAnalyticsService: WeakMetricsAnalyticsService,
+    private readonly feedbackGroundednessJudgeService: FeedbackGroundednessJudgeService,
+    private readonly ragQualityAnalyticsService: RagQualityAnalyticsService,
+    private readonly activationAnalyticsService: ActivationAnalyticsService,
+    private readonly completionRateAnalyticsService: CompletionRateAnalyticsService,
+    private readonly languageMixAnalyticsService: LanguageMixAnalyticsService,
+    private readonly skillGrowthAnalyticsService: SkillGrowthAnalyticsService,
+    private readonly foundationalSkillsAnalyticsService: FoundationalSkillsAnalyticsService,
+    private readonly foundationalSkillsBenchmarkAnalyticsService: FoundationalSkillsBenchmarkAnalyticsService,
+    private readonly courseImpactAnalyticsService: CourseImpactAnalyticsService,
+    private readonly qualityDistributionAnalyticsService: QualityDistributionAnalyticsService,
+    private readonly competencyMapAnalyticsService: CompetencyMapAnalyticsService,
+    private readonly trackDropoffAnalyticsService: TrackDropoffAnalyticsService,
+    private readonly coachingLoopAnalyticsService: CoachingLoopAnalyticsService,
+    private readonly orgHealthAnalyticsService: OrgHealthAnalyticsService,
+    private readonly orgSessionDistributionAnalyticsService: OrgSessionDistributionAnalyticsService,
+    private readonly learnerKpisAnalyticsService: LearnerKpisAnalyticsService,
+    private readonly scenarioUsageAnalyticsService: ScenarioUsageAnalyticsService,
+    private readonly scribeAdoptionAnalyticsService: ScribeAdoptionAnalyticsService,
+    private readonly practiceDepthAnalyticsService: PracticeDepthAnalyticsService,
+    private readonly orgEngagementAnalyticsService: OrgEngagementAnalyticsService,
+    private readonly roleplayCostAnalyticsService: RoleplayCostAnalyticsService,
+    private readonly roleplaySessionCostAnalyticsService: RoleplaySessionCostAnalyticsService,
+    private readonly xpPerMinuteAnalyticsService: XpPerMinuteAnalyticsService,
+    private readonly codingAgentCostAnalyticsService: CodingAgentCostAnalyticsService,
+    private readonly fixSessionEngineCostAnalyticsService: FixSessionEngineCostAnalyticsService,
+    private readonly bugAgentPerformanceAnalyticsService: BugAgentPerformanceAnalyticsService,
+    private readonly qualitySentimentAnalyticsService: QualitySentimentAnalyticsService,
+    private readonly effectivenessAnalyticsService: EffectivenessAnalyticsService,
+    private readonly scenarioEffectivenessAnalyticsService: ScenarioEffectivenessAnalyticsService,
+    private readonly practiceQualityAnalyticsService: PracticeQualityAnalyticsService,
+    private readonly curriculumAnalyticsService: CurriculumAnalyticsService,
+    private readonly foundationalSkillsEffectivenessService: FoundationalSkillsEffectivenessService,
+    private readonly courseProgressAnalyticsService: CourseProgressAnalyticsService,
+    private readonly scenarioCalibrationAnalyticsService: ScenarioCalibrationAnalyticsService,
+    private readonly effectivenessOrgsAnalyticsService: EffectivenessOrgsAnalyticsService,
+    private readonly measurementConvergenceAnalyticsService: MeasurementConvergenceAnalyticsService,
+    private readonly feedbackUptakeAnalyticsService: FeedbackUptakeAnalyticsService,
+    private readonly selfEfficacyAnalyticsService: SelfEfficacyAnalyticsService,
+    private readonly judgeAgreementAnalyticsService: JudgeAgreementAnalyticsService,
+    private readonly foundationalSkillsTransferAnalyticsService: FoundationalSkillsTransferAnalyticsService,
+    private readonly chartPreferenceService: ChartPreferenceService,
+    private readonly tenantScopeService: TenantScopeService,
+  ) {}
+
+  @Get('chart-registry')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Admin analytics chart registry',
+    description:
+      'The canonical, read-only map from a stable chart id ("admin analytics ' +
+      'question id", e.g. AAQ-042) to the chart it names, across every ' +
+      'Analytics tab and Highlights sub-tab. The id is the handle used to refer ' +
+      'to one specific chart in code review and requests; tab/subTab record ' +
+      'where it lives today. Source of truth is ' +
+      'admin-analytics-chart-registry.constants.ts.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chart registry retrieved successfully',
+  })
+  getChartRegistry(): readonly AdminAnalyticsChartEntry[] {
+    return ADMIN_ANALYTICS_CHART_REGISTRY;
+  }
+
+  @Get('overview')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Platform analytics overview (super-admin)',
+    description:
+      'Platform-wide metrics: user growth, active users (DAU/WAU/MAU), ' +
+      'simulations completed, weekly retention and users by role, plus a KPI ' +
+      'summary. Window selected via `range` or an explicit `from`/`to`; ' +
+      '`compare=prev` adds the equal-length preceding window as the basis for ' +
+      'KPI deltas. NOTE: the summary scalars cover the SELECTED window — they ' +
+      'previously covered a fixed rolling 30 days and the current ISO week ' +
+      'regardless of the picker, hence the `activeUsers` / ' +
+      '`simulationsCompleted` renames.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Analytics overview retrieved successfully',
+    type: AnalyticsOverviewResponseDto,
+  })
+  async getOverview(
+    @Query() query: AnalyticsOverviewQueryDto,
+  ): Promise<AnalyticsOverviewResponseDto> {
+    return this.platformAnalyticsService.getOverview(query);
+  }
+
+  @Get('highlights')
+  // Scoped by tenantId apart from the sections withheld below from an
+  // organization-restricted admin (withholdPlatformWideHighlights).
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Leadership highlights (super-admin)',
+    description:
+      'Leadership KPI aggregates NOT already served by /overview or ' +
+      '/scribe/overview: org adoption (active orgs + top orgs by completed ' +
+      'simulations), practice minutes, mean/median/p95 simulation length, ' +
+      'roleplay quality trend (composite ' +
+      'evaluation score), learner CSAT trend, learning-track funnel and AI ' +
+      'cost per completed simulation. Bucket granularity follows the `range` ' +
+      'param (30d -> day, 90d -> week, 12m -> month) unless overridden. ' +
+      'Supports an explicit `from`/`to` window, `compare=prev` for the ' +
+      'equal-length preceding window (the basis for KPI deltas), and ' +
+      '`tenantId` to narrow to one org — see `scoping.unscopedSections` for the ' +
+      'aggregates that stay platform-wide regardless.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Highlights aggregates retrieved successfully',
+    type: AnalyticsHighlightsResponseDto,
+  })
+  async getHighlights(
+    @Query() query: AnalyticsHighlightsQueryDto,
+  ): Promise<AnalyticsHighlightsResponseDto> {
+    const highlights =
+      await this.highlightsAnalyticsService.getHighlights(query);
+    return (await this.tenantScopeService.isRestricted())
+      ? withholdPlatformWideHighlights(highlights)
+      : highlights;
+  }
+
+  @Get('cohort-retention')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Monthly learner cohort retention (super-admin)',
+    description:
+      'For each month, the learner accounts created in it, followed forward: ' +
+      'how many of that cohort practised at least N minutes in each later ' +
+      'calendar month. All three "active user" definitions (10 / 50 / 100 ' +
+      'minutes per month) are returned in the same response so the client can ' +
+      'switch definition without a refetch and the three can never disagree ' +
+      'about the denominator. ALL-TIME and month-grained by design — this ' +
+      'endpoint takes no `range`/`bucket`/`from`/`to`, because a cohort is only ' +
+      'readable once it has been followed for several months. Month 0 is not ' +
+      'measured: the signup month is the cohort itself, 100% by definition. ' +
+      '`tenantId` narrows both the population and the activity.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cohort retention grid retrieved successfully',
+    type: CohortRetentionResponseDto,
+  })
+  async getCohortRetention(
+    @Query() query: CohortRetentionQueryDto,
+  ): Promise<CohortRetentionResponseDto> {
+    return this.cohortAnalyticsService.getCohortRetention(query);
+  }
+
+  @Get('xp-growth')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Cumulative platform XP over time (super-admin)',
+    description:
+      'How much XP the platform has awarded to its learners, as a running ' +
+      'lifetime total per period, with the XP earned in each period and the ' +
+      'distinct learners who earned it alongside. Summed from `xp_events`, the ' +
+      "append-only ledger, which is the record — a session's XP contribution " +
+      'cannot be rebuilt from detection rows after the fact, so nothing here ' +
+      'is re-derived from source data. Bucketed on `awardedOn` (the calendar ' +
+      'day an award counts against) rather than on `createdAt`, so backfilled ' +
+      'history lands on the day it was earned instead of piling onto the day ' +
+      'the Progress dashboard shipped. Test organisations are excluded, as ' +
+      'everywhere on these surfaces; `tenantId` narrows to one org. The window ' +
+      'defaults to all time in monthly buckets and honours ' +
+      '`range`/`bucket`/`from`/`to` — `bucket` is the day/week/month/year ' +
+      'grain the chart control drives. The cumulative line always opens at ' +
+      '`summary.baselineXp` (XP earned before the window), so narrowing the ' +
+      'window narrows what is shown without redefining the quantity — and an ' +
+      'all-time window is no exception, because its left edge is the platform ' +
+      'data floor (first user or session) rather than the first award, so any ' +
+      'XP predating that floor becomes the opening balance instead of ' +
+      'vanishing. One caveat the numbers cannot state themselves: the launch ' +
+      'backfill deliberately awarded neither the streak multiplier nor skill ' +
+      "personal bests, so pre-launch XP is a floor and the curve's LEVEL is " +
+      'not comparable across the launch boundary — its shape is.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'XP growth series retrieved successfully',
+    type: XpGrowthResponseDto,
+  })
+  async getXpGrowth(
+    @Query() query: XpGrowthQueryDto,
+  ): Promise<XpGrowthResponseDto> {
+    return this.xpGrowthAnalyticsService.getXpGrowth(query);
+  }
+
+  @Get('xp-goals')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Actual XP earned vs. goal, by day/week/month/quarter/year/all (super-admin)',
+    description:
+      'Goals exist only at month/quarter/year; `grain=day|week|all` returns ' +
+      'actual XP only (`goalXp: null` throughout, `all` as one point). ' +
+      'Actual platform XP earned per period (from `xp_events`, the same ' +
+      'ledger as `xp-growth`) alongside a goal figure for that period, where ' +
+      'one has been set. Goals are NOT editable through this API — they are ' +
+      'seeded directly into `analytics_xp_goals` by migration, one row per ' +
+      '(grain, periodStart). A period with no goal row comes back with ' +
+      '`goalXp: null` and `hasGoal: false` so the chart can render an ' +
+      'explicit "no goal set" placeholder rather than a fabricated zero. ' +
+      'Platform-wide only — no tenant filter. The window runs from a fixed ' +
+      'April 2026 floor (the period goals are actually tracked against, not ' +
+      "the platform's all-time data floor) through at least today's period " +
+      '(flagged `inProgress: true`, since it can still rise), and further still ' +
+      'through any future period that already has a goal set, flagged ' +
+      '`upcoming: true` with `actualXp: 0` since nothing has happened yet.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'XP vs goal series retrieved successfully',
+    type: GoalsXpResponseDto,
+  })
+  async getGoalsXp(
+    @Query() query: GoalsXpQueryDto,
+  ): Promise<GoalsXpResponseDto> {
+    return this.goalsXpAnalyticsService.getGoalsXp(query);
+  }
+
+  @Get('active-users-xp')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Active learners by per-period XP threshold (super-admin)',
+    description:
+      'Distinct learners whose XP earned WITHIN each bucket (not lifetime ' +
+      'cumulative XP) clears a fixed activity bar — see ' +
+      '`ActiveUsersXpPointDto.activeUsers` for the exact threshold. Test ' +
+      'organisations are excluded, platform-wide only. Honours the standard ' +
+      '`range`/`bucket`/`from`/`to` window params.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Active-users-by-XP series retrieved successfully',
+    type: ActiveUsersXpResponseDto,
+  })
+  async getActiveUsersXp(
+    @Query() query: ActiveUsersXpQueryDto,
+  ): Promise<ActiveUsersXpResponseDto> {
+    return this.activeUsersXpAnalyticsService.getActiveUsers(query);
+  }
+
+  @Get('xp-level-reached')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Unique learners reaching each XP level, per period (super-admin)',
+    description:
+      'For every XP level 1 through MAX_LEVEL, the distinct learners who ' +
+      'FIRST crossed into it during each bucket — the flow behind the level ' +
+      'ladder, not a stock reading of who currently holds each level. ' +
+      'Derived from the `xp_events` ledger (there is no per-level history in ' +
+      'the `user_progress` rollup, only the most recent level-up). Supports ' +
+      '`quarter` in addition to day/week/month/year. Platform-wide only.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Level-reached series retrieved successfully',
+    type: XpLevelReachedResponseDto,
+  })
+  async getXpLevelReached(
+    @Query() query: XpLevelReachedQueryDto,
+  ): Promise<XpLevelReachedResponseDto> {
+    return this.xpLevelReachedAnalyticsService.getLevelsReached(query);
+  }
+
+  @Get('bug-hunter-volume')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Bug Hunter found vs. fixed volume, per period (super-admin)',
+    description:
+      '"Found" counts bugs autonomously discovered by Bug Hunter in each ' +
+      'bucket (excludes human-reported bugs filed via "Report a bug"). ' +
+      '"Fixed" counts findings that reached MERGED or later, regardless of ' +
+      'who originally filed them. Platform/internal-wide — `bug_findings` ' +
+      'carries no tenant column.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bug Hunter volume series retrieved successfully',
+    type: BugHunterVolumeResponseDto,
+  })
+  async getBugHunterVolume(
+    @Query() query: BugHunterVolumeQueryDto,
+  ): Promise<BugHunterVolumeResponseDto> {
+    return this.bugHunterVolumeAnalyticsService.getVolume(query);
+  }
+
+  @Get('xp-by-tenant')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Total XP by tenant over a trailing window (super-admin)',
+    description:
+      'Total XP earned across the platform within a trailing window, split ' +
+      'by tenant: one bar for the whole window (`grain=all`, the default) ' +
+      'or one stacked bar per day/week/month/quarter/year in `points`. Its ' +
+      'own `window` control (30d/90d/365d/all). Test tenants are excluded ' +
+      'entirely, never folded into `otherXp`. The top tenants by XP over the ' +
+      'whole window are named individually in every period; the rest roll ' +
+      'into `otherXp`.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'XP-by-tenant bar retrieved successfully',
+    type: XpByTenantResponseDto,
+  })
+  async getXpByTenant(
+    @Query() query: XpByTenantQueryDto,
+  ): Promise<XpByTenantResponseDto> {
+    return this.xpByTenantAnalyticsService.getXpByTenant(query);
+  }
+
+  @Get('practice-stickiness')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Practice stickiness funnel (super-admin)',
+    description:
+      'Of the learners who practised once, how many came back — and again. A ' +
+      'step is a DAY carrying at least 5 minutes of practice, so several ' +
+      'sessions in one evening count once: the funnel measures RETURNING, not ' +
+      'session length. Steps are nested (at least N qualifying days) so the ' +
+      'series can only narrow, and both conversions are returned — ' +
+      '`ofPreviousPct` says where people are lost, `ofTopPct` says how rare ' +
+      'deep engagement is. Ten explicit rungs plus a `beyondLastStep` tail so ' +
+      'the funnel still reconciles with the population. ALL-TIME by design: ' +
+      '"did they ever come back" cannot be asked of a window without ' +
+      'reporting every recent signup as churned. Percentages are suppressed ' +
+      '(null) when their denominator is below `minPopulation`, which is the ' +
+      'same minimum-group-size rule the cohort grid uses; the counts stay. ' +
+      '`spacing` (AAQ-224): gaps between consecutive countable sessions, same ' +
+      'learners, all-time.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Stickiness funnel retrieved successfully',
+    type: StickinessResponseDto,
+  })
+  async getPracticeStickiness(
+    @Query() query: StickinessQueryDto,
+  ): Promise<StickinessResponseDto> {
+    return this.practiceDepthAnalyticsService.getStickiness(query);
+  }
+
+  @Get('qualified-sessions')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Roleplay sessions of 5+ minutes (super-admin)',
+    description:
+      'Completed roleplay sessions long enough to be practice — at least 5 ' +
+      'minutes of call duration — per bucket, with ALL completed sessions ' +
+      'beside them and the qualifying share. Both numbers because a fall in ' +
+      'qualifying sessions means something different when total sessions fell ' +
+      'with it (a quieter platform) than when they did not (sessions getting ' +
+      'shorter, or failing early). Definition matches the tab\'s "completed ' +
+      'simulation" exactly — eventStatus COMPLETED, timestamped by ' +
+      'COALESCE(endedAt, createdAt), duration from ' +
+      'scenario_session_details.callDuration in milliseconds net of paused ' +
+      'time — so this reconciles with the completed-simulations and play-time ' +
+      'charts. Sessions with no measurable duration are excluded from BOTH ' +
+      'counts. Counts gap-fill to real zeros; the SHARE is null over a zero ' +
+      'denominator. Supports range/bucket/from/to and tenantId.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Qualifying session trend retrieved successfully',
+    type: QualifiedSessionsResponseDto,
+  })
+  async getQualifiedSessions(
+    @Query() query: QualifiedSessionsQueryDto,
+  ): Promise<QualifiedSessionsResponseDto> {
+    return this.practiceDepthAnalyticsService.getQualifiedSessions(query);
+  }
+
+  @Get('org-engagement')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Org count and recent org activity (super-admin)',
+    description:
+      'Three org-level readings: how many non-test, non-deleted orgs exist, ' +
+      'how many were active in the trailing `activityDays` (7/28/90, default ' +
+      '28) with that as a share, and a 12-month activity trend. "Active" is >=1 completed simulation, the same definition as ' +
+      "the completed-simulations and top-orgs panels. The headline's " +
+      'denominator counts only orgs that existed BEFORE the window opened: an ' +
+      'org signed up three days ago has not had the chance to be inactive for ' +
+      '28. The trend is per CALENDAR MONTH, a different measurement from the ' +
+      'trailing headline rather than the same number. `tenantId` is accepted ' +
+      'and IGNORED — every figure counts orgs, which one org cannot narrow — ' +
+      'and the sections are named in scoping.unscopedSections.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Org engagement retrieved successfully',
+    type: OrgEngagementResponseDto,
+  })
+  async getOrgEngagement(
+    @Query() query: OrgEngagementQueryDto,
+  ): Promise<OrgEngagementResponseDto> {
+    return this.orgEngagementAnalyticsService.getOrgEngagement(query);
+  }
+
+  @Get('roleplay-cost')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'AI cost per 10 minutes of roleplay (super-admin)',
+    description:
+      'Estimated AI spend per 10 minutes of practice over time, split by area ' +
+      '(live roleplay / feedback & summary / quiz grading) and by service ' +
+      '(LLM / STT / TTS). Answers the unit-economics question ' +
+      'cost-per-completed-simulation cannot: a simulation is not a fixed ' +
+      'amount of product, so that figure moves when session length moves. ' +
+      'Only LEARNER-CAUSED spend is in the numerator — judges, studio ' +
+      'authoring, copilot, translation and internal tooling are reported ' +
+      'separately as `excludedCostUsd` rather than dropped or shared out, ' +
+      'because sharing them out would make practice look more expensive in a ' +
+      'week when nobody practised but somebody authored ten scenarios. The ' +
+      'denominator is the SAME practice-minutes measurement the ' +
+      'practice-minutes chart uses. Every figure is an ESTIMATE priced at ' +
+      'read time from a hand-maintained table that ignores prompt-cache ' +
+      'discounts and negotiated rates; `unpricedCalls` counts calls with no ' +
+      'pricing entry, which contribute $0 and make the total an ' +
+      'understatement whenever it is non-zero. USD only. Ratios are null over ' +
+      'a bucket with no practice — a ratio with no denominator is not zero. ' +
+      'Platform-wide always: llm_usage is largely tenantless by design, so a ' +
+      'tenant-filtered cost would be a fraction of real spend presented as ' +
+      'the whole.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roleplay unit cost retrieved successfully',
+    type: RoleplayCostResponseDto,
+  })
+  async getRoleplayCost(
+    @Query() query: RoleplayCostQueryDto,
+  ): Promise<RoleplayCostResponseDto> {
+    return this.roleplayCostAnalyticsService.getRoleplayCost(query);
+  }
+
+  @Get('roleplay-session-cost')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'AI cost per minute of roleplay, per session (super-admin)',
+    description:
+      'What it costs in AI to DELIVER a roleplay session, per minute of ' +
+      'practice, for the sessions started in each period. The session is the ' +
+      "unit: every model call tagged to it — the character's replies, STT, " +
+      'TTS, fillers and holding lines, event and rule detectors, live coaching, ' +
+      'the debrief evaluation, the debrief chat and memory folds — is summed ' +
+      'and bucketed by when the SESSION started, so a debrief that lands after ' +
+      'midnight stays with its session. Split into components that sum to the ' +
+      'total. Authoring spend cannot appear (it carries no session); analysis ' +
+      'spend tagged to a session (actor evaluation, judges) is reported as ' +
+      '`excludedCostUsd` and never folded in. Every session ever started ' +
+      'counts, however short. `partial` marks periods that began before every ' +
+      'delivery call was logged (`fullCoverageFrom`) — their cost is ' +
+      'understated and cannot be backfilled. Estimates, USD, platform-wide.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roleplay session cost retrieved successfully',
+    type: RoleplaySessionCostResponseDto,
+  })
+  async getRoleplaySessionCost(
+    @Query() query: RoleplaySessionCostQueryDto,
+  ): Promise<RoleplaySessionCostResponseDto> {
+    return this.roleplaySessionCostAnalyticsService.getRoleplaySessionCost(
+      query,
+    );
+  }
+
+  @Get('xp-per-minute')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'XP earned per minute of roleplay, by XP source (super-admin)',
+    description:
+      'All XP awarded in each period (the `xp_events` ledger, on `awardedOn`) ' +
+      'divided by the roleplay minutes practised in it (`user_daily_scores`, ' +
+      'the same figure as the Roleplay Minutes chart). The numerator is split ' +
+      'by XP source — roleplay (practice minutes, completion, depth ' +
+      'milestones), track items, debriefs & peer comments, weekly consistency, ' +
+      'retired rules — over the one shared denominator, so the parts sum to ' +
+      'the headline and the non-roleplay share shows how the learning ' +
+      'portfolio is shifting. Ratios are null in a period with no roleplay ' +
+      'minutes. Platform-wide, test orgs excluded.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'XP per roleplay minute retrieved successfully',
+    type: XpPerMinuteResponseDto,
+  })
+  async getXpPerMinute(
+    @Query() query: XpPerMinuteQueryDto,
+  ): Promise<XpPerMinuteResponseDto> {
+    return this.xpPerMinuteAnalyticsService.getXpPerMinute(query);
+  }
+
+  @Get('roleplay-session-cost/sessions/:sessionId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'The AI cost of one roleplay session, itemised (super-admin)',
+    description:
+      "One session's delivery cost by task, service and model, using the same " +
+      'classification as /roleplay-session-cost. Lines with a null component ' +
+      'are analysis spend, excluded from the cost.',
+  })
+  @ApiParam({ name: 'sessionId', description: 'Scenario session uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Session cost retrieved successfully',
+    type: RoleplaySessionCostDetailDto,
+  })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  async getRoleplaySessionCostDetail(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ): Promise<RoleplaySessionCostDetailDto> {
+    return this.roleplaySessionCostAnalyticsService.getSessionCost(sessionId);
+  }
+
+  @Get('coding-agent-cost')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Bug Hunter + Builder AI cost, over time and by model (super-admin)',
+    description:
+      'The platform-wide "AI cost" chart (GET token-consumption) has no filter ' +
+      'to isolate one feature and no time axis at all — this is the dedicated ' +
+      'view for the two autonomous coding agents specifically: a day/week/' +
+      'month trend comparing the two, plus a whole-window per-model ' +
+      'breakdown within each. `service` is not the discriminator — both ' +
+      'features write `service: llm` — the real one is `task` (`bug_hunter` ' +
+      'vs the `builder_*` family). Every figure is an ESTIMATE priced at read ' +
+      'time from a hand-maintained table that ignores prompt-cache discounts ' +
+      'and negotiated rates; `unpricedCalls` counts calls with no pricing ' +
+      'entry, which contribute $0 and understate the total whenever nonzero. ' +
+      'Platform-wide always, same reasoning as roleplay-cost.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Coding-agent cost retrieved successfully',
+    type: CodingAgentCostResponseDto,
+  })
+  async getCodingAgentCost(
+    @Query() query: CodingAgentCostQueryDto,
+  ): Promise<CodingAgentCostResponseDto> {
+    return this.codingAgentCostAnalyticsService.getCodingAgentCost(query);
+  }
+
+  @Get('fix-session-engine-cost')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Average cost per completed Bug Hunter fix session, by engine (super-admin)',
+    description:
+      '"Same job, cheaper model, here\'s the delta" — the direct comparison ' +
+      "coding-agent-cost's per-model spend TOTAL can't give: Bug Hunter has " +
+      'run its two engines a very different number of times, so whichever ' +
+      'ran less often would always show the smaller total regardless of ' +
+      'which is actually cheaper per fix. This averages ' +
+      "`totalTokenCostUsd` across each engine's COMPLETED fix sessions only " +
+      '(a stuck, skipped, or still-open run has no finished cost to compare) ' +
+      '— the same figure the run-history table\'s own "Est. cost" column ' +
+      'shows, not a second, differently-derived estimate. `sessionCount` is ' +
+      'part of the response on purpose: a handful of sessions is not yet a ' +
+      'trend, and this number is what tells a reader whether to trust the ' +
+      'average.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Fix-session cost by engine retrieved successfully',
+    type: FixSessionEngineCostResponseDto,
+  })
+  async getFixSessionEngineCost(
+    @Query() query: FixSessionEngineCostQueryDto,
+  ): Promise<FixSessionEngineCostResponseDto> {
+    return this.fixSessionEngineCostAnalyticsService.getFixSessionEngineCost(
+      query,
+    );
+  }
+
+  @Get('bug-agent-performance')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      "Bug Hunter's five headline performance trends, by calendar week (super-admin)",
+    description:
+      'Precision (accuracy/reversal rate), fix throughput (approved-to-merged, ' +
+      'escalation and fallback rates), speed (stage latencies, queue-to-start), ' +
+      'cost, and reliability (completion/fallback/regression rates) — all ' +
+      'bucketed by week regardless of the requested `bucket`, since this chart ' +
+      'is inherently a week-over-week view. Reuses the exact funnel arithmetic ' +
+      "AccuracyPanel's single-window figures already use, applied per week.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bug Agent performance trends retrieved successfully',
+    type: BugAgentPerformanceResponseDto,
+  })
+  async getBugAgentPerformance(
+    @Query() query: BugAgentPerformanceQueryDto,
+  ): Promise<BugAgentPerformanceResponseDto> {
+    return this.bugAgentPerformanceAnalyticsService.getPerformance(query);
+  }
+
+  @Get('quality-sentiment')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Roleplay quality vs learner sentiment (super-admin)',
+    description:
+      'The LLM-judge composite score and a PROXY NPS on one time axis, plus ' +
+      'their correlation. Divergence is the signal: quality rising while ' +
+      'sentiment falls means the scenarios got harder, both falling means ' +
+      'something broke, and either number alone can be moved in the wrong ' +
+      'direction unnoticed. IMPORTANT — the sentiment series is NOT NPS. Ally ' +
+      'has never asked the 0-10 "would you recommend" question; this is ' +
+      'derived from the 1-5 post-session rating by treating 5 as a promoter, ' +
+      '4 as passive and <=3 as a detractor, then scoring it the way NPS is ' +
+      'scored. It is comparable with itself over time and with nobody ' +
+      "else's published score, and every surface must label it as a proxy " +
+      '(see `proxyNote`). Both series are bucketed on the SESSION timestamp, ' +
+      'not on when the evaluation or the rating was written, so asynchronous ' +
+      'evaluation cannot slide the two lines against each other and ' +
+      'manufacture divergence. Proxy NPS is null below `minResponses` — over ' +
+      'a handful of responses one rating swings it by tens of points. Neither ' +
+      'series is gap-filled with zeros: both are means, so a quiet bucket ' +
+      'breaks the line rather than drawing a collapse. The correlation is ' +
+      'computed over paired buckets only and suppressed below three of them, ' +
+      'and is co-movement, NOT evidence of causation either way.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality vs sentiment retrieved successfully',
+    type: QualitySentimentResponseDto,
+  })
+  async getQualitySentiment(
+    @Query() query: QualitySentimentQueryDto,
+  ): Promise<QualitySentimentResponseDto> {
+    return this.qualitySentimentAnalyticsService.getQualitySentiment(query);
+  }
+
+  @Get('chart-preferences')
+  @CallerScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: "The caller's saved per-chart controls (super-admin)",
+    description:
+      'Every saved window/grain preference for the CALLING user, across all ' +
+      'analytics tabs. The Highlights tab has no page-level date range — each ' +
+      'chart owns its own controls — and this is what makes that choice ' +
+      'survive a reload and follow the reader to another machine. Chart ids ' +
+      'are client-owned strings, so a key the client no longer recognises is ' +
+      'safe to ignore; a stored value that is no longer a legal range or ' +
+      'grain is dropped on the way out rather than failing the request.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chart preferences retrieved successfully',
+    type: ChartPreferencesResponseDto,
+  })
+  async getChartPreferences(
+    @Req() req: { user: { id: number } },
+  ): Promise<ChartPreferencesResponseDto> {
+    return this.chartPreferenceService.getForUser(req.user.id);
+  }
+
+  @Put('chart-preferences')
+  @CallerScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: "Save the caller's per-chart controls (super-admin)",
+    description:
+      'Upserts one row per chart for the calling user and returns the full ' +
+      'saved set. A BATCH, so re-ranging three charts while reading is one ' +
+      'round trip and a tab saving on unmount gets its one chance. NOT a ' +
+      'replace-all: charts absent from the payload keep what they had, so a ' +
+      'client that knows only about the tab on screen cannot wipe the saved ' +
+      'state of every other tab. To clear one chart, send it with ' +
+      '`range: null, bucket: null`.',
+  })
+  @ApiBody({ type: SaveChartPreferencesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Chart preferences saved successfully',
+    type: ChartPreferencesResponseDto,
+  })
+  async saveChartPreferences(
+    @Req() req: { user: { id: number } },
+    @Body() body: SaveChartPreferencesDto,
+  ): Promise<ChartPreferencesResponseDto> {
+    return this.chartPreferenceService.saveForUser(req.user.id, body);
+  }
+
+  @Get('usage-levels')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Monthly learner usage-level mix (super-admin)',
+    description:
+      'For each of the last 12 complete calendar months plus the current one, ' +
+      'how many learners practised 0 / under 10 / 10-25 / 25-50 / 50-100 / ' +
+      '100-500 / 500-1000 / 1000+ minutes in that month — the distribution ' +
+      'behind the practice-minutes total, and whether the mix is shifting up. ' +
+      'Bands are lower-inclusive and upper-exclusive, and are counted from a ' +
+      "learner's monthly SUM of user_daily_scores.minutesPlayed. Both " +
+      'denominators ("percentage of users" has two defensible readings — every ' +
+      'registered learner, or only those who had ever practised) are returned ' +
+      'per month from the same pass, so the client switches definition without a ' +
+      'refetch and the two can never divide different numerators. MONTH-GRAINED ' +
+      'and fixed-window by design — this endpoint takes no ' +
+      '`range`/`bucket`/`from`/`to`, because a shift in a distribution is only ' +
+      'visible across several months. The current month is flagged `partial`: it ' +
+      'is still accruing minutes, so its low bands are overstated. `tenantId` ' +
+      'narrows both the population and the activity.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage-level distribution retrieved successfully',
+    type: UsageLevelResponseDto,
+  })
+  async getUsageLevels(
+    @Query() query: UsageLevelQueryDto,
+  ): Promise<UsageLevelResponseDto> {
+    return this.usageLevelAnalyticsService.getUsageLevels(query);
+  }
+
+  @Get('roleplay-volume')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Learners by lifetime completed roleplays (super-admin)',
+    description:
+      'How the learner population splits across bands of COMPLETED ROLEPLAYS ' +
+      'per learner: 0 / 1 / 2 / 3-5 / 6-10 / 11-25 / 26-50 / 51+. The ' +
+      'distribution behind the roleplay volume charts — whether the volume comes ' +
+      'from the whole population or from a handful of enthusiasts, and how large ' +
+      'the never-started group is. Bands are inclusive on BOTH bounds (a count ' +
+      'is discrete, so "3-5" means 3, 4 or 5), counted per learner from ' +
+      'scenario_sessions with eventStatus COMPLETED attributed by counselorId. ' +
+      'The zero band is a residual (`registeredLearners - learnersWithAny`) ' +
+      'because a learner who never practised has no session row to count. ' +
+      'ALL-TIME by design — this endpoint takes no `range`/`bucket`/`from`/`to`: ' +
+      'a lifetime count is the quantity that answers the question, and over a ' +
+      '30-day window nearly every learner would land in the lowest bands ' +
+      'whatever their real depth. Counts, never percentages, are returned, with ' +
+      '`minPopulationSize` as the floor below which a share must not be stated. ' +
+      '`tenantId` narrows both the population and the sessions.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roleplay-volume distribution retrieved successfully',
+    type: RoleplayVolumeResponseDto,
+  })
+  async getRoleplayVolume(
+    @Query() query: RoleplayVolumeQueryDto,
+  ): Promise<RoleplayVolumeResponseDto> {
+    return this.roleplayVolumeAnalyticsService.getRoleplayVolume(query);
+  }
+
+  @Get('roadmap-delivery')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Votes shipped per month by owner (super-admin)',
+    description:
+      'Of the demand our own team voted for on the internal product roadmap, how ' +
+      'much did we ship, when, and by whom. Each released opportunity — both ' +
+      "`idea` and `bug` — is weighted by its VOTES, i.e. the board's " +
+      '`priorityScore`: the sum over every voter and every monthly period, not ' +
+      'just the release month, because an opportunity accrues backing while it ' +
+      'waits and shipping it satisfies all of it. That makes a bar a measure of ' +
+      'demand satisfied rather than of throughput, where a count would weigh a ' +
+      '3-vote nicety like a 90-vote blocker. Bucketed on `releasedAt` by ' +
+      "calendar month and split by owner (the linked account's current name, " +
+      'else the legacy migrated string, else an Unassigned band), with the tail ' +
+      'past `maxOwners` rolled into one band on an ALL-TIME ranking so no band ' +
+      'moves when the reader filters. Both type splits come back in the one pass ' +
+      'so the client switches between them without a refetch. ALL-TIME and ' +
+      'MONTH-GRAINED by design — no `range`/`bucket`/`from`/`to`: the roadmap is ' +
+      'a slow log where a quarter can hold a handful of releases. No `tenantId` ' +
+      "either: the roadmap tables carry no tenant because the board is Ally's " +
+      'own backlog. Crucially, `releasedAt` is stamped only on the TRANSITION ' +
+      'into `released` and was never backfilled, so a large share of released ' +
+      'rows have no date; those are excluded from `months` and reported in ' +
+      '`undated` rather than dated from a proxy column, and a client MUST show ' +
+      'that figure or the plotted total reads as the whole history.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roadmap delivery retrieved successfully',
+    type: RoadmapDeliveryResponseDto,
+  })
+  async getRoadmapDelivery(): Promise<RoadmapDeliveryResponseDto> {
+    return this.roadmapDeliveryAnalyticsService.getRoadmapDelivery();
+  }
+
+  @Get('ship-volume')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Changed lines shipped per week, by repo (super-admin)',
+    description:
+      "How much code landed on each Ally repo's default branch per week — " +
+      "GitHub's own `/stats/code_frequency` for `ally-be`, `ally-web`, " +
+      '`ally-ai`, `ally-ai-learn`, `ally-mobile`, `infra` and the developer ' +
+      'wiki, summed into one axis and split by repo. Plotted as CHURN ' +
+      '(additions + deletions, deletions made positive) rather than net, ' +
+      'because a week that removes 40k lines did real work a net figure would ' +
+      'show as nearly nothing; both parts are returned. Weeks are ' +
+      'SUNDAY-anchored because that is how GitHub buckets the underlying ' +
+      "statistics, so these numbers agree with GitHub's own Insights pages. " +
+      'This is an OUTPUT measure and callers should present it as one: churn ' +
+      'says how much code moved, never whether the right thing moved, and the ' +
+      'outcome counterpart on the same tab is `roadmap-delivery`. There is ' +
+      'deliberately NO author split — the same API would give one, and a ' +
+      'per-person line count is the standard way this metric does damage. ' +
+      'Takes no `tenantId`: it measures our own engineering, not customer ' +
+      'data. Two failure modes the caller MUST render: the current week is ' +
+      'flagged `partial` (it can only grow), and any repo whose statistics ' +
+      'could not be read appears in `unavailableRepos` — churn is a sum across ' +
+      'repos, so a missing one silently shortens every bar. GitHub answers 202 ' +
+      'while it recomputes a repo after a push, in which case the last good ' +
+      'series is served from cache and flagged `servedFromCache`.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Weekly ship volume retrieved successfully',
+    type: ShipVolumeResponseDto,
+  })
+  async getShipVolume(
+    @Query() query: ShipVolumeQueryDto,
+  ): Promise<ShipVolumeResponseDto> {
+    return this.shipVolumeAnalyticsService.getShipVolume(query);
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Testing-tab endpoints                                                     */
+  /*                                                                           */
+  /* Originally candidates for the leadership Highlights tab, surfaced on a    */
+  /* separate admin tab first so they could be judged against real data before */
+  /* anything on Highlights changed; that Testing tab has since been folded    */
+  /* into Highlights (see ally-web's HighlightsTab.tsx). Same guard as every   */
+  /* sibling here — SUPER_ADMIN_ROLES, never a tighter tier than the rest of   */
+  /* /v1/analytics.                                                            */
+  /* ------------------------------------------------------------------------ */
+
+  @Get('activation')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Activation: practising learners, funnel, time to first practice',
+    description:
+      'Three views of the same question — do new learners reach value, and how ' +
+      'fast. (1) `practisingLearners`: distinct learners who completed a scored ' +
+      'session per bucket, the candidate north-star series, gap-filled with real ' +
+      'zeros because it is a count. (2) `funnel`: signed up -> started a sim -> ' +
+      'completed one -> completed 3+, over the ALL-TIME learner population; the ' +
+      'first stage is 100% by construction and is labelled as the denominator ' +
+      'rather than presented as a measurement. (3) `timeToFirstPractice`: days ' +
+      'from signup to first completed session as COUNTS per band (bands are ' +
+      'inclusive on both ends, stated in `boundsNote`), with a residual ' +
+      '"never practised" figure derived as registered minus activated — a ' +
+      'learner who never practised has no first session to bucket. The funnel ' +
+      'and the distribution ignore the window deliberately: both are questions ' +
+      'about accounts, not about a period. Test organisations are excluded ' +
+      'throughout, and preview/seed rooms do not count as sessions.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Activation metrics retrieved successfully',
+    type: ActivationResponseDto,
+  })
+  async getActivation(
+    @Query() query: ActivationQueryDto,
+  ): Promise<ActivationResponseDto> {
+    return this.activationAnalyticsService.getActivation(query);
+  }
+
+  @Get('completion-rate')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Started vs completed roleplays per period (super-admin)',
+    description:
+      'Of the sessions learners launched in each bucket, how many reached a ' +
+      'scored ending — the leading friction signal, and the caveat behind every ' +
+      'efficacy metric on the platform (those can only see sessions that ' +
+      'finished). `completionRatePct` is NULL for a bucket with no launches: a ' +
+      'rate over a zero denominator is undefined, not 0%, and a fabricated zero ' +
+      'here would be the most flattering possible way to be wrong. The counts ' +
+      'are gap-filled so the axis stays a real calendar.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Completion rate retrieved successfully',
+    type: CompletionRateResponseDto,
+  })
+  async getCompletionRate(
+    @Query() query: CompletionRateQueryDto,
+  ): Promise<CompletionRateResponseDto> {
+    return this.completionRateAnalyticsService.getCompletionRate(query);
+  }
+
+  @Get('language-mix')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Completed sessions by language per period (super-admin)',
+    description:
+      'Which languages carry practice, and whether the mix is shifting — the ' +
+      'input to language investment decisions. VOLUME only: language QUALITY is ' +
+      'the /language-quality endpoint, and duplicating it here would let a ' +
+      'reader compare a number with itself. The tail beyond `maxSeries` ' +
+      'languages is pooled into "Other" on the server so a client cannot invent ' +
+      'a ninth colour for a dimension nobody can hold nine of; sessions with no ' +
+      'resolvable language become "Unknown". `bucketTotals` travels with the ' +
+      'shares because a 100%-stacked chart hides its own denominator — every bar ' +
+      'is the same height over forty sessions or four thousand.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Language mix retrieved successfully',
+    type: LanguageMixResponseDto,
+  })
+  async getLanguageMix(
+    @Query() query: LanguageMixQueryDto,
+  ): Promise<LanguageMixResponseDto> {
+    return this.languageMixAnalyticsService.getLanguageMix(query);
+  }
+
+  @Get('skill-growth')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Helping-skills composite by Nth slice (super-admin)',
+    description:
+      "Learner ruler R1: each learner's roleplay speech is cut into 5,000-character slices scored " +
+      '1–4 against the fixed foundational helping skills rubric (pinned to FHS_RUBRIC_VERSION, test ' +
+      'orgs excluded). Median + IQR of the composite at each cut index, for all learners and for ' +
+      'the experienced panel (`experiencedMinSessions`+ scored cuts), from one pass over one set of ' +
+      'cuts. Percentiles are null below `minSampleSize` while n travels. `trendMix` classifies each ' +
+      "learner with the Helping skills tab's learnerTrend (first half vs last half of all scored " +
+      'cuts, noise-sized band). ALL-TIME by design. Until 2026-10 this endpoint plotted the LLM ' +
+      "judge's score of the AI actor, not the learner — see `provenance`.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Skill growth curve retrieved successfully',
+    type: SkillGrowthResponseDto,
+  })
+  async getSkillGrowth(
+    @Query() query: SkillGrowthQueryDto,
+  ): Promise<SkillGrowthResponseDto> {
+    return this.skillGrowthAnalyticsService.getSkillGrowth(query);
+  }
+
+  @Get('foundational-skills')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Foundational helping skills by practice volume (super-admin)',
+    description:
+      'Are learners getting better at the skills every helping conversation needs, ' +
+      "whatever scenarios they practise? Each learner's completed roleplay speech is " +
+      'cut into fixed 5,000-character slices of their OWN words, and each slice is ' +
+      'scored against the fixed foundational helping skills rubric (1-4), independent of every ' +
+      "scenario's competencies. Per cut: the learners who reached it, their average, " +
+      "the SAME learners' average at cut 1 and their mean paired change (the control " +
+      'for survivorship, since later cuts hold only those who kept practising), the ' +
+      'share showing an unhelpful behaviour, and per-skill averages. Averages are null ' +
+      'below `minSampleSize` while counts still travel. ALL-TIME and platform-wide by ' +
+      'design; test organisations excluded; one rubric version per response.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Foundational skills growth retrieved successfully',
+    type: FoundationalSkillsResponseDto,
+  })
+  async getFoundationalSkills(
+    @Query() query: FoundationalSkillsQueryDto,
+  ): Promise<FoundationalSkillsResponseDto> {
+    return this.foundationalSkillsAnalyticsService.getFoundationalSkills(query);
+  }
+
+  @Get('foundational-skills/learners')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Learners behind the foundational skills chart (super-admin)',
+    description:
+      'The drill-down behind GET /v1/analytics/foundational-skills: one row per ' +
+      'learner with a scored cut at `minCut` (the same membership rule as the ' +
+      "chart's per-cut count, so `minCut=5` is exactly the cut-5 cohort), carrying " +
+      'every scored cut — composite (1-4), unhelpful flag, per-skill levels and the ' +
+      'behaviour codes the judge saw. Same rubric version and test-organisation ' +
+      'exclusion as the chart. No sample floor: it lists individuals, like the ' +
+      'skill-growth learner list. Behaviour codes only; no transcript text exists to return.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Learner cut series retrieved successfully',
+    type: FoundationalSkillsLearnersResponseDto,
+  })
+  async getFoundationalSkillsLearners(
+    @Query() query: FoundationalSkillsLearnersQueryDto,
+  ): Promise<FoundationalSkillsLearnersResponseDto> {
+    return this.foundationalSkillsAnalyticsService.getLearners(query);
+  }
+
+  @Get('foundational-skills/progress')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'What is moving in the foundational helping skills (super-admin)',
+    description:
+      'Backs the Highlights → Skills sub-tab. Over one balanced panel — the ' +
+      'learners whose first `cuts` cuts are all scored, so every cut holds the ' +
+      'same people — it returns: a headline; composite, unhelpful rate, tier and ' +
+      'per-skill averages by cut; per-skill start-vs-now change with how many ' +
+      'learners improved, held or declined, level mix and platform-wide ' +
+      'opportunity; per-behaviour start-vs-now share; unhelpful transitions; ' +
+      "every learner's own-baseline trend; change by practice volume; and one " +
+      'row per panel learner. Start/now are windows (first and last ⌊N/2⌋ cuts). ' +
+      'Averages and shares are null below `minSampleSize` while counts travel. ' +
+      'All-time and platform-wide unless `tenantId` narrows it to one org; test ' +
+      'organisations excluded, one rubric version. Also `learnersScatter` + ' +
+      '`doseResponse` (AAQ-217): every classifiable learner, gated at ' +
+      '`doseResponse.minLearners`.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Foundational skills progress retrieved successfully',
+    type: FoundationalSkillsProgressResponseDto,
+  })
+  async getFoundationalSkillsProgress(
+    @Query() query: FoundationalSkillsProgressQueryDto,
+  ): Promise<FoundationalSkillsProgressResponseDto> {
+    return this.foundationalSkillsAnalyticsService.getProgress(query);
+  }
+
+  @Get('foundational-skills/behaviours')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Behaviour rates ("habits") behind the helping-skills measure (super-admin)',
+    description:
+      'For every rubric behaviour: the share of practice where learners show it (where its skill ' +
+      'could be shown), how person-specific it is (ICC), and own start vs now — the group change with ' +
+      'a bootstrap CI and Benjamini–Hochberg correction, and each learner’s change by Fisher exact test. ' +
+      'The list carries each learner’s habit-grid behaviours; `userId` returns one learner with all ' +
+      'of theirs. `tenantId` narrows to one org. Built from stored behaviour codes; test organisations ' +
+      'excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Behaviour rates retrieved successfully',
+    type: FoundationalSkillsBehavioursResponseDto,
+  })
+  async getFoundationalSkillsBehaviours(
+    @Query() query: FoundationalSkillsBehavioursQueryDto,
+  ): Promise<FoundationalSkillsBehavioursResponseDto> {
+    return this.foundationalSkillsAnalyticsService.getBehaviours(query);
+  }
+
+  @Get('foundational-skills/advanced-behaviours')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Advanced helping behaviours by practice depth (super-admin, AAQ-237)',
+    description:
+      'Per learner: the share of their chances at an advanced rubric behaviour that they took, in ' +
+      'their last half of scored slices against their first half (from `baselineFrom`, default 2 so ' +
+      'slice 1 is a warm-up), adjusted for which roleplays filled each slice using roleplay effects ' +
+      'estimated from other learners only. Grouped into nested tiers by scored slices (4+, 6+, 8+, ' +
+      '10+); a tier is listed from `minCohortSize` learners, and its averages, interval and sign test ' +
+      'are null below `minSampleSize` while the up/down counts travel. A hypothesis to watch, not a ' +
+      'result: see `provenance.note`. `tenantId` narrows to one org. Stored behaviour codes only; ' +
+      'test organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advanced behaviours by practice depth retrieved successfully',
+    type: FoundationalSkillsAdvancedBehavioursResponseDto,
+  })
+  async getFoundationalSkillsAdvancedBehaviours(
+    @Query() query: FoundationalSkillsAdvancedBehavioursQueryDto,
+  ): Promise<FoundationalSkillsAdvancedBehavioursResponseDto> {
+    return this.foundationalSkillsAnalyticsService.getAdvancedBehaviours(query);
+  }
+
+  @Get('foundational-skills/benchmark')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Benchmark roleplay, before and after (super-admin)',
+    description:
+      'Backs the Highlights benchmark chart (AAQ-189). A roleplay flagged ' +
+      '`metadata.fhsBenchmark` is taken at onboarding and again later; every completed ' +
+      'session of it is scored WHOLE on the foundational helping skills rubric (1-4). ' +
+      "Pairing: each learner's FIRST scored session of a benchmark scenario against their " +
+      'LATEST scored session of the SAME scenario, only when the latest came at least ' +
+      '`minCutsBetween` more 5,000-character cuts of practice after the first; a learner ' +
+      'with pairs on several benchmark scenarios is counted once, on the one with the most ' +
+      'practice in between. `summary` and `skills` are paired over learners (a skill only ' +
+      'where it was assessable in both sessions), with a deterministic bootstrap interval ' +
+      'and an exact sign test; averages, intervals and tests are null below ' +
+      '`minSampleSize` while counts still travel. With no roleplay flagged: empty ' +
+      '`scenarios` and zero counts, never 404. All-time and platform-wide unless ' +
+      '`tenantId` narrows it to one org; test organisations excluded, one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Benchmark before/after retrieved successfully',
+    type: FoundationalSkillsBenchmarkResponseDto,
+  })
+  async getFoundationalSkillsBenchmark(
+    @Query() query: FoundationalSkillsBenchmarkQueryDto,
+  ): Promise<FoundationalSkillsBenchmarkResponseDto> {
+    return this.foundationalSkillsBenchmarkAnalyticsService.getBenchmark(query);
+  }
+
+  @Get('course-impact')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Course impact: helping skills before vs after each course (super-admin)',
+    description:
+      'Backs Highlights → Course impact. For every course with an enrollment: each learner who ' +
+      'finished it is compared with themselves on the foundational helping skills (1-4, one fixed ' +
+      'rubric whatever the scenario) — the mean of their last `windowCuts` scored 5,000-character ' +
+      'slices that closed BEFORE they started, against their first `windowCuts` slices made wholly ' +
+      'AFTER they finished. `coverage` is the funnel from enrolled to paired; `composite` the paired ' +
+      'change with a deterministic bootstrap interval and an exact sign test; averages, intervals and ' +
+      'tests are null below `minSampleSize` while counts still travel. `trackId` adds `course`: the ' +
+      'same comparison skill by skill (flagging the skills its roleplays assess) and for the share of ' +
+      'slices with an unhelpful behaviour. All-time and platform-wide unless `tenantId` narrows it to ' +
+      "one org (by the learner's own org); test organisations excluded, one rubric version. Also " +
+      'returns `pooled` (each paired learner once, at their earliest-finished course) and ' +
+      '`reference` (learners with no enrollment, read at the course learners’ median slice position ' +
+      'and gap) — associated with the course, not caused by it. With no enrollments: empty ' +
+      '`courses`, never 404.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Course impact retrieved successfully',
+    type: CourseImpactResponseDto,
+  })
+  async getCourseImpact(
+    @Query() query: CourseImpactQueryDto,
+  ): Promise<CourseImpactResponseDto> {
+    return this.courseImpactAnalyticsService.getCourseImpact(query);
+  }
+
+  @Get('skill-growth/learners')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Learners with their own-baseline helping-skills trend (super-admin)',
+    description:
+      'The drill-down behind the skill-growth curve: one row per learner with a scored FHS cut, ' +
+      'classified improving/flat/declining by learnerTrend — first half vs last half of all their ' +
+      'scored cuts, against ± bandZ × cutNoiseSd × √(2/w) (each row carries its own band). Learners ' +
+      'below `minSessions` scored cuts are listed as insufficient with null means. Sorted by own ' +
+      'change, never by level. Paged in memory over the same cuts the curve uses.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Learner trend page retrieved successfully',
+    type: SkillGrowthLearnersResponseDto,
+  })
+  async getSkillGrowthLearners(
+    @Query() query: SkillGrowthLearnersQueryDto,
+  ): Promise<SkillGrowthLearnersResponseDto> {
+    return this.skillGrowthAnalyticsService.getLearnerTrends(query);
+  }
+
+  @Get('skill-growth/learners/:userId')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: "One learner's helping-skills timeline (super-admin)",
+    description:
+      'Every scored FHS cut (composite 1–4, per-skill levels, unhelpful flag, the scenarios it ' +
+      'spanned) and every scored quiz/annotation attempt for one learner, oldest first, side by ' +
+      'side and never blended. Platform-wide; classified against the platform-wide noise estimate. ' +
+      '404 on an unknown user id; a known learner with no scored cuts returns empty series.',
+  })
+  @ApiParam({ name: 'userId', description: 'users.id of the learner' })
+  @ApiResponse({
+    status: 200,
+    description: 'Learner series retrieved successfully',
+    type: SkillGrowthLearnerSeriesResponseDto,
+  })
+  async getSkillGrowthLearnerSeries(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('tenantId') tenantId?: string,
+  ): Promise<SkillGrowthLearnerSeriesResponseDto> {
+    return this.skillGrowthAnalyticsService.getLearnerSeries(
+      userId,
+      tenantId?.trim() || undefined,
+    );
+  }
+
+  @Get('quality-distribution')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Quality percentiles and satisfaction mix per period (super-admin)',
+    description:
+      'The distribution-aware successor to the two mean-lines on Highlights. ' +
+      '(1) `quality`: median with p25/p75 of the LLM-judged composite score per ' +
+      'bucket, sparse — a bucket with no evaluated sessions is ABSENT, because ' +
+      'an average has no meaningful zero and gap-filling one fabricates a ' +
+      'measurement. (2) `satisfaction`: ratings split 1-2 / 3 / 4-5 rather than ' +
+      'averaged, since a mean of 3.8 from all-4s and a mean of 3.8 from ' +
+      'half-5s-and-half-2s call for opposite responses; the counts are ' +
+      'gap-filled but every derived percentage is null over a zero denominator, ' +
+      'and `responseRatePct` states what share of completed sessions were rated ' +
+      'at all — the silent denominator behind any satisfaction figure. (3) ' +
+      '`lowRatingTags`: what sessions rated 3 or below were tagged with, ranked, ' +
+      'tail pooled into "Other". Percentiles are suppressed below ' +
+      '`minSampleSize` while the counts survive. (4) `byOrdinal` (AAQ-229): ' +
+      "rating by the learner's Nth rated session, ALL-TIME regardless of the " +
+      'window.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality distribution retrieved successfully',
+    type: QualityDistributionResponseDto,
+  })
+  async getQualityDistribution(
+    @Query() query: QualityDistributionQueryDto,
+  ): Promise<QualityDistributionResponseDto> {
+    return this.qualityDistributionAnalyticsService.getQualityDistribution(
+      query,
+    );
+  }
+
+  @Get('competency-map')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Practice volume against learner skill level per competency (super-admin)',
+    description:
+      'Volume: completed sessions on scenarios carrying each competency tag (a multi-tagged ' +
+      'scenario counts toward each; untagged practice reported as `unattributed`). Score: mean FHS ' +
+      'level (1–4) of the rubric skill the tag names, over single-scenario scored cuts of tagged ' +
+      'scenarios where that skill was assessable; null with `scoreUnavailable` = tooFewCuts below ' +
+      '`minSampleSize`, or noRubricSkill for tags with no rubric equivalent. `cutAttribution` ' +
+      'reports the single-scenario share. ALL-TIME. Until 2026-10 the score was the median of the ' +
+      "AI actor's judge score.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Competency map retrieved successfully',
+    type: CompetencyMapResponseDto,
+  })
+  async getCompetencyMap(
+    @Query() query: CompetencyMapQueryDto,
+  ): Promise<CompetencyMapResponseDto> {
+    return this.competencyMapAnalyticsService.getCompetencyMap(query);
+  }
+
+  @Get('track-dropoff')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Track item completion by format (super-admin)',
+    description:
+      'Of the track items learners actually reached, the share they finished, ' +
+      'broken down by item FORMAT (roleplay / case / quiz / article / video / ' +
+      'journal) and by section. Format rather than position: position in a track ' +
+      'is confounded with format, and format is the lever anyone can pull. ' +
+      '"Reached" means a progress row that is not LOCKED — an item the learner ' +
+      "could get to. Item types come back in the platform's own enum order, " +
+      'because an ordered category keeps its order everywhere including a ' +
+      'legend, and a list that re-sorts itself between loads cannot be compared ' +
+      "with last week's screenshot. Rates over fewer than `minGroupSize` " +
+      'learners are suppressed while the row and its counts stay.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Track drop-off retrieved successfully',
+    type: TrackDropoffResponseDto,
+  })
+  async getTrackDropoff(
+    @Query() query: TrackDropoffQueryDto,
+  ): Promise<TrackDropoffResponseDto> {
+    return this.trackDropoffAnalyticsService.getTrackDropoff(query);
+  }
+
+  @Get('coaching-loop')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Review sharing and turnaround per period (super-admin)',
+    description:
+      'Whether the human feedback loop is alive: how many completed sessions ' +
+      'were shared for review, and how long learners wait for the first comment ' +
+      'from someone else. Adoption and responsiveness are returned as separate ' +
+      'series so a client can draw two panels rather than two axes — a count and ' +
+      'a duration on one pair of axes invite a correlation the data does not ' +
+      'support. Turnaround percentiles are null below `minSampleSize` reviews in ' +
+      'the bucket: a median over two reviews is a name, not a statistic. ' +
+      'Aggregate only, and deliberately never broken down by reviewer — naming a ' +
+      'slow trainer is a judgement this surface must not make.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Coaching loop metrics retrieved successfully',
+    type: CoachingLoopResponseDto,
+  })
+  async getCoachingLoop(
+    @Query() query: CoachingLoopQueryDto,
+  ): Promise<CoachingLoopResponseDto> {
+    return this.coachingLoopAnalyticsService.getCoachingLoop(query);
+  }
+
+  @Get('org-health')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Per-organisation activity, recency and credit use (super-admin)',
+    description:
+      'One row per customer organisation, ordered by longest silence first — the ' +
+      'account-management agenda. All-time totals plus a trailing 12-ISO-week ' +
+      'trend on a shared axis (so rows are comparable with each other, not each ' +
+      'scaled to itself) and last-28-days against previous-28-days for ' +
+      'direction. Ordered by recency rather than volume because a lifetime total ' +
+      'makes an org that stopped three months ago look like a top customer, ' +
+      'which is the opposite of the churn question. Credit utilisation is summed ' +
+      'from the PER-USER `simulation_credits` rows; an org with no limit set ' +
+      'returns null with `creditsUnset` rather than 0%, because there is no ' +
+      'ceiling to be a share of. Orgs under `minGroupSize` learners keep their ' +
+      'counts and have their rates suppressed — a percentage over four ' +
+      'identifiable people is a statement about those people.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Organisation health retrieved successfully',
+    type: OrgHealthResponseDto,
+  })
+  async getOrgHealth(
+    @Query() query: OrgHealthQueryDto,
+  ): Promise<OrgHealthResponseDto> {
+    return this.orgHealthAnalyticsService.getOrgHealth(query);
+  }
+
+  @Get('org-session-distribution')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Orgs bucketed by avg session time and avg session frequency per learner (super-admin)',
+    description:
+      'How the whole customer base is shaped, not which specific org is ' +
+      'struggling (see org-health for that): all-time average minutes-played ' +
+      'per learner, and all-time average completed sessions per learner, each ' +
+      'bucketed into bands across every non-test org. Meaningful ONLY ' +
+      "platform-wide — a single org's average has no band without every " +
+      'other org to compare against. Suppressed (empty bands) below ' +
+      'minGroupSize orgs.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Org session-time/frequency distribution retrieved successfully',
+    type: OrgSessionDistributionResponseDto,
+  })
+  async getOrgSessionDistribution(
+    @Query() query: OrgSessionDistributionQueryDto,
+  ): Promise<OrgSessionDistributionResponseDto> {
+    return this.orgSessionDistributionAnalyticsService.getDistribution(query);
+  }
+
+  @Get('learner-kpis')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'LEARNER-role-scoped headline KPIs (super-admin)',
+    description:
+      "The overview endpoint's totalUsers/activeUsers/simulationsCompleted " +
+      'count every account regardless of role, so an admin or counsellor ' +
+      'moves the same numbers a learner does. This is the LEARNER-only cut: ' +
+      'all-time total/active learners, all-time completed sessions ' +
+      'attributed to learners, and an all-time monthly learner-signup trend.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Learner-scoped KPIs retrieved successfully',
+    type: LearnerKpisResponseDto,
+  })
+  async getLearnerKpis(
+    @Query() query: LearnerKpisQueryDto,
+  ): Promise<LearnerKpisResponseDto> {
+    return this.learnerKpisAnalyticsService.getLearnerKpis(query);
+  }
+
+  @Get('scenario-usage')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Most/least-used scenarios, platform-wide (super-admin)',
+    description:
+      'Top and bottom scenarios by all-time completed-session count, across ' +
+      'every non-test tenant — the platform-wide counterpart of the ' +
+      'tenant-scoped "most used simulations" list on the Organization Metrics ' +
+      'dashboard. "Least-used" is among scenarios with >=1 completed ' +
+      'session; a never-completed scenario has no row to rank.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Scenario usage retrieved successfully',
+    type: ScenarioUsageResponseDto,
+  })
+  async getScenarioUsage(
+    @Query() query: ScenarioUsageQueryDto,
+  ): Promise<ScenarioUsageResponseDto> {
+    return this.scenarioUsageAnalyticsService.getScenarioUsage(query);
+  }
+
+  @Get('scribe-adoption')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Orgs and counsellors using Scribe per period (super-admin)',
+    description:
+      'Whether the live-support stream is spreading beyond pilots: distinct ' +
+      'organisations and distinct counsellors with at least one scribe session ' +
+      'per bucket, with session volume as context. BREADTH, not operations — one ' +
+      'enthusiastic org can carry a session count on its own, and failure rates, ' +
+      'pipeline funnels and STT provider reliability already live on ' +
+      '/scribe/overview and /scribe/summary-failures. Archived sessions are ' +
+      'excluded. Counts, so the axis is gap-filled with real zeros.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Scribe adoption retrieved successfully',
+    type: ScribeAdoptionResponseDto,
+  })
+  async getScribeAdoption(
+    @Query() query: ScribeAdoptionQueryDto,
+  ): Promise<ScribeAdoptionResponseDto> {
+    return this.scribeAdoptionAnalyticsService.getScribeAdoption(query);
+  }
+
+  @Get('voice-latency')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Voice-to-voice latency trend (super-admin)',
+    description:
+      'Per-bucket avg / p50 / p95 voice-to-voice latency from ' +
+      'scenario_session_turn_metrics, split by `source` (live pipeline vs ' +
+      'historical transcript). Bucket granularity follows the `range` param ' +
+      '(30d -> day, 90d -> week, 12m -> month).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Voice-to-voice latency trend retrieved successfully',
+    type: VoiceLatencyResponseDto,
+  })
+  async getVoiceLatency(
+    @Query() query: VoiceLatencyQueryDto,
+  ): Promise<VoiceLatencyResponseDto> {
+    return this.platformAnalyticsService.getVoiceLatency(query);
+  }
+
+  @Get('voice-latency/sessions')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Session-wise voice latency for one simulation (super-admin)',
+    description:
+      'One row per session (worst-first by avg response latency), averaging ' +
+      "that session's turns across every pipeline stage (EOU, STT finalize, " +
+      'LLM TTFT, process events, knowledge retrieval, TTS TTFB, behaviors). ' +
+      'Optionally narrowed further by `language`. See the sibling ' +
+      '`/voice-latency/sessions/summary` endpoint for the whole-filtered-set ' +
+      "average, independent of this endpoint's pagination.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Session-wise voice latency retrieved successfully',
+    type: ListVoiceLatencySessionsResponseDto,
+  })
+  async getVoiceLatencySessions(
+    @Query() query: VoiceLatencySessionsQueryDto,
+  ): Promise<ListVoiceLatencySessionsResponseDto> {
+    return this.platformAnalyticsService.getVoiceLatencySessions(query);
+  }
+
+  @Get('voice-latency/sessions/summary')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Session-wise voice latency summary for one simulation (super-admin)',
+    description:
+      'Overall average across every session matching the scenario(+language) ' +
+      'filter, over the full window (not just the current page of ' +
+      '`/voice-latency/sessions`).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Voice latency summary retrieved successfully',
+    type: VoiceLatencySessionsSummaryResponseDto,
+  })
+  async getVoiceLatencySessionsSummary(
+    @Query() query: VoiceLatencySessionsSummaryQueryDto,
+  ): Promise<VoiceLatencySessionsSummaryResponseDto> {
+    return this.platformAnalyticsService.getVoiceLatencySessionsSummary(query);
+  }
+
+  @Get('voice-latency/by-scenario')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Voice latency ranked by simulation, worst-first (super-admin)',
+    description:
+      'One row per simulation with a matching turn in the window, sorted by ' +
+      'avg response latency descending, with the same per-stage breakdown ' +
+      '(EOU, STT finalize, LLM TTFT, process events, knowledge retrieval, ' +
+      'TTS TTFB, behaviors) as `/voice-latency/sessions` — "which ' +
+      'simulations are slow" as its own question, distinct from that ' +
+      'endpoint\'s "this simulation\'s worst sessions, once known".',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Voice latency by simulation retrieved successfully',
+    type: VoiceLatencyByScenarioResponseDto,
+  })
+  async getVoiceLatencyByScenario(
+    @Query() query: VoiceLatencyByScenarioQueryDto,
+  ): Promise<VoiceLatencyByScenarioResponseDto> {
+    return this.platformAnalyticsService.getVoiceLatencyByScenario(query);
+  }
+
+  @Get('agent-join-reliability')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Agent-join reliability trend (super-admin)',
+    description:
+      'Per-bucket agent-join failure rate + dispatch->join latency (p50/p95) ' +
+      'from the session lifecycle log, plus the overall session outcome mix. ' +
+      'Bucket granularity follows the `range` param (30d -> day, 90d -> week, ' +
+      '12m -> month).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Agent-join reliability trend retrieved successfully',
+    type: AgentJoinReliabilityResponseDto,
+  })
+  async getAgentJoinReliability(
+    @Query() query: AgentJoinReliabilityQueryDto,
+  ): Promise<AgentJoinReliabilityResponseDto> {
+    return this.platformAnalyticsService.getAgentJoinReliability(query);
+  }
+
+  @Get('start-latency')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Simulation start-latency trend (super-admin)',
+    description:
+      'Per-bucket avg / p50 / p95 simulation start latency ("time to first ' +
+      'word": agent job start -> the agent begins its opening dialogue) from ' +
+      'scenario_session_start_metrics, with the mean of each startup segment ' +
+      '(configure / initialize / connect / prep) for a stacked breakdown. Split ' +
+      'by `source` (live pipeline vs historical transcript). Bucket granularity ' +
+      'follows the `range` param (30d -> day, 90d -> week, 12m -> month).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Simulation start-latency trend retrieved successfully',
+    type: StartLatencyResponseDto,
+  })
+  async getStartLatency(
+    @Query() query: StartLatencyQueryDto,
+  ): Promise<StartLatencyResponseDto> {
+    return this.platformAnalyticsService.getStartLatency(query);
+  }
+
+  @Get('conversation-drift')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Conversation drift analytics (super-admin)',
+    description:
+      'Drift rate per language (primary KPI) plus attribution mix (STT vs LLM ' +
+      'vs cascade vs context) and failure-mode breakdown, over ' +
+      'turn_drift_judgment. Sliceable by language / scenario / model / provider ' +
+      '/ promptVersion for experiment comparison.',
+  })
+  @ApiResponse({ status: 200, type: ConversationDriftResponseDto })
+  async getConversationDrift(
+    @Query() query: ConversationDriftQueryDto,
+  ): Promise<ConversationDriftResponseDto> {
+    return this.platformAnalyticsService.getConversationDrift(
+      query.range ?? '90d',
+      {
+        language: query.language,
+        scenarioId: query.scenarioId,
+        scenarioVersionId: query.scenarioVersionId,
+        llmModel: query.llmModel,
+        llmProvider: query.llmProvider,
+        promptVersion: query.promptVersion,
+      },
+    );
+  }
+
+  @Get('token-consumption')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'AI token consumption by model & task (super-admin)',
+    description:
+      'Total LLM token usage over `range`, grouped by (model × task) and ' +
+      'converted to an estimated USD cost via the pricing table. Tokens are ' +
+      'the source of truth; `priced=false` flags models with no pricing entry.',
+  })
+  @ApiResponse({ status: 200, type: TokenConsumptionResponseDto })
+  async getTokenConsumption(
+    @Query() query: TokenConsumptionQueryDto,
+  ): Promise<TokenConsumptionResponseDto> {
+    return this.platformAnalyticsService.getTokenConsumption(query);
+  }
+
+  @Get('scribe/overview')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Scribe-session analytics overview (super-admin)',
+    description:
+      'Platform-wide scribe (counselor session) metrics over `range`: total ' +
+      'sessions, summary success rate, sessions-created trend, outcome ' +
+      'breakdown by summaryStatus, and mode split (SCRIBE upload vs DICTATION ' +
+      'live). Derived from the `chats` table (cross-tenant).',
+  })
+  @ApiResponse({ status: 200, type: ScribeOverviewResponseDto })
+  async getScribeOverview(
+    @Query() query: ScribeAnalyticsQueryDto,
+  ): Promise<ScribeOverviewResponseDto> {
+    return this.scribeAnalyticsService.getOverview(query);
+  }
+
+  @Get('scribe/summary-failures')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Scribe summary-generation failure analytics (super-admin)',
+    description:
+      'Summary-failure rate over `range` (FAILED / (SUCCESS + FAILED), ' +
+      'excluding no-audio and in-flight), the failure-rate trend, failures by ' +
+      'pipeline stage, retryable-vs-terminal split, and timeout-vs-other split. ' +
+      'Derived from the `chats` table (cross-tenant).',
+  })
+  @ApiResponse({ status: 200, type: ScribeSummaryFailureResponseDto })
+  async getScribeSummaryFailures(
+    @Query() query: ScribeAnalyticsQueryDto,
+  ): Promise<ScribeSummaryFailureResponseDto> {
+    return this.scribeAnalyticsService.getSummaryFailures(query);
+  }
+
+  @Get('weak-performing-metrics')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Weak performing metrics dashboard (super-admin)',
+    description:
+      'The five simulator-quality metrics under active repair — actor ' +
+      'responsiveness, conversational progression & resolution, language ' +
+      'realism, feedback groundedness and actor clienthood — as trends over ' +
+      'one shared filter tuple.\n\n' +
+      'Judge labels and deterministic measures are combined, but never mixed: ' +
+      'the judges contribute only booleans, enum labels and counts, and every ' +
+      'rate, weight and correlation is computed in SQL or in the service. ' +
+      'Each series carries its own state (measured / partial / none) and the ' +
+      'caveat needed to read it honestly — several are deliberately partial ' +
+      'and a bare number would be over-read.\n\n' +
+      'Always segment: three findings in this data turned out to be ' +
+      'composition artefacts rather than regressions, so language, model and ' +
+      'scenario filters are part of the metric, not decoration.',
+  })
+  @ApiResponse({ status: 200, type: WeakMetricsResponseDto })
+  async getWeakPerformingMetrics(
+    @Query() query: WeakMetricsQueryDto,
+  ): Promise<WeakMetricsResponseDto> {
+    return this.weakMetricsAnalyticsService.getWeakMetrics(query);
+  }
+
+  @Get('rag-quality')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Corpus retrieval quality, as the judge labelled it (super-admin)',
+    description:
+      'What the retrieval log plus its LLM-judge labels say about whether retrieval is ' +
+      'working: sufficiency per retrieval, relevance per passage, and the precision curve ' +
+      'that settles what the similarity floor should be. ' +
+      'SUFFICIENCY AND RELEVANCE LEAD, NOT VOLUME — retrieval count is the gameable number ' +
+      'here, since an operator probing thresholds in the admin preview can double it in an ' +
+      'afternoon without anything improving. ' +
+      'EVERYTHING IS A COUNT. `coverage.belowReportingFloor` is true when the judged sample ' +
+      'is too small for a percentage to mean anything; show the counts and suppress the ' +
+      'rates rather than reporting 83% of six. ' +
+      'SEGMENT BY CONSUMER before believing any of it: `byConsumer` is in every response for ' +
+      'that reason, and `consumer` narrows the whole payload. ' +
+      'The floor curve carries an asymmetry worth stating: every judged passage already ' +
+      'cleared the floor in force when it was retrieved, so `relevant`/`irrelevant` measure ' +
+      'PRECISION and `relevantLost` estimates what a HIGHER floor would have discarded. What ' +
+      'a LOWER floor would have found is not in the log at all — that needs the same queries ' +
+      're-run, which the retrieval preview does by hand. ' +
+      '`gaps` is the qualitative half and usually the most actionable: the judge naming what ' +
+      'it would have needed is the only thing that separates a corpus gap from a floor set ' +
+      'too tight, because both arrive as an empty retrieval. ' +
+      'Judgments are scoped to one pinned (model, rubric) pair; `judgeVersions` reports every ' +
+      'pair present, and more than one means the window mixes two judges.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'RAG quality retrieved successfully',
+    type: RagQualityResponseDto,
+  })
+  async getRagQuality(
+    @Query() query: RagQualityQueryDto,
+  ): Promise<RagQualityResponseDto> {
+    return this.ragQualityAnalyticsService.getRagQuality(query);
+  }
+
+  @Post('feedback-groundedness/backfill')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Judge whether post-session feedback is true (super-admin)',
+    description:
+      'Runs the feedback-groundedness judge over stored feedback: each claim ' +
+      'is checked against the session transcript and labelled supported, ' +
+      'unsupported, contradicted or misattributed.\n\n' +
+      'This is the only metric that measures whether the number a learner is ' +
+      'graded by is CORRECT — delivery and score discrimination were already ' +
+      'measurable, truth was not.\n\n' +
+      'The longest and most expensive of the three backfills (a Gemini call ' +
+      'per session over a full transcript, ~2,673 sessions for a year). ' +
+      'Confirm judge token-usage emission is switched on first, or the spend ' +
+      'is invisible until it is billed. Pass judgePromptVersion to make the ' +
+      'run resumable — re-issuing skips whatever already landed.',
+  })
+  @ApiResponse({ status: 202, type: GroundednessBackfillJobDto })
+  async startGroundednessBackfill(
+    @Body() body: StartGroundednessBackfillDto,
+  ): Promise<GroundednessBackfillJobDto> {
+    const unjudgedForVersion = body.judgePromptVersion
+      ? {
+          judgeModel: body.judgeModel ?? 'gemini-2.5-pro',
+          judgePromptVersion: body.judgePromptVersion,
+        }
+      : null;
+    return this.feedbackGroundednessJudgeService.startBackfill(
+      body.sinceDays ?? 365,
+      unjudgedForVersion,
+      body.concurrency,
+    );
+  }
+
+  @Get('feedback-groundedness/backfill/:jobId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({ summary: 'Groundedness backfill job status (super-admin)' })
+  @ApiResponse({ status: 200, type: GroundednessBackfillJobDto })
+  async groundednessBackfillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<GroundednessBackfillJobDto> {
+    const job = await this.feedbackGroundednessJudgeService.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException(`Backfill job ${jobId} not found`);
+    }
+    return job;
+  }
+
+  @Post('conversation-drift/backfill')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Re-run the drift backfill over the last N days (super-admin)',
+    description:
+      'Kicks off an async drift-judge backfill on ally-ai over sessions created ' +
+      'in the last `sinceDays` days (default 90 ≈ 3 months), judging only ' +
+      'sessions not already judged. Returns a job id; poll the status endpoint.',
+  })
+  @ApiResponse({ status: 202, type: DriftBackfillJobDto })
+  async startDriftBackfill(
+    @Body() body: StartDriftBackfillDto,
+  ): Promise<DriftBackfillJobDto> {
+    // A rubric version turns this into a RE-judge: only sessions without rows
+    // under that version are picked up, so it skips work already done and is
+    // safe to re-issue after a failure. Without one it keeps the original
+    // meaning — judge whatever has never been judged at all.
+    const unjudgedForVersion = body.judgePromptVersion
+      ? {
+          judgeModel: body.judgeModel ?? 'gemini-2.5-pro',
+          judgePromptVersion: body.judgePromptVersion,
+        }
+      : null;
+    // Lean mode needs BOTH versions: the one to copy forward from, and the one
+    // to write. Without a target version there is nothing to pin the new rows
+    // to, so it is rejected rather than guessed at.
+    const leanFromVersion =
+      body.lean && unjudgedForVersion
+        ? {
+            judgeModel: body.judgeModel ?? 'gemini-2.5-pro',
+            judgePromptVersion: body.leanFromPromptVersion ?? 'v1',
+          }
+        : null;
+    if (body.lean && !unjudgedForVersion) {
+      throw new BadRequestException(
+        'lean backfill requires judgePromptVersion: it names the version the ' +
+          'topped-up rows are written under, which is what the dashboard pins.',
+      );
+    }
+
+    return this.platformAnalyticsService.startDriftBackfill(
+      body.sinceDays ?? 90,
+      Boolean(unjudgedForVersion),
+      unjudgedForVersion,
+      body.concurrency,
+      leanFromVersion,
+    );
+  }
+
+  @Get('conversation-drift/backfill/:jobId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({ summary: 'Drift backfill job status (super-admin)' })
+  @ApiResponse({ status: 200, type: DriftBackfillJobDto })
+  async driftBackfillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<DriftBackfillJobDto> {
+    return this.platformAnalyticsService.getDriftBackfillStatus(jobId);
+  }
+
+  @Get('language-quality')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Language-quality evaluation dashboard (super-admin)',
+    description:
+      'Categorized, severity-weighted language error rates per 100 turns — ' +
+      'by dimension (severity-stacked), by language, by category — plus the ' +
+      'prompt-vs-model isolation split and a recent error log. Aggregated ' +
+      'from the same per-session judgment rows shown in Roleplay Session ' +
+      'Logs. Pinned to the latest judge version; no scalar quality scores.',
+  })
+  @ApiResponse({ status: 200, type: LanguageQualityResponseDto })
+  async getLanguageQuality(
+    @Query() query: LanguageQualityQueryDto,
+  ): Promise<LanguageQualityResponseDto> {
+    return this.languageAnalyticsService.getLanguageQuality(query);
+  }
+
+  @Get('glossary-effect')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Did the language glossary change anything? (super-admin)',
+    description:
+      'Adherence (deterministic avoid-term hits per 100 agent messages) and ' +
+      'naturalness (severity-weighted style errors per 100 judged turns) on ' +
+      "the same sessions, before vs after EACH language's own glossary " +
+      'go-live, segmented by agent model and pinned to one judge version. ' +
+      'Compare only cells sharing a language and an agentModel: pooling ' +
+      'across models reads a traffic-mix shift as a result.',
+  })
+  @ApiResponse({ status: 200, type: GlossaryEffectResponseDto })
+  async getGlossaryEffect(
+    @Query() query: GlossaryEffectQueryDto,
+  ): Promise<GlossaryEffectResponseDto> {
+    return this.glossaryEffectAnalyticsService.getGlossaryEffect(query);
+  }
+
+  @Get('language-quality/reference')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'The pinned reference experiment (super-admin)',
+    description:
+      'FR13: the saved filter tuple all language-quality deltas are read against.',
+  })
+  @ApiResponse({ status: 200, type: LanguageEvalReferenceDto })
+  async getLanguageReference(): Promise<LanguageEvalReferenceDto | null> {
+    return this.languageAnalyticsService.getReference();
+  }
+
+  @Post('language-quality/reference')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Pin a reference experiment (super-admin)',
+    description:
+      'Saves the given filter tuple ({language?, scenarioVersionId?, ' +
+      'promptVersion?, llmModel?}) as THE pinned reference; unpins any ' +
+      'previous one. Deltas on the Language tab are read against it.',
+  })
+  @ApiResponse({ status: 201, type: LanguageEvalReferenceDto })
+  async setLanguageReference(
+    @Body() body: SetLanguageEvalReferenceDto,
+  ): Promise<LanguageEvalReferenceDto | null> {
+    return this.languageAnalyticsService.setReference(body);
+  }
+
+  @Get('filler-quality')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Thinking-filler quality over time (super-admin)',
+    description:
+      'Finding rates per 100 played fillers, bucketed by day. The denominator ' +
+      'is played fillers, not sessions or turns: a session that played forty ' +
+      'and one that played two are not comparable units. No scalar quality ' +
+      'scores — rates are computed at read time from labelled findings.',
+  })
+  @ApiResponse({ status: 200, type: [FillerQualityPointDto] })
+  async getFillerQuality(
+    @Query() query: FillerQualityQueryDto,
+  ): Promise<FillerQualityPointDto[]> {
+    return this.fillerAnalyticsService.getFillerQuality(query);
+  }
+
+  @Post('filler-quality/backfill')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Run the thinking-filler judge backfill (super-admin)',
+    description:
+      'Kicks off an async thinking-filler judge backfill on ally-ai over ' +
+      'sessions that actually played a filler. Writes per-session denominator ' +
+      'rows and per-finding annotations. Returns a job id to poll. ' +
+      'The filler is the character first words, so response latency is ' +
+      'measured to it — this is what tells a fast filler from a good one.',
+  })
+  @ApiResponse({ status: 202, type: FillerBackfillJobDto })
+  async startFillerBackfill(
+    @Body() body: StartFillerBackfillDto,
+  ): Promise<FillerBackfillJobDto> {
+    return this.fillerJudgeService.startBackfill({
+      since: body.since,
+      until: body.until,
+      language: body.language,
+      scenarioId: body.scenarioId,
+      limit: body.limit,
+      rejudge: body.rejudge,
+      concurrency: body.concurrency,
+    });
+  }
+
+  @Get('filler-quality/backfill/:jobId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Thinking-filler backfill job status (super-admin)',
+  })
+  @ApiResponse({ status: 200, type: FillerBackfillJobDto })
+  async fillerBackfillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<FillerBackfillJobDto> {
+    const job = await this.fillerJudgeService.getJob(jobId);
+    if (!job) {
+      return {
+        jobId,
+        status: 'error',
+        total: 0,
+        processed: 0,
+        judged: 0,
+        findings: 0,
+        skipped: 0,
+        failed: 0,
+        error: 'job not found (expired or unknown)',
+      };
+    }
+    return job;
+  }
+
+  @Post('language-quality/backfill')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Run the language-quality judge backfill (super-admin)',
+    description:
+      'Kicks off an async language-quality judge backfill on ally-ai over ' +
+      'sessions created in the last `sinceDays` days (default 90), judging ' +
+      'only sessions not already judged. Writes per-session denominator rows ' +
+      'and per-error annotations (read raw by Roleplay Session Logs; ' +
+      'aggregated by the analytics dashboard). Returns a job id to poll.',
+  })
+  @ApiResponse({ status: 202, type: LanguageBackfillJobDto })
+  async startLanguageBackfill(
+    @Body() body: StartLanguageBackfillDto,
+  ): Promise<LanguageBackfillJobDto> {
+    // Three modes, in increasing cost:
+    //  - default              judge sessions never judged by any rubric
+    //  - judgePromptVersion   judge sessions not yet judged by THAT rubric
+    //                         (the re-judge path; resumable, skips done work)
+    //  - rejudge=true         re-run everything, including already-judged
+    const unjudgedForVersion = body.judgePromptVersion
+      ? {
+          judgeModel: body.judgeModel ?? 'gemini-2.5-pro',
+          judgePromptVersion: body.judgePromptVersion,
+        }
+      : null;
+    return this.languageJudgeService.startBackfill(
+      body.sinceDays ?? 90,
+      unjudgedForVersion ? true : !body.rejudge,
+      unjudgedForVersion,
+      body.concurrency,
+    );
+  }
+
+  @Get('language-quality/backfill/:jobId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Language-quality backfill job status (super-admin)',
+  })
+  @ApiResponse({ status: 200, type: LanguageBackfillJobDto })
+  async languageBackfillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<LanguageBackfillJobDto> {
+    const job = await this.languageJudgeService.getJob(jobId);
+    if (!job) {
+      return {
+        jobId,
+        status: 'error',
+        total: 0,
+        processed: 0,
+        judged: 0,
+        errorAnnotations: 0,
+        skipped: 0,
+        failed: 0,
+        error: 'job not found (expired or unknown)',
+      };
+    }
+    return job;
+  }
+
+  @ApiOperation({ summary: 'Get all dashboards' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the list of all dashboards',
+    type: DashboardResponseDTO,
+    isArray: true,
+  })
+  @Get('dashboard/all')
+  // A dashboard definition is shared by every organization it is assigned to,
+  // so an organization-restricted admin may neither list nor change them.
+  @PlatformWidePermissions([PERMISSIONS.EDIT_ANALYTICS_DASHBOARD])
+  async getAllDashboards(): Promise<DashboardResponseDTO[]> {
+    return this.analyticsService.getAllDashboards();
+  }
+
+  @Get('dashboard/:externalId')
+  @AuthPermissions([PERMISSIONS.VIEW_ANALYTICS_DASHBOARD_URL])
+  getDashboardUrl(@Param() { externalId }: DashboardIdParamDto) {
+    return this.analyticsService.getDashboardUrl(externalId);
+  }
+
+  @Post('dashboard/:externalId/refresh')
+  @UseGuards(JwtAuthGuard)
+  refreshDashboardUrl(@Param() { externalId }: DashboardIdParamDto) {
+    return this.analyticsService.refreshDashboardUrl(externalId);
+  }
+
+  @Post('dashboard')
+  // A dashboard definition is shared by every organization it is assigned to,
+  // so an organization-restricted admin may neither list nor change them.
+  @PlatformWidePermissions([PERMISSIONS.EDIT_ANALYTICS_DASHBOARD])
+  createDashboard(
+    @Body() dashboard: CreateDashboardDto,
+  ): Promise<CreateDashboardResponseDto> {
+    return this.analyticsService.createDashboard(dashboard);
+  }
+
+  @Get('dashboard')
+  @AuthPermissions([PERMISSIONS.VIEW_ANALYTICS_DASHBOARD])
+  getDashboards(@Req() req: { user: { id: number } }) {
+    return this.analyticsService.getDashboards(req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Update a dashboard' })
+  @ApiParam({
+    name: 'dashboardId',
+    type: String,
+    description: 'The ID of the dashboard to update',
+  })
+  @ApiBody({ type: UpdateDashboardDto })
+  @Patch('dashboard/:dashboardId')
+  // A dashboard definition is shared by every organization it is assigned to,
+  // so an organization-restricted admin may neither list nor change them.
+  @PlatformWidePermissions([PERMISSIONS.EDIT_ANALYTICS_DASHBOARD])
+  updateDashboard(
+    @Param('dashboardId', ParseUUIDPipe) dashboardId: string,
+    @Body() updateDashboardDto: UpdateDashboardDto,
+  ) {
+    return this.analyticsService.updateDashboard(
+      dashboardId,
+      updateDashboardDto,
+    );
+  }
+
+  @Get('effectiveness/funnel')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Where learners fall out of the effectiveness chain (super-admin)',
+    description:
+      'Backs Highlights → Effectiveness AAQ-203. All-time distinct learners: signed up (learner-role ' +
+      'accounts, the activation population) → completed a countable session → completed two → first ' +
+      'scored 5,000-character cut → 2+ cuts (measurable) → 4+ cuts (classifiable) → improving beyond ' +
+      'their own noise band (the Helping skills AAQ-181 classification). Each stage counts only learners ' +
+      'in every stage above it; `clamp` says how many measured learners that drops. Shares are null below ' +
+      '`minCohortSize`, and the improving split below `minSampleSize` classifiable learners; counts always ' +
+      'travel. `tenantId` narrows stages 1–3 by the learner’s org and 4–7 by the cut’s org. Test ' +
+      'organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Effectiveness funnel retrieved successfully',
+    type: EffectivenessFunnelResponseDto,
+  })
+  async getEffectivenessFunnel(
+    @Query() query: EffectivenessFunnelQueryDto,
+  ): Promise<EffectivenessFunnelResponseDto> {
+    return this.effectivenessAnalyticsService.getFunnel(query);
+  }
+
+  @Get('foundational-skills/progress/segments')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Helping skills start → now, by segment (super-admin)',
+    description:
+      'Backs Highlights → Effectiveness AAQ-204 and Helping skills AAQ-219. The same balanced panel and ' +
+      'windows as GET foundational-skills/progress (`cuts`, `baselineFrom`, `tenantId` behave identically, ' +
+      'and `overall` equals its `summary.composite`), split by `dimension`: language, workerType, orgSize, ' +
+      'course, difficulty or difficultyTransition. Per segment: paired change with a bootstrap 95% CI and ' +
+      'sign test; segments under `minSampleSize` learners are listed in `withheld` with their count only. ' +
+      'Segments are not independent; a gap between two is a hypothesis, not a finding. All-time; test ' +
+      'organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Helping skills segments retrieved successfully',
+    type: FoundationalSkillsSegmentsResponseDto,
+  })
+  async getFoundationalSkillsProgressSegments(
+    @Query() query: FoundationalSkillsSegmentsQueryDto,
+  ): Promise<FoundationalSkillsSegmentsResponseDto> {
+    return this.effectivenessAnalyticsService.getProgressSegments(query);
+  }
+
+  @Get('scenarios/opportunity-coverage')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Which helping skills each scenario gives learners a chance to show (super-admin)',
+    description:
+      'Backs Highlights → Curriculum → Scenarios (AAQ-214, AAQ-215). Over scored helping-skills cuts whose every ' +
+      'session played ONE scenario: per scenario with at least `minSampleSize` such cuts, the share in which the judge ' +
+      'found an opportunity for each of the 14 rubric skills, with the skills its competency tags map to marked. ' +
+      '`tagGaps` lists tagged skills under 30% over 20+ cuts, most-played first. All-time; platform-wide unless ' +
+      '`tenantId` narrows it; test organisations excluded; one rubric version. Empty lists, never 404.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Opportunity coverage retrieved successfully',
+    type: ScenarioOpportunityCoverageResponseDto,
+  })
+  async getScenarioOpportunityCoverage(
+    @Query() query: ScenarioOpportunityCoverageQueryDto,
+  ): Promise<ScenarioOpportunityCoverageResponseDto> {
+    return this.scenarioEffectivenessAnalyticsService.getOpportunityCoverage(
+      query,
+    );
+  }
+
+  @Get('scenarios/repeat-improvement')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Same-scenario repeat improvement: first vs latest session score (super-admin)',
+    description:
+      'Backs Highlights → Curriculum → Scenarios (AAQ-216). Per learner and scenario VERSION with 2+ countable scored ' +
+      'plays at least a day apart (unresolved zeros dropped): first vs latest `scenario_sessions.score`. Per version: ' +
+      'paired change, bootstrap CI and sign test, null below `minSampleSize` pairs. `pooled` counts each learner once ' +
+      '(raw points do not compare across scenarios). `scenarioId` picks the slope chart (default: most pairs); ' +
+      '`picker` lists the top 10. All-time; `tenantId` narrows by session tenant; test organisations excluded.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Repeat improvement retrieved successfully',
+    type: ScenarioRepeatImprovementResponseDto,
+  })
+  async getScenarioRepeatImprovement(
+    @Query() query: ScenarioRepeatImprovementQueryDto,
+  ): Promise<ScenarioRepeatImprovementResponseDto> {
+    return this.scenarioEffectivenessAnalyticsService.getRepeatImprovement(
+      query,
+    );
+  }
+
+  @Get('practice-quality')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Was it practice? Learner talk share, turns and practice-session share (super-admin)',
+    description:
+      'Backs Highlights → Usage (AAQ-208, AAQ-209). Per countable session, bucketed by session end: learner characters ' +
+      '÷ all characters (client filler/interim lines dropped) as median + p25/p75, median learner turns, and the share ' +
+      'of sessions with ≥3 learner turns, ≥2 minutes net of pauses and ≥300 learner characters (`practiceThresholds`). ' +
+      'Percentiles and shares are null below `minSampleSize` sessions; counts gap-filled. Window params + `language` + ' +
+      '`tenantId`; test organisations excluded. Compare talk share within one language.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Practice quality retrieved successfully',
+    type: PracticeQualityResponseDto,
+  })
+  async getPracticeQuality(
+    @Query() query: PracticeQualityQueryDto,
+  ): Promise<PracticeQualityResponseDto> {
+    return this.practiceQualityAnalyticsService.getPracticeQuality(query);
+  }
+
+  @Get('curriculum/course-funnel')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Course funnel: enrolled → started → halfway → finished, per course (super-admin)',
+    description:
+      'Backs Highlights → Curriculum (AAQ-210). Enrolments created in the window (default 12m) in live or ' +
+      'archived courses: started = opened or completed an item (enrolment writes startedAt immediately, so it ' +
+      'cannot tell enrolled from started); halfway = completedItems ÷ totalItems ≥ 0.5 (the tenant course-usage ' +
+      'definition) or finished; finished = completedAt; stalled = started, unfinished, no activity in 30 days. ' +
+      'Median and IQR days enrol → finish. Rates and medians null below `minCohortSize`; top 15 by enrolments ' +
+      "flagged `inChart`, the rest still listed. `tenantId` narrows by the learner's org; test orgs excluded.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Course funnel retrieved successfully',
+    type: CourseFunnelResponseDto,
+  })
+  async getCurriculumCourseFunnel(
+    @Query() query: CourseFunnelQueryDto,
+  ): Promise<CourseFunnelResponseDto> {
+    return this.curriculumAnalyticsService.getCourseFunnel(query);
+  }
+
+  @Get('curriculum/quiz-outcomes')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Quiz outcomes: first-attempt pass and first → best gain, per quiz (super-admin)',
+    description:
+      'Backs Highlights → Curriculum (AAQ-211, AAQ-212). One outcome per learner per quiz, cohort = learners whose ' +
+      'earliest attemptNumber-1 attempt was submitted in the window (default 12m). First-attempt pass share, ' +
+      'retry share, and first vs best scored attempt over learners with 2+ scored attempts (paired bootstrap CI). ' +
+      'Expanded view: up to 5 questions most often wrong on the first attempt, by id and type only — never ' +
+      'question or answer text. Rates null below `minSampleSize`. Open-ended answers are LLM-graded ' +
+      "(track-quiz-grading). `tenantId` narrows by the learner's org; test orgs excluded.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quiz outcomes retrieved successfully',
+    type: QuizOutcomesResponseDto,
+  })
+  async getCurriculumQuizOutcomes(
+    @Query() query: QuizOutcomesQueryDto,
+  ): Promise<QuizOutcomesResponseDto> {
+    return this.curriculumAnalyticsService.getQuizOutcomes(query);
+  }
+
+  @Get('curriculum/roleplay-gates')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Roleplay score gates inside courses: cleared first time, later, or stuck (super-admin)',
+    description:
+      'Backs Highlights → Curriculum (AAQ-213). All time. Per course roleplay whose completionCriteria.minScore is ' +
+      'above 0 (0 means no gate, per meetsMinimumScore): progress rows with a linked countable session, split into ' +
+      'passed first time (first session cleared the gate), passed later, stuck (unlocked, unfinished, last session ' +
+      '> 14 days ago) and in progress; median attemptCount to pass; calibration flag under 40% / over 95% ' +
+      'first-time pass. Shares null below `minSampleSize`. Session scores are scenario-scaled. `tenantId` narrows ' +
+      "by the learner's org; test orgs excluded.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roleplay gates retrieved successfully',
+    type: RoleplayGatesResponseDto,
+  })
+  async getCurriculumRoleplayGates(
+    @Query() query: RoleplayGatesQueryDto,
+  ): Promise<RoleplayGatesResponseDto> {
+    return this.curriculumAnalyticsService.getRoleplayGates(query);
+  }
+
+  @Get('foundational-skills/time-to-competence')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Time to competence on each helping-skills tier (super-admin)',
+    description:
+      'Backs AAQ-205 on Highlights → Helping skills. Per tier, a Kaplan–Meier curve of the share of ' +
+      'learners who, by their Nth scored 5,000-character slice, have reached level 3 (every basic ' +
+      'behaviour) at least once on all but one of the tier’s movable skills (`tierCompetenceSkills`; ' +
+      '`excludedSkills` are the capped and rarely assessable ones); learners who stop practising are ' +
+      'censored, not counted as "never". A one-time crossing, not sustained. Returns at-risk counts ' +
+      'under every point, the median slices to competence (or `notReachedByHalf`), median practice ' +
+      'minutes among those who reached it, and the skill not-yet-reached learners most often lack. ' +
+      'Shares are null below `minSampleSize` at risk while counts travel. All-time; `tenantId` narrows ' +
+      'to one org; test organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Time to competence retrieved successfully',
+    type: TimeToCompetenceResponseDto,
+  })
+  async getFoundationalSkillsTimeToCompetence(
+    @Query() query: FoundationalSkillsEffectivenessQueryDto,
+  ): Promise<TimeToCompetenceResponseDto> {
+    return this.foundationalSkillsEffectivenessService.getTimeToCompetence(
+      query,
+    );
+  }
+
+  @Get('foundational-skills/retention')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Helping-skills change across a break in practice (super-admin)',
+    description:
+      'Backs AAQ-206. For each learner’s consecutive scored slices k → k+1, the gap from the end of ' +
+      'slice k’s last session to the start of the first session in slice k+1 that slice k did not ' +
+      'contain, banded <7 / 7–13 / 14–29 / 30+ days. Per band: the composite (1–4) change and the ' +
+      'change in unhelpful-behaviour share, averaged per learner first, with a paired bootstrap ' +
+      'interval and sign test over learners; withheld below `minPairs` pairs from `minLearners` ' +
+      'learners while counts travel. Under 7 days is the "no break" reference. Pairs inside one ' +
+      'session or without session times are counted, not plotted. All-time; `tenantId` narrows to ' +
+      'one org; test organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Skill retention retrieved successfully',
+    type: SkillRetentionResponseDto,
+  })
+  async getFoundationalSkillsRetention(
+    @Query() query: FoundationalSkillsEffectivenessQueryDto,
+  ): Promise<SkillRetentionResponseDto> {
+    return this.foundationalSkillsEffectivenessService.getRetention(query);
+  }
+
+  @Get('practice-progression')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Scenario difficulty mix by practice ordinal (super-admin)',
+    description:
+      'Backs AAQ-207. For each learner’s 1st..12th countable session (completed, real rooms, no ' +
+      'AI-vs-AI test runs; ordered by start time), the count and share at each scenario difficulty ' +
+      'label (EASY / MEDIUM / HARD / untagged), plus the same for the fixed panel of learners with ' +
+      '12+ sessions (survivorship control). Shares null below `minSampleSize` sessions. Difficulty is ' +
+      'an authoring label, not a measured property. All-time; `tenantId` narrows to one org by the ' +
+      'session tenant; test organisations excluded.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Practice progression retrieved successfully',
+    type: PracticeProgressionResponseDto,
+  })
+  async getPracticeProgression(
+    @Query() query: FoundationalSkillsEffectivenessQueryDto,
+  ): Promise<PracticeProgressionResponseDto> {
+    return this.foundationalSkillsEffectivenessService.getPracticeProgression(
+      query,
+    );
+  }
+
+  @Get('curriculum/progress-curve')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Where in a course momentum dies: share of started enrolments reaching each item (super-admin)',
+    description:
+      'Backs Highlights → Curriculum (AAQ-225). All time. Per ACTIVE/ARCHIVED course, its live items in unlock order ' +
+      '(sections by order, then items by order); x = position scaled 0–100, y = share of STARTED enrolments (opened or ' +
+      'completed an item, or finished) whose furthest unlocked item is at or beyond it. Courses need `minSampleSize` ' +
+      'started enrolments; the 5 with the most carry points (`courses`), other measurable ones are listed in `others`, ' +
+      'the rest in `belowFloor` with counts only. `steepestDrop` names the item learners stopped at. Reached means ' +
+      "unlocked, not opened (`opened` shows the gap). `tenantId` narrows by the learner's org; test orgs excluded.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Course progress curve retrieved successfully',
+    type: ProgressCurveResponseDto,
+  })
+  async getCurriculumProgressCurve(
+    @Query() query: CourseProgressAnalyticsQueryDto,
+  ): Promise<ProgressCurveResponseDto> {
+    return this.courseProgressAnalyticsService.getProgressCurve(query);
+  }
+
+  @Get('curriculum/knowledge-vs-skill')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Does knowing predict doing? First-attempt quiz score vs helping-skills composite (super-admin)',
+    description:
+      'Backs Highlights → Curriculum (AAQ-226). All time. One point per learner × course: x = mean first-attempt ' +
+      "scorePct over the course's live quizzes (pending/ungraded first attempts left out, never replaced by a retry); " +
+      'y = mean FHS composite (pinned rubric) of the first `skillWindowCuts` scored slices made wholly after enrolling. ' +
+      'Spearman r (average ranks) with a learner-clustered deterministic bootstrap 95% CI, null below `minSampleSize` ' +
+      "(30) points, overall and per course. `tenantId` narrows by the learner's org; test orgs excluded.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Knowledge vs skill retrieved successfully',
+    type: KnowledgeVsSkillResponseDto,
+  })
+  async getCurriculumKnowledgeVsSkill(
+    @Query() query: CourseProgressAnalyticsQueryDto,
+  ): Promise<KnowledgeVsSkillResponseDto> {
+    return this.courseProgressAnalyticsService.getKnowledgeVsSkill(query);
+  }
+
+  @Get('scenarios/calibration')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Scenario difficulty calibration: where session scores land (super-admin)',
+    description:
+      'Backs Highlights → Curriculum → Scenarios (AAQ-227). Per scenario VERSION with at least `minSampleSize` countable ' +
+      'scored sessions (unresolved zeros dropped): the share of sessions in bands of the attainable score range derived ' +
+      "from the scenario's current scoring config (positive event score × maxOccurrences + 10 per SHOULD_DO behaviour " +
+      'instruction, an uncapped contributor counted once), over sessions since that config last changed; raw-point bands ' +
+      'when no range applies. Authored difficultyLevel alongside; tooEasy / tooHard flags. All-time; `tenantId` narrows by ' +
+      'session tenant; test organisations excluded. Empty lists, never 404.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Calibration retrieved successfully',
+    type: ScenarioCalibrationResponseDto,
+  })
+  async getScenarioCalibration(
+    @Query() query: ScenarioCalibrationQueryDto,
+  ): Promise<ScenarioCalibrationResponseDto> {
+    return this.scenarioCalibrationAnalyticsService.getCalibration(query);
+  }
+
+  @Get('scenarios/progression')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Did the learner move the client? Simulation-state progression (super-admin)',
+    description:
+      'Backs Highlights → Curriculum → Scenarios (AAQ-228). Per countable session, bucketed by session end: reached the ' +
+      'terminal simulation state / advanced past the opening state / never got past it, from the per-turn state on ' +
+      'scenario_session_turn_metrics.metadata (since 2026-06-10). Sessions with no usable state are counted as `untracked`, ' +
+      'not plotted; shares null below `minSampleSize`. `byScenario` covers the whole window. Standard window query; ' +
+      '`tenantId` narrows by session tenant; test organisations excluded.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Progression retrieved successfully',
+    type: ScenarioProgressionResponseDto,
+  })
+  async getScenarioProgression(
+    @Query() query: ScenarioProgressionQueryDto,
+  ): Promise<ScenarioProgressionResponseDto> {
+    return this.scenarioCalibrationAnalyticsService.getProgression(query);
+  }
+
+  @Get('effectiveness/orgs')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Org effectiveness scorecard (super-admin)',
+    description:
+      'Backs Highlights → Orgs (EFF-90, AAQ-232). One row per non-test org with data: measurable learners ' +
+      '(2+ scored helping-skills cuts in that org), each classifiable learner’s own first-half → last-half ' +
+      'composite change (paired bootstrap CI), the share improving beyond the PLATFORM noise band, ' +
+      'unhelpful-behaviour change in percentage points, course completion (completed ÷ started enrolments, ' +
+      'by the learner’s org) and the internal self-harm cue follow-up share, plus a 6-month median-composite ' +
+      'sparkline. All-time, one pass over every scored cut; rows below `minSampleSize` measurable learners ' +
+      'carry counts and null rates. `tenantId` narrows the rows only. Test orgs excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Org effectiveness scorecard retrieved successfully',
+    type: EffectivenessOrgsResponseDto,
+  })
+  async getEffectivenessOrgs(
+    @Query() query: EffectivenessOrgsQueryDto,
+  ): Promise<EffectivenessOrgsResponseDto> {
+    return this.effectivenessOrgsAnalyticsService.getOrgScorecard(query);
+  }
+
+  @Get('effectiveness/cost-per-improvement')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Cost per improved learner (super-admin)',
+    description:
+      'Backs Highlights → Effectiveness (EFF-61, AAQ-218). Learner-caused AI spend in the window (the ' +
+      'roleplay-cost total behind AAQ-076, same window params, range defaults to all) ÷ learners classified ' +
+      'improving beyond noise whose last scored cut closed in that window. Ratio null below `minSampleSize` ' +
+      'improved learners; both sides always returned. Platform-wide by construction (`tenantId` ignored). ' +
+      'A ceiling, not a unit price.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cost per improved learner retrieved successfully',
+    type: CostPerImprovementResponseDto,
+  })
+  async getCostPerImprovement(
+    @Query() query: CostPerImprovementQueryDto,
+  ): Promise<CostPerImprovementResponseDto> {
+    return this.effectivenessOrgsAnalyticsService.getCostPerImprovement(query);
+  }
+
+  @Get('measurement/convergence')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Do the rulers agree? (super-admin)',
+    description:
+      'Backs Highlights → Helping skills (EFF-80, AAQ-222). Over single-scenario scored cuts: Spearman rank ' +
+      'correlation (average ranks for ties), with n, between R1 helping-skills composite, R2 session score ' +
+      'z-scored within scenario version, R3 behaviour-instruction hit balance, R4 mean skill coverage and R6 ' +
+      'learner rating. r null below `minPairs` (50). All-time; `tenantId` narrows the cuts (the R2 yardstick ' +
+      'stays platform-wide). Agreement is not validity.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Ruler convergence retrieved successfully',
+    type: MeasurementConvergenceResponseDto,
+  })
+  async getMeasurementConvergence(
+    @Query() query: MeasurementConvergenceQueryDto,
+  ): Promise<MeasurementConvergenceResponseDto> {
+    return this.measurementConvergenceAnalyticsService.getConvergence(query);
+  }
+
+  @Get('foundational-skills/feedback-uptake')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Named improvements that were acted on (super-admin)',
+    description:
+      'Backs Highlights → Helping skills AAQ-221. Each debriefed session’s areas of growth are ' +
+      'filed under foundational helping skills by a scheduled model call (mapper version pinned). ' +
+      "For each mapped session: the learner's last scored cut closed by the session's end against " +
+      'their first cut whose first session ended after it; sessions sharing both cuts are one ' +
+      'window. Per skill assessable in both cuts: NAMED (a debrief in the window filed an ' +
+      'improvement under it) vs UNNAMED, as the share of each learner’s observations where the ' +
+      'level rose / held / fell, collapsed to one value per learner. `difference` is named − unnamed ' +
+      '"rose" share within learner, with a deterministic bootstrap over learners and a sign test; ' +
+      'shares and differences are null below `minSampleSize` while counts travel. Observational: ' +
+      'regression to the mean inflates the named arm, which the unnamed control and ' +
+      '`beforeLevelAvg` are there to show. All-time; test organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Feedback uptake retrieved successfully',
+    type: FeedbackUptakeResponseDto,
+  })
+  async getFeedbackUptake(
+    @Query() query: FeedbackUptakeQueryDto,
+  ): Promise<FeedbackUptakeResponseDto> {
+    return this.feedbackUptakeAnalyticsService.getFeedbackUptake(query);
+  }
+
+  @Get('foundational-skills/self-efficacy')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Learner confidence against the judge: start → now, and calibration (super-admin)',
+    description:
+      'Backs Highlights → Quality & sentiment (AAQ-230, AAQ-231). `confidence`: each learner’s ' +
+      'self-rated confidence (0–10, the self-efficacy instrument) on their first vs latest answer, ' +
+      'over the items rated both times, per tier and per skill — beside the judge’s level (1–4) at the ' +
+      'scored cut nearest each answer for the same learners. `calibration`: every rated item against ' +
+      'the nearest cut (±30 days) where the skill was assessable, self rescaled 1 + 3·r/10, over-/under-' +
+      'confident beyond ±0.75 levels, one point per learner (their latest), Spearman r, and scatter ' +
+      'points (no learner ids). Self-ratings are never an outcome alone: learners are poor, often over-' +
+      'confident self-assessors, and the judge is not yet checked against human raters. All-time; one ' +
+      'instrument and one rubric version; test orgs excluded; `tenantId` narrows by the answer’s org. ' +
+      'Numbers below `minSampleSize` learners are null while counts travel; with no answers, zeros and nulls.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Self-efficacy analytics retrieved successfully',
+    type: SelfEfficacyResponseDto,
+  })
+  async getFoundationalSkillsSelfEfficacy(
+    @Query() query: SelfEfficacyQueryDto,
+  ): Promise<SelfEfficacyResponseDto> {
+    return this.selfEfficacyAnalyticsService.getSelfEfficacy(query);
+  }
+
+  @Get('foundational-skills/judge-agreement')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Judge vs human agreement on the helping-skills rubric (super-admin)',
+    description:
+      'Backs AAQ-223. People rate a stratified sample of foundational-skills cuts (30 per ' +
+      'calendar quarter, composite tercile × session language; see ' +
+      '`GET /v1/foundational-skills/human-ratings/sample`) by ticking behaviour codes, and each ' +
+      "level is derived with the judge's own rule. Per skill: Cohen's κ on opportunity, and where " +
+      'both found one, κ unweighted and quadratic-weighted on the 1–4 level plus % exact, for judge ' +
+      'vs human (one pair per rating) and human vs human (every rater pair on a cut); the ' +
+      'any-unhelpful flag likewise. κ and % are null below `minSampleSize` rated cuts while counts ' +
+      'travel; `status` is `notYetMeasured` with no ratings. All-time, platform-wide, test orgs ' +
+      'excluded, one rubric version (other versions excluded and counted).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Judge vs human agreement retrieved successfully',
+    type: JudgeAgreementResponseDto,
+  })
+  async getFoundationalSkillsJudgeAgreement(): Promise<JudgeAgreementResponseDto> {
+    return this.judgeAgreementAnalyticsService.getJudgeAgreement();
+  }
+
+  @Get('foundational-skills/transfer')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Helping skills on first contact with a new scenario (super-admin)',
+    description:
+      'Backs AAQ-220. Only single-scenario cuts (every session one scenario). For learners with ' +
+      '`minSingleScenarioCuts`+ scored single-scenario cuts: the first cut on a scenario met in no ' +
+      'earlier cut (single or mixed, scored or not) against the single-scenario cut just before it, ' +
+      'when that one was on a scenario already played. Pairs collapse to one value per learner; paired ' +
+      'bootstrap interval and sign test; averages, interval, test and slope rows null below ' +
+      '`minSampleSize` learners while counts travel. `sameDifficulty` repeats the comparison over ' +
+      'same-difficulty pairs; `difficultyShift` tallies harder/same/easier. All-time; `tenantId` ' +
+      'narrows by the cut tenant; test organisations excluded; one rubric version.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Transfer to a new scenario retrieved successfully',
+    type: FoundationalSkillsTransferResponseDto,
+  })
+  async getFoundationalSkillsTransfer(
+    @Query() query: FoundationalSkillsTransferQueryDto,
+  ): Promise<FoundationalSkillsTransferResponseDto> {
+    return this.foundationalSkillsTransferAnalyticsService.getTransfer(query);
+  }
+
+  @AuthRoles(UserRole.COUNSELOR)
+  @Get('counselor-stats')
+  @ApiOperation({
+    summary: 'Get counselor statistics',
+    description:
+      'Fetch counselor listening and sharing duration statistics with optional date range for the authenticated user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Counselor statistics retrieved successfully',
+    type: [CounselorStatsResponseDto],
+  })
+  async getCounselorStats(
+    @Query() queryParams: CounselorStatsQueryDto,
+    @Req() req: { user: { id: number } },
+  ): Promise<CounselorStatsResponseDto> {
+    return this.analyticsService.getCounselorStats(queryParams, req.user.id);
+  }
+}

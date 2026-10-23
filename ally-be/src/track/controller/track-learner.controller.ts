@@ -1,0 +1,386 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
+import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
+import { Public } from 'src/auth/decorators/auth.metadata';
+import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { TrackEnrollmentService } from '../service/track-enrollment.service';
+import { TrackQuizService } from '../service/track-quiz.service';
+import { TrackJournalService } from '../service/track-journal.service';
+import { TrackAnnotationService } from '../service/track-annotation.service';
+import { TrackGameService } from '../service/track-game.service';
+import { TrackProgressDashboardService } from '../service/track-progress-dashboard.service';
+import { TrackResourceEmbedService } from '../service/track-resource-embed.service';
+import { VideoProgressDto } from '../dto/video-progress.dto';
+import {
+  QuizAnswerDto,
+  SubmitQuizAttemptDto,
+} from '../dto/submit-quiz-attempt.dto';
+import { SubmitAnnotationAttemptDto } from '../dto/submit-annotation-attempt.dto';
+import { SubmitArticleQuestionAnswerDto } from '../dto/article-question-answer.dto';
+import { SaveJournalDraftsDto } from '../dto/journal-entry.dto';
+import { GameResultDto } from '../dto/game-result.dto';
+import { BranchingResultDto } from '../dto/branching-result.dto';
+import { BucketSortPlacementDto } from '../dto/bucket-sort-placement.dto';
+import { TrackBucketSortService } from '../service/track-bucket-sort.service';
+import { TrackBranchingService } from '../service/track-branching.service';
+import {
+  EnrollTrackDto,
+  SetTrackLanguageDto,
+} from '../dto/track-translation.dto';
+
+@ApiTags('Learn Tracks')
+@ApiBearerAuth()
+@ApiSecurity('access-token')
+@Controller('v1/learn')
+export class TrackLearnerController {
+  constructor(
+    private readonly trackEnrollmentService: TrackEnrollmentService,
+    private readonly trackQuizService: TrackQuizService,
+    private readonly trackJournalService: TrackJournalService,
+    private readonly trackAnnotationService: TrackAnnotationService,
+    private readonly trackGameService: TrackGameService,
+    private readonly trackBucketSortService: TrackBucketSortService,
+    private readonly trackBranchingService: TrackBranchingService,
+    private readonly trackProgressDashboardService: TrackProgressDashboardService,
+    private readonly trackResourceEmbedService: TrackResourceEmbedService,
+  ) {}
+
+  @ApiOperation({ summary: 'List tracks available to the learner' })
+  @AuthPermissions([PERMISSIONS.VIEW_TRACKS])
+  @Get('tracks')
+  async getTracks(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Query('languageCode') languageCode?: string,
+  ) {
+    return this.trackEnrollmentService.getTracksForLearner({
+      limit,
+      offset,
+      languageCode,
+    });
+  }
+
+  @ApiOperation({
+    summary: 'Track detail with per-component progress (no answer keys)',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @Get('tracks/:trackId')
+  async getTrackDetail(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Query('languageCode') languageCode?: string,
+  ) {
+    return this.trackEnrollmentService.getTrackDetailForLearner(
+      trackId,
+      languageCode,
+    );
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: 'Public outline of a course whose share link is public',
+    description:
+      'No login required. Served only while the course is published and its ' +
+      'author has switched public view on; otherwise 404, with the same ' +
+      'message whether or not the course exists. Titles, descriptions and ' +
+      'component types only — no content, no progress. `story` is the ' +
+      "course's story-led landing page with its display rules already " +
+      'applied (null unless the author set a hook): a block is present only ' +
+      'when it is switched on and has the content it needs, and the content ' +
+      'note lists the trigger warnings on the course’s roleplays and cases.',
+  })
+  @Get('tracks/:trackId/public')
+  async getPublicTrackOutline(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Query('languageCode') languageCode?: string,
+  ) {
+    return this.trackEnrollmentService.getPublicTrackOutline(
+      trackId,
+      languageCode,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Whether the signed-in learner can take this course',
+    description:
+      'Same rules as the detail view and enrolment, returned as ' +
+      '`{hasAccess, enrolled, reason}` instead of a 403 — the shared-link ' +
+      'landing page asks this right after login.',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @Get('tracks/:trackId/access')
+  async getTrackAccess(@Param('trackId', ParseUUIDPipe) trackId: string) {
+    return this.trackEnrollmentService.getTrackAccess(trackId);
+  }
+
+  @ApiOperation({
+    summary:
+      'Progress + consolidated feedback dashboard for an enrolled course',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @Get('tracks/:trackId/progress')
+  async getTrackProgressDashboard(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+  ) {
+    return this.trackProgressDashboardService.getDashboard(trackId);
+  }
+
+  @ApiOperation({ summary: 'Enroll in a track (idempotent)' })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/:trackId/enroll')
+  async enroll(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Body() dto?: EnrollTrackDto,
+  ) {
+    // The app language seeds the course's language when it is published in it.
+    return this.trackEnrollmentService.enroll(trackId, dto?.languageCode);
+  }
+
+  @ApiOperation({
+    summary: 'Languages this course is published in, plus the learner’s choice',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @Get('tracks/:trackId/languages')
+  async getTrackLanguages(@Param('trackId', ParseUUIDPipe) trackId: string) {
+    return this.trackEnrollmentService.getTrackLanguages(trackId);
+  }
+
+  @ApiOperation({
+    summary:
+      'Choose the language for this course. Persists on the enrollment and is the language answers are marked in.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Put('tracks/:trackId/language')
+  async setTrackLanguage(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Body() dto: SetTrackLanguageDto,
+  ) {
+    return this.trackEnrollmentService.setTrackLanguage(
+      trackId,
+      dto.languageCode,
+    );
+  }
+
+  @ApiOperation({ summary: 'Next unlocked component in the track' })
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @Get('tracks/:trackId/next-item')
+  async getNextItem(@Param('trackId', ParseUUIDPipe) trackId: string) {
+    return this.trackEnrollmentService.getNextItem(trackId);
+  }
+
+  @ApiOperation({
+    summary:
+      'Open a component; returns the type-specific payload the player renders',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/start')
+  async startItem(@Param('itemId', ParseUUIDPipe) itemId: string) {
+    return this.trackEnrollmentService.startItem(itemId);
+  }
+
+  @ApiOperation({ summary: 'Mark an article as read (completes the item)' })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/article-read')
+  async markArticleRead(@Param('itemId', ParseUUIDPipe) itemId: string) {
+    return this.trackEnrollmentService.markArticleRead(itemId);
+  }
+
+  @ApiOperation({
+    summary: "Which of an article's resources must open outside the app",
+    description:
+      'Checks each resource URL server-side (status code and framing ' +
+      'headers, cached) because an embedded frame cannot report a 403, a ' +
+      'bot-check page or an embedding block to the player. Any failure ' +
+      'reports openExternally: true.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Get('tracks/items/:itemId/resources/embeddability')
+  async getResourceEmbeddability(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+  ) {
+    return this.trackResourceEmbedService.getResourceEmbeddability(itemId);
+  }
+
+  @ApiOperation({
+    summary: "Answer one of an article's inline questions",
+    description:
+      'Single-shot and final — the question cannot be answered twice. The ' +
+      'response carries the correct option so the reader can be shown which ' +
+      'answer was right, and completes the article once every question has ' +
+      'been answered and any minReadSeconds dwell rule has been met.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/article-questions/:questionId/answer')
+  async submitArticleQuestionAnswer(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Param('questionId') questionId: string,
+    @Body() dto: SubmitArticleQuestionAnswerDto,
+  ) {
+    return this.trackEnrollmentService.submitArticleQuestionAnswer(
+      itemId,
+      questionId,
+      dto.selectedOptionId,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Report video watch progress (completes at the required pct)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/video-progress')
+  async reportVideoProgress(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: VideoProgressDto,
+  ) {
+    return this.trackEnrollmentService.reportVideoProgress(
+      itemId,
+      dto.watchedPct,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      "Answer a video's quiz interjection (gates playback; does not complete the item)",
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/interjections/:interjectionId/answer')
+  async submitInterjectionAnswer(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Param('interjectionId') interjectionId: string,
+    @Body() dto: QuizAnswerDto,
+  ) {
+    return this.trackEnrollmentService.submitInterjectionAnswer(
+      itemId,
+      interjectionId,
+      dto,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'Submit a quiz attempt; server grades (incl. LLM for open-ended) and returns per-question results',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/quiz-attempts')
+  async submitQuizAttempt(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: SubmitQuizAttemptDto,
+  ) {
+    return this.trackQuizService.submitAttempt(itemId, dto.answers);
+  }
+
+  @ApiOperation({
+    summary: 'Retry LLM grading for a PENDING_GRADING attempt',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/quiz-attempts/:attemptId/regrade')
+  async regradeQuizAttempt(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Param('attemptId', ParseUUIDPipe) attemptId: string,
+  ) {
+    return this.trackQuizService.regradeAttempt(itemId, attemptId);
+  }
+
+  @ApiOperation({
+    summary:
+      'Submit annotation marks; server grades against the key and returns per-mark verdicts',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/annotation-attempts')
+  async submitAnnotationAttempt(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: SubmitAnnotationAttemptDto,
+  ) {
+    return this.trackAnnotationService.submitAttempt(itemId, dto.marks);
+  }
+
+  @ApiOperation({
+    summary: "Record a finished game run as the learner's personal best",
+    description:
+      'Scoreboard only — a game component completes when it is opened, so ' +
+      'this never unlocks, gates or grades anything.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/game-result')
+  async recordGameResult(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: GameResultDto,
+  ) {
+    return this.trackGameService.recordResult(itemId, dto.score);
+  }
+
+  @ApiOperation({
+    summary: 'Check where the learner placed one bucket-sort item',
+    description:
+      'Returns the verdict, the correct bucket and the explanation for that ' +
+      'item only. The first placement of each item is the one recorded.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/bucket-sort/place')
+  async placeBucketSortItem(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: BucketSortPlacementDto,
+  ) {
+    return this.trackBucketSortService.checkPlacement(
+      itemId,
+      dto.sortItemId,
+      dto.bucketId,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Start another round of a finished bucket sort',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/bucket-sort/restart')
+  async restartBucketSort(@Param('itemId', ParseUUIDPipe) itemId: string) {
+    return this.trackBucketSortService.startNewRound(itemId);
+  }
+
+  @ApiOperation({
+    summary: 'Record a finished run of a branching scenario',
+    description:
+      'Takes the choices the learner made. The path is walked through the ' +
+      'authored scenario; reaching any ending completes the component.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/branching-result')
+  async recordBranchingResult(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: BranchingResultDto,
+  ) {
+    return this.trackBranchingService.recordResult(itemId, dto.path);
+  }
+
+  @ApiOperation({ summary: 'Autosave journal drafts' })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/journal')
+  async saveJournalDrafts(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body() dto: SaveJournalDraftsDto,
+  ) {
+    return this.trackJournalService.saveDrafts(itemId, dto.responses);
+  }
+
+  @ApiOperation({
+    summary: 'Submit the journal (validates required prompts, completes item)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @Post('tracks/items/:itemId/journal/submit')
+  async submitJournal(@Param('itemId', ParseUUIDPipe) itemId: string) {
+    return this.trackJournalService.submit(itemId);
+  }
+}

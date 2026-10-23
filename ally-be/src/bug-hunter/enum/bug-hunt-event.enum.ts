@@ -1,0 +1,106 @@
+/**
+ * One value per pipeline step the workflow can report. Stored as
+ * `character varying` with a CHECK constraint (repo convention, not a
+ * Postgres enum — see AnalyticsSuggestionStatus for why).
+ *
+ * `SKIPPED_DISABLED` and `SETTINGS_CHANGED` are not pipeline steps: the first
+ * is the whole content of a run that found the kill switch off, and the
+ * second is emitted by the settings write path itself (not a run), with
+ * `runId` null, so the on/off history is visible in the same timeline.
+ */
+export enum BugHuntEventStage {
+  SKIPPED_DISABLED = 'skipped_disabled',
+  /** A scheduled sweep whose repo had nothing new to look at — see BugHuntRunStatus.SKIPPED_QUIET. */
+  SKIPPED_QUIET = 'skipped_quiet',
+  FINDER_RESULT = 'finder_result',
+  VERIFY = 'verify',
+  /**
+   * A fix session's study of the feature, posted before it changes any code —
+   * how it works today, where the value lives, the planned fix — with a
+   * second model's review in the payload. See BugFixStudy.
+   */
+  STUDY = 'study',
+  FIX_ATTEMPT = 'fix_attempt',
+  TEST_WRITTEN = 'test_written',
+  DOC_UPDATED = 'doc_updated',
+  PR_OPENED = 'pr_opened',
+  MERGED = 'merged',
+  ESCALATED = 'escalated',
+  ERROR = 'error',
+  SETTINGS_CHANGED = 'settings_changed',
+  /** An admin pressed "Start fix session" and the GitHub Actions dispatch was accepted. */
+  SESSION_DISPATCHED = 'session_dispatched',
+  /** An admin pressed "Release to production" and the repo's release workflow was dispatched. */
+  RELEASE_DISPATCHED = 'release_dispatched',
+  /** The release workflow finished successfully — the fix is live. */
+  RELEASED = 'released',
+  /** The release workflow finished red. The fix is merged to master but NOT deployed. */
+  RELEASE_FAILED = 'release_failed',
+  /** A fix agent found the bug spans repos and reported an ordered plan. */
+  PLAN_CREATED = 'plan_created',
+  /** The orchestrator dispatched the next step of a plan. */
+  STEP_STARTED = 'step_started',
+  /**
+   * A human stopped a fix on purpose: an admin pressed "Stop fix session"
+   * (BugFixSessionService.cancelFixSession), or a developer closed the agent's
+   * PR on GitHub without merging it (reconcilePrOpenedFindings). The payload's
+   * `closedOnGitHub: true` tells the two apart.
+   */
+  CANCELLED = 'cancelled',
+  /**
+   * An admin rewrote the bug's description before putting Bug Hunter on it —
+   * see BugFindingService.editDescription. Recorded because the description IS
+   * the fix agent's brief, so a reviewer asking why a session went the way it
+   * did needs to see that the brief changed, and when relative to the dispatch.
+   */
+  DESCRIPTION_EDITED = 'description_edited',
+  /**
+   * An admin pinned or un-pinned the coarse roadmap stage by hand — see
+   * BugFindingService.setStage. Recorded because a hand-set stage deliberately
+   * stops tracking `status`, so the timeline is the only place a later reader
+   * can see why the two disagree, and who decided they should.
+   */
+  STAGE_CHANGED = 'stage_changed',
+  /**
+   * Somebody said no, and why — a human rejecting a bug, or the Verify phase
+   * refuting one. Recorded because a decline used to appear on this timeline
+   * as a bare status change with no explanation beside it, which is the one
+   * event a later reader most needs the reasoning for: it is the only outcome
+   * where nothing further will ever happen to the bug.
+   */
+  DECISION_RECORDED = 'decision_recorded',
+  /**
+   * A bug Bug Hunter had already fixed and shipped has come back — written on
+   * BOTH rows, the returning finding and the fix that failed to hold, so
+   * either drawer tells the whole story without a join.
+   */
+  REGRESSED = 'regressed',
+  /**
+   * A sweep re-found a bug that had already been declined, and the dedupe
+   * suppressed it rather than opening a second row. Worth a line: silently
+   * dropping a finder's output is the kind of thing that, undocumented, looks
+   * like the finder having missed something.
+   */
+  RECURRENCE_SUPPRESSED = 'recurrence_suppressed',
+  /**
+   * A finder-error dismissal was overturned: a later finding under the same
+   * dedupe key shipped, proving the original dismissal wrong. Written on the
+   * dismissed row so its drawer shows when and by which finding it was
+   * reversed, not just an aggregate rate on the scorecard.
+   */
+  REVERSED = 'reversed',
+  /**
+   * A fix turned out wrong — the Verifier refused it at the wrong layer, the
+   * bug came back, a person reverted the PR, or the post-release check found
+   * the symptom again. The payload names the chain link that broke; see
+   * BugWrongFix.
+   */
+  WRONG_FIX = 'wrong_fix',
+
+  /**
+   * The reconcile loop found a pull request for a fix session that had
+   * completed successfully without reporting back, and pulled the finding out
+   * of FAILED.
+   */
+  SESSION_RECOVERED = 'session_recovered',
+}

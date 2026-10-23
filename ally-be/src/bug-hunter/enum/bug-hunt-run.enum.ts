@@ -1,0 +1,60 @@
+/**
+ * Stored as `character varying` with a CHECK constraint, per repo convention
+ * (see AnalyticsSuggestionStatus) — not a Postgres enum.
+ */
+export enum BugHuntTrigger {
+  SCHEDULED = 'scheduled',
+  MANUAL = 'manual',
+  /**
+   * The Verifier's run (OPP-0779): a read-only pass over one fix PR on the
+   * OTHER vendor's model, dispatched by Bug Hunter itself the moment a fix
+   * session reaches PR_OPENED. Records a verdict; never writes to the repo.
+   */
+  VERIFY_FIX = 'verify_fix',
+  /**
+   * The independent finding verifier's run (OPP-0780): one per closed sweep,
+   * on the other vendor's model, confirming or refuting every unproven
+   * finding the sweep kept before any of them is fixed in AI mode.
+   */
+  VERIFY_FINDINGS = 'verify_findings',
+  /**
+   * The PR review sense (OPP-0785): a read-only pass over one open pull
+   * request a person opened, on its head, filing findings linked to the PR.
+   * Judged by the finding Verifier; a confirmed finding becomes a review
+   * comment, never a blocking check.
+   */
+  PR_REVIEW = 'pr_review',
+  /**
+   * One admin, one bug, one click — a run scoped to a single finding, started
+   * by `POST findings/:id/fix-session` rather than by a repo-wide sweep. It
+   * skips Discover and Verify entirely (the bug is already known and already
+   * confirmed) and runs only the Fix phase for that finding. Its
+   * `bug_hunt_runs` row carries the same totals as any other run; they just
+   * only ever sum to one finding.
+   */
+  FIX_SESSION = 'fix_session',
+  /**
+   * The weekly feature-map run: a read-only pass over one repo that writes
+   * a card per user-facing feature — screens, endpoints, services, tables,
+   * who writes the data, which other repos take part — so a study starts
+   * from how the feature works instead of re-reading the codebase cold.
+   * Never edits the repo. See bug-hunter-feature-map.service.ts.
+   */
+  FEATURE_MAP = 'feature_map',
+}
+
+export enum BugHuntRunStatus {
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  /** The feature was off when this trigger fired; the run did no work. */
+  SKIPPED_DISABLED = 'skipped_disabled',
+  /**
+   * A scheduled sweep whose repo had nothing new since its last completed
+   * sweep — no commits, and no CloudWatch log group to catch a production
+   * issue without one. Never applies to a human-triggered sweep or a fix
+   * session: an explicit ask always runs. See
+   * `BugHunterService.requireWorthSweepingOrRecordSkip`.
+   */
+  SKIPPED_QUIET = 'skipped_quiet',
+}

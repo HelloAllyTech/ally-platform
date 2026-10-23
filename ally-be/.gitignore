@@ -1,0 +1,79 @@
+# compiled output
+/dist
+/node_modules
+
+# Logs
+/logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Lint cache
+.eslintcache
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+.env.bak*
+docker.env
+gcloud/
+
+# Secrets / certs / dumps (never commit)
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.dump
+*.sql
+*.swp
+scan_report.*
+.secrets/
+
+# .claude/ holds personal overrides *and* shared agent config. Ignore the
+# contents by default, then re-include the committed team pieces — the Stacks
+# skill and UserPromptSubmit hook only reach other engineers if they are
+# tracked. Re-include needs `.claude/*`, not `.claude/`: git will not descend
+# into an excluded directory to un-exclude anything inside it.
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+!.claude/hooks/
+!.claude/agents/
+
+# Scratch clone of the wiki, created by the wiki-pr flow (see AGENTS.md)
+.wiki-tmp/
+
+# Bug Hunter eval replays: per-run detail stays local, the score is recorded in ally-be (see evals/bug-hunter/README.md)
+evals/bug-hunter/results/
+.eval-worktrees/

@@ -1,0 +1,1031 @@
+import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { DataSource, IsNull, Repository } from 'typeorm';
+
+import { BugFinding } from '../entity/bug-finding.entity';
+import {
+  BUG_FINDING_FINDER_ERROR_REASONS,
+  BugFindingDecisionReason,
+  BugFindingStatus,
+  BUG_FINDING_OPEN_STATUSES,
+} from '../enum/bug-finding.enum';
+import { BUG_HUNT_LOW_CONFIDENCE_THRESHOLD } from '../constants/bug-hunter.constants';
+
+/**
+ * Where a finding stands, in three words, for the operations aggregates.
+ *
+ * Listed rather than derived so a new status shows up as uncounted in the
+ * panel — the same argument `BugHunterMetricsService.OPEN_STATUSES` makes.
+ * "Accepted" is anything that reached a fix stage or beyond, failures
+ * included: somebody (or AI mode) treated it as a real bug, whatever became
+ * of the fix.
+ */
+export const FINDING_ACCEPTED_STATUSES: string[] = [
+  BugFindingStatus.APPROVED,
+  BugFindingStatus.QUEUED,
+  BugFindingStatus.FIXING,
+  BugFindingStatus.NEEDS_INPUT,
+  BugFindingStatus.BLOCKED,
+  BugFindingStatus.COORDINATING,
+  BugFindingStatus.PR_OPENED,
+  BugFindingStatus.MERGED,
+  BugFindingStatus.RELEASING,
+  BugFindingStatus.RELEASED,
+  BugFindingStatus.RELEASE_FAILED,
+  BugFindingStatus.FAILED,
+  BugFindingStatus.CANCELLED,
+];
+export const FINDING_DECLINED_STATUSES: string[] = [
+  BugFindingStatus.DISMISSED,
+  BugFindingStatus.REJECTED,
+];
+export const FINDING_UNDECIDED_STATUSES: string[] = [
+  BugFindingStatus.NEW,
+  BugFindingStatus.PENDING_APPROVAL,
+];
+
+/** Statuses that mean "still open" — a matching dedupe key under one of these is the same bug, not a new one. One definition, shared with the metrics funnel: see BUG_FINDING_OPEN_STATUSES. */
+const OPEN_STATUSES: BugFindingStatus[] = BUG_FINDING_OPEN_STATUSES;
+
+/**
+ * Statuses that mean "somebody already said no to this".
+ *
+ * The counterpart to OPEN_STATUSES, and deliberately a separate set rather
+ * than "everything not open": MERGED and RELEASED are also not open, and a
+ * dedupe hit against one of THOSE means something completely different — a
+ * regression, not a settled argument (see SHIPPED_STATUSES).
+ */
+const DECLINED_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.REJECTED,
+  BugFindingStatus.DISMISSED,
+];
+
+/**
+ * Statuses that mean "we fixed this".
+ *
+ * MERGED as well as RELEASED, because a bug reappearing between merge and
+ * release is still the fix having failed to hold — for the frontends a merge
+ * to master is often what a developer would call shipped, and ally-mobile
+ * never reaches RELEASED at all.
+ */
+const SHIPPED_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.MERGED,
+  BugFindingStatus.RELEASED,
+];
+
+/** One previously-declined bug, condensed for the sweep prompt's "known non-bugs" block. */
+export interface DeclinedFindingSummary {
+  title: string;
+  file: string | null;
+  symbol: string | null;
+  reason: BugFindingDecisionReason;
+  note: string | null;
+}
+
+/** Counts for one (source, repo) cell of the metrics report. */
+export interface FindingOutcomeCount {
+  source: string;
+  repo: string | null;
+  status: string;
+  decisionReason: string | null;
+  /** Findings whose stored confidence is below the low-confidence threshold. */
+  lowConfidence: number;
+  /** Findings carrying no confidence at all — proven ones, and rows predating verifier scoring. */
+  unscored: number;
+  /**
+   * Findings in this cell whose dismissal was later proven wrong — see
+   * `reversed_at`. Windowed on `createdAt` like every other field here, so it
+   * shares a cohort with `count` (which feeds the rate's denominator) — see
+   * `outcomeCounts`'s doc for why that matters, and for the lag it implies.
+   */
+  reversed: number;
+  count: number;
+}
+
+/** Same cells as `FindingOutcomeCount`, one set per calendar week — see `weeklyOutcomeCounts`. */
+export interface WeeklyFindingOutcomeCount extends FindingOutcomeCount {
+  week: Date;
+}
+
+/**
+ * One (day, source) cell of new findings — see `dailyFiledCounts`.
+ *
+ * `accepted` / `declined` / `undecided` describe where those findings stand
+ * NOW, not on the day they were filed: the chart pairs a day's volume with
+ * the share of it that later held up, which is the only thing that stops a
+ * noisy finder reading as a productive one.
+ */
+export interface DailyFiledCount {
+  /** Calendar day, `YYYY-MM-DD`, in the database's clock (UTC). */
+  day: string;
+  source: string;
+  /**
+   * Whether the finder had mechanical proof (a failing test, a lint error, a
+   * recurring log event) or inferred the bug by reading. The operations view
+   * split. Kept on the row for the analytics that still read it; the
+   * operations view sums across it.
+   */
+  proven: boolean;
+  filed: number;
+  /** Reached a fix stage or beyond — a human or AI mode treated it as a real bug. */
+  accepted: number;
+  /** Dismissed by a verifier or rejected by a human. */
+  declined: number;
+  /** Still new or pending approval. */
+  undecided: number;
+}
+/** How long findings sat between two lifecycle stamps, in hours. */
+export interface StageLatency {
+  /** Median, not mean: one bug that sat for three weeks should not describe the other twenty. */
+  medianHours: number | null;
+  p90Hours: number | null;
+  /** Rows the median is computed from — a median over two findings is not a latency. */
+  sampled: number;
+}
+
+export interface ListBugFindingsFilter {
+  status?: BugFindingStatus;
+  source?: string;
+  repo?: string;
+  /**
+   * Only the findings one sweep touched — the shift log's "Found N" made
+   * clickable.
+   *
+   * Server-side rather than client-side on the loaded window, and that is the
+   * whole point of it. `runId` is stamped on a row every time a run touches it,
+   * INCLUDING a re-triage of a human-reported bug that was filed weeks ago (see
+   * BugFindingService.persistFindings), so a run's findings are scattered
+   * arbitrarily far down a table ordered by `createdAt`. Filtering the newest-N
+   * window in the browser would have shown 2 of a run's 10 and called it 2.
+   */
+  runId?: string;
+  limit: number;
+  offset: number;
+}
+
+@Injectable()
+export class BugFindingRepository extends Repository<BugFinding> {
+  constructor(dataSource: DataSource) {
+    super(BugFinding, dataSource.createEntityManager());
+  }
+
+  /**
+   * Hashed identity for "this is the same bug" — stable across runs so a
+   * still-open finding never gets a second row.
+   *
+   * Keyed on the code coordinate plus the finder class, NOT on the finder's
+   * prose. `description` is LLM-generated: it used to be hashed directly, so
+   * the same bug described differently on a later night produced a different
+   * key and a duplicate row. The sweep was manufacturing its own noise.
+   *
+   * `symbol` (function/class/route/component) is the stable discriminator.
+   * When a finder does not supply one we fall back to a normalised
+   * *fingerprint* of the description rather than its raw text — that still
+   * collapses rewordings, while keeping two genuinely different bugs in the
+   * same file apart. Dropping description entirely would collapse every
+   * code-review finding in a large file into one row, which is worse than the
+   * bug being fixed here.
+   *
+   * `repo` is deliberately not hashed in: it stays a separate, indexed WHERE
+   * clause in findOpenByDedupeKey, so the same bug in two repos reads as two
+   * findings without needing two hashes.
+   */
+  static dedupeKey(
+    file: string | null | undefined,
+    source: string,
+    symbol?: string | null,
+    description?: string | null,
+  ): string {
+    const norm = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+    const discriminator = symbol?.trim()
+      ? norm(symbol)
+      : BugFindingRepository.descriptionFingerprint(description ?? '');
+    const normalized = `${norm(file ?? '')}::${norm(source)}::${discriminator}`;
+    return createHash('sha256').update(normalized).digest('hex');
+  }
+
+  /**
+   * A prose-insensitive fingerprint of a finding description, used only when
+   * the finder gave us no `symbol`.
+   *
+   * Strips the parts an LLM varies between runs while describing the same
+   * defect — digits (line numbers, counts), quoted literals, punctuation and
+   * common filler words — then sorts the surviving tokens so word order stops
+   * mattering. Two descriptions of one bug converge; descriptions of two
+   * different bugs keep different token sets.
+   *
+   * Not exact, and not meant to be: this is the fallback path. Finders that
+   * emit `symbol` bypass it entirely and dedupe precisely.
+   */
+  static descriptionFingerprint(description: string): string {
+    const STOPWORDS = new Set([
+      'the',
+      'a',
+      'an',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'and',
+      'or',
+      'but',
+      'if',
+      'then',
+      'than',
+      'that',
+      'this',
+      'these',
+      'those',
+      'it',
+      'its',
+      'as',
+      'by',
+      'from',
+      'not',
+      'no',
+      'never',
+      'always',
+      'should',
+      'would',
+      'will',
+      'can',
+      'could',
+      'may',
+      'might',
+      'must',
+      'does',
+      'do',
+      'did',
+      'has',
+      'have',
+      'had',
+      'when',
+      'which',
+      'while',
+      'because',
+      'so',
+      'there',
+      // Structural filler: once digits are stripped, "line 88" and "at file
+      // foo" leave behind words that say nothing about WHICH bug this is.
+      'line',
+      'lines',
+      'file',
+      'column',
+      'col',
+      'code',
+      'method',
+      'function',
+      'here',
+      'also',
+      'currently',
+      'instead',
+      'rather',
+      'actually',
+    ]);
+
+    /**
+     * Crude suffix stripping, not real stemming. Exists for one reason: the
+     * commonest way two descriptions of one bug differ is verb form —
+     * "retries"/"retry", "resets"/"reset", "leaking"/"leaks". A full stemmer
+     * would be a dependency and far more aggression than this needs.
+     */
+    const stem = (t: string): string => {
+      if (t.length > 4 && t.endsWith('ies')) return `${t.slice(0, -3)}y`;
+      for (const suffix of ['ing', 'ed', 'es', 's']) {
+        if (t.length > suffix.length + 2 && t.endsWith(suffix)) {
+          return t.slice(0, -suffix.length);
+        }
+      }
+      return t;
+    };
+
+    const tokens = description
+      .toLowerCase()
+      // Quoted literals vary in quoting style between runs; keep the words.
+      .replace(/["'`]/g, ' ')
+      // Line/column numbers and counts are the single most-varied part.
+      .replace(/\d+/g, ' ')
+      .replace(/[^a-z\s]/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 2 && !STOPWORDS.has(t))
+      .map(stem);
+
+    // Sorted + de-duplicated: word order and repetition must not change identity.
+    const unique = Array.from(new Set(tokens)).sort();
+    return unique.join(' ');
+  }
+
+  /** The open row for this exact bug in this repo, if one already exists — see class-level OPEN_STATUSES. */
+  findOpenByDedupeKey(
+    repo: string,
+    dedupeKey: string,
+  ): Promise<BugFinding | null> {
+    return this.createQueryBuilder('f')
+      .where('f.repo = :repo', { repo })
+      .andWhere('f.dedupeKey = :dedupeKey', { dedupeKey })
+      .andWhere('f.status IN (:...statuses)', { statuses: OPEN_STATUSES })
+      .getOne();
+  }
+
+  /**
+   * The most recently DECLINED row for this exact bug in this repo, if one was
+   * declined since `since`.
+   *
+   * The sibling of `findOpenByDedupeKey` for the other half of the dedupe
+   * question. Without it a sweep re-filed every refuted or rejected finding
+   * the moment it re-read the same code, so the reviewer's own decision had a
+   * lifetime of one night and the queue filled with arguments already settled.
+   *
+   * Ordered by decision date, newest first: a bug may have been declined more
+   * than once over months, and the standing decision is the last one.
+   */
+  findRecentlyDeclinedByDedupeKey(
+    repo: string,
+    dedupeKey: string,
+    since: Date,
+  ): Promise<BugFinding | null> {
+    return (
+      this.createQueryBuilder('f')
+        .where('f.repo = :repo', { repo })
+        .andWhere('f.dedupeKey = :dedupeKey', { dedupeKey })
+        .andWhere('f.status IN (:...statuses)', { statuses: DECLINED_STATUSES })
+        // `decidedAt` is null on a verifier dismissal (no human decided it), so
+        // fall back to the row's own update stamp rather than dropping those —
+        // a refuted finding is exactly the kind that gets re-filed nightly.
+        .andWhere('COALESCE(f.decidedAt, f."updatedAt") >= :since', { since })
+        .orderBy('COALESCE(f.decidedAt, f."updatedAt")', 'DESC')
+        .getOne()
+    );
+  }
+
+  /**
+   * The most recent row for this bug that was already FIXED, if it shipped
+   * since `since` — i.e. this "new" finding is the fix coming undone.
+   *
+   * Seen live and the reason this exists: a shutdown race in ally-ai-learn was
+   * fixed and released on 28 August, kept firing in production, and the 2
+   * September sweep filed it again as an ordinary new bug. Both rows were
+   * correct in isolation and neither said the thing that mattered.
+   */
+  findRecentlyShippedByDedupeKey(
+    repo: string,
+    dedupeKey: string,
+    since: Date,
+  ): Promise<BugFinding | null> {
+    return (
+      this.createQueryBuilder('f')
+        .where('f.repo = :repo', { repo })
+        .andWhere('f.dedupeKey = :dedupeKey', { dedupeKey })
+        .andWhere('f.status IN (:...statuses)', { statuses: SHIPPED_STATUSES })
+        // releasedAt is null for a MERGED-but-unreleased fix, so the update
+        // stamp stands in — same reasoning as the decline lookup above.
+        .andWhere('COALESCE(f.releasedAt, f."updatedAt") >= :since', { since })
+        .orderBy('COALESCE(f.releasedAt, f."updatedAt")', 'DESC')
+        .getOne()
+    );
+  }
+
+  /**
+   * Fixes that landed in this repo for bugs in the same file or on the same
+   * symbol — the "how was a bug like this fixed here before" half of a fix
+   * dossier. Newest first, the finding being fixed excluded.
+   *
+   * File OR symbol rather than the exact dedupe key: the exact key is the
+   * same bug (a regression, handled by `findRecentlyShippedByDedupeKey`),
+   * whereas a neighbour is a different bug whose fix shows the shape of this
+   * one. Symbol alone is allowed because a route or component name is stable
+   * across a file move.
+   */
+  listShippedSimilar(
+    repo: string,
+    file: string | null | undefined,
+    symbol: string | null | undefined,
+    excludeFindingId: string,
+    limit = 3,
+  ): Promise<BugFinding[]> {
+    if (!file && !symbol) return Promise.resolve([]);
+    const query = this.createQueryBuilder('f')
+      .where('f.repo = :repo', { repo })
+      .andWhere('f.id != :excludeFindingId', { excludeFindingId })
+      .andWhere('f.status IN (:...statuses)', { statuses: SHIPPED_STATUSES })
+      .orderBy('COALESCE(f.releasedAt, f."updatedAt")', 'DESC')
+      .take(limit);
+    if (file && symbol) {
+      query.andWhere('(f.file = :file OR f.symbol = :symbol)', {
+        file,
+        symbol,
+      });
+    } else if (file) {
+      query.andWhere('f.file = :file', { file });
+    } else {
+      query.andWhere('f.symbol = :symbol', { symbol });
+    }
+    return query.getMany();
+  }
+
+  /**
+   * Bugs still open in the same file as the one being fixed, so a session
+   * knows what else lives in the code it is about to change. Excludes the
+   * finding itself and any child step of a plan.
+   */
+  listOpenInFile(
+    repo: string,
+    file: string,
+    excludeFindingId: string,
+    limit = 5,
+  ): Promise<BugFinding[]> {
+    return this.createQueryBuilder('f')
+      .where('f.repo = :repo', { repo })
+      .andWhere('f.file = :file', { file })
+      .andWhere('f.id != :excludeFindingId', { excludeFindingId })
+      .andWhere('f.parentFindingId IS NULL')
+      .andWhere('f.status IN (:...statuses)', { statuses: OPEN_STATUSES })
+      .orderBy('f.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Declined findings for this exact bug (`repo` + `dedupeKey`) whose decline
+   * was a finder error and that have not already been marked reversed — the
+   * candidates `checkForAndRecordReversals` flips to reversed once a
+   * same-dedupe-key finding actually ships.
+   *
+   * `excludeFindingId` keeps the just-shipped finding itself out of its own
+   * result set — relevant when a finding was previously declined, reopened,
+   * and then shipped under the same row.
+   *
+   * `shippedAt` guards against retroactively reversing a dismissal that was
+   * actually correct at the time it was made: a regression row can be filed
+   * under the same `dedupeKey` *after* the original bug already shipped (see
+   * `persistFindings`, which opens a new row when a match has already
+   * shipped), and an admin declining that regression as a `duplicate` of the
+   * already-fixed bug is a correct call, not a finder error to reverse later.
+   * Only declines that predate the ship count.
+   */
+  findReversibleFinderErrors(
+    repo: string,
+    dedupeKey: string,
+    excludeFindingId: string,
+    shippedAt: Date,
+  ): Promise<BugFinding[]> {
+    return this.createQueryBuilder('f')
+      .where('f.repo = :repo', { repo })
+      .andWhere('f.dedupeKey = :dedupeKey', { dedupeKey })
+      .andWhere('f.status IN (:...statuses)', { statuses: DECLINED_STATUSES })
+      .andWhere('f.decision_reason IN (:...reasons)', {
+        reasons: BUG_FINDING_FINDER_ERROR_REASONS,
+      })
+      .andWhere('f.reversedAt IS NULL')
+      .andWhere('f.id != :excludeFindingId', { excludeFindingId })
+      .andWhere('COALESCE(f.decidedAt, f."updatedAt") < :shippedAt', {
+        shippedAt,
+      })
+      .getMany();
+  }
+
+  /**
+   * Recent declines for one repo where the FINDER was judged wrong, newest
+   * first — the sweep prompt's "known non-bugs" block.
+   *
+   * Filtered to `BUG_FINDING_FINDER_ERROR_REASONS` on purpose. Telling a sweep
+   * "you were wrong about this" only helps when somebody actually concluded
+   * that; showing it a list of real bugs the team chose not to fix would teach
+   * it to stop reporting real bugs, which is the opposite of the intent. See
+   * that constant's doc.
+   */
+  /**
+   * Unproven findings whose truth has since been settled one way or the other
+   * — declined, or shipped — newest settlement first. The raw material of the
+   * verifier eval set; `BugHunterEvalService.buildSet` decides which of these
+   * carry a usable label and what it is.
+   *
+   * `proven = false` because the verifier never runs on a failing test or a
+   * log cluster, so grading it on those would be grading a phase that did not
+   * happen. `file`/`symbol` required because a verifier with no location has
+   * nothing to read. Takes more than `limit` so the labelling pass has room to
+   * drop the reasons it cannot grade (`wont_fix`, `duplicate`, ...).
+   */
+  listSettledForEval(
+    repo: string | undefined,
+    limit: number,
+  ): Promise<BugFinding[]> {
+    const query = this.createQueryBuilder('f')
+      .where('f.status IN (:...statuses)', {
+        statuses: [...DECLINED_STATUSES, ...SHIPPED_STATUSES],
+      })
+      .andWhere('f.proven = false')
+      .andWhere('f.parentFindingId IS NULL')
+      .andWhere('(f.file IS NOT NULL OR f.symbol IS NOT NULL)')
+      .orderBy('COALESCE(f.decidedAt, f."updatedAt")', 'DESC')
+      .take(limit);
+    if (repo) query.andWhere('f.repo = :repo', { repo });
+    return query.getMany();
+  }
+
+  listRecentFinderErrors(
+    repo: string,
+    since: Date,
+    limit: number,
+  ): Promise<BugFinding[]> {
+    return (
+      this.createQueryBuilder('f')
+        .where('f.repo = :repo', { repo })
+        .andWhere('f.status IN (:...statuses)', { statuses: DECLINED_STATUSES })
+        // `f.decision_reason`, not `f.decisionReason`: the metrics query below
+        // has to name the raw column (TypeORM's `select()` cannot resolve a
+        // property there), and having the two spellings side by side in one file
+        // is how somebody later "fixes" the working one. Both forms compile —
+        // this is about them agreeing.
+        .andWhere('f.decision_reason IN (:...reasons)', {
+          reasons: BUG_FINDING_FINDER_ERROR_REASONS,
+        })
+        .andWhere('COALESCE(f.decidedAt, f."updatedAt") >= :since', { since })
+        .orderBy('COALESCE(f.decidedAt, f."updatedAt")', 'DESC')
+        .take(limit)
+        .getMany()
+    );
+  }
+
+  /** The NEW, not-yet-triaged row for a human-reported bug — see RoadmapOpportunityService.create. */
+  findByReportedBugId(reportedBugId: string): Promise<BugFinding | null> {
+    return this.findOne({ where: { reportedBugId } });
+  }
+
+  /**
+   * Findings stuck at NEEDS_INPUT with a question nobody has answered, last
+   * touched before `before`.
+   *
+   * Drives the stale-question digest. The `before` cutoff is what stops a
+   * question asked ten minutes ago being reported as neglected — an admin may
+   * simply not have looked yet.
+   */
+  listStaleNeedsInput(before: Date): Promise<BugFinding[]> {
+    return this.createQueryBuilder('f')
+      .where('f.status = :status', { status: BugFindingStatus.NEEDS_INPUT })
+      .andWhere('f.escalationQuestion IS NOT NULL')
+      .andWhere('f.escalationAnswer IS NULL')
+      .andWhere('f."updatedAt" < :before', { before })
+      .orderBy('f."updatedAt"', 'ASC')
+      .getMany();
+  }
+
+  /** Human-reported bugs still at NEW — the reported-bugs finder's read queue (see BugHunterFinderDataService). */
+  /**
+   * Everything still open, newest first — optionally for one repo.
+   *
+   * For callers outside Bug Hunter that want to know what is already known
+   * broken before proposing work. Capped: this feeds an agent's context, and
+   * an unbounded list would crowd out the reasoning it is meant to inform.
+   */
+  listOpenForRepo(repo?: string, limit = 25): Promise<BugFinding[]> {
+    const query = this.createQueryBuilder('f')
+      .where('f.status IN (:...statuses)', { statuses: OPEN_STATUSES })
+      .orderBy('f.createdAt', 'DESC')
+      .take(limit);
+    if (repo) query.andWhere('f.repo = :repo', { repo });
+    return query.getMany();
+  }
+
+  /**
+   * Open findings one pipeline filed, newest first, optionally narrowed by a
+   * case-insensitive substring over title and symbol.
+   *
+   * By source rather than by repo, because "what has the UX scan found" is a
+   * question about provenance, not about which codebase the answer lives in —
+   * and a UX-sourced finding always carries the helpline frontend's repo, so a
+   * repo filter answers the wrong question and an unfiltered list buries the
+   * answer under static-analysis findings.
+   *
+   * Shares OPEN_STATUSES with `listOpenForRepo` rather than restating it: two
+   * definitions of "open" drift, and the one that drifts is always the copy.
+   */
+  listOpenBySource(
+    source: BugFinding['source'],
+    term?: string,
+    limit = 25,
+  ): Promise<BugFinding[]> {
+    const query = this.createQueryBuilder('f')
+      .where('f.source = :source', { source })
+      .andWhere('f.status IN (:...statuses)', { statuses: OPEN_STATUSES })
+      .orderBy('f.createdAt', 'DESC')
+      .take(limit);
+    if (term) {
+      query.andWhere(
+        '(LOWER(f.title) LIKE :term OR LOWER(f.symbol) LIKE :term)',
+        { term: `%${term.toLowerCase()}%` },
+      );
+    }
+    return query.getMany();
+  }
+
+  /**
+   * `repo` narrows to items `RoadmapOpportunityService.create`'s intake
+   * classifier already believed belong to it, PLUS anything still unfiled —
+   * never to ONLY the confidently-classified ones. Dropping the null-repo
+   * fallback would silently hide a bug the classifier couldn't place from
+   * every sweep, when today it's meant to reach all of them until one claims
+   * it. Omit `repo` for the platform-wide, unfiltered list this always was.
+   */
+  listNewReportedBugs(repo?: string, limit = 50): Promise<BugFinding[]> {
+    const source = 'reported_bug' as BugFinding['source'];
+    const status = BugFindingStatus.NEW;
+    return this.find({
+      where: repo
+        ? [
+            { source, status, repo },
+            { source, status, repo: IsNull() },
+          ]
+        : { source, status },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /** Manual-mode findings an admin has approved for this repo, waiting for the Fix phase to pick them up. */
+  listApprovedForRepo(repo: string): Promise<BugFinding[]> {
+    return this.find({
+      where: { repo, status: BugFindingStatus.APPROVED },
+      order: { decidedAt: 'ASC' },
+    });
+  }
+
+  /** A coordinated fix's steps, always in plan order — the order IS the contract. */
+  listChildren(parentFindingId: string): Promise<BugFinding[]> {
+    return this.find({
+      where: { parentFindingId },
+      order: { stepIndex: 'ASC' },
+    });
+  }
+
+  /** Every parent whose plan is still being worked through — the orchestrator's queue. */
+  listCoordinatingParents(): Promise<BugFinding[]> {
+    return this.find({
+      where: { status: BugFindingStatus.COORDINATING },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /** Parents mid-release, whose steps are being deployed one at a time. */
+  listReleasingParents(): Promise<BugFinding[]> {
+    return this.createQueryBuilder('f')
+      .where('f.status = :status', { status: BugFindingStatus.RELEASING })
+      .andWhere(
+        'EXISTS (SELECT 1 FROM bug_findings c WHERE c.parent_finding_id = f.id)',
+      )
+      .orderBy('f."createdAt"', 'ASC')
+      .getMany();
+  }
+
+  // ── metrics (see BugHunterMetricsService) ────────────────────────────────
+  /**
+   * New findings per calendar day and source, with where each cohort stands
+   * now — the operations panel's "what I turn up, day by day".
+   *
+   * "Unique" bugs by day falls out of the row model: a re-discovery touches
+   * the existing row (`persistFindings`) rather than inserting, so counting
+   * rows by `createdAt` IS counting distinct bugs. Child steps are excluded,
+   * as everywhere else in this file's aggregates — a three-repo fix is one
+   * bug. The day is taken in the database's clock, and the client is told so.
+   */
+  dailyFiledCounts(since: Date): Promise<DailyFiledCount[]> {
+    return this.createQueryBuilder('f')
+      .select(`to_char(f."createdAt", 'YYYY-MM-DD')`, 'day')
+      .addSelect('f.source', 'source')
+      .addSelect('f.proven', 'proven')
+      .addSelect('COUNT(*)::int', 'filed')
+      .addSelect(
+        `COUNT(*) FILTER (WHERE f.status IN (:...accepted))::int`,
+        'accepted',
+      )
+      .addSelect(
+        `COUNT(*) FILTER (WHERE f.status IN (:...declined))::int`,
+        'declined',
+      )
+      .addSelect(
+        `COUNT(*) FILTER (WHERE f.status IN (:...undecided))::int`,
+        'undecided',
+      )
+      .where('f.parentFindingId IS NULL')
+      .andWhere('f."createdAt" >= :since', { since })
+      .setParameters({
+        accepted: FINDING_ACCEPTED_STATUSES,
+        declined: FINDING_DECLINED_STATUSES,
+        undecided: FINDING_UNDECIDED_STATUSES,
+      })
+      .groupBy('day')
+      .addGroupBy('f.source')
+      .addGroupBy('f.proven')
+      .orderBy('day', 'ASC')
+      .getRawMany<DailyFiledCount>();
+  }
+  /**
+   * `outcomeCounts`'s exact cells, bucketed by the calendar week a finding
+   * was filed — the raw material a week-over-week precision/reversal-rate
+   * trend chart folds into one `FindingFunnel` per week via
+   * `BugHunterMetricsService`'s existing `groupFunnels`/`foldFunnel`. Kept as
+   * a separate method rather than an optional `bucket` param on
+   * `outcomeCounts`: that method's single-window shape (`since` only, no
+   * `week` column) is a real, load-bearing simplification for its own
+   * callers, not an accident to generalise away.
+   */
+  weeklyOutcomeCounts(
+    start: Date,
+    end: Date,
+  ): Promise<WeeklyFindingOutcomeCount[]> {
+    return this.createQueryBuilder('f')
+      .select(`date_trunc('week', f."createdAt")`, 'week')
+      .addSelect('f.source', 'source')
+      .addSelect('f.repo', 'repo')
+      .addSelect('f.status', 'status')
+      .addSelect('f.decision_reason', 'decisionReason')
+      .addSelect('COUNT(*)::int', 'count')
+      .addSelect(
+        `COUNT(*) FILTER (
+           WHERE NULLIF(f.metadata->>'confidence', '') IS NOT NULL
+             AND (f.metadata->>'confidence')::numeric < :threshold
+         )::int`,
+        'lowConfidence',
+      )
+      .addSelect(
+        `COUNT(*) FILTER (WHERE NULLIF(f.metadata->>'confidence', '') IS NULL)::int`,
+        'unscored',
+      )
+      .addSelect(
+        `COUNT(*) FILTER (WHERE f.reversed_at IS NOT NULL)::int`,
+        'reversed',
+      )
+      .where('f.parentFindingId IS NULL')
+      .andWhere('f."createdAt" >= :start', { start })
+      .andWhere('f."createdAt" < :end', { end })
+      .setParameter('threshold', BUG_HUNT_LOW_CONFIDENCE_THRESHOLD)
+      .groupBy('week')
+      .addGroupBy('f.source')
+      .addGroupBy('f.repo')
+      .addGroupBy('f.status')
+      .addGroupBy('f.decision_reason')
+      .orderBy('week', 'ASC')
+      .getRawMany<WeeklyFindingOutcomeCount>();
+  }
+  /**
+   * `regressionCounts`'s two cohorts, bucketed by calendar week — the
+   * `regressions` cohort by discovery week, `regressedFixes` by the week the
+   * fix that failed either released or (for repos with no release step)
+   * last updated — see `regressionCounts`'s own doc for why those are the
+   * right anchors.
+   */
+  async weeklyRegressionCounts(
+    start: Date,
+    end: Date,
+  ): Promise<
+    Array<{ week: Date; regressions: number; regressedFixes: number }>
+  > {
+    const rows = await this.manager.query<
+      Array<{ week: Date; regressions: string; regressed_fixes: string }>
+    >(
+      `
+      SELECT
+        date_trunc('week', bucket) AS week,
+        COUNT(*) FILTER (WHERE kind = 'regression') AS regressions,
+        COUNT(*) FILTER (WHERE kind = 'regressed_fix') AS regressed_fixes
+      FROM (
+        SELECT f."createdAt" AS bucket, 'regression' AS kind
+        FROM bug_findings f
+        WHERE f.parent_finding_id IS NULL
+          AND f.metadata ? 'regressionOf'
+          AND f."createdAt" >= $1 AND f."createdAt" < $2
+        UNION ALL
+        SELECT COALESCE(f.released_at, f."updatedAt") AS bucket, 'regressed_fix' AS kind
+        FROM bug_findings f
+        WHERE f.parent_finding_id IS NULL
+          AND (f.metadata->>'regressed')::boolean IS TRUE
+          AND COALESCE(f.released_at, f."updatedAt") >= $1
+          AND COALESCE(f.released_at, f."updatedAt") < $2
+      ) unioned
+      GROUP BY week
+      ORDER BY week
+      `,
+      [start, end],
+    );
+    return rows.map((row) => ({
+      week: row.week,
+      regressions: Number(row.regressions),
+      regressedFixes: Number(row.regressed_fixes),
+    }));
+  }
+
+  /**
+   * `stageLatencies`'s three medians, bucketed by the calendar week a finding
+   * was FILED — same cohorting choice as `weeklyOutcomeCounts`, so a trend
+   * chart's precision and speed lines describe the same weekly cohort of
+   * findings. `filedToMergedMedianHours`/`mergedToReleasedMedianHours` for
+   * recent weeks will legitimately read null or thin (sampled low) purely
+   * because those bugs have not had time to reach that stage yet — expected,
+   * not a bug in the query.
+   */
+  async weeklyStageLatencies(
+    start: Date,
+    end: Date,
+  ): Promise<
+    Array<{
+      week: Date;
+      filedToDecided: StageLatency;
+      filedToMerged: StageLatency;
+      mergedToReleased: StageLatency;
+    }>
+  > {
+    const rows = await this.manager.query<
+      Array<{
+        week: Date;
+        filed_to_merged_median: string | null;
+        filed_to_merged_p90: string | null;
+        filed_to_merged_n: string;
+        merged_to_released_median: string | null;
+        merged_to_released_p90: string | null;
+        merged_to_released_n: string;
+        filed_to_decided_median: string | null;
+        filed_to_decided_p90: string | null;
+        filed_to_decided_n: string;
+      }>
+    >(
+      `
+      WITH scoped AS (
+        SELECT
+          date_trunc('week', f."createdAt") AS week,
+          f."createdAt"  AS filed_at,
+          f.decided_at   AS decided_at,
+          f.released_at  AS released_at,
+          (
+            SELECT MIN(e."createdAt")
+            FROM bug_hunt_events e
+            WHERE e.finding_id = f.id AND e.stage = 'merged'
+          ) AS merged_at
+        FROM bug_findings f
+        WHERE f.parent_finding_id IS NULL
+          AND f."createdAt" >= $1 AND f."createdAt" < $2
+      ),
+      hours AS (
+        SELECT
+          week,
+          EXTRACT(EPOCH FROM (merged_at - filed_at)) / 3600      AS filed_to_merged,
+          EXTRACT(EPOCH FROM (released_at - merged_at)) / 3600   AS merged_to_released,
+          EXTRACT(EPOCH FROM (decided_at - filed_at)) / 3600     AS filed_to_decided
+        FROM scoped
+      )
+      SELECT
+        week,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY filed_to_merged)
+          FILTER (WHERE filed_to_merged IS NOT NULL AND filed_to_merged >= 0)   AS filed_to_merged_median,
+        percentile_cont(0.9) WITHIN GROUP (ORDER BY filed_to_merged)
+          FILTER (WHERE filed_to_merged IS NOT NULL AND filed_to_merged >= 0)   AS filed_to_merged_p90,
+        COUNT(*) FILTER (WHERE filed_to_merged IS NOT NULL AND filed_to_merged >= 0) AS filed_to_merged_n,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY merged_to_released)
+          FILTER (WHERE merged_to_released IS NOT NULL AND merged_to_released >= 0) AS merged_to_released_median,
+        percentile_cont(0.9) WITHIN GROUP (ORDER BY merged_to_released)
+          FILTER (WHERE merged_to_released IS NOT NULL AND merged_to_released >= 0) AS merged_to_released_p90,
+        COUNT(*) FILTER (WHERE merged_to_released IS NOT NULL AND merged_to_released >= 0) AS merged_to_released_n,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY filed_to_decided)
+          FILTER (WHERE filed_to_decided IS NOT NULL AND filed_to_decided >= 0)  AS filed_to_decided_median,
+        percentile_cont(0.9) WITHIN GROUP (ORDER BY filed_to_decided)
+          FILTER (WHERE filed_to_decided IS NOT NULL AND filed_to_decided >= 0)  AS filed_to_decided_p90,
+        COUNT(*) FILTER (WHERE filed_to_decided IS NOT NULL AND filed_to_decided >= 0) AS filed_to_decided_n
+      FROM hours
+      GROUP BY week
+      ORDER BY week
+      `,
+      [start, end],
+    );
+
+    const latency = (
+      median: string | null,
+      p90: string | null,
+      n: string | undefined,
+    ): StageLatency => ({
+      medianHours: median == null ? null : Number(median),
+      p90Hours: p90 == null ? null : Number(p90),
+      sampled: Number(n ?? 0),
+    });
+
+    return rows.map((row) => ({
+      week: row.week,
+      filedToMerged: latency(
+        row.filed_to_merged_median,
+        row.filed_to_merged_p90,
+        row.filed_to_merged_n,
+      ),
+      mergedToReleased: latency(
+        row.merged_to_released_median,
+        row.merged_to_released_p90,
+        row.merged_to_released_n,
+      ),
+      filedToDecided: latency(
+        row.filed_to_decided_median,
+        row.filed_to_decided_p90,
+        row.filed_to_decided_n,
+      ),
+    }));
+  }
+
+  /**
+   * Median hours from a finding's dispatch to the first event its fix
+   * session reported — isolating "the agent was slow to start" from "the
+   * GitHub Actions runner queue was slow," which `stageLatencies`'
+   * filed→merged figure cannot distinguish (that clock also includes actual
+   * fix time). Bucketed by the week of `dispatchedAt`.
+   */
+  async weeklyQueueToStartLatency(
+    start: Date,
+    end: Date,
+  ): Promise<
+    Array<{ week: Date; medianHours: number | null; sampled: number }>
+  > {
+    const rows = await this.manager.query<
+      Array<{ week: Date; median_hours: string | null; sampled: string }>
+    >(
+      `
+      WITH scoped AS (
+        SELECT
+          date_trunc('week', f.dispatched_at) AS week,
+          EXTRACT(EPOCH FROM (first_event.first_at - f.dispatched_at)) / 3600 AS hours
+        FROM bug_findings f
+        JOIN LATERAL (
+          SELECT MIN(e."createdAt") AS first_at
+          FROM bug_hunt_events e
+          WHERE e.finding_id = f.id AND e."createdAt" >= f.dispatched_at
+        ) first_event ON true
+        WHERE f.parent_finding_id IS NULL
+          AND f.dispatched_at IS NOT NULL
+          AND f.dispatched_at >= $1 AND f.dispatched_at < $2
+      )
+      SELECT
+        week,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY hours)
+          FILTER (WHERE hours IS NOT NULL AND hours >= 0) AS median_hours,
+        COUNT(*) FILTER (WHERE hours IS NOT NULL AND hours >= 0) AS sampled
+      FROM scoped
+      GROUP BY week
+      ORDER BY week
+      `,
+      [start, end],
+    );
+    return rows.map((row) => ({
+      week: row.week,
+      medianHours: row.median_hours == null ? null : Number(row.median_hours),
+      sampled: Number(row.sampled),
+    }));
+  }
+  async listPaginated(filter: ListBugFindingsFilter): Promise<{
+    items: BugFinding[];
+    count: number;
+    /**
+     * Rows per status over the same scope (source, repo, run), ignoring the
+     * status filter and the page. The lifecycle chips above the table count
+     * from this, so they describe the whole set rather than the hundred rows
+     * the window happened to load — which is what "Everything 100 · Closed
+     * 100" was.
+     */
+    countsByStatus: Record<string, number>;
+  }> {
+    // Child steps are deliberately absent from the main table: a coordinated
+    // fix should read as ONE bug there, and its steps belong in that bug's own
+    // drawer rather than as three near-identical rows next to it.
+    const scoped = () => {
+      const qb = this.createQueryBuilder('f').where(
+        'f.parentFindingId IS NULL',
+      );
+      if (filter.source)
+        qb.andWhere('f.source = :source', { source: filter.source });
+      if (filter.repo) qb.andWhere('f.repo = :repo', { repo: filter.repo });
+      if (filter.runId)
+        qb.andWhere('f.runId = :runId', { runId: filter.runId });
+      return qb;
+    };
+
+    const qb = scoped().orderBy('f."createdAt"', 'DESC');
+    if (filter.status)
+      qb.andWhere('f.status = :status', { status: filter.status });
+
+    const [[items, count], statusRows] = await Promise.all([
+      qb.take(filter.limit).skip(filter.offset).getManyAndCount(),
+      scoped()
+        .select('f.status', 'status')
+        .addSelect('COUNT(*)::int', 'count')
+        .groupBy('f.status')
+        .getRawMany<{ status: string; count: number }>(),
+    ]);
+    const countsByStatus: Record<string, number> = {};
+    for (const row of statusRows)
+      countsByStatus[row.status] = Number(row.count);
+    return { items, count, countsByStatus };
+  }
+}
