@@ -207,7 +207,6 @@ jobs:
       - prepare-env
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    if: true
 
     steps:
       - name: Checkout
@@ -217,7 +216,7 @@ jobs:
 
       - name: Set up Python
         if: ${{ env.TEST_RUNTIME == 'python' }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.TEST_RUNTIME_VERSION }}
 
@@ -244,7 +243,7 @@ jobs:
 
       - name: Load cached dependencies
         id: cached-dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.TEST_CACHE_PATHS }}
           key: venv-${{ runner.os }}-py${{ env.TEST_RUNTIME_VERSION }}-${{ hashFiles('**/poetry.lock') }}
@@ -382,6 +381,7 @@ jobs:
       pull-requests: write
       contents: read
     needs:
+      - validate-and-tag
       - prepare-env
       - build-push-image
       - run-db-migration
@@ -456,7 +456,7 @@ jobs:
           echo "${DELIMITER}" >> $GITHUB_OUTPUT
 
       - name: Create Release Draft
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           name: Release v${{ needs.validate-and-tag.outputs.VERSION }}

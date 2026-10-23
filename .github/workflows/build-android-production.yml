@@ -45,7 +45,7 @@ jobs:
           aws s3 cp "${{ secrets.ANDROID_GOOGLE_SERVICES_S3_URI_PROD }}" "android/app/src/prod/google-services.json"
 
       - name: Install Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: 'temurin'
@@ -64,7 +64,7 @@ jobs:
           npm ci
 
       - name: Cache Gradle Wrapper
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
@@ -72,7 +72,7 @@ jobs:
             ${{ runner.os }}-gradle-wrapper-
 
       - name: Cache Gradle Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
