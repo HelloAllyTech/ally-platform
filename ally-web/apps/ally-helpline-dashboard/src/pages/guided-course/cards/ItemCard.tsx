@@ -78,7 +78,11 @@ export const ItemCard: FC<ItemCardProps> = ({
 
   const typeWord = t(entry.typeWordKey);
   const minutes = card.meta?.minutes;
-  const format = card.meta?.format && card.meta.format !== typeWord ? card.meta.format : null;
+  // The server's format often repeats the type word ("video"); show it only when it adds something.
+  const format =
+    card.meta?.format && card.meta.format.toLowerCase() !== typeWord.toLowerCase()
+      ? card.meta.format
+      : null;
   const meta =
     [format, minutes ? t("guide.card.meta.minutes", { count: minutes }) : null]
       .filter(Boolean)

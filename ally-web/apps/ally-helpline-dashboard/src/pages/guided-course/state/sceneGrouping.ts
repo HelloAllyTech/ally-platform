@@ -18,6 +18,8 @@ export const visibleEntries = (
 ): FeedEntry[] =>
   entries.filter(entry => {
     if (entry.kind === "crisis") return false;
+    // A Continue or Start is stored as an empty learner message: nothing to show.
+    if (entry.kind === "message" && entry.role === "learner" && !entry.text.trim()) return false;
     const sceneId = entry.sceneId;
     if (!sceneId) return true;
     const scene = scenes[sceneId];

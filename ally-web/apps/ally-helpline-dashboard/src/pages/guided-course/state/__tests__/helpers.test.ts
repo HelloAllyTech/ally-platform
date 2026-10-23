@@ -63,6 +63,26 @@ describe("scene collapse", () => {
     expect(visible.map(e => e.id)).toEqual(["scene:a", "m1", "k1", "receipt:a", "m2"]);
   });
 
+  it("hides the empty learner message an intent-only turn leaves behind", () => {
+    const withIntent: FeedEntry[] = [
+      ...entries,
+      {
+        kind: "message",
+        id: "m3",
+        role: "learner",
+        text: "  ",
+        status: "final",
+        turnId: "u3",
+        clientTurnId: null,
+        seq: 7,
+        sceneId: null,
+      },
+    ];
+    expect(
+      visibleEntries(withIntent, { a: scene("a", false) }, new Set()).map(e => e.id),
+    ).not.toContain("m3");
+  });
+
   it("finds a scene's first card for Skip intro", () => {
     expect(firstCardInScene(entries, "a")).toBe("k1");
     expect(firstCardInScene(entries, "b")).toBeNull();
