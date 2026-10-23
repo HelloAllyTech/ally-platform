@@ -59,6 +59,7 @@ const gates = (overrides: Partial<BuilderEvalGates> = {}): BuilderEvalGates => (
   askedBeforeReading: 0,
   unrepairedEditFailures: 0,
   falseUpdateClaims: 0,
+  falseReadyClaims: 0,
   consistent: true,
   evidenceCited: true,
   ...overrides,
@@ -460,9 +461,14 @@ describe("formatting", () => {
 });
 
 describe("gates", () => {
-  it("lists all six, marking each non-zero count and each false flag as failing", () => {
+  it("lists every gate, marking each non-zero count and each false flag as failing", () => {
     const entries = gateEntries(
-      gates({ unseenFailures: 2, falseUpdateClaims: 1, evidenceCited: false }),
+      gates({
+        unseenFailures: 2,
+        falseUpdateClaims: 1,
+        falseReadyClaims: 1,
+        evidenceCited: false,
+      }),
     );
 
     expect(entries.map(entry => entry.key)).toEqual([
@@ -470,14 +476,25 @@ describe("gates", () => {
       "askedBeforeReading",
       "unrepairedEditFailures",
       "falseUpdateClaims",
+      "falseReadyClaims",
       "consistent",
       "evidenceCited",
     ]);
     expect(entries.filter(entry => entry.failing).map(entry => entry.key)).toEqual([
       "unseenFailures",
       "falseUpdateClaims",
+      "falseReadyClaims",
       "evidenceCited",
     ]);
+    expect(gateViolationCount(gates({ falseReadyClaims: 2 }))).toBe(2);
+  });
+
+  it("leaves out a gate the run was scored before, rather than flag it", () => {
+    const older = gates();
+    delete older.falseReadyClaims;
+
+    expect(gateEntries(older).map(entry => entry.key)).not.toContain("falseReadyClaims");
+    expect(gateViolationCount(older)).toBe(0);
   });
 
   it("has no entries for a run with no gates, such as one that errored before scoring", () => {
