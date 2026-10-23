@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
@@ -15,6 +11,7 @@ import {
   GuideThreadStatus,
 } from '../enum/guide.enum';
 import { GuideSettingsService } from '../settings/guide-settings.service';
+import { guideDisabled, guideNoAccess } from '../guide-errors';
 
 const PG_UNIQUE_VIOLATION = '23505';
 
@@ -32,13 +29,6 @@ export interface AppendMessageInput {
   clientTurnId?: string | null;
   renderedContent?: Record<string, any>[] | null;
   metadata?: Record<string, any> | null;
-}
-
-/** The answer when the guide may not run here; the client renders classic. */
-export class GuideUnavailableException extends ForbiddenException {
-  constructor(readonly reason: string) {
-    super({ code: 'guide_disabled', reason });
-  }
 }
 
 /**
@@ -69,14 +59,11 @@ export class GuideThreadService {
     user: TokenUser,
   ): Promise<GuideThread> {
     if (!(await this.settings.isGuidedAvailable(trackId, user.tenantId))) {
-      throw new GuideUnavailableException('switched_off');
+      throw guideDisabled();
     }
     const access = await this.trackEnrollmentService.getTrackAccess(trackId);
     if (!access.hasAccess) {
-      throw new ForbiddenException({
-        code: 'no_access',
-        reason: access.reason,
-      });
+      throw guideNoAccess();
     }
     const existing = await this.findActive(trackId, user);
     if (existing) return existing;

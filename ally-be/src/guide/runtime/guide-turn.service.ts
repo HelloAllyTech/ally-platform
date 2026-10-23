@@ -24,6 +24,7 @@ import {
   GuideReleaseBundle,
 } from '../release/guide-release.bundle';
 import { GuideSettingsService } from '../settings/guide-settings.service';
+import { guideMessageTooLong } from '../guide-errors';
 import { GuideEventBusService } from './guide-event-bus.service';
 import { GuideThreadService } from './guide-thread.service';
 
@@ -84,11 +85,15 @@ export class GuideTurnService {
   async accept(
     thread: GuideThread,
     user: TokenUser,
-    input: { clientTurnId: string; text: string },
+    input: { clientTurnId: string; text: string; intent?: string | null },
   ): Promise<{ turnId: string }> {
     const text = (input.text ?? '').trim();
     if (text.length > GUIDE_DEFAULT_POLICY.safety.messageMaxChars) {
-      throw new BadRequestException({ code: 'message_too_long' });
+      throw guideMessageTooLong(GUIDE_DEFAULT_POLICY.safety.messageMaxChars);
+    }
+    // Empty text is only meaningful alongside a chip's intent.
+    if (!text && !input.intent) {
+      throw new BadRequestException('A message or an intent is required');
     }
     const { turn, created } = await this.turnStore.createOrGet({
       agentKey: ALLY_GUIDE_AGENT_KEY,

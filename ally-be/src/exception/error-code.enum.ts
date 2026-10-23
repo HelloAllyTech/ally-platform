@@ -118,6 +118,22 @@ export enum ErrorCode {
   HELPLINE_NOT_LISTENER = 'HELPLINE_NOT_LISTENER',
   /** 401. The guest token is missing, expired, revoked or not a guest token. */
   HELPLINE_GUEST_TOKEN_INVALID = 'HELPLINE_GUEST_TOKEN_INVALID',
+
+  // ── Ally guide (src/guide) ────────────────────────────────────────────────
+  // The same conditions reach a live stream as `turn.failed{code}` in the
+  // guide's own contract (guide-contract.schema.json, GuideFailureCode).
+  /**
+   * 403. A kill switch has the guided course off — for everyone, this tenant
+   * or this course. The client opens the classic course instead.
+   */
+  GUIDE_DISABLED = 'GUIDE_DISABLED',
+  /**
+   * 403. The learner cannot open this course. The reason is not repeated here:
+   * `GET /v1/learn/tracks/:trackId/access` returns it, as it does for classic.
+   */
+  GUIDE_NO_ACCESS = 'GUIDE_NO_ACCESS',
+  /** 400. The learner's message is over the length limit; nothing was stored. */
+  GUIDE_MESSAGE_TOO_LONG = 'GUIDE_MESSAGE_TOO_LONG',
 }
 
 /**

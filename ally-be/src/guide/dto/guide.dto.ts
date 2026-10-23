@@ -41,7 +41,7 @@ export class GuideTurnRequestDto {
 
   @ApiProperty()
   @IsString()
-  // Length is enforced in the service so the error carries `message_too_long`.
+  // Length is checked in the service so the 400 carries GUIDE_MESSAGE_TOO_LONG.
   text!: string;
 
   @ApiPropertyOptional({ type: GuideAnchorDto })

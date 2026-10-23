@@ -1,3 +1,5 @@
+import { BadRequestException, HttpException } from '@nestjs/common';
+import { ErrorCode } from 'src/exception/error-code.enum';
 import {
   chunkForStreaming,
   GUIDE_STUB_REPLY,
@@ -177,15 +179,36 @@ describe('GuideTurnService (step 1.0 stub turn)', () => {
     expect(runSpy).not.toHaveBeenCalled();
   });
 
-  it('rejects a message longer than the policy allows', async () => {
+  it('rejects a message longer than the policy allows, with GUIDE_MESSAGE_TOO_LONG', async () => {
     const { service } = setup();
-    await expect(
-      service.accept(
+    const error = await service
+      .accept(
         { id: 'th1', tenantId: 'org', lastEventSeq: 0 } as never,
         { id: 1, tenantId: 'org', username: 'x' },
         { clientTurnId: 'c1', text: 'x'.repeat(2001) },
-      ),
-    ).rejects.toThrow();
+      )
+      .catch((e: HttpException) => e);
+    expect((error as HttpException).getStatus()).toBe(400);
+    expect((error as HttpException).getResponse()).toMatchObject({
+      errorCode: ErrorCode.GUIDE_MESSAGE_TOO_LONG,
+    });
+  });
+
+  it('rejects a blank message unless a chip intent comes with it', async () => {
+    const { service } = setup();
+    const thread = { id: 'th1', tenantId: 'org', lastEventSeq: 0 } as never;
+    const user = { id: 1, tenantId: 'org', username: 'x' };
+    jest.spyOn(service, 'run').mockResolvedValue(undefined as never);
+    await expect(
+      service.accept(thread, user, { clientTurnId: 'c1', text: '   ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.accept(thread, user, {
+        clientTurnId: 'c2',
+        text: '',
+        intent: 'continue',
+      }),
+    ).resolves.toEqual({ turnId: expect.any(String) });
   });
 });
 
