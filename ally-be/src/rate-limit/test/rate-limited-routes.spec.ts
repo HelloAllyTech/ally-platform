@@ -239,6 +239,8 @@ describe('Rate-limited routes', () => {
           [JwtRefreshAuthGuard, allow],
           [AuthGuard('jwt'), allow],
           [PermissionsGuard, allow],
+          // impersonate is behind the Users tab toggle.
+          [FeatureToggleGuard, allow],
         ],
       );
     });
@@ -340,6 +342,7 @@ describe('Rate-limited routes', () => {
             [JwtRefreshAuthGuard, allow],
             [AuthGuard('jwt'), allow],
             [PermissionsGuard, allow],
+            [FeatureToggleGuard, allow],
           ],
         );
       });

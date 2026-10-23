@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Controller,
   Post,
@@ -197,7 +199,9 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('impersonate')
-  @AuthPermissions([PERMISSIONS.IMPERSONATE_USER])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.IMPERSONATE_USER],
+  })
   @Version('1')
   @HttpCode(HttpStatus.OK)
   async impersonate(

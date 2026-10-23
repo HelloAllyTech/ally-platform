@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Body,
   Controller,
@@ -14,7 +16,6 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { SkillExperimentService } from '../service/skill-experiment.service';
 import {
@@ -36,7 +37,9 @@ export class SkillExperimentController {
   @ApiOperation({
     summary: 'Every skill connected to auto-improve, with its experiment state',
   })
-  @AuthPermissions([PERMISSIONS.VIEW_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.VIEW_SKILL_EXPERIMENT],
+  })
   @Get()
   async list() {
     return this.service.listConnected();
@@ -45,14 +48,18 @@ export class SkillExperimentController {
   @ApiOperation({
     summary: "One skill's experiment: config, variants, timeline, spend",
   })
-  @AuthPermissions([PERMISSIONS.VIEW_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.VIEW_SKILL_EXPERIMENT],
+  })
   @Get(':promptId')
   async get(@Param('promptId', ParseUUIDPipe) promptId: string) {
     return this.service.getDetail(promptId);
   }
 
   @ApiOperation({ summary: 'Create or update the rubric and thresholds' })
-  @AuthPermissions([PERMISSIONS.EDIT_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_SKILL_EXPERIMENT],
+  })
   @Put(':promptId')
   async configure(
     @Param('promptId', ParseUUIDPipe) promptId: string,
@@ -63,7 +70,9 @@ export class SkillExperimentController {
   }
 
   @ApiOperation({ summary: 'Turn auto-improve on (starts a baseline run)' })
-  @AuthPermissions([PERMISSIONS.EDIT_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_SKILL_EXPERIMENT],
+  })
   @Post(':promptId/start')
   async start(@Param('promptId', ParseUUIDPipe) promptId: string) {
     return this.service.start(promptId);
@@ -72,7 +81,9 @@ export class SkillExperimentController {
   @ApiOperation({
     summary: 'Turn auto-improve off (the skill serves its own text)',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_SKILL_EXPERIMENT],
+  })
   @Post(':promptId/stop')
   async stop(@Param('promptId', ParseUUIDPipe) promptId: string) {
     return this.service.stop(promptId);
@@ -81,7 +92,9 @@ export class SkillExperimentController {
   @ApiOperation({
     summary: 'Resume a paused experiment with a fresh variant budget',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_SKILL_EXPERIMENT],
+  })
   @Post(':promptId/resume')
   async resume(@Param('promptId', ParseUUIDPipe) promptId: string) {
     return this.service.resume(promptId);
@@ -91,17 +104,18 @@ export class SkillExperimentController {
     summary:
       'Apply the best version to the skill as a new version and end the experiment',
   })
-  @AuthPermissions(
-    [PERMISSIONS.EDIT_SKILL_EXPERIMENT, PERMISSIONS.EDIT_PROMPT],
-    'AND',
-  )
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_SKILL_EXPERIMENT, PERMISSIONS.EDIT_PROMPT],
+  })
   @Post(':promptId/apply')
   async apply(@Param('promptId', ParseUUIDPipe) promptId: string) {
     return this.service.apply(promptId);
   }
 
   @ApiOperation({ summary: 'Judged outputs, newest first' })
-  @AuthPermissions([PERMISSIONS.VIEW_SKILL_EXPERIMENT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.VIEW_SKILL_EXPERIMENT],
+  })
   @Get(':promptId/observations')
   async observations(
     @Param('promptId', ParseUUIDPipe) promptId: string,

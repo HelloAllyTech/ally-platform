@@ -53,7 +53,10 @@ export class BuilderEvalController {
   ) {}
 
   @Get('gated-prompts')
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  // Read only by the System Skills tab's prompt side panel.
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @ApiOperation({
     summary: 'Prompt codes whose edits go live only through the eval gate',
   })

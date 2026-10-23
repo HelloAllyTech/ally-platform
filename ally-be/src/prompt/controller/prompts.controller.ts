@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Body,
   Controller,
@@ -54,7 +56,9 @@ export class PromptsController {
     summary:
       'Backfill: (re)translate every enabled source across eligible languages',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Post('translations/backfill')
   async backfillTranslations(): Promise<BackfillResult> {
     return this.promptTranslationService.backfillEnabledPrompts();
@@ -74,7 +78,9 @@ export class PromptsController {
   @ApiOperation({
     summary: 'Re-translate a prompt into all eligible languages',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Post(':id/translations')
   async retranslatePrompt(
     @Param('id') id: string,
@@ -86,7 +92,9 @@ export class PromptsController {
     summary:
       'Re-translate a prompt into a single language (per-language retry)',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Post(':id/translations/:languageId')
   async retranslatePromptLanguage(
     @Param('id') id: string,
@@ -99,7 +107,9 @@ export class PromptsController {
     summary:
       'Set the runtime model that runs the main agent for one language (multilingual path)',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Put(':id/translations/:languageId/runtime-model')
   async setTranslationRuntimeModel(
     @Param('id') id: string,
@@ -179,14 +189,18 @@ export class PromptsController {
   @ApiOperation({
     summary: 'Duplicate an existing prompt to start a new variant',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Post(':id/duplicate')
   async duplicatePrompt(@Param('id') id: string): Promise<Prompt> {
     return this.promptsService.duplicatePrompt(id);
   }
 
   @ApiOperation({ summary: 'Create new prompts' })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Post('')
   async createPrompts(
     @Body() createPromptsDto: CreatePromptsDto,
@@ -210,7 +224,9 @@ export class PromptsController {
   }
 
   @ApiOperation({ summary: 'Update a prompt' })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Put(':id')
   async updatePrompt(
     @Param('id') id: string,
@@ -220,7 +236,9 @@ export class PromptsController {
   }
 
   @ApiOperation({ summary: 'Revert prompt to codebase default' })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Post(':id/revert')
   async revertPrompt(@Param('id') id: string): Promise<boolean> {
     return this.promptsService.revertPrompt(id);
@@ -233,7 +251,9 @@ export class PromptsController {
       'backed prompts must be obsoleted first (remove their .txt file). ' +
       'Refused with 409 when any scenario still references the variant.',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @Delete(':id')
   async deleteObsoletePrompt(@Param('id') id: string): Promise<void> {
     return this.promptsService.deleteObsoletePrompt(id);
@@ -245,7 +265,9 @@ export class PromptsController {
       'prompt via metadata.selectedMainPromptCode. Drives the in-use guard ' +
       'and tooltip on the "Delete variant" button in the studio side panel.',
   })
-  @AuthPermissions([PERMISSIONS.VIEW_PROMPT])
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.VIEW_PROMPT],
+  })
   @Get(':id/usage')
   async getPromptUsage(@Param('id') id: string): Promise<{
     count: number;

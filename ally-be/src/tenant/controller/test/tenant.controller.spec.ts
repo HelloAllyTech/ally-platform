@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { PermissionsService } from 'src/authorization/service/permissions.service';
+import { featureToggleGuardProviders } from 'src/auth/guards/test/feature-toggle-guard.fixtures';
 import { TenantController } from '../tenant.controller';
 import { TenantService } from '../../service/tenant.service';
 import { Tenant, TenantStatus } from '../../entity/tenant.entity';
@@ -131,6 +133,9 @@ describe('TenantController', () => {
           provide: TenantScopeService,
           useValue: tenantScopeService,
         },
+        // The organization screens' routes are behind the Users tab toggle.
+        ...featureToggleGuardProviders([TenantScopeService]),
+        { provide: PermissionsService, useValue: mockPermissionsService },
       ],
     }).compile();
 

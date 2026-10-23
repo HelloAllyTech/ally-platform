@@ -15,6 +15,7 @@ describe('ContentAccessService — per-admin content visibility and authoring', 
     isPlatformTierAdmin: jest.Mock;
     hasToggle: jest.Mock;
   };
+  let dataSource: { query: jest.Mock };
   let service: ContentAccessService;
 
   beforeEach(() => {
@@ -26,7 +27,11 @@ describe('ContentAccessService — per-admin content visibility and authoring', 
         toggles.has(key),
       ),
     };
-    service = new ContentAccessService(featureToggleService as any);
+    dataSource = { query: jest.fn().mockResolvedValue([{ outside: 0 }]) };
+    service = new ContentAccessService(
+      featureToggleService as any,
+      dataSource as any,
+    );
   });
 
   describe('visibility (See All Content)', () => {
@@ -129,6 +134,49 @@ describe('ContentAccessService — per-admin content visibility and authoring', 
           ADMIN_ID,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('organization assignment (assertAllInView)', () => {
+    it('lets ids through when every one is the caller’s own', async () => {
+      await expect(
+        service.assertAllInView(AuthoredContentType.CASE, ['a', 'b'], ADMIN_ID),
+      ).resolves.toBeUndefined();
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM "cases"'),
+        [['a', 'b'], ADMIN_ID],
+      );
+    });
+
+    it('refuses the batch when any id belongs to someone else (or no one)', async () => {
+      dataSource.query.mockResolvedValue([{ outside: 1 }]);
+
+      await expect(
+        service.assertAllInView(AuthoredContentType.ROLEPLAY, [1, 2], ADMIN_ID),
+      ).rejects.toThrow(
+        new ForbiddenException(
+          'You can only add or remove roleplays you created. ' +
+            'Ask whoever manages admin access to turn on See All Content for you.',
+        ),
+      );
+    });
+
+    it('skips the lookup for an admin who sees everything, or a tenant ADMIN', async () => {
+      toggles.add(FeatureToggleKey.CONTENT_VIEW_ALL);
+      await service.assertAllInView(
+        AuthoredContentType.COURSE,
+        ['t'],
+        ADMIN_ID,
+      );
+      toggles.clear();
+      platformTier = false;
+      await service.assertAllInView(
+        AuthoredContentType.COURSE,
+        ['t'],
+        ADMIN_ID,
+      );
+
+      expect(dataSource.query).not.toHaveBeenCalled();
     });
   });
 });

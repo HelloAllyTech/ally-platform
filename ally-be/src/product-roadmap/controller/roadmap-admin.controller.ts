@@ -184,7 +184,9 @@ export class RoadmapAdminController {
     return this.taxonomyService.deleteGoal(user.id, id);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunity-owners/eligible')
   @ApiOperation({
     summary: 'The users who may own an opportunity',
@@ -198,7 +200,9 @@ export class RoadmapAdminController {
     return this.opportunityService.listEligibleOwners();
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunity-owners')
   listOwners() {
     return this.taxonomyService.listOwners();
@@ -269,7 +273,9 @@ export class RoadmapAdminController {
   // cites it, and a filer told "this conflicts with a non-goal" must be able to read the
   // non-goal. Written on the same manage gate as every other strategy setting.
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('strategy-context')
   @ApiOperation({
     summary: 'The Vision & strategy page',
@@ -305,7 +311,9 @@ export class RoadmapAdminController {
   // board is ranked against, and one opportunity may advance several or none. Same id-not-name
   // path-parameter rule, for the same reason.
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('strategy-goals')
   @ApiOperation({
     summary: 'Strategy goals, each with its unassessed count',
@@ -398,7 +406,9 @@ export class RoadmapAdminController {
     return this.strategyGoalService.deleteGoal(user.id, id);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('rank-weights')
   @ApiOperation({ summary: 'The four composite-rank factor weights' })
   @ApiResponse({ status: HttpStatus.OK, type: RankWeightsResponseDto })
@@ -424,7 +434,9 @@ export class RoadmapAdminController {
     return this.strategyGoalService.updateWeights(user.id, dto);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunities/:id/goal-impact')
   @ApiOperation({ summary: "One opportunity's strategy-goal verdicts" })
   @ApiResponse({ status: HttpStatus.OK, type: [GoalImpactVerdictDto] })
@@ -469,13 +481,17 @@ export class RoadmapAdminController {
 
   // ── interview notes ───────────────────────────────────────────────────────
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('interview-notes')
   listInterviews(@Query() query: RoadmapListQueryDto) {
     return this.interviewService.list(query);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('interview-notes')
   createInterview(
     @CurrentUser() user: TokenUser,
@@ -484,7 +500,9 @@ export class RoadmapAdminController {
     return this.interviewService.create(user.id, dto);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Patch('interview-notes/:id')
   @ApiOperation({ summary: 'Edit a note (author or manager)' })
   async updateInterview(
@@ -500,7 +518,9 @@ export class RoadmapAdminController {
     );
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Delete('interview-notes/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeInterview(
@@ -526,7 +546,9 @@ export class RoadmapAdminController {
    * change — a second copy in the admin bundle would drift, and the drift would show up as a
    * checklist item the grader never grades.
    */
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Get('ai/readiness/criteria')
   @ApiOperation({
     summary: 'The readiness checklist a draft is graded against',
@@ -560,7 +582,9 @@ export class RoadmapAdminController {
     return this.aiService.findDuplicates(dto.description, dto.productGoal);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('ai/classify')
   @ApiOperation({
     summary: 'Suggest a product goal for a draft',
@@ -572,7 +596,9 @@ export class RoadmapAdminController {
     return this.aiService.classifyGoal(dto.description);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('ai/summarise')
   @ApiOperation({ summary: 'Summarise an interview transcript' })
   @ApiResponse({ status: 201, type: AiTextResponseDto })
@@ -593,7 +619,9 @@ export class RoadmapAdminController {
    * The JSON form of a turn, kept for the admin bundle already in production, which predates
    * the stream below — ally-be deploys ahead of ally-web. Same copilot, same turn, no progress.
    */
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('ai/opportunity-interview')
   @ApiOperation({
     summary: 'One turn of the opportunity copilot (JSON)',
@@ -624,7 +652,9 @@ export class RoadmapAdminController {
    * No per-session lock, unlike Builder's stream: there is no session. Two tabs running turns
    * at once each get their own answer and neither writes anything.
    */
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('ai/opportunity-interview/stream')
   @ApiOperation({
     summary: 'One turn of the opportunity copilot (SSE)',

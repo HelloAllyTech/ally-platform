@@ -1182,7 +1182,9 @@ export class LearnController {
     summary:
       "Pull an ElevenLabs voice's creation type (IVC/PVC/Voice Design) so v3 compatibility is visible",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_VOICE])
+  @RequireFeatureToggle(FeatureToggleKey.SCENARIO_VOICES, {
+    permissions: [PERMISSIONS.EDIT_SCENARIO_VOICE],
+  })
   @Post('scenario-voices/:id/sync-elevenlabs')
   async syncElevenLabsVoice(
     @Param('id', ParseUUIDPipe) id: string,
@@ -1194,7 +1196,9 @@ export class LearnController {
     summary:
       "Look up an ElevenLabs voice id before it's saved — resolves its creation type, gender, and language",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_VOICE])
+  @RequireFeatureToggle(FeatureToggleKey.SCENARIO_VOICES, {
+    permissions: [PERMISSIONS.EDIT_SCENARIO_VOICE],
+  })
   @Get('scenario-voices/elevenlabs-lookup')
   async lookupElevenLabsVoice(
     @Query('voiceId') voiceId: string,
@@ -1206,7 +1210,9 @@ export class LearnController {
     summary:
       "Sync every ElevenLabs scenario voice's creation type from the workspace listing",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_VOICE])
+  @RequireFeatureToggle(FeatureToggleKey.SCENARIO_VOICES, {
+    permissions: [PERMISSIONS.EDIT_SCENARIO_VOICE],
+  })
   @Post('scenario-voices/sync-elevenlabs/bulk')
   async bulkSyncElevenLabsVoices(): Promise<ElevenLabsBulkSyncSummary> {
     return this.elevenLabsVoiceSyncService.bulkSyncAllVoices();
@@ -1231,7 +1237,9 @@ export class LearnController {
     description:
       "Which config field the options are for, when a provider populates more than one. ElevenLabs takes `voice_id` for every voice in the workspace; omit it for that provider's model list, which is the default. No other provider has a second field.",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_VOICE])
+  @RequireFeatureToggle(FeatureToggleKey.SCENARIO_VOICES, {
+    permissions: [PERMISSIONS.EDIT_SCENARIO_VOICE],
+  })
   @Get('scenario-voices/tts-catalog')
   async getTtsCatalog(
     @Query('provider') provider: string,
@@ -1278,7 +1286,9 @@ export class LearnController {
   }
 
   @ApiOperation({ summary: 'Create scenario voices' })
-  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_VOICE])
+  @RequireFeatureToggle(FeatureToggleKey.SCENARIO_VOICES, {
+    permissions: [PERMISSIONS.EDIT_SCENARIO_VOICE],
+  })
   @Post(['scenario-voices', 'scenarios/voices'])
   async createScenarioVoices(
     @Body() createScenarioVoicesDto: CreateScenarioVoicesDto,
@@ -1287,7 +1297,9 @@ export class LearnController {
   }
 
   @ApiOperation({ summary: 'Update a scenario voice' })
-  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO_VOICE])
+  @RequireFeatureToggle(FeatureToggleKey.SCENARIO_VOICES, {
+    permissions: [PERMISSIONS.EDIT_SCENARIO_VOICE],
+  })
   @Put(['scenario-voices/:id', 'scenarios/voices/:id'])
   async updateScenarioVoice(
     @Param('id') id: string,

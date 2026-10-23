@@ -24,7 +24,8 @@ export const FeatureToggleKey = {
   CREATE_CASES: "create_cases",
   CREATE_COURSES: "create_courses",
   // One per sidebar tab that was gated on a permission alone. Default ON for
-  // every platform admin; enforced here (sidebar + route), not by ally-be.
+  // every platform admin; enforced here (sidebar + route) and by ally-be on the
+  // routes only that tab uses (ally-be admin-tab-toggle-gates.spec.ts).
   EVENTS: "events",
   SCENARIO_VOICES: "scenario_voices",
   PROMPTS: "prompts",

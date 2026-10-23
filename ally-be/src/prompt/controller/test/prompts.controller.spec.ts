@@ -1,4 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
+import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
+import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
 import { CanActivate } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PromptsController } from '../prompts.controller';
@@ -49,6 +52,22 @@ describe('PromptsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PromptsController],
       providers: [
+        // FeatureToggleGuard's dependencies: the edit routes now also need the
+        // admin's System Skills toggle. Granted here; the gate itself is pinned
+        // in admin-tab-toggle-gates.spec.ts.
+        {
+          provide: FeatureToggleService,
+          useValue: {
+            hasToggle: jest.fn().mockResolvedValue(true),
+            isWithheld: jest.fn().mockResolvedValue(false),
+            isLimitedToOrgScopedRoutes: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: TenantFeatureService,
+          useValue: { isEnabledForTenant: jest.fn().mockResolvedValue(false) },
+        },
+        { provide: TenantScopeService, useValue: {} },
         {
           provide: PromptsService,
           useValue: {

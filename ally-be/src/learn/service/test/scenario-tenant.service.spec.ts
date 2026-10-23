@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { AuditLogService } from 'src/audit/service/audit-log.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ScenarioTenantService } from '../scenario-tenant.service';
@@ -48,6 +49,7 @@ describe('ScenarioTenantService', () => {
       providers: [
         { provide: AuditLogService, useValue: mockAuditLogService },
         ScenarioTenantService,
+        permissiveContentAccessProvider(),
         {
           provide: ScenarioTenantRepository,
           useValue: mockScenarioTenantRepository,

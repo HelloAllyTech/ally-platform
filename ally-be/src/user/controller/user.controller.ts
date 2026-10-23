@@ -236,7 +236,9 @@ export class UserController {
     description:
       'Include holders of a platform role (super admin / super duper admin / internal), who are excluded by default. Requires view:super-duper-admins.',
   })
-  @AuthPermissions([PERMISSIONS.VIEW_USERS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.VIEW_USERS],
+  })
   @Get()
   async getAllUsers(
     @Query('limit') limit?: number,
@@ -271,7 +273,9 @@ export class UserController {
   })
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @AuthPermissions([PERMISSIONS.EDIT_USER, PERMISSIONS.EDIT_USER_ROLE])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_USER, PERMISSIONS.EDIT_USER_ROLE],
+  })
   @ApiSecurity('access-token')
   async addUser(@Body() userData: AddUserDto): Promise<AddUserResponseDto> {
     return this.userService.addUser(userData);
@@ -289,7 +293,9 @@ export class UserController {
   })
   @Post('bulk')
   @HttpCode(HttpStatus.CREATED)
-  @AuthPermissions([PERMISSIONS.EDIT_USER, PERMISSIONS.EDIT_USER_ROLE])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_USER, PERMISSIONS.EDIT_USER_ROLE],
+  })
   @ApiSecurity('access-token')
   async bulkAddUsers(
     @Body() bulkData: BulkAddUsersDto,
@@ -321,7 +327,9 @@ export class UserController {
   }
 
   @Patch(':id')
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_USER],
+  })
   @ApiOperation({ summary: 'Update user details' })
   async updateUser(
     @Param('id', ParseIntPipe) id: number,
@@ -331,7 +339,9 @@ export class UserController {
   }
 
   @Patch('/:id/status')
-  @AuthPermissions([PERMISSIONS.EDIT_USER_STATUS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_USER_STATUS],
+  })
   @ApiOperation({ summary: 'Update user status' })
   async updateUserStatus(
     @Param('id', ParseIntPipe) id: number,

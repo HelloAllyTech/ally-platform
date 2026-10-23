@@ -17,7 +17,6 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
@@ -50,14 +49,18 @@ export class RoadmapCollaborationController {
 
   // ── comments ──────────────────────────────────────────────────────────────
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunities/:id/comments')
   @ApiOperation({ summary: 'Comments on an opportunity, oldest first' })
   listComments(@Param('id', ParseUUIDPipe) id: string) {
     return this.commentService.list(id);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('opportunities/:id/comments')
   @ApiOperation({ summary: 'Add a comment' })
   createComment(
@@ -68,7 +71,9 @@ export class RoadmapCollaborationController {
     return this.commentService.create(user.id, id, dto);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Patch('comments/:commentId')
   @ApiOperation({
     summary: 'Edit your own comment',
@@ -84,7 +89,9 @@ export class RoadmapCollaborationController {
     return this.commentService.update(user.id, commentId, dto);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Delete('comments/:commentId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a comment (author or roadmap manager)' })
@@ -101,7 +108,9 @@ export class RoadmapCollaborationController {
 
   // ── saved views ───────────────────────────────────────────────────────────
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('views')
   @ApiOperation({
     summary: 'Your saved views plus every pinned view',
@@ -113,14 +122,18 @@ export class RoadmapCollaborationController {
     return this.savedViewService.list(user.id);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('views/tab-order')
   @ApiOperation({ summary: 'Your saved-view tab order' })
   getTabOrder(@CurrentUser() user: TokenUser) {
     return this.savedViewService.getTabOrder(user.id);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Put('views/tab-order')
   @ApiOperation({
     summary: 'Reorder your saved-view tabs',
@@ -132,14 +145,18 @@ export class RoadmapCollaborationController {
     return this.savedViewService.setTabOrder(user.id, dto.viewIds);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('views')
   @ApiOperation({ summary: 'Save the current filters as a named view' })
   createView(@CurrentUser() user: TokenUser, @Body() dto: CreateSavedViewDto) {
     return this.savedViewService.create(user.id, dto);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Patch('views/:id')
   @ApiOperation({
     summary: 'Rename or re-snapshot a view (owner or manager)',
@@ -176,7 +193,9 @@ export class RoadmapCollaborationController {
     return this.savedViewService.setPinned(user.id, id, dto.pinned);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Delete('views/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a view (owner or manager)' })

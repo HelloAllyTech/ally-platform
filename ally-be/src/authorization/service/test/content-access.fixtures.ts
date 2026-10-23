@@ -14,5 +14,6 @@ export const permissiveContentAccessProvider = () => ({
     canAuthor: jest.fn().mockResolvedValue(true),
     assertCanAuthor: jest.fn().mockResolvedValue(undefined),
     assertCanModify: jest.fn().mockResolvedValue(undefined),
+    assertAllInView: jest.fn().mockResolvedValue(undefined),
   },
 });

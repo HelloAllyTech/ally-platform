@@ -158,7 +158,7 @@ export const UserManagement: FC = () => {
     handleUserAddClick,
     handleAddCredit,
     includePlatformAdmins,
-  } = useUserManagement(tenants, canListPlatformAdmins);
+  } = useUserManagement(tenants, canListPlatformAdmins, canSeeUsersAndOrgs);
 
   const watchedRoles = userMethods.watch("roles") || [];
 

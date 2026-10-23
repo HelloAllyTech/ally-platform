@@ -727,6 +727,30 @@ describe("UserManagement", () => {
     });
   });
 
+  // With the Users toggle off, an admin who holds Admin User Management still
+  // reaches the page — for the Ally admins list — and nothing else on it.
+  describe("with the Users toggle off", () => {
+    beforeEach(() => {
+      mockUserState(
+        [Permissions.EDIT_USER, Permissions.VIEW_USERS],
+        [FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+      renderUserManagement();
+    });
+
+    it("hides the Users and Organizations sub-tabs", () => {
+      expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
+    });
+
+    it("does not load the users list, which ally-be would refuse", () => {
+      expect(useUserManagementHook.useUserManagement).toHaveBeenLastCalledWith(
+        expect.anything(),
+        false,
+        false,
+      );
+    });
+  });
+
   describe("Platform accounts", () => {
     const openFilters = (role?: string) => {
       setPermissions([Permissions.EDIT_USER], role ? { role } : undefined);
@@ -755,6 +779,8 @@ describe("UserManagement", () => {
       expect(useUserManagementHook.useUserManagement).toHaveBeenLastCalledWith(
         expect.anything(),
         true,
+        // The Users toggle, on in this suite's fixtures: the users list loads.
+        true,
       );
     });
 
@@ -765,6 +791,8 @@ describe("UserManagement", () => {
       expect(useUserManagementHook.useUserManagement).toHaveBeenLastCalledWith(
         expect.anything(),
         false,
+        // The Users toggle, on in this suite's fixtures: the users list loads.
+        true,
       );
     });
 

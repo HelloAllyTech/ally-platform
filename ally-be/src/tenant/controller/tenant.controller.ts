@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { Tenant, TenantStatus } from '../entity/tenant.entity';
 import {
   ApiBearerAuth,
@@ -56,7 +58,9 @@ export class TenantController {
   ) {}
 
   @Post()
-  @AuthPermissions([PERMISSIONS.EDIT_TENANT])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_TENANT],
+  })
   async create(@Body() createTenantDto: CreateTenantDto): Promise<Tenant> {
     // A new organization would sit outside their own allowlist the moment it
     // existed.
@@ -75,7 +79,9 @@ export class TenantController {
     description: 'Include user count for this tenant',
     default: false,
   })
-  @AuthPermissions([PERMISSIONS.VIEW_TENANT])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.VIEW_TENANT],
+  })
   @Get(':id')
   async findById(
     @Param('id') id: string,
@@ -189,7 +195,9 @@ export class TenantController {
 
   @ApiOperation({ summary: 'Edit tenant details' })
   @ApiResponse({ status: 200, description: 'updated tenant successfully' })
-  @AuthPermissions([PERMISSIONS.EDIT_TENANT])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_TENANT],
+  })
   @Patch(':id')
   async updateTenant(
     @Param('id') id: string,
@@ -200,7 +208,9 @@ export class TenantController {
   }
 
   @ApiOperation({ summary: 'Get presigned URL for organization logo upload' })
-  @AuthPermissions([PERMISSIONS.EDIT_TENANT])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_TENANT],
+  })
   @Post('logo-url')
   async getPresignedUrlForOrganizationLogo(
     @Body() logoUploadRequestDto: LogoUploadRequestDto,
@@ -211,7 +221,9 @@ export class TenantController {
   }
 
   @ApiOperation({ summary: 'Delete organization logo ' })
-  @AuthPermissions([PERMISSIONS.EDIT_TENANT])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_TENANT],
+  })
   @Delete('logo')
   async deleteOrganizationLogo(
     @Body() deleteLogoDto: DeleteLogoDto,

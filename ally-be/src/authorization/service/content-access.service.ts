@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { FeatureToggleKey } from '../constants/admin-feature-toggle.constants';
 import { FeatureToggleService } from './feature-toggle.service';
@@ -27,6 +28,14 @@ const PLURAL: Record<AuthoredContentType, string> = {
   [AuthoredContentType.TRACK]: 'tracks',
   [AuthoredContentType.CASE]: 'cases',
   [AuthoredContentType.COURSE]: 'courses',
+};
+
+/** Each type's table — every one carries a nullable integer `createdBy`. */
+const TABLE: Record<AuthoredContentType, string> = {
+  [AuthoredContentType.ROLEPLAY]: 'scenarios',
+  [AuthoredContentType.TRACK]: 'scenario_paths',
+  [AuthoredContentType.CASE]: 'cases',
+  [AuthoredContentType.COURSE]: 'tracks',
 };
 
 const TOGGLE_LABEL: Record<AuthoredContentType, string> = {
@@ -59,7 +68,10 @@ const TOGGLE_LABEL: Record<AuthoredContentType, string> = {
  */
 @Injectable()
 export class ContentAccessService {
-  constructor(private readonly featureToggleService: FeatureToggleService) {}
+  constructor(
+    private readonly featureToggleService: FeatureToggleService,
+    private readonly dataSource: DataSource,
+  ) {}
 
   /**
    * The creator id this caller's content reads must be narrowed to, or `null`
@@ -123,6 +135,31 @@ export class ContentAccessService {
     throw new ForbiddenException(
       `You can view ${PLURAL[type]} but not create or change them. ` +
         `Ask whoever manages admin access to turn on ${TOGGLE_LABEL[type]} for you.`,
+    );
+  }
+
+  /**
+   * Refuse a batch of ids unless every one is in the caller's view — for the
+   * organization assignment routes, which take ids straight from the body.
+   * Ids that don't exist are left to the caller's own validation.
+   */
+  async assertAllInView(
+    type: AuthoredContentType,
+    ids: (string | number)[] | undefined,
+    userId = currentUserId(),
+  ): Promise<void> {
+    if (!ids?.length) return;
+    const ownerId = await this.ownerFilterFor(userId);
+    if (ownerId === null) return;
+    const [{ outside }] = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS outside FROM "${TABLE[type]}"
+        WHERE id = ANY($1) AND "createdBy" IS DISTINCT FROM $2`,
+      [ids, ownerId],
+    );
+    if (outside === 0) return;
+    throw new ForbiddenException(
+      `You can only add or remove ${PLURAL[type]} you created. ` +
+        'Ask whoever manages admin access to turn on See All Content for you.',
     );
   }
 

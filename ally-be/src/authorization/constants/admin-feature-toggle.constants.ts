@@ -67,9 +67,12 @@ export enum FeatureToggleKey {
   // One key per sidebar tab that was gated on a permission alone, so every tab
   // can be switched off per admin. All defaultEnabled: every platform admin
   // already had these tabs, and keeps them until someone switches one off.
-  // Enforced in the admin console (sidebar + route) only — the endpoints
-  // behind most of these also serve the learner and helpline apps, so a
-  // @RequireFeatureToggle on them would lock out users these keys never apply to.
+  // Enforced in the admin console (sidebar + route) and on the backend routes
+  // that ONLY that tab uses. A route anything else calls — the public blog,
+  // the helpline and mobile apps, an X-API-Key service, the roleplay builder's
+  // pickers — stays ungated, because FeatureToggleGuard fails closed for
+  // everyone without admin toggles. The route-by-route map, with the reason
+  // for every exception, is pinned in test/admin-tab-toggle-gates.spec.ts.
   EVENTS = 'events',
   SCENARIO_VOICES = 'scenario_voices',
   PROMPTS = 'prompts',

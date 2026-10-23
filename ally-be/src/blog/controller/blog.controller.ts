@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Body,
   Controller,
@@ -17,7 +19,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { Public } from 'src/auth/decorators/auth.metadata';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
@@ -86,7 +87,9 @@ export class BlogController {
   @Post('upload-url')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({ summary: 'Create a presigned URL for a blog image upload' })
   @ApiResponse({ status: 201, type: UploadBlogImageResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid file type or size' })
@@ -99,7 +102,9 @@ export class BlogController {
   @Post()
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({ summary: 'Create a blog post (draft or published)' })
   @ApiResponse({ status: 201, type: BlogResponseDto })
   async create(@Body() body: CreateBlogDto): Promise<BlogResponseDto> {
@@ -109,7 +114,9 @@ export class BlogController {
   @Get()
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.VIEW_BLOGS])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.VIEW_BLOGS],
+  })
   @ApiOperation({ summary: 'List blog posts (all statuses) with filters' })
   @ApiResponse({ status: 200, type: GetBlogsResponseDto })
   async getBlogs(
@@ -121,7 +128,9 @@ export class BlogController {
   @Get(':id')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.VIEW_BLOGS])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.VIEW_BLOGS],
+  })
   @ApiOperation({ summary: 'Get a blog post by ID (any status)' })
   @ApiParam({ name: 'id', description: 'Blog UUID' })
   @ApiResponse({ status: 200, type: BlogResponseDto })
@@ -133,7 +142,9 @@ export class BlogController {
   @Patch(':id')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({ summary: 'Update a blog post' })
   @ApiParam({ name: 'id', description: 'Blog UUID' })
   @ApiResponse({ status: 200, type: BlogResponseDto })
@@ -147,7 +158,9 @@ export class BlogController {
   @Post(':id/publish')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({ summary: 'Publish a blog post' })
   @ApiParam({ name: 'id', description: 'Blog UUID' })
   @ApiResponse({ status: 201, type: BlogResponseDto })
@@ -158,7 +171,9 @@ export class BlogController {
   @Post(':id/unpublish')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({ summary: 'Unpublish a blog post (back to draft)' })
   @ApiParam({ name: 'id', description: 'Blog UUID' })
   @ApiResponse({ status: 201, type: BlogResponseDto })
@@ -169,7 +184,9 @@ export class BlogController {
   @Delete(':id')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.DELETE_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.BLOG, {
+    permissions: [PERMISSIONS.DELETE_BLOG],
+  })
   @ApiOperation({ summary: 'Delete a blog post' })
   @ApiParam({ name: 'id', description: 'Blog UUID' })
   @ApiResponse({

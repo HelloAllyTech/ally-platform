@@ -46,7 +46,16 @@ const IMPERSONATION_APP_URL = import.meta.env.VITE_IMPERSONATION_APP_URL;
  * there is no opt-in to make. Gates the query param, so nobody else can trip
  * the backend's 403.
  */
-export function useUserManagement(tenants: Tenant[], canListPlatformAdmins = false) {
+/**
+ * `canListUsers` is the admin's Users toggle. Off, the page shows only the
+ * Ally admins sub-tab, and ally-be refuses the users list — so the query is
+ * skipped rather than left to 403 on mount.
+ */
+export function useUserManagement(
+  tenants: Tenant[],
+  canListPlatformAdmins = false,
+  canListUsers = true,
+) {
   const [search, setSearch] = useState<string>("");
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [addUsermodalOpen, setAddUserModalOpen] = useState<boolean>(false);
@@ -125,7 +134,9 @@ export function useUserManagement(tenants: Tenant[], canListPlatformAdmins = fal
     includePlatformAdmins: includePlatformAdmins || undefined,
   };
 
-  const { data: usersResponse, isFetching: isUsersFetching } = useGetUsersQuery(userParams);
+  const { data: usersResponse, isFetching: isUsersFetching } = useGetUsersQuery(userParams, {
+    skip: !canListUsers,
+  });
 
   useEffect(() => {
     setUsersOffset(0);

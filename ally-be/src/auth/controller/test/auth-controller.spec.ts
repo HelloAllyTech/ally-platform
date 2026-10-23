@@ -1,4 +1,5 @@
 import { CustomThrottlerGuard } from 'src/rate-limit/guard/custom-throttler.guard';
+import { featureToggleGuardProviders } from 'src/auth/guards/test/feature-toggle-guard.fixtures';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { JwtRefreshAuthGuard } from 'src/auth/guards/jwt-refresh-auth.guard';
@@ -37,6 +38,8 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: PermissionsService, useValue: mockPermissionsService },
+        // impersonate is behind the Users tab toggle.
+        ...featureToggleGuardProviders(),
         {
           provide: PostHog,
           useValue: { capture: jest.fn(), alias: jest.fn() },

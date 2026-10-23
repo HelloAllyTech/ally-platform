@@ -8,18 +8,28 @@ import { ScenarioPathTenantRepository } from '../repository/scenario-path-tenant
 import { ScenarioPathTenantValidationShared } from './scenario-tenant-validation-shared';
 import { DeleteScenarioPathTenantDto } from '../dto/delete-scenario-path-tenant.dto';
 import { SuccessResponse } from 'src/common/type/common.type';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 
 @Injectable()
 export class ScenarioPathTenantService {
   constructor(
     private readonly scenarioPathTenantRepository: ScenarioPathTenantRepository,
     private readonly scenarioPathTenantValidationShared: ScenarioPathTenantValidationShared,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   async assignScenarioPathsToTenant(
     tenantId: string,
     createScenarioPathTenantDto: CreateScenarioPathTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.TRACK,
+      createScenarioPathTenantDto.scenarioPathIds,
+    );
     await this.scenarioPathTenantValidationShared.validateScenarioPathTenant(
       createScenarioPathTenantDto.scenarioPathIds,
       tenantId,
@@ -49,6 +59,11 @@ export class ScenarioPathTenantService {
     tenantId: string,
     deleteScenarioTenantDto: DeleteScenarioPathTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.TRACK,
+      deleteScenarioTenantDto.scenarioPathIds,
+    );
     await this.scenarioPathTenantValidationShared.validateScenarioPathTenant(
       deleteScenarioTenantDto.scenarioPathIds,
       tenantId,
