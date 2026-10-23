@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:lottie/lottie.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -315,6 +316,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // RN's real SplashScreen opens full-screen on this Lottie
+              // animation, then slides/shrinks it away as the email/OTP
+              // sheet rises over it — confirmed from source
+              // (`animationContainer`'s absolute, full-screen positioning +
+              // a `translateY` interpolation tied to the sheet's state).
+              // Ported here as a simpler top-of-column illustration, shown
+              // only on the email step (closest single frame to what RN's
+              // animation settles on before the sheet takes over), rather
+              // than reproducing the full reanimated slide/shrink
+              // choreography.
+              if (_step == _Step.email) ...[
+                SizedBox(
+                  height: 220,
+                  child: Lottie.asset(
+                    'assets/animations/splashAnimation.json',
+                    fit: BoxFit.contain,
+                    repeat: false,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               _buildGreeting(context),
               const SizedBox(height: 24),
               if (_step == _Step.email) ...[

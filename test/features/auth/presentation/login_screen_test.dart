@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lottie/lottie.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
@@ -198,6 +199,13 @@ void main() {
         expect(find.textContaining('Privacy Policy..'), findsOneWidget);
       },
     );
+
+    testWidgets('shows the real splash Lottie animation above the greeting', (tester) async {
+      await pumpLogin(tester);
+
+      final builder = tester.widget<LottieBuilder>(find.byType(LottieBuilder));
+      expect((builder.lottie as AssetLottie).assetName, 'assets/animations/splashAnimation.json');
+    });
   });
 
   group('otp step', () {
@@ -219,6 +227,12 @@ void main() {
       }
       await tester.pump();
     }
+
+    testWidgets('hides the splash Lottie animation once advanced to the OTP step', (tester) async {
+      await advanceToOtpStep(tester);
+
+      expect(find.byType(LottieBuilder), findsNothing);
+    });
 
     testWidgets('disables Verify until all 4 digits are entered, then enables it', (tester) async {
       await advanceToOtpStep(tester);
