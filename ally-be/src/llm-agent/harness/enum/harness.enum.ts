@@ -29,6 +29,8 @@ export enum AgentReleaseAuditAction {
   PROMOTED = 'promoted',
   ROLLED_BACK = 'rolled_back',
   EMERGENCY_ROLLBACK = 'emergency_rollback',
+  CANARY_STARTED = 'canary_started',
+  CANARY_STOPPED = 'canary_stopped',
   NOTE = 'note',
 }
 

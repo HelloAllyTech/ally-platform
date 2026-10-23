@@ -4,7 +4,7 @@ import {
   AgentReleaseAuditAction,
   AgentReleaseStatus,
 } from '../../enum/harness.enum';
-import { AgentReleaseService } from '../agent-release.service';
+import { AgentReleaseService, inCanary } from '../agent-release.service';
 
 /** A tiny in-memory stand-in for the two repositories and transactions. */
 function fakeDataSource() {
@@ -199,6 +199,80 @@ describe('AgentReleaseService', () => {
       await service.syncSeed('ally_guide', v2);
       await service.syncSeed('ally_guide', v2);
       expect(fake.releases).toHaveLength(2);
+    });
+  });
+
+  describe('canary', () => {
+    async function withDraft() {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      await service.ensureSeed('ally_guide', { policy: { a: 1 } });
+      const draft = await service.createDraft(
+        'ally_guide',
+        { policy: { a: 2 } },
+        7,
+      );
+      return { fake, service, draft };
+    }
+
+    it('puts a draft in front of a share of epochs, one canary at a time, never over 30%', async () => {
+      const { fake, service, draft } = await withDraft();
+      await expect(service.startCanary(draft.id, 31, 7)).rejects.toThrow(
+        '1–30%',
+      );
+      const started = await service.startCanary(draft.id, 20, 7, 'try it');
+      expect(started).toMatchObject({ status: 'canary', rolloutPercent: 20 });
+      expect((await service.getCanary('ally_guide'))?.id).toBe(draft.id);
+      const second = await service.createDraft(
+        'ally_guide',
+        { policy: { a: 3 } },
+        7,
+      );
+      await expect(service.startCanary(second.id, 10, 7)).rejects.toThrow(
+        'already in canary',
+      );
+      expect(fake.audit.map((a) => a.action)).toContain(
+        AgentReleaseAuditAction.CANARY_STARTED,
+      );
+    });
+
+    it('promoting the canary makes it GA and ends the canary', async () => {
+      const { service, draft } = await withDraft();
+      await service.startCanary(draft.id, 20, 7);
+      const ga = await service.makeGa(draft.id, 7);
+      expect(ga.status).toBe(AgentReleaseStatus.GA);
+      expect(await service.getCanary('ally_guide')).toBeNull();
+      expect((await service.getGa('ally_guide'))?.id).toBe(draft.id);
+    });
+
+    it('stopping retires it; an emergency stop moves every thread at its next turn', async () => {
+      const { fake, service, draft } = await withDraft();
+      await service.startCanary(draft.id, 20, 7);
+      const before = await service.lastEmergencyRollbackId('ally_guide');
+      await service.stopCanary('ally_guide', 7, true, 'crisis spike');
+      expect(fake.releases.find((r) => r.id === draft.id)?.status).toBe(
+        AgentReleaseStatus.RETIRED,
+      );
+      expect(await service.getCanary('ally_guide')).toBeNull();
+      expect(await service.lastEmergencyRollbackId('ally_guide')).not.toBe(
+        before,
+      );
+      await expect(service.stopCanary('ally_guide', 7, false)).rejects.toThrow(
+        'No release is in canary',
+      );
+    });
+  });
+
+  describe('inCanary', () => {
+    it('is stable for a thread and close to the share across threads', () => {
+      expect(inCanary('th-1', 'rel-c', 20)).toBe(inCanary('th-1', 'rel-c', 20));
+      let hits = 0;
+      for (let i = 0; i < 2000; i++) {
+        if (inCanary(`th-${i}`, 'rel-c', 20)) hits++;
+      }
+      expect(hits / 2000).toBeGreaterThan(0.16);
+      expect(hits / 2000).toBeLessThan(0.24);
+      expect(inCanary('th-1', 'rel-c', 0)).toBe(false);
     });
   });
 });

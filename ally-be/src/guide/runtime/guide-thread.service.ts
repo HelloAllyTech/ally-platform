@@ -270,6 +270,7 @@ export class GuideThreadService {
         | 'epoch'
         | 'epochSnapshot'
         | 'releaseId'
+        | 'arm'
         | 'languageCode'
       >
     >,

@@ -45,6 +45,8 @@ export interface GuideEpochSnapshot {
   layerHashes?: Record<string, string>;
   startedAt?: string;
   reason?: string;
+  /** GA or canary: which arm this epoch's release was (plan §7.4). */
+  arm?: 'ga' | 'canary';
   /** Seq of the epoch's first learner message: history replays from here. */
   startSeq?: number;
   /** The latest emergency rollback when the epoch began (audit id). */

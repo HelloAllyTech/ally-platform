@@ -142,6 +142,7 @@ function setup(
   const release = { id: 'rel-1', bundle: GUIDE_DEFAULT_BUNDLE };
   const releases = {
     getGa: jest.fn(async () => release),
+    getCanary: jest.fn(async (): Promise<any> => null),
     getById: jest.fn(async () => release),
     lastEmergencyRollbackId: jest.fn(async () => null),
   };
@@ -290,6 +291,7 @@ function setup(
     visitors,
     conductor,
     learnerData,
+    releases,
   };
 }
 
@@ -821,6 +823,25 @@ describe('GuideTurnService', () => {
       'system',
     ]);
     expect(t.threads.saveState.mock.calls[0][1]).not.toHaveProperty('epoch');
+  });
+
+  it('a new epoch goes to the canary for its share, and the turn records the arm', async () => {
+    const t = setup({ scripts: [textPass('Hello from the canary.')] });
+    const canary = {
+      id: 'rel-c',
+      bundle: GUIDE_DEFAULT_BUNDLE,
+      rolloutPercent: 100,
+    };
+    (t as any).releases.getCanary.mockResolvedValue(canary);
+    const ctx = await t.run();
+    expect(ctx.releaseId).toBe('rel-c');
+    expect(ctx.arm).toBe('canary');
+    expect(ctx.epoch?.snapshot.arm).toBe('canary');
+    expect(t.turnStore.transition).toHaveBeenCalledWith(
+      'turn-1',
+      'streaming',
+      expect.objectContaining({ releaseId: 'rel-c', arm: 'canary' }),
+    );
   });
 
   const visitorTurn = (

@@ -29,6 +29,7 @@ import { GuideAdminService } from '../admin/guide-admin.service';
 import { GuideBaselineService } from '../measure/guide-baseline.service';
 import {
   GuideBaselineCaptureDto,
+  GuideCanaryStartDto,
   GuideCrisisResponseDto,
   GuideRollbackDto,
   UpdateGuideSwitchesDto,
@@ -271,6 +272,40 @@ export class GuideAdminController {
     @CurrentUser() user: TokenUser,
   ) {
     return this.releases.makeGa(releaseId, user.id);
+  }
+
+  @Post('releases/:releaseId/canary')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Put a draft in front of a share of new conversations (one canary at a time; promote it to make it GA)',
+  })
+  startCanary(
+    @Param('releaseId', ParseUUIDPipe) releaseId: string,
+    @Body() dto: GuideCanaryStartDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.releases.startCanary(
+      releaseId,
+      dto.percent,
+      user.id,
+      dto.reason,
+    );
+  }
+
+  @Post('releases/canary/stop')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Stop the canary without promoting it; emergency moves every thread to GA at its next turn',
+  })
+  stopCanary(@Body() dto: GuideRollbackDto, @CurrentUser() user: TokenUser) {
+    return this.releases.stopCanary(
+      ALLY_GUIDE_AGENT_KEY,
+      user.id,
+      dto.emergency,
+      dto.reason,
+    );
   }
 
   @Post('releases/rollback')

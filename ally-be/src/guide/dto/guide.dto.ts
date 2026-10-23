@@ -254,3 +254,19 @@ export class GuideBaselineCaptureDto {
   @MaxLength(500)
   note?: string;
 }
+
+/** POST /v1/guide/admin/releases/:id/canary — show it to a share of new epochs. */
+export class GuideCanaryStartDto {
+  @ApiProperty({
+    description: 'Share of new conversations, 1–30 (plan default 20).',
+  })
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  percent!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}

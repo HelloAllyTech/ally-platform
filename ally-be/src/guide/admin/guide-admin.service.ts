@@ -89,6 +89,7 @@ export class GuideAdminService {
       ),
       this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
     ]);
+    const canary = await this.releases.getCanary(ALLY_GUIDE_AGENT_KEY);
     const t = turns[0] ?? {};
     const tr = traces[0] ?? {};
     const input = num(tr.input);
@@ -131,7 +132,79 @@ export class GuideAdminService {
       release: ga
         ? { id: ga.id, version: ga.version, promotedAt: ga.promotedAt }
         : null,
+      canary: canary
+        ? {
+            id: canary.id,
+            version: canary.version,
+            percent: canary.rolloutPercent ?? null,
+          }
+        : null,
+      arms: await this.arms(window, canary?.id ?? null),
     };
+  }
+
+  /**
+   * GA against canary over the window (plan §7.4, §4.13): what a person
+   * needs to promote or stop a canary by hand in M2 — volume, failures,
+   * time to first token, cost per thread, safety and thumbs. Only turns of
+   * the canary in flight count as canary; earlier canaries are history.
+   */
+  private async arms(window: number, canaryId: string | null) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT CASE WHEN t."arm" = 'canary' AND t."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",
+              count(*) AS turns,
+              count(DISTINCT t."threadId") AS threads,
+              count(*) FILTER (WHERE t."status" = 'failed') AS failed,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY t."ttftMs") AS "ttftP50",
+              COALESCE(sum(t."costUsd"), 0) AS cost,
+              count(*) FILTER (WHERE tr."summary"->>'replyKind' = 'crisis') AS "crisisReplies",
+              count(*) FILTER (WHERE tr."summary"->>'modeAfter' = 'CARE'
+                                 AND COALESCE(tr."summary"->>'modeBefore', '') <> 'CARE') AS "careEntries",
+              count(*) FILTER (WHERE tr."summary"->>'replyKind' = 'refusal') AS refusals
+         FROM "agent_turns" t
+         LEFT JOIN "agent_turn_traces" tr ON tr."turnId" = t."id"
+        WHERE t."agentKey" = $1 AND t."createdAt" >= now() - ($2::int * interval '1 day')
+          AND t."releaseId" IS NOT NULL
+        GROUP BY 1`,
+      [ALLY_GUIDE_AGENT_KEY, window, canaryId],
+    );
+    const thumbs: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT CASE WHEN t."arm" = 'canary' AND t."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",
+              count(*) FILTER (WHERE f."rating" > 0) AS up,
+              count(*) FILTER (WHERE f."rating" < 0) AS down
+         FROM "guide_turn_feedback" f
+         JOIN "guide_messages" m ON m."id" = f."messageId"
+         JOIN "agent_turns" t ON t."id" = m."turnId"
+        WHERE t."agentKey" = $1 AND f."createdAt" >= now() - ($2::int * interval '1 day')
+        GROUP BY 1`,
+      [ALLY_GUIDE_AGENT_KEY, window, canaryId],
+    );
+    const thumbsBy = new Map(thumbs.map((row) => [row.arm, row] as const));
+    return rows
+      .map((row) => {
+        const turns = num(row.turns);
+        const threads = num(row.threads);
+        const f = thumbsBy.get(row.arm);
+        const up = num(f?.up);
+        const down = num(f?.down);
+        return {
+          arm: row.arm as 'ga' | 'canary',
+          turns,
+          threads,
+          failureRate: turns ? num(row.failed) / turns : null,
+          ttftP50Ms:
+            row.ttftP50 === null ? null : Math.round(Number(row.ttftP50)),
+          costPerThreadUsd: threads
+            ? Number((num(row.cost) / threads).toFixed(4))
+            : null,
+          crisisReplies: num(row.crisisReplies),
+          careEntries: num(row.careEntries),
+          refusals: num(row.refusals),
+          thumbsUp: up,
+          thumbsDown: down,
+        };
+      })
+      .sort((a, b) => (a.arm === 'ga' ? -1 : b.arm === 'ga' ? 1 : 0));
   }
 
   /** Conversations tab: threads, newest activity first. No content. */

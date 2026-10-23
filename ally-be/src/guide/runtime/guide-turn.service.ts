@@ -21,7 +21,10 @@ import {
   HarnessTurnContext,
   runHarnessStages,
 } from 'src/llm-agent/harness/pipeline/harness-turn-runner';
-import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release.service';
+import {
+  AgentReleaseService,
+  inCanary,
+} from 'src/llm-agent/harness/release/agent-release.service';
 import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.service';
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
 import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
@@ -269,6 +272,8 @@ export interface GuideTurnContext extends HarnessTurnContext {
   visitorIpHash?: string | null;
   /** Messages the visitor has left today, this message counted. */
   visitorAllowance?: { remaining: number; limit: number } | null;
+  /** GA or canary: the release arm this turn's epoch was assigned (plan §7.4). */
+  arm?: 'ga' | 'canary' | null;
   /** This turn moved CRISIS to CARE on "I'm safe right now". */
   safeTapped?: boolean;
   /** The learner spoke over this turn's reply while it streamed. */
@@ -899,8 +904,15 @@ export class GuideTurnService {
       ctx.history = replayHistory(rows);
       ctx.epoch = { number: thread.epoch, snapshot: snapshot!, isNew: false };
     } else {
-      release = ga;
-      const bundle = ga.bundle as unknown as GuideReleaseBundle;
+      // A new epoch: GA, or the canary for its share of threads (plan §7.4).
+      // The arm holds for the whole epoch, like the release it names.
+      const canary = await this.releases.getCanary(ALLY_GUIDE_AGENT_KEY);
+      const toCanary = Boolean(
+        canary && inCanary(ctx.threadId, canary.id, canary.rolloutPercent ?? 0),
+      );
+      release = toCanary ? canary! : ga;
+      ctx.arm = toCanary ? 'canary' : 'ga';
+      const bundle = release.bundle as unknown as GuideReleaseBundle;
       spans = buildSystemSpans(bundle, orgSpan, courseSpan);
       const route = this.models.route(
         bundle,
@@ -913,7 +925,8 @@ export class GuideTurnService {
         number: thread.epoch + 1,
         isNew: true,
         snapshot: {
-          releaseId: ga.id,
+          releaseId: release.id,
+          arm: ctx.arm,
           model: route.model,
           tier,
           layerHashes: spans.hashes,
@@ -1146,6 +1159,7 @@ export class GuideTurnService {
     }));
     await this.turnStore.transition(ctx.turnId, AgentTurnStatus.STREAMING, {
       releaseId: ctx.releaseId,
+      arm: ctx.arm ?? ctx.epoch?.snapshot?.arm ?? 'ga',
     });
   }
 
@@ -1751,6 +1765,7 @@ export class GuideTurnService {
             epoch: ctx.epoch.number,
             epochSnapshot: ctx.epoch.snapshot,
             releaseId: ctx.releaseId,
+            arm: ctx.arm ?? 'ga',
           }
         : {}),
     });

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import {
   BadRequestException,
   Injectable,
@@ -16,19 +17,48 @@ import { canonicalHash } from './canonical-hash.util';
 
 /** How long a GA lookup is reused; a promotion or rollback clears it at once. */
 export const RELEASE_CACHE_MS = 30_000;
+/** Plan Appendix A: a canary never takes more than 30% of new epochs. */
+export const CANARY_MAX_PERCENT = 30;
+
+/**
+ * Whether a thread's new epoch lands in the canary: a stable hash of the
+ * thread and the canary release, so a thread stays in its arm for that
+ * canary and a new canary reshuffles who sees it.
+ */
+export function inCanary(
+  threadId: string,
+  canaryReleaseId: string,
+  percent: number,
+): boolean {
+  const bucket =
+    parseInt(
+      createHash('sha256')
+        .update(`${threadId}:${canaryReleaseId}`)
+        .digest('hex')
+        .slice(0, 8),
+      16,
+    ) % 100;
+  return bucket < percent;
+}
 
 const PG_UNIQUE_VIOLATION = '23505';
 
 /**
  * Releases (plans/ally-guide/plan.md §7.4): immutable, versioned behaviour
  * bundles with exactly one GA per agent. v1 of the pipeline is manual —
- * draft → promote → GA, with one-step rollback; evaluation, shadow and canary
- * stages arrive with milestone M4 and slot in before `promote`.
+ * draft → (canary at a share of new epochs) → promote → GA, with one-step
+ * rollback. Evaluation and shadow stages arrive with milestone M4 and slot in
+ * before the canary.
  */
 @Injectable()
 export class AgentReleaseService {
   private readonly logger = LoggerService.getInstance(AgentReleaseService.name);
   private readonly gaCache = new Map<
+    string,
+    { release: AgentRelease | null; readAt: number }
+  >();
+
+  private readonly canaryCache = new Map<
     string,
     { release: AgentRelease | null; readAt: number }
   >();
@@ -254,6 +284,7 @@ export class AgentReleaseService {
         status: AgentReleaseStatus.GA,
         promotedAt: new Date(),
         retiredAt: null,
+        rolloutPercent: null,
       });
       await auditRepo.save({
         agentKey,
@@ -368,11 +399,156 @@ export class AgentReleaseService {
       return { ...target, status: AgentReleaseStatus.GA } as AgentRelease;
     });
     this.gaCache.delete(promoted.agentKey);
+    this.canaryCache.delete(promoted.agentKey);
     this.emergencyCache.delete(promoted.agentKey);
     this.logger.info(
       `${promoted.agentKey} release v${promoted.version} is now GA (${action}) by user ${userId}`,
     );
     return promoted;
+  }
+
+  /** The release in canary, if any (plan §7.4: at most one per agent). */
+  async getCanary(agentKey: string): Promise<AgentRelease | null> {
+    const cached = this.canaryCache.get(agentKey);
+    if (cached && Date.now() - cached.readAt < RELEASE_CACHE_MS) {
+      return cached.release;
+    }
+    const release = await this.releases.findOne({
+      where: { agentKey, status: AgentReleaseStatus.CANARY },
+    });
+    this.canaryCache.set(agentKey, { release, readAt: Date.now() });
+    return release;
+  }
+
+  /**
+   * Put a draft or candidate in front of `percent` of new epochs (plan §7.4,
+   * Appendix A: 20% by default, never more than 30%). One canary at a time;
+   * promote it with makeGa, or stop it.
+   */
+  async startCanary(
+    releaseId: string,
+    percent: number,
+    userId: number,
+    reason?: string,
+  ): Promise<AgentRelease> {
+    const share = Math.floor(percent);
+    if (!Number.isFinite(share) || share < 1 || share > CANARY_MAX_PERCENT) {
+      throw new BadRequestException(
+        `A canary takes 1–${CANARY_MAX_PERCENT}% of new conversations.`,
+      );
+    }
+    const started = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const target = await repo.findOne({ where: { id: releaseId } });
+      if (!target) throw new NotFoundException('Release not found');
+      if (
+        ![
+          AgentReleaseStatus.DRAFT,
+          AgentReleaseStatus.CANDIDATE,
+          AgentReleaseStatus.SHADOW,
+          AgentReleaseStatus.CANARY,
+        ].includes(target.status)
+      ) {
+        throw new BadRequestException(
+          `A ${target.status} release cannot go to canary.`,
+        );
+      }
+      const other = await repo.findOne({
+        where: { agentKey: target.agentKey, status: AgentReleaseStatus.CANARY },
+      });
+      if (other && other.id !== target.id) {
+        throw new BadRequestException(
+          `v${other.version} is already in canary. Promote or stop it first.`,
+        );
+      }
+      await repo.update(target.id, {
+        status: AgentReleaseStatus.CANARY,
+        rolloutPercent: share,
+      });
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey: target.agentKey,
+        releaseId: target.id,
+        action: AgentReleaseAuditAction.CANARY_STARTED,
+        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorUserId: userId,
+        detail: {
+          version: target.version,
+          percent: share,
+          fromStatus: target.status,
+          reason: reason ?? null,
+        },
+      });
+      return {
+        ...target,
+        status: AgentReleaseStatus.CANARY,
+        rolloutPercent: share,
+      } as AgentRelease;
+    });
+    this.canaryCache.delete(started.agentKey);
+    this.logger.info(
+      `${started.agentKey} release v${started.version} in canary at ${share}% by user ${userId}`,
+    );
+    return started;
+  }
+
+  /**
+   * End the canary without promoting it: the release is retired and new
+   * epochs all get GA. With `emergency` (a safety reason) every thread moves
+   * to GA at its next turn, as an emergency rollback does; otherwise canary
+   * threads finish their epoch first.
+   */
+  async stopCanary(
+    agentKey: string,
+    userId: number,
+    emergency: boolean,
+    reason?: string,
+  ): Promise<AgentRelease> {
+    const stopped = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const canary = await repo.findOne({
+        where: { agentKey, status: AgentReleaseStatus.CANARY },
+      });
+      if (!canary) throw new BadRequestException('No release is in canary.');
+      await repo.update(canary.id, {
+        status: AgentReleaseStatus.RETIRED,
+        retiredAt: new Date(),
+      });
+      const audit = manager.getRepository(AgentReleaseAudit);
+      await audit.save({
+        agentKey,
+        releaseId: canary.id,
+        action: AgentReleaseAuditAction.CANARY_STOPPED,
+        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorUserId: userId,
+        detail: {
+          version: canary.version,
+          emergency,
+          reason: reason ?? null,
+        },
+      });
+      if (emergency) {
+        // The same marker an emergency rollback leaves: every thread's next
+        // turn starts a new epoch on GA.
+        await audit.save({
+          agentKey,
+          releaseId: canary.id,
+          action: AgentReleaseAuditAction.EMERGENCY_ROLLBACK,
+          actorKind: AgentReleaseAuthorKind.HUMAN,
+          actorUserId: userId,
+          detail: { canaryStopped: true, reason: reason ?? null },
+        });
+      }
+      return {
+        ...canary,
+        status: AgentReleaseStatus.RETIRED,
+      } as AgentRelease;
+    });
+    this.canaryCache.delete(agentKey);
+    this.emergencyCache.delete(agentKey);
+    this.logger.info(
+      `${agentKey} canary v${stopped.version} stopped${emergency ? ' (emergency)' : ''} by user ${userId}`,
+    );
+    return stopped;
   }
 
   /** Roll back to the GA release before the current one. */
