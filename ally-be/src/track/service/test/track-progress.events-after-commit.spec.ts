@@ -119,3 +119,71 @@ describe('TrackProgressService.completeItem — events after commit', () => {
     expect(emitter.emit).not.toHaveBeenCalled();
   });
 });
+
+describe('TrackProgressService.handleRoleplayEnd — attempt-ended event', () => {
+  function setup(item: Record<string, unknown>) {
+    const emitted: Array<{ name: string; payload: any }> = [];
+    const progress = {
+      id: 'tip-1',
+      trackItemId: 'item-1',
+      trackEnrollmentId: 'enr-1',
+      userId: 7,
+      status: SessionItemStatus.UNLOCKED,
+      attemptCount: 0,
+    };
+    const service = new TrackProgressService(
+      { transaction: jest.fn() } as any,
+      {
+        simulationPath: { simulationPathItemMinDurationForCompletion: 60 },
+      } as any,
+      {
+        emit: (name: string, payload: unknown) =>
+          emitted.push({ name, payload }),
+      } as any,
+      { findOne: jest.fn(async () => progress), update: jest.fn() } as any,
+      {
+        findOne: jest.fn(async () => ({
+          id: 'item-1',
+          type: TrackItemType.ROLEPLAY,
+          completionCriteria: {},
+          ...item,
+        })),
+      } as any,
+    );
+    return { service, emitted };
+  }
+
+  it('reports a call too short to count', async () => {
+    const { service, emitted } = setup({});
+    await service.handleRoleplayEnd({
+      trackItemProgressId: 'tip-1',
+      score: 50,
+      callDuration: 10_000,
+    });
+    expect(emitted).toEqual([
+      {
+        name: TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED,
+        payload: expect.objectContaining({
+          outcome: 'too_short',
+          trackItemId: 'item-1',
+          callDurationMs: 10_000,
+        }),
+      },
+    ]);
+  });
+
+  it('reports a score below the bar', async () => {
+    const { service, emitted } = setup({
+      completionCriteria: { minScore: 70 },
+    });
+    await service.handleRoleplayEnd({
+      trackItemProgressId: 'tip-1',
+      score: 20,
+      callDuration: 120_000,
+    });
+    expect(emitted[0].payload).toMatchObject({
+      outcome: 'below_score',
+      score: 20,
+    });
+  });
+});

@@ -19,7 +19,35 @@ export const TRACK_EVENTS = {
   ITEM_COMPLETED: 'track.item.completed',
   SECTION_COMPLETED: 'track.section.completed',
   TRACK_COMPLETED: 'track.completed',
+  /** A quiz attempt has a result (or is waiting for model grading). */
+  QUIZ_GRADED: 'track.quiz.graded',
+  /** A roleplay attempt ended, whether or not it completed the item. */
+  ROLEPLAY_ATTEMPT_ENDED: 'track.roleplay.attempt.ended',
 } as const;
+
+/** Payload of TRACK_EVENTS.QUIZ_GRADED. */
+export interface TrackQuizGradedEvent {
+  userId: number;
+  trackEnrollmentId: string;
+  trackItemId: string;
+  attemptId: string;
+  status: string;
+  passed: boolean | null;
+  scorePct: number | null;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+}
+
+/** Payload of TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED. */
+export interface TrackRoleplayAttemptEndedEvent {
+  userId: number;
+  trackEnrollmentId: string;
+  trackItemId: string;
+  trackItemProgressId: string;
+  outcome: 'completed' | 'too_short' | 'below_score';
+  score: number | null;
+  callDurationMs: number;
+}
 
 export const CASE_SESSION_COMPLETED_EVENT = 'case.session.completed';
 
@@ -226,10 +254,22 @@ export class TrackProgressService {
       this.configService.simulationPath
         ?.simulationPathItemMinDurationForCompletion ??
       0;
+    const attemptEnded = (outcome: TrackRoleplayAttemptEndedEvent['outcome']) =>
+      this.emitSafely(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, {
+        userId: progress.userId,
+        trackEnrollmentId: progress.trackEnrollmentId,
+        trackItemId: progress.trackItemId,
+        trackItemProgressId,
+        outcome,
+        score: score ?? null,
+        callDurationMs: callDuration ?? 0,
+      } satisfies TrackRoleplayAttemptEndedEvent);
+
     if (callDurationInSeconds < minDurationSeconds) {
       this.logger.info(
         `Track roleplay too short (${callDurationInSeconds}s < ${minDurationSeconds}s) for progress ${trackItemProgressId}`,
       );
+      attemptEnded('too_short');
       return NOOP_RESULT;
     }
 
@@ -238,10 +278,26 @@ export class TrackProgressService {
       this.logger.info(
         `Track roleplay score ${score} below minScore ${minScore} for progress ${trackItemProgressId}`,
       );
+      attemptEnded('below_score');
       return NOOP_RESULT;
     }
 
-    return this.completeItem(trackItemProgressId, { score });
+    const result = await this.completeItem(trackItemProgressId, { score });
+    attemptEnded('completed');
+    return result;
+  }
+
+  /** A quiz attempt's result, for listeners (the Ally guide). */
+  emitQuizGraded(event: TrackQuizGradedEvent): void {
+    this.emitSafely(TRACK_EVENTS.QUIZ_GRADED, event);
+  }
+
+  private emitSafely(name: string, payload: unknown): void {
+    try {
+      this.eventEmitter.emit(name, payload);
+    } catch (error) {
+      this.logger.error(`Failed to emit ${name}: ${error}`);
+    }
   }
 
   /**

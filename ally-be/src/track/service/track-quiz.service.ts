@@ -359,6 +359,22 @@ export class TrackQuizService {
     );
     const attemptsUsed =
       await this.trackQuizAttemptRepository.countByProgressId(progressId);
+    if (progress) {
+      this.trackProgressService.emitQuizGraded({
+        userId: progress.userId,
+        trackEnrollmentId: progress.trackEnrollmentId,
+        trackItemId: progress.trackItemId,
+        attemptId: attempt.id,
+        status: attempt.status,
+        passed: attempt.passed ?? null,
+        scorePct:
+          attempt.scorePct !== undefined && attempt.scorePct !== null
+            ? Number(attempt.scorePct)
+            : null,
+        attemptsUsed,
+        maxAttempts: quiz.settings.maxAttempts ?? null,
+      });
+    }
 
     return {
       attemptId: attempt.id,

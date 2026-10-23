@@ -359,6 +359,15 @@ describe('GuideProgressListener', () => {
           return options.duplicate ? [[], 0] : [[{ id: 'trg-1' }], 1];
         }
         if (sql.includes('UPDATE "guide_cards"')) return [[{ id: 'c1' }], 1];
+        if (sql.includes('FROM "track_enrollments"')) {
+          return [{ trackId: 'tr1', tenantId: 'org', userId: 3 }];
+        }
+        if (sql.includes('FROM "scenario_sessions"')) {
+          return [{ trackItemProgressId: 'tip1' }];
+        }
+        if (sql.includes('FROM "track_item_progress"')) {
+          return [{ trackEnrollmentId: 'enr1', trackItemId: 'i2' }];
+        }
         return [];
       }),
     };
@@ -427,6 +436,61 @@ describe('GuideProgressListener', () => {
         dedupeKey: 'item_completed:enr1:i2',
         description: 'The learner completed "Meera calls" (roleplay).',
       },
+    );
+  });
+
+  it('folds a failed quiz into the next turn and speaks now if the learner is watching', async () => {
+    const t = setup({ present: true });
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att1',
+      status: 'FAILED',
+      passed: false,
+      scorePct: 40,
+      attemptsUsed: 1,
+      maxAttempts: 3,
+    });
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      { id: 3, tenantId: 'org' },
+      expect.objectContaining({
+        dedupeKey: 'quiz_graded:att1:FAILED',
+        description: expect.stringContaining('2 attempts left'),
+      }),
+    );
+  });
+
+  it('lets a passed quiz speak through its completion instead', async () => {
+    const t = setup({ present: true });
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att2',
+      status: 'PASSED',
+      passed: true,
+      scorePct: 90,
+      attemptsUsed: 1,
+      maxAttempts: 3,
+    });
+    expect(t.turns.acceptTrigger).not.toHaveBeenCalled();
+  });
+
+  it('offers an after-action review when the debrief is ready', async () => {
+    const t = setup({ present: true });
+    await t.listener.onDebriefReady({
+      scenarioSessionId: 'ss1',
+      tenantId: 'org',
+    });
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        dedupeKey: 'debrief_ready:ss1',
+        description: expect.stringContaining('after-action review'),
+      }),
     );
   });
 

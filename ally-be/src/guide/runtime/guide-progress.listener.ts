@@ -4,7 +4,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { LoggerService } from 'src/logger/logger.service';
-import { TRACK_EVENTS } from 'src/track/service/track-progress.service';
+import {
+  SCENARIO_SESSION_DEBRIEF_READY_EVENT,
+  ScenarioSessionDebriefReadyEvent,
+} from 'src/learn/constants/scenario-session-events.constants';
+import {
+  TRACK_EVENTS,
+  TrackQuizGradedEvent,
+  TrackRoleplayAttemptEndedEvent,
+} from 'src/track/service/track-progress.service';
 import { CourseSpine } from '../conductor/course-spine';
 import { GuideConductorService } from '../conductor/guide-conductor.service';
 import {
@@ -96,6 +104,25 @@ export class GuideProgressListener {
     );
   }
 
+  @OnEvent(TRACK_EVENTS.QUIZ_GRADED, { async: true })
+  async onQuizGraded(event: TrackQuizGradedEvent): Promise<void> {
+    await this.safely('quiz', event as never, () => this.quizGraded(event));
+  }
+
+  @OnEvent(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, { async: true })
+  async onRoleplayEnded(event: TrackRoleplayAttemptEndedEvent): Promise<void> {
+    await this.safely('roleplay', event as never, () =>
+      this.roleplayEnded(event),
+    );
+  }
+
+  @OnEvent(SCENARIO_SESSION_DEBRIEF_READY_EVENT, { async: true })
+  async onDebriefReady(event: ScenarioSessionDebriefReadyEvent): Promise<void> {
+    await this.safely('debrief', event as never, () =>
+      this.debriefReady(event),
+    );
+  }
+
   private async safely(
     what: string,
     event: TrackProgressEventPayload,
@@ -105,7 +132,7 @@ export class GuideProgressListener {
       await fn();
     } catch (error) {
       this.logger.error(
-        `Guide ${what}-completed handling failed for track ${event.trackId}`,
+        `Guide ${what} event handling failed for track ${event?.trackId ?? '?'}`,
         error,
       );
     }
@@ -306,5 +333,173 @@ export class GuideProgressListener {
         await this.threads.update(thread.id, { completedAt: new Date() });
       }
     }
+  }
+
+  /** The course and owner behind an enrollment. */
+  private async enrollment(
+    trackEnrollmentId: string,
+  ): Promise<{ trackId: string; tenantId: string; userId: number } | null> {
+    const rows: Array<{ trackId: string; tenantId: string; userId: number }> =
+      await this.dataSource.query(
+        `SELECT "trackId", "tenant_id" AS "tenantId", "userId"
+           FROM "track_enrollments" WHERE "id" = $1`,
+        [trackEnrollmentId],
+      );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Leave a platform event for each of the learner's guide threads on this
+   * course; if `speakNow` and they are watching, Ally takes a turn for it.
+   */
+  private async fold(input: {
+    trackEnrollmentId: string;
+    trackItemId: string;
+    kind: string;
+    dedupeKey: string;
+    describe: (title: string, typeLabel: string) => string;
+    speakNow: boolean;
+  }): Promise<void> {
+    const enrollment = await this.enrollment(input.trackEnrollmentId);
+    if (!enrollment) return;
+    const base = {
+      userId: enrollment.userId,
+      tenantId: enrollment.tenantId,
+      trackId: enrollment.trackId,
+      trackEnrollmentId: input.trackEnrollmentId,
+      trackItemId: input.trackItemId,
+      trackSectionId: '',
+      itemType: '',
+    };
+    const threads = await this.activeThreads(base);
+    if (!threads.length) return;
+    const spine = await this.loadSpine(base);
+    const item = spine.items.find(
+      (candidate) => candidate.id === input.trackItemId,
+    );
+    const description = input.describe(
+      item?.title ?? 'an activity',
+      item ? itemTypeLabel(item.type) : 'activity',
+    );
+    for (const thread of threads) {
+      if (
+        !(await this.claim(thread, input.kind, input.dedupeKey, description, {
+          itemId: input.trackItemId,
+        }))
+      ) {
+        continue;
+      }
+      if (
+        input.speakNow &&
+        thread.userId &&
+        (await this.cards.isPresent(thread.id))
+      ) {
+        await this.turns.acceptTrigger(
+          thread,
+          {
+            id: thread.userId,
+            tenantId: thread.tenantId ?? enrollment.tenantId,
+          },
+          { dedupeKey: input.dedupeKey, description },
+        );
+      }
+    }
+  }
+
+  private async quizGraded(event: TrackQuizGradedEvent): Promise<void> {
+    const left =
+      event.maxAttempts != null
+        ? Math.max(0, event.maxAttempts - event.attemptsUsed)
+        : null;
+    const score =
+      event.scorePct != null ? ` (${Math.round(event.scorePct)}%)` : '';
+    await this.fold({
+      trackEnrollmentId: event.trackEnrollmentId,
+      trackItemId: event.trackItemId,
+      kind: 'quiz_graded',
+      dedupeKey: `quiz_graded:${event.attemptId}:${event.status}`,
+      // A pass is also an item completion, which speaks for itself.
+      speakNow: event.passed !== true,
+      describe: (title) => {
+        if (event.status === 'PENDING_GRADING') {
+          return `The learner's answers to the quiz "${title}" are still being graded.`;
+        }
+        if (event.passed)
+          return `The learner passed the quiz "${title}"${score}.`;
+        if (left === 0) {
+          return (
+            `The learner did not pass the quiz "${title}"${score} and has no attempts left. ` +
+            'The course keeps it locked, as in the classic view: be kind, offer to revisit the ' +
+            'material, and point them to the course owner or support.'
+          );
+        }
+        return (
+          `The learner did not pass the quiz "${title}" this time${score}` +
+          (left != null
+            ? `; ${left} attempt${left === 1 ? '' : 's'} left.`
+            : '.') +
+          ' Reflect on it with consequences, not correctness, within what the quiz lets them see, ' +
+          'and offer to revisit the material first.'
+        );
+      },
+    });
+  }
+
+  private async roleplayEnded(
+    event: TrackRoleplayAttemptEndedEvent,
+  ): Promise<void> {
+    await this.fold({
+      trackEnrollmentId: event.trackEnrollmentId,
+      trackItemId: event.trackItemId,
+      kind: 'roleplay_ended',
+      dedupeKey: `roleplay_ended:${event.trackItemProgressId}:${event.callDurationMs}:${event.score ?? 'na'}`,
+      speakNow: event.outcome !== 'completed',
+      describe: (title) => {
+        switch (event.outcome) {
+          case 'too_short':
+            return (
+              `The learner left the practice "${title}" early, so it does not count yet. ` +
+              'Acknowledge it without judgement and offer to try again when they are ready, ' +
+              'or to rehearse one opening line first.'
+            );
+          case 'below_score':
+            return (
+              `The learner finished the practice "${title}" but it did not meet the course's bar yet. ` +
+              'Keep it about choices and their consequences; offer to try again when they are ready.'
+            );
+          default:
+            return `The learner finished the practice "${title}".`;
+        }
+      },
+    });
+  }
+
+  private async debriefReady(
+    event: ScenarioSessionDebriefReadyEvent,
+  ): Promise<void> {
+    const rows: Array<{ trackItemProgressId: string | null }> =
+      await this.dataSource.query(
+        `SELECT "trackItemProgressId" FROM "scenario_sessions" WHERE "id" = $1`,
+        [event.scenarioSessionId],
+      );
+    const progressId = rows[0]?.trackItemProgressId;
+    if (!progressId) return;
+    const progress: Array<{ trackEnrollmentId: string; trackItemId: string }> =
+      await this.dataSource.query(
+        `SELECT "trackEnrollmentId", "trackItemId" FROM "track_item_progress" WHERE "id" = $1`,
+        [progressId],
+      );
+    if (!progress[0]) return;
+    await this.fold({
+      trackEnrollmentId: progress[0].trackEnrollmentId,
+      trackItemId: progress[0].trackItemId,
+      kind: 'debrief_ready',
+      dedupeKey: `debrief_ready:${event.scenarioSessionId}`,
+      speakNow: true,
+      describe: (title) =>
+        `The debrief for the learner's practice "${title}" is ready on their screen. ` +
+        'Offer a short after-action review: ask what they noticed first, then what happened, ' +
+        'why, and one thing to try next time. Never score the client.',
+    });
   }
 }
