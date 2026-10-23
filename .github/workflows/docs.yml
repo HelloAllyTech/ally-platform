@@ -31,14 +31,78 @@ jobs:
             https://raw.githubusercontent.com/HelloAllyTech/.github/main/scripts/docs_guard.py \
             -o docs_guard.py
 
-      - name: Check documentation rules
+      # A push that arrived through a pull request was already checked as that PR.
+      - name: Skip a push that already passed as a pull request
+        id: dedupe
+        if: github.event_name == 'push'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_NAME: ${{ github.event_name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python3 docs_guard.py
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          merged="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null)] | length' 2>/dev/null || echo 0)"
+          if [ "${merged:-0}" -gt 0 ]; then
+            echo "Arrived via a merged pull request — already guarded there."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Paths are repo-relative (`ally-be/src/...`), which is what the root .docs-map.yml
+      # watches.
+      - name: Collect changed files
+        if: steps.dedupe.outputs.skip != 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE="$BASE_SHA"; HEAD="$HEAD_SHA"
+          else
+            HEAD="$GITHUB_SHA"
+            BASE="$PUSH_BEFORE"
+            # A first push, or a force-push, leaves `before` unreachable. Fall back to the
+            # head's parent so we check something real rather than the whole history.
+            if [ -z "${BASE:-}" ] || [ "${BASE//0/}" = "" ] \
+               || ! git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null; then
+              BASE="${HEAD}^"
+            fi
+          fi
+          git diff --name-only --diff-filter=d "$BASE" "$HEAD" > changed-files.txt
+          git log --format=%B "$BASE..$HEAD" > commit-messages.txt || true
+          echo "Changed files:"
+          sed 's/^/  /' changed-files.txt
+
+      - name: Capture the escape hatches
+        if: steps.dedupe.outputs.skip != 'true'
+        env:
+          # Via env, never interpolated into the script body — a PR description is
+          # attacker-controlled text and must not reach the shell as code.
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            printf '%s' "${PR_BODY:-}" > pr-body.txt
+            printf '%s' "${PR_LABELS:-}" > pr-labels.txt
+          else
+            cp commit-messages.txt pr-body.txt
+            if grep -qiE '^[[:space:]]*Docs-Skip:[[:space:]]*\S' pr-body.txt; then
+              printf 'docs:skip' > pr-labels.txt
+            else
+              : > pr-labels.txt
+            fi
+          fi
+
+      - name: Check documentation rules
+        if: steps.dedupe.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          python3 docs_guard.py \
+            --repo-root . \
+            --changed-files changed-files.txt \
+            --pr-body pr-body.txt \
+            --labels "$(cat pr-labels.txt)"
 
   docs-paths:
     runs-on: ubuntu-latest
@@ -53,9 +117,7 @@ jobs:
         with:
           node-version: "24"
 
+      # One scan covers every app: the lint reads tracked markdown from the git root, and
+      # `--siblings` resolves `ally-be/...`-style references against the app directories.
       - name: Check documented file paths across monorepo
-        run: |
-          for dir in ally-be ally-web ally-ai ally-ai-learn ally-mobile helloallytech.github.io; do
-            echo "=== Checking $dir ==="
-            (cd "$dir" && node ../scripts/docs-path-lint.mjs --siblings "$GITHUB_WORKSPACE")
-          done
+        run: node scripts/docs-path-lint.mjs --siblings "$GITHUB_WORKSPACE"

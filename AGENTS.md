@@ -7,79 +7,18 @@ This document helps AI agents (Claude Code, Copilot, etc.) quickly orient themse
 
 ## Repo Quick Reference
 
-### ally-be (Core Backend)
-- **Stack**: NestJS 11 / TypeScript 5.9 / Node 24 / PostgreSQL 14 / Redis 7 / TypeORM
-- **Entry**: `src/main.ts` -> `src/app.module.ts` (43 modules)
-- **Key modules**: auth, learn, livekit, ai, chat, audio-ingest, conversational-guardrails, badge, community, prompt, tenant, user, authorization, scenario-report
-- **DB migrations**: `src/database/migrations/` (211+ files, TypeORM)
-- **Seeds**: `src/database/seeds/`
-- **WebSocket gateways**: `src/chat/gateway/microphone-chat.gateway.ts`, `src/audio-ingest/gateway/cloud-telephony.gateway.ts`, `src/scenario-report/gateway/scenario-report.gateway.ts`
-- **API docs**: Swagger at `/api-docs` when running
-- **Tests**: Jest (`npm test`), E2E (`npm run test:e2e`)
-- **Key patterns**: RTK Query-style API services, EventEmitter for async, Redis pub/sub, RBAC guards, tenant isolation decorators
+Every app directory has its own `AGENTS.md` / `CLAUDE.md` router — read it before working there. This table only orients you.
 
-### ally-ai (AI Service)
-- **Stack**: FastAPI / Python 3.12 / Poetry / Weaviate / LangChain / OpenAI
-- **Entry**: `app/main.py`
-- **Key services**: `app/core/conversations/`, `app/core/summaries/`, `app/core/text_generations/`, `app/core/reference_documents/`, `app/core/transcriptions/`, `app/core/queue/`
-- **Prompts**: `app/prompts/` (file-based templates, dynamically loaded)
-- **Vector DB**: Weaviate collections defined in `app/core/vector_db/constants.py`
-- **Migrations**: `app/migrations/` (Weaviate schema migrations)
-- **Background worker**: SQS transcription worker in `app/core/queue/transcription_request_sqs_worker.py`
-- **Tests**: pytest (`make test`)
-- **Key patterns**: Abstract base classes for services, dependency injection via FastAPI, Pydantic settings, HIPAA audit logging
+| Path | Stack | Entry | Read first |
+|------|-------|-------|-----------|
+| `ally-be/` | NestJS 11 / TypeScript 5.9 / Node 24 / PostgreSQL 14 / Redis 7 / TypeORM | `src/main.ts` → `src/app.module.ts` | `ally-be/AGENTS.md`, `ally-be/DATA_SCHEMA.md` |
+| `ally-ai/` | FastAPI / Python 3.12 / Poetry / Weaviate / LangChain / OpenAI | `app/main.py` | `ally-ai/AGENTS.md`, `app/core/config.py` |
+| `ally-ai-learn/` | FastAPI + LiveKit Agents / Python 3.12 / Poetry / LangGraph / multi-provider TTS/STT/LLM | `app/main.py` (API), `app/worker.py` (agent) | `ally-ai-learn/AGENTS.md`, `app/core/graph/graph_builder.py`, `docs/architecture.md` |
+| `ally-web/` | Nx 22 / React 18 / TypeScript / Vite dashboards / Next.js 14 landing | admin (8081), helpline (8080), landing (3000) under `apps/` | `ally-web/AGENTS.md`, `apps/ally-helpline-dashboard/src/main.tsx` |
+| `ally-mobile/` | React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query | `index.js` → `src/App.tsx` | `ally-mobile/AGENTS.md`, `src/navigation/RootNavigator.tsx` |
+| `helloallytech.github.io/` | The Developer Wiki's source (`wiki/`); `publish-wiki.yml` mirrors it to GitHub Pages | — | `helloallytech.github.io/CLAUDE.md` |
 
-### ally-ai-learn (Training Agent)
-- **Stack**: FastAPI + LiveKit Agents / Python 3.12 / Poetry / LangGraph / Multi-provider TTS/STT/LLM
-- **Entry**: `app/main.py` (FastAPI), `app/worker.py` (LiveKit agent)
-- **Graph pipeline**: `app/core/graph/` (LangGraph with 6 nodes: process_events -> resolve_branching -> generate_response/detect_behaviors -> apply_voice -> send_feedback)
-- **Event system**: `app/core/events/` (9 event types: SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER, TIME, SCORE, COMBINATION, HELPER_UTTERANCE_LENGTH, HELPER_INTERRUPTED, HELPER_PARAPHRASED)
-- **Provider factories**: `app/tts/factory.py`, `app/stt/factory.py`, `app/llms/factory.py`
-- **Scenario models**: `app/core/scenario/base.py`
-- **Prompts**: `app/prompts/` with categories: system, branching, prosody, events
-- **Docs**: Extensive in `docs/` (01-13 numbered guides)
-- **Tests**: pytest (`make test`)
-- **Key patterns**: Factory pattern for providers, LiveKit agent lifecycle (configure/initialize/start), event orchestration with eligibility constraints
-
-### ally-web (Web Frontend Monorepo)
-- **Stack**: Nx 22 / React 18 / TypeScript / Vite (dashboards) / Next.js 14 (landing)
-- **Apps**:
-  - `apps/ally-web/` - Next.js landing page (port 3000)
-  - `apps/ally-helpline-dashboard/` - Vite + React + MUI + Tailwind (port 8080)
-  - `apps/ally-admin-dashboard/` - Vite + React + Tailwind (port 8081)
-- **Shared lib**: `libs/ui-shared/` (25+ shared components)
-- **State**: Redux Toolkit + RTK Query + Redux Persist
-- **Real-time**: Socket.IO client + LiveKit components-react
-- **Tests**: Vitest (`npx nx test <app>`)
-- **Key patterns**: RTK Query for API calls, path aliases (`@api`, `@components`), permission-based routing, i18next for i18n
-
-### ally-mobile (Mobile App)
-- **Stack**: React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query
-- **Entry**: `index.js` -> `src/App.tsx`
-- **Navigation**: React Navigation 7 (native-stack + bottom-tabs + drawer)
-- **Services**: RTK Query in `src/services/` (30+ API files)
-- **Hooks**: 45+ custom hooks in `src/hooks/`
-- **State**: Redux slices in `src/store/`
-- **Real-time**: Socket.IO + LiveKit React Native
-- **Audio**: `react-native-live-audio-stream` for recording, LiveKit for voice sessions
-- **Tests**: Jest + React Native Testing Library
-- **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
-
-### infra (Infrastructure — Standalone Repo Outside `ally-platform`)
-- **Repository**: `HelloAllyTech/infra` (intentionally kept outside the `ally-platform` monorepo as a separate private repository to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d at the monorepo root)
-- **Stack**: Ansible 13 + Terraform + Docker Compose
-- **Ansible roles**: `ansible/roles/` (30+ roles)
-- **Playbooks**: `ansible/` - `baremetal.yml`, `ally_core.yml`, `ally_ai.yml`, `ally_learn.yml`, `ally_web.yml`, `ci.yml`
-- **Templates**: Docker Compose Jinja2 templates in `ansible/templates/`
-- **Inventories**: `ansible/inventories/development/`, `ansible/inventories/global/`
-- **Scripts**: `scripts/bootstrap.sh` (clone repos), `scripts/dev_env.sh` (start dev), `scripts/colima.sh`
-- **Secrets**: Ansible Vault (requires `$HOME/ansible_vault_pass`)
-- **Key patterns**: Incus containers on Hetzner baremetal, Consul for service discovery, Caddy for reverse proxy, Wireguard VPN
-
-### helloallytech.github.io (Developer Hub)
-- **Stack**: Jekyll / GitHub Pages
-- **Content**: `index.md`, `CONTRIBUTING.md`, `get-started.md`, `tech-stack.md`
-- **Minimal**: Static docs site, rarely needs changes
+**infra** is a standalone private repo (`HelloAllyTech/infra`), kept outside `ally-platform` to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d here. Ansible 13 + Terraform + Docker Compose: playbooks such as `infra/ansible/baremetal.yml`, dev scripts at its root (`infra/bootstrap.sh`, `infra/dev_env.sh`, `infra/colima.sh`). Vault needs `$HOME/ansible_vault_pass`. Incus containers on Hetzner baremetal, Consul, Caddy, Wireguard.
 
 ## Cross-Repo Conventions
 
@@ -131,17 +70,6 @@ npm run migration:run
 
 ### Weaviate schema changes (ally-ai)
 Add migration file in `app/migrations/` following the `NNN-description.py` pattern.
-
-## Files to Read First (per repo)
-
-| Repo | Start Here |
-|------|-----------|
-| ally-be | `src/app.module.ts`, `src/main.ts`, `README.md` |
-| ally-ai | `app/main.py`, `app/core/config.py`, `README.md` |
-| ally-ai-learn | `app/worker.py`, `app/core/graph/graph_builder.py`, `docs/architecture.md` |
-| ally-web | `nx.json`, `apps/ally-helpline-dashboard/src/main.tsx`, `README.md` |
-| ally-mobile | `src/App.tsx`, `src/navigation/RootNavigator.tsx`, `README.md` |
-| infra | `README.md`, `scripts/dev_env.sh`, `ansible/baremetal.yml` |
 
 ## Gotchas & Important Notes
 
