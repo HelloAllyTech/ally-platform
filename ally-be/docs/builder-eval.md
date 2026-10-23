@@ -104,7 +104,8 @@ settings, or both. The flow:
    same interview loop, and started after every one of those fixtures was last edited;
    otherwise one is run alongside on that loop. A baseline from the other loop would credit
    or blame the prompt for what the loop did, and one from before an edit (`PATCH`, or an
-   import that matched by name) scored a checklist or script that has since changed. To keep
+   import that matched by name) scored a checklist or script that has since changed; when an
+   edit is why a fresh baseline ran, the verdict names the fixture and when it was edited. To keep
    old suites readable against the truth they were scored on, re-cut a fixture under a new
    name and switch the old one off rather than editing it in place.
 3. The candidate passes when nothing got measurably worse:

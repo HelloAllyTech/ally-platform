@@ -432,14 +432,14 @@ export class BuilderEvalService {
       const baselinePromise =
         suite.trigger === 'prompt_gate'
           ? this.resolveBaseline(suite, fixtures)
-          : Promise.resolve(null);
+          : Promise.resolve({ baseline: null, note: null });
       await this.runQueued(suite, fixtures);
 
       const runs = await this.runs.find({ where: { suiteId } });
       const summary = summariseSuite(fixtures, runs);
       let verdict: BuilderEvalVerdict | null = null;
       if (suite.trigger === 'prompt_gate') {
-        const baseline = await baselinePromise;
+        const { baseline, note } = await baselinePromise;
         verdict = baseline?.summary
           ? compareSuites(summary, baseline.summary, baseline.id)
           : {
@@ -447,6 +447,7 @@ export class BuilderEvalService {
               reasons: ['No baseline could be run to compare against.'],
               baselineSuiteId: baseline?.id ?? null,
             };
+        if (note) verdict.reasons.push(note);
       }
       // Only a suite still running completes. A cancelled one keeps its status
       // and gets the summary of what did run — and never publishes: a gate
@@ -553,12 +554,13 @@ export class BuilderEvalService {
    * `fixtures` are the candidate's, as it loaded them. A suite started before
    * any of them was last edited is never reused: it scored a checklist or an
    * admin script that has since changed, and comparing against it would
-   * credit (or blame) the prompt for the edit.
+   * credit (or blame) the prompt for the edit. When that is why a fresh one
+   * ran, `note` says so, for the verdict.
    */
   private async resolveBaseline(
     suite: BuilderEvalSuite,
     fixtures: BuilderEvalFixture[],
-  ): Promise<BuilderEvalSuite | null> {
+  ): Promise<{ baseline: BuilderEvalSuite | null; note: string | null }> {
     const since = new Date(Date.now() - BUILDER_EVAL_BASELINE_MAX_AGE_MS);
     const editedAt = (fixture: BuilderEvalFixture | null) =>
       fixture?.updatedAt?.getTime() ?? 0;
@@ -592,11 +594,19 @@ export class BuilderEvalService {
     const reusable = comparable.find(
       (candidate) => (candidate.createdAt?.getTime() ?? 0) >= lastEdited,
     );
-    if (reusable) return reusable;
+    if (reusable) return { baseline: reusable, note: null };
     // Say why a baseline that would otherwise have been reused was not: a
-    // fresh one costs a full suite, and the reason is not on any page.
+    // fresh one costs a full suite. The verdict gets a line; the log the ids.
+    let note: string | null = null;
     if (comparable.length && lastEditedFixture) {
       const skipped = comparable[0];
+      const editedOn = lastEditedFixture.updatedAt
+        .toISOString()
+        .slice(0, 16)
+        .replace('T', ' ');
+      note =
+        `Ran a fresh baseline: the latest one on these fixtures (${skipped.id.slice(0, 8)}) ` +
+        `started before "${lastEditedFixture.name}" was edited on ${editedOn} UTC.`;
       this.logger.info(
         `[BUILDER_EVAL] baseline ${skipped.id} (started ${skipped.createdAt?.toISOString()}) ` +
           `not reused for ${suite.id}: fixture "${lastEditedFixture.name}" (${lastEditedFixture.id}) ` +
@@ -622,9 +632,12 @@ export class BuilderEvalService {
       );
       return null;
     });
-    if (!baseline) return null;
+    if (!baseline) return { baseline: null, note };
     await this.inflight.get(baseline.id);
-    return this.suites.findOne({ where: { id: baseline.id } });
+    return {
+      baseline: await this.suites.findOne({ where: { id: baseline.id } }),
+      note,
+    };
   }
 
   /**

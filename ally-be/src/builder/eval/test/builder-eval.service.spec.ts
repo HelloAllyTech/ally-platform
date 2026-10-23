@@ -408,10 +408,10 @@ describe('BuilderEvalService', () => {
 
       await expect(
         (service as any).resolveBaseline(gate(true), [fixture('debrief')]),
-      ).resolves.toBe(validated);
+      ).resolves.toEqual({ baseline: validated, note: null });
       await expect(
         (service as any).resolveBaseline(gate(false), [fixture('debrief')]),
-      ).resolves.toBe(legacy);
+      ).resolves.toEqual({ baseline: legacy, note: null });
     });
 
     it('never reuses a baseline that started before a fixture was edited', async () => {
@@ -426,14 +426,19 @@ describe('BuilderEvalService', () => {
       ]);
       const info = jest.spyOn((service as any).logger, 'info');
 
-      await (service as any).resolveBaseline(gate(true), [
+      const { note } = await (service as any).resolveBaseline(gate(true), [
         { ...fixture('debrief'), updatedAt: edited },
       ]);
 
       expect(startSuite).toHaveBeenCalledWith(
         expect.objectContaining({ trigger: 'baseline' }),
       );
-      // A fresh baseline costs a full suite, so the log says which edit forced it.
+      // A fresh baseline costs a full suite, so the verdict says which edit
+      // forced it, and the log carries the ids.
+      expect(note).toBe(
+        'Ran a fresh baseline: the latest one on these fixtures (before-e) ' +
+          'started before "debrief" was edited on 2026-10-23 08:00 UTC.',
+      );
       expect(info).toHaveBeenCalledWith(
         expect.stringContaining(
           'baseline before-edit (started 2026-10-23T07:00:00.000Z) not reused for gate-1: ' +
@@ -456,7 +461,7 @@ describe('BuilderEvalService', () => {
             updatedAt: new Date('2026-10-23T08:00:00Z'),
           },
         ]),
-      ).resolves.toBe(after);
+      ).resolves.toEqual({ baseline: after, note: null });
       expect(startSuite).not.toHaveBeenCalled();
     });
 
@@ -681,5 +686,44 @@ describe('BuilderEvalService — cancelling a suite', () => {
       expect.objectContaining({ status: 'completed' }),
     );
     expect(promptsService.updatePrompt).not.toHaveBeenCalled();
+  });
+
+  it("puts the reason a fresh baseline ran on the gate's verdict", async () => {
+    const suites = {
+      findOneOrFail: jest
+        .fn()
+        .mockResolvedValue({ id: 'gate-1', trigger: 'prompt_gate' }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const runs = { find: jest.fn().mockResolvedValue([]) };
+    const service = new BuilderEvalService(
+      {
+        getRepository: (entity: any) =>
+          entity?.name === 'BuilderEvalSuite' ? suites : runs,
+      } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    jest.spyOn(service as any, 'runQueued').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'resolveBaseline').mockResolvedValue({
+      baseline: null,
+      note: 'Ran a fresh baseline: because of an edit.',
+    });
+
+    await (service as any).execute('gate-1', []);
+
+    expect(suites.update).toHaveBeenCalledWith(
+      { id: 'gate-1', status: 'running' },
+      expect.objectContaining({
+        verdict: expect.objectContaining({
+          reasons: [
+            'No baseline could be run to compare against.',
+            'Ran a fresh baseline: because of an edit.',
+          ],
+        }),
+      }),
+    );
   });
 });
