@@ -54,8 +54,8 @@ export class GuideTurnRequestDto {
     enum: ['start', 'continue', 'locked_peek', 'not_now'],
   })
   @IsOptional()
-  @IsIn(['start', 'continue', 'locked_peek', 'not_now'])
-  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | null;
+  @IsIn(['start', 'continue', 'locked_peek', 'not_now', 'safe_now'])
+  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | 'safe_now' | null;
 }
 
 /** PUT /v1/guide/admin/settings — any subset of the kill switches. */

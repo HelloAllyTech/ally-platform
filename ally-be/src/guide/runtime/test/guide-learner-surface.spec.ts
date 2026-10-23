@@ -147,6 +147,25 @@ describe('GuideViewService.bootstrap', () => {
       findOne: jest.fn(async () => findOne),
       find: jest.fn(async () => find),
       save: jest.fn(async (row: any) => row),
+      manager: {
+        query: jest.fn(async (sql: string) =>
+          sql.includes("'crisis.response'")
+            ? [
+                {
+                  payload: {
+                    type: 'crisis.response',
+                    data: {
+                      messageId: 'm9',
+                      text: 'You matter.',
+                      language: 'en',
+                      lines: [],
+                    },
+                  },
+                },
+              ]
+            : [],
+        ),
+      },
     });
     return new GuideViewService(
       settings as never,
@@ -230,6 +249,28 @@ describe('GuideViewService.bootstrap', () => {
       reason: 'NOT_IN_GROUP',
     });
     expect(result.spine).toBeUndefined();
+  });
+
+  it('brings the crisis card back on a reload while the thread is in CRISIS', async () => {
+    const thread = {
+      id: 'th1',
+      pacing: {},
+      lastEventSeq: 9,
+      languageCode: 'en',
+    };
+    const inCrisis = await service({
+      thread: { ...thread, mode: 'CRISIS' },
+    }).bootstrap('tr1', user);
+    expect(inCrisis.crisis).toEqual({
+      messageId: 'm9',
+      text: 'You matter.',
+      language: 'en',
+      lines: [],
+    });
+    const calm = await service({
+      thread: { ...thread, mode: 'CARE' },
+    }).bootstrap('tr1', user);
+    expect(calm.crisis).toBeUndefined();
   });
 
   it('draws everything for a learner with a thread', async () => {

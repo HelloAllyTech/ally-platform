@@ -106,6 +106,7 @@ import {
   CLEAR_VERDICT,
   SentinelOverlay,
   SentinelVerdict,
+  afterSafeTap,
   isLearnerCrisis,
   isLearnerDistress,
   nextMode,
@@ -144,7 +145,12 @@ export const GUIDE_REFUSAL_TEXT =
 export const GUIDE_EMPTY_REPLY_TEXT =
   'Sorry, I lost my train of thought there. Could you say that again?';
 
-export type GuideIntent = 'start' | 'continue' | 'locked_peek' | 'not_now';
+export type GuideIntent =
+  | 'start'
+  | 'continue'
+  | 'locked_peek'
+  | 'not_now'
+  | 'safe_now';
 
 export interface GuideTurnInput {
   clientTurnId: string;
@@ -226,6 +232,8 @@ export interface GuideTurnContext extends HarnessTurnContext {
   restarted: boolean;
   /** Set for a turn a platform event started (no learner words). */
   platformEvent: string | null;
+  /** This turn moved CRISIS to CARE on "I'm safe right now". */
+  safeTapped?: boolean;
   /** The learner spoke over this turn's reply while it streamed. */
   bargedIn?: boolean;
   /** Reply text already sent to the learner (screen or speaker). */
@@ -568,6 +576,14 @@ export class GuideTurnService {
     });
     ctx.thread = thread;
     ctx.mode = thread.mode ?? GuideMode.NORMAL;
+    // "I'm safe right now" on the crisis card: CARE for the rest of the
+    // session, and Ally gently continues (plan §6.3 step 5). Not a message
+    // the Sentinel has to read correctly — the tap is the answer.
+    if (ctx.intent === 'safe_now') {
+      const change = afterSafeTap(ctx.mode);
+      ctx.mode = change.mode;
+      ctx.safeTapped = change.changed;
+    }
     ctx.pacing = { ...(thread.pacing ?? {}) };
     if (
       !(await this.settings.isGuidedAvailable(thread.trackId, ctx.tenantId))
@@ -1548,6 +1564,18 @@ export class GuideTurnService {
     }
 
     const modeChanged = ctx.mode !== thread.mode;
+    if (ctx.safeTapped) {
+      await this.crisis
+        .recordSafeTap({
+          threadId: ctx.threadId,
+          userId: ctx.userId,
+          tenantId: ctx.tenantId,
+          releaseId: ctx.releaseId,
+        })
+        .catch((error) =>
+          this.logger.error('Safe-tap signal write failed', error),
+        );
+    }
     if (modeChanged) {
       const atmosphere = atmosphereOf({
         mode: ctx.mode,

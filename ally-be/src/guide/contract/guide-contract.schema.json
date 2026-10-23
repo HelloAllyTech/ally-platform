@@ -199,6 +199,29 @@
         }
       }
     },
+    "GuideCrisisState": {
+      "description": "The fixed crisis response on screen (plan §6.3): sent as crisis.response, and in bootstrap while the thread is in CRISIS so a reload keeps the card.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["messageId", "text", "language", "lines"],
+      "properties": {
+        "messageId": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GuideCrisisLine"
+          }
+        }
+      }
+    },
     "GuideCrisisLine": {
       "type": "object",
       "additionalProperties": false,
@@ -611,26 +634,7 @@
           "const": "crisis.response"
         },
         "data": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["messageId", "text", "language", "lines"],
-          "properties": {
-            "messageId": {
-              "type": "string"
-            },
-            "text": {
-              "type": "string"
-            },
-            "language": {
-              "type": "string"
-            },
-            "lines": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/GuideCrisisLine"
-              }
-            }
-          }
+          "$ref": "#/$defs/GuideCrisisState"
         }
       }
     },
@@ -977,9 +981,16 @@
           "$ref": "#/$defs/GuideAnchor"
         },
         "intent": {
-          "description": "A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, or the Not now chip (which starts Ally's steering cooldown).",
+          "description": "A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, the Not now chip (which starts Ally's steering cooldown), or \"I'm safe right now\" on the crisis card (CRISIS → CARE, plan §6.3 step 5).",
           "type": ["string", "null"],
-          "enum": ["start", "continue", "locked_peek", "not_now", null]
+          "enum": [
+            "start",
+            "continue",
+            "locked_peek",
+            "not_now",
+            "safe_now",
+            null
+          ]
         }
       }
     },
@@ -1527,6 +1538,9 @@
         },
         "nextStep": {
           "$ref": "#/$defs/GuideNextStep"
+        },
+        "crisis": {
+          "$ref": "#/$defs/GuideCrisisState"
         }
       }
     }

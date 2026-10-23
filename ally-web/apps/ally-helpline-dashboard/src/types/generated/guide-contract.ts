@@ -77,6 +77,14 @@ export interface GuideMemoryRef {
   label: string;
 }
 
+/** The fixed crisis response on screen (plan §6.3): sent as crisis.response, and in bootstrap while the thread is in CRISIS so a reload keeps the card. */
+export interface GuideCrisisState {
+  messageId: string;
+  text: string;
+  language: string;
+  lines: Array<GuideCrisisLine>;
+}
+
 export interface GuideCrisisLine {
   name: string;
   phone: string;
@@ -212,12 +220,7 @@ export interface GuideEventModeChanged extends GuideEventBase {
 
 export interface GuideEventCrisisResponse extends GuideEventBase {
   type: 'crisis.response';
-  data: {
-    messageId: string;
-    text: string;
-    language: string;
-    lines: Array<GuideCrisisLine>;
-  };
+  data: GuideCrisisState;
 }
 
 export interface GuideEventNotebookAdded extends GuideEventBase {
@@ -332,8 +335,8 @@ export interface GuideTurnRequest {
   clientTurnId: string;
   text: string;
   anchor?: GuideAnchor;
-  /** A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, or the Not now chip (which starts Ally's steering cooldown). */
-  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | null;
+  /** A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, the Not now chip (which starts Ally's steering cooldown), or "I'm safe right now" on the crisis card (CRISIS → CARE, plan §6.3 step 5). */
+  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | 'safe_now' | null;
 }
 
 export interface GuideTurnAccepted {
@@ -525,4 +528,5 @@ export interface GuideBootstrap {
   cards: Array<GuidePresentedCard>;
   prefs: GuidePrefs;
   nextStep?: GuideNextStep;
+  crisis?: GuideCrisisState;
 }

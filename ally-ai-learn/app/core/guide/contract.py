@@ -83,6 +83,15 @@ class GuideCrisisLine(_GuideModel):
     url: Optional[str] = None
 
 
+class GuideCrisisState(_GuideModel):
+    """The fixed crisis response on screen (plan §6.3): sent as crisis.response, and in bootstrap while the thread is in CRISIS so a reload keeps the card."""
+
+    message_id: str = Field(alias="messageId")
+    text: str
+    language: str
+    lines: list[GuideCrisisLine]
+
+
 class GuideSceneReceipt(_GuideModel):
     behaviour_labels: list[str] = Field(alias="behaviourLabels")
     side_quests: int = Field(alias="sideQuests")
@@ -233,16 +242,9 @@ class GuideEventModeChanged(GuideEventBase):
     data: GuideEventModeChangedData
 
 
-class GuideEventCrisisResponseData(_GuideModel):
-    message_id: str = Field(alias="messageId")
-    text: str
-    language: str
-    lines: list[GuideCrisisLine]
-
-
 class GuideEventCrisisResponse(GuideEventBase):
     type: Literal["crisis.response"]
-    data: GuideEventCrisisResponseData
+    data: GuideCrisisState
 
 
 class GuideEventNotebookAddedData(_GuideModel):
@@ -356,7 +358,7 @@ class GuideTurnRequest(_GuideModel):
     client_turn_id: str = Field(alias="clientTurnId")
     text: str
     anchor: Optional[GuideAnchor] = None
-    intent: Optional[Literal["start", "continue", "locked_peek", "not_now"]] = None
+    intent: Optional[Literal["start", "continue", "locked_peek", "not_now", "safe_now"]] = None
 
 
 class GuideTurnAccepted(_GuideModel):
@@ -548,3 +550,4 @@ class GuideBootstrap(_GuideModel):
     cards: list[GuidePresentedCard]
     prefs: GuidePrefs
     next_step: Optional[GuideNextStep] = Field(default=None, alias="nextStep")
+    crisis: Optional[GuideCrisisState] = None

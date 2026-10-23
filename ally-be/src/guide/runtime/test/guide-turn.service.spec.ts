@@ -204,6 +204,7 @@ function setup(
     })),
     lines: jest.fn(() => [{ name: 'Line', phone: '14416' }]),
     record: jest.fn(async () => undefined),
+    recordSafeTap: jest.fn(async () => undefined),
     lastCrisisAt: jest.fn(async () => null),
   };
   const tools = {
@@ -439,6 +440,26 @@ describe('GuideTurnService', () => {
     expect(ctx.restarted).toBe(false);
     expect(t.requests).toHaveLength(1);
     expect(t.requests[0].request.messages[1].content).toContain('CARE');
+  });
+
+  it('"I\'m safe right now" moves CRISIS to CARE and Ally gently continues', async () => {
+    const t = setup({
+      thread: await continuingThread(GuideMode.CRISIS),
+      scripts: [textPass('Thank you for telling me. We can go slowly.')],
+    });
+    const ctx = await t.run({ text: '', intent: 'safe_now' });
+    expect(ctx.mode).toBe(GuideMode.CARE);
+    expect(ctx.replyKind).toBe('model');
+    expect(t.crisis.recordSafeTap).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: 'th1', userId: 1 }),
+    );
+    expect(t.events.find((e) => e.type === 'mode.changed')?.data).toMatchObject(
+      { mode: GuideMode.CARE },
+    );
+    const blocks = t.requests[0].request.messages
+      .flatMap((m: any) => (Array.isArray(m.content) ? m.content : []))
+      .map((b: any) => b.text ?? '');
+    expect(blocks.join(' ')).toContain("I'm safe right now");
   });
 
   it('stays with the learner on a repeated crisis instead of repeating it all', async () => {

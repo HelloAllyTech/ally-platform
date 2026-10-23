@@ -12,6 +12,8 @@ import { DEFAULT_CRISIS_TEXT, resolveSupportLines } from './fixed-responses';
 
 /** The signal kind a crisis leaves behind: who and when, never what. */
 export const CRISIS_SIGNAL_KIND = 'crisis_entered';
+/** "I'm safe right now" tapped: the false-positive side of the crisis rate (plan G-3). */
+export const CRISIS_SAFE_TAP_SIGNAL_KIND = 'crisis_safe_tap';
 
 /**
  * The crisis flow's data (plans/ally-guide/plan.md §6.3): the approved fixed
@@ -93,6 +95,27 @@ export class GuideCrisisService {
         payload: { language: input.language, source: input.source },
         // Written from this process's clock, as it is read back by
         // lastCrisisAt and compared with it.
+        occurredAt: new Date(),
+      }),
+    );
+  }
+
+  /** "I'm safe right now" on the crisis card. No content, like the crisis record. */
+  async recordSafeTap(input: {
+    threadId: string;
+    userId: number | null;
+    tenantId: string | null;
+    releaseId: string | null;
+  }): Promise<void> {
+    await this.signals.save(
+      this.signals.create({
+        kind: CRISIS_SAFE_TAP_SIGNAL_KIND,
+        threadId: input.threadId,
+        userId: input.userId,
+        visitorId: null,
+        tenantId: input.tenantId,
+        releaseId: input.releaseId,
+        payload: {},
         occurredAt: new Date(),
       }),
     );

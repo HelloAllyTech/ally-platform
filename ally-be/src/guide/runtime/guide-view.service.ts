@@ -17,6 +17,7 @@ import {
   GuideAvailability,
   GuideBootstrap,
   GuideCard as GuideCardEvent,
+  GuideCrisisState,
   GuideMessageView,
   GuideNextStep,
   GuidePrefs,
@@ -163,9 +164,10 @@ export class GuideViewService {
     if (!thread) return view;
 
     const mode = thread.mode ?? GuideMode.NORMAL;
-    const [messages, cards] = await Promise.all([
+    const [messages, cards, crisis] = await Promise.all([
       this.recentMessages(thread.id),
       this.presentedCards(thread.id),
+      mode === GuideMode.CRISIS ? this.crisisOnScreen(thread.id) : null,
     ]);
     return {
       ...view,
@@ -186,7 +188,26 @@ export class GuideViewService {
       },
       messages,
       cards,
+      ...(crisis ? { crisis } : {}),
     };
+  }
+
+  /**
+   * The crisis response still on screen, for a reload while the thread is in
+   * CRISIS: the card, its lines and the two buttons come back, not a feed
+   * that silently lost them.
+   */
+  private async crisisOnScreen(
+    threadId: string,
+  ): Promise<GuideCrisisState | null> {
+    const rows: Array<{ payload: { data?: GuideCrisisState } }> =
+      await this.threads.manager.query(
+        `SELECT "payload" FROM "guide_thread_events"
+          WHERE "threadId" = $1 AND "type" = 'crisis.response'
+          ORDER BY "seq" DESC LIMIT 1`,
+        [threadId],
+      );
+    return rows[0]?.payload?.data ?? null;
   }
 
   async prefsFor(

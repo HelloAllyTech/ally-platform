@@ -245,6 +245,7 @@ const INTENT_TEXT: Record<string, string> = {
   continue: 'The learner pressed Continue.',
   locked_peek: 'The learner tapped a locked item to see what is ahead.',
   not_now: 'The learner pressed "Not now".',
+  safe_now: 'The learner tapped "I\'m safe right now" on the crisis card.',
 };
 
 export interface LearnerTurnInput {
