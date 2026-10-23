@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { TrackProgressionMode, TrackStatus } from '../type/track.type';
 import { TrackLandingPage } from '../type/track-landing-page.type';
+import { TrackGuideNotes } from '../type/track-guide-notes.type';
 
 @Entity('tracks')
 export class Track extends BaseWithoutTenantEntity {
@@ -76,6 +77,11 @@ export class Track extends BaseWithoutTenantEntity {
   // re-points them at the copy's sections.
   @Column({ type: 'jsonb', nullable: true })
   landingPage?: TrackLandingPage | null;
+
+  // The Ally guide's course layer: trainer notes and per-item tension
+  // (plans/ally-guide/plan.md §7.5). Admin-only; never in a learner payload.
+  @Column({ type: 'jsonb', nullable: true })
+  guideNotes?: TrackGuideNotes | null;
 
   @DeleteDateColumn()
   deletedAt?: Date;

@@ -210,15 +210,13 @@ function tsInlineObject(node, indent) {
 }
 
 /**
- * `eslintDisable`: ally-be lints with the prettier rule, which the generator's
- * own layout would trip; ally-web's lint passes as-is and reports an unused
- * directive, so only the ally-be copy carries one. Both repos keep the
- * generated file out of `prettier --check` via .prettierignore.
+ * Lint and prettier: both apps keep the generated file out of prettier via
+ * .prettierignore, and their ESLint configs then have nothing to report, so no
+ * eslint-disable header is emitted (one would be flagged as unused).
  */
-export function generateTypeScript(schema, { eslintDisable = false } = {}) {
+export function generateTypeScript(schema) {
   const defs = schema.$defs;
   const out = [
-    ...(eslintDisable ? ['/* eslint-disable */'] : []),
     `// ${HEADER_NOTE}`,
     '',
     `export const GUIDE_CONTRACT_VERSION = ${schema['x-contract-version']} as const;`,
@@ -547,7 +545,7 @@ export function validateFixtures(schema = loadSchema(), dir = FIXTURES_DIR) {
 export function renderAll(schema = loadSchema()) {
   assertSupportedSubset(schema);
   return {
-    [OUTPUTS.beTs]: generateTypeScript(schema, { eslintDisable: true }),
+    [OUTPUTS.beTs]: generateTypeScript(schema),
     [OUTPUTS.webTs]: generateTypeScript(schema),
     [OUTPUTS.aiLearnPy]: generatePython(schema),
   };

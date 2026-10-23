@@ -71,6 +71,32 @@ import {
   HelplineSummaryKind,
 } from '../../helpline/constants/helpline.constants';
 import {
+  AgentChannel,
+  AgentConfigLayer,
+  AgentReleaseAuditAction,
+  AgentReleaseAuthorKind,
+  AgentReleaseStatus,
+  AgentTurnStatus,
+  AgentTurnTrigger,
+} from '../../llm-agent/harness/enum/harness.enum';
+import {
+  GuideAppointmentStatus,
+  GuideCardKind,
+  GuideCardPresentation,
+  GuideCardState,
+  GuideCrisisScope,
+  GuideMemoryKind,
+  GuideMemoryStatus,
+  GuideMessageKind,
+  GuideMessageRole,
+  GuideMode,
+  GuideNotebookKind,
+  GuideThreadStatus,
+  GuideTone,
+  GuideTriggerStatus,
+  TrackEntrySource,
+} from '../../guide/enum/guide.enum';
+import {
   SkillExperimentEventType,
   SkillExperimentPauseReason,
   SkillExperimentStatus,
@@ -279,6 +305,34 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_course_copilot_jobs_kind', Object.values(CourseCopilotJobKind)],
     ['CHK_course_copilot_jobs_status', Object.values(CourseCopilotJobStatus)],
     ['CHK_course_copilot_events_type', Object.values(CourseCopilotEventType)],
+    // Agent harness + Ally guide (plans/ally-guide/plan.md §8).
+    ['CHK_agent_releases_status', Object.values(AgentReleaseStatus)],
+    ['CHK_agent_releases_author_kind', Object.values(AgentReleaseAuthorKind)],
+    ['CHK_agent_release_audit_action', Object.values(AgentReleaseAuditAction)],
+    [
+      'CHK_agent_release_audit_actor_kind',
+      Object.values(AgentReleaseAuthorKind),
+    ],
+    ['CHK_agent_config_overrides_layer', Object.values(AgentConfigLayer)],
+    ['CHK_agent_turns_status', Object.values(AgentTurnStatus)],
+    ['CHK_agent_turns_trigger', Object.values(AgentTurnTrigger)],
+    ['CHK_agent_turns_channel', Object.values(AgentChannel)],
+    ['CHK_guide_threads_status', Object.values(GuideThreadStatus)],
+    ['CHK_guide_threads_mode', Object.values(GuideMode)],
+    ['CHK_guide_messages_role', Object.values(GuideMessageRole)],
+    ['CHK_guide_messages_channel', Object.values(AgentChannel)],
+    ['CHK_guide_messages_kind', Object.values(GuideMessageKind)],
+    ['CHK_guide_cards_kind', Object.values(GuideCardKind)],
+    ['CHK_guide_cards_presentation', Object.values(GuideCardPresentation)],
+    ['CHK_guide_cards_state', Object.values(GuideCardState)],
+    ['CHK_guide_cards_tone', Object.values(GuideTone)],
+    ['CHK_guide_triggers_status', Object.values(GuideTriggerStatus)],
+    ['CHK_guide_learner_memories_kind', Object.values(GuideMemoryKind)],
+    ['CHK_guide_learner_memories_status', Object.values(GuideMemoryStatus)],
+    ['CHK_guide_notebook_entries_kind', Object.values(GuideNotebookKind)],
+    ['CHK_guide_appointments_status', Object.values(GuideAppointmentStatus)],
+    ['CHK_guide_crisis_responses_scope', Object.values(GuideCrisisScope)],
+    ['CHK_track_enrollments_entry_source', Object.values(TrackEntrySource)],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));
