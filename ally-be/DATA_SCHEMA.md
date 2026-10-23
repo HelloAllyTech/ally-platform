@@ -885,6 +885,7 @@ row keyed by a user.
 | `guide_crisis_responses` | `scope` (`platform` / `tenant`), `tenant_id`, `languageCode`, `body`, `version`, `active`, `approvedBy` | **Clinician-approved fixed crisis copy.** One active row per (scope, tenant, language). Never model-generated, never editable by the learning loop. |
 | `guide_signals` | `kind`, `value`, `payload`, `threadId`, `messageId`, `userId`, `releaseId`, `arm` | Learning-loop signals; ids and counts only, never text. |
 | `guide_turn_feedback` | `messageId` + `userId` (uniq), `rating` (±1), `comment` | Thumbs on Ally's messages. |
+| `guide_alerts` | `rule`, `severity`, `fingerprint` (uniq: rule + window), `summary`, `value` (jsonb), `notifiedAt`, `acknowledgedAt`, `acknowledgedBy` | Each firing of an Ally alert rule (failures, latency SLO, cost, crisis spike, anonymous cap, cache health), once per rule per window. Numbers only. |
 | `guide_baseline_snapshots` | `windowDays`, `windowStart`, `windowEnd`, `capturedByUserId`, `note`, `metrics` (jsonb: per-cohort completion, first-day win, 7-day return, quiz first-attempt pass, keyed by `entrySource`) | The pre-launch baseline Ally is compared against in place of a classic holdout (plan decision 19). Public courses only; aggregates, never a learner. Every snapshot is kept. |
 
 ## 4. Weaviate (vector DB — `ally-ai`)
