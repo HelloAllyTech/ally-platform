@@ -72,6 +72,20 @@ export const RELEASE_TARGETS: Record<string, ReleaseTarget> = {
 };
 
 /**
+ * The key a resolved target sits under in RELEASE_TARGETS (`ally-web:admin`),
+ * which is also how per-target configuration is addressed — Builder's health
+ * URLs are keyed by it. A target is identified by its workflow: one deployable,
+ * one release workflow, so the key is recoverable from the target alone.
+ */
+export function releaseTargetKey(target: ReleaseTarget): string | null {
+  return (
+    Object.entries(RELEASE_TARGETS).find(
+      ([, entry]) => entry.workflow === target.workflow,
+    )?.[0] ?? null
+  );
+}
+
+/**
  * Which deployable a finding belongs to.
  *
  * Single-app repos answer from `repo` alone. `ally-web` needs the file path,

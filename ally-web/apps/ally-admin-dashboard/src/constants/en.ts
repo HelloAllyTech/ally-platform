@@ -4174,9 +4174,9 @@ export const en = {
       retryIntro: "The last attempt failed:",
       reposLabel: "Repos to change",
       reposHintIssue:
-        "Each repo the approved design changes is built one after another, in the order ally-be → ally-ai → ally-ai-learn → ally-web → ally-mobile, with one pull request per repo. The next repo starts once the previous one's CI passes.",
+        "Each service the approved design changes is built one after another, in the order ally-be → ally-ai → ally-ai-learn → ally-web → ally-mobile, with one pull request per service — each a folder of the ally-platform repository. The next service starts once the previous one's CI passes.",
       issueModelNote:
-        "The model is set per repo on GitHub with the BUILDER_MODEL variable (default Gemini 3 Flash). Cost isn't tracked for opencode builds.",
+        "The model is set once for every service, on GitHub, with the BUILDER_MODEL variable (default Gemini 3 Flash). Cost isn't tracked for opencode builds.",
       reposPlaceholder: "Choose repos…",
       reposRequired: "Choose at least one repo before starting.",
       saveReposFailed: "Couldn't save the chosen repos.",

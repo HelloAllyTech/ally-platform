@@ -560,10 +560,15 @@ function normaliseCatalogEntries(
 }
 
 /**
- * What this repository's CI will hold the pull request to, so a build runs the
+ * What this service's CI will hold the pull request to, so a build runs the
  * same commands before it finishes instead of learning them from a red check,
- * and the docs rule its docs-guard enforces — a rule no fix run can satisfy
- * after the fact, because it needs a line in the PR description.
+ * and the docs rule the monorepo's docs guard enforces. The guard reads the
+ * ROOT `.docs-map.yml` (a service's own copy is a leftover of its archived
+ * repo and names the old two-PR wiki flow); since the wiki is a folder of the
+ * same repo, the page a rule requires is edited in this pull request, not in
+ * a separate one. A build is told so up front because the only way out of a
+ * required page that genuinely stays accurate is a `docs:skip` label, which
+ * is a person's to apply.
  */
 export function renderRepoChecks(repos: BuilderRepoDefinition[]): string {
   if (!repos.length) return '';
@@ -581,7 +586,7 @@ export function renderRepoChecks(repos: BuilderRepoDefinition[]): string {
     '',
     'Run these before you finish and fix what they report. Formatting of the files you changed is applied for you afterwards.',
     '',
-    'Docs: if `.docs-map.yml` exists, a file you change may map to a doc. Update a mapped doc inside this repository when your change makes it wrong. For a mapped wiki page, end your summary with one line: `Wiki-PR: none — <why the page stays accurate>` or `Wiki-PR: needed — <what the page must now say>`.',
+    'Docs: the `.docs-map.yml` at the root of this monorepo (one folder up from this service; ignore any copy inside the service folder) maps files to the docs that describe them, including wiki pages under `helloallytech.github.io/wiki/`. When a file you change is mapped, update that doc in this same pull request — the wiki is a folder of this repository, so its page is edited here, not through a separate pull request or a `Wiki-PR:` line. If a mapped page genuinely stays accurate, say which page and why in your summary; a person then waives the check.',
   );
   return lines.join('\n');
 }

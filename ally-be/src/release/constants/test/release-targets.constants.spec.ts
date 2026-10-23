@@ -1,7 +1,27 @@
 import {
   RELEASE_TARGETS,
+  releaseTargetKey,
   resolveMonorepoReleaseTargets,
 } from '../release-targets.constants';
+
+describe('releaseTargetKey', () => {
+  it('recovers the key every target is configured under', () => {
+    for (const [key, target] of Object.entries(RELEASE_TARGETS)) {
+      expect(releaseTargetKey(target)).toBe(key);
+    }
+  });
+
+  it('is null for a target the table does not hold', () => {
+    expect(
+      releaseTargetKey({
+        repo: 'ally-mobile',
+        workflow: 'build-ios-production.yml',
+        tagPrefix: 'v',
+        label: 'x',
+      }),
+    ).toBeNull();
+  });
+});
 
 /**
  * What a pull request opened in the monorepo releases. Each file is attributed

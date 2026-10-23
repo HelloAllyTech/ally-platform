@@ -1847,14 +1847,58 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     trigger: 'An admin drafts the technical design from a ready PRD',
     detail:
       'The design run on builder-session.yml: the designer on the planner model, the ' +
-      'critic on the verifier model. Usage is reported back by the runner. Builds ' +
-      "themselves are issues worked by each repo's own opencode workflow.",
+      'critic on the verifier model, reading every service from one checkout of the ' +
+      'monorepo. Usage is reported back by the runner. Builds themselves are issues ' +
+      'worked by opencode (builder-opencode-build, below).',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
     configuredBy:
       'BUILDER_BUILD_MODEL / BUILDER_PLANNER_MODEL / BUILDER_VERIFIER_MODEL',
     configPath: 'builder.coderModel',
+  },
+  /*
+   * The two GitHub-native halves below run opencode in the monorepo's own
+   * Actions, not through an SDK here, so no `configPath`: their model is a
+   * repository variable the workflow reads. Usage reaches ally-be as a POST
+   * to pipeline/usage from the workflow (opencode-usage.py) and is recorded
+   * against BUILDER_BUILD, the same label as the design run — which is why
+   * both rows share its task.
+   */
+  {
+    id: 'builder-opencode-build',
+    task: LlmTask.BUILDER_BUILD,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A build issue is labelled `builder`, or `/oc` asks for a fix on its pull request',
+    detail:
+      'One workflow (.github/workflows/builder.yml → builder-opencode.yml) builds every ' +
+      "service: it reads the service from the issue's `builder-service` marker, sets up " +
+      'that folder of the monorepo, fetches the private spec from Builder and runs ' +
+      '`opencode github run` there. The same run answers `/oc` comments on the pull ' +
+      'request it opened, with the fix request Builder renders from the outstanding feedback.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy:
+      'BUILDER_MODEL (Actions variable on the monorepo, read by .github/workflows/builder-opencode.yml)',
+  },
+  {
+    id: 'builder-repo-review',
+    task: LlmTask.BUILDER_BUILD,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: "An opencode pull request's CI goes green",
+    detail:
+      'The code review with the code checked out (.github/workflows/builder-review.yml → ' +
+      'builder-review-opencode.yml): parallel review passes and a verify pass as opencode ' +
+      "agents in the service's folder, filing findings to Builder, which sends them to " +
+      'opencode as `/oc`. Dispatched by ally-be with the service named; the run id is in ' +
+      'the run title so ally-be can find its own run.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3.1-pro-preview',
+    configuredBy:
+      'BUILDER_REVIEW_MODEL, falling back to BUILDER_REVIEW_FALLBACK_MODEL (Actions variables on the monorepo, read by .github/workflows/builder-review-opencode.yml)',
   },
   {
     id: 'builder-lesson-curation',
@@ -1909,11 +1953,12 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     // pipeline/repo-maps, and that endpoint takes no cost.
     task: null,
     runtime: LlmRuntime.ALLY_BE,
-    trigger: "A weekly job rewrites each repo's map for Builder",
+    trigger: "A weekly job rewrites each service's map for Builder",
     detail:
-      'Sundays 03:00 UTC, one agentic opencode run per repo (five) in ' +
-      '.github/workflows/builder-context-refresh.yml via scripts/builder/refresh-repo-map.sh. ' +
-      'The map is what the interview and every build phase read before opening files.',
+      'Sundays 03:00 UTC, one agentic opencode run per service (five), each reading its ' +
+      'folder of one monorepo checkout, in .github/workflows/builder-context-refresh.yml ' +
+      'via ally-be/scripts/builder/refresh-repo-map.sh. The map is what the interview ' +
+      'and every build phase read before opening files.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

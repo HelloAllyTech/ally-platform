@@ -173,7 +173,8 @@ jobs:
             echo "separate builds. Every path in the specification is relative to \`${SERVICE}/\`, and every"
             echo "command in it runs from that folder: \`cd ${SERVICE}\` first. Follow ${SERVICE}/AGENTS.md /"
             echo "${SERVICE}/CLAUDE.md. Plan with your todo list first. Keep every change additive and"
-            echo "inside the files the design scopes for ${SERVICE}. Run its typecheck, lint and tests and"
+            echo "inside the files the design scopes for ${SERVICE} (plus any wiki page the docs rule in"
+            echo "the specification requires for them). Run its typecheck, lint and tests and"
             echo 'fix what they report; add a test for every requirement as the design maps them. Do not'
             echo 'push or open a pull request yourself; that happens when you finish. End with a short'
             echo 'summary of what you changed and how you tested it.'
@@ -216,9 +217,15 @@ jobs:
           # switches branches itself makes it skip the push ("Agent managed its
           # own branch"), and the work is lost while the reply says it is done
           # (ally-mobile#114).
+          #
+          # The wiki folder is the one place outside the service a run may
+          # write: the root .docs-map.yml requires a wiki page for some code
+          # changes, and the docs guard fails the pull request until that page
+          # is updated in it. A run held to its own folder could never clear
+          # that check.
           PROMPT="${PROMPT}
 
-          Rules for this run: this is the ${SERVICE} service, in the ${SERVICE}/ folder of a monorepo; change files only under ${SERVICE}/ and run its commands from there. Stay on the branch you are on. Do not create, switch or check out branches, do not commit, and do not push: your changes in the working tree are committed and pushed for you when you finish. If you made no change, say so plainly."
+          Rules for this run: this is the ${SERVICE} service, in the ${SERVICE}/ folder of a monorepo; change files only under ${SERVICE}/ — plus a wiki page under helloallytech.github.io/wiki/ when the root .docs-map.yml maps a file you changed to it — and run the service's commands from ${SERVICE}/. Stay on the branch you are on. Do not create, switch or check out branches, do not commit, and do not push: your changes in the working tree are committed and pushed for you when you finish. If you made no change, say so plainly."
           export PROMPT
           opencode github run
         env:

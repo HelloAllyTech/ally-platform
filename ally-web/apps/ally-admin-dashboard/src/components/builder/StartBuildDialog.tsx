@@ -48,9 +48,9 @@ interface StartBuildDialogProps {
 
 /**
  * Collects what a build needs before it can dispatch: which repos it touches.
- * Every build is an issue build — opencode runs in each repo's own Actions,
- * the model is a per-repo GitHub variable, and no cost is reported — so there
- * is no budget or model to ask for here.
+ * Every build is an issue build — opencode runs in the monorepo's Actions, in
+ * the service's folder, the model is one GitHub variable for every service,
+ * and no cost is reported — so there is no budget or model to ask for here.
  *
  * Repos are saved onto the session (`updateBuilderSession`) before start-build
  * is called, not alongside it — the backend refuses to start a build with an

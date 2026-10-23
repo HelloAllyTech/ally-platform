@@ -157,7 +157,11 @@ export const BUILDER_HANDOFF_CONTEXT_MAX = 120_000;
 
 /* ── Build dispatch ─────────────────────────────────────────────────────── */
 
-/** The workflow file, hosted in ally-be — one copy, so it cannot drift. */
+/**
+ * The design workflow, in the monorepo's root `.github/workflows/` — one copy
+ * (it was hosted in ally-be's own repo before the 2026-10-23 cutover), so it
+ * cannot drift.
+ */
 export const BUILDER_WORKFLOW_FILE = 'builder-session.yml';
 
 /**
@@ -194,9 +198,12 @@ export const BUILDER_OWN_ACTORS = [
 ] as const;
 
 /**
- * The code review for an opencode pull request runs in the target repo's own
- * Actions (`builder-review.yml`, calling ally-be's builder-review-opencode.yml),
- * with the code checked out so it can prove what it reports.
+ * The code review for an opencode pull request runs in the monorepo's Actions
+ * (`builder-review.yml`, calling `builder-review-opencode.yml` beside it, with
+ * the service's folder set up and the code checked out so it can prove what
+ * it reports). One workflow serves every service; ally-be names the service in
+ * the dispatch, and the run's title carries the review run id (see
+ * `builderRunTitle` below).
  *
  * It reviews every head CI turns green: a finding goes to opencode as `/oc`,
  * opencode pushes, and the fix is reviewed in turn — one more review than the
@@ -298,47 +305,6 @@ export const BUILDER_DISPATCH_LOCK_TTL_SECONDS = 60;
 /** Reconcile cadence key in the scheduled-task registry. */
 export const BUILDER_RECONCILE_INTERVAL = '5min';
 export const BUILDER_RECONCILE_TASK = 'builder-run-reconcile';
-
-/* ── Checks a fix run must not be dispatched for ────────────────────────── */
-
-/**
- * Failing checks that are real, belong in the timeline, and are still not
- * Builder's to fix from inside a code repo.
- *
- * `docs-guard` is the whole of the list today. Its `repo-page-architecture`
- * rule fires whenever a build touches `src/app.module.ts` or a gateway — which
- * every build that adds a module does — and satisfying it needs a `Wiki-PR:`
- * trailer pointing at a pull request in a repo the runner cannot clone. A fix
- * run can repair the in-repo half (`DATA_SCHEMA.md`) and never the other, so
- * left as PENDING it burns all `maxFixRunsPerPr` attempts and leaves the pull
- * request exactly as red as it started.
- *
- * Recording it OBSERVED keeps it visible and out of `countPending`, which is
- * the same treatment a failure somebody else pushed already gets, and for the
- * same reason: it is true, and it is not ours to act on.
- *
- * DELETE THIS ONCE BUILDER OPENS WIKI PRs ITSELF. At that point the check
- * becomes fixable and suppressing it would hide a real failure.
- */
-export const BUILDER_UNFIXABLE_CHECKS: readonly string[] = ['docs-guard'];
-
-/**
- * Whether a check name is one of the above.
- *
- * Normalised rather than compared literally because the name reaching us is
- * GitHub's, not ours: the job id (`docs-guard`) is what the checks API
- * reports, the workflow's own `name:` is "Docs guard", and which one a caller
- * sees has changed with GitHub's rendering before. Matching a name that has
- * drifted costs a wasted fix run; matching one case-insensitively costs
- * nothing.
- */
-export const isUnfixableCheck = (check: string): boolean => {
-  const normalised = String(check ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_]+/g, '-');
-  return BUILDER_UNFIXABLE_CHECKS.includes(normalised);
-};
 
 /**
  * AI-task-registry row ids for Builder's own calls.
