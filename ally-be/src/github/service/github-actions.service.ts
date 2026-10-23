@@ -5,10 +5,13 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { isMonorepoService } from 'src/github/constants/github-repos.constants';
 
+// Relative, not 'src/…': nest build's path-alias hook crashes on an alias
+// re-export of a module this file also imports ("Cannot read properties of
+// undefined (reading 'checkJsDirective')"), while tsc and jest are fine.
 export {
   MONOREPO_SERVICES,
   isMonorepoService,
-} from 'src/github/constants/github-repos.constants';
+} from '../constants/github-repos.constants';
 
 /** The subset of a GitHub Actions run this module cares about. */
 export interface WorkflowRun {
