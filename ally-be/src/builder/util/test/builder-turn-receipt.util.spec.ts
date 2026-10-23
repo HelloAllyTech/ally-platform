@@ -273,6 +273,34 @@ describe('reply claims', () => {
     ['Shall I mark it build-ready?', false],
     ['Is the plan complete enough for you?', false],
     ["You can't start the build yet: R3 has no owner.", false],
+    // Phrasings from suite 5d24dd95 and the local live check (2026-10-23).
+    ['The build is now ready to start.', true],
+    [
+      'Next, a technical design will be drafted from this PRD, and after review, the build will begin.',
+      true,
+    ],
+    [
+      'The next step is for a technical design to be drafted from this PRD.',
+      true,
+    ],
+    [
+      "You can review the full specification and, when you're ready, start the build.",
+      true,
+    ],
+    ["When you're happy with it, you can start the build.", true],
+    ['The PRD is final.', true],
+    [
+      "I'm also addressing the review findings to get this ready to build.",
+      false,
+    ],
+    ['We are now very close to having a build-ready specification.', false],
+    ["Once we define that, we'll be ready to build.", false],
+    [
+      'Before this is ready to build, we need to address one last point.',
+      false,
+    ],
+    ['To start the build, R3 needs an owner.', false],
+    ['When R3 has an owner, the build can start.', false],
   ])('claimsPrdReady(%p) is %p', (text, expected) => {
     expect(claimsPrdReady(text)).toBe(expected);
   });
