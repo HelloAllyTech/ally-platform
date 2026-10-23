@@ -18,6 +18,18 @@ export const BUILDER_EVAL_MAX_RUNNING_SUITES = 2;
 export const BUILDER_EVAL_BASELINE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Bumped whenever a change alters what a suite measures — a new gate, or the
+ * validated turn holding replies back differently — so a prompt gate never
+ * compares a candidate with a baseline scored on other terms. A suite's
+ * summary records the version it was scored under; a baseline is reused only
+ * on a match, otherwise one runs alongside.
+ *
+ * 2 — `falseReadyClaims` gate; ready claims held back every time and judged
+ *     after the reviewer's due pass (2026-10-23).
+ */
+export const BUILDER_EVAL_SCORING_VERSION = 2;
+
+/**
  * How often a running suite says it is alive. Separate from run completion on
  * purpose: one interview replay can run longer than any sensible stall window,
  * and "no run finished lately" is not "nobody is running it".

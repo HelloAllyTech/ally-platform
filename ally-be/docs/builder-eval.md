@@ -107,9 +107,11 @@ settings, or both. The flow:
 1. The fixtures are replayed with the candidate. The candidate is applied inside the sandbox
    only, so nothing live reads it.
 2. The result is compared with a baseline on the live settings. A baseline is reused if it
-   covers the same fixtures, is under 7 days old, overrode no prompt or model, and ran the
-   same interview loop; otherwise one is run alongside on that loop. A baseline from the other
-   loop would credit or blame the prompt for what the loop did.
+   covers the same fixtures, is under 7 days old, overrode no prompt or model, ran the
+   same interview loop, and was scored under the current `BUILDER_EVAL_SCORING_VERSION`
+   (recorded in its summary); otherwise one is run alongside on that loop. A baseline from the
+   other loop, or from before a gate existed, would credit or blame the prompt for what changed
+   around it. Bump the version with any change to what a suite measures.
 3. The candidate passes when nothing got measurably worse:
    - gate violations and corrections did not rise;
    - the checklist score did not fall more than 0.05;
