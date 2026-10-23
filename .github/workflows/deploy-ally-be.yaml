@@ -36,6 +36,11 @@ on:
 
 jobs:
   prepare-env:
+    # No checkout in this job, so the workflow's service-folder default
+    # does not exist on the runner; run from the workspace root instead.
+    defaults:
+      run:
+        working-directory: .
     name: Prepare Env
     runs-on: ubuntu-22.04
     timeout-minutes: 2
@@ -239,6 +244,11 @@ jobs:
           security-groups: ${{ needs.prepare-env.outputs.SECURITY_GROUPS }}
 
   deploy:
+    # No checkout in this job, so the workflow's service-folder default
+    # does not exist on the runner; run from the workspace root instead.
+    defaults:
+      run:
+        working-directory: .
     needs:
       - build
       - prepare-env

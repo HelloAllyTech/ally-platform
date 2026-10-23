@@ -125,6 +125,11 @@ jobs:
           echo "✅ Tag $TAG created and pushed" >> $GITHUB_STEP_SUMMARY
 
   prepare-env:
+    # No checkout in this job, so the workflow's service-folder default
+    # does not exist on the runner; run from the workspace root instead.
+    defaults:
+      run:
+        working-directory: .
     name: Prepare Production Environment
     needs: validate-and-tag
     runs-on: ubuntu-22.04
@@ -311,6 +316,11 @@ jobs:
           security-groups: ${{ needs.prepare-env.outputs.SECURITY_GROUPS }}
 
   deploy:
+    # No checkout in this job, so the workflow's service-folder default
+    # does not exist on the runner; run from the workspace root instead.
+    defaults:
+      run:
+        working-directory: .
     needs:
       - validate-and-tag
       - build

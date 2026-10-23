@@ -72,7 +72,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            android/.gradle
+            ally-mobile/android/.gradle
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -110,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-develop-release-${{ github.run_number }}
-          path: android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-*.apk
+          path: ally-mobile/android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-*.apk
           retention-days: 7
 
       - name: Send Slack notification

@@ -98,6 +98,11 @@ jobs:
           project_region: ${{ steps.env-vars.outputs.project_region }}
 
   changes:
+    # No checkout in this job, so the workflow's service-folder default
+    # does not exist on the runner; run from the workspace root instead.
+    defaults:
+      run:
+        working-directory: .
     needs: prepare-env
     runs-on: ubuntu-22.04
     outputs:
