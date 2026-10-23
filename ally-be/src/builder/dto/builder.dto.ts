@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Exclude, Expose, Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
@@ -22,6 +22,7 @@ import {
   BuilderLessonCategory,
   BuilderLessonStatus,
   BuilderSessionStatus,
+  BuilderStage,
 } from '../enum/builder.enum';
 import {
   BUILDER_SLUG_MAX_LENGTH,
@@ -137,32 +138,74 @@ export class CreateBuilderSessionDto {
   title?: string;
 }
 
+@Exclude()
 export class BuilderSessionSummaryDto {
   @ApiProperty({ format: 'uuid' })
+  @Expose()
   id!: string;
 
   @ApiProperty()
+  @Expose()
   title!: string;
 
+  @ApiProperty()
+  @Expose()
+  slug!: string;
+
   @ApiProperty({ enum: BuilderSessionStatus })
+  @Expose()
   status!: BuilderSessionStatus;
 
+  @ApiPropertyOptional({ enum: BuilderStage })
+  @Expose()
+  currentStage?: BuilderStage | null;
+
   @ApiPropertyOptional({ type: [String] })
+  @Expose()
   repos?: string[] | null;
 
   @ApiPropertyOptional({ description: 'Coder model for build runs' })
+  @Expose()
   model?: string | null;
 
   @ApiProperty({ description: 'Total cost in USD' })
+  @Expose()
   totalCostUsd!: string;
 
+  @ApiProperty()
+  @Expose()
+  lastMessageSeq!: number;
+
+  @ApiPropertyOptional()
+  @Expose()
+  budgetUsd?: string | null;
+
+  @ApiProperty()
+  @Expose()
+  runnerMinutes!: number;
+
+  @ApiPropertyOptional()
+  @Expose()
+  error?: string | null;
+
+  @ApiProperty()
+  @Expose()
+  createdBy!: number;
+
   @ApiPropertyOptional({ description: 'Name of the creator' })
+  @Expose()
   createdByName?: string | null;
 
+  @ApiProperty()
+  @Expose()
+  createdAt!: Date;
+
   @ApiProperty({ description: 'When the session was last updated' })
+  @Expose()
   updatedAt!: Date;
 
   @ApiPropertyOptional({ description: 'When the session was archived' })
+  @Expose()
   archivedAt?: Date | null;
 }
 
