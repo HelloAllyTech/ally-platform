@@ -40,6 +40,7 @@ const ORG_SCOPED_ANALYTICS_ROUTES = [
   'foundational-skills/transfer',
   'highlights',
   'language-mix',
+  'learner-feedback',
   'learner-kpis',
   'measurement/convergence',
   'org-health',

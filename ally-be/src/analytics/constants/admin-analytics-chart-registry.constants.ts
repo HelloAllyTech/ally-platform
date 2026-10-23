@@ -2200,6 +2200,24 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/tabs/FoundationalSkillsSubTab.tsx'),
       note: "Nested tiers of learners by scored slices (4+, 6+, 8+, 10+): each learner's last half vs first half of slices (from slice 2 by default; picker for slice 1), the share of chances at an advanced behaviour they took, adjusted for which roleplays filled each slice (roleplay effects leave-one-learner-out). Change ± bootstrap 95% CI and sign test; averages withheld below 20 learners, counts travel; tier listed from 5. Added 2026-10-12 as a hypothesis to watch after a one-off read (6+ slices: 15 of 19 rose; flat across 4+). /v1/analytics/foundational-skills/advanced-behaviours",
     },
+    {
+      id: 'AAQ-238',
+      tab: 'Ratings & comments',
+      title: 'Ratings in this window',
+      kind: 'group',
+      chartType: 'KPI strip',
+      componentFile: f('Analytics/tabs/RatingsCommentsTab.tsx'),
+      note: "Sessions rated, how many carry a written comment, the mean star rating, and the count per star (1-5, zeros shown). Covers the whole window before the feed's own filters. Latest rating per session; every countable session, also those that ended with no conversation, so it can run slightly above AAQ-156. Clicking a star narrows the feed. /v1/analytics/learner-feedback summary",
+    },
+    {
+      id: 'AAQ-239',
+      tab: 'Ratings & comments',
+      title: 'What learners wrote',
+      kind: 'chart',
+      chartType: 'table',
+      componentFile: f('Analytics/tabs/RatingsCommentsTab.tsx'),
+      note: 'One row per rated session, newest first: date, stars, comment, quick-pick tags, learner, organisation, roleplay. Filters: star, comment or not (default: only with a comment), text search over comment, learner and roleplay. 25 a page. Links to the session in Roleplay Logs for admins who have it. /v1/analytics/learner-feedback items',
+    },
   ];
 
 /** Total number of registered charts — handy for the guard test and the UI. */
