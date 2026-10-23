@@ -1,0 +1,55 @@
+name: Wiki PR lifecycle
+
+# Merges each wiki PR when the code PR that spawned it merges, closes it when that PR is
+# abandoned, and nudges when it has been waiting too long.
+#
+# Scheduled rather than webhook-driven on purpose: a missed event self-heals on the next
+# pass instead of leaving a docs PR stranded forever.
+#
+# Spec: https://tech.helloally.ai/#/wiki/contributing/docs-system.md
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Report what would happen without doing it.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: wiki-pr-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Needs read on the code repos as well as write here, so it cannot be the default
+      # GITHUB_TOKEN. It merges other people's wiki PRs, so it must not be a human's PAT
+      # either — that would record a person as approving docs they never read.
+      - name: Mint a token for the wiki and the code repos
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DOCS_BOT_APP_ID }}
+          private-key: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
+          owner: HelloAllyTech
+          repositories: helloallytech.github.io,ally-be,ally-ai,ally-ai-learn,ally-web
+
+      - name: Reconcile wiki PRs against their source PRs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          python3 scripts/wiki_pr_lifecycle.py \
+            ${{ inputs.dry-run && '--dry-run' || '' }}

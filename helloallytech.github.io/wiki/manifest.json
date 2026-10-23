@@ -1,0 +1,694 @@
+{
+  "site": "https://tech.helloally.ai/#/wiki",
+  "pages": [
+    {
+      "path": "context.md",
+      "title": "Context",
+      "summary": "Active session meta-context, handoffs, and current operational states.",
+      "tags": [
+        "meta",
+        "context",
+        "state"
+      ],
+      "last_reconciled": "",
+      "words": 468,
+      "url": "https://tech.helloally.ai/#/wiki/context.md",
+      "skip_reason": "session handoff state — not task context"
+    },
+    {
+      "path": "contributing/dev-setup.md",
+      "title": "Developer Setup",
+      "summary": "How to clone all Ally repositories and start the full local development environment.",
+      "tags": [
+        "contributing",
+        "setup",
+        "onboarding",
+        "environment"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 1374,
+      "url": "https://tech.helloally.ai/#/wiki/contributing/dev-setup.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "contributing/docs-system.md",
+      "title": "Documentation System",
+      "summary": "How Ally's documentation is routed, deduplicated, enforced in CI, and kept current — the contract behind AGENTS.md, .docs-map.yml, ROUTING.md, and the weekly reconciler.",
+      "tags": [
+        "contributing",
+        "docs",
+        "agents",
+        "ci",
+        "automation"
+      ],
+      "last_reconciled": "2026-08-06",
+      "words": 1413,
+      "url": "https://tech.helloally.ai/#/wiki/contributing/docs-system.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "contributing/guide.md",
+      "title": "Contributing Guide",
+      "summary": "Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories.",
+      "tags": [
+        "contributing",
+        "sdlc",
+        "workflow",
+        "standards"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 767,
+      "url": "https://tech.helloally.ai/#/wiki/contributing/guide.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "contributing/planning-with-stacks.md",
+      "title": "Working with the Stacks MCP",
+      "summary": "Pull Stacks context whenever a product judgement comes up — while planning and while coding — how an agent searches the library itself, how to cite what comes back, and how the server is wired in.",
+      "tags": [
+        "contributing",
+        "agents",
+        "planning",
+        "mcp",
+        "workflow"
+      ],
+      "last_reconciled": "2026-09-15",
+      "words": 2856,
+      "url": "https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "contributing/release-process.md",
+      "title": "Release Process",
+      "summary": "The shared production-release process for every Ally service — semantic versioning policy, the automated pipeline, release-draft review, and troubleshooting.",
+      "tags": [
+        "contributing",
+        "release",
+        "versioning",
+        "ci",
+        "deployment"
+      ],
+      "last_reconciled": "2026-09-17",
+      "words": 1282,
+      "url": "https://tech.helloally.ai/#/wiki/contributing/release-process.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "getting-started.md",
+      "title": "Getting Started",
+      "summary": "A guide outlining how humans and agents operate this knowledge base.",
+      "tags": [
+        "guide",
+        "help",
+        "setup"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 310,
+      "url": "https://tech.helloally.ai/#/wiki/getting-started.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "index.md",
+      "title": "Wiki Directory",
+      "summary": "",
+      "tags": [],
+      "last_reconciled": "",
+      "words": 733,
+      "url": "https://tech.helloally.ai/#/wiki/index.md",
+      "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
+    },
+    {
+      "path": "log.md",
+      "title": "Activity Log",
+      "summary": "A chronological log tracking all wiki updates and modifications.",
+      "tags": [
+        "operations",
+        "log"
+      ],
+      "last_reconciled": "",
+      "words": 11283,
+      "url": "https://tech.helloally.ai/#/wiki/log.md",
+      "skip_reason": "append-only history — read only when auditing what changed"
+    },
+    {
+      "path": "memory.md",
+      "title": "Memory",
+      "summary": "Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each entry is a bug that already cost us.",
+      "tags": [
+        "meta",
+        "memory",
+        "learnings"
+      ],
+      "last_reconciled": "2026-09-17",
+      "words": 3184,
+      "url": "https://tech.helloally.ai/#/wiki/memory.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "overview.md",
+      "title": "Overview",
+      "summary": "Repository overview and active directories layout description.",
+      "tags": [
+        "meta",
+        "structure"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 285,
+      "url": "https://tech.helloally.ai/#/wiki/overview.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/agent-guide.md",
+      "title": "Cross-Repo Agent Guide",
+      "summary": "Quick-reference for AI assistants and developers working across Ally repos — per-repo entry points, cross-repo conventions, common tasks, and gotchas.",
+      "tags": [
+        "platform",
+        "agents",
+        "conventions",
+        "reference"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 1097,
+      "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/ai-lab.md",
+      "title": "AI Lab — Prompt Workbench & Human Evaluation",
+      "summary": "The admin AI Lab — author prompt Skills with variables, execute Runs against OpenAI or Anthropic models, and collect structured human and LLM-judge evaluations of the outputs.",
+      "tags": [
+        "platform",
+        "ai-lab",
+        "prompts",
+        "evaluation",
+        "human-eval",
+        "admin"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 1160,
+      "url": "https://tech.helloally.ai/#/wiki/platform/ai-lab.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/analytics-agent.md",
+      "title": "Analytics Agent — Natural-Language Questions Over Platform Data",
+      "summary": "The Analytics Agent tab — ask an analytics question in English, get a narrated answer with the SQL that produced it. How the plan → guard → execute → narrate pipeline works, and the three-layer trust boundary that makes generated SQL safe to run.",
+      "tags": [
+        "platform",
+        "analytics",
+        "agent",
+        "text-to-sql",
+        "admin",
+        "super-duper-admin",
+        "llm",
+        "security"
+      ],
+      "last_reconciled": "2026-07-30",
+      "words": 2181,
+      "url": "https://tech.helloally.ai/#/wiki/platform/analytics-agent.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/architecture.md",
+      "title": "Architecture & Data Flow",
+      "summary": "How Ally's services connect — data flow, integration points, message queues, storage, and authentication across the platform.",
+      "tags": [
+        "platform",
+        "architecture",
+        "integration",
+        "queues",
+        "storage"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 1459,
+      "url": "https://tech.helloally.ai/#/wiki/platform/architecture.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/auto-improve.md",
+      "title": "Auto-improve — Rubric-Judged Testing for System Skills",
+      "summary": "How System Skills' Auto-improve works — which skills can run it, the loop (designer drafts a challenger, the router splits live traffic, an LLM judge scores against an admin's rubric), what the target means, why a loop pauses, what Apply does, and the limits to know before trusting a winner.",
+      "tags": [
+        "platform",
+        "auto-improve",
+        "skills",
+        "prompts",
+        "evaluation",
+        "llm-judge",
+        "admin",
+        "experiments"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 2107,
+      "url": "https://tech.helloally.ai/#/wiki/platform/auto-improve.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/builder-agent.md",
+      "title": "Builder Agent — From a Sentence to a Merged Pull Request",
+      "summary": "The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, and why so much of its machinery is about not lying to the reader.",
+      "tags": [
+        "platform",
+        "builder",
+        "agent",
+        "automation",
+        "ci",
+        "release",
+        "admin",
+        "llm"
+      ],
+      "last_reconciled": "2026-09-21",
+      "words": 3293,
+      "url": "https://tech.helloally.ai/#/wiki/platform/builder-agent.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/language-quality-eval.md",
+      "title": "Language-Quality Evaluation & RCA",
+      "summary": "How we evaluate and fix the language quality of voice roleplay agents — categorized error annotation by LLM judge, two objective speech metrics, and single-variable root-cause analysis.",
+      "tags": [
+        "platform",
+        "evaluation",
+        "language-quality",
+        "voice",
+        "llm-judge",
+        "rca"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 2403,
+      "url": "https://tech.helloally.ai/#/wiki/platform/language-quality-eval.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/login-allowed-roles.md",
+      "title": "Login allowedRoles — Client-Supplied Filter, and the Role-Retirement Test Case",
+      "summary": "Why every auth call carries a client-supplied allowedRoles list, how retiring a role from the backend enum once locked every consumer-app user out of login, and the regression test case that now guards it.",
+      "tags": [
+        "platform",
+        "auth",
+        "roles",
+        "deployment",
+        "sdlc",
+        "testing"
+      ],
+      "last_reconciled": "2026-08-06",
+      "words": 992,
+      "url": "https://tech.helloally.ai/#/wiki/platform/login-allowed-roles.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/overview.md",
+      "title": "Platform Overview",
+      "summary": "What Ally is, its mission, and the multi-repo ecosystem that makes up the platform.",
+      "tags": [
+        "platform",
+        "overview",
+        "ecosystem",
+        "mission"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 432,
+      "url": "https://tech.helloally.ai/#/wiki/platform/overview.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/scribe-summary-writes.md",
+      "title": "Scribe Summary Writes — Merge Semantics & Client Rules",
+      "summary": "Why scribe session notes appeared not to save, the merge-based write contract that replaced the destructive one, and the backend-first deploy rule every scribe client depends on.",
+      "tags": [
+        "platform",
+        "scribe",
+        "data-integrity",
+        "deployment",
+        "sdlc"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 1332,
+      "url": "https://tech.helloally.ai/#/wiki/platform/scribe-summary-writes.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/stats.md",
+      "title": "Platform Stats",
+      "summary": "Generated counts of the things prose keeps getting wrong — entities, migrations, modules, providers. Regenerated weekly; never hand-edited.",
+      "tags": [
+        "platform",
+        "reference",
+        "generated"
+      ],
+      "last_reconciled": "2026-10-19",
+      "words": 175,
+      "url": "https://tech.helloally.ai/#/wiki/platform/stats.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/tech-stack.md",
+      "title": "Tech Stack",
+      "summary": "The polyglot technology stack used across Ally's frontend, mobile, backend, AI, and infrastructure layers.",
+      "tags": [
+        "platform",
+        "tech-stack",
+        "tooling"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 660,
+      "url": "https://tech.helloally.ai/#/wiki/platform/tech-stack.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/ai-product-patterns.md",
+      "title": "AI-Product Patterns",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. How Ally builds features where a model proposes and a person decides — disclosure, provenance, human-in-the-loop review, recording the \"no\", and never letting an unvalidated model answer become stored data.",
+      "tags": [
+        "product",
+        "best-practices",
+        "ai",
+        "llm",
+        "human-in-the-loop",
+        "disclosure",
+        "provenance"
+      ],
+      "last_reconciled": "2026-07-31",
+      "words": 1695,
+      "url": "https://tech.helloally.ai/#/wiki/product/ai-product-patterns.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/best-practices.md",
+      "title": "Product Management Best Practices",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. The former hub for Ally's product-management conventions — the house rules that apply to every product decision, plus a growing set of subsections (UI, Gamification, Data Visualisation, Prioritisation, User Personas, …).",
+      "tags": [
+        "product",
+        "best-practices",
+        "hub",
+        "ux",
+        "design",
+        "prioritisation",
+        "agents"
+      ],
+      "last_reconciled": "2026-07-31",
+      "words": 1331,
+      "url": "https://tech.helloally.ai/#/wiki/product/best-practices.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/chart-dashboard-principles.md",
+      "title": "Chart & Dashboard Design Principles",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. A constraints-file reference for building charts and dashboards — perception rules, chart anatomy, clarity/simplicity/colour rules, persuasion-vs-deception boundaries, a chart-type lookup, an acceptance checklist, and an anti-pattern list.",
+      "tags": [
+        "product",
+        "best-practices",
+        "data-viz",
+        "charts",
+        "dashboards",
+        "reference",
+        "agents"
+      ],
+      "last_reconciled": "2026-07-29",
+      "words": 7166,
+      "url": "https://tech.helloally.ai/#/wiki/product/chart-dashboard-principles.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/data-visualisation.md",
+      "title": "Data Visualisation",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. Rules for showing numbers honestly at Ally — pick the chart from the question, never hide sample size or uncertainty, and design the dashboard around a decision.",
+      "tags": [
+        "product",
+        "best-practices",
+        "data-viz",
+        "charts",
+        "dashboards",
+        "analytics",
+        "metrics"
+      ],
+      "last_reconciled": "2026-07-30",
+      "words": 5667,
+      "url": "https://tech.helloally.ai/#/wiki/product/data-visualisation.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/gamification.md",
+      "title": "Gamification",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. When and how to use badges, streaks, progress and leaderboards in a clinical-adjacent training product — and the cases where gamifying actively harms the outcome.",
+      "tags": [
+        "product",
+        "best-practices",
+        "gamification",
+        "badges",
+        "leaderboards",
+        "motivation"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 800,
+      "url": "https://tech.helloally.ai/#/wiki/product/gamification.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/prioritisation.md",
+      "title": "Prioritisation",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. How Ally decides what to build next — problem before solution, explicit non-goals, thin vertical slices, and honest treatment of the maintenance and platform work that never wins a scoring model.",
+      "tags": [
+        "product",
+        "best-practices",
+        "prioritisation",
+        "roadmap",
+        "scope",
+        "tradeoffs"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 847,
+      "url": "https://tech.helloally.ai/#/wiki/product/prioritisation.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/ui.md",
+      "title": "UI & Interaction",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. How Ally screens should behave — states before styling, hierarchy, permission-aware UI, latency as a design problem, accessibility and localisation.",
+      "tags": [
+        "product",
+        "best-practices",
+        "ui",
+        "ux",
+        "design",
+        "accessibility",
+        "i18n"
+      ],
+      "last_reconciled": "2026-08-06",
+      "words": 1735,
+      "url": "https://tech.helloally.ai/#/wiki/product/ui.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "product/user-personas.md",
+      "title": "User Personas",
+      "summary": "DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. Who Ally is built for — counsellor, learner, trainer/admin, tenant admin, super-admin — as working sketches tied to real permission roles, plus the rules for keeping personas honest.",
+      "tags": [
+        "product",
+        "best-practices",
+        "personas",
+        "users",
+        "research",
+        "roles"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 1100,
+      "url": "https://tech.helloally.ai/#/wiki/product/user-personas.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-ai-learn.md",
+      "title": "ally-ai-learn — Voice Training Agent",
+      "summary": "A LiveKit-based voice AI agent (FastAPI + LangGraph) that simulates mental-health client conversations, detecting counseling skills in real time, scoring them, and publishing events to ally-be via AWS SQS.",
+      "tags": [
+        "repo",
+        "ai",
+        "livekit",
+        "langgraph",
+        "voice",
+        "python"
+      ],
+      "last_reconciled": "2026-09-03",
+      "words": 3414,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-ai.md",
+      "title": "ally-ai — AI Copilot Service",
+      "summary": "ally-ai (internally \"Lifeline AI\") is the FastAPI AI copilot service that provides conversation analysis, summaries, transcription, drift/language-quality scoring, and Weaviate-backed semantic search for the Ally counselor-training platform.",
+      "tags": [
+        "repo",
+        "ai",
+        "fastapi",
+        "weaviate",
+        "python"
+      ],
+      "last_reconciled": "2026-09-03",
+      "words": 3058,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-be.md",
+      "title": "ally-be — Core Backend",
+      "summary": "ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth, real-time voice sessions, the audio/transcription pipeline, AI-driven feedback, and analytics for the counselor-training platform.",
+      "tags": [
+        "repo",
+        "backend",
+        "nestjs",
+        "api"
+      ],
+      "last_reconciled": "2026-08-06",
+      "words": 4058,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-changelog.md",
+      "title": "ally-changelog — Cross-Repo Changelog Journal",
+      "summary": "Holds the auto-written CHANGELOG.md fed by merges across every Ally repo, via a shared dispatch workflow.",
+      "tags": [
+        "repo",
+        "changelog",
+        "automation",
+        "github-actions"
+      ],
+      "last_reconciled": "2026-08-14",
+      "words": 420,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-changelog.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-mobile.md",
+      "title": "ally-mobile — Mobile App",
+      "summary": "React Native iOS/Android app for mental-health counsellors, covering live sessions with transcription, peer reviews, voice-based AI simulations, and Scribe voice-dictation notes.",
+      "tags": [
+        "repo",
+        "mobile",
+        "react-native",
+        "ios",
+        "android"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 1941,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-mobile.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-web.md",
+      "title": "ally-web — Web Applications",
+      "summary": "An Nx monorepo containing Ally's two user-facing web applications — a Vite+React helpline dashboard for counselors (port 8080) and a Vite+React admin dashboard for super admins (port 8081) — plus a shared UI library.",
+      "tags": [
+        "repo",
+        "frontend",
+        "nx",
+        "react",
+        "vite"
+      ],
+      "last_reconciled": "2026-09-22",
+      "words": 1401,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-web.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/calibrate-backend.md",
+      "title": "calibrate-backend — Calibrate API Service",
+      "summary": "FastAPI backend for the hosted Calibrate product — serves calibrate-frontend and orchestrates calibrate benchmark/simulation runs.",
+      "tags": [
+        "repo",
+        "calibrate",
+        "backend",
+        "fastapi",
+        "python"
+      ],
+      "last_reconciled": "2026-08-14",
+      "words": 196,
+      "url": "https://tech.helloally.ai/#/wiki/repos/calibrate-backend.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/calibrate-frontend.md",
+      "title": "calibrate-frontend — Calibrate Web UI",
+      "summary": "Next.js UI for the hosted Calibrate product — datasets, personas, scenarios, simulations, and evaluation results.",
+      "tags": [
+        "repo",
+        "calibrate",
+        "frontend",
+        "nextjs",
+        "evaluation"
+      ],
+      "last_reconciled": "2026-08-14",
+      "words": 228,
+      "url": "https://tech.helloally.ai/#/wiki/repos/calibrate-frontend.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/calibrate.md",
+      "title": "calibrate — Voice Agent Evaluation Framework",
+      "summary": "Open-source CLI/library for benchmarking STT, TTS and LLM providers and running persona-based voice-agent simulations.",
+      "tags": [
+        "repo",
+        "calibrate",
+        "evaluation",
+        "voice-agents",
+        "python",
+        "cli"
+      ],
+      "last_reconciled": "2026-08-14",
+      "words": 383,
+      "url": "https://tech.helloally.ai/#/wiki/repos/calibrate.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/infra.md",
+      "title": "infra — Infrastructure & Dev Environment",
+      "summary": "The infra repo provisions Ally's Hetzner baremetal, Incus containers, and AWS services via Ansible + Terraform, holds the shell scripts developers use to bootstrap repos and run the local stack, and defines how operators get SSH and VPN access to the fleet.",
+      "tags": [
+        "repo",
+        "infra",
+        "ansible",
+        "terraform",
+        "docker",
+        "devops"
+      ],
+      "last_reconciled": "2026-08-09",
+      "words": 1961,
+      "url": "https://tech.helloally.ai/#/wiki/repos/infra.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "skills/example-skill/SKILL.md",
+      "title": "example-skill",
+      "summary": "An example custom agent skill template showing how to layout rules, references, loops, and scheduled tasks.",
+      "tags": [],
+      "last_reconciled": "2026-07-11",
+      "words": 194,
+      "url": "https://tech.helloally.ai/#/wiki/skills/example-skill/SKILL.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "skills/example-skill/references/README.md",
+      "title": "Skill References",
+      "summary": "",
+      "tags": [],
+      "last_reconciled": "",
+      "words": 37,
+      "url": "https://tech.helloally.ai/#/wiki/skills/example-skill/references/README.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "welcome.md",
+      "title": "Welcome",
+      "summary": "Welcome to the Ally Developer Wiki — the canonical knowledge base for the Ally platform.",
+      "tags": [
+        "homepage",
+        "general"
+      ],
+      "last_reconciled": "2026-07-28",
+      "words": 443,
+      "url": "https://tech.helloally.ai/#/wiki/welcome.md",
+      "skip_reason": ""
+    }
+  ]
+}
