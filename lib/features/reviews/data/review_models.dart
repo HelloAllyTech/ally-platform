@@ -20,17 +20,57 @@ class ReviewAuthor {
   final String profileImage;
 }
 
-/// Mirrors RN's `ScenarioSessionData` — only the field the audio player
-/// needs. Only ever present on the simulation review *detail* response
-/// (`GetReviewByIdResponse`); the list endpoint and scribe reviews don't
-/// carry it, so it's nullable throughout.
+/// Mirrors RN's `ScenarioSessionData` — present on both the review list and
+/// detail responses for simulation reviews (never for scribe reviews).
 class ReviewScenarioSession {
-  ReviewScenarioSession({this.audioUrl});
+  ReviewScenarioSession({this.audioUrl, this.duration, this.createdAt});
 
   factory ReviewScenarioSession.fromJson(Map<String, dynamic> json) =>
-      ReviewScenarioSession(audioUrl: json['audioUrl'] as String?);
+      ReviewScenarioSession(
+        audioUrl: json['audioUrl'] as String?,
+        duration: json['duration']?.toString(),
+        createdAt: json['createdAt'] as String?,
+      );
 
   final String? audioUrl;
+
+  /// A string of seconds (RN types it `duration: string`, not a number) —
+  /// kept as a raw string here too; `formatDurationFromSeconds` parses it.
+  final String? duration;
+  final String? createdAt;
+}
+
+/// Mirrors RN's `ScribeSessionData` — the scribe-review equivalent of
+/// [ReviewScenarioSession] (no `audioUrl`: scribe reviews never carry one).
+class ReviewScribeSession {
+  ReviewScribeSession({this.summaryName, this.duration, this.createdAt});
+
+  factory ReviewScribeSession.fromJson(Map<String, dynamic> json) =>
+      ReviewScribeSession(
+        summaryName: json['summaryName'] as String?,
+        duration: json['duration']?.toString(),
+        createdAt: json['createdAt'] as String?,
+      );
+
+  final String? summaryName;
+  final String? duration;
+  final String? createdAt;
+}
+
+/// Mirrors RN's `ReviewScenario` — the scenario a simulation review's
+/// session was played from. `coverImageUrl`/`coverVideoUrl` aren't modeled
+/// here: this scoped port's `ReviewCard` shows title/description text only,
+/// not RN's `SimulationDetailsCard` cover art.
+class ReviewScenario {
+  ReviewScenario({required this.title, this.description});
+
+  factory ReviewScenario.fromJson(Map<String, dynamic> json) => ReviewScenario(
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String?,
+  );
+
+  final String title;
+  final String? description;
 }
 
 class ReviewItem {
@@ -43,6 +83,9 @@ class ReviewItem {
     required this.summaryName,
     this.reviewStatus,
     this.scenarioSession,
+    this.scenario,
+    this.scribeSession,
+    this.reactions = const {},
   });
 
   factory ReviewItem.fromJson(Map<String, dynamic> json) => ReviewItem(
@@ -56,6 +99,15 @@ class ReviewItem {
     scenarioSession: json['scenarioSession'] != null
         ? ReviewScenarioSession.fromJson(json['scenarioSession'] as Map<String, dynamic>)
         : null,
+    scenario: json['scenario'] != null
+        ? ReviewScenario.fromJson(json['scenario'] as Map<String, dynamic>)
+        : null,
+    scribeSession: json['scribeSession'] != null
+        ? ReviewScribeSession.fromJson(json['scribeSession'] as Map<String, dynamic>)
+        : null,
+    reactions: (json['reactions'] as Map<String, dynamic>? ?? {}).map(
+      (key, value) => MapEntry(key, (value as num).toInt()),
+    ),
   );
 
   final String id;
@@ -70,6 +122,9 @@ class ReviewItem {
   final String? reviewStatus;
 
   final ReviewScenarioSession? scenarioSession;
+  final ReviewScenario? scenario;
+  final ReviewScribeSession? scribeSession;
+  final Map<String, int> reactions;
 
   bool get isPrivate => reviewStatus == 'HIDDEN';
 }

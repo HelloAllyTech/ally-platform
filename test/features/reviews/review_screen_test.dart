@@ -92,7 +92,7 @@ void main() {
 
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('please check this'), findsOneWidget);
-    expect(find.text('4'), findsOneWidget);
+    expect(find.text('4 comments'), findsOneWidget);
   });
 
   testWidgets('tapping a review marks it read and navigates to its detail route', (tester) async {
@@ -125,7 +125,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Alex'));
+    // Tapping the user's name/avatar does nothing on the real card — only
+    // the "Review Conversation" link (or the comment count) opens the
+    // detail screen, confirmed from the real ReviewCard source.
+    await tester.tap(find.text('Review Conversation'));
     await tester.pumpAndSettle();
 
     verify(() => repository.markAsRead('rev-42')).called(1);

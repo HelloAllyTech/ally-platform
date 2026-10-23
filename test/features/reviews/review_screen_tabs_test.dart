@@ -111,7 +111,7 @@ void main() {
     // VIEW_SCRIBE_REVIEWS (plural, list visibility) without VIEW_SCRIBE_REVIEW
     // (singular, detail visibility) leaves the row disabled — same gating
     // CallLogScreen/simulation reviews already use.
-    await tester.tap(find.text('Robin'));
+    await tester.tap(find.text('Review Conversation'));
     await tester.pumpAndSettle();
     verifyNever(() => scribeRepository.markAsRead(any()));
   });
@@ -157,7 +157,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Robin'));
+    await tester.tap(find.text('Review Conversation'));
     await tester.pumpAndSettle();
 
     verify(() => scribeRepository.markAsRead('r1')).called(1);

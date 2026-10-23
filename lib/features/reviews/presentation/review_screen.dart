@@ -11,6 +11,7 @@ import '../../../core/widgets/tab_screen_header.dart';
 import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
+import 'review_card.dart';
 
 /// Port of ally-mobile (React Native)'s `ReviewScreen` — one screen, not
 /// two tabs/routes. An `AppTabView` switches between simulation reviews and
@@ -170,50 +171,17 @@ class _ReviewList extends ConsumerWidget {
         if (reviews.isEmpty) {
           return Center(child: Text(ref.t('review.empty.title')));
         }
-        final label = ref.t('review.feedCard.reviewType', {
-          'reviewType': reviewType == ReviewType.scribe
-              ? 'Scribe'
-              : 'Simulation',
-        });
         return ListView.separated(
+          padding: const EdgeInsets.all(16),
           itemCount: reviews.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
+          separatorBuilder: (_, _) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
             final review = reviews[index];
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: review.createdBy.profileImage.isNotEmpty
-                    ? NetworkImage(review.createdBy.profileImage)
-                    : null,
-                child: review.createdBy.profileImage.isEmpty
-                    ? Text(
-                        review.createdBy.name.isNotEmpty
-                            ? review.createdBy.name[0].toUpperCase()
-                            : '?',
-                      )
-                    : null,
-              ),
-              title: Text(review.summaryName ?? review.createdBy.name),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: ReviewTypeChip(reviewType: reviewType, label: label),
-                  ),
-                  Text(
-                    review.note,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-              isThreeLine: true,
-              trailing: review.commentsCount > 0
-                  ? Chip(label: Text('${review.commentsCount}'))
-                  : null,
-              enabled: canViewDetails,
-              onTap: canViewDetails ? () => onReviewTapped(review) : null,
+            return ReviewCard(
+              review: review,
+              reviewType: reviewType,
+              canViewDetails: canViewDetails,
+              onOpenReview: () => onReviewTapped(review),
             );
           },
         );
