@@ -142,10 +142,15 @@ settings, or both. The flow:
    only, so nothing live reads it.
 2. The result is compared with a baseline on the live settings. A baseline is reused if it
    covers the same fixtures, is under 7 days old, overrode no prompt or model, ran the
-   same interview loop, and was scored under the current `BUILDER_EVAL_SCORING_VERSION`
-   (recorded in its summary); otherwise one is run alongside on that loop. A baseline from the
-   other loop, or from before a gate existed, would credit or blame the prompt for what changed
-   around it. Bump the version with any change to what a suite measures.
+   same interview loop, was scored under the current `BUILDER_EVAL_SCORING_VERSION`
+   (recorded in its summary), and started after every one of those fixtures was last edited;
+   otherwise one is run alongside on that loop. A baseline from the other loop, or from before
+   a gate existed, would credit or blame the prompt for what changed around it. Bump the
+   version with any change to what a suite measures. A baseline from before a fixture edit
+   (`PATCH`, or an import that matched by name) scored a checklist or script that has since
+   changed; when an edit is why a fresh baseline ran, the verdict names the fixture and when it
+   was edited. To keep old suites readable against the truth they were scored on, re-cut a
+   fixture under a new name and switch the old one off rather than editing it in place.
 3. The candidate passes when nothing got measurably worse:
    - gate violations and corrections did not rise;
    - the checklist score did not fall more than 0.05;
