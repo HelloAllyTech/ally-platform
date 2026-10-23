@@ -34,7 +34,7 @@ export function claimsPrdEdit(text: string | null | undefined): boolean {
 const CLAIMS_READY = new RegExp(
   [
     String.raw`build[- ]ready`,
-    String.raw`ready (?:to|for) (?:be )?(?:build|built|building|the build|a build|technical design|the technical design|design|development|implementation)`,
+    String.raw`ready (?:to|for) (?:be )?(?:build|built|building|the build|a build|technical design|the technical design|design|development|implementation|the next (?:step|stage|phase))`,
     String.raw`(?:PRD|plan|it|document|spec) is (?:now )?(?:\w+ and )?(?:ready|complete|final|finali[sz]ed)`,
     String.raw`readiness is (?:now )?(?:at )?100`,
     String.raw`build is (?:now )?ready`,
