@@ -34,7 +34,12 @@ export const useAchievementBadgeModal = (): UseAchievementBadgeModalReturn => {
   const reportedBadgeIds = useRef<Set<string>>(new Set());
 
   const isBadgesEnabled = permissions.includes(Permissions.VIEW_BADGES);
-  const isSimulationPath = isPathExcluded(pathname, [ROUTES.SIMULATION_SUMMARY_FULL]);
+  // No confetti on the post-roleplay summary, nor in Ally's journey, which never
+  // uses confetti and may be in a quiet or crisis state.
+  const isSimulationPath = isPathExcluded(pathname, [
+    ROUTES.SIMULATION_SUMMARY_FULL,
+    ROUTES.JOURNEY,
+  ]);
 
   const {
     data: badgesResponse,
