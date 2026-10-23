@@ -352,9 +352,11 @@ describe('GuideProgressListener', () => {
 
   function setup(options: { duplicate?: boolean; present?: boolean } = {}) {
     const queries: string[] = [];
+    const params: unknown[][] = [];
     const dataSource = {
-      query: jest.fn(async (sql: string) => {
+      query: jest.fn(async (sql: string, args: unknown[] = []) => {
         queries.push(sql);
+        params.push(args);
         if (sql.includes('INSERT INTO "guide_triggers"')) {
           return options.duplicate ? [[], 0] : [[{ id: 'trg-1' }], 1];
         }
@@ -405,7 +407,7 @@ describe('GuideProgressListener', () => {
       turns as never,
       threads as never,
     );
-    return { listener, bus, threadService, turns, queries };
+    return { listener, bus, threadService, turns, queries, params };
   }
 
   it('marks the card done, moves the Spine, opens the release window and celebrates the practice', async () => {
@@ -433,7 +435,7 @@ describe('GuideProgressListener', () => {
       expect.objectContaining({ id: 'th1' }),
       { id: 3, tenantId: 'org' },
       {
-        dedupeKey: 'item_completed:enr1:i2',
+        dedupeKey: 'th1:item_completed:enr1:i2',
         description: 'The learner completed "Meera calls" (roleplay).',
       },
     );
@@ -456,10 +458,53 @@ describe('GuideProgressListener', () => {
       expect.objectContaining({ id: 'th1' }),
       { id: 3, tenantId: 'org' },
       expect.objectContaining({
-        dedupeKey: 'quiz_graded:att1:FAILED',
+        dedupeKey: 'th1:quiz_graded:att1:FAILED',
         description: expect.stringContaining('2 attempts left'),
       }),
     );
+  });
+
+  it('scopes the dedupe key to the thread, so a replacement thread still hears the event', async () => {
+    const t = setup();
+    await t.listener.onItemCompleted(event);
+    const insert = t.queries.findIndex((sql) =>
+      sql.includes('INSERT INTO "guide_triggers"'),
+    );
+    expect(t.params[insert]).toContain('th1:item_completed:enr1:i2');
+  });
+
+  it('reads the enrollment by its real column names', async () => {
+    const t = setup();
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att3',
+      status: 'FAILED',
+      passed: false,
+      scorePct: 40,
+      attemptsUsed: 1,
+      maxAttempts: 3,
+    });
+    const sql = t.queries.find((q) => q.includes('FROM "track_enrollments"'));
+    expect(sql).toContain('"tenantId"');
+    expect(sql).not.toContain('tenant_id');
+  });
+
+  it('lets a quiz with no pass mark speak through its completion too', async () => {
+    const t = setup({ present: true });
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att4',
+      status: 'GRADED',
+      passed: null,
+      scorePct: 98,
+      attemptsUsed: 1,
+      maxAttempts: null,
+    });
+    expect(t.turns.acceptTrigger).not.toHaveBeenCalled();
   });
 
   it('lets a passed quiz speak through its completion instead', async () => {
@@ -488,7 +533,7 @@ describe('GuideProgressListener', () => {
       expect.anything(),
       expect.anything(),
       expect.objectContaining({
-        dedupeKey: 'debrief_ready:ss1',
+        dedupeKey: 'th1:debrief_ready:ss1',
         description: expect.stringContaining('after-action review'),
       }),
     );

@@ -68,6 +68,10 @@ function returningRows<T>(result: unknown): T[] {
  * At-least-once safe: every effect hangs off a trigger row whose dedupe key
  * is unique, and a duplicate event stops at the insert.
  */
+/** A platform event's dedupe key, scoped to one thread. */
+export const threadDedupeKey = (threadId: string, key: string): string =>
+  `${threadId}:${key}`;
+
 @Injectable()
 export class GuideProgressListener {
   private readonly logger = LoggerService.getInstance(
@@ -149,7 +153,11 @@ export class GuideProgressListener {
     });
   }
 
-  /** Insert the trigger; false when this event was already handled. */
+  /**
+   * Insert the trigger; false when this event was already handled for this
+   * thread. Keys are per thread: an event a learner's archived thread already
+   * folded in is still news to the thread that replaced it.
+   */
   private async claim(
     thread: GuideThread,
     kind: string,
@@ -167,7 +175,7 @@ export class GuideProgressListener {
         [
           thread.id,
           kind,
-          dedupeKey,
+          threadDedupeKey(thread.id, dedupeKey),
           JSON.stringify({ description, ...extra }),
           GuideTriggerStatus.PENDING,
           thread.tenantId ?? null,
@@ -277,7 +285,7 @@ export class GuideProgressListener {
         await this.turns.acceptTrigger(
           { ...thread, pacing },
           { id: thread.userId, tenantId: thread.tenantId ?? event.tenantId },
-          { dedupeKey, description },
+          { dedupeKey: threadDedupeKey(thread.id, dedupeKey), description },
         );
       }
     }
@@ -341,7 +349,7 @@ export class GuideProgressListener {
   ): Promise<{ trackId: string; tenantId: string; userId: number } | null> {
     const rows: Array<{ trackId: string; tenantId: string; userId: number }> =
       await this.dataSource.query(
-        `SELECT "trackId", "tenant_id" AS "tenantId", "userId"
+        `SELECT "trackId", "tenantId", "userId"
            FROM "track_enrollments" WHERE "id" = $1`,
         [trackEnrollmentId],
       );
@@ -400,7 +408,10 @@ export class GuideProgressListener {
             id: thread.userId,
             tenantId: thread.tenantId ?? enrollment.tenantId,
           },
-          { dedupeKey: input.dedupeKey, description },
+          {
+            dedupeKey: threadDedupeKey(thread.id, input.dedupeKey),
+            description,
+          },
         );
       }
     }
@@ -418,8 +429,10 @@ export class GuideProgressListener {
       trackItemId: event.trackItemId,
       kind: 'quiz_graded',
       dedupeKey: `quiz_graded:${event.attemptId}:${event.status}`,
-      // A pass is also an item completion, which speaks for itself.
-      speakNow: event.passed !== true,
+      // A pass — or a graded attempt on a quiz with no pass mark (passed
+      // null) — is also an item completion, which speaks for itself. Only a
+      // fail or a pending grade needs a turn of its own.
+      speakNow: event.passed === false || event.status === 'PENDING_GRADING',
       describe: (title) => {
         if (event.status === 'PENDING_GRADING') {
           return `The learner's answers to the quiz "${title}" are still being graded.`;

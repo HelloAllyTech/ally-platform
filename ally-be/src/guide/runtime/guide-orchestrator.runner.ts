@@ -113,6 +113,30 @@ export interface OrchestratorRunOutput {
 
 type FinalMessage = Extract<AgentStreamEvent, { type: 'final' }>['message'];
 
+/** Characters of a later pass held back to judge whether it repeats. */
+export const REPEAT_PROBE_CHARS = 60;
+
+const words = (text: string): string[] =>
+  text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+/**
+ * Whether the opening of a later pass restates text the learner has already
+ * been shown this turn: at least four of its words, and 80% of them, appear
+ * in the earlier text.
+ */
+export function repeatsEarlierText(opening: string, earlier: string): boolean {
+  const probe = words(opening).slice(0, 12);
+  if (probe.length < 4) return false;
+  const seen = new Set(words(earlier));
+  const shared = probe.filter((word) => seen.has(word)).length;
+  return shared / probe.length >= 0.8;
+}
+
 const textOf = (content: AgentContentBlock[]): string =>
   content
     .filter((block) => block.type === 'text')
@@ -148,6 +172,24 @@ export async function runOrchestrator(
       const closing = pass === input.maxPasses;
       passes++;
       let separatorSent = texts.join('').length === 0;
+      // A later pass that restates the reply so far (a model re-framing the
+      // card it just presented) is muted on screen; its blocks are kept for
+      // replay. Its opening is held back until it can be judged.
+      const earlier = texts.join(' ');
+      let probing = earlier.length > 0;
+      let held = '';
+      let muted = false;
+      const release = async (text: string) => {
+        if (!sawText) {
+          sawText = true;
+          input.onFirstText?.();
+        }
+        if (!separatorSent) {
+          separatorSent = true;
+          await input.gate.push('\n\n');
+        }
+        await input.gate.push(text);
+      };
       let final: FinalMessage | null = null;
       for await (const event of input.stream({
         system: input.system,
@@ -163,18 +205,26 @@ export async function runOrchestrator(
           : undefined,
       })) {
         if (event.type === 'text_delta') {
-          if (!sawText) {
-            sawText = true;
-            input.onFirstText?.();
+          if (muted) continue;
+          if (probing) {
+            held += event.text;
+            if (held.length < REPEAT_PROBE_CHARS) continue;
+            probing = false;
+            if (repeatsEarlierText(held, earlier)) {
+              muted = true;
+              continue;
+            }
+            await release(held);
+            continue;
           }
-          if (!separatorSent) {
-            separatorSent = true;
-            await input.gate.push('\n\n');
-          }
-          await input.gate.push(event.text);
+          await release(event.text);
         } else {
           final = event.message;
         }
+      }
+      if (probing && held) {
+        if (repeatsEarlierText(held, earlier)) muted = true;
+        else await release(held);
       }
       if (!final) break;
       usage.push(final.usage);
@@ -191,7 +241,7 @@ export async function runOrchestrator(
         messages.push(assistant);
         appended.push(assistant);
         const passText = textOf(content);
-        if (passText) texts.push(passText);
+        if (passText && !muted) texts.push(passText);
       }
 
       const uses = content.filter(

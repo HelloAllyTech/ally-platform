@@ -41,6 +41,18 @@ export interface AppendMessageInput {
  * private to the learner who owns it, in the org it was created under: any
  * other caller gets the same 404 as a missing thread, so ids cannot be probed.
  */
+/**
+ * The newest unfinished course-item card for ($1 thread, $2 item) created
+ * since $3 (an ISO instant, or null for any time). `createdAt` is a
+ * timestamp without time zone holding UTC, so the instant is converted in
+ * SQL — a JS Date parameter would be read in the server process's zone.
+ */
+export const LIVE_ITEM_CARD_SQL = `SELECT "id", "state" FROM "guide_cards"
+  WHERE "threadId" = $1 AND "trackItemId" = $2 AND "kind" = 'course_item'
+    AND "state" IN ('announced', 'ready', 'active')
+    AND ($3::timestamptz IS NULL OR "createdAt" >= ($3::timestamptz AT TIME ZONE 'UTC'))
+  ORDER BY "createdAt" DESC LIMIT 1`;
+
 @Injectable()
 export class GuideThreadService {
   constructor(
@@ -259,6 +271,25 @@ export class GuideThreadService {
         ORDER BY "updatedAt" DESC LIMIT 1`,
       [threadId],
     );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * An unfinished card for this item presented since the epoch began, or
+   * null. Presenting the same step again only stacks duplicate cards in the
+   * feed; within an epoch the earlier one is still in view.
+   */
+  async liveItemCard(
+    threadId: string,
+    trackItemId: string,
+    epochStartedAt: string | null,
+  ): Promise<{ id: string; state: string } | null> {
+    const rows: Array<{ id: string; state: string }> =
+      await this.dataSource.query(LIVE_ITEM_CARD_SQL, [
+        threadId,
+        trackItemId,
+        epochStartedAt,
+      ]);
     return rows[0] ?? null;
   }
 

@@ -126,6 +126,7 @@ function setup(
     ),
     saveState: jest.fn<Promise<void>, [string, any]>(async () => undefined),
     openItemCard: jest.fn(async () => null),
+    liveItemCard: jest.fn(async () => null),
     markReplyInterrupted: jest.fn(async (): Promise<string | null> => null),
   };
   const turnStore = {
@@ -215,6 +216,7 @@ function setup(
   };
   const triggers = {
     find: jest.fn(async () => options.triggers ?? []),
+    count: jest.fn(async () => (options.triggers ?? []).length),
     update: jest.fn(async () => undefined),
   };
   const service = new GuideTurnService(
@@ -507,9 +509,47 @@ describe('GuideTurnService', () => {
     );
     ctx.platformEvent = 'The learner completed "Listening".';
     await t.service.run(ctx);
-    expect(ctx.stoppedAt).toBe('prepare');
+    expect(ctx.stoppedAt).toBe('persist.learner');
     expect(t.models.stream).not.toHaveBeenCalled();
-    expect(t.events.map((e) => e.type)).not.toContain('learner.message');
+    // No note left behind, and nothing the learner sees: it never started.
+    expect(t.appended).toHaveLength(0);
+    const seen = t.events.map((e) => e.type);
+    expect(seen).not.toContain('turn.started');
+    expect(seen).not.toContain('turn.completed');
+    expect(seen).not.toContain('turn.failed');
+  });
+
+  it('a trigger turn waits for a turn in flight instead of failing', async () => {
+    const t = setup({
+      triggers: [
+        {
+          id: 'trg-1',
+          kind: 'item_completed',
+          payload: { description: 'The learner completed "Check" (quiz).' },
+        },
+      ],
+      scripts: [textPass('You finished the check.')],
+    });
+    t.redis.acquireLock.mockResolvedValueOnce(false);
+    const ctx = t.service.createContext(
+      {
+        id: 'th1',
+        trackId: 'tr1',
+        lastEventSeq: 0,
+        mode: GuideMode.NORMAL,
+        pacing: {},
+        epoch: 0,
+      } as never,
+      { id: 1, tenantId: 'org', username: '' },
+      { clientTurnId: 'trg:y', text: '' },
+      'turn-1',
+    );
+    ctx.platformEvent = 'The learner completed "Check" (quiz).';
+    await t.service.run(ctx);
+    expect(ctx.failure).toBeUndefined();
+    expect(t.redis.acquireLock).toHaveBeenCalledTimes(2);
+    expect(t.models.stream).toHaveBeenCalled();
+    expect(t.events.map((e) => e.type)).toContain('turn.completed');
   });
 
   it('runs a spoken turn: deltas to the speaker, voice route and budget', async () => {

@@ -326,6 +326,36 @@ describe('renderSituationReport', () => {
     expect(text).toContain('only if the learner asks');
   });
 
+  it('asks for the next step when Continue is pressed and nothing is on screen', () => {
+    const steer = {
+      level: 3 as const,
+      reason: 'learner asked to continue',
+      dockVisible: true,
+      mayPresentNext: true,
+    };
+    expect(report({ continuePressed: true, steer })).toContain(
+      'present the next step now',
+    );
+    expect(
+      report({ continuePressed: true, steer, nextOnScreen: true }),
+    ).not.toContain('present the next step now');
+  });
+
+  it('says when the next step is already on screen', () => {
+    expect(report({ nextOnScreen: true })).toContain(
+      'its card is already on screen',
+    );
+    expect(report()).not.toContain('already on screen');
+  });
+
+  it('tells a platform-started turn to answer the event, not old messages', () => {
+    const text = report({ platformTurn: true, mode: GuideMode.CARE });
+    expect(text).toContain('started by the platform');
+    expect(text).toContain('Do not answer earlier messages again');
+    expect(text).toContain('quiet and factual in CARE');
+    expect(report()).not.toContain('started by the platform');
+  });
+
   it('carries the CARE and real-case overlays', () => {
     expect(report({ mode: GuideMode.CARE })).toContain('CARE:');
     expect(report({ overlay: 'real_case' })).toContain('REAL CASE');

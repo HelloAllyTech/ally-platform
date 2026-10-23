@@ -1,7 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
+import { SessionItemStatus } from 'src/common/type/common.type';
 import { TrackItemType } from 'src/track/type/track.type';
+import { buildCourseSpine } from '../../conductor/course-spine';
 import {
   GuideToolExecutorService,
+  isGroundedInLearnerWords,
   isLearnersOwnWords,
 } from '../../capabilities/guide-tool-executor.service';
 import { verifyTutorAnswer } from '../../capabilities/specialists/guide-tutor.service';
@@ -260,6 +263,7 @@ describe('learner tools', () => {
       create: jest.fn((row) => row),
       save: jest.fn(async (row) => ({ id: 'c1', ...row })),
       update: jest.fn(),
+      query: jest.fn(async (): Promise<unknown[]> => []),
     };
     const executor = new GuideToolExecutorService(
       cards as never,
@@ -290,7 +294,7 @@ describe('learner tools', () => {
       }),
       ...overrides,
     };
-    return { executor, ctx, learnerData, emitted };
+    return { executor, ctx, learnerData, emitted, cards };
   }
 
   it('remembers only when memory is on and the moment is ordinary', async () => {
@@ -329,11 +333,62 @@ describe('learner tools', () => {
       (
         await ok.executor.execute(
           'remember',
-          { kind: 'goal', note: 'Calmer openings.' },
+          { kind: 'goal', note: 'Wants people to feel safe talking at 3am.' },
           ok.ctx,
         )
       ).isError,
     ).toBe(false);
+  });
+
+  it('never remembers what the learner did not say', async () => {
+    // A trigger turn asked a question and stored its own answer (1.5 walk).
+    const invented = setup();
+    const result = await invented.executor.execute(
+      'remember',
+      {
+        kind: 'possible_self',
+        note: 'A calm listener who helps people find small next steps.',
+      },
+      invented.ctx,
+    );
+    expect(result.isError).toBe(true);
+    expect(invented.learnerData.remember).not.toHaveBeenCalled();
+
+    const platform = setup({ platformTurn: true });
+    expect(
+      (
+        await platform.executor.execute(
+          'remember',
+          {
+            kind: 'possible_self',
+            note: 'Wants people to feel safe talking at 3am.',
+          },
+          platform.ctx,
+        )
+      ).isError,
+    ).toBe(true);
+  });
+
+  it('isGroundedInLearnerWords allows a paraphrase but not an invention', () => {
+    const said = [
+      'I think I rushed to fill the silence. Next time I want to let it breathe.',
+    ];
+    expect(
+      isGroundedInLearnerWords(
+        'Wants to let silence breathe instead of rushing to fill it.',
+        said,
+      ),
+    ).toBe(true);
+    expect(
+      isGroundedInLearnerWords('Prefers detailed written feedback.', said),
+    ).toBe(false);
+    expect(isGroundedInLearnerWords('', said)).toBe(false);
+    // Another script cannot be judged word by word; other guards still hold.
+    expect(
+      isGroundedInLearnerWords('Wants to slow down in silences.', [
+        'मैं चुप्पी में जल्दी बोल देती हूँ',
+      ]),
+    ).toBe(true);
   });
 
   it('saves only the learner’s own words to the notebook', async () => {
@@ -391,6 +446,68 @@ describe('learner tools', () => {
       presentation: 'inline',
     });
     expect((await close()).isError).toBe(true);
+  });
+
+  it('points to a step already on screen instead of stacking a duplicate card', async () => {
+    const spine = buildCourseSpine({
+      id: 'tr1',
+      title: 'Course',
+      enrolled: true,
+      sections: [
+        {
+          id: 's1',
+          title: 'Start',
+          order: 1,
+          items: [
+            {
+              id: 'i1',
+              type: TrackItemType.ARTICLE,
+              order: 1,
+              title: 'Welcome',
+              status: SessionItemStatus.UNLOCKED,
+            },
+          ],
+        },
+      ],
+    });
+    const steer = {
+      level: 3,
+      reason: 'learner asked to continue',
+      dockVisible: true,
+      mayPresentNext: true,
+    };
+    const input = { item_id: 'i1', reason: 'next_step', framing: 'Read this' };
+
+    const first = setup({
+      spine,
+      steer,
+      epochStartedAt: '2026-10-23T17:00:00.000Z',
+    });
+    const presented = JSON.parse(
+      (await first.executor.execute('present_course_item', input, first.ctx))
+        .content,
+    );
+    expect(presented.presented).toBe(true);
+    expect(first.emitted).toEqual(['card.presented']);
+
+    const again = setup({
+      spine,
+      steer,
+      epochStartedAt: '2026-10-23T17:00:00.000Z',
+    });
+    again.cards.query.mockResolvedValue([{ id: 'c0', state: 'ready' }]);
+    const result = await again.executor.execute(
+      'present_course_item',
+      input,
+      again.ctx,
+    );
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content)).toMatchObject({
+      presented: false,
+      alreadyOnScreen: true,
+    });
+    expect(again.emitted).toEqual([]);
+    expect(again.cards.save).not.toHaveBeenCalled();
   });
 
   it('isLearnersOwnWords needs a real phrase, not a word', () => {

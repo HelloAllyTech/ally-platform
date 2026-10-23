@@ -66,8 +66,19 @@ export function isLearnerCrisis(verdict: SentinelClassification): boolean {
   return verdict.risk === 'crisis' && aboutLearner(verdict);
 }
 
+/**
+ * CARE pauses the course for the rest of the session, so a hesitant "care"
+ * is not enough to enter it; a crisis has no such floor — a false alarm
+ * costs one tap, a miss far more.
+ */
+export const CARE_MIN_CONFIDENCE = 0.6;
+
 export function isLearnerDistress(verdict: SentinelClassification): boolean {
-  return verdict.risk === 'care' && verdict.about === 'self';
+  return (
+    verdict.risk === 'care' &&
+    verdict.about === 'self' &&
+    verdict.confidence >= CARE_MIN_CONFIDENCE
+  );
 }
 
 export interface ModeChange {

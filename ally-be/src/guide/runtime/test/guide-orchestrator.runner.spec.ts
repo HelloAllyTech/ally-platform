@@ -1,6 +1,7 @@
 import { AgentStreamEvent } from 'src/llm-agent/type/agent-llm.type';
 import {
   ReleaseGate,
+  repeatsEarlierText,
   runOrchestrator,
   trimToCompleteExchange,
 } from '../guide-orchestrator.runner';
@@ -122,6 +123,67 @@ describe('runOrchestrator', () => {
     expect(requests.every((r) => r.tools.length === 1)).toBe(true);
     expect(requests.every((r) => r.cacheConversation)).toBe(true);
     expect(requests[1].messages).toHaveLength(3);
+  });
+
+  it('mutes a later pass that restates the reply, but keeps it for replay', async () => {
+    const said =
+      'The reflection journal card is on screen, about six minutes. Open it when you are ready.';
+    const { stream } = streamOf([
+      [
+        { type: 'text_delta', text: said },
+        final(
+          [
+            { type: 'text', text: said },
+            { type: 'tool_use', id: 'tu1', name: 'get_progress', input: {} },
+          ],
+          'tool_use',
+        ),
+      ],
+      [
+        // Streamed in small pieces, as a provider would.
+        ...said
+          .match(/.{1,7}/g)!
+          .map((text) => ({ type: 'text_delta' as const, text })),
+        final([{ type: 'text', text: said }]),
+      ],
+    ]);
+    const released: string[] = [];
+    const gate = new ReleaseGate(async (text) => {
+      released.push(text);
+    });
+    await gate.release();
+    const out = await runOrchestrator({
+      ...base(),
+      stream,
+      executeTool: jest.fn(async () => ({ content: '{}', isError: false })),
+      gate,
+    });
+    expect(out.text).toBe(said);
+    expect(released.join('')).toBe(said);
+    // Replay keeps exactly what the model produced, both passes.
+    expect(out.appended.map((m) => m.role)).toEqual([
+      'assistant',
+      'user',
+      'assistant',
+    ]);
+  });
+
+  it('repeatsEarlierText tells a restatement from a continuation', () => {
+    const earlier =
+      'Nice, you finished the article. The platform walkthrough is ready next.';
+    expect(
+      repeatsEarlierText(
+        'Nice — you finished the article. The platform walkthrough',
+        earlier,
+      ),
+    ).toBe(true);
+    expect(
+      repeatsEarlierText(
+        'It says to reflect before advising and to name the emotion first.',
+        'Let me check what the course says.',
+      ),
+    ).toBe(false);
+    expect(repeatsEarlierText('Yes.', earlier)).toBe(false);
   });
 
   it('closes with tool_choice none after the pass limit, keeping the tools', async () => {

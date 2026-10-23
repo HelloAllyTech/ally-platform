@@ -40,6 +40,12 @@ export interface SituationInput {
   openItem?: Pick<SpineItem, 'id' | 'title' | 'type'> | null;
   /** A quiz is open: only point to material (plan §6.4). */
   quizOpen?: boolean;
+  /** The next step's card is already in view (presented this epoch, unfinished). */
+  nextOnScreen?: boolean;
+  /** The platform started this turn (a completion, a grade), not the learner. */
+  platformTurn?: boolean;
+  /** The learner pressed Start or Continue: they asked for the next step. */
+  continuePressed?: boolean;
 }
 
 const GUIDANCE_LABEL: Record<GuidanceDial, string> = {
@@ -98,6 +104,19 @@ export function renderSituationReport(input: SituationInput): string {
     );
   }
 
+  if (input.platformTurn) {
+    lines.push(
+      'This turn was started by the platform, not by a new message from the learner. ' +
+        'Respond to the <platform_event> lines in the latest message: acknowledge what ' +
+        'they just did, specifically, in a sentence or two. Do not answer earlier ' +
+        'messages again. Acknowledging it is fine at any steer level' +
+        (input.mode === GuideMode.CARE
+          ? ' — keep it quiet and factual in CARE'
+          : '') +
+        '; the steer level still decides whether you mention the next step.',
+    );
+  }
+
   lines.push(
     `steer: level ${steer.level} (${steer.reason}). ${STEER_LINE[steer.level]}`,
   );
@@ -128,7 +147,14 @@ export function renderSituationReport(input: SituationInput): string {
     );
   } else {
     lines.push(`progress: ${spine.completed} of ${spine.total} complete.`);
-    if (spine.current) lines.push(`next step: ${describe(spine.current)}.`);
+    if (spine.current) {
+      lines.push(
+        `next step: ${describe(spine.current)}` +
+          (input.nextOnScreen
+            ? ' — its card is already on screen; if they want to go on, point to it, do not present it again.'
+            : '.'),
+      );
+    }
     if (spine.upcoming) lines.push(`after that: ${describe(spine.upcoming)}.`);
   }
 
@@ -143,6 +169,20 @@ export function renderSituationReport(input: SituationInput): string {
             'offer to rehearse one opening line with them and give one specific note.'
         : 'First win: the first activity is long. Before it, offer a quick ' +
             'one-question dilemma from the course topic to warm up.',
+    );
+  }
+
+  if (
+    input.continuePressed &&
+    steer.mayPresentNext &&
+    !input.nextOnScreen &&
+    !input.openItem &&
+    spine.current &&
+    !spine.finished
+  ) {
+    lines.push(
+      'They pressed Continue: present the next step now with present_course_item, ' +
+        'then frame it in a sentence.',
     );
   }
 

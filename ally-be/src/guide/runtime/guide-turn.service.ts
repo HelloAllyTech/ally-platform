@@ -17,6 +17,7 @@ import {
 import {
   HarnessStage,
   HarnessStageError,
+  HarnessStageResult,
   HarnessTurnContext,
   runHarnessStages,
 } from 'src/llm-agent/harness/pipeline/harness-turn-runner';
@@ -106,6 +107,7 @@ import {
   SentinelOverlay,
   SentinelVerdict,
   isLearnerCrisis,
+  isLearnerDistress,
   nextMode,
   sessionStartMode,
 } from '../safety/sentinel';
@@ -120,6 +122,14 @@ import { GuideThreadService } from './guide-thread.service';
 /** One turn at a time per thread; the lock outlives the hard timeout. */
 export const GUIDE_TURN_LOCK_PREFIX = 'guide-turn';
 export const GUIDE_TURN_LOCK_TTL_SECONDS = 120;
+/**
+ * A platform turn waits this long for the thread's lock instead of failing:
+ * two events from one action (a quiz graded and its item completed) or a
+ * learner message in flight must not surface as an error the learner never
+ * caused. It matches the turn's hard timeout (plan §7.8).
+ */
+export const GUIDE_TRIGGER_LOCK_WAIT_MS = 45_000;
+const GUIDE_TRIGGER_LOCK_POLL_MS = 500;
 
 /** Tool-calling passes before the closing pass (plan §7.8 step 3). */
 export const GUIDE_MAX_TOOL_PASSES = 6;
@@ -209,6 +219,8 @@ export interface GuideTurnContext extends HarnessTurnContext {
   restarted: boolean;
   /** Set for a turn a platform event started (no learner words). */
   platformEvent: string | null;
+  /** turn.started has gone out: the client is waiting for this turn's end. */
+  announced?: boolean;
   /** Platform events folded into this turn; consumed if it succeeds. */
   pendingTriggers: GuideTrigger[];
   /** An item was completed since the last turn (steer may present next). */
@@ -503,12 +515,20 @@ export class GuideTurnService {
   // ── admit ──────────────────────────────────────────────────────────────
 
   private async admit(ctx: GuideTurnContext): Promise<void> {
-    if (
+    const waitUntil = ctx.platformEvent
+      ? Date.now() + GUIDE_TRIGGER_LOCK_WAIT_MS
+      : 0;
+    while (
       !(await this.redis.acquireLock(ctx.lockKey, GUIDE_TURN_LOCK_TTL_SECONDS))
     ) {
-      throw new HarnessStageError(
-        'turn_in_progress',
-        'Ally is replying in another tab.',
+      if (Date.now() >= waitUntil) {
+        throw new HarnessStageError(
+          'turn_in_progress',
+          'Ally is replying in another tab.',
+        );
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, GUIDE_TRIGGER_LOCK_POLL_MS),
       );
     }
     ctx.locked = true;
@@ -535,8 +555,16 @@ export class GuideTurnService {
 
   // ── persist.learner ────────────────────────────────────────────────────
 
-  private async persistLearner(ctx: GuideTurnContext): Promise<void> {
+  private async persistLearner(
+    ctx: GuideTurnContext,
+  ): Promise<HarnessStageResult> {
     if (ctx.platformEvent) {
+      // The turn that held the lock may already have folded this event in:
+      // then there is nothing left to say, and no note to leave behind.
+      const pending = await this.triggers.count({
+        where: { threadId: ctx.threadId, status: GuideTriggerStatus.PENDING },
+      });
+      if (pending === 0) return 'stop';
       // Not the learner's words: a note the model sees, the learner does not.
       const note = await this.threads.appendMessage(
         ctx.threadId,
@@ -556,6 +584,7 @@ export class GuideTurnService {
         { turnId: ctx.turnId, trigger: 'platform_event' },
         ctx.lastSeq,
       );
+      ctx.announced = true;
       await this.presence(ctx, 'thinking', null);
       return;
     }
@@ -600,6 +629,7 @@ export class GuideTurnService {
       },
       ctx.lastSeq,
     );
+    ctx.announced = true;
     await this.presence(ctx, 'thinking', null);
   }
 
@@ -850,8 +880,9 @@ export class GuideTurnService {
     ) {
       events.push(
         'They have had a first win. When it fits naturally — not as an interruption — ' +
-          'ask once what kind of helper they want to become. Save their answer with ' +
-          'save_to_notebook (possible_self) and remember (possible_self).',
+          'ask once what kind of helper they want to become. Only after they answer, ' +
+          'in a later turn, save their words with save_to_notebook (possible_self) and ' +
+          'remember (possible_self). Never answer it for them.',
       );
       pacing = {
         ...pacing,
@@ -859,6 +890,20 @@ export class GuideTurnService {
       };
       ctx.pacing = pacing;
     }
+
+    // A card for the next step still in view from this sitting: say so, so
+    // "continue" points at it instead of stacking a duplicate.
+    const epochStartedAt = ctx.epoch?.snapshot?.startedAt ?? null;
+    const nextOnScreen =
+      !openItem && spine.current
+        ? Boolean(
+            await this.threads.liveItemCard(
+              ctx.threadId,
+              spine.current.id,
+              epochStartedAt,
+            ),
+          )
+        : false;
 
     ctx.situationInput = {
       turn: pacing.learnerTurns ?? 1,
@@ -877,6 +922,9 @@ export class GuideTurnService {
         ? { id: openItem.id, title: openItem.title, type: openItem.type }
         : null,
       quizOpen: openItem?.type === 'QUIZ' && openItem.state !== 'completed',
+      nextOnScreen,
+      platformTurn: Boolean(ctx.platformEvent) && !ctx.text.trim(),
+      continuePressed: ctx.intent === 'start' || ctx.intent === 'continue',
     };
     ctx.situation = renderSituationReport(ctx.situationInput);
     ctx.learnerMessage = buildLearnerMessage({
@@ -1306,6 +1354,8 @@ export class GuideTurnService {
         ctx.text,
       ].filter(Boolean),
       epochNumber: ctx.epoch?.number ?? 0,
+      epochStartedAt: ctx.epoch?.snapshot?.startedAt ?? null,
+      platformTurn: Boolean(ctx.platformEvent) && !ctx.text.trim(),
       learnerMessageId: ctx.learnerMessageId,
       emitDurable: async (type, data) => {
         if (type === 'card.presented' && ctx.voice) {
@@ -1497,7 +1547,7 @@ export class GuideTurnService {
     if (!verdict) return undefined;
     const flags = {
       crisis: ctx.replyKind === 'crisis' || undefined,
-      care: (verdict.risk === 'care' && verdict.about === 'self') || undefined,
+      care: isLearnerDistress(verdict) || undefined,
       realCase:
         verdict.overlay === 'real_case' ||
         verdict.overlay === 'real_case_urgent' ||
@@ -1530,20 +1580,25 @@ export class GuideTurnService {
       await this.redis.releaseLock(ctx.lockKey);
       ctx.locked = false;
     }
-    await this.bus
-      .emitEphemeral(
-        ctx.threadId,
-        failed ? 'turn.failed' : 'turn.completed',
-        failed
-          ? {
-              turnId: ctx.turnId,
-              code: (ctx.failure?.code ?? 'internal_error') as never,
-              message: ctx.failure?.message ?? '',
-            }
-          : { turnId: ctx.turnId },
-        ctx.lastSeq,
-      )
-      .catch(() => undefined);
+    // A platform turn the learner never saw start ends silently: an error
+    // for a turn they did not ask for would only alarm them.
+    const silent = Boolean(ctx.platformEvent) && !ctx.announced;
+    await (silent
+      ? Promise.resolve()
+      : this.bus
+          .emitEphemeral(
+            ctx.threadId,
+            failed ? 'turn.failed' : 'turn.completed',
+            failed
+              ? {
+                  turnId: ctx.turnId,
+                  code: (ctx.failure?.code ?? 'internal_error') as never,
+                  message: ctx.failure?.message ?? '',
+                }
+              : { turnId: ctx.turnId },
+            ctx.lastSeq,
+          )
+          .catch(() => undefined));
     const usage = ctx.output?.usage ?? [];
     const sum = (
       key:

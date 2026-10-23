@@ -9,6 +9,7 @@ import {
   GuideReleaseBundle,
 } from '../release/guide-release.bundle';
 import { GuideCallAttribution } from '../runtime/guide-model.service';
+import { LIVE_ITEM_CARD_SQL } from '../runtime/guide-thread.service';
 import { SentinelOverlay } from '../safety/sentinel';
 import { GuideTutorService } from './specialists/guide-tutor.service';
 import { SteerDecision, afterReflection } from '../conductor/pacing';
@@ -64,6 +65,10 @@ export interface GuideToolContext {
   /** What the learner has written lately, newest last — notebook text must come from here. */
   learnerTexts: string[];
   epochNumber: number;
+  /** The platform started this turn (a completion, a grade): the learner said nothing new. */
+  platformTurn?: boolean;
+  /** When the current epoch began (ISO): cards from before it have scrolled away. */
+  epochStartedAt?: string | null;
   learnerMessageId?: string;
 }
 
@@ -115,6 +120,79 @@ export function isLearnersOwnWords(
   const needle = fold(text);
   if (needle.split(' ').filter(Boolean).length < 2) return false;
   return learnerTexts.some((said) => fold(said).includes(needle));
+}
+
+/** Function words a memory note may add without the learner having said them. */
+const NOTE_FILLER = new Set([
+  'about',
+  'after',
+  'also',
+  'been',
+  'before',
+  'being',
+  'could',
+  'does',
+  'from',
+  'have',
+  'into',
+  'just',
+  'learner',
+  'learners',
+  'more',
+  'most',
+  'much',
+  'only',
+  'should',
+  'some',
+  'that',
+  'their',
+  'them',
+  'they',
+  'this',
+  'very',
+  'were',
+  'what',
+  'when',
+  'where',
+  'which',
+  'while',
+  'will',
+  'with',
+  'would',
+  'your',
+]);
+
+const contentWords = (text: string): string[] =>
+  fold(text)
+    .split(' ')
+    .filter((word) => [...word].length >= 4 && !NOTE_FILLER.has(word));
+
+/** Crude stem: the first four characters (letters and their marks). */
+const stem = (word: string): string => [...word].slice(0, 4).join('');
+
+/**
+ * Whether a memory note is drawn from what the learner wrote, not made up:
+ * at least half its content words share a stem with the learner's recent
+ * words. A note is a paraphrase, so it cannot be held to their exact words
+ * the way a notebook entry is — but a note with nothing in common with
+ * anything they said is Ally's invention (seen in the 1.5 walk, where a
+ * trigger turn asked "what helper do you want to become?" and stored its
+ * own answer). Text mostly outside the Latin script is not judged: a note
+ * written in English about a Hindi message would never match.
+ */
+export function isGroundedInLearnerWords(
+  note: string,
+  learnerTexts: string[],
+): boolean {
+  const said = learnerTexts.join(' ');
+  const letters = said.match(/\p{L}/gu) ?? [];
+  const latin = said.match(/\p{Script=Latin}/gu) ?? [];
+  if (letters.length > 0 && latin.length / letters.length < 0.5) return true;
+  const words = contentWords(note);
+  if (words.length < 2) return words.length === 0 ? false : true;
+  const heard = new Set(contentWords(said).map(stem));
+  const matched = words.filter((word) => heard.has(stem(word))).length;
+  return matched / words.length >= 0.5;
 }
 
 /**
@@ -202,6 +280,27 @@ export class GuideToolExecutorService {
       PRESENTATION_BY_TYPE[item.type] ?? GuideCardPresentation.SHELF;
     const reopening = item.state === 'completed';
 
+    // The same step is still in view from earlier in this sitting: presenting
+    // it again only stacks a duplicate card (seen in the 1.5 walk).
+    if (!reopening) {
+      const [live] = (await this.cards.query(LIVE_ITEM_CARD_SQL, [
+        ctx.threadId,
+        item.id,
+        ctx.epochStartedAt ?? null,
+      ])) as Array<{ id: string; state: string }>;
+      if (live) {
+        return ok({
+          presented: false,
+          alreadyOnScreen: true,
+          state: live.state,
+          next:
+            live.state === GuideCardState.ACTIVE
+              ? 'The learner already has this open. Do not present it again; let them carry on.'
+              : 'This card is already on screen above. Do not present it again; point them to it in a few words.',
+        });
+      }
+    }
+
     const saved = await this.cards.save(
       this.cards.create({
         threadId: ctx.threadId,
@@ -249,7 +348,9 @@ export class GuideToolExecutorService {
     return ok({
       presented: true,
       card: `${itemTypeLabel(item.type)} "${item.title}", about ${item.estimatedMinutes} minutes`,
-      next: 'The card is on screen. Frame it in a sentence and let the learner open it.',
+      next:
+        'The card is on screen. If your reply has not framed it yet, frame it in one ' +
+        'sentence; if it already has, add nothing — never repeat what you wrote.',
     });
   }
 
@@ -415,8 +516,18 @@ export class GuideToolExecutorService {
     if (QUIET_MODES.has(ctx.mode) || ctx.overlay !== 'none') {
       return fail('Nothing is remembered from this kind of moment.');
     }
+    if (ctx.platformTurn) {
+      return fail(
+        'The learner has not said anything this turn. Remember only what they tell you.',
+      );
+    }
     const kinds = Object.values(GuideMemoryKind) as string[];
     if (!kinds.includes(input.kind)) return fail('Unknown kind.');
+    if (!isGroundedInLearnerWords(String(input.note ?? ''), ctx.learnerTexts)) {
+      return fail(
+        'That is not something the learner said. Remember only what they told you, in close to their words.',
+      );
+    }
     const policy = ctx.bundle.policy.memory;
     const result = await this.learnerData.remember({
       owner: { id: ctx.userId, tenantId: ctx.tenantId },

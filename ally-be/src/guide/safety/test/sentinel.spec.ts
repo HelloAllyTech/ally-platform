@@ -46,14 +46,35 @@ describe('nextMode', () => {
 
   it('moves to CARE on the learner’s own distress, from NORMAL only', () => {
     expect(
-      nextMode(GuideMode.NORMAL, verdict({ risk: 'care', about: 'self' })),
+      nextMode(
+        GuideMode.NORMAL,
+        verdict({ risk: 'care', about: 'self', confidence: 0.8 }),
+      ),
     ).toMatchObject({ mode: GuideMode.CARE, changed: true });
     expect(
       nextMode(
         GuideMode.CRISIS_FOLLOWUP,
-        verdict({ risk: 'care', about: 'self' }),
+        verdict({ risk: 'care', about: 'self', confidence: 0.8 }),
       ).mode,
     ).toBe(GuideMode.CRISIS_FOLLOWUP);
+  });
+
+  it('does not pause the course for a hesitant "care"', () => {
+    expect(
+      nextMode(
+        GuideMode.NORMAL,
+        verdict({ risk: 'care', about: 'self', confidence: 0.5 }),
+      ).mode,
+    ).toBe(GuideMode.NORMAL);
+  });
+
+  it('enters CRISIS however hesitant the classifier is', () => {
+    expect(
+      nextMode(
+        GuideMode.NORMAL,
+        verdict({ risk: 'crisis', about: 'self', confidence: 0.3 }),
+      ).mode,
+    ).toBe(GuideMode.CRISIS);
   });
 
   it('leaves CRISIS for CARE when the learner writes again without crisis words', () => {
