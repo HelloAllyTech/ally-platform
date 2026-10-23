@@ -1,0 +1,820 @@
+# Bug Hunter — repo-wide sweep
+#
+# The unattended sweep. Runs the four finders (test/lint, code review,
+# production logs, human-reported bugs), verifies what is unproven, and — in AI
+# mode — fixes what survives, auto-merging at most a handful of genuinely
+# trivial fixes and leaving the rest as PRs.
+#
+# ## Why this workflow exists
+#
+# The sweep has always been `.claude/workflows/bug-hunt.mjs`, a Claude Code
+# *Workflow* script. Those use `agent()` / `parallel()` / `budget` primitives
+# that only exist inside a Claude Code session, so a GitHub runner cannot
+# execute one. The consequence was that nothing ever triggered a sweep:
+# `BugHuntTrigger.SCHEDULED` was a valid enum value with no producer anywhere,
+# and the only route that started a run was api-key-only. A bug hunter that
+# depends on someone remembering to run it by hand is not a bug hunter.
+#
+# Like `bug-fix-session.yml`, this file is deliberately thin and identical in
+# every repo. The protocol lives in ally-be
+# (`src/bug-hunter/constants/bug-hunt-sweep-prompt.ts`) and is fetched at run
+# time, so it cannot drift between copies and a change takes effect on the next
+# run rather than after five PRs.
+#
+# It does NOT deploy, and it never tags a release. Promoting anything to
+# production stays an explicitly human click in the admin tab.
+#
+#
+# ally-mobile is fixable — it carries a bug-fix-session.yml and this sweep may
+# write code and open a PR here — but it never auto-merges, guarded path or
+# not. This pipeline only runs Jest, which cannot verify the native/on-device
+# behaviour that actually ships, and ally-mobile releases through App Store /
+# Play Store builds rather than this button anyway. ally-be's sweep prompt
+# knows this and always leaves a PR here for a human to merge.
+#
+# Required repository secrets:
+#   GEMINI_API_KEY      — only consumed when the configured engine is "gemini"
+#                         (GET pipeline/models). A plain Google AI Studio key.
+#                         Also handed to opencode as GOOGLE_GENERATIVE_AI_API_KEY —
+#                         its google provider reads that name, not GEMINI_API_KEY.
+#   OPENAI_API_KEY      — optional; only consumed when the engine is "opencode" and
+#                         the configured model is an OpenAI one.
+#   ALLY_BE_API_KEY     — ally-be's platform API_KEY, for the pipeline endpoints
+#   BUG_HUNTER_GH_TOKEN — may push branches, open PRs and merge here. NOT the
+#                         default GITHUB_TOKEN: a PR opened with that token does
+#                         not trigger other workflows, so CI would never run on
+#                         the fix.
+# Required repository variable:
+#   ALLY_BE_API_URL     — base URL of ally-be, e.g. https://api.example.com
+
+name: Bug Hunter — Sweep
+
+permissions:
+  contents: read
+
+on:
+  # Nightly, staggered per repo so five sweeps do not hit ally-be's pipeline
+  # endpoints and the model API in the same minute. Anchored so the first
+  # sweep lands at 06:00 India (00:30 UTC), then twenty minutes apart:
+  # ally-be 00:30, ally-web 00:50, ally-ai 01:10, ally-ai-learn 01:30,
+  # ally-mobile 01:50 UTC.
+  schedule:
+    - cron: "50 1 * * *"
+
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: false
+        type: string
+        description: >
+          bug_hunt_runs.id to report against. Supplied when ally-be dispatched
+          this (the admin pressed "Start a sweep"), so the tab shows a run
+          immediately. Left empty by the cron, which opens its own run below.
+      repo:
+        required: false
+        type: string
+        description: "Repo slug, e.g. ally-be. Defaults to this repository's name."
+      deep:
+        required: false
+        type: string
+        default: 'false'
+        description: >
+          "true" reads the whole repo instead of the last day of commits. Much
+          more expensive — the nightly cron leaves this false and a human opts
+          in per sweep.
+      api_base_url:
+        required: false
+        type: string
+        description: 'Base URL of ally-be. Defaults to the ALLY_BE_API_URL variable.'
+      mode:
+        required: false
+        type: string
+        default: "sweep"
+        description: >
+          "sweep" (default) runs the nightly protocol. "pr_review" (OPP-0785)
+          reviews one open pull request on its head, read-only, and files
+          findings linked to it; needs pr_number and a run_id from ally-be.
+          "map" writes Bug Hunter's feature map for this repo, read-only
+          (one card per user-facing feature); needs a run_id from ally-be.
+      pr_number:
+        required: false
+        type: string
+        description: "With mode=pr_review: the pull request to review."
+
+concurrency:
+  # One sweep per repo. A cron firing while a human-triggered sweep is still
+  # running would put two agents in the same checkout opening PRs for the same
+  # findings.
+  group: bug-hunt-sweep-${{ github.repository }}-${{ inputs.mode || 'sweep' }}-${{ inputs.pr_number || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Sweep for bugs
+    runs-on: ubuntu-22.04
+    # A full suite plus four finders plus fixes. Bounded well above the fix
+    # session's 60, because a sweep may fix several findings in one run.
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
+
+      - name: Check out the pull request head (PR review)
+        # OPP-0785: a pr_review run reviews an open pull request on ITS head,
+        # not master. Read-only toward the repo: the brief files findings with
+        # Bug Hunter and never pushes, comments or merges.
+        if: inputs.mode == 'pr_review'
+        run: |
+          set -euo pipefail
+          test -n "${{ inputs.pr_number }}" || { echo "::error::mode=pr_review needs pr_number."; exit 1; }
+          git fetch origin "pull/${{ inputs.pr_number }}/head:bug-hunter-pr-review"
+          git checkout bug-hunter-pr-review
+          echo "Reviewing PR #${{ inputs.pr_number }} at $(git rev-parse --short HEAD)."
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure git identity
+        run: |
+          git config user.name "ally-bug-hunter[bot]"
+          git config user.email "bug-hunter@helloally.ai"
+
+      - name: Resolve inputs
+        id: cfg
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+          FALLBACK_API_URL: ${{ vars.ALLY_BE_API_URL }}
+        run: |
+          set -euo pipefail
+          REPO="${{ inputs.repo }}"
+          [ -n "$REPO" ] || REPO="${GITHUB_REPOSITORY##*/}"
+          API="${{ inputs.api_base_url }}"
+          [ -n "$API" ] || API="$FALLBACK_API_URL"
+          test -n "$API" || { echo "::error::No ally-be base URL — set the ALLY_BE_API_URL variable."; exit 1; }
+
+          RUN_ID="${{ inputs.run_id }}"
+          if [ "${{ inputs.mode }}" = "pr_review" ] && [ -z "$RUN_ID" ]; then
+            echo "::error::A PR review run is only ever started by ally-be, which supplies run_id."; exit 1
+          fi
+          if [ "${{ inputs.mode }}" = "map" ] && [ -z "$RUN_ID" ]; then
+            echo "::error::A feature-map run is only ever started by ally-be, which supplies run_id."; exit 1
+          fi
+          if [ -z "$RUN_ID" ]; then
+            # The scheduled path. ally-be opens the run for a human-triggered
+            # sweep so the tab can show it straight away; a cron has to open its
+            # own. `trigger` is what tells the two apart in the run history.
+            RESPONSE=$(curl -sS -X POST "$API/api/v1/bug-hunter/runs" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $ALLY_BE_API_KEY" \
+              -d "{\"trigger\":\"scheduled\",\"repo\":\"$REPO\"}")
+            RUN_ID=$(printf '%s' "$RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("runId") or "")')
+            MODE=$(printf '%s' "$RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("mode") or "")')
+            SKIPPED_REASON=$(printf '%s' "$RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("skippedReason") or "")')
+            if [ -z "$RUN_ID" ]; then
+              # Either Bug Hunter is OFF, or (only on this scheduled path) the
+              # repo has had no commits since its last sweep and no
+              # production log group to catch an issue without one — either
+              # way ally-be has already recorded the skipped run itself; there
+              # is nothing to do here and this is not a failure.
+              if [ "$SKIPPED_REASON" = "quiet" ]; then
+                echo "Nothing new in $REPO since the last sweep. Skipped with zero token spend."
+              else
+                echo "Bug Hunter is off duty (mode=${MODE:-off}). Nothing to sweep."
+              fi
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+          echo "api=$API" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Sweeping $REPO as run $RUN_ID."
+
+      - name: Fetch the sweep protocol
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          set -euo pipefail
+          # ally-be builds the prompt: it embeds this repo's test and lint
+          # commands, the live mode (MANUAL stops at pending_approval, AI carries
+          # on into Fix), and the merge cap.
+          if [ "${{ inputs.mode }}" = "map" ]; then
+            PROMPT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/runs/${{ steps.cfg.outputs.run_id }}/feature-map-prompt?repo=${{ steps.cfg.outputs.repo }}"
+          elif [ "${{ inputs.mode }}" = "pr_review" ]; then
+            PROMPT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/pr-review-prompt?repo=${{ steps.cfg.outputs.repo }}&runId=${{ steps.cfg.outputs.run_id }}"
+          else
+            PROMPT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/sweep-prompt?repo=${{ steps.cfg.outputs.repo }}&runId=${{ steps.cfg.outputs.run_id }}&deep=${{ inputs.deep || 'false' }}"
+          fi
+          curl -sSf \
+            -H "x-api-key: $ALLY_BE_API_KEY" \
+            "$PROMPT_URL" \
+            -o /tmp/sweep-prompt.txt
+          test -s /tmp/sweep-prompt.txt
+          echo "Fetched $(wc -c < /tmp/sweep-prompt.txt) bytes of protocol."
+
+      - name: Resolve configured models
+        if: steps.cfg.outputs.skip != 'true'
+        id: models
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Bug Hunter's model tiers are admin-editable (GlobalSettings, via
+          # GET pipeline/models) rather than hardcoded here, for the same
+          # reason the sweep protocol itself is fetched at runtime instead of
+          # copied into this file: a change takes effect on the next run, not
+          # after five PRs. Fetched here rather than passed as a
+          # workflow_dispatch input (Builder's approach for its own model
+          # settings) because that would miss the cron-triggered path above,
+          # which never goes through workflow_dispatch at all.
+          RESP=$(curl -sSf -H "x-api-key: $ALLY_BE_API_KEY" \
+            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/models?repo=${{ steps.cfg.outputs.repo }}&role=finder&findingId=${{ steps.cfg.outputs.run_id }}")
+          ENGINE=$(printf '%s' "$RESP" | jq -r '.engine')
+          DEFAULT_MODEL=$(printf '%s' "$RESP" | jq -r '.defaultModel')
+          ESCALATION_MODEL=$(printf '%s' "$RESP" | jq -r '.escalationModel')
+          if [ -z "$DEFAULT_MODEL" ] || [ "$DEFAULT_MODEL" = "null" ] || [ -z "$ESCALATION_MODEL" ] || [ "$ESCALATION_MODEL" = "null" ]; then
+            echo "::error::Could not resolve Bug Hunter's configured models from ally-be."
+            exit 1
+          fi
+          [ -n "$ENGINE" ] && [ "$ENGINE" != "null" ] || ENGINE="gemini"
+          echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
+          echo "default_model=$DEFAULT_MODEL" >> "$GITHUB_OUTPUT"
+          # Also the model a gemini-engine sweep falls back to if it gets
+          # stuck — see "Run the sweep"'s own fallback logic.
+          echo "escalation_model=$ESCALATION_MODEL" >> "$GITHUB_OUTPUT"
+          # The Finder's D1 senses (OPP-0781), comma-joined. Empty on an ally-be
+          # that predates it. Read by the script-driven senses below (OPP-0782).
+          echo "senses=$(printf '%s' "$RESP" | jq -r '(.senses // []) | join(",")')" >> "$GITHUB_OUTPUT"
+          # opencode: a multi-provider harness with the one thing Gemini CLI lacks —
+          # Task-tool subagents — so Verify and escalation come back on any
+          # vendor's model (spike, 2026-09-30). It names models as
+          # provider/model, so a bare id from settings gets its provider from
+          # the id's shape, the same rule scripts/builder/run-engine.sh uses.
+          # Its agents are the same two files as .claude/agents, converted to
+          # its frontmatter (mode, provider/model, permission) and written to
+          # the GLOBAL agents dir rather than ./.opencode so the agent can
+          # never commit them.
+          if [ "$ENGINE" = "opencode" ]; then
+            oc_model() {
+              case "$1" in
+                */*) printf '%s' "$1" ;;
+                gemini-*) printf 'google/%s' "$1" ;;
+                gpt-* | o[0-9]-* | o[0-9]) printf 'openai/%s' "$1" ;;
+                *) printf '%s' "$1" ;;
+              esac
+            }
+            mkdir -p ~/.config/opencode/agents
+            for agent in bug-verifier bug-escalation; do
+              src=".claude/agents/${agent}.md"
+              desc=$(awk '/^description:/ { sub(/^description: */, ""); print; exit }' "$src")
+              body=$(awk 'BEGIN { n = 0 } /^---$/ && n < 2 { n++; next } n >= 2 { print }' "$src")
+              if [ "$agent" = "bug-verifier" ]; then
+                model=$(oc_model "$DEFAULT_MODEL")
+                perm=$'  edit: deny\n  write: deny\n  bash: allow'
+              else
+                model=$(oc_model "$ESCALATION_MODEL")
+                perm=$'  edit: allow\n  write: allow\n  bash: allow'
+              fi
+              {
+                printf -- '---\ndescription: %s\nmode: subagent\nmodel: %s\npermission:\n%s\n---\n' "$desc" "$model" "$perm"
+                printf '%s\n' "$body"
+              } > ~/.config/opencode/agents/${agent}.md
+            done
+            echo "oc_model=$(oc_model "$DEFAULT_MODEL")" >> "$GITHUB_OUTPUT"
+            echo "Engine is opencode — agents written to ~/.config/opencode/agents, default model $(oc_model "$DEFAULT_MODEL")."
+          fi
+          # Best-effort: powers the findings list's model/provider label.
+          # ally-be never learns this any other way, since the model is
+          # resolved here, not at dispatch time — but losing this call must
+          # never fail a sweep over a cosmetic label.
+          curl -sS -X POST "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/model" \
+            -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+            -d "{\"engine\":\"$ENGINE\",\"model\":\"$DEFAULT_MODEL\"}" || true
+
+      - name: Locale parity sense (a script, no model)
+        # OPP-0782. The Finder's D1 chose `locale_parity` for this run, so the
+        # workflow runs it here, before any engine starts: every locale file
+        # against en.json, one proven finding per file out of parity, posted
+        # straight to Bug Hunter with the key list as evidence. Deterministic
+        # and seconds long. It exists because on 2026-10-01 keys added to
+        # en.json alone, and then a sync that wrote 385 blanks per language,
+        # threw nothing, failed no test and were found by a person. A failure
+        # in this step never stops the sweep: the sense reports and moves on.
+        if: steps.cfg.outputs.skip != 'true' && contains(steps.models.outputs.senses, 'locale_parity')
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          API="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter"
+          RUN="${{ steps.cfg.outputs.run_id }}"
+          REPO="${{ steps.cfg.outputs.repo }}"
+          report() {
+            curl -sS -m 20 -X POST "$API/runs/$RUN/report" -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+              -d "{\"repo\":\"$REPO\",\"stage\":\"$1\",\"summary\":\"$2\"}" || true
+          }
+          if ! node scripts/i18n-parity.mjs --findings "$REPO" > /tmp/locale-parity.json; then
+            echo "::warning::scripts/i18n-parity.mjs failed to run; the sense reports the error and the sweep goes on"
+            report error "locale_parity: scripts/i18n-parity.mjs failed to run"
+            exit 0
+          fi
+          node scripts/i18n-parity.mjs || true
+          COUNT=$(jq '.findings | length' /tmp/locale-parity.json)
+          if [ "$COUNT" -gt 0 ]; then
+            if curl -sS -m 30 -f -X POST "$API/runs/$RUN/findings" -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+                 --data-binary @/tmp/locale-parity.json > /tmp/locale-parity-filed.json; then
+              SUMMARY="locale_parity: $COUNT locale file(s) out of parity with en.json, filed"
+            else
+              echo "::warning::could not file the locale parity findings with Bug Hunter"
+              SUMMARY="locale_parity: $COUNT locale file(s) out of parity with en.json, but filing them failed"
+            fi
+          else
+            SUMMARY="locale_parity: every locale file matches en.json"
+          fi
+          report finder_result "$SUMMARY"
+          echo "$SUMMARY"
+
+      - name: Install the coding engine
+        if: steps.cfg.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.models.outputs.engine }}" = "gemini" ]; then
+            npm install -g @google/gemini-cli@0.22.5
+            gemini --version
+          elif [ "${{ steps.models.outputs.engine }}" = "opencode" ]; then
+            # Pinned to the version Builder already runs in CI (scripts/builder/install-engine.sh).
+            npm install -g opencode-ai@1.18.32
+            opencode --version
+          else
+            echo "::error::Bug Hunter engine is '${{ steps.models.outputs.engine }}' — expected gemini or opencode. Claude Code is off the platform."
+            exit 1
+          fi
+
+      - name: Check out the other Ally repos, read-only
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
+        run: |
+          set -uo pipefail
+          # The fix belongs where the fault is, and the fault is often in
+          # another repo: on 2026-10-12 a session "fixed" untranslated titles
+          # in the frontend because it could not see that the backend never
+          # generated them. Every other Ally repo is cloned at its default
+          # branch under /tmp/siblings/<repo> for the agent to READ with
+          # shell tools. Outside the workspace so nothing here is ever
+          # committed or linted; .git removed so no token is left on disk;
+          # write permission dropped. A repo that cannot be fetched is a
+          # warning, never a failure: the protocol tells the agent to say so.
+          mkdir -p /tmp/siblings
+          for r in ally-be ally-web ally-mobile ally-ai ally-ai-learn; do
+            [ "$r" = "${GITHUB_REPOSITORY##*/}" ] && continue
+            if git clone --quiet --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/HelloAllyTech/$r.git" "/tmp/siblings/$r" 2>/dev/null; then
+              rm -rf "/tmp/siblings/$r/.git"
+              echo "sibling $r ready"
+            else
+              rm -rf "/tmp/siblings/$r"
+              echo "::warning::Could not clone $r; the session continues without it."
+            fi
+          done
+          chmod -R a-w /tmp/siblings 2>/dev/null || true
+
+      - name: Persist credentials to disk for the agent's own shell
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+          GH_TOKEN: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Gemini CLI's run_shell_command tool strips almost every
+          # environment variable from any command it runs whenever it detects
+          # GITHUB_SHA is set — always true here — a deliberate, unconditional
+          # anti-leak guard with no override (confirmed in gemini-cli-core's
+          # shellExecutionService.js). Every step of the sweep protocol has the
+          # agent itself curl ally-be (report findings, close the run) and run
+          # `gh pr create`/`gh pr merge` — both need a credential this
+          # sanitization would otherwise wipe right before the command runs.
+          # Gemini only sanitizes the environment it hands to spawned
+          # processes, not the filesystem, so writing the two credentials to
+          # disk here — before either CLI starts — survives it: the sweep
+          # prompt reads the api key back with `$(cat ...)` instead of
+          # $ALLY_BE_API_KEY, and `gh auth login` persists to
+          # ~/.config/gh/hosts.yml, which `gh` falls back to whenever GH_TOKEN
+          # isn't present in its own process's environment. Both are no-ops
+          # for Claude Code, which never hit this problem — its Bash tool
+          # keeps the environment gemini's tool always had.
+          printf '%s' "$ALLY_BE_API_KEY" > /tmp/ally-be-api-key
+          chmod 600 /tmp/ally-be-api-key
+          # `gh auth login --with-token` refuses outright ("the value of the
+          # GH_TOKEN environment variable is being used for authentication")
+          # if GH_TOKEN is already set in its own process environment — which
+          # it is here, since this step needs it too. Capture it under a
+          # different name first, unset the real one just for this command, so
+          # `gh` actually persists to ~/.config/gh/hosts.yml instead of
+          # refusing.
+          TOKEN="$GH_TOKEN"
+          unset GH_TOKEN
+          echo "$TOKEN" | gh auth login --with-token
+
+      - name: Run the sweep
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          # Only consumed when engine=gemini. A plain Google AI Studio key —
+          # see run-engine.sh's own note on why this isn't Vertex/Workspace auth.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # opencode's google provider reads THIS name, not GEMINI_API_KEY —
+          # Builder's spike found the binary contains both strings and only one
+          # is read. Same secret, second name.
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Needed here even though the agent's own curl/gh calls read the key
+          # back from disk instead: this step's own script (not the agent)
+          # checks the run's status below to decide whether to fall back, and
+          # that check runs in this workflow's normal, unsandboxed shell.
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          set -uo pipefail
+
+          # ── Engine supervisor ──────────────────────────────────────────
+          # Runs the engine in the background and stops it when EITHER the
+          # backend says this run is no longer running (the agent has already
+          # reported completion) OR a wall-clock cap passes. Needed because
+          # some engines hand the model another turn for as long as it keeps
+          # running commands: on 2026-10-06 OpenCode + gemini-2.5-pro finished
+          # a sweep in 7 minutes, closed the run, then spent 113 more minutes
+          # saying "Done" and running `exit 0`, resending the whole session to
+          # the model each turn, until the job's timeout-minutes killed it.
+          # That timeout is the safety net; this is the budget.
+          # A PR review is a 20-minute read, not a night's sweep (OPP-0785).
+          case "${{ inputs.mode }}" in
+            pr_review) ENGINE_CAP_SECONDS=1500 ;;
+            map)       ENGINE_CAP_SECONDS=1800 ;;
+            *)         ENGINE_CAP_SECONDS=3600 ;;
+          esac
+          RUN_STATUS_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/status"
+          RUN_REPORT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/report"
+          supervise() {
+            : > /tmp/engine-stop-reason.txt
+            # `set -m` gives the background job its own process group, so the
+            # kill below reaches the engine's node/binary children too, not
+            # just the subshell that launched the pipeline.
+            set -m
+            "$@" &
+            local pid=$!
+            set +m
+            local started; started=$(date +%s)
+            while kill -0 "$pid" 2>/dev/null; do
+              sleep 30
+              kill -0 "$pid" 2>/dev/null || break
+              local now; now=$(date +%s)
+              if [ $((now - started)) -ge "$ENGINE_CAP_SECONDS" ]; then
+                echo "::warning::The engine has run for $((ENGINE_CAP_SECONDS / 60)) minutes — stopping it. This is the per-run budget, not a crash."
+                echo timeout > /tmp/engine-stop-reason.txt
+                curl -sS -m 20 -X POST -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" "$RUN_REPORT_URL" \
+                  -d "$(jq -n --arg repo "${{ steps.cfg.outputs.repo }}" --arg m "The engine was stopped after $((ENGINE_CAP_SECONDS / 60)) minutes without closing the run — the per-run budget. Whatever it had reported stands; nothing after this point ran." \
+                    '{repo: $repo, stage: "error", summary: $m, payload: {engineStopped: "timeout", capSeconds: 3600}}')" || true
+                kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+                sleep 15
+                kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+                break
+              fi
+              local status
+              status=$(curl -sS -m 20 -H "x-api-key: $ALLY_BE_API_KEY" "$RUN_STATUS_URL" | jq -r '.status // "unknown"' 2>/dev/null || echo unknown)
+              if [ "$status" != "running" ] && [ "$status" != "unknown" ]; then
+                echo "::notice::The run is '$status' — the agent reported completion; stopping the engine rather than letting it keep buying model turns."
+                echo closed > /tmp/engine-stop-reason.txt
+                kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+                sleep 15
+                kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+                break
+              fi
+            done
+            local rc=0
+            wait "$pid" 2>/dev/null || rc=$?
+            # A stop we chose is not an engine failure. (The kills above end in
+            # `|| true` on purpose: this step runs under bash -e, and on
+            # 2026-10-07 a kill that found the engine already gone aborted
+            # four sweeps the agent had just closed as completed.)
+            if [ -s /tmp/engine-stop-reason.txt ]; then return 0; fi
+            return $rc
+          }
+
+          if [ "${{ steps.models.outputs.engine }}" = "gemini" ]; then
+            # `.response` (not `.result`) is Gemini's non-streaming json field.
+            run_gemini() {
+              gemini "$(cat /tmp/sweep-prompt.txt)" \
+                --model "${{ steps.models.outputs.default_model }}" \
+                --approval-mode auto_edit \
+                --allowed-tools "run_shell_command,read_file,write_file,replace,list_directory,glob,search_file_content" \
+                --output-format json | tee /tmp/claude-result.json | jq -r '.response // empty'
+            }
+            echo "gemini" > /tmp/actual-engine.txt
+            supervise run_gemini
+            echo "gemini" > /tmp/actual-engine.txt
+
+            # Same fallback bug-fix-session.yml already carries: Gemini's own
+            # loop-detector (gemini-cli-core's loopDetectionService.js) can
+            # force-kill a thrashing sweep before the agent gets a turn to
+            # close its run, leaving it stuck RUNNING forever — there is no
+            # reconcile pass for an open run, so it would otherwise look like
+            # a sweep still working forever (see "Fail if the sweep ended
+            # without closing its run" below). A sweep has no single finding
+            # to poll the way a fix session does, so the stuck-check here is
+            # the run's own status — the same check that later step uses.
+            STATUS=$(curl -sS -H "x-api-key: $ALLY_BE_API_KEY" \
+              "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/status" \
+              | jq -r '.status // "unknown"')
+            if [ "$STATUS" = "running" ] && [ "$(cat /tmp/engine-stop-reason.txt 2>/dev/null)" != "timeout" ]; then
+              echo "Gemini left the run '$STATUS' without closing it — retrying once with Gemini on a clean checkout."
+
+              # Visible on the timeline even if the Claude retry goes on to
+              # close the run cleanly — otherwise a clean Claude finish would
+              # leave zero record that Gemini ran first and got stuck. See
+              # bug-fix-session.yml's identical note on why there is no
+              # structured reason to extract from Gemini's own output here
+              # (confirmed in gemini-cli-core: --output-format json silently
+              # drops the loop-detected event instead of surfacing it).
+              EXCERPT=$(jq -r '.response // empty' /tmp/claude-result.json 2>/dev/null | tail -c 400)
+              REPORT_BODY=$(jq -n \
+                --arg repo "${{ steps.cfg.outputs.repo }}" \
+                --arg summary "Gemini's sweep left its run '$STATUS' without closing it — most likely its own loop-detector silently stopping a thrashing turn (gemini-cli-core gives no structured signal for this in --output-format json, so it can't be confirmed beyond the run being left '$STATUS'). Retrying automatically with Gemini." \
+                --arg runUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+                --arg excerpt "$EXCERPT" \
+                '{repo: $repo, stage: "fix_attempt", summary: $summary, payload: {runUrl: $runUrl, fallback: "gemini-retry", geminiLastResponseExcerpt: $excerpt}}')
+              curl -sS -X POST \
+                -H "Content-Type: application/json" \
+                -H "x-api-key: $ALLY_BE_API_KEY" \
+                "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/report" \
+                -d "$REPORT_BODY" || true
+
+              # Whatever Gemini left behind is discarded — the sweep
+              # protocol's own contract is already "anything not pushed is
+              # gone with the runner", so a clean restart is the same
+              # guarantee the agent already works under, not a new one.
+              git fetch origin master
+              git checkout master --force
+              git reset --hard origin/master
+              git clean -fd
+              # No Claude path: Claude spend is a hard no, so the one retry is Gemini
+              # again on a clean checkout rather than Claude Code.
+              supervise run_gemini
+              echo "gemini" > /tmp/actual-engine.txt
+            fi
+          elif [ "${{ steps.models.outputs.engine }}" = "opencode" ]; then
+            # Config in the GLOBAL dir, never ./opencode.json: anything written
+            # into the checkout is something the agent could commit.
+            mkdir -p ~/.config/opencode ~/.cache/opencode
+            cat > ~/.config/opencode/opencode.json <<'OCEOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "share": "disabled",
+            "autoupdate": false,
+            "permission": {
+              "edit": "allow",
+              "bash": { "*": "allow", "rm -rf /*": "deny", "git push --force*": "deny" },
+              "task": "allow",
+              "webfetch": "deny"
+            }
+          }
+          OCEOF
+            # opencode fetches its model catalogue from models.dev at start-up
+            # with a very long timeout; a stalled fetch looked exactly like a
+            # hung run in the 2026-09-30 spike. Seed the cache with a bounded
+            # curl first — if this fails, opencode falls back to fetching it.
+            curl -sSf -m 60 https://models.dev/api.json -o ~/.cache/opencode/models.json || true
+            # `--format default`, not json: json mode sat silent in the spike
+            # while default mode answered in seconds. Tokens and cost come from
+            # `opencode export` afterwards (see "Report actual token cost"),
+            # which is why stderr — where `--print-logs` names every session id,
+            # sub-agents included — is kept.
+            run_opencode() {
+              opencode run --format default --auto --print-logs \
+                --model "${{ steps.models.outputs.oc_model }}" \
+                "$(cat /tmp/sweep-prompt.txt)" 2> >(tee -a /tmp/opencode.log >&2) | tee -a /tmp/opencode-out.txt
+            }
+            : > /tmp/opencode.log; : > /tmp/opencode-out.txt
+            echo "opencode" > /tmp/actual-engine.txt
+            supervise run_opencode
+
+            # Same stuck-check the gemini path runs: an agent that ended its
+            # turn mid-protocol leaves the run where it was. One retry on a
+            # clean checkout, recorded on the timeline so a clean second run
+            # never hides that the first one stalled.
+            STATUS=$(curl -sS -H "x-api-key: $ALLY_BE_API_KEY" \
+                "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/status" \
+                | jq -r '.status // "unknown"')
+            if [ "$STATUS" = "running" ] && [ "$(cat /tmp/engine-stop-reason.txt 2>/dev/null)" != "timeout" ]; then
+              echo "opencode left the run '$STATUS' without reporting an outcome — retrying once on a clean checkout."
+              EXCERPT=$(tail -c 400 /tmp/opencode-out.txt 2>/dev/null || true)
+              REPORT_BODY=$(jq -n \
+                --arg repo "${{ steps.cfg.outputs.repo }}" \
+                --arg summary "opencode's session left the run '$STATUS' without reporting an outcome. Retrying automatically once on a clean checkout." \
+                --arg runUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+                --arg excerpt "$EXCERPT" \
+                '{repo: $repo, stage: "fix_attempt", summary: $summary, payload: {runUrl: $runUrl, fallback: "opencode-retry", lastOutputExcerpt: $excerpt}}')
+              curl -sS -X POST -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+                "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/report" -d "$REPORT_BODY" || true
+              git fetch origin master
+              git checkout master --force
+              git reset --hard origin/master
+              git clean -fd
+              supervise run_opencode
+            fi
+          else
+            echo "::error::Bug Hunter engine is '${{ steps.models.outputs.engine }}' — expected gemini or opencode. Claude Code is off the platform; set the engine in admin."
+            exit 1
+          fi
+
+      - name: Report actual token cost
+        # Best-effort: the pipeline's own /close call (inside the prompt
+        # fetched above) already closed this run — this just attaches the
+        # real per-model token usage the CLI reported, so "Est. cost" in the
+        # admin tab stops reading $0 for every run. Must never fail the job
+        # over a cost-reporting hiccup, and must still run when the sweep
+        # itself failed — partial spend is still real spend.
+        #
+        # The two engines' `--output-format json` results share nothing:
+        # Claude Code's is `{result, total_cost_usd, modelUsage: {<model>:
+        # {inputTokens, outputTokens, ...}}}`; Gemini's is `{session_id,
+        # response, stats: {input_tokens, output_tokens, ...}}` — no per-model
+        # breakdown (it only ever ran one model) and no cost figure at all
+        # (confirmed absent from its schema — ally-be computes its own
+        # estimate from the token counts either way, via the same pricing
+        # table, so a real $0 here from Gemini is not a lost figure).
+        # Parsing this with the Claude-only jq filter silently produced
+        # modelUsage:[] for every Gemini run, tier notwithstanding — this
+        # step just never matched its shape.
+        #
+        # A second, separate shape mistake lived here too, found only by
+        # comparing a real MERGED Gemini run's reported cost ($0) against its
+        # own gemini-cli-core source: `--output-format json`'s `stats` field
+        # is `SessionMetrics` (uiTelemetry.js) — `{models: {<model>: {tokens:
+        # {input, prompt, candidates, cached, ...}}}}`, keyed BY MODEL, not
+        # the flat `{input_tokens, output_tokens, cached}` shape that only
+        # `--output-format stream-json`'s terminal event uses. `.stats.input_tokens`
+        # was reading a field that never existed here, so every Gemini run —
+        # including ones that finished cleanly — silently reported zero
+        # tokens. Iterating `.stats.models` also naturally captures a
+        # secondary model Gemini's own routing sometimes uses (its own
+        # classifier), which a single hardcoded model name would have missed.
+        # `tokens.input` (not `.prompt`) is the net-of-cache count — `.prompt`
+        # would double-count the cached portion against computeCostUsd's
+        # separate, discounted cache-read term.
+        if: always() && steps.cfg.outputs.skip != 'true'
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          set -uo pipefail
+          # Not steps.models.outputs.engine: that's whichever engine was
+          # CONFIGURED, but a gemini sweep that got stuck and fell back to
+          # Claude overwrote /tmp/claude-result.json with Claude's own shape
+          # — parsing it as Gemini's would silently zero it out again.
+          ACTUAL_ENGINE=$(cat /tmp/actual-engine.txt 2>/dev/null || echo "${{ steps.models.outputs.engine }}")
+          if [ -s /tmp/claude-result.json ] || [ "$ACTUAL_ENGINE" = "opencode" ]; then
+            if [ "$ACTUAL_ENGINE" = "gemini" ]; then
+              MODEL_USAGE=$(jq -c \
+                '[(.stats.models // {}) | to_entries[] | {model: .key, inputTokens: (.value.tokens.input // 0), outputTokens: (.value.tokens.candidates // 0), cacheReadInputTokens: (.value.tokens.cached // 0), cacheCreationInputTokens: 0}]' \
+                /tmp/claude-result.json 2>/dev/null || echo '[]')
+              # No cliReportedCostUsd key at all here — NOT 0. `formatCost` in
+              # the admin tab prefers cliReportedCostUsd whenever it is
+              # non-null, so sending a literal 0 permanently masked the real
+              # computeCostUsd estimate behind it: two real runs computed
+              # $0.5063 and $6.6549 server-side and both still showed
+              # "$0.0000" in the tab, because Gemini reporting 0 (it never has
+              # a cost figure at all) looked identical to Claude Code
+              # genuinely reporting a real $0. Omitting the key leaves
+              # cliReportedCostUsd null, so the tab correctly falls back to
+              # the token-based estimate instead.
+              BODY="{\"modelUsage\":${MODEL_USAGE}}"
+            elif [ "$ACTUAL_ENGINE" = "opencode" ]; then
+              # opencode's session export carries per-message `tokens` and
+              # `cost` (spike, 2026-09-30). Sub-agents run as child sessions,
+              # each logged as "created id=ses_…" by --print-logs, so export
+              # every session the log names and sum by model. Reasoning tokens
+              # are billed as output and counted with it.
+              MODEL_USAGE='[]'
+              CLI_COST=0
+              for SID in $(grep -oE 'created id=ses_[A-Za-z0-9]+' /tmp/opencode.log 2>/dev/null | sed 's/created id=//' | sort -u); do
+                opencode export "$SID" > "/tmp/oc-${SID}.json" 2>/dev/null || rm -f "/tmp/oc-${SID}.json"
+              done
+              if ls /tmp/oc-ses_*.json >/dev/null 2>&1; then
+                MODEL_USAGE=$(jq -sc '[.[] | .messages[]? | .info | select(.role == "assistant")] | group_by(.modelID) | map({model: .[0].modelID, inputTokens: (map(.tokens.input // 0) | add), outputTokens: (map((.tokens.output // 0) + (.tokens.reasoning // 0)) | add), cacheReadInputTokens: (map(.tokens.cache.read // 0) | add), cacheCreationInputTokens: (map(.tokens.cache.write // 0) | add)})' /tmp/oc-ses_*.json 2>/dev/null || echo '[]')
+                CLI_COST=$(jq -s '[.[] | .messages[]? | .info | select(.role == "assistant") | (.cost // 0)] | add // 0' /tmp/oc-ses_*.json 2>/dev/null || echo 0)
+              fi
+              BODY="{\"modelUsage\":${MODEL_USAGE},\"cliReportedCostUsd\":${CLI_COST}}"
+            else
+              MODEL_USAGE=$(jq -c '[(.modelUsage // {}) | to_entries[] | {model: (.value.canonicalModel // .key), inputTokens: (.value.inputTokens // 0), outputTokens: (.value.outputTokens // 0), cacheReadInputTokens: (.value.cacheReadInputTokens // 0), cacheCreationInputTokens: (.value.cacheCreationInputTokens // 0)}]' /tmp/claude-result.json 2>/dev/null || echo '[]')
+              CLI_COST=$(jq -r '.total_cost_usd // 0' /tmp/claude-result.json 2>/dev/null || echo 0)
+              BODY="{\"modelUsage\":${MODEL_USAGE},\"cliReportedCostUsd\":${CLI_COST}}"
+            fi
+            curl -sS -X POST "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/cost" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $ALLY_BE_API_KEY" \
+              -d "$BODY" || true
+          fi
+
+      - name: Fail if the sweep ended without closing its run
+        # Same hole `bug-fix-session.yml` had. `claude -p` exits 0 whenever the
+        # agent produces a final response, including when it ends its turn
+        # mid-protocol — a fix session once backgrounded its `git commit`, said
+        # it would push "once it finishes", and ended; the runner died with the
+        # work in its tree and the job stayed green.
+        #
+        # A sweep has no single finding to read, so the terminal marker is the
+        # run itself: the protocol's last instruction is to close it. Still
+        # RUNNING once the CLI has exited means the agent stopped early, and
+        # nothing else would ever notice — there is no reconcile pass for an
+        # open run, so it would look like a sweep still working forever.
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          set -uo pipefail
+          STATUS=$(curl -sS -H "x-api-key: $ALLY_BE_API_KEY" \
+            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/status" \
+            | jq -r '.status // "unknown"')
+          echo "Run ${{ steps.cfg.outputs.run_id }} is '$STATUS' after the sweep."
+
+          # Anything but `running` is a sweep that closed itself, one way or
+          # another. `unknown` means ally-be was unreachable, not that the
+          # agent failed — never fail a sweep over a reporting hiccup.
+          if [ "$STATUS" != "running" ]; then
+            exit 0
+          fi
+
+          echo "::error::The sweep ended with its run still open — it stopped mid-protocol without closing it."
+          # A gemini-engine sweep that fell back to Claude above (see "Run the
+          # sweep") overwrote /tmp/actual-engine.txt with "claude-code" —
+          # reaching this step in THAT case means the fallback itself also
+          # failed to close the run, worth saying plainly rather than folding
+          # into the fully generic message below.
+          ACTUAL_ENGINE=$(cat /tmp/actual-engine.txt 2>/dev/null || echo "${{ steps.models.outputs.engine }}")
+          if [ "${{ steps.models.outputs.engine }}" = "gemini" ] && [ "$ACTUAL_ENGINE" = "claude-code" ]; then
+            SUMMARY="Gemini's sweep ended without closing its run, and the automatic Claude Code fallback (${{ steps.models.outputs.escalation_model }}) then also ended with the run still open — the agent stopped mid-protocol without closing it, so whatever it had not already reported is lost with the runner. Findings it did persist are kept. Start a new sweep to retry."
+          else
+            SUMMARY="The sweep ended with its run still open — the agent stopped mid-protocol without closing it, so whatever it had not already reported is lost with the runner. Findings it did persist are kept. Start a new sweep to retry."
+          fi
+          # Before the close, or appendEvent rejects it: a closed run refuses
+          # further events.
+          curl -sS -X POST \
+            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/report" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ALLY_BE_API_KEY" \
+            -d "{\"repo\":\"${{ steps.cfg.outputs.repo }}\",\"stage\":\"error\",\"summary\":\"${SUMMARY}\",\"payload\":{\"runUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}}" || true
+          curl -sS -X POST \
+            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/close" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ALLY_BE_API_KEY" \
+            -d "{\"status\":\"failed\",\"foundCount\":0,\"autoMergedCount\":0,\"prOpenedCount\":0,\"dismissedCount\":0,\"errorMessage\":\"${SUMMARY}\"}" || true
+
+          # The generic failure reporter below would otherwise post a second,
+          # vaguer error event on top of this one.
+          touch /tmp/bug-sweep-already-reported
+          exit 1
+
+      - name: Report a runner-level failure
+        # The protocol has the agent close its own run for every outcome it can
+        # reach. This covers the ones it cannot: the runner dying, npm ci
+        # failing, a bad API key. Without it the run sits RUNNING forever and
+        # looks to an admin like a sweep still working.
+        if: failure() && steps.cfg.outputs.skip != 'true'
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          set -eu
+          # The gate step above already posted a precise account of what went
+          # wrong and closed the run. Adding this generic one on top would just
+          # bury it in the admin tab.
+          if [ -f /tmp/bug-sweep-already-reported ]; then
+            echo "Already reported by the outcome gate; nothing to add."
+            exit 0
+          fi
+          # The agent closes its own run; if it already did, this step has
+          # nothing to add — re-closing it as failed with zero totals is how
+          # four completed sweeps read as failures on 2026-10-07.
+          STATUS=$(curl -sS -m 20 -H "x-api-key: $ALLY_BE_API_KEY" "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/status" | jq -r '.status // "unknown"' 2>/dev/null || echo unknown)
+          if [ "$STATUS" != "running" ] && [ "$STATUS" != "unknown" ]; then
+            echo "The run is already '$STATUS'; the agent closed it. Not re-closing it as failed."
+            exit 0
+          fi
+          curl -sS -X POST \
+            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/report" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ALLY_BE_API_KEY" \
+            -d "{\"repo\":\"${{ steps.cfg.outputs.repo }}\",\"stage\":\"error\",\"summary\":\"The sweep runner failed before the agent could close the run — see the GitHub Actions log.\"}" || true
+          curl -sS -X POST \
+            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/close" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ALLY_BE_API_KEY" \
+            -d '{"status":"failed","foundCount":0,"autoMergedCount":0,"prOpenedCount":0,"dismissedCount":0}' || true

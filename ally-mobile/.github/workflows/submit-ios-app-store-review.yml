@@ -1,0 +1,76 @@
+name: Submit iOS for App Store review
+#
+# Manual-only, the highest-stakes workflow in this repo: submits the current App Store Connect
+# listing + latest TestFlight build for Apple's FULL App Store review — real public distribution,
+# not TestFlight. Never auto-triggered by anything else here.
+#
+# If no version is ready in App Store Connect, the script creates the next one and carries the
+# previous version's en-US listing forward onto it (text fields as-is, screenshots re-uploaded
+# byte-for-byte since Apple's API has no "reuse existing screenshot" call) — this only makes
+# "identical to last time" free, not "different this time"; a human still updates the listing in
+# App Store Connect when it actually needs to change. Export compliance is never answered here.
+# DOES auto-release once approved: the script forces releaseType to AFTER_APPROVAL, so the
+# moment Apple approves this submission, it goes live to every real App Store user — no
+# further human click required.
+
+on:
+  workflow_dispatch:
+    inputs:
+      whats_new:
+        description: '"What''s New in This Version" text (optional - leave blank to keep whatever is already set in App Store Connect)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: submit-ios-app-store-review
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install jsonwebtoken (CI-only tooling, not an app dependency)
+        run: npm install jsonwebtoken --no-save
+
+      - name: Submit for App Store review
+        id: submit
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          # Passed as an env var, never interpolated straight into the run: line — this is
+          # admin-typed free text, and ${{ }}-interpolating untrusted input directly into a
+          # shell command is a real injection risk. Same pattern build-android-production.yml
+          # already uses for its release-notes input.
+          WHATS_NEW_TEXT: ${{ inputs.whats_new }}
+        run: node scripts/submit-ios-app-store-review.mjs
+
+      - name: Notify Slack - submitted for App Store review
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: "iOS version ${{ steps.submit.outputs.version_string }} submitted for Apple's full App Store review (triggered by ${{ github.actor }}). Release is set to AFTER_APPROVAL — the moment Apple approves it, it goes live to every real App Store user automatically, no further action needed."
+
+      - name: Notify Slack - submission failed
+        if: failure()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'iOS App Store review submission FAILED (triggered by ${{ github.actor }}). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'

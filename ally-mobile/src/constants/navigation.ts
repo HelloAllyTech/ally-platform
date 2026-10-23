@@ -1,0 +1,45 @@
+export const SCREEN_NAMES = {
+  // Root Stack Screens
+  SPLASH: 'Splash',
+  SUSPENDED_ACCOUNT: 'SuspendedAccount',
+  COMPLETE_PROFILE: 'CompleteProfile',
+  HOME: 'Home',
+  LISTENING: 'Listening',
+  CALL_SUMMARY: 'CallSummary',
+  CALL_LOG: 'CallLog',
+  BREATHING: 'Breathing',
+  BREATHING_EXERCISE: 'BreathingExercise',
+  LIVE_KIT_TEST: 'LiveKitTest',
+  SIMULATIONS: 'Simulations',
+  SIMULATION_DETAILS: 'SimulationDetails',
+  SIMULATION_PATH_DETAILS: 'SimulationPathDetails',
+  CASE_DETAILS: 'CaseDetails',
+  COURSE_OVERVIEW: 'CourseOverview',
+  COURSE_ITEM_PLAYER: 'CourseItemPlayer',
+  COURSE_PROGRESS: 'CourseProgress',
+  SIMULATION_ASSISTANT: 'SimulationAssistant',
+  SIMULATION_FEEDBACK: 'SimulationFeedback',
+  ACHIEVEMENTS: 'Achievements',
+  PROGRESS: 'Progress',
+  PROFILE_SETTINGS: 'ProfileSettings',
+  BUG_REPORT: 'BugReport',
+  REVIEW_DETAILS: 'ReviewDetails',
+  SCRIBE_REVIEW_DETAILS: 'ScribeReviewDetails',
+  REACTIONS: 'Reactions',
+  SHARE_CALL_LOG: 'ShareCallLog',
+  SHARE_SIMULATION: 'ShareSimulation',
+  NOTIFICATIONS: 'Notifications',
+  // Tab Screens
+  HOME_TAB: 'HomeTab',
+  COMMUNITY: 'Community',
+  USER_ANALYTICS: 'UserAnalytics',
+  SEARCH: 'Search',
+  LEARN: 'Learn',
+  LEADERBOARD: 'Leaderboard',
+  REVIEW: 'Review',
+
+  // Drawer Screens
+  BOTTOM_TABS: 'BottomTabs',
+} as const;
+
+export type ScreenNames = (typeof SCREEN_NAMES)[keyof typeof SCREEN_NAMES];

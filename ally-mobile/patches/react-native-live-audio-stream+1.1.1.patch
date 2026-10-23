@@ -1,0 +1,22 @@
+diff --git a/node_modules/react-native-live-audio-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java b/node_modules/react-native-live-audio-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java
+index 20f454f..71ef72d 100644
+--- a/node_modules/react-native-live-audio-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java
++++ b/node_modules/react-native-live-audio-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java
+@@ -114,4 +114,17 @@ public class RNLiveAudioStreamModule extends ReactContextBaseJavaModule {
+     public void stop(Promise promise) {
+         isRecording = false;
+     }
++
++    // Patch: Fixes React Native warning "EventEmitter.removeListener('audioData', ...): Method has been deprecated."
++    // RN 0.65+ requires native modules that emit events to implement addListener/removeListeners methods
++    // to avoid deprecation warnings when subscribing to events.
++    @ReactMethod
++    public void addListener(String eventName) {
++        // Required for RN 0.65+ event emitter compatibility
++    }
++
++    @ReactMethod
++    public void removeListeners(Integer count) {
++        // Required for RN 0.65+ event emitter compatibility
++    }
+ }

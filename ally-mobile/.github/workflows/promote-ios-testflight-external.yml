@@ -1,0 +1,81 @@
+name: Promote iOS build to TestFlight external group
+#
+# On-demand only. Nothing calls this, and nothing should: every tester on this app is in
+# Internal Testers, who get each build straight from the TestFlight upload in
+# build-ios-production.yml. This exists for the day that stops being true.
+#
+# NOT READY TO USE AS-IS. Apple refuses an external submission until App Store Connect has
+# a feedback email and a complete Beta App Review Detail — contact name, email and phone,
+# plus a demo account or a documented way for a reviewer to get past a login this app gates
+# behind an emailed OTP. All of that was empty when last checked (2026-09-21). Run this
+# anyway and it will fail cleanly and print exactly which fields are still blank, which is
+# the fastest way to find out what is left.
+#
+# Scope: TestFlight external testers and Apple's Beta App Review. This is NOT the App Store
+# — see submit-ios-app-store-review.yml for that, which is a one-way door.
+#
+# Safe to re-run: the script assigns the already-uploaded build to the group and submits it,
+# both idempotent enough that a second run on an already-submitted build simply reports so.
+
+on:
+  workflow_dispatch:
+    inputs:
+      wait_minutes:
+        description: "How long to wait for the build to finish processing on
+
+          Apple's side before giving up (default 25)."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-ios-testflight-external
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # master, because the script reads the marketing version out of the checked-out
+          # project to decide which build to promote — it has to match what was released.
+          ref: master
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install jsonwebtoken (CI-only tooling, not an app dependency)
+        run: npm install jsonwebtoken --no-save
+
+      - name: Submit to TestFlight external group
+        id: submit
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          TESTFLIGHT_EXTERNAL_GROUP_NAME: ${{ vars.TESTFLIGHT_EXTERNAL_GROUP_NAME }}
+          TESTFLIGHT_WAIT_MINUTES: ${{ inputs.wait_minutes }}
+        run: node scripts/promote-ios-testflight.mjs
+
+      - name: Notify Slack - submitted to TestFlight external group
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: "iOS build ${{ steps.submit.outputs.build_version }} submitted to the TestFlight external group by ${{ github.actor }}. Apple's Beta App Review still needs to clear (typically ~24h) before external testers can install it."
+
+      - name: Notify Slack - retry failed
+        if: failure()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Manual TestFlight external submission FAILED (triggered by ${{ github.actor }}). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'

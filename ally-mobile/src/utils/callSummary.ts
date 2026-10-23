@@ -1,0 +1,18 @@
+import {CallSummaryGenerationData} from '@/constants';
+import {Tag} from '@/services/callSummaryApi';
+
+export const mapTagsToString = (tags: Tag[]) => {
+  return tags?.map(tag => tag.tag)?.join(', ') || '';
+};
+
+export const getEstimatedSummaryGenerationTime = (callDuration: number) => {
+  // calculate the estimated generation time in seconds based on actual generation time
+  // 1.2 is a buffer to account for the time it takes to generate the summary
+  const estimatedGenerationTimeInseconds =
+    ((CallSummaryGenerationData.summaryGenerationDurationInSeconds *
+      callDuration) /
+      CallSummaryGenerationData.durationInSeconds) *
+    1.2;
+
+  return Math.ceil(estimatedGenerationTimeInseconds / 60);
+};
