@@ -31,6 +31,10 @@ local.properties
 *.iml
 *.hprof
 .cxx/
+# Signing keys never live in the repo (it is public). CI decodes the release
+# keystore from the ANDROID_RELEASE_KEYSTORE_BASE64 secret.
+*.keystore
+*.jks
 !debug.keystore
 .kotlin/
 
