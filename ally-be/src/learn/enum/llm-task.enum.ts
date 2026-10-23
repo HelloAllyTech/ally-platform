@@ -319,6 +319,9 @@ export enum LlmTask {
   GUIDE_ORCHESTRATOR = 'guide_orchestrator',
   GUIDE_SENTINEL = 'guide_sentinel',
   GUIDE_TUTOR = 'guide_tutor',
+  // The guide's voice worker (ally-ai-learn app/guide_worker.py).
+  GUIDE_VOICE_STT = 'guide_voice_stt',
+  GUIDE_VOICE_TTS = 'guide_voice_tts',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

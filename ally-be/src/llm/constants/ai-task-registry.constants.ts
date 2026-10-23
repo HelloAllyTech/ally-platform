@@ -2322,6 +2322,37 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     defaultModel: 'claude-opus-5-5',
     configuredBy: 'ally_guide release modelRouting.tutor',
   },
+  {
+    id: 'guide-voice-stt',
+    task: LlmTask.GUIDE_VOICE_STT,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'A learner talks to Ally by voice',
+    detail:
+      "Speech recognition in the guide's own voice worker (app/guide_worker.py), a separate " +
+      'deployment from the roleplay agent. Same provider resolution as the roleplay agent for ' +
+      "the session's language; semantic turn detection for en and hi, VAD with a longer " +
+      'endpointing delay otherwise. The final transcript becomes a guide turn through ' +
+      'POST /v1/guide/voice/turns.',
+    hotPath: true,
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'google',
+    defaultModel: 'chirp_2',
+    configuredBy: 'DEFAULT_STT_CONFIG, then the language’s stt config',
+  },
+  {
+    id: 'guide-voice-tts',
+    task: LlmTask.GUIDE_VOICE_TTS,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'Ally speaks a reply in a voice session',
+    detail:
+      "Speech synthesis of Ally's streamed reply (and card hints, and the fixed crisis " +
+      'message) in the guide voice worker. One voice for Ally per language.',
+    hotPath: true,
+    kind: AiTaskKind.SPEECH,
+    provider: 'multiple',
+    defaultModel: 'per-language',
+    configuredBy: 'Guide worker voice config per language',
+  },
 ];
 
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [
