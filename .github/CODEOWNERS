@@ -1,0 +1,40 @@
+# GitHub only reads CODEOWNERS at the repository root (or .github/, docs/), so the
+# per-service files under <service>/.github/CODEOWNERS stopped applying at the move
+# to ally-platform. These are those rules, prefixed with each service's folder.
+# Last match wins.
+
+# ally-be, ally-web, ally-ai, ally-ai-learn, ally-mobile: docs and the docs map
+/ally-be/*.md                                       @HelloAllyTech/helloallydevs
+/ally-be/.docs-map.yml                              @HelloAllyTech/helloallydevs
+/ally-be/.github/pull_request_template.md           @HelloAllyTech/helloallydevs
+/ally-be/docs/                                      @HelloAllyTech/helloallydevs
+
+/ally-web/*.md                                      @HelloAllyTech/helloallydevs
+/ally-web/.docs-map.yml                             @HelloAllyTech/helloallydevs
+/ally-web/.github/pull_request_template.md          @HelloAllyTech/helloallydevs
+/ally-web/docs/                                     @HelloAllyTech/helloallydevs
+
+/ally-ai/*.md                                       @HelloAllyTech/helloallydevs
+/ally-ai/.docs-map.yml                              @HelloAllyTech/helloallydevs
+/ally-ai/.github/pull_request_template.md           @HelloAllyTech/helloallydevs
+/ally-ai/docs/                                      @HelloAllyTech/helloallydevs
+
+/ally-ai-learn/*.md                                 @HelloAllyTech/helloallydevs
+/ally-ai-learn/.docs-map.yml                        @HelloAllyTech/helloallydevs
+/ally-ai-learn/.github/pull_request_template.md     @HelloAllyTech/helloallydevs
+/ally-ai-learn/docs/                                @HelloAllyTech/helloallydevs
+
+/ally-mobile/*.md                                   @HelloAllyTech/helloallydevs
+/ally-mobile/.docs-map.yml                          @HelloAllyTech/helloallydevs
+/ally-mobile/.github/pull_request_template.md       @HelloAllyTech/helloallydevs
+
+# The wiki (published to tech.helloally.ai)
+/helloallytech.github.io/wiki/                      @ajeygore @gksoriginals @sandeepmalhotragithub @shubhambhoite502
+/helloallytech.github.io/scripts/                   @ajeygore @gksoriginals @sandeepmalhotragithub @shubhambhoite502
+/helloallytech.github.io/*.md                       @ajeygore @gksoriginals @sandeepmalhotragithub @shubhambhoite502
+
+# Generated or bot-maintained: no owner, so no review request.
+/helloallytech.github.io/wiki/ROUTING.md
+/helloallytech.github.io/wiki/manifest.json
+/helloallytech.github.io/wiki/platform/stats.md
+/helloallytech.github.io/llmwiki/

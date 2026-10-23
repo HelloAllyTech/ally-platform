@@ -1,0 +1,20 @@
+# GitHub only reads dependabot.yml at the repository root, so ally-web's own
+# (ally-web/.github/dependabot.yml) stopped applying at the move to ally-platform.
+# This is that entry, pointed at ally-web's folder.
+#
+# Scoped to the one directory with ally-web's lockfile: ally-web is npm
+# workspaces, and with no scope Dependabot tries every apps/* and libs/*
+# manifest and fails with `dependency_file_not_supported`.
+#
+# `open-pull-requests-limit: 0` keeps version-update pull requests off, as they
+# were. Security updates are a separate repo setting and use this scope.
+#
+# The other services never had a Dependabot config; add them here when
+# someone is ready to work through their updates.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/ally-web"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
