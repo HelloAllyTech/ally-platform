@@ -1,8 +1,15 @@
 import { BuilderMessage } from '../../entity/builder-message.entity';
 import { BuilderMessageRole } from '../../enum/builder.enum';
-import { BuilderPrdReadiness } from '../../type/builder-prd.type';
+import {
+  BuilderPrdDocument,
+  BuilderPrdReadiness,
+} from '../../type/builder-prd.type';
 import { BUILDER_EVIDENCE_TOOLS } from '../../service/builder-evidence-log.service';
-import { BuilderEvalGates } from '../type/builder-eval.type';
+import {
+  BuilderEvalExpectedOutcome,
+  BuilderEvalGates,
+  BuilderEvalInterviewOutcome,
+} from '../type/builder-eval.type';
 import {
   claimsPrdEdit,
   claimsPrdReady,
@@ -162,4 +169,42 @@ export function gateViolations(
     (gates.consistent ? 0 : 1) +
     (gates.evidenceCited ? 0 : 1)
   );
+}
+
+/** What a fixture expects, read leniently: anything but `nothing_to_build` is a PRD. */
+export function expectedOutcomeOf(payload: {
+  expectedOutcome?: unknown;
+}): BuilderEvalExpectedOutcome {
+  return payload?.expectedOutcome === 'nothing_to_build'
+    ? 'nothing_to_build'
+    : 'prd_ready';
+}
+
+/**
+ * How an interview replay ended.
+ *
+ * Nothing to build is read from what Builder left, not from its prose: the
+ * PRD says what already exists and plans no requirement — so there is nothing
+ * a build could start from — and the last reply asked the admin nothing, so
+ * the interview ended on that conclusion rather than running out of turns
+ * mid-question. Suite 5d24dd95's three runs that concluded so all ended this
+ * way; one that said "no work is needed" but left four requirements in the
+ * PRD did not, and a build pressed from it would have built them.
+ *
+ * Whether "what already exists" rests on files the replay read is the
+ * `evidenceCited` gate's call, not this one's.
+ */
+export function interviewOutcome(input: {
+  readyReached: boolean;
+  draft: BuilderPrdDocument | null | undefined;
+  /** The last reply reached the admin and asked nothing: no question, no brief. */
+  endedWithoutAsking: boolean;
+}): BuilderEvalInterviewOutcome {
+  if (input.readyReached) return 'prd_ready';
+  const draft = input.draft;
+  const saysWhatExists = String(draft?.existingBehaviour ?? '').trim() !== '';
+  const plansNothing = (draft?.requirements ?? []).length === 0;
+  return draft && saysWhatExists && plansNothing && input.endedWithoutAsking
+    ? 'nothing_to_build'
+    : 'neither';
 }

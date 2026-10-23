@@ -94,12 +94,32 @@ function validatePayload(
         'An interview fixture needs the opening message the admin started with.',
       );
     }
+    const expected = interview.expectedOutcome;
+    if (
+      expected !== undefined &&
+      expected !== null &&
+      expected !== 'prd_ready' &&
+      expected !== 'nothing_to_build'
+    ) {
+      // Refused rather than read as a PRD: a misspelt "nothing to build"
+      // would quietly score the fixture against the opposite expectation.
+      throw new BadRequestException(
+        `expectedOutcome must be "prd_ready" or "nothing_to_build", not ${JSON.stringify(expected)}.`,
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { expectedOutcome, ...rest } = interview;
     return {
-      ...interview,
+      ...rest,
       adminScript: Array.isArray(interview.adminScript)
         ? interview.adminScript.map(String)
         : [],
       checklist: normaliseChecklist(interview.checklist),
+      // Stored only when it differs from the default, so every fixture from
+      // before it existed keeps its payload, and exports, unchanged.
+      ...(expected === 'nothing_to_build'
+        ? { expectedOutcome: 'nothing_to_build' as const }
+        : {}),
     };
   }
   const review = payload as BuilderEvalPrdReviewPayload;
