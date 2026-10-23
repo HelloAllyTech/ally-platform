@@ -3,10 +3,9 @@ import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ChevronRight} from '@/assets';
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import {htmlToMultilineText} from '@/utils';
 
 import {ProgressBar} from './ProgressBar';
 
@@ -56,9 +55,7 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
       )}
       <View style={styles.listHeaderContent}>
         <Text style={styles.pathTitle}>{title}</Text>
-        <Text style={styles.pathDescription}>
-          {htmlToMultilineText(description)}
-        </Text>
+        <RichText html={description} />
 
         {showProgressBar &&
           completedScenarios !== undefined &&
@@ -122,13 +119,6 @@ const styles = ScaledSheet.create({
     ...typography.display.small,
     fontWeight: fontWeights.medium,
     color: colors.ds.typography.highEmphasis,
-    textAlign: 'center',
-  },
-  pathDescription: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    fontWeight: fontWeights.regular,
-    color: colors.ds.typography.mediumEmphasis,
     textAlign: 'center',
   },
   progressBarContainer: {

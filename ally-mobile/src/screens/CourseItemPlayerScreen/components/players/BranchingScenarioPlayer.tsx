@@ -424,11 +424,17 @@ export const BranchingScenarioPlayer: React.FC<
                   })}`
                 : ''}
             </Text>
-            <Text style={styles.scoreMeta}>
-              {result.passed
-                ? t('courses.branching.passed')
-                : t('courses.branching.notPassed')}
-            </Text>
+            {/*
+              A replay that scores under the pass mark must not say the item
+              "stays open" when an earlier run already completed it.
+            */}
+            {result.passed || !result.itemCompleted ? (
+              <Text style={styles.scoreMeta}>
+                {result.passed
+                  ? t('courses.branching.passed')
+                  : t('courses.branching.notPassed')}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
