@@ -99,6 +99,12 @@ const isBlockChild = (node: HtmlNode): boolean =>
   !INLINE_TAGS.has(node.tag) &&
   !SKIP_TAGS.has(node.tag);
 
+/** Whitespace-only text, or a paragraph that holds nothing but whitespace. */
+const isBlankNode = (node: HtmlNode): boolean => {
+  if (node.type === 'text') return node.value.trim().length === 0;
+  return node.tag === 'p' && node.children.every(isBlankNode);
+};
+
 const renderInline = (
   nodes: HtmlNode[],
   keyPrefix: string,
@@ -174,19 +180,19 @@ const renderBlockElement = (
   switch (node.tag) {
     case 'h1':
       return (
-        <Text key={key} style={[styles.h1, ...baseTextStyle]}>
+        <Text key={key} style={[styles.h1, ...baseTextStyle, headingFont.h1]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'h2':
       return (
-        <Text key={key} style={[styles.h2, ...baseTextStyle]}>
+        <Text key={key} style={[styles.h2, ...baseTextStyle, headingFont.h2]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'h3':
       return (
-        <Text key={key} style={[styles.h3, ...baseTextStyle]}>
+        <Text key={key} style={[styles.h3, ...baseTextStyle, headingFont.h3]}>
           {renderInline(node.children, key)}
         </Text>
       );
@@ -255,6 +261,13 @@ function renderBlocks(
   const blocks: React.ReactNode[] = [];
   let inlineBuffer: HtmlNode[] = [];
   let paragraphCount = 0;
+
+  // Editors leave an empty <p></p> after the last line. It renders as a blank
+  // paragraph and its margin, so drop trailing ones (a blank line in the middle
+  // is a spacer the author chose, and stays).
+  let end = nodes.length;
+  while (end > 0 && isBlankNode(nodes[end - 1])) end--;
+  nodes = nodes.slice(0, end);
 
   const flushInline = () => {
     const hasContent = inlineBuffer.some(
@@ -394,3 +407,21 @@ const styles = ScaledSheet.create({
     lineHeight: '22@ms',
   },
 });
+
+/**
+ * A caller's `textStyle` (the journal's body font, say) is applied after the
+ * heading style so it can set the colour, which also flattened the heading's
+ * font, weight and size to body text. Re-assert only those, last.
+ */
+const headingFont = (['h1', 'h2', 'h3'] as const).reduce(
+  (acc, tag) => {
+    const {fontSize, lineHeight} = StyleSheet.flatten(styles[tag]);
+    acc[tag] = {
+      ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+      fontSize,
+      lineHeight,
+    };
+    return acc;
+  },
+  {} as Record<'h1' | 'h2' | 'h3', TextStyle>,
+);

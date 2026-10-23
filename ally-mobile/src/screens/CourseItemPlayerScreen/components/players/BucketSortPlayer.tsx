@@ -196,6 +196,15 @@ export const BucketSortPlayer: React.FC<BucketSortPlayerProps> = ({
             {isTarget && current ? (
               <Text style={styles.settledActive}>{current.text}</Text>
             ) : null}
+            {/* The red card is the wrong pick for THIS item, not for the ones
+                already settled in it, so show which item was misplaced. */}
+            {isWrong && current ? (
+              <Text
+                testID="bucket-sort-misplaced"
+                style={[styles.settledActive, styles.misplaced]}>
+                {current.text}
+              </Text>
+            ) : null}
             {settled.map(i => (
               <Text key={i.id} style={styles.settled}>
                 {i.text}
@@ -397,6 +406,10 @@ const styles = ScaledSheet.create({
     borderRadius: '6@ms',
     paddingHorizontal: '8@ms',
     paddingVertical: '4@ms',
+  },
+  misplaced: {
+    textDecorationLine: 'line-through',
+    color: colors.ds.feedback.onErrorContainer,
   },
   notice: {
     ...body,

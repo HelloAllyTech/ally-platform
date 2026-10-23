@@ -1,5 +1,5 @@
 import React from 'react';
-import {View} from 'react-native';
+import {StyleSheet, View} from 'react-native';
 import {render} from '@testing-library/react-native';
 
 import {RichText} from '../RichText';
@@ -67,6 +67,34 @@ describe('RichText', () => {
     expect(getByText('Title')).toBeTruthy();
     expect(getByText(/line one/)).toBeTruthy();
     expect(getByText(/line two/)).toBeTruthy();
+  });
+
+  it('keeps a heading larger and heavier than body text when the caller sets a body textStyle', () => {
+    const {getByText} = render(
+      <RichText
+        html="<h1>Big</h1><p>small</p>"
+        textStyle={{
+          fontFamily: 'IBMPlexSerif-Regular',
+          fontSize: 14,
+          color: '#123456',
+        }}
+      />,
+    );
+    const heading = StyleSheet.flatten(getByText('Big').props.style);
+    const body = StyleSheet.flatten(getByText('small').props.style);
+    expect(heading.fontFamily).toBe('IBMPlexSerif-Medium');
+    expect(heading.fontSize).toBeGreaterThan(body.fontSize as number);
+    // The caller still owns the colour.
+    expect(heading.color).toBe('#123456');
+  });
+
+  it('drops empty paragraphs at the end but keeps a blank line in the middle', () => {
+    const {toJSON} = render(
+      <RichText html="<p>a</p><p></p><p>b</p><p></p><p> </p>" />,
+    );
+    // a, the blank spacer, b — the two trailing empties are gone.
+    const view = toJSON() as {children: unknown[]};
+    expect(view.children).toHaveLength(3);
   });
 
   it('drops script and style content', () => {

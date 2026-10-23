@@ -108,7 +108,7 @@ describe('BucketSortPlayer', () => {
     mockPlace.mockResolvedValue(
       reply({correct: false, placedBucketId: 'b2', explanation: 'Because.'}),
     );
-    const {getByTestId, getByText, queryByText} = setup();
+    const {getByTestId, getByText, queryByText, queryByTestId} = setup();
     expect(getByText('Reflect feelings')).toBeTruthy();
 
     await act(async () => {
@@ -123,6 +123,8 @@ describe('BucketSortPlayer', () => {
     await waitFor(() => getByTestId('bucket-sort-feedback'));
     expect(getByText('courses.bucketSort.notQuite')).toBeTruthy();
     expect(getByText('Because.')).toBeTruthy();
+    // The red bucket names the item that was put there wrongly.
+    expect(getByTestId('bucket-sort-misplaced')).toBeTruthy();
 
     // Buckets are locked while the feedback is being read.
     mockPlace.mockClear();
@@ -132,6 +134,7 @@ describe('BucketSortPlayer', () => {
     fireEvent.press(getByTestId('bucket-sort-next'));
     expect(getByText('Give advice fast')).toBeTruthy();
     expect(queryByText('Reflect feelings')).toBeTruthy(); // settled in its bucket
+    expect(queryByTestId('bucket-sort-misplaced')).toBeNull();
   });
 
   it('holds completion until "See results", then shows the summary', async () => {

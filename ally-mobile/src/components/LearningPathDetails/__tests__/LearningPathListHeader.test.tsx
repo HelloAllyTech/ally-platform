@@ -7,6 +7,9 @@ jest.mock('@/components', () => {
   const React = require('react');
   const {TouchableOpacity, Text} = require('react-native');
   return {
+    // Real component: the header renders rich-text course descriptions, and
+    // these tests assert on that output.
+    RichText: jest.requireActual('../../RichText/RichText').RichText,
     Button: ({
       label,
       onPress,
@@ -66,6 +69,21 @@ describe('LearningPathListHeader', () => {
 
     expect(getByText('My Path')).toBeTruthy();
     expect(getByText('Learn something new')).toBeTruthy();
+  });
+
+  it('renders a rich-text description with its markup, not flattened', () => {
+    const {getByText, queryByText} = render(
+      <LearningPathListHeader
+        {...defaultProps}
+        title="My Path"
+        description="<p>Learn <strong>something</strong> new</p>"
+      />,
+    );
+
+    // The bold segment renders as its own styled Text node, and the raw
+    // tags must not leak into the visible text.
+    expect(getByText('something')).toBeTruthy();
+    expect(queryByText(/<strong>/)).toBeNull();
   });
 
   it('shows cover image when URL provided', () => {
