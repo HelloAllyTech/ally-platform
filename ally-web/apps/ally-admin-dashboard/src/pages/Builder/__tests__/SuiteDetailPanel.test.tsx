@@ -129,7 +129,7 @@ describe("SuiteDetailPanel", () => {
       expect(screen.getByText(strings.runCard.gatesHeading(3))).toBeInTheDocument();
     });
 
-    it("lists all six gates once opened, flagging the failing ones", () => {
+    it("lists every gate once opened, flagging the failing ones", () => {
       renderPanel();
       fireEvent.click(screen.getByRole("button", { name: strings.runCard.showDetails }));
 
@@ -138,6 +138,7 @@ describe("SuiteDetailPanel", () => {
         "askedBeforeReading",
         "unrepairedEditFailures",
         "falseUpdateClaims",
+        "falseReadyClaims",
         "consistent",
         "evidenceCited",
       ] as const) {
@@ -171,6 +172,38 @@ describe("SuiteDetailPanel", () => {
       expect(screen.getByText(strings.runCard.readyYes(88))).toBeInTheDocument();
       expect(screen.getByText(strings.runCard.toolCalls(14, 3))).toBeInTheDocument();
       expect(screen.getByText(strings.runCard.correctedItems("C1"))).toBeInTheDocument();
+    });
+
+    // Suite 5d24dd95 read "No (readiness 100)" on 9 runs: the score counts only what is
+    // written, and what held them back was a row that only blocks.
+    it("says what held a not-ready run back, beside its score", () => {
+      suiteResult.data = evalSuiteDetail({
+        runs: [
+          evalRun({
+            metrics: {
+              ...evalRun().metrics!,
+              readyReached: false,
+              readinessScore: 100,
+              readyAtEnd: false,
+              blockersAtEnd: [
+                { key: "prdReview", label: "Cold review" },
+                { key: "lastMessageApplied", label: "Your latest message is in the PRD" },
+              ],
+            },
+          }),
+        ],
+      });
+      renderPanel();
+      fireEvent.click(screen.getByRole("button", { name: strings.runCard.showDetails }));
+
+      expect(
+        screen.getByText(
+          strings.runCard.readyNo(100, ["Cold review", "Your latest message is in the PRD"]),
+        ),
+      ).toBeInTheDocument();
+      expect(strings.runCard.readyNo(100, ["Cold review"])).toBe(
+        "No — held back by Cold review (readiness 100)",
+      );
     });
 
     it("shows the critic's outcome for a PRD-review run", () => {

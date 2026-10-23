@@ -364,12 +364,129 @@ describe('BuilderInterviewOrchestratorService — validated turns', () => {
     await drain();
 
     expect(resultFor('end-1').reasons.join(' ')).toMatch(
-      /says the PRD is ready, and readiness says it is not: Problem is empty\. \| No repos picked yet\./,
+      /the PRD is ready, or to start the build, and readiness says it is not: Problem is empty \| No repos picked yet\. Fix what you can now/,
     );
     expect(lastCheckpoint().content).toBe(
       'Two blockers are left: the problem and the repos.',
     );
     expect(lastCheckpoint().metadata.receipt.warnings).toEqual([]);
+    expect(lastCheckpoint().metadata.readyClaimCorrected).toBeUndefined();
+  });
+
+  // Suite 5d24dd95: 8 of the 9 replies that told the admin "ready" were sent
+  // back once, then went through on the second try with the same words.
+  it('keeps holding back a ready claim, and past the retries says what is left under it', async () => {
+    readiness.sections = [
+      { key: 'summary', label: 'Summary', ok: true, hint: '' },
+      {
+        key: 'prdReview',
+        label: 'Cold review',
+        ok: false,
+        hint: '2 review finding(s) to fix or dismiss.',
+      },
+    ];
+    const claim = {
+      message:
+        'The PRD is now complete. You can start the build whenever you are ready.',
+      prdUnchangedBecause: 'Nothing new.',
+    };
+    streams = [
+      pass([use('end-1', 'finish_turn', claim)]),
+      pass([use('end-2', 'finish_turn', claim)]),
+      pass([use('end-3', 'finish_turn', claim)]),
+    ];
+
+    const frames = await drain();
+
+    expect(resultFor('end-1')).toMatchObject({ delivered: false });
+    expect(resultFor('end-2')).toMatchObject({ delivered: false });
+    expect(resultFor('end-3')).toMatchObject({ delivered: true });
+    const shown =
+      'The PRD is now complete. You can start the build whenever you are ready.\n\n' +
+      'Not ready to build yet — 2 review finding(s) to fix or dismiss.';
+    expect(
+      frames.filter((frame) => frame.event === 'token').map((f) => f.data),
+    ).toEqual([{ delta: shown }]);
+    const final = lastCheckpoint();
+    expect(final.content).toBe(shown);
+    expect(final.metadata.readyClaimCorrected).toBe(true);
+    expect(final.metadata.rejections).toBe(2);
+    expect(final.metadata.receipt.warnings).toEqual([
+      'Builder said the PRD is ready; the readiness check disagrees.',
+    ]);
+  });
+
+  it('settles the cold review before judging a ready claim', async () => {
+    const settled = { ...readiness, score: 100, ready: true, blockers: [] };
+    const readinessService = (service as any).readiness;
+    readinessService.plan.mockResolvedValueOnce({
+      readiness,
+      review: 'recheck',
+    });
+    readinessService.runReview.mockResolvedValueOnce({
+      ...settled,
+      review: { status: 'done', findings: [] },
+    });
+    streams = [
+      pass([
+        use('edit-1', 'set_section', { section: 'summary', text: 'Fixed.' }),
+        use('end-1', 'finish_turn', { message: 'The PRD is build-ready.' }),
+      ]),
+    ];
+
+    const frames = await drain();
+
+    // The recheck the turn's end would have run, run first — so the fixes
+    // this turn made count, and the claim goes out the first time.
+    expect(readinessService.plan).toHaveBeenCalledWith(
+      'session-1',
+      expect.objectContaining({ versionNumber: 4 }),
+      'turn_end',
+    );
+    expect(readinessService.runReview).toHaveBeenCalledWith(
+      'session-1',
+      expect.anything(),
+      'recheck',
+      'turn_end',
+    );
+    expect(resultFor('end-1')).toMatchObject({ delivered: true });
+    expect(
+      frames
+        .filter((frame) => frame.event === 'tool_result')
+        .map((frame) => frame.data),
+    ).toContainEqual({
+      name: 'prd_recheck',
+      summary: 'PRD review: nothing to fix',
+    });
+    expect(lastCheckpoint().content).toBe('The PRD is build-ready.');
+  });
+
+  it('says what is left under prose that claims ready when it is shown unchecked', async () => {
+    readiness.sections = [
+      {
+        key: 'openQuestions',
+        label: 'Open questions',
+        ok: false,
+        hint: '1 open question(s) left to settle.',
+      },
+    ];
+    const prose =
+      'The plan is now simpler and ready. You can now start the build.';
+    streams = [
+      pass([text(prose)], 'end_turn'),
+      pass([text(prose)], 'end_turn'),
+      pass([text(prose)], 'end_turn'),
+    ];
+
+    await drain();
+
+    expect(lastCheckpoint().content).toBe(
+      `${prose}\n\nNot ready to build yet — 1 open question(s) left to settle.`,
+    );
+    expect(lastCheckpoint().metadata.readyClaimCorrected).toBe(true);
+    expect(lastCheckpoint().metadata.receipt.warnings).toContain(
+      'Builder said the PRD is ready; the readiness check disagrees.',
+    );
   });
 
   it("asks the model to record the admin's own words, or say why they change nothing", async () => {

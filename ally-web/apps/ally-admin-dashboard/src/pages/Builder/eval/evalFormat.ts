@@ -328,6 +328,7 @@ export const GATE_KEYS = [
   "askedBeforeReading",
   "unrepairedEditFailures",
   "falseUpdateClaims",
+  "falseReadyClaims",
   "consistent",
   "evidenceCited",
 ] as const;
@@ -341,10 +342,13 @@ export interface GateEntry {
   failing: boolean;
 }
 
-/** All six gates, in the order the docs list them, each marked failing or clean. */
+/**
+ * Every gate the run was scored with, in the order the docs list them, each marked failing or
+ * clean. A gate added since the run was scored is left out rather than shown as failing.
+ */
 export const gateEntries = (gates: BuilderEvalGates | null | undefined): GateEntry[] => {
   if (!gates) return [];
-  return GATE_KEYS.map(key => {
+  return GATE_KEYS.filter(key => gates[key] !== undefined).map(key => {
     const value = gates[key];
     const numeric = typeof value === "number" ? value : null;
     return {

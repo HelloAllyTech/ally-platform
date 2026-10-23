@@ -176,7 +176,10 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
                   value={
                     metrics.readyReached
                       ? strings.readyYes(metrics.readinessScore)
-                      : strings.readyNo(metrics.readinessScore)
+                      : strings.readyNo(
+                          metrics.readinessScore,
+                          (metrics.blockersAtEnd ?? []).map(blocker => blocker.label),
+                        )
                   }
                 />
                 <Stat
