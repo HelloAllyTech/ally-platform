@@ -218,6 +218,7 @@ describe('ScenarioSessionService', () => {
     };
 
     const mockScenarioService = {
+      assertRoleplayInView: jest.fn().mockResolvedValue(undefined),
       getScenario: jest.fn(),
       getScenarioVoice: jest.fn(),
       getAdminScenario: jest.fn(),

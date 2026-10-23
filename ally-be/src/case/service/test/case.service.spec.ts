@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { DataSource } from 'typeorm';
 import { CaseService } from '../case.service';
 import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
@@ -57,6 +58,7 @@ describe('CaseService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CaseService,
+        permissiveContentAccessProvider(),
         {
           provide: ScenarioSharedService,
           useValue: {

@@ -50,6 +50,12 @@ export class CaseRepository extends Repository<Case> {
     this.applyStatusFilter(query, filters);
     this.applySearchFilter(query, filters);
 
+    if (filters?.createdByUserId) {
+      query.andWhere('case.createdBy = :createdByUserId', {
+        createdByUserId: filters.createdByUserId,
+      });
+    }
+
     if (filters?.sortBy) {
       const sortColumn = this.getValidatedSortColumn(filters.sortBy);
       if (sortColumn) {

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { DataSource } from 'typeorm';
 import { CaseSharedService } from 'src/case/service/case-shared.service';
 import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
@@ -82,6 +83,7 @@ describe('TrackService — story landing page (tracks.landingPage)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrackService,
+        permissiveContentAccessProvider(),
         { provide: DataSource, useValue: dataSource },
         { provide: TrackRepository, useValue: trackRepository },
         {

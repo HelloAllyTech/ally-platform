@@ -19,6 +19,8 @@ export interface ScenarioPathFilterOptions {
   assignmentStatus?: AssignmentStatus;
   sortBy?: ScenarioPathSortBy;
   order?: SortOrder;
+  /** Only tracks this user created (ContentAccessService.ownerFilterFor). */
+  createdByUserId?: number | null;
 }
 
 export interface ScenarioPathWithSession extends ScenarioPath {

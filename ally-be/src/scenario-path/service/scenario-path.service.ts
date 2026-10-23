@@ -26,6 +26,10 @@ import {
 } from '../constants/scenario-path.constant';
 import { ScenarioPathRepository } from '../repository/scenario-path.repository';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ScenarioPathItemRepository } from '../repository/scenario-path-item.repository';
 import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
@@ -59,6 +63,7 @@ export class ScenarioPathService {
     private tenantService: TenantService,
     private openaiTranslationsService: OpenAITranslationsService,
     private readonly sharedLanguageService: SharedLanguageService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   async getScenarioPaths(
@@ -70,8 +75,10 @@ export class ScenarioPathService {
         throw new NotFoundException('Tenant not found');
       }
     }
-    const result =
-      await this.scenarioPathRepository.getAllScenarioPaths(filters);
+    const result = await this.scenarioPathRepository.getAllScenarioPaths({
+      ...filters,
+      createdByUserId: await this.contentAccessService.ownerFilterFor(),
+    });
 
     const scenarioPaths = result.data.map((scenarioPath: any) => {
       const { scenarioPathTenant, ...scenarioPathData } = scenarioPath;
@@ -97,6 +104,16 @@ export class ScenarioPathService {
   }
 
   async getScenarioPathById(id: string): Promise<GetScenarioPathResponseDto> {
+    const scenarioPath = await this.scenarioPathRepository.findOne({
+      where: { id },
+      select: ['id', 'createdBy'],
+    });
+    if (scenarioPath) {
+      await this.contentAccessService.assertCanSee(
+        AuthoredContentType.TRACK,
+        scenarioPath.createdBy,
+      );
+    }
     return this.scenarioPathSharedService.getScenarioPathWithScenarios(id);
   }
 
@@ -175,6 +192,10 @@ export class ScenarioPathService {
       this.logger.error(`Scenario path not found for id: ${id}`);
       throw new NotFoundException('Scenario path not found');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.TRACK,
+      scenarioPath.createdBy,
+    );
 
     const scenarioPathSession =
       await this.scenarioPathSessionService.getScenarioPathSessionByScenarioPathId(
@@ -447,6 +468,10 @@ export class ScenarioPathService {
     if (!scenarioPath) {
       throw new NotFoundException('Scenario path not found');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.TRACK,
+      scenarioPath.createdBy,
+    );
 
     const scenarioPathSession =
       await this.scenarioPathSessionService.getScenarioPathSessionByScenarioPathId(
@@ -478,12 +503,18 @@ export class ScenarioPathService {
   async duplicateScenarioPath(
     id: string,
   ): Promise<DuplicateScenarioPathResponseDto> {
+    const copierIdStr = ExecutionManager.getUserId();
+    const copierId = copierIdStr ? Number(copierIdStr) : undefined;
     const scenarioPath = await this.scenarioPathRepository.findOne({
       where: { id },
     });
     if (!scenarioPath) {
       throw new NotFoundException('Scenario path not found');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.TRACK,
+      scenarioPath.createdBy,
+    );
 
     const scenarioPathItems = await this.scenarioPathItemRepository.find({
       where: { scenarioPathId: id },
@@ -496,6 +527,9 @@ export class ScenarioPathService {
       status: ScenarioPathStatus.DRAFT,
       isGlobal: scenarioPath.isGlobal,
       totalScenarios: scenarioPath.totalScenarios,
+      // A copy belongs to whoever made it — without this it had no creator,
+      // so an admin limited to their own content could not see their copy.
+      ...(copierId ? { createdBy: copierId, updatedBy: copierId } : {}),
     };
 
     return await this.dataSource.transaction(async (manager) => {

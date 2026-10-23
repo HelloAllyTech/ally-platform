@@ -42,6 +42,8 @@ export interface CaseFilterOptions {
   assignmentStatus?: AssignmentStatus;
   sortBy?: CaseSortBy;
   order?: SortOrder;
+  /** Only cases this user created (ContentAccessService.ownerFilterFor). */
+  createdByUserId?: number | null;
 }
 
 export interface CaseWithSessionFilterOptions {

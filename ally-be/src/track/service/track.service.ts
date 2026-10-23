@@ -67,6 +67,10 @@ import {
 } from '../util/track-landing-page.util';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
 import { TrackTranslationService } from './track-translation.service';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 
 @Injectable()
 export class TrackService {
@@ -82,6 +86,7 @@ export class TrackService {
     private readonly tenantService: TenantService,
     private readonly trackTranslationService: TrackTranslationService,
     private readonly tenantScopeService: TenantScopeService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   /**
@@ -92,19 +97,26 @@ export class TrackService {
    * to every organization at once. Everyone else is unaffected.
    *
    * Called by the admin controller ahead of every route that changes an
-   * existing track, its structure or its translations.
+   * existing track, its structure or its translations. Also holds every
+   * platform admin to their content toggles (ContentAccessService): Create
+   * Courses on, and the course in their view.
    */
   async assertCallerMayEdit(trackId: string): Promise<void> {
     const userId = this.getUserId();
-    if (!(await this.tenantScopeService.isRestricted(userId))) {
-      return;
-    }
     const track = await this.trackRepository.findOne({
       where: { id: trackId },
       select: ['id', 'createdBy'],
     });
     if (!track) {
       throw new NotFoundException('Track not found');
+    }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.COURSE,
+      track.createdBy,
+      userId,
+    );
+    if (!(await this.tenantScopeService.isRestricted(userId))) {
+      return;
     }
     if (track.createdBy !== userId) {
       throw new ForbiddenException('You can only edit your own courses');
@@ -168,7 +180,10 @@ export class TrackService {
         throw new NotFoundException('Tenant not found');
       }
     }
-    const result = await this.trackRepository.getAllTracks(filters);
+    const result = await this.trackRepository.getAllTracks({
+      ...filters,
+      createdByUserId: await this.contentAccessService.ownerFilterFor(),
+    });
 
     const tracks = result.data.map((track: any) => {
       const { trackTenant, ...trackData } = track;
@@ -191,12 +206,40 @@ export class TrackService {
   }
 
   async getTrackById(id: string): Promise<TrackWithStructure> {
+    const track = await this.trackRepository.findOne({
+      where: { id },
+      select: ['id', 'createdBy'],
+    });
+    if (track) {
+      await this.contentAccessService.assertCanSee(
+        AuthoredContentType.COURSE,
+        track.createdBy,
+      );
+    }
     return this.trackSharedService.getTrackWithStructure(id);
+  }
+
+  /**
+   * The content-toggle half of assertCallerMayEdit, for the service methods
+   * Course Copilot calls directly rather than through the controller. Copilot
+   * runs as the session's owner, so it is held to their toggles.
+   */
+  private async assertCourseModifiable(id: string): Promise<void> {
+    const track = await this.trackRepository.findOne({
+      where: { id },
+      select: ['id', 'createdBy'],
+    });
+    if (!track) return;
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.COURSE,
+      track.createdBy,
+    );
   }
 
   async createTrack(
     createTrackDto: CreateTrackDto,
   ): Promise<TrackSummaryResponseDto> {
+    await this.contentAccessService.assertCanAuthor(AuthoredContentType.COURSE);
     const status = createTrackDto.status ?? TrackStatus.DRAFT;
     if (status === TrackStatus.ACTIVE) {
       throw new BadRequestException(
@@ -237,6 +280,7 @@ export class TrackService {
     id: string,
     updateTrackDto: UpdateTrackDto,
   ): Promise<TrackSummaryResponseDto> {
+    await this.assertCourseModifiable(id);
     const track = await this.trackRepository.findOne({ where: { id } });
     if (!track) {
       throw new NotFoundException('Track not found');
@@ -518,6 +562,7 @@ export class TrackService {
   }
 
   async duplicateTrack(id: string): Promise<TrackSummaryResponseDto> {
+    await this.assertCourseModifiable(id);
     const source = await this.trackSharedService.getTrackWithStructure(id);
     const userId = this.getUserId();
 

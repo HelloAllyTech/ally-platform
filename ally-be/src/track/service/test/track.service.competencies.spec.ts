@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { CaseSharedService } from 'src/case/service/case-shared.service';
@@ -63,6 +64,7 @@ describe('TrackService — course competency tag (tracks.competencyIds)', () => 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrackService,
+        permissiveContentAccessProvider(),
         { provide: DataSource, useValue: dataSource },
         { provide: TrackRepository, useValue: trackRepository },
         {

@@ -494,8 +494,11 @@ export class LearnController {
   @ApiOperation({ summary: 'Duplicate scenario' })
   @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
   @Post('scenarios/:id/duplicate')
-  async duplicateScenario(@Param('id') id: number): Promise<Scenarios> {
-    return this.scenarioService.duplicateScenario(id);
+  async duplicateScenario(
+    @CurrentUser() tokenUser: TokenUser,
+    @Param('id') id: number,
+  ): Promise<Scenarios> {
+    return this.scenarioService.duplicateScenario(id, tokenUser);
   }
 
   @ApiOperation({ summary: 'List saved versions of a scenario (newest first)' })
@@ -644,8 +647,11 @@ export class LearnController {
   @ApiOperation({ summary: 'Delete a scenario by id' })
   @AuthPermissions([PERMISSIONS.DELETE_ADMIN_SCENARIO])
   @Delete('admin-scenarios/:id')
-  async deleteAdminScenario(@Param('id') id: number): Promise<boolean> {
-    return this.scenarioService.deleteAdminScenario(id);
+  async deleteAdminScenario(
+    @CurrentUser() tokenUser: TokenUser,
+    @Param('id') id: number,
+  ): Promise<boolean> {
+    return this.scenarioService.deleteAdminScenario(id, tokenUser);
   }
 
   @ApiOperation({ summary: 'Get all scenario sessions for user' })

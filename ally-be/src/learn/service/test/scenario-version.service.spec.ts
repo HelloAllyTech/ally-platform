@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ScenarioVersionService } from '../scenario-version.service';
@@ -73,6 +74,7 @@ describe('ScenarioVersionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScenarioVersionService,
+        permissiveContentAccessProvider(),
         { provide: ScenarioVersionRepository, useValue: versionRepo },
         { provide: ScenariosRepository, useValue: scenariosRepo },
         { provide: ScenarioService, useValue: scenarioService },

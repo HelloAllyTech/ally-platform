@@ -19,6 +19,10 @@ import { ScenarioService } from './scenario.service';
 import { ScenarioStatus } from '../type/scenario.type';
 import { GetAdminScenarioDto } from '../dto/get-scenario.dto';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 import { LoggerService } from 'src/logger/logger.service';
 
 /** Column values for a freshly inserted version (see `saveNewVersion`). */
@@ -52,6 +56,7 @@ export class ScenarioVersionService {
     private readonly scenarioService: ScenarioService,
     private readonly permissionsService: PermissionsService,
     private readonly dataSource: DataSource,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   /**
@@ -61,6 +66,10 @@ export class ScenarioVersionService {
    */
   async listVersions(scenarioId: number): Promise<ScenarioVersion[]> {
     const scenario = await this.requireScenario(scenarioId);
+    await this.contentAccessService.assertCanSee(
+      AuthoredContentType.ROLEPLAY,
+      scenario.createdBy,
+    );
     const existing =
       await this.scenarioVersionRepository.listByScenario(scenarioId);
     if (existing.length > 0) {
@@ -78,6 +87,10 @@ export class ScenarioVersionService {
     scenarioId: number,
     versionId: string,
   ): Promise<ScenarioVersion> {
+    await this.contentAccessService.assertCanSee(
+      AuthoredContentType.ROLEPLAY,
+      (await this.requireScenario(scenarioId)).createdBy,
+    );
     const version = await this.scenarioVersionRepository.findOne({
       where: { id: versionId, scenarioId },
     });
@@ -604,5 +617,10 @@ export class ScenarioVersionService {
     if (isMultiTenantAdmin && scenario.createdBy !== userId) {
       throw new ForbiddenException('You can only edit your own roleplays');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.ROLEPLAY,
+      scenario.createdBy,
+      userId,
+    );
   }
 }

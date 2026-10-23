@@ -14,6 +14,11 @@ export type ScenarioFilters = {
   isPublic?: boolean;
   isMultiTenantAdmin?: boolean;
   userId?: number;
+  /**
+   * Only scenarios this user created — a platform admin without See All
+   * Content (ContentAccessService.ownerFilterFor). Null/absent: no narrowing.
+   */
+  createdByUserId?: number | null;
   languageCode?: string;
   /**
    * Apply the requester's cohort restrictions. Present only on the learner

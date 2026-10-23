@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { In, IsNull, Not } from 'typeorm';
@@ -36,6 +37,7 @@ describe('CourseCopilotSessionService', () => {
   let messageRepository: { listBySession: jest.Mock };
   let jobRepository: { listBySession: jest.Mock };
   let trackShared: { getTrackById: jest.Mock };
+  let contentAccess: { assertCanAuthor: jest.Mock; assertCanModify: jest.Mock };
   let costService: { budget: jest.Mock };
   let eventService: { listAfter: jest.Mock };
   let structure: {
@@ -69,6 +71,10 @@ describe('CourseCopilotSessionService', () => {
     messageRepository = { listBySession: jest.fn().mockResolvedValue([]) };
     jobRepository = { listBySession: jest.fn().mockResolvedValue([]) };
     trackShared = { getTrackById: jest.fn() };
+    contentAccess = {
+      assertCanAuthor: jest.fn().mockResolvedValue(undefined),
+      assertCanModify: jest.fn().mockResolvedValue(undefined),
+    };
     costService = {
       budget: jest.fn().mockResolvedValue({
         ceilingUsd: 15,
@@ -93,6 +99,7 @@ describe('CourseCopilotSessionService', () => {
       costService as any,
       eventService as any,
       structure as any,
+      contentAccess as any,
     );
   });
 
@@ -164,6 +171,21 @@ describe('CourseCopilotSessionService', () => {
     );
   });
 
+  it('refuses to start a new course for an admin without Create Courses', async () => {
+    contentAccess.assertCanAuthor.mockRejectedValue(
+      new ForbiddenException('You can view courses but not create them.'),
+    );
+
+    await expect(service.createSession(user)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(contentAccess.assertCanAuthor).toHaveBeenCalledWith(
+      'course',
+      user.id,
+    );
+    expect(sessionRepository.save).not.toHaveBeenCalled();
+  });
+
   // ── createSession: EDIT mode ─────────────────────────────────────────────
 
   describe('createSession for an existing course (EDIT mode)', () => {
@@ -178,6 +200,23 @@ describe('CourseCopilotSessionService', () => {
       await expect(
         service.createSession(user, { trackId: 'nope' }),
       ).rejects.toThrow(NotFoundException);
+      expect(sessionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a course the admin may not change (content toggles)', async () => {
+      trackShared.getTrackById.mockResolvedValue({ ...track, createdBy: 99 });
+      contentAccess.assertCanModify.mockRejectedValue(
+        new ForbiddenException('You can only open courses you created.'),
+      );
+
+      await expect(
+        service.createSession(user, { trackId: 'track-1' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(contentAccess.assertCanModify).toHaveBeenCalledWith(
+        'course',
+        99,
+        user.id,
+      );
       expect(sessionRepository.save).not.toHaveBeenCalled();
     });
 
