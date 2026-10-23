@@ -1,0 +1,253 @@
+import {
+  StatsIcon,
+  ScribeIcon,
+  ScenarioIcon,
+  LearnIcon,
+  Leaderboard,
+  ProgressLadderIcon,
+  ReviewNavIcon,
+  Badge,
+  CharacterLibraryIcon,
+} from "@assets";
+
+import { Permissions } from "./permissions";
+import { TabId } from "./tabs";
+// Imported by relative path, not from @assets: an @assets icon here breaks every
+// test that mocks @assets explicitly, and a lucide icon breaks the ones that
+// mock lucide-react — this one has no dependencies for either to miss.
+import HelplineNavIcon from "../components/nav-sidebar/HelplineNavIcon";
+
+export const ROUTES = {
+  // Public Routes
+  LOGIN: "/login",
+  SIGNUP: "/signup",
+  HEALTH: "/health",
+  MAGIC_VERIFY: "/auth/verify",
+  SUSPENDED_USER: "/suspended-user",
+  IMPERSONATE: "/impersonate",
+  TERMS: "/terms",
+  PRIVACY: "/privacy",
+  BLOG: "/blog",
+  BLOG_POST: "/blog/:slug",
+  CHANGELOG: "/blog/changelog",
+  ROADMAP: "/blog/roadmap",
+  // Standalone public self-check. Capitalised because that is the URL the
+  // link is shared as; React Router matches it case-insensitively, so
+  // /sjt1 lands on the same page.
+  SJT1: "/SJT1",
+  // The same page with every line of its text editable in place. Public like
+  // the page it edits, and harmless for that: edits live in the editor's own
+  // browser and reach /SJT1 only by being exported and committed.
+  SJT1_EDIT: "/SJT1/edit",
+  // Standalone public report for school leadership: teacher readiness across
+  // the five SJT skills, on sample data or a CSV read in the browser.
+  SJT_REPORT1: "/sjtreport1",
+  // The conversational homepage, trialled beside /login rather than replacing
+  // it: Ally greets the visitor, and sign-in happens inside the conversation.
+  HOME_V2: "/v2",
+
+  // Private Routes
+  HOME: "/",
+  CALL_LOGS: "/call-logs",
+  AUDIO_CALL: "/audio-call",
+  SCRIBE_LOGS: "/scribe-logs",
+  ROLEPLAY_LOGS: "/roleplay-logs",
+  CALENDER: "/calender",
+  STRESS_BUSTER: "/stress-buster",
+  ANALYTICS: "/analytics",
+  SETTINGS: "/settings",
+  CHARACTER_LIBRARY: "/character-library",
+  CHARACTER_LIBRARY_INTERVIEW: "/character-library/interview",
+  SUMMARY: "/summary/:chatId",
+  SEARCH: "/search",
+  LEARN: "/learn",
+  SCENARIO: "/scenario/:scenarioId",
+  PATHWAY: "/pathway/:pathwayId",
+  CASE: "/case/:caseId",
+  // Track 2.0 (multi-component learning tracks)
+  TRACK: "/track/:trackId",
+  TRACK_ITEM: "/track/:trackId/item/:itemId",
+  TRACK_PROGRESS: "/track/:trackId/progress",
+  // A course's public share link. Must match `getCourseSharePath` in
+  // ally-admin-dashboard and the `/course` entries in public/.well-known
+  // (they hand the link to the mobile app when it is installed).
+  COURSE_LANDING: "/course/:trackId",
+  SIMULATION: "/simulation/:id/:scenarioTitle",
+  SIMULATION_SUMMARY: "/simulation-summary",
+  SIMULATION_SUMMARY_FULL: "/simulation-summary/:sessionId",
+  COMMUNITY_LEADERBOARD: "/community",
+  PROGRESS: "/progress",
+  REVIEW: "/review",
+  ACHIEVEMENTS_VIEW_ALL: "/achievements",
+  SIMULATION_REVIEW_DETAILS: "/simulation-review/:reviewId",
+  SCRIBE_REVIEW_DETAILS: "/scribe-review/:reviewId",
+  ARCHIVES: "/archives",
+  // Text helpline: the listener workspace (gated on a helpline permission AND
+  // the tenant's TEXT_HELPLINE_ENABLED toggle — see useCanUseTextHelpline).
+  HELPLINE: "/helpline",
+  HELPLINE_CHAT: "/helpline/chat/:chatId",
+  HELPLINE_HISTORY: "/helpline/history",
+  HELPLINE_MONITOR: "/helpline/monitor",
+  HELPLINE_QA: "/helpline/qa",
+  HELPLINE_QA_DETAIL: "/helpline/qa/:chatId",
+  HELPLINE_TEAM: "/helpline/team",
+  // Text helpline: the anonymous public talker page. No sign-in, no nav.
+  TALK: "/talk/:tenantCode",
+} as const;
+
+// Route builders for the Track 2.0 parameterised routes (string-only — this
+// file must not gain component/icon imports, see @assets mock note below).
+export const buildTrackRoute = (trackId: string) => `/track/${trackId}`;
+export const buildCourseLandingRoute = (trackId: string) => `/course/${trackId}`;
+export const buildTrackItemRoute = (trackId: string, itemId: string) =>
+  `/track/${trackId}/item/${itemId}`;
+/** Query param pointing the track player at a discussion post to highlight. */
+export const TRACK_DISCUSSION_POST_QUERY_PARAM = "post";
+export const buildTrackItemDiscussionPostRoute = (
+  trackId: string,
+  itemId: string,
+  postId: string,
+) =>
+  `${buildTrackItemRoute(trackId, itemId)}?${TRACK_DISCUSSION_POST_QUERY_PARAM}=${encodeURIComponent(postId)}`;
+export const buildTrackProgressRoute = (trackId: string) => `/track/${trackId}/progress`;
+export const buildHelplineChatRoute = (chatId: string) =>
+  `/helpline/chat/${encodeURIComponent(chatId)}`;
+/** A message inside a chat, for links from QA evidence quotes. */
+export const buildHelplineChatMessageRoute = (chatId: string, messageId: number) =>
+  `${buildHelplineChatRoute(chatId)}#message-${messageId}`;
+export const buildHelplineQaRoute = (chatId: string) =>
+  `/helpline/qa/${encodeURIComponent(chatId)}`;
+
+export const excludeNavBar = [
+  ROUTES.AUDIO_CALL,
+  ROUTES.SUMMARY,
+  ROUTES.STRESS_BUSTER,
+  ROUTES.SIMULATION,
+  ROUTES.SIMULATION_SUMMARY_FULL,
+  // Full-screen track player (page-turner) hides the nav bar
+  ROUTES.TRACK_ITEM,
+] as string[];
+
+export const navBarOptions = [
+  {
+    id: TabId.LEARN,
+    title: "Learn",
+    key: "nav.tabs.learn",
+    Icon: LearnIcon,
+    path: ROUTES.LEARN,
+    activePages: [
+      ROUTES.SCENARIO,
+      ROUTES.PATHWAY,
+      ROUTES.CASE,
+      ROUTES.TRACK,
+      ROUTES.TRACK_ITEM,
+      ROUTES.TRACK_PROGRESS,
+      ROUTES.COURSE_LANDING,
+    ],
+    permissions: [Permissions.EDIT_SCENARIO_SESSION],
+  },
+  {
+    id: TabId.REVIEW,
+    title: "Review",
+    key: "nav.tabs.review",
+    Icon: ReviewNavIcon,
+    path: ROUTES.REVIEW,
+    activePages: [ROUTES.REVIEW, ROUTES.SIMULATION_REVIEW_DETAILS, ROUTES.SCRIBE_REVIEW_DETAILS],
+    permissions: [Permissions.VIEW_SIMULATION_REVIEWS, Permissions.VIEW_SCRIBE_REVIEWS],
+  },
+  {
+    id: TabId.BADGES,
+    title: "Badges",
+    key: "nav.tabs.badges",
+    Icon: Badge,
+    path: ROUTES.ACHIEVEMENTS_VIEW_ALL,
+    activePages: [],
+    permissions: [Permissions.VIEW_BADGES],
+  },
+  {
+    id: TabId.PROGRESS,
+    title: "Progress",
+    key: "nav.tabs.progress",
+    Icon: ProgressLadderIcon,
+    path: ROUTES.PROGRESS,
+    activePages: [],
+    // Empty on purpose. Visibility needs more than "holds a permission" — every learner
+    // holds VIEW_USER_RANK, so the org toggle is the real gate. NavSideBar special-cases
+    // this tab id against useProgressSummary, the same escape hatch the Character
+    // Library tab uses.
+    permissions: [] as Permissions[],
+  },
+  {
+    id: TabId.LEADERBOARD,
+    title: "Community",
+    key: "nav.tabs.community",
+    Icon: Leaderboard,
+    path: ROUTES.COMMUNITY_LEADERBOARD,
+    activePages: [ROUTES.ACHIEVEMENTS_VIEW_ALL],
+    permissions: [Permissions.VIEW_LEADERBOARD],
+  },
+  {
+    id: TabId.SCRIBE_LOGS,
+    title: "Scribe Logs",
+    key: "nav.tabs.scribeLogs",
+    Icon: ScribeIcon,
+    path: ROUTES.SCRIBE_LOGS,
+    activePages: [ROUTES.ARCHIVES],
+    permissions: [Permissions.VIEW_CALL_LOGS, Permissions.VIEW_CONSOLIDATED_LOGS],
+  },
+  {
+    id: TabId.ROLEPLAY_LOGS,
+    title: "Roleplay Logs",
+    key: "nav.tabs.roleplayLogs",
+    Icon: ScenarioIcon,
+    path: ROUTES.ROLEPLAY_LOGS,
+    activePages: [],
+    permissions: [Permissions.VIEW_SCENARIO_SESSION, Permissions.VIEW_ADMIN_SCENARIO_SESSION],
+  },
+  {
+    id: TabId.ANALYTICS,
+    title: "Statistics",
+    key: "nav.tabs.statistics",
+    Icon: StatsIcon,
+    path: ROUTES.ANALYTICS,
+    activePages: [],
+    // Empty on purpose. VIEW_ANALYTICS_DASHBOARD says the user is allowed to see
+    // analytics, not that their tenant has any — a permission-only gate showed a
+    // Statistics tab to tenants whose only content was "no dashboards available".
+    // NavSideBar special-cases this tab id against useCanViewAnalytics, the same
+    // escape hatch Progress and Character Library use.
+    permissions: [] as Permissions[],
+  },
+  {
+    id: TabId.CHARACTER_LIBRARY,
+    title: "Character Library",
+    key: "nav.tabs.characterLibrary",
+    Icon: CharacterLibraryIcon,
+    path: ROUTES.CHARACTER_LIBRARY,
+    activePages: [ROUTES.CHARACTER_LIBRARY_INTERVIEW],
+    // Not permission-array-gated (same escape hatch as Progress):
+    // visibility needs the view:scenario-character permission AND the tenant's
+    // CHARACTER_LIBRARY_ENABLED org toggle, so useCanViewCharacterLibrary
+    // handles it in NavSideBar instead.
+    permissions: [] as Permissions[],
+  },
+  {
+    id: TabId.HELPLINE,
+    title: "Helpline",
+    key: "nav.tabs.helpline",
+    Icon: HelplineNavIcon,
+    path: ROUTES.HELPLINE,
+    activePages: [
+      ROUTES.HELPLINE_CHAT,
+      ROUTES.HELPLINE_HISTORY,
+      ROUTES.HELPLINE_MONITOR,
+      ROUTES.HELPLINE_QA,
+      ROUTES.HELPLINE_QA_DETAIL,
+      ROUTES.HELPLINE_TEAM,
+    ],
+    // Empty on purpose, like Character Library: visibility needs a helpline
+    // permission AND the tenant's TEXT_HELPLINE_ENABLED toggle, so
+    // useCanUseTextHelpline decides it in NavSideBar.
+    permissions: [] as Permissions[],
+  },
+];

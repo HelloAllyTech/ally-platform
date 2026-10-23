@@ -1,0 +1,233 @@
+import { useState } from "react";
+
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+
+import { logger } from "@ally-ui-mono/ui-shared";
+import type { InteractionMode } from "@ally-ui-mono/ui-shared";
+import { useEndSimulationMutation, useStartSimulationMutation } from "@api";
+import { LOCAL_STORAGE_KEYS } from "@constants";
+import { useUser } from "@hooks";
+
+interface StartSimulationParams {
+  scenarioId: number;
+  scenarioPathSessionItemId?: string;
+  caseSessionItemId?: string;
+  /** Track 2.0: link this session to a track item progress row. */
+  trackItemProgressId?: string;
+  languageId?: number;
+  /** TEXT opens a text-chat roleplay. Omitted (or VOICE) is a voice call. */
+  interactionMode?: InteractionMode;
+}
+
+interface SimulationMetadata {
+  title?: string;
+  coverImageUrl?: string;
+}
+
+interface UseStartSimulationOptions {
+  onSuccess?: () => void;
+  onError?: (error: unknown) => void;
+  isReplaceScreen?: boolean;
+}
+
+interface UseStartSimulationReturn {
+  startSimulation: ({
+    params,
+    metadata,
+  }: {
+    params: StartSimulationParams;
+    metadata?: SimulationMetadata;
+  }) => Promise<void>;
+  isStarting: boolean;
+}
+
+/**
+ * Custom hook for starting simulations with error handling and navigation
+ */
+export const useStartSimulation = (
+  options?: UseStartSimulationOptions,
+): UseStartSimulationReturn => {
+  const navigate = useNavigate();
+  const [isStarting, setIsStarting] = useState(false);
+  const [startSimulationMutation] = useStartSimulationMutation();
+  const [endSimulation] = useEndSimulationMutation();
+  const { user } = useUser();
+
+  const { isReplaceScreen = false, onSuccess = () => {}, onError = () => {} } = options || {};
+
+  const startSimulation = async ({
+    params,
+    metadata,
+  }: {
+    params: StartSimulationParams;
+    metadata?: SimulationMetadata;
+  }) => {
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const {
+        scenarioId,
+        scenarioPathSessionItemId,
+        caseSessionItemId,
+        trackItemProgressId,
+        languageId,
+        interactionMode,
+      } = params;
+      const dataParams: {
+        scenarioId: number;
+        scenarioPathSessionItemId?: string;
+        caseSessionItemId?: string;
+        trackItemProgressId?: string;
+        languageId?: number;
+        platform: "web" | "mobile-ios" | "mobile-android";
+        interactionMode?: InteractionMode;
+      } = {
+        scenarioId,
+        languageId,
+        platform: "web",
+      };
+
+      // Only a text chat is sent explicitly: a voice start stays the exact
+      // request it has always been, so nothing changes for it. A literal, not
+      // ui-shared's INTERACTION_MODE: suites mock that package wholesale.
+      if (interactionMode === "TEXT") {
+        dataParams.interactionMode = "TEXT";
+      }
+
+      if (scenarioPathSessionItemId?.length > 0) {
+        dataParams.scenarioPathSessionItemId = scenarioPathSessionItemId;
+      }
+
+      if (caseSessionItemId?.length > 0) {
+        dataParams.caseSessionItemId = caseSessionItemId;
+      }
+
+      if (trackItemProgressId?.length > 0) {
+        dataParams.trackItemProgressId = trackItemProgressId;
+      }
+
+      const { data, error } = await startSimulationMutation(dataParams);
+
+      // Handle success
+      if (data) {
+        const { scenarioSession, scenario, accessToken } = data;
+
+        // Store room data in localStorage
+        localStorage.setItem(
+          LOCAL_STORAGE_KEYS.ROOM_DATA,
+          JSON.stringify({
+            roomId: scenario?.id,
+            title: metadata?.title || scenario?.title,
+            // Challenge description + reminders stay viewable during the
+            // roleplay (SessionSidebar on the simulation screen). Reminders
+            // are also gated server-side, but check remindersEnabled here
+            // too so the client never displays them when the switch is off.
+            description: scenario?.description,
+            reminders: scenario?.remindersEnabled ? scenario?.reminders || [] : [],
+            triggerWarnings: scenario?.triggerWarnings || [],
+            localParticipant: {
+              name: user?.name,
+              coverImageUrl: user?.profileImageUrl,
+            },
+            remoteParticipant: {
+              name: scenario?.metadata?.name || metadata?.title,
+              coverImageUrl: scenario?.coverImageUrl || metadata?.coverImageUrl,
+            },
+            accessToken: accessToken.token,
+            createdAt: scenarioSession.startedAt,
+            serverUrl: accessToken.serverUrl,
+            checklistEvents: scenario?.checklistEvents || [],
+            experienceMode: scenario?.experienceMode,
+            checklistType: scenario?.checklistType,
+            maxTimeValue: scenario?.maxTimeValue,
+            timerMode: scenario?.timerMode,
+            showScoreMeter: scenario?.showScoreMeter,
+            pauseEnabled: scenario?.pauseEnabled,
+            // Opt-in per roleplay — drives the Supervisor tab in the session
+            // sidebar. The agent gates note generation independently, so this
+            // only controls whether the learner has somewhere to read them.
+            supervisorNotesEnabled: scenario?.supervisorNotesEnabled === true,
+            // Opt-in per roleplay, same shape. The agent decides separately
+            // whether to publish video (its own global kill-switch), and the
+            // interface only swaps in a video surface once a track actually
+            // arrives — so this being true never degrades the audio-only view.
+            videoActorEnabled: scenario?.videoActorEnabled === true,
+            // Opt-out per roleplay, unlike supervisorNotesEnabled above: only an
+            // explicit false hides the learner-facing Live tab.
+            liveTabEnabled: scenario?.liveTabEnabled !== false,
+            stateNames: scenario?.stateNames || [],
+            difficultyLevel: scenario?.difficultyLevel,
+            // Which session screen to open. The server's answer, not the
+            // request: it is what the agent was actually dispatched as.
+            interactionMode: scenario?.interactionMode ?? "VOICE",
+          }),
+        );
+
+        // Call success callback if provided
+        onSuccess?.();
+
+        // Navigate to simulation room
+        const scenarioTitle = metadata?.title || scenario?.title;
+        navigate(`/simulation/${scenarioSession.id}/${scenarioTitle}`, {
+          replace: isReplaceScreen,
+        });
+
+        setIsStarting(false);
+        return;
+      }
+
+      // Handle error
+      if (error) {
+        const errorData = error as {
+          data?: { statusCode?: number; entityId?: string; message?: string };
+        };
+
+        if (errorData.data?.statusCode === 403) {
+          // The roleplay v2 gate throws two distinct, useful messages —
+          // "not currently enabled" (rollout not live yet) vs. "not
+          // available for this account yet" (allowlist) — collapsing both
+          // into one generic string left the learner with no way to tell a
+          // platform-wide rollout state from an account-specific one. Only
+          // the two known, curated gate strings are shown verbatim; any
+          // other 403 still gets the safe generic message.
+          const knownGateMessages = [
+            "Roleplay v2 is not currently enabled.",
+            "Roleplay v2 is not available for this account yet.",
+            // Text-chat gate (org switch off, or the roleplay doesn't offer
+            // it). Both name the way forward: start it as a voice call.
+            "Text chat roleplays are not switched on for your organisation. You can still start this roleplay as a voice call.",
+            "This roleplay is not available as a text chat. You can still start it as a voice call.",
+          ];
+          const backendMessage = errorData.data?.message;
+          toast.error(
+            backendMessage && knownGateMessages.includes(backendMessage)
+              ? backendMessage
+              : "You are not authorized to start this simulation",
+          );
+        } else if (errorData.data?.statusCode === 400 && errorData?.data?.entityId) {
+          // End previous simulation and retry
+          await endSimulation({ sessionId: errorData?.data?.entityId });
+          toast.success("Previous simulation ended. Starting new one...");
+        } else {
+          toast.error(errorData?.data?.message || "Failed to start simulation");
+        }
+
+        // Call error callback if provided
+        onError?.(error);
+        setIsStarting(false);
+        return;
+      }
+    } catch (error) {
+      logger.error("Failed to start simulation");
+      toast.error("An unexpected error occurred");
+      onError?.(error);
+      setIsStarting(false);
+    }
+  };
+
+  return {
+    startSimulation,
+    isStarting,
+  };
+};

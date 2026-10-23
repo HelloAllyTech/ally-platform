@@ -1,0 +1,1646 @@
+import { useMemo, useState } from "react";
+
+import { LineChart, SimpleBarChart } from "@carbon/charts-react";
+
+import {
+  useGetActivationQuery,
+  useGetAnalyticsHighlightsQuery,
+  useGetAnalyticsOverviewQuery,
+  useGetCompletionRateQuery,
+  useGetLearnerKpisQuery,
+  useGetXpGrowthQuery,
+} from "@api";
+import { AnalyticsBucket, AnalyticsGrain } from "@types";
+
+import {
+  AnalyticsTabFilters,
+  PLATFORM_WIDE_NOTE,
+  asOf,
+  asOfStamp,
+  isUnscoped,
+  windowLabel,
+} from "../analyticsFilters";
+import {
+  DEFAULT_GROUPING,
+  GROUPING_LABEL,
+  bucketTitle,
+  grainAsBucket,
+  groupingNote,
+  inProgressCaption,
+  isInProgress,
+  useChartGrouping,
+  useGrainQueries,
+  withoutInProgress,
+} from "../analyticsGrouping";
+import { useAnalyticsOrgScope } from "../analyticsOrgScope";
+import { ChartDetailModal } from "../ChartDetailModal";
+import {
+  ChartCard,
+  GroupingPicker,
+  KpiTile,
+  KpiTileProps,
+  MIN_N_FOR_SCORE,
+  ScrollableChart,
+  boundedDomainNote,
+  buildSource,
+  hBarOpts,
+  lineOpts,
+  timeBarOpts,
+} from "../chartKit";
+import { CONTEXT, PALETTE } from "../chartScales";
+import { CohortRetentionCard } from "../CohortRetentionCard";
+import { FunnelBars } from "../FunnelBars";
+import {
+  CSAT_SCALE,
+  COST_PER_SIM_SCALE,
+  CUMULATIVE_XP_SCALE,
+  RATING_DOMAIN,
+  SCORE_DOMAIN,
+  TOTAL_COST_SCALE,
+  buildActiveUserMultiples,
+  buildCostPerSimSeries,
+  buildCsatTrendSeries,
+  buildCumulativeUsersSeries,
+  buildCumulativeXpSeries,
+  buildPracticeMinutesSeries,
+  buildRoleBars,
+  buildSimulationsSeries,
+  buildTopOrgBars,
+  buildTotalCostSeries,
+  buildTrackFunnelStages,
+  formatKpi,
+  sparkValues,
+  totalUnpricedCalls,
+} from "../highlightsChart";
+import { RoleplayVolumeCard } from "../RoleplayVolumeCard";
+import {
+  COMPLETION_SCALE,
+  PCT_DOMAIN,
+  PRACTISING_SCALE,
+  allRatesMissing,
+  buildCompletionRateSeries,
+  buildPractisingLearnersSeries,
+  formatCount,
+  formatPct,
+  practisingTakeaway,
+} from "../testingChart";
+import { UsageLevelCard } from "../UsageLevelCard";
+
+const EMPTY_SIMS_POINTS = [];
+const EMPTY_CSAT_POINTS = [];
+const EMPTY_COST_POINTS = [];
+const EMPTY_XP_POINTS = [];
+const EMPTY_TOTAL_COST_POINTS = [];
+
+const SubHeading = ({ children }: { children: string }) => (
+  <h2 className="text-xs font-medium tracking-wide text-typography-500 mt-8 mb-3">{children}</h2>
+);
+
+/**
+ * KPI tiles drawn from platform-wide sources: the overview endpoint (users)
+ * and the /highlights sections withheld from an org-restricted admin.
+ */
+const PLATFORM_WIDE_KPI_LABELS = new Set([
+  "Total users",
+  "Active users",
+  "Active orgs",
+  "AI cost / sim",
+]);
+
+/** Note appended to a panel that stayed platform-wide under a tenant filter. */
+const scopeNote = (unscoped: boolean) => (unscoped ? ` · ${PLATFORM_WIDE_NOTE}` : "");
+
+/**
+ * The charts on this tab that carry their own grouping control.
+ *
+ * A chart is listed here when re-grouping it re-grains the SAME metric. The
+ * DAU/WAU/MAU small multiples are deliberately absent: those are trailing-window
+ * definitions sampled once per day, so "monthly DAU" is not this metric at a
+ * coarser grain, it is a different measurement. Users-by-role, the track funnel
+ * and the per-org ranking have no time axis at all, and the three fixed-window
+ * cards (cohort retention, usage levels, roleplay volume) own their own grain by
+ * construction.
+ */
+type ChartId = "sims" | "csat" | "costPerSim" | "totalCost" | "wpl" | "completion" | "xp";
+
+/**
+ * Which endpoint feeds each chart.
+ *
+ * Split so a grain is only fetched from the endpoint that needs it: re-graining
+ * a growth chart must not re-run the highlights aggregation (thirteen parallel
+ * queries) for a grain nothing on that side is showing.
+ */
+const OVERVIEW_CHARTS = ["sims"] as const;
+const HIGHLIGHTS_CHARTS = ["csat", "costPerSim", "totalCost"] as const;
+
+const CHART_IDS: ChartId[] = [...OVERVIEW_CHARTS, ...HIGHLIGHTS_CHARTS, "wpl", "completion", "xp"];
+
+/**
+ * A weekly-or-coarser metric: a daily north star is noise, a yearly one hides
+ * it. Quarter sits between month and year — still coarser than the metric's
+ * own daily grain, but not the "hides it" case year is excluded for — so it
+ * joins week/month rather than being held back with year.
+ */
+const WPL_GRAINS: AnalyticsBucket[] = ["week", "month", "quarter"];
+
+// `DEFAULT_GROUPING` is typed `AnalyticsGrain` (Phase 1 widening); this whole
+// tab is mechanism B, migrated in a later phase, and stays bucket-only.
+const DEFAULT_BUCKET = grainAsBucket(DEFAULT_GROUPING);
+
+/**
+ * `hQ`/`oQ` below are hand-rolled to one hook per SQL-bucketable grain — now
+ * five, `quarter` included (Phase 4 mechanism-B migration; Phase 0/2 already
+ * made `quarter` a legal bucket on both endpoints, so this is no new backend
+ * query shape, just one more fixed branch). They stay bucket-only: neither
+ * endpoint has an unbucketed "whole window" query of its own, so a chart fed
+ * by one that wants an All-time KPI reads it off the SAME bucketed response's
+ * `summary` (already a genuine whole-window aggregate on both DTOs, not a
+ * fold of the bucketed rows) rather than adding a sixth "allTime" hook.
+ */
+const BASE_HQ_OQ_BUCKET: AnalyticsBucket = "month";
+
+/** Every SQL-bucketable grain — the options list for a chart adding "quarter". */
+const QUARTER_GRAINS: AnalyticsBucket[] = ["day", "week", "month", "quarter", "year"];
+
+/** `QUARTER_GRAINS` plus "All time", for a chart with a genuine whole-window KPI. */
+const ALL_TIME_GRAINS: AnalyticsGrain[] = [...QUARTER_GRAINS, "allTime"];
+
+/**
+ * Every chart opens on the same grain, so the first paint is two requests.
+ *
+ * The north star is the one exception: "practising learners this week" is the
+ * metric by definition, not a monthly figure read at a finer grain, so it opens
+ * on week.
+ */
+const DEFAULT_GROUPINGS = {
+  ...(Object.fromEntries(CHART_IDS.map(id => [id, DEFAULT_BUCKET])) as Record<
+    ChartId,
+    AnalyticsBucket
+  >),
+  wpl: "week" as AnalyticsBucket,
+};
+
+/**
+ * Platform — the whole-platform picture, the first sub-tab of Highlights.
+ *
+ * Was the Highlights tab in its entirety until the tab gained sub-tabs; the
+ * charts and their reasoning are unchanged, and the four sibling sub-tabs
+ * (usage levels, orgs, quality, unit economics) sit beside it rather than
+ * displacing anything here.
+ *
+ * This absorbed the former separate "Overview" tab. The two had four charts in
+ * common, rendered identically from the same data, which meant a reader could
+ * compare a number with itself and think they had corroborated it. Each chart now
+ * lives in exactly one place.
+ *
+ * The tab is organised into five sections with **one focal tile each** and the
+ * supporting tiles in greys: if every panel shouts, the page has no focus, and
+ * salience has to be budgeted across the whole screen rather than per chart.
+ *
+ * ## Window and grain
+ *
+ * The tab is **all-time** and shows no time-range picker (declared by
+ * `TabDef.uses.range` in Analytics.tsx, which drives both the picker and the
+ * window queried, so the two cannot disagree). Leadership's question here is
+ * about the whole history; what replaces the page-level range is **per-chart
+ * grouping** — each time series carries its own day/week/month/year control, so
+ * one reader can look at years of growth and weeks of quality at the same time.
+ *
+ * Grouping resolves SERVER-side: one query per grain currently on screen,
+ * deduplicated by RTK Query. Re-binning on the client would be correct only for
+ * counts and sums — a mean of monthly means weights a quiet month like a busy
+ * one, and a median or p95 cannot be recovered from bucketed values at all. The
+ * base grain stays fetched even when no chart shows it, because the KPI strip,
+ * the funnel and the per-org ranking read from that response.
+ *
+ * Two consequences this surface states rather than hides:
+ *  - **No KPI deltas.** An all-time window has no equal-length predecessor, so
+ *    the server returns no comparison basis and each tile shows its bare value
+ *    with its sample size. A "+12%" with no named basis is not a fact about
+ *    anything, so the arrow goes rather than the basis being invented.
+ *  - **The current period is left off every plot.** It is still accruing, so it
+ *    can only rise and would draw as a fall. It stays in the expanded table and
+ *    the export, flagged, which is where a provisional number belongs.
+ */
+export const PlatformSubTab = ({ query }: AnalyticsTabFilters) => {
+  // An org-restricted admin sees only what narrows to their org: the
+  // platform-wide overview endpoint is not requested, and the cards built on it
+  // or on the /highlights sections the server withholds from them (org
+  // adoption, AI spend) are not drawn.
+  const { restricted } = useAnalyticsOrgScope();
+  const { groupingFor, setGrouping } = useChartGrouping<ChartId>(DEFAULT_GROUPINGS, DEFAULT_BUCKET);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  /**
+   * "All time" isn't a bucket `useChartGrouping` can store — that hook stays
+   * bucket-only (see its file doc) — so it is tracked here as a flag layered
+   * on top, per chart. A chart's real bucket (`groupingFor`) is left exactly
+   * where it was when the reader last picked one, so flipping All-time back
+   * off returns to that grain rather than resetting to the default.
+   */
+  const [allTimeCharts, setAllTimeCharts] = useState<Set<ChartId>>(new Set());
+  const grainFor = (chart: ChartId): AnalyticsGrain =>
+    allTimeCharts.has(chart) ? "allTime" : groupingFor(chart);
+  const setGrain = (chart: ChartId, grouping: AnalyticsGrain) => {
+    const isAllTime = grouping === "allTime";
+    setAllTimeCharts(prev => {
+      if (prev.has(chart) === isAllTime) return prev;
+      const next = new Set(prev);
+      if (isAllTime) next.add(chart);
+      else next.delete(chart);
+      return next;
+    });
+    if (!isAllTime) setGrouping(chart, grouping);
+  };
+  /**
+   * The real SQL bucket a chart's response is actually fetched at, even in
+   * All-time mode: neither endpoint below has an unbucketed "whole window"
+   * query of its own, so All-time reads its KPI off the SAME bucketed
+   * response's `summary` (a genuine server-computed whole-window aggregate,
+   * not a client fold of the bucketed rows — see `BASE_HQ_OQ_BUCKET`'s doc).
+   */
+  const resolvedBucket = (chart: ChartId): AnalyticsBucket => grainAsBucket(grainFor(chart));
+
+  /* ------------------------- one query per grain --------------------------- */
+  //
+  // Five hooks per endpoint, fixed in number so hook order is stable, each
+  // skipped unless a chart FED BY THAT ENDPOINT is reading that grain. Untouched,
+  // this is exactly two requests — the same as before the control existed — and
+  // re-graining one chart adds exactly one. `compare` is never requested: the
+  // window is all-time, which has no comparison basis.
+  const hBuckets = new Set<AnalyticsBucket>([
+    BASE_HQ_OQ_BUCKET,
+    ...HIGHLIGHTS_CHARTS.map(resolvedBucket),
+  ]);
+  const oBuckets = new Set<AnalyticsBucket>([
+    BASE_HQ_OQ_BUCKET,
+    ...OVERVIEW_CHARTS.map(resolvedBucket),
+  ]);
+
+  const hQ = {
+    day: useGetAnalyticsHighlightsQuery(
+      { ...query, bucket: "day" },
+      { skip: !hBuckets.has("day") },
+    ),
+    week: useGetAnalyticsHighlightsQuery(
+      { ...query, bucket: "week" },
+      { skip: !hBuckets.has("week") },
+    ),
+    month: useGetAnalyticsHighlightsQuery(
+      { ...query, bucket: "month" },
+      { skip: !hBuckets.has("month") },
+    ),
+    quarter: useGetAnalyticsHighlightsQuery(
+      { ...query, bucket: "quarter" },
+      { skip: !hBuckets.has("quarter") },
+    ),
+    year: useGetAnalyticsHighlightsQuery(
+      { ...query, bucket: "year" },
+      { skip: !hBuckets.has("year") },
+    ),
+  };
+  const oQ = {
+    day: useGetAnalyticsOverviewQuery(
+      { ...query, bucket: "day" },
+      { skip: restricted || !oBuckets.has("day") },
+    ),
+    week: useGetAnalyticsOverviewQuery(
+      { ...query, bucket: "week" },
+      { skip: restricted || !oBuckets.has("week") },
+    ),
+    month: useGetAnalyticsOverviewQuery(
+      { ...query, bucket: "month" },
+      { skip: restricted || !oBuckets.has("month") },
+    ),
+    quarter: useGetAnalyticsOverviewQuery(
+      { ...query, bucket: "quarter" },
+      { skip: restricted || !oBuckets.has("quarter") },
+    ),
+    year: useGetAnalyticsOverviewQuery(
+      { ...query, bucket: "year" },
+      { skip: restricted || !oBuckets.has("year") },
+    ),
+  };
+
+  // The north-star pair. Each is fed by an endpoint of its own and read at ONE
+  // grain — the chart's — because the tiles beside them are grain-dependent too
+  // ("practising learners in the latest full week" is a different number at a
+  // monthly grain), so pinning a base grain here would only fetch a response
+  // nothing displays.
+  const activationQ = useGrainQueries(
+    useGetActivationQuery,
+    query,
+    new Set([resolvedBucket("wpl")]),
+  );
+  const completionQ = useGrainQueries(
+    useGetCompletionRateQuery,
+    query,
+    new Set([resolvedBucket("completion")]),
+  );
+  const activation = activationQ[resolvedBucket("wpl")];
+  const completion = completionQ[resolvedBucket("completion")];
+
+  // Cumulative platform XP. Its own endpoint (the append-only xp_events ledger)
+  // and read at ONE grain — the chart's — because nothing else on this tab reads
+  // from it, so pinning a base grain would only fetch a response nothing shows.
+  const xpQ = useGrainQueries(useGetXpGrowthQuery, query, new Set([resolvedBucket("xp")]));
+  const xpGrowthQ = xpQ[resolvedBucket("xp")];
+
+  // LEARNER-role-scoped counterparts of the overview KPIs above, which count
+  // every account regardless of role. All-time: a lifetime headcount has no
+  // window to narrow.
+  const tenantOnly = useMemo(() => ({ tenantId: query.tenantId }), [query.tenantId]);
+  const learnerKpis = useGetLearnerKpisQuery(tenantOnly);
+
+  // The base response. KPIs and the panels with no time axis read from here, so
+  // they do not blink out when the last chart on this grain is switched away.
+  const highlights = hQ[BASE_HQ_OQ_BUCKET];
+  const overview = oQ[BASE_HQ_OQ_BUCKET];
+
+  const highlightsLoading = highlights.isLoading && !highlights.data;
+  const overviewLoading = overview.isLoading && !overview.data;
+
+  const h = highlights.data;
+  const o = overview.data;
+  const summary = h?.summary;
+  const overviewSummary = o?.summary;
+
+  const hWindow = windowLabel(h?.window);
+  const oWindow = windowLabel(o?.window);
+
+  const costUnscoped = isUnscoped("costPerSim", h?.scoping);
+  const orgsUnscoped = isUnscoped("topOrgs", h?.scoping);
+
+  /**
+   * The grouping control for one chart. A function returning an element, not a
+   * component defined in the render body — a fresh component identity each
+   * render would remount the picker (and unmount the chart's sibling subtree)
+   * every time any state on this tab changed.
+   */
+  const picker = (chart: ChartId, options: AnalyticsGrain[] = QUARTER_GRAINS) => (
+    <GroupingPicker
+      id={`highlights-grouping-${chart}`}
+      value={grainFor(chart)}
+      onChange={grouping => setGrain(chart, grouping)}
+      options={options}
+    />
+  );
+
+  /**
+   * Whether a chart's OWN grain is still in flight, not the tab as a whole.
+   *
+   * `isUninitialized` counts: on the render where a grain is first selected the
+   * hook has only just stopped being skipped, so it reports neither loading nor
+   * fetching yet. Without it the card renders its empty state ("No data for this
+   * range") for a frame before the request it is waiting on has even started.
+   */
+  const busy = (q: {
+    isLoading: boolean;
+    isFetching: boolean;
+    isUninitialized: boolean;
+    data?: unknown;
+  }) => !q.data && (q.isLoading || q.isFetching || q.isUninitialized);
+
+  /* --------------------- per-chart responses and grains -------------------- */
+
+  const simsQ = oQ[resolvedBucket("sims")];
+  const csatQ = hQ[resolvedBucket("csat")];
+  const costPerSimQ = hQ[resolvedBucket("costPerSim")];
+  const totalCostQ = hQ[resolvedBucket("totalCost")];
+
+  const grain = {
+    sims: grainFor("sims"),
+    csat: grainFor("csat"),
+    costPerSim: grainFor("costPerSim"),
+    totalCost: grainFor("totalCost"),
+    wpl: grainFor("wpl"),
+    completion: grainFor("completion"),
+    xp: grainFor("xp"),
+  };
+
+  /* ----------------------------- plotted series ---------------------------- */
+  //
+  // `withoutInProgress` strips the still-accruing period from what is PLOTTED
+  // only. The detail tables below read the full arrays and flag that row.
+
+  const simsPoints = simsQ.data?.simulationsCompleted ?? EMPTY_SIMS_POINTS;
+  const simsInProgress = simsQ.data?.window.inProgressBucket;
+  const sims = useMemo(
+    () => buildSimulationsSeries(withoutInProgress(simsPoints, p => p.bucket, simsInProgress)),
+    [simsPoints, simsInProgress],
+  );
+
+  const csatPoints = csatQ.data?.csatTrend ?? EMPTY_CSAT_POINTS;
+  const csatInProgress = csatQ.data?.window.inProgressBucket;
+  const csat = useMemo(
+    () => buildCsatTrendSeries(withoutInProgress(csatPoints, p => p.bucket, csatInProgress)),
+    [csatPoints, csatInProgress],
+  );
+
+  const costPoints = costPerSimQ.data?.costPerSim ?? EMPTY_COST_POINTS;
+  const costInProgress = costPerSimQ.data?.window.inProgressBucket;
+  const costPerSim = useMemo(
+    () => buildCostPerSimSeries(withoutInProgress(costPoints, p => p.bucket, costInProgress)),
+    [costPoints, costInProgress],
+  );
+  const unpriced = useMemo(() => totalUnpricedCalls(costPoints), [costPoints]);
+
+  const xpPoints = xpGrowthQ.data?.points ?? EMPTY_XP_POINTS;
+  const xpInProgress = xpGrowthQ.data?.window.inProgressBucket;
+  const cumulativeXp = useMemo(
+    () => buildCumulativeXpSeries(withoutInProgress(xpPoints, p => p.bucket, xpInProgress)),
+    [xpPoints, xpInProgress],
+  );
+  // The change behind the curve, for the card's takeaway. Read from the last
+  // COMPLETE period — the accruing one can only rise, so quoting it would
+  // understate the figure by however much of the period is left to run.
+  const latestCompleteXp = useMemo(() => {
+    const complete = withoutInProgress(xpPoints, p => p.bucket, xpInProgress);
+    return complete.length > 0 ? complete[complete.length - 1] : undefined;
+  }, [xpPoints, xpInProgress]);
+
+  const totalCostPoints = totalCostQ.data?.costPerSim ?? EMPTY_TOTAL_COST_POINTS;
+  const totalCostInProgress = totalCostQ.data?.window.inProgressBucket;
+  const totalCost = useMemo(
+    () =>
+      buildTotalCostSeries(withoutInProgress(totalCostPoints, p => p.bucket, totalCostInProgress)),
+    [totalCostPoints, totalCostInProgress],
+  );
+
+  /* --------------- base-response panels (no grain of their own) ------------- */
+
+  const activeMultiples = useMemo(() => buildActiveUserMultiples(o?.activeUsers ?? []), [o]);
+  const roles = useMemo(() => buildRoleBars(o?.usersByRole ?? []), [o]);
+  const topOrgs = useMemo(() => buildTopOrgBars(h?.topOrgs ?? [], h?.topOrgsBelowFloor), [h]);
+  const funnelStages = useMemo(() => buildTrackFunnelStages(h?.trackFunnel), [h]);
+
+  /* ------------------------------- KPIs ----------------------------------- */
+
+  const baseInProgress = h?.window.inProgressBucket;
+  const baseOverviewInProgress = o?.window.inProgressBucket;
+
+  // Sparklines come from the BASE grain, not from each chart's grain: a KPI's
+  // trend should not change shape because someone re-grouped one chart below it.
+  // They drop the accruing period for the same reason the plots do.
+  const kpiSparks = useMemo(() => {
+    const growth = withoutInProgress(o?.userGrowth ?? [], p => p.date, baseOverviewInProgress);
+    return {
+      cumulative: sparkValues(buildCumulativeUsersSeries(growth)),
+      sims: sparkValues(
+        buildSimulationsSeries(
+          withoutInProgress(o?.simulationsCompleted ?? [], p => p.bucket, baseOverviewInProgress),
+        ),
+      ),
+      practice: sparkValues(
+        buildPracticeMinutesSeries(
+          withoutInProgress(h?.practiceMinutes ?? [], p => p.bucket, baseInProgress),
+        ),
+      ),
+      csat: sparkValues(
+        buildCsatTrendSeries(withoutInProgress(h?.csatTrend ?? [], p => p.bucket, baseInProgress)),
+      ),
+      costPerSim: sparkValues(
+        buildCostPerSimSeries(
+          withoutInProgress(h?.costPerSim ?? [], p => p.bucket, baseInProgress),
+        ),
+      ),
+    };
+  }, [h, o, baseInProgress, baseOverviewInProgress]);
+
+  // Each tile states what it counts, in one line, on its face. The strip is the
+  // part of this page most likely to be screenshotted on its own, and a bare
+  // "Active orgs: 0" is not interpretable without knowing that "active" means a
+  // COMPLETED simulation and that the figure covers all of the platform's
+  // history. Definitions are worded to match the derivations the charts cite.
+  //
+  // No `delta` / `comparisonLabel` on any tile: the window is all-time, so the
+  // server returns no comparison basis and there is nothing honest to compare
+  // against. The tiles fall back to showing their sample size.
+  const allKpis = [
+    {
+      label: "Total users",
+      description: "Every registered account, all time.",
+      value: formatKpi(overviewSummary?.totalUsers),
+      spark: kpiSparks.cumulative,
+      loading: overviewLoading,
+      error: overview.isError,
+      onRetry: overview.refetch,
+    },
+    {
+      label: "Active users",
+      description:
+        "Distinct people who have started at least one simulation — started, not necessarily finished.",
+      value: formatKpi(overviewSummary?.activeUsers),
+      loading: overviewLoading,
+      error: overview.isError,
+      onRetry: overview.refetch,
+    },
+    {
+      label: "Active orgs",
+      description:
+        "Organisations with at least one completed simulation. An org that only browsed does not count.",
+      value: formatKpi(summary?.activeOrgs),
+      loading: highlightsLoading,
+      error: highlights.isError,
+      onRetry: highlights.refetch,
+    },
+    {
+      label: "Completed sims",
+      description:
+        "Roleplay sessions played through to the end. Abandoned and failed runs are excluded.",
+      value: formatKpi(summary?.completedSimulations),
+      spark: kpiSparks.sims,
+      loading: highlightsLoading,
+      error: highlights.isError,
+      onRetry: highlights.refetch,
+    },
+    {
+      label: "Practice minutes",
+      description:
+        "Total minutes learners spent practising, summed across everyone. A few heavy users can carry this on their own.",
+      value: formatKpi(summary?.practiceMinutes),
+      spark: kpiSparks.practice,
+      loading: highlightsLoading,
+      error: highlights.isError,
+      onRetry: highlights.refetch,
+    },
+    {
+      label: "Avg quality score",
+      description: `Mean composite score of evaluated sessions, ${SCORE_DOMAIN[0]}–${SCORE_DOMAIN[1]}, judged by an LLM against the scenario rubric. The full trend now lives on the Quality & sentiment sub-tab, as the Roleplay Quality Index.`,
+      value: formatKpi(summary?.avgCompositeScore, { decimals: 1 }),
+      // Below the documented minimum this tile shows "not enough data" instead:
+      // a one-decimal mean of a handful of LLM-judged sessions is noise wearing
+      // a decimal point.
+      //
+      // No `spark` here any more: its source, the per-bucket qualityTrend
+      // series, was retired from this endpoint along with the trend chart it
+      // fed (superseded by the Roleplay Quality Index). This tile keeps only
+      // the whole-window figure `getQualityOverall` still provides.
+      n: summary?.evaluatedSessions,
+      nUnit: "evaluated sessions",
+      minN: MIN_N_FOR_SCORE,
+      loading: highlightsLoading,
+      error: highlights.isError,
+      onRetry: highlights.refetch,
+    },
+    {
+      label: "Avg rating",
+      description: `Mean ${RATING_DOMAIN[0]}–${RATING_DOMAIN[1]} rating learners gave after a session. Rating is optional, so this covers only those who answered.`,
+      value: formatKpi(summary?.avgCsat, { decimals: 2 }),
+      n: summary?.csatResponses,
+      nUnit: "responses",
+      minN: MIN_N_FOR_SCORE,
+      spark: kpiSparks.csat,
+      loading: highlightsLoading,
+      error: highlights.isError,
+      onRetry: highlights.refetch,
+    },
+    {
+      label: "AI cost / sim",
+      // The scope note is on the tile, not just on the chart below: this tile
+      // draws from the same unattributable spend rows, so under a tenant filter
+      // it is a platform-wide number and has to say so where it is read.
+      description:
+        "Estimated AI spend (LLM + speech-to-text + text-to-speech) divided by completed sims. Priced at read time, not a billed figure." +
+        scopeNote(costUnscoped),
+      value: formatKpi(summary?.costPerCompletedSimUsd, { prefix: "$", decimals: 2 }),
+      spark: kpiSparks.costPerSim,
+      loading: highlightsLoading,
+      error: highlights.isError,
+      onRetry: highlights.refetch,
+    },
+  ];
+
+  const kpis = restricted
+    ? allKpis.filter(kpi => !PLATFORM_WIDE_KPI_LABELS.has(kpi.label))
+    : allKpis;
+
+  /* ---------------------- north star & learner counts ---------------------- */
+
+  const a = activation.data;
+  const wplInProgress = a?.window.inProgressBucket;
+  const wplPoints = useMemo(
+    () => withoutInProgress(a?.practisingLearners ?? [], p => p.bucket, wplInProgress),
+    [a, wplInProgress],
+  );
+  const wplSeries = useMemo(() => buildPractisingLearnersSeries(wplPoints), [wplPoints]);
+
+  const completionData = completion.data;
+  const completionInProgress = completionData?.window.inProgressBucket;
+  const completionPoints = useMemo(
+    () => withoutInProgress(completionData?.points ?? [], p => p.bucket, completionInProgress),
+    [completionData, completionInProgress],
+  );
+  const completionSeries = useMemo(
+    () => buildCompletionRateSeries(completionPoints),
+    [completionPoints],
+  );
+
+  // Monthly signups double as the "new learners" trend: an all-time endpoint has
+  // no window to bucket by grain, so this one series is month-grained by
+  // construction and carries no picker.
+  const lk = learnerKpis.data;
+  const learnerSignupSeries = useMemo(
+    () =>
+      (lk?.signupsByMonth ?? []).map(p => ({
+        group: "New learners",
+        key: p.month,
+        value: p.newLearners,
+      })),
+    [lk],
+  );
+
+  /* ------------------------------ options --------------------------------- */
+  //
+  // Memoised on the chart's own grain: the axis title is the only thing in these
+  // that varies, and a fresh options object on every render makes Carbon re-apply
+  // (and re-animate) the chart.
+
+  const xpOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "XP",
+        bottomTitle: bucketTitle(grain.xp),
+        colorScale: CUMULATIVE_XP_SCALE,
+        legend: false,
+      }),
+    [grain.xp],
+  );
+  const simsOpts = useMemo(
+    () =>
+      timeBarOpts({
+        leftTitle: "Completed",
+        bottomTitle: bucketTitle(grain.sims),
+        colorScale: { Simulations: CONTEXT.line },
+      }),
+    [grain.sims],
+  );
+  const rolesOpts = useMemo(
+    () =>
+      hBarOpts({
+        bottomTitle: "Users",
+        colorScale: {
+          ...roles.bars.reduce(
+            (acc, b, i) => ({ ...acc, [b.group]: i === 0 ? "#264D8E" : CONTEXT.line }),
+            {},
+          ),
+        },
+      }),
+    [roles],
+  );
+  const csatOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Rating",
+        bottomTitle: bucketTitle(grain.csat),
+        colorScale: CSAT_SCALE,
+        legend: false,
+        domain: RATING_DOMAIN,
+      }),
+    [grain.csat],
+  );
+  const csatZoomedOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Rating",
+        bottomTitle: bucketTitle(grain.csat),
+        colorScale: CSAT_SCALE,
+        legend: false,
+      }),
+    [grain.csat],
+  );
+  const orgsOpts = useMemo(
+    () =>
+      hBarOpts({
+        bottomTitle: "Completed simulations",
+        colorScale: topOrgs.reduce(
+          (acc, b, i) => ({ ...acc, [b.group]: i === 0 ? "#264D8E" : CONTEXT.line }),
+          {},
+        ),
+      }),
+    [topOrgs],
+  );
+  const costPerSimOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "USD per simulation",
+        bottomTitle: bucketTitle(grain.costPerSim),
+        colorScale: COST_PER_SIM_SCALE,
+        legend: false,
+      }),
+    [grain.costPerSim],
+  );
+  const totalCostOpts = useMemo(
+    () =>
+      timeBarOpts({
+        leftTitle: "USD",
+        bottomTitle: bucketTitle(grain.totalCost),
+        colorScale: TOTAL_COST_SCALE,
+      }),
+    [grain.totalCost],
+  );
+  const wplOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Learners",
+        bottomTitle: bucketTitle(grain.wpl),
+        colorScale: PRACTISING_SCALE,
+        legend: false,
+      }),
+    [grain.wpl],
+  );
+  const completionOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Completed of started (%)",
+        bottomTitle: bucketTitle(grain.completion),
+        colorScale: COMPLETION_SCALE,
+        legend: false,
+        domain: PCT_DOMAIN,
+      }),
+    [grain.completion],
+  );
+  const completionZoomedOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Completed of started (%)",
+        bottomTitle: bucketTitle(grain.completion),
+        colorScale: COMPLETION_SCALE,
+        legend: false,
+      }),
+    [grain.completion],
+  );
+  const learnerSignupOpts = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "New learners",
+        legend: false,
+        colorScale: { "New learners": PALETTE.blue },
+      }),
+    [],
+  );
+
+  /* --------------------------- detail tables ------------------------------ */
+
+  /** Bucket label for a table row, flagged while the period is still accruing. */
+  const rowKey = (bucket: string, inProgress?: string | null) =>
+    isInProgress(bucket, inProgress) ? `${bucket} (in progress)` : bucket;
+
+  /** The header lines every export carries: window, grain, and the omission. */
+  const exportLines = (
+    window: string,
+    grouping: AnalyticsGrain,
+    inProgress?: string | null,
+    ...extra: string[]
+  ) => [
+    `Window: ${window}`,
+    `Grouping: ${bucketTitle(grouping)}`,
+    ...(inProgress
+      ? [`${inProgress} is still accruing — provisional, and omitted from the chart`]
+      : []),
+    ...extra,
+  ];
+
+  const costUnpricedNote =
+    unpriced > 0
+      ? ` · ${unpriced.toLocaleString()} calls had no pricing entry, so this UNDERSTATES real spend`
+      : " · every call in this window was priced";
+
+  /* --------------------------- All-time KPI tiles -------------------------- */
+  //
+  // Each reads OFF THE SAME bucketed response as the trend above it (see
+  // `resolvedBucket`'s doc) — every field below is a genuine whole-window
+  // aggregate the server already computes, not a client-side fold of the
+  // bucketed points (which would be wrong for a mean, a median, or a distinct
+  // count). A chart with no such aggregate, or where "the whole window as one
+  // number" asks a different question than the trend does (the north star,
+  // the new/returning partition, a per-period signup count that would just
+  // restate the cumulative-users figure beside it), does not offer "All time"
+  // at all — its `picker(...)` call below has no `ALL_TIME_GRAINS` override.
+
+  const csatIsAllTime = grain.csat === "allTime";
+  const csatKpi: KpiTileProps = {
+    label: "Learner satisfaction",
+    description: `Mean ${RATING_DOMAIN[0]}–${RATING_DOMAIN[1]} rating learners gave after a session, all time.`,
+    value: formatKpi(summary?.avgCsat, { decimals: 2 }),
+    n: summary?.csatResponses,
+    nUnit: "responses",
+    minN: MIN_N_FOR_SCORE,
+  };
+
+  const costPerSimIsAllTime = grain.costPerSim === "allTime";
+  const costPerSimKpi: KpiTileProps = {
+    label: "AI cost per completed simulation",
+    description:
+      "All platform AI spend (LLM + STT + TTS) divided by completed sims, all time." +
+      scopeNote(costUnscoped),
+    value: formatKpi(summary?.costPerCompletedSimUsd, { prefix: "$", decimals: 2 }),
+  };
+
+  const totalCostIsAllTime = grain.totalCost === "allTime";
+  const totalCostKpi: KpiTileProps = {
+    label: "Total AI spend",
+    description: "All platform AI spend, all time." + costUnpricedNote + scopeNote(costUnscoped),
+    value: formatKpi(summary?.totalAiCostUsd, { prefix: "$", decimals: 2 }),
+  };
+
+  const simsIsAllTime = grain.sims === "allTime";
+  const simsKpi: KpiTileProps = {
+    label: "Completed simulations",
+    description: "Volume context for the quality and cost figures, all time.",
+    value: formatKpi(summary?.completedSimulations),
+  };
+
+  const completionIsAllTime = grain.completion === "allTime";
+  const completionKpi: KpiTileProps = {
+    label: "Session completion rate",
+    description: "Completed of launched sessions, all time.",
+    value: formatPct(completionData?.summary.completionRatePct),
+    n: completionData?.summary.started,
+    nUnit: "sessions launched",
+  };
+
+  const xpIsAllTime = grain.xp === "allTime";
+  const xpKpi: KpiTileProps = {
+    label: "Cumulative XP awarded",
+    description: "Running total of every XP award across the platform, all time.",
+    value: formatKpi(xpGrowthQ.data?.summary.cumulativeXp),
+    n: xpGrowthQ.data?.summary.earners,
+    nUnit: "learners earning",
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* KPI strip. Definitions and sample sizes live on the tiles, not in
+          tooltips — a caveat that only appears on hover never reaches the
+          screenshot that ends up in a board deck. No change-vs-previous on an
+          all-time window: see the file header. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+        {kpis.map(kpi => (
+          <KpiTile key={kpi.label} {...kpi} chartId="AAQ-012" />
+        ))}
+      </div>
+
+      {/* ---------------------------- North star -------------------------- */}
+      {/* The headline pair, above growth: how many people reached value in the
+          last completed period, and how much friction stood between launching a
+          session and finishing one. Everything below is an explanation of these
+          two. */}
+      <SubHeading>North star</SubHeading>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <KpiTile
+          label="Practising learners"
+          description={`Distinct learners who completed a scored session in the latest full ${bucketTitle(
+            grain.wpl,
+          ).toLowerCase()}. The north-star metric: people reaching value, not sessions played.`}
+          value={formatCount(a?.summary.latestPractisingLearners)}
+          loading={busy(activation)}
+          error={activation.isError}
+          onRetry={activation.refetch}
+          chartId="AAQ-013"
+        />
+        <KpiTile
+          label="Activation rate"
+          description="Share of all learner accounts that have ever completed a simulation. All-time, so it falls when a new org is onboarded and rises as those learners start."
+          value={formatPct(a?.summary.activationRatePct)}
+          n={a?.summary.registeredLearners}
+          nUnit="learner accounts"
+          loading={busy(activation)}
+          error={activation.isError}
+          onRetry={activation.refetch}
+          chartId="AAQ-014"
+        />
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <ChartCard
+          title="Practising learners per period"
+          caption={`Distinct learners who completed a scored session. Counts people reaching value rather than sessions played, so it cannot be inflated by a handful of enthusiasts.${inProgressCaption(
+            grain.wpl,
+            wplInProgress,
+          )}`}
+          source={buildSource({
+            derivation: "Distinct learners with >=1 completed session, bucketed",
+            window: windowLabel(a?.window),
+            extra: groupingNote(grain.wpl),
+            asOf: asOf(a?.window),
+          })}
+          takeaway={practisingTakeaway(wplPoints)}
+          loading={busy(activation)}
+          error={activation.isError}
+          onRetry={activation.refetch}
+          empty={!busy(activation) && wplSeries.length === 0}
+          controls={picker("wpl", WPL_GRAINS)}
+          onExpand={() => setExpanded("wpl")}
+          chartId="AAQ-015"
+        >
+          <ScrollableChart data={wplSeries}>
+            <LineChart data={wplSeries} options={wplOpts} />
+          </ScrollableChart>
+        </ChartCard>
+
+        <ChartCard
+          title="Session completion rate"
+          caption={`Of the sessions learners launched, the share that reached a scored ending. A leading friction signal — and the caveat behind every efficacy panel on this tab, which can only see the sessions that finished. A period with no launches is a gap, not 0%.${inProgressCaption(
+            grain.completion,
+            completionInProgress,
+          )}`}
+          source={buildSource({
+            derivation: "Completed / launched sessions per period",
+            window: windowLabel(completionData?.window),
+            n: completionData?.summary.started,
+            nUnit: "sessions launched",
+            extra: groupingNote(grain.completion),
+            asOf: asOf(completionData?.window),
+          })}
+          takeaway={
+            completionData?.summary.completionRatePct !== null &&
+            completionData?.summary.completionRatePct !== undefined
+              ? `${formatPct(completionData.summary.completionRatePct)} of ${formatCount(
+                  completionData.summary.started,
+                )} launched sessions reached a scored ending`
+              : undefined
+          }
+          loading={completionIsAllTime ? false : busy(completion)}
+          error={completionIsAllTime ? false : completion.isError}
+          onRetry={completion.refetch}
+          empty={
+            completionIsAllTime ? false : !busy(completion) && allRatesMissing(completionPoints)
+          }
+          emptyText="No sessions launched in any period on this axis"
+          controls={picker("completion", ALL_TIME_GRAINS)}
+          onExpand={() => setExpanded("completion")}
+          kpi={completionIsAllTime ? completionKpi : undefined}
+          chartId="AAQ-016"
+        >
+          <ScrollableChart data={completionSeries}>
+            <LineChart data={completionSeries} options={completionOpts} />
+          </ScrollableChart>
+        </ChartCard>
+      </div>
+
+      {/* ------------------------- Growth & reach ------------------------- */}
+      <SubHeading>Growth &amp; reach</SubHeading>
+      {restricted ? null : overview.isError ? (
+        <ChartCard
+          error
+          onRetry={overview.refetch}
+          errorTitle="Couldn't load platform metrics"
+          errorSubtitle="There was a problem fetching growth and activity."
+          chartId="AAQ-017"
+        >
+          <div />
+        </ChartCard>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <ChartCard
+            title="Users by role"
+            caption={
+              roles.otherRoles > 0
+                ? `Top 4 roles; the remaining ${roles.otherRoles} are grouped as "Other".`
+                : "All roles."
+            }
+            source={buildSource({
+              derivation: "Group membership, current (not windowed)",
+              asOf: asOf(o?.window),
+            })}
+            loading={overviewLoading}
+            empty={!overviewLoading && roles.bars.length === 0}
+            chartId="AAQ-021"
+          >
+            <SimpleBarChart data={roles.bars} options={rolesOpts} />
+          </ChartCard>
+        </div>
+      )}
+
+      {/* Follows one cohort forward, which is the only way to see whether newer
+          intakes stick. Its per-period companion, "Active users — new vs
+          returning" (AAQ-020), moved to Priority along with the new-users and
+          cumulative-users charts (AAQ-018/019) that used to share this section.
+          It owns its own query and is month-grained by construction — a cohort
+          triangle needs a fixed cohort grain, so it carries no grouping control. */}
+      <div className="mt-4">
+        <CohortRetentionCard tenantId={query.tenantId} />
+      </div>
+
+      {/* --------------------------- Engagement --------------------------- */}
+      {/* --------------------------- Learner KPIs -------------------------- */}
+      {/* The LEARNER-only cut of the counts above, which include every role.
+          Kept as its own strip rather than folded into the KPI row: a reader
+          comparing "total users" with "total learners" needs to see that they
+          are different populations, not two tiles that disagree. */}
+      <SubHeading>Learner KPIs</SubHeading>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <KpiTile
+            label="Total learners"
+            description="LEARNER-role accounts created, all-time — the KPI strip above counts every role."
+            value={formatCount(lk?.summary.totalLearners)}
+            loading={learnerKpis.isLoading && !lk}
+            error={learnerKpis.isError}
+            onRetry={learnerKpis.refetch}
+            chartId="AAQ-022"
+          />
+          <KpiTile
+            label="Active learners"
+            description="Distinct learners with >=1 completed session, all-time."
+            value={formatCount(lk?.summary.activeLearners)}
+            loading={learnerKpis.isLoading && !lk}
+            error={learnerKpis.isError}
+            onRetry={learnerKpis.refetch}
+            chartId="AAQ-023"
+          />
+          <KpiTile
+            label="Completed sessions"
+            description="Completed sessions attributed to learners, all-time."
+            value={formatCount(lk?.summary.totalCompletedSessions)}
+            loading={learnerKpis.isLoading && !lk}
+            error={learnerKpis.isError}
+            onRetry={learnerKpis.refetch}
+            chartId="AAQ-024"
+          />
+        </div>
+
+        <ChartCard
+          title="New learners per month"
+          caption="LEARNER-role signups, all-time and month-grained — the LEARNER-only cut of the new-users trend above, which counts every role."
+          source={buildSource({
+            derivation: "LEARNER-role users.createdAt, grouped by month",
+            window: "All time",
+            n: lk?.summary.totalLearners,
+            nUnit: "learner accounts",
+            asOf: asOfStamp(lk?.computedAt),
+          })}
+          loading={learnerKpis.isLoading && !lk}
+          error={learnerKpis.isError}
+          onRetry={learnerKpis.refetch}
+          empty={!learnerKpis.isLoading && learnerSignupSeries.length === 0}
+          chartId="AAQ-025"
+        >
+          <ScrollableChart data={learnerSignupSeries}>
+            <LineChart data={learnerSignupSeries} options={learnerSignupOpts} />
+          </ScrollableChart>
+        </ChartCard>
+      </div>
+
+      <SubHeading>Engagement</SubHeading>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {!restricted && (
+          <ChartCard
+            title="Completed simulations"
+            caption={`Volume context for the quality and cost figures.${inProgressCaption(
+              grain.sims,
+              simsInProgress,
+            )}`}
+            source={buildSource({
+              derivation: "Sessions with eventStatus COMPLETED, per period",
+              window: windowLabel(simsQ.data?.window),
+              extra: groupingNote(grain.sims),
+              asOf: asOf(simsQ.data?.window),
+            })}
+            loading={simsIsAllTime ? false : busy(simsQ)}
+            error={simsIsAllTime ? false : simsQ.isError}
+            onRetry={simsQ.refetch}
+            empty={simsIsAllTime ? false : !busy(simsQ) && sims.length === 0}
+            controls={picker("sims", ALL_TIME_GRAINS)}
+            onExpand={() => setExpanded("sims")}
+            kpi={simsIsAllTime ? simsKpi : undefined}
+            chartId="AAQ-027"
+          >
+            <ScrollableChart data={sims}>
+              <SimpleBarChart data={sims} options={simsOpts} />
+            </ScrollableChart>
+          </ChartCard>
+        )}
+
+        {/* Sits in Engagement rather than in Growth & reach on purpose: this is
+            a measure of what learners DID, not of how many of them there are.
+            Its own endpoint (the xp_events ledger), so it survives an overview
+            failure and re-graining it costs one request. */}
+        <ChartCard
+          title="Cumulative XP awarded"
+          caption={`Running total of every XP award across the platform, excluding test organisations. A lifetime total can only rise, so the shape — where it steepens and where it flattens — is the whole signal; the level is not one. Awards are dated to the day they were EARNED, so history seeded at the Progress launch sits where it happened rather than on the launch date.${inProgressCaption(
+            grain.xp,
+            xpInProgress,
+          )}`}
+          source={buildSource({
+            derivation: "Running total of xp_events.xp, by awardedOn",
+            window: windowLabel(xpGrowthQ.data?.window),
+            n: xpGrowthQ.data?.summary.earners,
+            nUnit: "learners earning",
+            extra: groupingNote(grain.xp),
+            asOf: asOf(xpGrowthQ.data?.window),
+          })}
+          takeaway={
+            latestCompleteXp
+              ? `${formatCount(xpGrowthQ.data?.summary.cumulativeXp)} XP all time · ` +
+                `${formatCount(latestCompleteXp.xpEarned)} earned by ` +
+                `${formatCount(latestCompleteXp.earners)} learners in the latest full ` +
+                `${GROUPING_LABEL[grain.xp].toLowerCase()}`
+              : undefined
+          }
+          loading={xpIsAllTime ? false : busy(xpGrowthQ)}
+          error={xpIsAllTime ? false : xpGrowthQ.isError}
+          onRetry={xpGrowthQ.refetch}
+          empty={xpIsAllTime ? false : !busy(xpGrowthQ) && cumulativeXp.length === 0}
+          emptyText={
+            // Two different reasons the plot can be empty, and only one of them
+            // is "no XP". At a coarse grain on a young platform EVERY bucket on
+            // the axis can be the accruing one — read yearly over ten months of
+            // history, there is exactly one bucket and it is not finished — so
+            // the series is empty while the ledger is not. Saying "no XP has
+            // been awarded" there would be flatly false, and false in the
+            // direction that makes the product look worse than it is.
+            xpPoints.length > 0
+              ? `Every period on this axis is still accruing, so there is no completed ${GROUPING_LABEL[
+                  grain.xp
+                ].toLowerCase()} to plot yet. Group by a finer period, or expand for the provisional figures.`
+              : "No XP has been awarded in any period on this axis"
+          }
+          controls={picker("xp", ALL_TIME_GRAINS)}
+          onExpand={() => setExpanded("xp")}
+          kpi={xpIsAllTime ? xpKpi : undefined}
+          chartId="AAQ-028"
+        >
+          <ScrollableChart data={cumulativeXp}>
+            <LineChart data={cumulativeXp} options={xpOpts} />
+          </ScrollableChart>
+        </ChartCard>
+      </div>
+
+      {/* Sits directly under the practice-minutes total on purpose: that line
+          says how much practice happened, which a handful of heavy users can
+          carry on their own, and this says who it came from. Owns its own query
+          because it is monthly and fixed-window, and says so on its face. */}
+      <div className="mt-4">
+        <UsageLevelCard tenantId={query.tenantId} />
+      </div>
+
+      {/* Next to the usage-level mix on purpose: both are distributions over the
+          same learner population, and adjacency is what tells the reader they are
+          two views of one question. That one bands a MONTH of minutes and shows
+          whether the mix is shifting; this one bands a LIFETIME of completed
+          roleplays and shows how deep engagement goes and how many learners never
+          started. Owns its own query, all-time by construction. */}
+      <div className="mt-4">
+        <RoleplayVolumeCard tenantId={query.tenantId} />
+      </div>
+
+      {/* Active users as small multiples: DAU/WAU/MAU are nested windows, so on
+          one axis MAU dominates and the volatile DAU shape is unreadable. No
+          grouping control here — these are trailing-window definitions sampled
+          once per day, so a coarser grain would answer a different question
+          rather than the same one at lower resolution. */}
+      {!restricted && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {activeMultiples.map(m => (
+            <ChartCard
+              key={m.label}
+              title={`Active users — ${m.label}`}
+              caption="Sampled daily, and not re-groupable: a trailing 7- or 30-day count read monthly would be a different measure. Each window has its own vertical scale; they are nested, so they are not comparable by height."
+              source={buildSource({
+                derivation: "Distinct users with session activity in the trailing window",
+                window: oWindow,
+              })}
+              loading={overviewLoading}
+              empty={!overviewLoading && m.series.length === 0}
+              chartId="AAQ-029"
+            >
+              <ScrollableChart data={m.series}>
+                <LineChart
+                  data={m.series}
+                  options={lineOpts({
+                    leftTitle: "Distinct users",
+                    bottomTitle: "Day",
+                    colorScale: m.scale,
+                    legend: false,
+                    extra: { points: { enabled: false } },
+                  })}
+                />
+              </ScrollableChart>
+            </ChartCard>
+          ))}
+        </div>
+      )}
+
+      {/* --------------------------- Outcomes --------------------------- */}
+      {/* Was "Outcomes & quality", holding this card beside "Roleplay quality"
+          in a two-column grid. That chart is retired (superseded by the
+          Roleplay Quality Index on the Quality & sentiment sub-tab), so this
+          is now the section's only chart and runs full width rather than
+          sitting half-width with an empty twin beside it. */}
+      <SubHeading>Outcomes</SubHeading>
+      <div className="grid grid-cols-1 gap-4">
+        <ChartCard
+          title="Learner satisfaction"
+          caption={`Mean post-session rating. ${boundedDomainNote(
+            RATING_DOMAIN,
+          )} Gaps are periods with no ratings.${inProgressCaption(grain.csat, csatInProgress)}`}
+          source={buildSource({
+            derivation: "Mean of scenario_session_feedbacks.rating",
+            window: windowLabel(csatQ.data?.window),
+            n: summary?.csatResponses,
+            nUnit: "responses",
+            extra: groupingNote(grain.csat),
+            asOf: asOf(csatQ.data?.window),
+          })}
+          loading={csatIsAllTime ? false : busy(csatQ)}
+          error={csatIsAllTime ? false : csatQ.isError}
+          onRetry={csatQ.refetch}
+          n={summary?.csatResponses}
+          nUnit="responses"
+          minN={MIN_N_FOR_SCORE}
+          empty={csatIsAllTime ? false : !busy(csatQ) && csat.every(d => d.value === null)}
+          controls={picker("csat", ALL_TIME_GRAINS)}
+          onExpand={() => setExpanded("csat")}
+          kpi={csatIsAllTime ? csatKpi : undefined}
+          chartId="AAQ-030"
+        >
+          <ScrollableChart data={csat}>
+            <LineChart data={csat} options={csatOpts} />
+          </ScrollableChart>
+        </ChartCard>
+      </div>
+
+      <ChartCard
+        title="Learning track funnel"
+        caption="Every enrollment ever created. Recent cohorts have had less time to finish, so a low completion share here is not necessarily a drop-off."
+        source={buildSource({
+          derivation: "track_enrollments cohort created in window",
+          window: hWindow,
+          n: h?.trackFunnel.enrolled,
+          nUnit: "enrollments",
+          asOf: asOf(h?.window),
+        })}
+        loading={highlightsLoading}
+        empty={!highlightsLoading && !funnelStages.some(st => st.reached > 0)}
+        wide
+        chartId="AAQ-031"
+      >
+        <div className="flex flex-col gap-4">
+          <FunnelBars stages={funnelStages} unit="enrollments" />
+          {h?.trackFunnel && h.trackFunnel.quizAttempts > 0 && (
+            <p className="text-xs" style={{ color: CONTEXT.strong }}>
+              Quiz pass rate: {formatKpi(h.trackFunnel.quizPassRatePct, { suffix: "%" })} (
+              {h.trackFunnel.quizPassed.toLocaleString()} of{" "}
+              {h.trackFunnel.quizAttempts.toLocaleString()} graded attempts)
+            </p>
+          )}
+        </div>
+      </ChartCard>
+
+      {/* ---------------------------- Adoption ---------------------------- */}
+      {!restricted && (
+        <>
+          <SubHeading>Adoption</SubHeading>
+          <ChartCard
+            title="Completed simulations by organisation"
+            caption={
+              h?.topOrgsBelowFloor && h.topOrgsBelowFloor.orgs > 0
+                ? `Top orgs by volume, all time. ${h.topOrgsBelowFloor.orgs} smaller orgs are grouped unnamed — naming an org with a handful of sessions identifies its learners.`
+                : "Top orgs by volume, all time."
+            }
+            source={
+              buildSource({
+                derivation: "Completed sessions grouped by tenant",
+                window: hWindow,
+                asOf: asOf(h?.window),
+              }) + scopeNote(orgsUnscoped)
+            }
+            loading={highlightsLoading}
+            error={highlights.isError}
+            onRetry={highlights.refetch}
+            empty={!highlightsLoading && topOrgs.length === 0}
+            wide
+            chartId="AAQ-032"
+          >
+            <SimpleBarChart data={topOrgs} options={orgsOpts} />
+          </ChartCard>
+        </>
+      )}
+
+      {/* ------------------------- Unit economics ------------------------- */}
+      {!restricted && (
+        <>
+          <SubHeading>Unit economics</SubHeading>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <ChartCard
+              title="AI cost per completed simulation"
+              caption={`All platform AI spend (LLM + STT + TTS) divided by completed simulations. Gaps are periods with no completed simulations.${inProgressCaption(
+                grain.costPerSim,
+                costInProgress,
+              )}`}
+              source={
+                buildSource({
+                  derivation: "Estimated from the pricing table at read time — not a billed figure",
+                  window: windowLabel(costPerSimQ.data?.window),
+                  extra: groupingNote(grain.costPerSim),
+                  asOf: asOf(costPerSimQ.data?.window),
+                }) +
+                costUnpricedNote +
+                scopeNote(costUnscoped)
+              }
+              loading={costPerSimIsAllTime ? false : busy(costPerSimQ)}
+              error={costPerSimIsAllTime ? false : costPerSimQ.isError}
+              onRetry={costPerSimQ.refetch}
+              errorTitle="Couldn't load AI cost"
+              errorSubtitle="There was a problem fetching cost metrics."
+              empty={
+                costPerSimIsAllTime
+                  ? false
+                  : !busy(costPerSimQ) && costPerSim.every(d => d.value === null)
+              }
+              controls={picker("costPerSim", ALL_TIME_GRAINS)}
+              onExpand={() => setExpanded("costPerSim")}
+              kpi={costPerSimIsAllTime ? costPerSimKpi : undefined}
+              chartId="AAQ-033"
+            >
+              <ScrollableChart data={costPerSim}>
+                <LineChart data={costPerSim} options={costPerSimOpts} />
+              </ScrollableChart>
+            </ChartCard>
+
+            <ChartCard
+              title="Total AI spend"
+              caption={`Absolute spend per period. Separate from cost-per-sim because the two differ by orders of magnitude.${inProgressCaption(
+                grain.totalCost,
+                totalCostInProgress,
+              )}`}
+              source={
+                buildSource({
+                  derivation: "Estimated from the pricing table at read time — not a billed figure",
+                  window: windowLabel(totalCostQ.data?.window),
+                  extra: groupingNote(grain.totalCost),
+                  asOf: asOf(totalCostQ.data?.window),
+                }) +
+                costUnpricedNote +
+                scopeNote(costUnscoped)
+              }
+              loading={totalCostIsAllTime ? false : busy(totalCostQ)}
+              error={totalCostIsAllTime ? false : totalCostQ.isError}
+              onRetry={totalCostQ.refetch}
+              empty={totalCostIsAllTime ? false : !busy(totalCostQ) && totalCost.length === 0}
+              controls={picker("totalCost", ALL_TIME_GRAINS)}
+              onExpand={() => setExpanded("totalCost")}
+              kpi={totalCostIsAllTime ? totalCostKpi : undefined}
+              chartId="AAQ-034"
+            >
+              <ScrollableChart data={totalCost}>
+                <SimpleBarChart data={totalCost} options={totalCostOpts} />
+              </ScrollableChart>
+            </ChartCard>
+          </div>
+        </>
+      )}
+
+      {/* ---------------------------- Detail views ------------------------- */}
+      {/*
+        The tables read the FULL arrays, including the accruing period, whose row
+        is flagged. That is where a provisional number belongs: a reader looking
+        at a grid can see "in progress" beside the figure, where a line chart can
+        only draw it as a fall.
+      */}
+
+      {expanded === "xp" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="Cumulative XP awarded"
+          caption="The table carries the per-period XP and the learners who earned it — the change behind a line that can only rise, and the way to tell whether it steepened because more learners practised or because the same ones earned more."
+          source={buildSource({
+            derivation: "Running total of xp_events.xp, by awardedOn",
+            window: windowLabel(xpGrowthQ.data?.window),
+            n: xpGrowthQ.data?.summary.earners,
+            nUnit: "learners earning",
+            extra: groupingNote(grain.xp),
+          })}
+          table={{
+            columns: [bucketTitle(grain.xp), "XP earned", "Learners earning", "Cumulative XP"],
+            rows: xpPoints.map(p => [
+              rowKey(p.bucket, xpInProgress),
+              p.xpEarned,
+              p.earners,
+              p.cumulativeXp,
+            ]),
+          }}
+          exportContext={exportLines(
+            windowLabel(xpGrowthQ.data?.window),
+            grain.xp,
+            xpInProgress,
+            `Opening balance before the window: ${formatCount(
+              xpGrowthQ.data?.summary.baselineXp,
+            )} XP`,
+          )}
+          render={({ height }) => (
+            <ScrollableChart data={cumulativeXp}>
+              <LineChart data={cumulativeXp} options={{ ...xpOpts, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "sims" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="Completed simulations"
+          source={buildSource({
+            derivation: "Sessions with eventStatus COMPLETED, per period",
+            window: windowLabel(simsQ.data?.window),
+            extra: groupingNote(grain.sims),
+          })}
+          table={{
+            columns: [bucketTitle(grain.sims), "Completed"],
+            rows: simsPoints.map(p => [rowKey(p.bucket, simsInProgress), p.count]),
+          }}
+          exportContext={exportLines(windowLabel(simsQ.data?.window), grain.sims, simsInProgress)}
+          render={({ height }) => (
+            <ScrollableChart data={sims}>
+              <SimpleBarChart data={sims} options={{ ...simsOpts, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "csat" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="Learner satisfaction"
+          caption="Response count per period is the column the chart cannot show."
+          source={buildSource({
+            derivation: "Mean of scenario_session_feedbacks.rating",
+            window: windowLabel(csatQ.data?.window),
+            n: summary?.csatResponses,
+            nUnit: "responses",
+            extra: groupingNote(grain.csat),
+          })}
+          zoomable
+          zoomNote={`Axis zoomed to the data instead of the full ${RATING_DOMAIN[0]}–${RATING_DOMAIN[1]} scale. This magnifies small changes — read the shape, not the height.`}
+          table={{
+            columns: [bucketTitle(grain.csat), "Avg rating", "Responses"],
+            rows: csatPoints.map(p => [rowKey(p.bucket, csatInProgress), p.avgRating, p.responses]),
+          }}
+          exportContext={exportLines(
+            windowLabel(csatQ.data?.window),
+            grain.csat,
+            csatInProgress,
+            `Minimum n for a stated score: ${MIN_N_FOR_SCORE}`,
+          )}
+          render={({ height, zoomed }) => (
+            <ScrollableChart data={csat}>
+              <LineChart
+                data={csat}
+                options={{ ...(zoomed ? csatZoomedOpts : csatOpts), height }}
+              />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "costPerSim" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="AI cost per completed simulation"
+          caption="Unpriced calls contribute $0, so a period with many of them understates cost."
+          source={buildSource({
+            derivation: "Estimated from the pricing table at read time — not a billed figure",
+            window: windowLabel(costPerSimQ.data?.window),
+            extra: groupingNote(grain.costPerSim),
+          })}
+          table={{
+            columns: [
+              bucketTitle(grain.costPerSim),
+              "Cost / sim (USD)",
+              "Total (USD)",
+              "Sims",
+              "Unpriced calls",
+            ],
+            rows: costPoints.map(p => [
+              rowKey(p.bucket, costInProgress),
+              p.costPerSimUsd,
+              p.estimatedCostUsd,
+              p.completedSimulations,
+              p.unpricedCalls,
+            ]),
+          }}
+          exportContext={exportLines(
+            windowLabel(costPerSimQ.data?.window),
+            grain.costPerSim,
+            costInProgress,
+            "Costs are estimated from the pricing table at read time, not billed figures",
+            `Unpriced calls in window: ${unpriced.toLocaleString()}`,
+          )}
+          render={({ height }) => (
+            <ScrollableChart data={costPerSim}>
+              <LineChart data={costPerSim} options={{ ...costPerSimOpts, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "totalCost" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="Total AI spend"
+          source={buildSource({
+            derivation: "Estimated from the pricing table at read time — not a billed figure",
+            window: windowLabel(totalCostQ.data?.window),
+            extra: groupingNote(grain.totalCost),
+          })}
+          table={{
+            columns: [bucketTitle(grain.totalCost), "Total (USD)"],
+            rows: totalCostPoints.map(p => [
+              rowKey(p.bucket, totalCostInProgress),
+              p.estimatedCostUsd,
+            ]),
+          }}
+          exportContext={exportLines(
+            windowLabel(totalCostQ.data?.window),
+            grain.totalCost,
+            totalCostInProgress,
+            `Unpriced calls in window: ${unpriced.toLocaleString()}`,
+          )}
+          render={({ height }) => (
+            <ScrollableChart data={totalCost}>
+              <SimpleBarChart data={totalCost} options={{ ...totalCostOpts, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "wpl" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="Practising learners per period"
+          caption="Distinct learners who completed a scored session."
+          source={buildSource({
+            derivation: "Distinct learners with >=1 completed session",
+            window: windowLabel(a?.window),
+            extra: groupingNote(grain.wpl),
+            asOf: asOf(a?.window),
+          })}
+          render={({ height }) => <LineChart data={wplSeries} options={{ ...wplOpts, height }} />}
+          table={{
+            columns: [bucketTitle(grain.wpl), "Learners", "Sessions"],
+            rows: (a?.practisingLearners ?? []).map(p => [
+              rowKey(p.bucket, wplInProgress),
+              p.learners,
+              p.sessions,
+            ]),
+          }}
+          exportContext={exportLines(windowLabel(a?.window), grain.wpl, wplInProgress)}
+          exportFilename="practising-learners"
+        />
+      )}
+
+      {expanded === "completion" && (
+        <ChartDetailModal
+          open
+          onClose={() => setExpanded(null)}
+          title="Session completion rate"
+          caption="Completed of launched sessions. A period with no launches has no rate — the cell is blank, not zero."
+          source={buildSource({
+            derivation: "Completed / launched sessions per period",
+            window: windowLabel(completionData?.window),
+            extra: groupingNote(grain.completion),
+            asOf: asOf(completionData?.window),
+          })}
+          zoomable
+          zoomNote="Axis zoomed to the data range — magnifies small changes; the tile shows the full 0–100% scale."
+          render={({ height, zoomed }) => (
+            <LineChart
+              data={completionSeries}
+              options={{ ...(zoomed ? completionZoomedOpts : completionOpts), height }}
+            />
+          )}
+          table={{
+            columns: [
+              bucketTitle(grain.completion),
+              "Launched",
+              "Completed",
+              "Abandoned",
+              "Rate %",
+            ],
+            rows: (completionData?.points ?? []).map(p => [
+              rowKey(p.bucket, completionInProgress),
+              p.started,
+              p.completed,
+              p.abandoned,
+              p.completionRatePct,
+            ]),
+          }}
+          exportContext={exportLines(
+            windowLabel(completionData?.window),
+            grain.completion,
+            completionInProgress,
+            "A blank rate means no sessions launched in that period — undefined, not 0%",
+          )}
+          exportFilename="session-completion-rate"
+        />
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,664 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+
+import { Button, TextArea, TextInput } from "@ally-ui-mono/ui-shared";
+import { useCreateCharacterMutation, useGetAvailableLanguagesQuery } from "@api";
+import { ArrowLeft, CloseIcon } from "@assets";
+import {
+  characterLibraryStrings as strings,
+  GENDER_IDENTITY_OPTIONS,
+  GENDER_OPTIONS,
+  SEXUAL_ORIENTATION_OPTIONS,
+} from "@constants";
+import { CharacterData } from "@types";
+
+import { ButtonVariant } from "../button";
+import ConfirmationDialog from "../confirmation-dialog";
+import { CharacterKnowledgeSourcesField } from "./CharacterKnowledgeSourcesField";
+import { DialectSamplesField } from "./DialectSamplesField";
+
+const emptyCharacter: CharacterData = {
+  name: "",
+  age: "",
+  gender: "",
+  profession: "",
+  currentLocation: "",
+  genderIdentity: "",
+  sexualOrientation: "",
+  characterProfileText: "",
+  languageCharacteristics: {},
+  linguisticStyleSamples: {},
+  knowledgeSources: [],
+};
+
+type PerLanguageField = "languageCharacteristics" | "linguisticStyleSamples";
+
+/** The seven fields the backend rejects a create without. */
+const REQUIRED_FIELDS = [
+  "name",
+  "age",
+  "gender",
+  "profession",
+  "currentLocation",
+  "genderIdentity",
+  "sexualOrientation",
+] as const;
+
+type RequiredField = (typeof REQUIRED_FIELDS)[number];
+
+const TITLE_ID = "character-form-panel-title";
+
+interface FieldProps {
+  label: string;
+  children: React.ReactNode;
+  required?: boolean;
+  /** Inline validation message, shown only after a save attempt. */
+  error?: string;
+}
+
+const Field: React.FC<FieldProps> = ({ label, children, required = false, error }) => (
+  <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2 sm:gap-4 mb-6">
+    <label className="text-base font-regular text-typography-800 w-full sm:w-[40%] flex-shrink-0 mt-0 sm:mt-2">
+      {label}
+      {required && (
+        <span aria-hidden className="text-red-500 ml-1">
+          *
+        </span>
+      )}
+    </label>
+    <div className="flex-1 w-full">
+      {children}
+      {/* role="alert" so a screen reader hears why Save didn't go through —
+          the button used to just sit there disabled, saying nothing. */}
+      {error && (
+        <p role="alert" className="mt-1 text-xs text-destructive-500">
+          {error}
+        </p>
+      )}
+    </div>
+  </div>
+);
+
+const NativeSelect: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  ariaLabel: string;
+  invalid?: boolean;
+  disabled?: boolean;
+}> = ({ value, onChange, options, placeholder, ariaLabel, invalid, disabled }) => (
+  <select
+    value={value}
+    onChange={e => onChange(e.target.value)}
+    aria-label={ariaLabel}
+    aria-invalid={invalid || undefined}
+    disabled={disabled}
+    className={`w-full text-base border-b bg-transparent py-2 focus:outline-none focus:border-primary-500 disabled:opacity-70 disabled:cursor-not-allowed ${
+      invalid ? "border-destructive-500" : "border-border-light"
+    }`}
+  >
+    <option value="" disabled>
+      {placeholder}
+    </option>
+    {options.map(option => (
+      <option key={option.value} value={option.value}>
+        {option.label}
+      </option>
+    ))}
+  </select>
+);
+
+interface CharacterFormPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (character: CharacterData) => void;
+  /** Prefills the form (e.g. from the interview agent's finished draft, or an
+   * existing row opened in `readOnly` mode). */
+  initialCharacter?: CharacterData | null;
+  /**
+   * Opens the panel as a locked, non-editable view of `initialCharacter`
+   * instead of a create form: every field is disabled, the repeatable
+   * dialect-sample/knowledge-source rows drop their add/remove controls, and
+   * the footer is a single Close button rather than Save+Cancel. This is how
+   * a tenant admin opens a character they already built — the ADMIN group
+   * only holds view+create on scenario-character (no edit), so there is
+   * nothing here for them to change.
+   */
+  readOnly?: boolean;
+  /**
+   * Display names for voice ids, keyed by voice id. The interview page builds
+   * this from the voice questions the admin answered, since a tenant ADMIN
+   * cannot read the voice catalog (`view:scenario-voices`) to look names up.
+   */
+  voiceLabels?: Record<string, string>;
+}
+
+/**
+ * Character form for tenant admins — a leaner port of
+ * ally-admin-dashboard's CharacterSidePanel. There is no edit mode here:
+ * the ADMIN group only holds view+create on scenario-character (see
+ * ally-be migration 1905000000000-AddTenantScopedCharacterLibrary), so this
+ * app only ever creates a new row or shows an existing one read-only — it
+ * never offers an affordance the backend would reject.
+ *
+ * Voice is shown and saved but never picked here: a tenant ADMIN cannot read
+ * the voice catalog (`view:scenario-voices`), so the only voices this form
+ * holds are the ones the admin chose in the interview. Cover image/video are
+ * left out too — file-upload URL signing's gate for a tenant ADMIN hasn't
+ * been verified yet.
+ */
+export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialCharacter,
+  readOnly = false,
+  voiceLabels = {},
+}) => {
+  const { t } = useTranslation();
+  const [formData, setFormData] = useState<CharacterData>(initialCharacter || emptyCharacter);
+  const [createCharacter, { isLoading: isCreating }] = useCreateCharacterMutation();
+  // Empty until the admin actually tries to save, so a half-filled form isn't
+  // pre-shouted at.
+  const [missingFields, setMissingFields] = useState<Set<RequiredField>>(new Set());
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+
+  const baseline = useMemo(() => initialCharacter || emptyCharacter, [initialCharacter]);
+
+  // Style note and dialect samples are per language (keyed by languages.id),
+  // so they sit behind one tab per language, the way admin's
+  // CharacterSidePanel lays them out.
+  const { data: catalogLanguages = [] } = useGetAvailableLanguagesQuery(
+    { active: true, hasVoices: true },
+    { skip: !isOpen },
+  );
+  const languageTabs = useMemo(() => {
+    const stored = new Set(
+      [
+        ...Object.keys(formData.voices ?? {}),
+        ...Object.keys(formData.languageCharacteristics ?? {}),
+        ...Object.keys(formData.linguisticStyleSamples ?? {}),
+      ].filter(Boolean),
+    );
+    const fromCatalog = catalogLanguages
+      .filter(language => language.language_id != null)
+      .map(language => ({ id: String(language.language_id), label: language.label }));
+    // A read-only view only has something to show for languages the
+    // character actually holds; the create form offers every language.
+    const offered = readOnly ? fromCatalog.filter(tab => stored.has(tab.id)) : fromCatalog;
+    // A language the character holds data for but the catalog no longer
+    // offers still gets a tab, so its lines stay visible rather than vanish.
+    const known = new Set(fromCatalog.map(tab => tab.id));
+    const retired = [...stored]
+      .filter(id => !known.has(id))
+      .map(id => ({ id, label: strings.unnamedLanguage(id) }));
+    return [...offered, ...retired];
+  }, [
+    catalogLanguages,
+    formData.voices,
+    formData.languageCharacteristics,
+    formData.linguisticStyleSamples,
+    readOnly,
+  ]);
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(null);
+  const activeLanguageId =
+    selectedLanguageId && languageTabs.some(tab => tab.id === selectedLanguageId)
+      ? selectedLanguageId
+      : (languageTabs[0]?.id ?? null);
+  const fieldRefs = useRef<Partial<Record<RequiredField, HTMLElement | null>>>({});
+  // Focus goes back where it came from on close, rather than to the top of
+  // the document.
+  const triggerRef = useRef<Element | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    setFormData(baseline);
+    setMissingFields(new Set());
+    setSelectedLanguageId(null);
+    triggerRef.current = document.activeElement;
+    // Land focus inside the panel on the first field, so keyboard and screen
+    // reader users start in the dialog instead of behind it.
+    const timer = setTimeout(() => fieldRefs.current.name?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [isOpen, baseline]);
+
+  const handleFieldChange = useCallback((fieldName: keyof CharacterData, value: unknown) => {
+    setFormData(prev => ({ ...prev, [fieldName]: value }));
+    setMissingFields(prev => {
+      if (!prev.has(fieldName as RequiredField)) return prev;
+      const next = new Set(prev);
+      next.delete(fieldName as RequiredField);
+      return next;
+    });
+  }, []);
+
+  /** Writes one language's value into a per-language map field. */
+  const setForActiveLanguage = useCallback(
+    (field: PerLanguageField, value: string | string[]) => {
+      if (!activeLanguageId) return;
+      setFormData(prev => ({
+        ...prev,
+        [field]: { ...(prev[field] ?? {}), [activeLanguageId]: value },
+      }));
+    },
+    [activeLanguageId],
+  );
+
+  // Always false in readOnly: nothing on the form can change, so there is
+  // never anything to discard, and closing should never prompt for it.
+  const isDirty = useMemo(
+    () => !readOnly && JSON.stringify(formData) !== JSON.stringify(baseline),
+    [readOnly, formData, baseline],
+  );
+
+  const findMissingFields = useCallback(() => {
+    const missing = new Set<RequiredField>();
+    REQUIRED_FIELDS.forEach(field => {
+      const value = formData[field];
+      if (value === null || value === undefined || String(value).trim() === "") missing.add(field);
+    });
+    return missing;
+  }, [formData]);
+
+  /**
+   * Closing discards everything typed — the backdrop used to swallow a
+   * half-written character on a stray click with no warning. Only ask when
+   * there's actually something to lose.
+   */
+  const requestClose = useCallback(() => {
+    if (isCreating) return;
+    if (isDirty) {
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    onClose();
+    (triggerRef.current as HTMLElement | null)?.focus?.();
+  }, [isCreating, isDirty, onClose]);
+
+  const confirmDiscard = useCallback(() => {
+    setIsDiscardConfirmOpen(false);
+    onClose();
+    (triggerRef.current as HTMLElement | null)?.focus?.();
+  }, [onClose]);
+
+  // Escape closes the panel, the way every other dialog in the app does.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // Let the discard confirmation own Escape while it's the top layer.
+      if (isDiscardConfirmOpen) return;
+      event.stopPropagation();
+      requestClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, isDiscardConfirmOpen, requestClose]);
+
+  const handleSave = useCallback(async () => {
+    // Save stays enabled and explains itself on click. Disabling it left the
+    // admin staring at a greyed button with no clue which of seven required
+    // fields — several of them scrolled out of sight — was still blank.
+    const missing = findMissingFields();
+    if (missing.size > 0) {
+      setMissingFields(missing);
+      toast.error(strings.requiredFieldsMissing);
+      const firstMissing = REQUIRED_FIELDS.find(field => missing.has(field));
+      if (firstMissing) {
+        const node = fieldRefs.current[firstMissing];
+        node?.scrollIntoView({ block: "center", behavior: "smooth" });
+        node?.focus();
+      }
+      return;
+    }
+
+    try {
+      // formData.id (a `temp-...` placeholder set by the interview draft, or
+      // absent on a manually-started form) is never sent — this form only
+      // ever creates.
+      const data = {
+        name: formData.name,
+        age: formData.age,
+        gender: formData.gender,
+        profession: formData.profession,
+        currentLocation: formData.currentLocation,
+        genderIdentity: formData.genderIdentity,
+        sexualOrientation: formData.sexualOrientation,
+        characterProfileText: formData.characterProfileText,
+        // Per language: drop blank style notes and sample rows the admin
+        // added but never filled, and drop a language left with nothing.
+        languageCharacteristics: Object.fromEntries(
+          Object.entries(formData.languageCharacteristics ?? {}).filter(
+            ([, text]) => text.trim() !== "",
+          ),
+        ),
+        linguisticStyleSamples: Object.fromEntries(
+          Object.entries(formData.linguisticStyleSamples ?? {})
+            .map(([languageId, samples]): [string, string[]] => [
+              languageId,
+              samples.filter(sample => sample.trim() !== ""),
+            ])
+            .filter(([, samples]) => samples.length > 0),
+        ),
+        // Drop knowledge sources with no title rather than sending the
+        // backend one it rejects (400).
+        // The voice the admin chose per language in the interview. Before
+        // this was sent, a character built by interview was saved with no
+        // voice at all, despite the admin having picked one.
+        voices: Object.fromEntries(
+          Object.entries(formData.voices ?? {}).filter(([, voiceId]) => Boolean(voiceId)),
+        ),
+        knowledgeSources: (formData.knowledgeSources || []).filter(
+          source => source.title.trim() !== "",
+        ),
+      };
+      const newCharacter = await createCharacter(data).unwrap();
+      toast.success(strings.characterCreatedSuccessfully);
+      onSave(newCharacter);
+      onClose();
+    } catch {
+      toast.error(strings.failedToCreateCharacter);
+    }
+  }, [formData, findMissingFields, createCharacter, onSave, onClose]);
+
+  const errorFor = (field: RequiredField) =>
+    missingFields.has(field) ? strings.requiredField : undefined;
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* Backdrop is presentational: Escape and the two labelled close
+          controls are the keyboard-reachable ways out. */}
+      <div className="flex-1 bg-black bg-opacity-50" aria-hidden onClick={requestClose} />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={TITLE_ID}
+        // Full width below `sm`: min-w-[600px] alone overflowed a phone
+        // viewport, pushing the panel's own footer buttons off-screen.
+        className="w-full sm:w-[50%] relative sm:min-w-[600px] max-w-[800px] h-full bg-white shadow-xl flex flex-col"
+      >
+        <div className="flex items-center justify-between p-4 sm:p-6">
+          <button
+            onClick={requestClose}
+            className="flex flex-row items-center justify-center gap-2 text-typography-600 hover:text-neutral-800"
+          >
+            <ArrowLeft width={14} height={14} />
+            <span id={TITLE_ID} className="text-base font-tertiary font-[500]">
+              {readOnly ? strings.viewCharacter : strings.createNewCharacter}
+            </span>
+          </button>
+          {/* The back arrow doubled as the title, which read as a heading
+              rather than as the way out. Give the panel a real close control. */}
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label={strings.closeForm}
+            className="rounded p-3 sm:p-1 text-typography-600 hover:bg-surface-100 hover:text-neutral-800"
+          >
+            <CloseIcon width={14} height={14} />
+          </button>
+        </div>
+
+        <div className="flex-1 px-4 sm:px-10 pt-2 sm:pt-6 pb-6 overflow-y-auto min-h-0 custom-scrollbar">
+          <Field label={t("characterLibrary.name")} required error={errorFor("name")}>
+            <TextInput
+              id="character-name"
+              labelText={t("characterLibrary.name")}
+              hideLabel
+              ref={(node: HTMLInputElement | null) => {
+                fieldRefs.current.name = node;
+              }}
+              value={formData.name}
+              onChange={e => handleFieldChange("name", e.target.value)}
+              placeholder={t("characterLibrary.namePlaceholder")}
+              invalid={missingFields.has("name")}
+              readOnly={readOnly}
+              className="w-full"
+            />
+          </Field>
+
+          <Field label={t("characterLibrary.age")} required error={errorFor("age")}>
+            <input
+              type="number"
+              inputMode="numeric"
+              ref={node => {
+                fieldRefs.current.age = node;
+              }}
+              value={formData.age}
+              // Parse explicitly rather than `parseInt(...) || ""`, which
+              // treated a typed 0 as empty.
+              onChange={e => {
+                const raw = e.target.value;
+                if (raw === "") return handleFieldChange("age", "");
+                const parsed = Number.parseInt(raw, 10);
+                handleFieldChange("age", Number.isNaN(parsed) ? "" : parsed);
+              }}
+              placeholder={t("characterLibrary.agePlaceholder")}
+              min="0"
+              max="150"
+              aria-label={t("characterLibrary.age")}
+              aria-invalid={missingFields.has("age") || undefined}
+              readOnly={readOnly}
+              // Matches the underline every sibling field has; this one used
+              // to sit borderless in the middle of the form.
+              className={`w-full px-0 py-2 text-base bg-transparent border-b focus:outline-none focus:border-primary-500 ${
+                missingFields.has("age") ? "border-destructive-500" : "border-border-light"
+              }`}
+              // Scrolling over a focused number input silently changes its
+              // value in the browser — blur so the page scrolls instead.
+              onWheel={e => e.currentTarget.blur()}
+            />
+          </Field>
+
+          <Field label={t("characterLibrary.gender")} required error={errorFor("gender")}>
+            <NativeSelect
+              value={formData.gender}
+              onChange={value => handleFieldChange("gender", value)}
+              options={GENDER_OPTIONS}
+              placeholder={t("characterLibrary.genderPlaceholder")}
+              ariaLabel={t("characterLibrary.gender")}
+              invalid={missingFields.has("gender")}
+              disabled={readOnly}
+            />
+          </Field>
+
+          <Field label={t("characterLibrary.profession")} required error={errorFor("profession")}>
+            <TextInput
+              id="character-profession"
+              labelText={t("characterLibrary.profession")}
+              hideLabel
+              value={formData.profession || ""}
+              onChange={e => handleFieldChange("profession", e.target.value)}
+              placeholder={t("characterLibrary.professionPlaceholder")}
+              invalid={missingFields.has("profession")}
+              readOnly={readOnly}
+              className="w-full"
+            />
+          </Field>
+
+          <Field
+            label={t("characterLibrary.currentLocation")}
+            required
+            error={errorFor("currentLocation")}
+          >
+            <TextInput
+              id="character-current-location"
+              labelText={t("characterLibrary.currentLocation")}
+              hideLabel
+              value={formData.currentLocation}
+              onChange={e => handleFieldChange("currentLocation", e.target.value)}
+              placeholder={t("characterLibrary.currentLocationPlaceholder")}
+              invalid={missingFields.has("currentLocation")}
+              readOnly={readOnly}
+              className="w-full"
+            />
+          </Field>
+
+          <Field
+            label={t("characterLibrary.genderIdentity")}
+            required
+            error={errorFor("genderIdentity")}
+          >
+            <NativeSelect
+              value={formData.genderIdentity}
+              onChange={value => handleFieldChange("genderIdentity", value)}
+              options={GENDER_IDENTITY_OPTIONS}
+              placeholder={t("characterLibrary.genderIdentityPlaceholder")}
+              ariaLabel={t("characterLibrary.genderIdentity")}
+              invalid={missingFields.has("genderIdentity")}
+              disabled={readOnly}
+            />
+          </Field>
+
+          <Field
+            label={t("characterLibrary.sexualOrientation")}
+            required
+            error={errorFor("sexualOrientation")}
+          >
+            <NativeSelect
+              value={formData.sexualOrientation}
+              onChange={value => handleFieldChange("sexualOrientation", value)}
+              options={SEXUAL_ORIENTATION_OPTIONS}
+              placeholder={t("characterLibrary.sexualOrientationPlaceholder")}
+              ariaLabel={t("characterLibrary.sexualOrientation")}
+              invalid={missingFields.has("sexualOrientation")}
+              disabled={readOnly}
+            />
+          </Field>
+
+          <Field label={t("characterLibrary.backstory")}>
+            <TextArea
+              id="character-backstory"
+              labelText={t("characterLibrary.backstory")}
+              hideLabel
+              value={formData.characterProfileText || ""}
+              onChange={e => handleFieldChange("characterProfileText", e.target.value)}
+              maxLength={2500}
+              placeholder={t("characterLibrary.backstoryPlaceholder")}
+              readOnly={readOnly}
+              rows={3}
+            />
+          </Field>
+
+          {activeLanguageId && (
+            <>
+              {languageTabs.length > 1 && (
+                <div
+                  role="tablist"
+                  aria-label={strings.languageTabs}
+                  className="flex flex-wrap gap-2 mb-4"
+                >
+                  {languageTabs.map(tab => {
+                    const isActive = tab.id === activeLanguageId;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => setSelectedLanguageId(tab.id)}
+                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                          isActive
+                            ? "border-primary-500 text-primary-700 bg-primary-50"
+                            : "border-border-light text-typography-600 hover:text-typography-800"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {formData.voices?.[activeLanguageId] && (
+                <Field label={strings.voice}>
+                  <span className="text-base text-typography-800">
+                    {voiceLabels[formData.voices[activeLanguageId]] ?? strings.voiceSelected}
+                  </span>
+                </Field>
+              )}
+
+              <Field label={strings.languageStyle}>
+                <TextArea
+                  id="character-language-characteristics"
+                  labelText={strings.languageStyle}
+                  hideLabel
+                  value={formData.languageCharacteristics?.[activeLanguageId] ?? ""}
+                  onChange={e => setForActiveLanguage("languageCharacteristics", e.target.value)}
+                  maxLength={1000}
+                  placeholder={strings.enterLanguageStyle}
+                  readOnly={readOnly}
+                  rows={2}
+                />
+              </Field>
+
+              <Field label={strings.dialectSamples}>
+                <DialectSamplesField
+                  samples={formData.linguisticStyleSamples?.[activeLanguageId] ?? []}
+                  onChange={samples => setForActiveLanguage("linguisticStyleSamples", samples)}
+                  readOnly={readOnly}
+                />
+              </Field>
+            </>
+          )}
+
+          <Field label={strings.knowledgeSources}>
+            <CharacterKnowledgeSourcesField
+              sources={formData.knowledgeSources || []}
+              onChange={sources => handleFieldChange("knowledgeSources", sources)}
+              readOnly={readOnly}
+            />
+          </Field>
+        </div>
+
+        <div className="flex items-center justify-center gap-4 p-4 bg-white shrink-0 mt-auto relative z-10 w-full">
+          {readOnly ? (
+            // Nothing here is editable, so there is nothing to save or
+            // cancel — a single Close is the only action that makes sense.
+            <Button kind="secondary" onClick={requestClose} className="min-w-[120px]">
+              {strings.close}
+            </Button>
+          ) : (
+            <>
+              <Button
+                kind="primary"
+                onClick={handleSave}
+                disabled={isCreating}
+                className="min-w-[120px]"
+              >
+                {isCreating ? t("characterLibrary.saving") : strings.save}
+              </Button>
+              <Button
+                kind="secondary"
+                onClick={requestClose}
+                className="min-w-[120px]"
+                disabled={isCreating}
+              >
+                {strings.cancel}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <ConfirmationDialog
+        isOpen={isDiscardConfirmOpen}
+        onClose={() => setIsDiscardConfirmOpen(false)}
+        title={{ normal: strings.discardConfirmTitle, italic: strings.discardConfirmTitleItalic }}
+        content={strings.discardConfirmDescription}
+        buttonText={strings.discardConfirmLeave}
+        buttonVariant={ButtonVariant.DESTRUCTIVE}
+        onButtonClick={confirmDiscard}
+        secondaryButtonText={strings.discardConfirmStay}
+        secondaryButtonVariant={ButtonVariant.SECONDARY}
+        onSecondaryButtonClick={() => setIsDiscardConfirmOpen(false)}
+      />
+    </div>
+  );
+};

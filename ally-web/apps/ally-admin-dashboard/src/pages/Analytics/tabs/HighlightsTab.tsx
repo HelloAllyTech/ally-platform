@@ -1,0 +1,250 @@
+import { ReactNode, useMemo, useState } from "react";
+
+import { Tab, TabList, TabPanel, TabPanels, CarbonTabs as Tabs } from "@ally-ui-mono/ui-shared";
+
+import { AnalyticsTabFilters } from "../analyticsFilters";
+import { useAnalyticsOrgScope } from "../analyticsOrgScope";
+import { CoachingSupportSubTab } from "./CoachingSupportSubTab";
+import { CourseImpactSubTab } from "./CourseImpactSubTab";
+import { CurriculumSubTab } from "./CurriculumSubTab";
+import { EffectivenessSubTab } from "./EffectivenessSubTab";
+import { FoundationalSkillsSubTab } from "./FoundationalSkillsSubTab";
+import { GoalsTab } from "./GoalsTab";
+import { OrgEngagementSubTab } from "./OrgEngagementSubTab";
+import { PlatformSubTab } from "./PlatformSubTab";
+import { QualitySentimentSubTab } from "./QualitySentimentSubTab";
+import { SkillGrowthSubTab } from "./SkillGrowthSubTab";
+import { UnitEconomicsSubTab } from "./UnitEconomicsSubTab";
+import { UsageLevelsSubTab } from "./UsageLevelsSubTab";
+
+/**
+ * Sub-tab registry — the single place to add or reorder a Highlights sub-tab.
+ *
+ * `label` is the tab; `blurb` is the one line under the tab strip that says what
+ * question the panel answers, so a reader who lands on an unfamiliar sub-tab is
+ * not left inferring it from five chart titles.
+ */
+interface SubTabDef {
+  id: string;
+  label: string;
+  blurb: string;
+  render: (filters: AnalyticsTabFilters) => ReactNode;
+  /**
+   * Shown to a platform admin restricted to some organizations: everything it
+   * draws narrows to the page's org, or is hidden for them. Priority, Orgs and
+   * Unit economics are platform-wide by construction and stay hidden.
+   */
+  orgScoped?: true;
+}
+
+const SUB_TABS: SubTabDef[] = [
+  {
+    // First entry = the landing panel. "Are we on pace against a goal" is the
+    // question leadership opens Highlights to answer, ahead of the broader
+    // platform-history picture in the sub-tabs below.
+    //
+    // No page-level pickers reach it: it is all-time and platform-wide by
+    // construction, and its own grain control (month/quarter/year) lives on
+    // the card, not on the tab strip.
+    id: "goals",
+    label: "Priority",
+    blurb: "",
+    render: () => <GoalsTab />,
+  },
+  {
+    // Straight after Priority: "are we on pace" is answered there, "is it
+    // working" here — the chain from reaching a learner to a measured change
+    // in how they help, each tile read from the tab that owns its definition.
+    // All-time with its own org filter, so no page filters reach it.
+    id: "effectiveness",
+    orgScoped: true,
+    label: "Effectiveness",
+    blurb:
+      "Does practice on Ally change how people help? Each tile is one link in that chain; open the tile's tab for the detail.",
+    render: () => <EffectivenessSubTab />,
+  },
+  {
+    // Next to Priority because it is the deep-dive behind AAQ-166 there: which
+    // of the 14 foundational helping skills practice is moving, and for whom.
+    // "Skill growth" below reads the same rubric (since 2026-10; before that it
+    // plotted the AI actor's judge score) but as a median curve per learner's Nth
+    // slice; this tab is the balanced-panel, start → now reading with intervals.
+    // Labelled "Helping skills" (not "Skills") so the two never read as the same.
+    // All-time like Priority, so no page filters reach it; it opens on all orgs
+    // and carries its own org filter.
+    id: "helping-skills",
+    orgScoped: true,
+    label: "Helping skills",
+    blurb:
+      "Is practice moving the 14 foundational helping skills, scored on one fixed rubric whatever the scenario? The same learners start to now — with how precise the measure is, what helpers do, safety, a same-scenario benchmark, and who to coach.",
+    render: () => <FoundationalSkillsSubTab />,
+  },
+  {
+    // The former Highlights tab in full — KPI strip, growth,
+    // engagement, outcomes, adoption and the existing unit-economics charts —
+    // plus the north-star pair, which belongs on the first platform-history
+    // screen a leader sees rather than a click away.
+    id: "platform",
+    orgScoped: true,
+    label: "Platform",
+    blurb: "The whole-platform picture: the north star, growth, engagement, outcomes and adoption.",
+    render: f => <PlatformSubTab {...f} />,
+  },
+  {
+    id: "levels",
+    orgScoped: true,
+    label: "Usage",
+    blurb:
+      "Whether learners start at all, whether they come back, and how much of their practice is long enough to count.",
+    render: f => <UsageLevelsSubTab {...f} />,
+  },
+  {
+    // Third, directly after the two usage panels: "are they practising" is the
+    // question a reader has to answer before "are they getting better" means
+    // anything.
+    id: "skills",
+    orgScoped: true,
+    label: "Skill growth",
+    blurb:
+      "Does practice raise learners' helping-skills score, slice by slice? The learning curve, how many individuals improved against their own start, which competencies the practice lands on, and any one learner's history — on the same 1–4 rubric as Helping skills.",
+    render: f => <SkillGrowthSubTab {...f} />,
+  },
+  {
+    // Content rather than people: the three sub-tabs above ask how far learners
+    // get and how well they do, and this one asks what the platform put in
+    // front of them.
+    id: "curriculum",
+    orgScoped: true,
+    label: "Curriculum",
+    blurb:
+      "What learners practise and what they finish: completion by item format, the language mix, and the most- and least-used scenarios.",
+    render: f => <CurriculumSubTab {...f} />,
+  },
+  {
+    // Straight after Curriculum: that panel asks what learners finish, this one
+    // asks whether finishing it made them better. Read on the Helping skills
+    // rubric, so every course is on one scale whatever its scenarios. All-time
+    // with its own org filter, like Helping skills, so no page filters reach it.
+    id: "course-impact",
+    orgScoped: true,
+    label: "Course impact",
+    blurb:
+      "Did each course leave its learners better at the 14 helping skills? Each learner's practice before starting against their practice after finishing, on one fixed rubric — with who each course can measure, skill by skill, and harmful habits.",
+    render: () => <CourseImpactSubTab />,
+  },
+  {
+    id: "quality",
+    orgScoped: true,
+    label: "Quality & sentiment",
+    blurb:
+      "Does the LLM judge agree with the learner? The same sessions read as an index, a proxy NPS, a distribution and a rating mix.",
+    render: f => <QualitySentimentSubTab {...f} />,
+  },
+  {
+    // The only panels on this tab that measure people other than learners.
+    id: "coaching",
+    orgScoped: true,
+    label: "Coaching & support",
+    blurb:
+      "The human loop around the product: sessions shared for review, how fast they get a reply, and how widely live support is used.",
+    render: f => <CoachingSupportSubTab {...f} />,
+  },
+  {
+    id: "orgs",
+    label: "Orgs",
+    blurb:
+      "How far each account has climbed, how many are still active, and how the customer base is shaped. Always platform-wide.",
+    render: () => <OrgEngagementSubTab />,
+  },
+  {
+    id: "cost",
+    label: "Unit economics",
+    blurb:
+      "What ten minutes of roleplay costs in AI, split by area and service. Estimates, in USD.",
+    render: () => <UnitEconomicsSubTab />,
+  },
+];
+
+/**
+ * Highlights — the leadership view, organised into sub-tabs.
+ *
+ * ## Why sub-tabs rather than one long page
+ *
+ * The tab reached twenty-three charts, and then absorbed the twenty that used to
+ * live on a separate Testing tab. Beyond a screen or two, a dashboard stops
+ * being read and starts being scrolled past, and the reader loses the ability to
+ * hold a section in their head — which is the whole point of grouping charts by
+ * the question they answer rather than by the endpoint that serves them.
+ *
+ * There is a second, mechanical reason: only the visible panel's hooks mount, so
+ * a reader opening Highlights pays for the Platform panel's requests and not for
+ * seven sub-tabs' worth of aggregation across two dozen endpoints. Mounting
+ * everything and hiding it with CSS would have made the first paint slower for
+ * every reader in order to save a click for some of them.
+ *
+ * ## Window and grain
+ *
+ * The tab takes NO page-level date range — declared by `TabDef.uses.range` in
+ * Analytics.tsx, which drives both the picker and the window queried, so the two
+ * cannot disagree. What replaces it is per-chart controls: each time series
+ * carries its own period and grain, and those choices are SAVED PER USER (see
+ * ./chartControls), so an analyst who always reads quality over 90 days does not
+ * re-pick it every morning.
+ *
+ * A page-level range would have been the smaller change and the wrong one: the
+ * charts here are not slices of one question. Activation and stickiness are
+ * lifetime measures that a window would redefine rather than narrow; the org
+ * counts are as-of-now; the cost ratio wants months. One picker over all of them
+ * would either lie about what it scoped or force every panel to the least useful
+ * common period.
+ *
+ * ## What deliberately has no picker
+ *
+ * Any card whose quantity is a lifetime or all-time measure says "all time" on
+ * its face and offers no control, rather than carrying one that cannot honestly
+ * do anything. A control that appears to narrow a metric while actually changing
+ * its definition is worse than no control.
+ */
+export const HighlightsTab = (filters: AnalyticsTabFilters) => {
+  const { restricted } = useAnalyticsOrgScope();
+  const subTabs = useMemo(
+    () => (restricted ? SUB_TABS.filter(t => t.orgScoped) : SUB_TABS),
+    [restricted],
+  );
+  const [selected, setSelected] = useState(0);
+  const active = subTabs[selected] ?? subTabs[0];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Tabs
+        selectedIndex={selected}
+        onChange={({ selectedIndex }: { selectedIndex: number }) => setSelected(selectedIndex)}
+      >
+        <TabList aria-label="Highlights sections" contained>
+          {subTabs.map(tab => (
+            <Tab key={tab.id}>{tab.label}</Tab>
+          ))}
+        </TabList>
+
+        {active.blurb ? (
+          <p className="mt-3 max-w-3xl text-xs leading-relaxed text-typography-500">
+            {active.blurb}
+          </p>
+        ) : null}
+
+        <TabPanels>
+          {subTabs.map((tab, i) => (
+            // No side padding on phones, as on the page's own tab panels.
+            <TabPanel key={tab.id} className="max-sm:!px-0">
+              {/* Rendered only while selected. Carbon keeps every TabPanel in
+                  the tree, so without this guard every panel's hooks would
+                  mount on first paint and fire their requests — the cost this
+                  structure exists to avoid. */}
+              {i === selected ? tab.render(filters) : null}
+            </TabPanel>
+          ))}
+        </TabPanels>
+      </Tabs>
+    </div>
+  );
+};

@@ -1,0 +1,90 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Dropdown Component > should match snapshot with default props 1`] = `
+<DocumentFragment>
+  <div
+    style="min-width: 200px;"
+  >
+    <div
+      class="cds--list-box__wrapper"
+    >
+      <div
+        class="cds--combo-box cds--list-box cds--list-box--md"
+      >
+        <div
+          class="cds--list-box__field"
+        >
+          <input
+            aria-activedescendant=""
+            aria-autocomplete="list"
+            aria-controls="downshift-:r2:-menu"
+            aria-expanded="false"
+            aria-haspopup="listbox"
+            aria-label="Choose an item"
+            autocomplete="off"
+            class="cds--text-input"
+            id="dropdown-combobox"
+            role="combobox"
+            tabindex="0"
+            type="text"
+            value="Option A"
+          />
+          <button
+            aria-label="Clear selected item"
+            class="cds--list-box__selection"
+            tabindex="-1"
+            title="Clear selected item"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              fill="currentColor"
+              focusable="false"
+              height="16"
+              preserveAspectRatio="xMidYMid meet"
+              viewBox="0 0 32 32"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M17.4141 16 24 9.4141 22.5859 8 16 14.5859 9.4143 8 8 9.4141 14.5859 16 8 22.5859 9.4143 24 16 17.4141 22.5859 24 24 22.5859 17.4141 16z"
+              />
+            </svg>
+          </button>
+          <button
+            aria-controls="downshift-:r2:-menu"
+            aria-expanded="false"
+            aria-label="Open"
+            class="cds--list-box__menu-icon"
+            id="downshift-:r2:-toggle-button"
+            tabindex="-1"
+            title="Open"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              fill="currentColor"
+              focusable="false"
+              height="16"
+              preserveAspectRatio="xMidYMid meet"
+              viewBox="0 0 16 16"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 11 3 6 3.7 5.3 8 9.6 12.3 5.3 13 6z"
+              />
+            </svg>
+          </button>
+        </div>
+        <ul
+          aria-labelledby="downshift-:r2:-label"
+          class="cds--list-box__menu"
+          id="downshift-:r2:-menu"
+          role="listbox"
+        />
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

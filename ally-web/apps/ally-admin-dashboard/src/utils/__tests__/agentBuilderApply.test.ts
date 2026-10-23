@@ -1,0 +1,314 @@
+import { describe, it, expect, vi } from "vitest";
+
+import type { UseFormReturn } from "react-hook-form";
+
+import { FORM_FIELD_IDS } from "@constants";
+
+import { applyAgentBuilderField, readEstablishedContext } from "../agentBuilderApply";
+
+/**
+ * Minimal RHF stub — applyAgentBuilderField touches setValue, and (for the
+ * per-language fields) reads the current value back via getValues to merge
+ * rather than clobber other languages.
+ */
+const makeForm = (existingValues: Record<string, unknown> = {}) => {
+  const setValue = vi.fn();
+  const getValues = vi.fn((key: string) => existingValues[key]);
+  return { form: { setValue, getValues } as unknown as UseFormReturn<any>, setValue, getValues };
+};
+
+const validStates = [
+  {
+    id: "s1",
+    name: "Guarded",
+    guidelines: "You are wary.",
+    scoreLower: 0,
+    scoreUpper: 100,
+    ragEnabled: false,
+  },
+  {
+    id: "s2",
+    name: "Opening up",
+    guidelines: "You share a little.",
+    scoreLower: 100,
+    scoreUpper: 200,
+    ragEnabled: true,
+  },
+];
+
+describe("applyAgentBuilderField — states", () => {
+  it("paints server-built states into the states form field", () => {
+    const { form, setValue } = makeForm();
+    const label = applyAgentBuilderField("states", validStates, form);
+
+    expect(label).toBe("States");
+    expect(setValue).toHaveBeenCalledTimes(1);
+    const [key, rows] = setValue.mock.calls[0];
+    expect(key).toBe(FORM_FIELD_IDS.STATES);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      id: "s1",
+      name: "Guarded",
+      guidelines: "You are wary.",
+      scoreLower: 0,
+      scoreUpper: 100,
+      ragEnabled: false,
+    });
+  });
+
+  it("returns null and writes nothing for an empty / non-array value", () => {
+    const { form, setValue } = makeForm();
+    expect(applyAgentBuilderField("states", [], form)).toBeNull();
+    expect(applyAgentBuilderField("states", undefined, form)).toBeNull();
+    expect(applyAgentBuilderField("states", "nope", form)).toBeNull();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+
+  it("drops malformed cards (missing name/guidelines or non-finite bounds)", () => {
+    const { form, setValue } = makeForm();
+    const mixed = [
+      validStates[0],
+      { id: "x", name: "", guidelines: "g", scoreLower: 0, scoreUpper: 100 },
+      { id: "y", name: "No guides", guidelines: "", scoreLower: 0, scoreUpper: 100 },
+      { id: "z", name: "Bad bounds", guidelines: "g", scoreLower: null, scoreUpper: 100 },
+    ];
+    const label = applyAgentBuilderField("states", mixed, form);
+
+    expect(label).toBe("States");
+    const rows = setValue.mock.calls[0][1];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe("Guarded");
+  });
+
+  it("mints an id when the server value is missing one, and defaults ragEnabled", () => {
+    const { form, setValue } = makeForm();
+    applyAgentBuilderField(
+      "states",
+      [{ name: "A", guidelines: "g", scoreLower: 0, scoreUpper: 100 }],
+      form,
+    );
+    const rows = setValue.mock.calls[0][1];
+    expect(typeof rows[0].id).toBe("string");
+    expect(rows[0].id.length).toBeGreaterThan(0);
+    expect(rows[0].ragEnabled).toBe(true);
+  });
+});
+
+describe("applyAgentBuilderField — backstory", () => {
+  it("writes the trimmed value into characterProfileText", () => {
+    const { form, setValue } = makeForm();
+    const label = applyAgentBuilderField("backstory", "  You grew up in Chennai.  ", form);
+
+    expect(label).toBe("Character Backstory");
+    expect(setValue).toHaveBeenCalledWith(
+      FORM_FIELD_IDS.CHARACTER_PROFILE_TEXT,
+      "You grew up in Chennai.",
+      expect.anything(),
+    );
+  });
+
+  it("returns null and writes nothing for an empty value", () => {
+    const { form, setValue } = makeForm();
+    expect(applyAgentBuilderField("backstory", "   ", form)).toBeNull();
+    expect(applyAgentBuilderField("backstory", undefined, form)).toBeNull();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyAgentBuilderField — spoken_languages", () => {
+  it("writes nothing — the wizard consumes the language list itself", () => {
+    const { form, setValue } = makeForm();
+    expect(
+      applyAgentBuilderField(
+        "spoken_languages",
+        [{ languageId: "1", label: "English", code: "en" }],
+        form,
+      ),
+    ).toBeNull();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyAgentBuilderField — opening_statements / reminders", () => {
+  it("joins non-empty lines back into a newline blob for openingStatements", () => {
+    const { form, setValue } = makeForm();
+    const label = applyAgentBuilderField(
+      "opening_statements",
+      "Hi there.\n\n  I wasn't sure I'd come.  \n",
+      form,
+    );
+
+    expect(label).toBe("Opening Dialogues");
+    expect(setValue).toHaveBeenCalledWith(
+      FORM_FIELD_IDS.OPENING_STATEMENTS,
+      "Hi there.\nI wasn't sure I'd come.",
+      expect.anything(),
+    );
+  });
+
+  it("joins non-empty lines back into a newline blob for reminders", () => {
+    const { form, setValue } = makeForm();
+    applyAgentBuilderField("reminders", "Maintain eye contact\nAsk open-ended questions", form);
+
+    expect(setValue).toHaveBeenCalledWith(
+      FORM_FIELD_IDS.REMINDERS,
+      "Maintain eye contact\nAsk open-ended questions",
+      expect.anything(),
+    );
+  });
+
+  it("returns null when every line is blank", () => {
+    const { form, setValue } = makeForm();
+    expect(applyAgentBuilderField("opening_statements", "  \n  ", form)).toBeNull();
+    expect(applyAgentBuilderField("reminders", "", form)).toBeNull();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyAgentBuilderField — opening_statements per language", () => {
+  it("writes the primary language's lines to openingStatements", () => {
+    const { form, setValue } = makeForm();
+    const label = applyAgentBuilderField("opening_statements", "Hi there.\nI wasn't sure.", form, {
+      languageId: "1",
+      primaryLanguageId: "1",
+    });
+
+    expect(label).toBe("Opening Dialogues");
+    expect(setValue).toHaveBeenCalledWith(
+      FORM_FIELD_IDS.OPENING_STATEMENTS,
+      "Hi there.\nI wasn't sure.",
+      expect.anything(),
+    );
+  });
+
+  it("routes a non-primary language into translationOpeningStatements, preserving other languages", () => {
+    const { form, setValue } = makeForm({
+      translationOpeningStatements: { "2": ["നമസ്കാരം"] },
+    });
+    applyAgentBuilderField("opening_statements", "नमस्ते.\nमुझे नहीं पता था.", form, {
+      languageId: "4",
+      primaryLanguageId: "1",
+    });
+
+    const [key, value] = setValue.mock.calls[0];
+    expect(key).toBe("translationOpeningStatements");
+    expect(value).toEqual({
+      "2": ["നമസ്കാരം"],
+      "4": ["नमस्ते.", "मुझे नहीं पता था."],
+    });
+    // The primary blob is left alone when generating a non-primary language.
+    expect(setValue).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps lines to the panel's line slots", () => {
+    const { form, setValue } = makeForm();
+    applyAgentBuilderField("opening_statements", "a\nb\nc\nd\ne\nf\ng", form, {
+      languageId: "4",
+      primaryLanguageId: "1",
+    });
+
+    const [, value] = setValue.mock.calls[0];
+    expect(value).toEqual({ "4": ["a", "b", "c", "d", "e"] });
+  });
+
+  it("still writes openingStatements when no language is given (single-language callers)", () => {
+    const { form, setValue } = makeForm();
+    applyAgentBuilderField("opening_statements", "Hi there.", form);
+
+    expect(setValue).toHaveBeenCalledWith(
+      FORM_FIELD_IDS.OPENING_STATEMENTS,
+      "Hi there.",
+      expect.anything(),
+    );
+  });
+});
+
+describe("applyAgentBuilderField — linguistic_style_samples / allowed_filler_words", () => {
+  it("keys samples and fillers under the generated language", () => {
+    const { form, setValue } = makeForm({
+      linguisticStyleSamples: { "1": ["I guess so."] },
+      allowedFillerWords: { "1": ["um"] },
+    });
+
+    applyAgentBuilderField("linguistic_style_samples", ["मुझे नहीं पता."], form, {
+      languageId: "4",
+    });
+    applyAgentBuilderField("allowed_filler_words", ["मतलब", "हाँ तो"], form, { languageId: "4" });
+
+    expect(setValue.mock.calls[0][1]).toEqual({
+      "1": ["I guess so."],
+      "4": ["मुझे नहीं पता."],
+    });
+    expect(setValue.mock.calls[1][1]).toEqual({ "1": ["um"], "4": ["मतलब", "हाँ तो"] });
+  });
+
+  it("keys new samples under the default (English) language, preserving other languages", () => {
+    const { form, setValue } = makeForm({
+      linguisticStyleSamples: { "2": ["Existing Malayalam sample"] },
+    });
+    const label = applyAgentBuilderField(
+      "linguistic_style_samples",
+      ["I guess so.", "I don't really know.", ""],
+      form,
+    );
+
+    expect(label).toBe("Linguistic Style Samples");
+    const [key, value] = setValue.mock.calls[0];
+    expect(key).toBe(FORM_FIELD_IDS.LINGUISTIC_STYLE_SAMPLES);
+    expect(value).toEqual({
+      "2": ["Existing Malayalam sample"],
+      "1": ["I guess so.", "I don't really know."],
+    });
+  });
+
+  it("dedupes and keys new fillers under the default (English) language", () => {
+    const { form, setValue } = makeForm({ allowedFillerWords: { "3": ["eh"] } });
+    const label = applyAgentBuilderField("allowed_filler_words", ["um", "you know", "um"], form);
+
+    expect(label).toBe("Allowed Filler Words");
+    const [key, value] = setValue.mock.calls[0];
+    expect(key).toBe("allowedFillerWords");
+    expect(value).toEqual({ "3": ["eh"], "1": ["um", "you know"] });
+  });
+
+  it("returns null and writes nothing for an empty list", () => {
+    const { form, setValue } = makeForm();
+    expect(applyAgentBuilderField("linguistic_style_samples", [], form)).toBeNull();
+    expect(applyAgentBuilderField("allowed_filler_words", undefined, form)).toBeNull();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+});
+
+describe("readEstablishedContext", () => {
+  const formWith = (values: Record<string, unknown>) =>
+    ({ getValues: (key: string) => values[key] }) as unknown as UseFormReturn<any>;
+
+  it("reads the description and persona the form now holds", () => {
+    expect(
+      readEstablishedContext(
+        formWith({
+          [FORM_FIELD_IDS.DESCRIPTION]: " <p>Withdrawn</p> ",
+          name: "Suchi",
+          age: 34,
+          gender: "female",
+          profession: "",
+          currentLocation: "Chennai",
+        }),
+      ),
+    ).toEqual({
+      challengeDescription: "<p>Withdrawn</p>",
+      persona: { name: "Suchi", age: 34, gender: "female", currentLocation: "Chennai" },
+    });
+  });
+
+  it("drops an age the server would reject and clips over-long text", () => {
+    const context = readEstablishedContext(
+      formWith({ age: "", name: "x".repeat(300), [FORM_FIELD_IDS.DESCRIPTION]: "" }),
+    );
+    expect(context).toEqual({ persona: { name: "x".repeat(200) } });
+  });
+
+  it("returns undefined when nothing has been established", () => {
+    expect(readEstablishedContext(formWith({ age: 0 }))).toBeUndefined();
+  });
+});

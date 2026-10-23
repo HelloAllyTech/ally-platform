@@ -1,0 +1,725 @@
+import {
+  FC,
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
+
+import { XIcon } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
+
+import { Tooltip } from "@ally-ui-mono/ui-shared";
+import { CustomImage, FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
+import { useGetLogoUrlQuery, useGetUnreadReviewCountQuery } from "@api";
+import { DockToRight, LogoutIllustration, RedirectIcon, ReportProblemNavIcon } from "@assets";
+import {
+  AppTooltip,
+  ConfirmationDialog,
+  ProfileSettings,
+  ReportProblemModal,
+  StreakPill,
+  LevelIndicator,
+  UserInfo,
+} from "@components";
+import {
+  ANALYTICS_EVENTS,
+  ANALYTICS_PROPS,
+  navBarOptions,
+  TabId,
+  Permissions,
+  TooltipLocation,
+  hasAllyAdminAccess,
+  adminAppUrl,
+  LOCAL_STORAGE_KEYS,
+} from "@constants";
+import {
+  useAnalytics,
+  useCanUseTextHelpline,
+  useCanViewAnalytics,
+  useCanViewCharacterLibrary,
+  usePracticeStreakSummary,
+  useProgressSummary,
+  useUser,
+} from "@hooks";
+
+import { NavSideBarProps, TabProps } from "./types";
+import { ButtonVariant } from "../button";
+import LanguageSelector from "../language-selector/LanguageSelector";
+import NotificationBadge from "../notification-badge/NotificationBadge";
+import { NotificationBell } from "../notification-feed";
+
+// Below Tailwind's `md` the sidebar is an off-canvas drawer opened from the
+// mobile top bar. A drawer of bare icons gives a phone user nothing to read,
+// so it always opens expanded there, whatever the desktop rail was set to.
+const MOBILE_MAX_WIDTH = 768;
+
+// On desktop the rail is collapsed unless pinned, and a mouse over it opens it
+// temporarily, floating over the page. The open delay is hover intent: long
+// enough that a cursor crossing the rail on its way to the window edge doesn't
+// flash it open, short enough to feel immediate. The close delay is grace, so
+// a brief slip past the edge doesn't snap it shut mid-reach.
+const PEEK_OPEN_DELAY_MS = 100;
+const PEEK_CLOSE_DELAY_MS = 150;
+
+// Storage can be unavailable (private windows, blocked site data); the pin then
+// lasts only until the next load rather than breaking the sidebar.
+const readPinned = (): boolean => {
+  try {
+    return localStorage.getItem(LOCAL_STORAGE_KEYS.NAV_SIDEBAR_PINNED) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const writePinned = (pinned: boolean) => {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.NAV_SIDEBAR_PINNED, String(pinned));
+  } catch {
+    // See readPinned.
+  }
+};
+
+// Keyboard focus opens the rail the way hover does, so its labels are readable
+// while tabbing through it. Focus left behind by a mouse click must not: the
+// clicked tab keeps focus, and would hold the rail open after the cursor left.
+const isKeyboardFocus = (element: Element): boolean => {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+};
+
+// Built lazily (inside the component) so `TabId`/`TooltipLocation` are not
+// dereferenced at module load — keeps tests that mock @constants from breaking.
+const getTabTooltipLocations = (): Partial<Record<string, TooltipLocation>> => ({
+  [TabId.LEARN]: TooltipLocation.LEARN_TAB,
+  [TabId.REVIEW]: TooltipLocation.REVIEW_TAB,
+  [TabId.BADGES]: TooltipLocation.BADGES_TAB,
+  [TabId.LEADERBOARD]: TooltipLocation.COMMUNITY_TAB,
+  [TabId.SCRIBE_LOGS]: TooltipLocation.SESSIONS_TAB,
+  [TabId.ANALYTICS]: TooltipLocation.STATISTICS_TAB,
+  [TabId.SEARCH]: TooltipLocation.SEARCH_TAB,
+});
+
+const defaultProfileUploadValues: {
+  profileImageUrl: string;
+} = {
+  profileImageUrl: "",
+};
+
+const Tab: FC<TabProps> = ({
+  id,
+  Icon,
+  title,
+  tKey,
+  tagKey,
+  activeTab,
+  isExpanded,
+  onClick,
+  badgeCount,
+  trailing,
+  href,
+}) => {
+  const { t } = useTranslation();
+  // Tabs that leave the app render as a real anchor, so they are
+  // middle-clickable and preview the destination on hover.
+  //
+  // In-app tabs still route via onClick rather than an href, but they are no
+  // longer click-only divs: primary navigation that can't be reached with Tab
+  // or activated with Enter locks out keyboard and screen-reader users, and
+  // this sidebar is the only way to move around the app. They carry a button
+  // role, take focus, respond to Enter and Space, and mark the current page
+  // with aria-current so it is announced rather than only coloured.
+  const Wrapper = href ? "a" : "div";
+  const isActive = activeTab === id;
+  const label = tKey ? t(tKey) : title;
+  const wrapperProps = href
+    ? { href, target: "_blank" as const, rel: "noopener noreferrer" }
+    : {
+        role: "button",
+        tabIndex: 0,
+        "aria-current": isActive ? ("page" as const) : undefined,
+        onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          // Space scrolls the page by default, and Enter can submit an
+          // enclosing form; a control that navigates must do neither.
+          event.preventDefault();
+          onClick?.();
+        },
+      };
+  return (
+    <Wrapper
+      data-testid={`nav-tab-${id}`}
+      className={`
+          w-full h-12 rounded-md p-4 flex items-center gap-3 my-1 cursor-pointer
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
+          ${isActive ? "bg-background-tertiary" : "hover:bg-background-secondary"}
+          transition-all duration-300 group
+        `}
+      onClick={onClick}
+      // Collapsed is the default rail, and there the tab is a bare icon: name it
+      // for assistive tech, which can't see the label a hover would reveal.
+      aria-label={isExpanded ? undefined : label}
+      {...wrapperProps}
+    >
+      <div className="relative flex-shrink-0">
+        <Icon
+          className={`${activeTab === id ? "" : "opacity-60"} `}
+          data-testid={`nav-tab-icon-${id}`}
+        />
+        {!isExpanded && badgeCount !== undefined && badgeCount > 0 && (
+          <NotificationBadge count={badgeCount} />
+        )}
+        {!isExpanded && trailing && <span className="absolute -right-3 -top-2">{trailing}</span>}
+      </div>
+
+      {isExpanded && (
+        <div className="flex items-center justify-between flex-1 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              data-testid={`nav-tab-title-${id}`}
+              className={`${
+                activeTab === id
+                  ? "text-typography-900 font-[500]"
+                  : "text-typography-800 font-[400]"
+              } font-primary text-lg truncate`}
+            >
+              {label}
+            </div>
+            {tagKey && (
+              <span
+                data-testid={`nav-tab-tag-${id}`}
+                className="flex-shrink-0 rounded-full bg-warning-50 px-2 py-[1px] text-[10px] font-semibold uppercase leading-none tracking-wide text-warning-700"
+              >
+                {t(tagKey)}
+              </span>
+            )}
+          </div>
+          {badgeCount !== undefined && badgeCount > 0 && (
+            <NotificationBadge count={badgeCount} isExpanded />
+          )}
+          {trailing}
+        </div>
+      )}
+    </Wrapper>
+  );
+};
+
+const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClose }) => {
+  const { t } = useTranslation();
+  const { track } = useAnalytics();
+  const { permissions, user, logout, getProfileUrl, deleteProfile, uploadProfile, refetchUser } =
+    useUser();
+  // Shared with the /learn bar via a single void-arg cache entry, so the pill
+  // and the bar are always the same number.
+  const { summary: streakSummary } = usePracticeStreakSummary();
+  const { summary: progressSummary, canViewProgress } = useProgressSummary();
+
+  const { data: unreadData } = useGetUnreadReviewCountQuery(
+    { isScribe: false },
+    { skip: !permissions.includes(Permissions.VIEW_SIMULATION_REVIEWS) },
+  );
+
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState<boolean>(false);
+  const [openReportProblem, setOpenReportProblem] = useState<boolean>(false);
+  const { canView: canViewCharacterLibrary } = useCanViewCharacterLibrary();
+  const { canView: canViewAnalytics } = useCanViewAnalytics();
+  const { canView: canUseTextHelpline } = useCanUseTextHelpline();
+  const permittedTabs = navBarOptions.filter(tab => {
+    // Text helpline needs a helpline permission AND the tenant's
+    // TEXT_HELPLINE_ENABLED toggle — see useCanUseTextHelpline.
+    if (tab.id === TabId.HELPLINE) {
+      return canUseTextHelpline;
+    }
+
+    // Character Library needs the view:scenario-character permission AND the
+    // tenant's CHARACTER_LIBRARY_ENABLED org toggle — see useCanViewCharacterLibrary.
+    if (tab.id === TabId.CHARACTER_LIBRARY) {
+      return canViewCharacterLibrary;
+    }
+
+    // Progress needs VIEW_USER_RANK AND the tenant's PROGRESS_DASHBOARD_ENABLED org
+    // toggle — see useProgressSummary. Every learner holds the permission, so a
+    // permission-only check would show the tab to orgs that never opted in.
+    if (tab.id === TabId.PROGRESS) {
+      return canViewProgress;
+    }
+
+    // Statistics needs VIEW_ANALYTICS_DASHBOARD AND something for the page to
+    // render — a registered dashboard, or the native Organization Metrics view.
+    // See useCanViewAnalytics: the permission alone put an empty tab in front of
+    // every tenant that has no dashboards configured.
+    if (tab.id === TabId.ANALYTICS) {
+      return canViewAnalytics;
+    }
+
+    // Check if user has permission for this tab
+    const hasPermission =
+      !tab.permissions || permissions?.some(permission => tab.permissions.includes(permission));
+    if (!hasPermission) return false;
+
+    // If this is the Badges tab, check if Leaderboard is also permitted
+    if (tab.id === TabId.BADGES) {
+      const hasLeaderboardPermission = navBarOptions.some(
+        t =>
+          t.id === TabId.LEADERBOARD &&
+          (!t.permissions || permissions?.some(permission => t.permissions.includes(permission))),
+      );
+      return !hasLeaderboardPermission;
+    }
+
+    return true;
+  });
+
+  const showAllyAdminLink = hasAllyAdminAccess(user) && !!adminAppUrl;
+
+  const navigate = useNavigate();
+  const { data: tenantData } = useGetLogoUrlQuery();
+
+  const [isPinned, setIsPinned] = useState(readPinned);
+  const [isPeeking, setIsPeeking] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_MAX_WIDTH);
+  const [openSettings, setOpenSettings] = useState(false);
+
+  const isExpanded = isMobile || isPinned || isPeeking;
+  // Only a hover-opened rail floats over the page. Pinned, it takes its own
+  // column and the page reflows around it, as it always has.
+  const isOverlaying = isPeeking && !isPinned && !isMobile;
+
+  const profileSettingsForm = useForm({
+    defaultValues: defaultProfileUploadValues,
+    mode: "onChange",
+  });
+
+  const profileUrl = profileSettingsForm.watch("profileImageUrl");
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < MOBILE_MAX_WIDTH);
+
+    handleResize();
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // What is holding the rail open. Refs, not state: they only decide where the
+  // next timer lands, and must be current inside handlers that fire in a burst.
+  const peekSourcesRef = useRef({ pointer: false, keyboard: false });
+  const peekTimerRef = useRef<number>();
+
+  useEffect(() => () => window.clearTimeout(peekTimerRef.current), []);
+
+  const syncPeek = () => {
+    const { pointer, keyboard } = peekSourcesRef.current;
+    const shouldPeek = pointer || keyboard;
+    // Keyboard focus is always deliberate, so it skips the hover-intent delay.
+    const delay = !shouldPeek ? PEEK_CLOSE_DELAY_MS : keyboard ? 0 : PEEK_OPEN_DELAY_MS;
+    window.clearTimeout(peekTimerRef.current);
+    peekTimerRef.current = window.setTimeout(() => setIsPeeking(shouldPeek), delay);
+  };
+
+  // A touch or pen "hovers" only for the instant of a tap, so a peek would open
+  // and shut again on every tap. Those users open the rail with its pin button.
+  const isHoverPointer = (event: PointerEvent<HTMLElement>) =>
+    event.pointerType !== "touch" && event.pointerType !== "pen";
+
+  const handlePointerEnter = (event: PointerEvent<HTMLElement>) => {
+    if (!isHoverPointer(event)) return;
+    peekSourcesRef.current.pointer = true;
+    syncPeek();
+  };
+
+  const handlePointerLeave = (event: PointerEvent<HTMLElement>) => {
+    if (!isHoverPointer(event)) return;
+    // Leaving with the mouse collapses the rail even if keyboard focus is still
+    // parked inside it — e.g. returned there by a modal closed with Escape.
+    // Focusing into it again from the keyboard reopens it.
+    peekSourcesRef.current = { pointer: false, keyboard: false };
+    syncPeek();
+  };
+
+  const handleFocus = (event: FocusEvent<HTMLElement>) => {
+    if (!isKeyboardFocus(event.target)) return;
+    peekSourcesRef.current.keyboard = true;
+    syncPeek();
+  };
+
+  const handleBlur = (event: FocusEvent<HTMLElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    peekSourcesRef.current.keyboard = false;
+    syncPeek();
+  };
+
+  const onTabClick = (path: string) => {
+    onTabChange(path);
+    onClose();
+  };
+
+  const handleTogglePin = () => {
+    const nextPinned = !isPinned;
+    setIsPinned(nextPinned);
+    writePinned(nextPinned);
+    // Unpinning means "collapse", so drop the hover-expansion as well, or the
+    // rail would stay open under the very cursor that just clicked it. It peeks
+    // again on the next hover.
+    window.clearTimeout(peekTimerRef.current);
+    setIsPeeking(false);
+  };
+
+  const toggleTitle = isPinned
+    ? t("nav.sidebar.collapse")
+    : isExpanded
+      ? t("nav.sidebar.pin")
+      : t("nav.sidebar.expand");
+
+  const handleLogout = () => {
+    setIsLogoutDialogOpen(true);
+  };
+
+  const closeLogoutDialog = () => {
+    setIsLogoutDialogOpen(false);
+  };
+
+  const handleConfirmLogout = () => {
+    // On confirm, not on opening the dialog — the spec's event is the session
+    // actually ending, and the dialog can be cancelled.
+    track(ANALYTICS_EVENTS.ACCOUNT_LOGGED_OUT);
+    logout();
+    navigate("/login");
+  };
+
+  const handleSettingsClose = () => {
+    setOpenSettings(false);
+  };
+
+  const handleReportProblemClick = () => {
+    setOpenReportProblem(true);
+  };
+
+  const closeReportProblem = () => {
+    setOpenReportProblem(false);
+  };
+
+  const renderTabs = () => {
+    const tabTooltipLocations = getTabTooltipLocations();
+
+    /**
+     * Persistent streak marker on the Learn tab.
+     *
+     * Reads from the shared summary hook, which takes no query argument — so
+     * this and the /learn bar resolve to the same RTK Query cache entry and a
+     * single request, and can never show different numbers.
+     *
+     * No tooltip: the Learn tab is already wrapped in AppTooltip, and
+     * NavbarWrapper's `overflow-y-hidden` computes overflow-x to `auto`, making
+     * it a clipping ancestor on both axes for the non-portaled Carbon tooltip —
+     * the failure already documented further down this file. The meaning lives
+     * in the pill's aria-label instead.
+     */
+    const renderStreakPill = () => {
+      if (!streakSummary || streakSummary.currentStreak <= 0) return null;
+
+      const labelKey = streakSummary.atRisk
+        ? "practiceStreak.nav.atRisk"
+        : "practiceStreak.nav.value";
+
+      return (
+        <StreakPill
+          days={streakSummary.currentStreak}
+          atRisk={streakSummary.atRisk}
+          ariaLabel={t(labelKey, { count: streakSummary.currentStreak })}
+        />
+      );
+    };
+
+    /**
+     * Persistent level ring on the Progress tab.
+     *
+     * Shares the void-argument summary query with the Progress page, so the rail and the
+     * page it links to resolve to one RTK Query cache entry and cannot disagree.
+     *
+     * Level 1 with no XP still renders: unlike a streak, which is genuinely absent until
+     * earned, every learner has a level, and hiding it until level 2 would make the tab
+     * look broken on day one.
+     */
+    const renderLevelIndicator = () => {
+      if (!progressSummary) return null;
+
+      return (
+        <LevelIndicator
+          level={progressSummary.level}
+          progress={progressSummary.progress}
+          isMaxLevel={progressSummary.isMaxLevel}
+          // Collapsed, the trailing slot is a small corner overlay on an 18px icon, so
+          // the ring is swapped for the pill the streak marker already uses there.
+          variant={isExpanded ? "ring" : "pill"}
+          ariaLabel={t("progress.a11y.navLevel", {
+            level: progressSummary.level,
+          })}
+        />
+      );
+    };
+
+    return (
+      <div
+        className="flex-1 flex-col gap-1 m-2 border-t border-t-border-light pt-3"
+        data-testid="nav-sidebar-tabs"
+      >
+        {permittedTabs?.map(({ id, Icon, title, path, key: translationKey, tagKey }: any) => {
+          const tab = (
+            <Tab
+              id={id}
+              Icon={Icon}
+              title={title}
+              tKey={translationKey}
+              tagKey={tagKey}
+              activeTab={activeTab}
+              isExpanded={isExpanded}
+              onClick={() => onTabClick(path)}
+              badgeCount={id === TabId.REVIEW ? unreadData?.count : undefined}
+              trailing={
+                id === TabId.LEARN
+                  ? renderStreakPill()
+                  : id === TabId.PROGRESS
+                    ? renderLevelIndicator()
+                    : undefined
+              }
+            />
+          );
+
+          const tooltipLocation = tabTooltipLocations[id];
+
+          return tooltipLocation ? (
+            <AppTooltip key={id} location={tooltipLocation}>
+              {tab}
+            </AppTooltip>
+          ) : (
+            <div key={id}>{tab}</div>
+          );
+        })}
+
+        {/* Report a problem is deliberately not in navBarOptions: it opens the
+            modal in place rather than routing anywhere, so activeTab can never
+            match it (never highlighted, same as Ally Admin below). Always
+            visible — not permission-gated — and closes the mobile drawer
+            first so the modal isn't left rendering behind it. */}
+        <Tab
+          id={TabId.REPORT_PROBLEM}
+          Icon={ReportProblemNavIcon}
+          title="Report a problem"
+          tKey="user.reportProblem"
+          activeTab={activeTab}
+          isExpanded={isExpanded}
+          onClick={() => {
+            handleReportProblemClick();
+            onClose();
+          }}
+        />
+
+        {/* Ally Admin is deliberately not in navBarOptions: it routes nowhere in
+            this app, can never be the active tab, and would force routes.ts to
+            import an icon (which breaks every test that mocks @assets — see the
+            note in that file). It is gated on the roles the admin console admits
+            at login rather than on a permission, and on there being somewhere to
+            send them, so an unset VITE_ADMIN_APP_URL hides it rather than
+            opening a dead tab. Kept below the tabs, separated, because it leaves
+            the app. */}
+        {showAllyAdminLink && (
+          <div className="mt-1 border-t border-t-border-light pt-1">
+            <Tab
+              id={TabId.ALLY_ADMIN}
+              Icon={RedirectIcon}
+              title="Ally Admin"
+              tKey="nav.tabs.allyAdmin"
+              activeTab={activeTab}
+              isExpanded={isExpanded}
+              href={adminAppUrl}
+              // The anchor does the navigating; this only dismisses the mobile
+              // drawer left open behind the new tab.
+              onClick={onClose}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleSettingsClick = () => {
+    setOpenSettings(true);
+  };
+
+  const handleProfileUpload = async () => {
+    const existingProfileUrl = user.profileImageUrl;
+
+    try {
+      await uploadProfile({ profileImageUrl: profileUrl });
+      if (existingProfileUrl) await deleteProfile({ profileImageUrl: existingProfileUrl });
+      await refetchUser();
+      track(ANALYTICS_EVENTS.PROFILE_UPDATED, {
+        // Profile Settings renders the name as a disabled input and the form only
+        // carries `profileImageUrl`, so a name change is not reachable today.
+        // Sent anyway so the payload matches the spec if the field opens up.
+        [ANALYTICS_PROPS.NAME_CHANGED]: false,
+        [ANALYTICS_PROPS.IMAGE_CHANGED]: !!profileUrl && profileUrl !== existingProfileUrl,
+      });
+      setOpenSettings(false);
+    } catch {
+      // console.error("Failed to update profile", error);
+    }
+  };
+
+  return (
+    <>
+      {/* Desktop: this wrapper is the sidebar's column in the page layout. It
+          reserves only the collapsed rail's width, or the full width once
+          pinned, so a hover-opened panel floats over the page instead of
+          reflowing it. On a phone it is empty: the panel is a fixed drawer. */}
+      <div
+        data-testid="nav-sidebar-rail"
+        className={`shrink-0 md:relative md:transition-[width] md:duration-150 ${
+          isPinned ? "md:w-64" : "md:w-24"
+        }`}
+      >
+        {/* Mobile: an off-canvas drawer above the sticky top bar (z-30) and its
+          own overlay (z-40). `invisible` while closed takes the off-screen
+          links out of the tab order and the accessibility tree; visibility
+          transitions discretely, so the slide-out still animates. */}
+        <div
+          id="app-nav-sidebar"
+          data-testid="nav-sidebar"
+          data-peeking={isOverlaying}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className={`fixed md:absolute inset-y-0 left-0 z-50 max-w-[85vw] bg-background h-dvh flex flex-col justify-between border-r border-r-border-light transition-all duration-300 md:duration-150 ${
+            isExpanded ? "w-64" : "w-24"
+          } ${isOverlaying ? "md:shadow-xl" : ""} p-[12px] font-primary ${
+            isOpen ? "translate-x-0" : "-translate-x-full invisible md:visible"
+          } md:translate-x-0 max-md:overflow-y-auto max-md:overscroll-contain`}
+        >
+          {/* Logo container */}
+          <div
+            className="relative flex items-center justify-between h-[72px]"
+            data-testid="nav-sidebar-header"
+          >
+            {/* Logo */}
+
+            {/* No `overflow-hidden` here: the org-name Tooltip renders its bubble
+              inline (Carbon Tooltip is not portaled), so an overflow-hidden
+              ancestor would clip it off-screen. The logo image is still clipped
+              to the rounded box by the inner wrapper's own overflow-hidden. */}
+            <div className="relative w-14 h-14 border-[0.5px] ml-2 rounded-md box-border flex items-center justify-center">
+              <Tooltip label={tenantData?.name ?? ""} align="right">
+                <div className="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center">
+                  <CustomImage
+                    src={tenantData?.logoUrl}
+                    alt="org-logo"
+                    className="object-cover w-full h-full rounded-md"
+                    fallbackClassName="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center bg-neutral-100"
+                    fallbackText={tenantData?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
+                  />
+                </div>
+              </Tooltip>
+            </div>
+
+            {/* The pin. Expanded — hover-opened or pinned — it sits beside the
+              logo. Collapsed it lies invisibly over the logo: a mouse never
+              meets it there (hovering opens the rail first), but a tap pins the
+              rail open on a touch screen, which has no hover to open it with.
+              One element across both states, so keyboard focus on it survives
+              the rail opening around it. */}
+            <button
+              type="button"
+              data-testid="nav-sidebar-toggle"
+              onClick={handleTogglePin}
+              className={
+                isExpanded
+                  ? "hidden md:block p-3 transition-all duration-200 hover:bg-gray-50 hover:rounded-md"
+                  : "hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-14 h-14 items-center justify-center rounded-md opacity-0 focus-visible:opacity-100"
+              }
+              title={toggleTitle}
+            >
+              <DockToRight />
+            </button>
+            {/* The drawer's own way out on a phone, where the desktop
+              collapse toggle above has no meaning. */}
+            <button
+              type="button"
+              data-testid="nav-sidebar-close"
+              onClick={onClose}
+              aria-label={t("nav.sidebar.collapse")}
+              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <XIcon aria-hidden="true" />
+            </button>
+          </div>
+          {renderTabs()}
+
+          <div
+            className="flex flex-col items-start gap-3 mx-4 my-3"
+            data-testid="nav-sidebar-footer"
+          >
+            <hr className="w-full border-t border-gray-200" data-testid="nav-sidebar-divider" />
+
+            <NotificationBell isExpanded={isExpanded} />
+
+            {isExpanded && FEATURE_FLAGS_MAP.LANGUAGE_SELECTOR_FLAG && (
+              <AppTooltip location={TooltipLocation.LANGUAGE_SELECTOR}>
+                <div className="w-full" data-testid="nav-sidebar-language-selector">
+                  <LanguageSelector label={t("nav.language.label")} />
+                </div>
+              </AppTooltip>
+            )}
+
+            <UserInfo
+              user={user}
+              onLogout={handleLogout}
+              isExpanded={isExpanded}
+              onProfileSettings={handleSettingsClick}
+              profileUrl={user?.profileImageUrl}
+              name={user?.name}
+            />
+          </div>
+        </div>
+      </div>
+      <ConfirmationDialog
+        title={{
+          normal: t("nav.logout.title.normal"),
+          italic: t("nav.logout.title.italic"),
+        }}
+        isOpen={isLogoutDialogOpen}
+        onClose={closeLogoutDialog}
+        content={t("nav.logout.content")}
+        buttonVariant={ButtonVariant.DESTRUCTIVE}
+        onButtonClick={handleConfirmLogout}
+        buttonText={t("nav.logout.button")}
+        icon={LogoutIllustration}
+      />
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
+          onClick={onClose}
+          data-testid="nav-sidebar-overlay"
+        ></div>
+      )}
+      <ProfileSettings
+        isOpen={openSettings}
+        onClose={handleSettingsClose}
+        userData={user}
+        formMethods={profileSettingsForm}
+        onButtonClick={handleProfileUpload}
+        getProfileUrl={getProfileUrl}
+      />
+      <ReportProblemModal open={openReportProblem} onClose={closeReportProblem} />
+    </>
+  );
+};
+
+export default NavSideBar;

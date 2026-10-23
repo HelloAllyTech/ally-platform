@@ -1,0 +1,1331 @@
+import { ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+
+import { ScaleTypes } from "@carbon/charts";
+import { Maximize } from "@icons";
+
+import {
+  Button,
+  CarbonDropdown as Dropdown,
+  InlineNotification,
+  SkeletonPlaceholder,
+  Tile,
+  Tooltip,
+} from "@ally-ui-mono/ui-shared";
+import { TooltipIcon } from "@assets";
+import { AnalyticsGrain } from "@types";
+
+import { GROUPING_LABEL } from "./analyticsGrouping";
+import { CONTEXT, ColorScale, PALETTE, formatDelta } from "./chartScales";
+
+/**
+ * Shared analytics chart kit — the single source of truth for how charts in the
+ * analytics dashboard look and behave. Use {@link ChartCard} to wrap every chart
+ * (title/caption/source + loading/error/empty/thin-data handling) and the option
+ * factories below so every chart shares the same axes/legend/toolbar defaults.
+ * Add new chart types here rather than hand-rolling option objects.
+ *
+ * The factories deliberately make the honest choice the easy one:
+ *  - `colorScale` is REQUIRED. Omitting it used to fall through to Carbon's
+ *    default palette, where a colour's meaning shifts with the data; 14 charts
+ *    did exactly that. Single-measure charts pass `single(label)`.
+ *  - Time series must use {@link timeBarOpts} / {@link lineOpts} (x = `key`);
+ *    only genuinely categorical comparisons use {@link barOpts} (x = `group`).
+ *    Mapping a per-bucket series through `barOpts` collapses every bucket onto
+ *    one x-category — that was a live bug on two tabs.
+ *  - Lines default to `curveLinear`. Monotone smoothing invents values between
+ *    measured points and glides across gaps in a sparse series with no visual
+ *    hint that data is missing.
+ *  - Any plot whose number of x-axis categories grows with the data goes inside
+ *    {@link ScrollableChart}. Carbon fits every category into whatever width it
+ *    is given, so a long series does not overflow — it compresses, until the tick
+ *    labels overlap into a grey smear and the bars are a pixel wide.
+ */
+
+export const CHART_HEIGHT = "300px";
+
+/** Height for the expanded (dense-tier) view in {@link ChartDetailModal}. */
+export const CHART_HEIGHT_EXPANDED = "460px";
+
+/**
+ * Minimum sample size before a derived score is shown as a confident number.
+ * Below this, surfaces render "not enough data" instead — a mean over a handful
+ * of LLM-judged sessions is noise wearing a decimal point.
+ *
+ * Documented in the wiki (product/data-visualisation.md, principle 4). Change it
+ * there and here together.
+ */
+export const MIN_N_FOR_SCORE = 20;
+
+export { PALETTE } from "./chartScales";
+export type { ColorScale } from "./chartScales";
+
+interface AxisOptsBase {
+  leftTitle?: string;
+  bottomTitle?: string;
+  /**
+   * Required — see the file header. Use `single(label)` for one-measure charts
+   * and a semantic scale from ./chartScales for anything with real categories.
+   */
+  colorScale: ColorScale;
+  legend?: boolean;
+  height?: string;
+  /** Explicit [min, max] for the value axis. Use for bounded scales (a 1–5
+   *  rating, a 0–100 score) so the plot shows where the value sits on the scale
+   *  the reader knows, instead of against an arbitrary data-driven ceiling. */
+  domain?: [number, number];
+  /**
+   * Explicit tick values for the value axis. Build with
+   * {@link integerTickValues} for any axis counting PEOPLE or events: left to
+   * itself, D3 subdivides a 0–3 range into halves, and "1.5 learners"
+   * is not a quantity that exists.
+   */
+  valueTicks?: number[];
+  /** Extra options merged last for special cases (e.g. axis thresholds). */
+  extra?: Record<string, unknown>;
+}
+
+/**
+ * Whole-number tick values from 0 to `max`, at most `maxTicks` of them.
+ *
+ * For count axes. A count has no fractional values, so an axis that offers them
+ * is inviting the reader to read one — and on the small ranges these charts
+ * often have (three learners, two orgs), D3's default subdivision
+ * produces nothing but fractions. Always spans zero, and always includes `max`
+ * so the tallest bar has a labelled tick to sit against.
+ */
+export const integerTickValues = (max: number, maxTicks = 8): number[] => {
+  const top = Math.max(1, Math.ceil(max));
+  const step = Math.max(1, Math.ceil(top / maxTicks));
+  const values: number[] = [];
+  for (let v = 0; v <= top; v += step) values.push(v);
+  if (values[values.length - 1] !== top) values.push(top);
+  return values;
+};
+
+/** One-measure colour scale: the chart's single series in the focal accent. */
+export const single = (label: string, color: string = PALETTE.blue): ColorScale => ({
+  [label]: color,
+});
+
+/** Grey a series that is context rather than subject (§8.2). */
+export const context = (label: string): ColorScale => ({ [label]: CONTEXT.line });
+
+/**
+ * The value axis.
+ *
+ * `includeZero` is forced on whenever there is no explicit `domain`, because
+ * these axes carry counts, rates and durations — all of which have a meaningful
+ * zero. Left to fit the data, Carbon starts the axis just below the minimum, so a
+ * series of 1s and 2s sits halfway up the plot and reads as far from zero as a
+ * series of 100s and 200s would.
+ *
+ * An explicit `domain` wins, which is how the bounded score/rating charts get
+ * their full rubric range and how the detail modal offers a zoomed view.
+ */
+const valueAxis = (
+  title: string,
+  domain?: [number, number],
+  stacked = false,
+  valueTicks?: number[],
+) => ({
+  mapsTo: "value",
+  scaleType: ScaleTypes.LINEAR,
+  title,
+  ...(stacked ? { stacked: true } : {}),
+  ...(domain ? { domain } : { includeZero: true }),
+  ...(valueTicks ? { ticks: { values: valueTicks } } : {}),
+});
+
+const labelAxis = (title: string, mapsTo: string) => ({
+  mapsTo,
+  scaleType: ScaleTypes.LABELS,
+  title,
+});
+
+/**
+ * Time-series line chart (x = `key`, y = `value`).
+ *
+ * `curve` defaults to linear: these are measured points, and a null value is a
+ * real gap that the reader must be able to see.
+ */
+export const lineOpts = ({
+  leftTitle = "Value",
+  bottomTitle = "",
+  colorScale,
+  legend = true,
+  height = CHART_HEIGHT,
+  domain,
+  curve = "curveLinear",
+  extra = {},
+}: AxisOptsBase & { curve?: string }) => ({
+  height,
+  axes: {
+    left: valueAxis(leftTitle, domain),
+    bottom: labelAxis(bottomTitle, "key"),
+  },
+  curve,
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Categorical bar chart (x = `group`, y = `value`) — one bar per category, for
+ * comparisons across things that have no order in time. For a per-bucket series
+ * use {@link timeBarOpts}.
+ */
+export const barOpts = ({
+  leftTitle = "Value",
+  bottomTitle = "",
+  colorScale,
+  legend = false,
+  height = CHART_HEIGHT,
+  domain,
+  extra = {},
+}: AxisOptsBase) => ({
+  height,
+  axes: {
+    left: valueAxis(leftTitle, domain),
+    bottom: labelAxis(bottomTitle, "group"),
+  },
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Time-bucketed bar chart (x = `key`, y = `value`) — one bar per period.
+ *
+ * This exists because `barOpts` maps the x-axis to `group`, so a series built as
+ * `{group: "<constant>", key: <bucket>}` renders every bucket stacked on a
+ * single x-category labelled with the constant. Any chart whose x-axis is time
+ * belongs here.
+ */
+export const timeBarOpts = ({
+  leftTitle = "Value",
+  bottomTitle = "",
+  colorScale,
+  legend = false,
+  height = CHART_HEIGHT,
+  domain,
+  extra = {},
+}: AxisOptsBase) => ({
+  height,
+  axes: {
+    left: valueAxis(leftTitle, domain),
+    bottom: labelAxis(bottomTitle, "key"),
+  },
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Horizontal bar chart (y = `group` labels, x = `value`).
+ *
+ * Use whenever category labels are long or free-text — org names, language
+ * names, model ids, multi-word error categories. In a 300px-tall vertical chart
+ * Carbon rotates and truncates those labels, so the reader cannot tell which bar
+ * is which.
+ */
+export const hBarOpts = ({
+  leftTitle = "",
+  bottomTitle = "Value",
+  colorScale,
+  legend = false,
+  height = CHART_HEIGHT,
+  domain,
+  valueTicks,
+  extra = {},
+}: AxisOptsBase) => ({
+  height,
+  axes: {
+    left: labelAxis(leftTitle, "group"),
+    bottom: valueAxis(bottomTitle, domain, false, valueTicks),
+  },
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/** Stacked bar chart over time (x = `key`, stacked y = `value`). */
+export const stackedBarOpts = ({
+  leftTitle = "Value",
+  bottomTitle = "",
+  colorScale,
+  legend = true,
+  height = CHART_HEIGHT,
+  domain,
+  extra = {},
+}: AxisOptsBase) => ({
+  height,
+  axes: {
+    left: valueAxis(leftTitle, domain, true),
+    bottom: labelAxis(bottomTitle, "key"),
+  },
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Dual-axis combo: bars on the left axis, a line on the right (x = `key`).
+ *
+ * **A second value axis is normally a lie**, and the rest of this kit does not
+ * offer one: two series on two scales can be made to cross wherever the author
+ * wants, so the reader sees a relationship that the numbers do not contain. The
+ * cumulative-users chart on the Highlights tab is deliberately a SEPARATE tile
+ * for exactly this reason.
+ *
+ * This factory exists for the one case where the objection does not apply: when
+ * the right-axis series is the RUNNING TOTAL of the left-axis one. They are then
+ * the same quantity at two aggregations, not two quantities being implicitly
+ * correlated, and the only thing the second scale does is stop a total that is
+ * two orders of magnitude larger from flattening the per-period bars into the
+ * axis. Do not reach for it otherwise — if the two series could in principle
+ * move independently, they belong in two tiles.
+ *
+ * Both axis titles are required rather than defaulted: an unlabelled second axis
+ * is the specific failure this whole comment is about.
+ */
+export const comboOpts = ({
+  barGroup,
+  lineGroup,
+  leftTitle,
+  rightTitle,
+  bottomTitle = "",
+  colorScale,
+  legend = true,
+  height = CHART_HEIGHT,
+  valueTicks,
+  rightTicks,
+  extra = {},
+}: Omit<AxisOptsBase, "leftTitle" | "domain"> & {
+  /** Series name plotted as bars against the left axis. */
+  barGroup: string;
+  /** Series name plotted as a line against the right axis. */
+  lineGroup: string;
+  leftTitle: string;
+  rightTitle: string;
+  /** Explicit ticks for the RIGHT axis; `valueTicks` covers the left one. */
+  rightTicks?: number[];
+}) => ({
+  height,
+  axes: {
+    left: {
+      ...valueAxis(leftTitle, undefined, false, valueTicks),
+      correspondingDatasets: [barGroup],
+      // Carbon needs one axis flagged as primary; the bars are the subject.
+      main: true,
+    },
+    right: {
+      ...valueAxis(rightTitle, undefined, false, rightTicks),
+      correspondingDatasets: [lineGroup],
+    },
+    bottom: labelAxis(bottomTitle, "key"),
+  },
+  comboChartTypes: [
+    { type: "simple-bar", correspondingDatasets: [barGroup] },
+    {
+      type: "line",
+      // Points on: the line is monthly, and without markers a reader cannot
+      // tell a flat stretch from a segment drawn across missing months.
+      options: { points: { enabled: true } },
+      correspondingDatasets: [lineGroup],
+    },
+  ],
+  curve: "curveLinear",
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Single-axis combo: a stacked area (the contributions) with a line (their
+ * sum) drawn over it, both against ONE value axis (x = `key`).
+ *
+ * `comboOpts` above exists for the one case a SECOND axis is legitimate — the
+ * line there is the same quantity as the bars at a different aggregation, and
+ * the second scale only keeps a much-larger cumulative total from flattening
+ * the per-period bars. This factory is the mirror-image case, where a second
+ * axis is not just unnecessary but wrong: the line here is the sum of the area
+ * layers AT THE SAME AGGREGATION — same unit, same 0-100 scale — so putting it
+ * on its own axis would let two things that are already numerically identical
+ * drift apart on the page. One axis, `stacked: true`, and the layers plus the
+ * line share it exactly.
+ *
+ * `areaGroups` sets the stack order (bottom to top); `lineGroup` rides the same
+ * axis as a plain line, not stacked with them. `domain` should normally be
+ * passed explicitly at `[0, 100]` for an index built to sum to that range —
+ * left to auto-fit, a stack whose true ceiling is 100 but whose observed data
+ * tops out at 60 would draw as if 60 were the ceiling.
+ */
+export const stackedAreaLineOpts = ({
+  areaGroups,
+  lineGroup,
+  leftTitle = "Value",
+  bottomTitle = "",
+  colorScale,
+  legend = true,
+  height = CHART_HEIGHT,
+  domain,
+  extra = {},
+}: Omit<AxisOptsBase, "leftTitle"> & {
+  leftTitle?: string;
+  /** Series names plotted as a stacked area, bottom to top. */
+  areaGroups: string[];
+  /** Series name plotted as a line over the stack — its sum, not a stacked layer. */
+  lineGroup: string;
+}) => ({
+  height,
+  axes: {
+    left: valueAxis(leftTitle, domain, true),
+    bottom: labelAxis(bottomTitle, "key"),
+  },
+  comboChartTypes: [
+    { type: "stacked-area", correspondingDatasets: areaGroups },
+    {
+      type: "line",
+      // Points on: gaps in the index (a bucket with no dimension covered) must
+      // be visibly distinguishable from a flat stretch, the same reason every
+      // sparse average series in this file enables them.
+      options: { points: { enabled: true } },
+      correspondingDatasets: [lineGroup],
+    },
+  ],
+  curve: "curveLinear",
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Scatter plot with TWO measured axes (x = `x`, y = `y`).
+ *
+ * The only chart type here whose x-axis is a quantity rather than a time bucket
+ * or a category, which is why it cannot borrow the factories above: it exists for
+ * the "is there a relationship between these two measures?" question, where the
+ * answer is a shape in a plane and neither axis is the subject on its own.
+ *
+ * Two cautions worth stating where the factory lives, since a scatter is the
+ * easiest chart to over-read:
+ *  - It shows correlation persuasively enough that readers make the causal leap
+ *    unprompted. The caption has to say what the chart does and does not claim.
+ *  - Colour must not be assigned per point. One point per entity is exactly the
+ *    case where colour-by-identity looks informative and encodes nothing; pass a
+ *    single-group scale and let the tooltip and the expanded table name the
+ *    points.
+ */
+export const scatterOpts = ({
+  leftTitle = "Value",
+  bottomTitle = "Value",
+  colorScale,
+  legend = false,
+  height = CHART_HEIGHT,
+  domain,
+  xDomain,
+  extra = {},
+}: AxisOptsBase & { xDomain?: [number, number] }) => ({
+  height,
+  axes: {
+    left: {
+      mapsTo: "y",
+      scaleType: ScaleTypes.LINEAR,
+      title: leftTitle,
+      ...(domain ? { domain } : { includeZero: true }),
+    },
+    bottom: {
+      mapsTo: "x",
+      scaleType: ScaleTypes.LINEAR,
+      title: bottomTitle,
+      ...(xDomain ? { domain: xDomain } : { includeZero: true }),
+    },
+  },
+  color: { scale: colorScale },
+  legend: { enabled: legend },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/**
+ * Donut chart (group = `group`, value = `value`).
+ *
+ * Keep to ~4 slices — people estimate wedge area badly, and past a handful of
+ * slices a sorted horizontal bar chart is strictly easier to read. Group the
+ * tail into "Other" rather than adding slices.
+ */
+export const donutOpts = ({
+  centerLabel = "",
+  colorScale,
+  height = CHART_HEIGHT,
+  extra = {},
+}: {
+  centerLabel?: string;
+  colorScale: ColorScale;
+  height?: string;
+  extra?: Record<string, unknown>;
+}) => ({
+  height,
+  resizable: true,
+  donut: { center: { label: centerLabel } },
+  color: { scale: colorScale },
+  toolbar: { enabled: false },
+  ...extra,
+});
+
+/* -------------------------------------------------------------------------- */
+/* Horizontal scrolling                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Minimum horizontal room one x-axis category gets before the plot scrolls
+ * instead of compressing.
+ *
+ * 28px is roughly what a rotated `2026-06-09` tick label needs to stand clear of
+ * its neighbours, and enough for a bar to read as a bar. Below that Carbon keeps
+ * fitting categories in — it never overflows — so fifty days in a half-width card
+ * renders as hairline bars under a solid band of overlapping dates, which is the
+ * state this constant exists to prevent.
+ */
+export const MIN_CATEGORY_WIDTH = 28;
+
+/** Width the value axis (title + tick labels) takes before the plot starts. */
+const AXIS_GUTTER = 88;
+
+/**
+ * Whether {@link ScrollableChart} captions an overflowing plot with its
+ * "scroll sideways" note. On by default; a tab that would rather keep its cards
+ * to just the plot turns it off for every chart beneath it with a provider,
+ * so a card reused on another tab keeps the note there.
+ */
+export const ScrollNoteContext = createContext(true);
+
+/** The shape {@link ScrollableChart} needs to count a series' x categories. */
+type ChartDatum = { key?: string | number | null; group?: string | number | null };
+
+/**
+ * Gives a plot the width its x-axis categories actually need, and scrolls the
+ * card sideways when that is more than the card has.
+ *
+ * Wrap every chart whose category count grows with the data — anything bucketed
+ * by time, and any categorical axis over an open-ended set (models, orgs). It is
+ * a no-op when the categories fit: the inner `min-width` only exceeds the
+ * container once there are enough of them, so a chart with six bars is untouched
+ * and no scrollbar appears.
+ *
+ * The value axis stays pinned while the plot scrolls — see {@link PinnedValueAxis}.
+ * Part of the range is off-screen, and the note below the plot says so: a plot
+ * cut off at the card edge with no caption reads as the whole series. A tab can
+ * drop the note with {@link ScrollNoteContext}; the pinned axis and tab stop stay.
+ *
+ * The alternative — thinning ticks to every nth label — keeps everything in view
+ * but shrinks the marks themselves, and a chart whose bars are narrower than the
+ * gap between them stops being readable at any tick density.
+ */
+export const ScrollableChart = ({
+  data,
+  on = "key",
+  minCategoryWidth = MIN_CATEGORY_WIDTH,
+  children,
+}: {
+  /** The series being plotted — the same array handed to the chart. */
+  data: readonly ChartDatum[];
+  /** Which field the x-axis maps to: `key` for time buckets, `group` for
+   *  {@link barOpts}-style categorical bars. */
+  on?: "key" | "group";
+  minCategoryWidth?: number;
+  children: ReactNode;
+}) => {
+  const scroller = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const showNote = useContext(ScrollNoteContext);
+
+  const categories = useMemo(() => new Set(data.map(d => d[on])).size, [data, on]);
+  const minWidth = categories * minCategoryWidth + AXIS_GUTTER;
+
+  // Measured rather than derived from the category count: whether the plot
+  // actually overflows depends on the card's width, which changes with the
+  // viewport and the grid breakpoint, and the note and the tab stop below must
+  // only appear when there is genuinely something out of view.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return undefined;
+    const measure = () => setOverflowing(el.scrollWidth - el.clientWidth > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [minWidth]);
+
+  return (
+    <>
+      <div className="relative">
+        <div
+          ref={scroller}
+          className="analytics-chart-scroll"
+          // Focusable only while it overflows: a scroll container is unreachable by
+          // keyboard without a tab stop, and a tab stop on a container with nothing
+          // to scroll is just an extra press on the way to the next control.
+          {...(overflowing
+            ? { tabIndex: 0, role: "group", "aria-label": "Chart, scrollable horizontally" }
+            : {})}
+        >
+          <div style={{ minWidth }}>{children}</div>
+        </div>
+        {overflowing && <PinnedValueAxis scroller={scroller} />}
+      </div>
+      {overflowing && showNote && (
+        <p className="mt-1 text-xs leading-tight text-typography-500">
+          Scroll sideways for the rest of the range.
+        </p>
+      )}
+    </>
+  );
+};
+
+/** Presentation properties copied inline, since the copy sits outside Carbon's CSS scope. */
+const AXIS_STYLE_PROPS = [
+  "fill",
+  "stroke",
+  "stroke-width",
+  "stroke-dasharray",
+  "opacity",
+  "visibility",
+  "display",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "text-anchor",
+  "dominant-baseline",
+];
+
+/** The first opaque background behind `el`, so the pinned axis hides the plot scrolling under it. */
+const backgroundBehind = (el: HTMLElement | null): string => {
+  for (let node = el; node; node = node.parentElement) {
+    const bg = getComputedStyle(node).backgroundColor;
+    if (bg && bg !== "transparent" && !/rgba\(.*,\s*0\)$/.test(bg)) return bg;
+  }
+  return "transparent";
+};
+
+/**
+ * A pinned copy of the chart's value axis, laid over the left edge of a
+ * {@link ScrollableChart} that overflows.
+ *
+ * Carbon draws the axis and the plot in one SVG, so the real axis cannot be made
+ * sticky — it scrolls away with the plot and the reader loses the scale. Instead
+ * this clones Carbon's `g.axis.left` into its own SVG that does not scroll,
+ * re-cloning whenever Carbon redraws (new data, a resize). It is a read-only
+ * picture: `pointer-events: none` lets hover and clicks reach the chart beneath.
+ */
+const PinnedValueAxis = ({ scroller }: { scroller: React.RefObject<HTMLDivElement> }) => {
+  const overlay = useRef<HTMLDivElement>(null);
+  const svg = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const root = scroller.current;
+    if (!root) return undefined;
+    let frame = 0;
+
+    const draw = () => {
+      frame = 0;
+      const axis = root.querySelector<SVGGElement>("g.axis.left");
+      const frameSvg = axis?.closest("svg.layout-svg-wrapper");
+      const box = overlay.current;
+      const target = svg.current;
+      if (!axis || !frameSvg || !box || !target) return;
+
+      const frameRect = frameSvg.getBoundingClientRect();
+      const width = axis.getBoundingClientRect().right - frameRect.left;
+      box.style.top = `${frameRect.top - root.getBoundingClientRect().top}px`;
+      box.style.width = `${Math.max(0, width)}px`;
+      box.style.height = `${frameRect.height}px`;
+      box.style.background = backgroundBehind(root);
+      target.setAttribute("width", String(Math.max(0, width)));
+      target.setAttribute("height", String(frameRect.height));
+
+      const copy = axis.cloneNode(true) as SVGGElement;
+      const from = [axis, ...Array.from(axis.querySelectorAll("*"))];
+      const to = [copy, ...Array.from(copy.querySelectorAll("*"))];
+      from.forEach((el, i) => {
+        const computed = getComputedStyle(el);
+        const style = (to[i] as SVGElement).style;
+        AXIS_STYLE_PROPS.forEach(prop => style.setProperty(prop, computed.getPropertyValue(prop)));
+      });
+      target.replaceChildren(copy);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(draw);
+    };
+
+    schedule();
+    const mutations = new MutationObserver(schedule);
+    mutations.observe(root, { subtree: true, childList: true, attributes: true });
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    resize?.observe(root);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      mutations.disconnect();
+      resize?.disconnect();
+    };
+  }, [scroller]);
+
+  return (
+    <div
+      ref={overlay}
+      aria-hidden
+      className="pointer-events-none absolute left-0 overflow-hidden"
+      style={{ top: 0, width: 0, height: 0 }}
+    >
+      <svg ref={svg} />
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Sample-size + provenance helpers                                           */
+/* -------------------------------------------------------------------------- */
+
+/** "n = 1,234 sessions" — the denominator, spelled out, on the surface. */
+export const formatN = (n: number | null | undefined, unit = ""): string | undefined => {
+  if (n === null || n === undefined) return undefined;
+  return `n = ${n.toLocaleString()}${unit ? ` ${unit}` : ""}`;
+};
+
+/** True when a derived score has too little data behind it to state plainly. */
+export const isThinSample = (n: number | null | undefined, minN = MIN_N_FOR_SCORE): boolean =>
+  n !== null && n !== undefined && n < minN;
+
+/**
+ * Caption fragment naming the full scale a bounded chart is plotted against.
+ *
+ * Stating the scale is what makes a flat-looking line honest: the reader can see
+ * that "barely moves" is a fact about the metric and not a squashed axis, and can
+ * tell where on the scale the value actually sits.
+ */
+export const boundedDomainNote = ([min, max]: [number, number]): string =>
+  `Plotted on the full ${min}–${max} scale.`;
+
+/**
+ * Build the provenance line every tile carries: what the number is derived from,
+ * over what window, from how many observations, as of when.
+ *
+ * Tiles get screenshotted into decks and read weeks later; a tile without
+ * provenance becomes an unanswerable question. This is also what makes an export
+ * carry its context.
+ */
+export const buildSource = ({
+  derivation,
+  window,
+  n,
+  nUnit,
+  asOf,
+  extra,
+}: {
+  derivation: string;
+  window?: string;
+  n?: number | null;
+  nUnit?: string;
+  asOf?: string;
+  extra?: string;
+}): string =>
+  [derivation, window, formatN(n, nUnit), extra, asOf ? `as of ${asOf}` : undefined]
+    .filter(Boolean)
+    .join(" · ");
+
+/* -------------------------------------------------------------------------- */
+/* Sparkline                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Minimal trend line for a KPI tile. Nulls break the path, so a gap in the
+ * series reads as a gap rather than a straight line through missing data.
+ *
+ * No axes, no labels — this answers "which way is it going", and the tile's
+ * value answers "where is it now". Exact values live in the chart below.
+ */
+export const Sparkline = ({
+  values,
+  color = PALETTE.blue,
+  width = 88,
+  height = 24,
+  label,
+}: {
+  values: (number | null)[];
+  color?: string;
+  width?: number;
+  height?: number;
+  label?: string;
+}) => {
+  const present = values.filter((v): v is number => v !== null);
+  if (present.length < 2) return null;
+
+  const min = Math.min(...present);
+  const max = Math.max(...present);
+  const span = max - min || 1;
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  const y = (v: number) => height - 1 - ((v - min) / span) * (height - 2);
+
+  // Split into contiguous runs so nulls leave visible gaps.
+  const runs: string[] = [];
+  let current: string[] = [];
+  values.forEach((v, i) => {
+    if (v === null) {
+      if (current.length > 1) runs.push(current.join(" "));
+      current = [];
+      return;
+    }
+    current.push(`${(i * step).toFixed(1)},${y(v).toFixed(1)}`);
+  });
+  if (current.length > 1) runs.push(current.join(" "));
+
+  const lastIdx = values.reduce((acc, v, i) => (v !== null ? i : acc), -1);
+  const lastVal = lastIdx >= 0 ? values[lastIdx] : null;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label={label ?? "Trend"}
+      className="overflow-visible"
+    >
+      {runs.map(points => (
+        <polyline
+          key={points}
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      ))}
+      {lastVal !== null && (
+        <circle cx={(lastIdx * step).toFixed(1)} cy={y(lastVal).toFixed(1)} r="2" fill={color} />
+      )}
+    </svg>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Chart ID badge                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The stable "admin analytics question ID" (e.g. `AAQ-042`) rendered next to a
+ * chart's title. Every chart, KPI tile and funnel on the Analytics page carries
+ * one; it never changes when a chart is restyled or moved, so it is the handle
+ * used to refer to a specific chart in code review, tickets and requests. The
+ * canonical id -> chart map is served read-only by ally-be at
+ * `GET /v1/analytics/chart-registry` (see its
+ * `admin-analytics-chart-registry.constants.ts`).
+ *
+ * Deliberately quiet: monospace, small, muted, no background — enough to read
+ * and copy, not enough to compete with the chart. Click (or Enter/Space) copies
+ * the id to the clipboard. `stopPropagation` keeps a click off any surrounding
+ * expand/row affordance.
+ */
+export const ChartIdBadge = ({ id }: { id?: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  if (!id) return null;
+
+  const copy = () => {
+    navigator.clipboard?.writeText(id).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      },
+      () => undefined,
+    );
+  };
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={`Chart ID ${id}, click to copy`}
+      title={`Chart ID ${id} — click to copy`}
+      onClick={e => {
+        e.stopPropagation();
+        copy();
+      }}
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          copy();
+        }
+      }}
+      className="shrink-0 cursor-pointer select-none rounded-sm border border-[#e0e0e0] px-1 py-px font-mono text-xs leading-none text-typography-400 hover:text-typography-700"
+    >
+      {copied ? "copied" : id}
+    </span>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* KPI tile                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface KpiTileProps {
+  label: string;
+  /**
+   * Stable admin analytics question id (e.g. `AAQ-042`). Rendered as a quiet
+   * {@link ChartIdBadge} beside the label. See the badge's doc for what it is.
+   */
+  chartId?: string;
+  /**
+   * What the number actually measures, in one line — the tile's equivalent of a
+   * {@link ChartCard} caption. Rendered on the face of the tile rather than in a
+   * tooltip: a definition that only appears on hover never reaches the
+   * screenshot that ends up in a board deck.
+   */
+  description?: string;
+  /** Pre-formatted by the caller (locale strings, "%" suffixes, em-dash). */
+  value: string;
+  /** Sample size behind the value. Rendered as "n = …" under the number. */
+  n?: number | null;
+  nUnit?: string;
+  /** Below this, the tile shows "not enough data" instead of the value. */
+  minN?: number;
+  /** Change vs the comparison window. Needs `comparisonLabel` to mean anything. */
+  delta?: number | null;
+  /** e.g. "vs previous 30 days" — a delta without its basis is meaningless. */
+  comparisonLabel?: string;
+  /** False for metrics where a rise is bad (error rates, latency, cost). */
+  higherIsBetter?: boolean;
+  deltaSuffix?: string;
+  deltaDecimals?: number;
+  /** Trend behind the headline number. */
+  spark?: (number | null)[];
+  loading?: boolean;
+  /**
+   * A fetch failure, distinct from a legitimate zero/thin sample. Without this,
+   * `isLoading` resolving to `false` on error fell through to the value branch
+   * and rendered `formatCount(undefined)` as "—" — the same dash used for a
+   * real zero, on a screen where the sibling {@link ChartCard} on the *same*
+   * query correctly showed a red error banner three lines below it.
+   */
+  error?: boolean;
+  onRetry?: () => void;
+}
+
+/**
+ * A single KPI stat tile: label, value, sample size, change vs the comparison
+ * window with its basis named, and a one-line definition of the metric.
+ *
+ * The delta carries an arrow as well as a colour so the direction survives
+ * greyscale and colour-blindness, and its good/bad sense follows
+ * `higherIsBetter` rather than assuming "up is good".
+ *
+ * The definition sits BELOW the number, not above it: the value is the focal
+ * element and prose over the top of it would compete for that. It is still on
+ * the face of the tile, because "what is this counting?" is the question a KPI
+ * strip most often leaves unanswered.
+ */
+export const KpiTile = ({
+  label,
+  chartId,
+  description,
+  value,
+  n,
+  nUnit,
+  minN,
+  delta,
+  comparisonLabel,
+  higherIsBetter = true,
+  deltaSuffix = "",
+  deltaDecimals = 1,
+  spark,
+  loading = false,
+  error = false,
+  onRetry,
+}: KpiTileProps) => {
+  const thin = minN !== undefined && isThinSample(n, minN);
+  const d = thin
+    ? null
+    : formatDelta(delta, { higherIsBetter, suffix: deltaSuffix, decimals: deltaDecimals });
+
+  return (
+    <Tile className="analytics-kpi">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <p className="text-sm text-typography-600">{label}</p>
+        <ChartIdBadge id={chartId} />
+      </div>
+
+      {loading ? (
+        <SkeletonPlaceholder className="analytics-kpi-skeleton" />
+      ) : error ? (
+        <div className="flex flex-col items-start gap-2">
+          <InlineNotification
+            kind="error"
+            lowContrast
+            hideCloseButton
+            title="Couldn't load"
+            subtitle="There was a problem fetching this number."
+          />
+          {onRetry && (
+            <Button kind="tertiary" size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          )}
+        </div>
+      ) : thin ? (
+        <>
+          <p className="text-lg font-medium text-typography-500">Not enough data</p>
+          <p className="text-xs text-typography-500 mt-1">
+            {formatN(n, nUnit)} · need {minN}
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Wraps rather than overflows: two-up on a phone, a tile is too
+              narrow for a long count beside its sparkline. */}
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <p className="min-w-0 break-words text-2xl font-medium text-typography-900 sm:text-3xl">
+              {value}
+            </p>
+            {spark && spark.length > 1 && <Sparkline values={spark} label={`${label} trend`} />}
+          </div>
+          <div className="mt-1 min-h-4">
+            {d && (
+              <span className="text-xs font-medium" style={{ color: d.color }}>
+                {d.arrow} {d.label}
+                {comparisonLabel && (
+                  <span className="text-typography-500 font-normal"> {comparisonLabel}</span>
+                )}
+              </span>
+            )}
+            {!d && n !== null && n !== undefined && (
+              <span className="text-xs text-typography-500">{formatN(n, nUnit)}</span>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Rendered in every state, including loading — it describes the metric,
+          not the value, so hiding it until data arrives would only shift the
+          layout under the reader. */}
+      {description && (
+        <p className="mt-2 text-xs leading-snug text-typography-500">{description}</p>
+      )}
+    </Tile>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Grouping picker                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The historical 4-value default — every call site that does not pass its own
+ * `options` keeps offering exactly these, unchanged, even though the picker can
+ * now accept the full {@link AnalyticsGrain} vocabulary (`GROUPINGS` in
+ * ./analyticsGrouping). A chart opts into "quarter"/"allTime" by passing its own
+ * `options` explicitly — until it does, it must keep rendering exactly as it
+ * does today.
+ */
+const LEGACY_GROUPING_OPTIONS: AnalyticsGrain[] = ["day", "week", "month", "year"];
+
+/**
+ * The per-chart "group by" control, for {@link ChartCard.controls}.
+ *
+ * Lives on the chart rather than the page because the grain belongs to the
+ * question the chart asks — see the header of ./analyticsGrouping. Rendered as a
+ * small dropdown rather than a four-way switcher so it stays inside a card
+ * header at the narrowest column width the grid produces.
+ */
+export const GroupingPicker = ({
+  id,
+  value,
+  onChange,
+  options = LEGACY_GROUPING_OPTIONS,
+}: {
+  id: string;
+  value: AnalyticsGrain;
+  onChange: (grouping: AnalyticsGrain) => void;
+  /** Restrict the offered grains where a coarser or finer one is meaningless. */
+  options?: AnalyticsGrain[];
+}) => {
+  const items = options.map(g => ({ id: g, label: GROUPING_LABEL[g] }));
+  const selected = items.find(i => i.id === value) ?? items[0];
+
+  return (
+    <div className="w-32 shrink-0">
+      <Dropdown
+        id={id}
+        size="sm"
+        titleText="Group by"
+        hideLabel
+        label="Group by"
+        // The chosen grain is the axis title too, so the control repeats it
+        // rather than being the only place it appears.
+        items={items}
+        selectedItem={selected}
+        itemToString={item => item?.label ?? ""}
+        onChange={({ selectedItem }) => {
+          if (selectedItem) onChange(selectedItem.id);
+        }}
+      />
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Chart card                                                                 */
+/* -------------------------------------------------------------------------- */
+
+interface ChartCardProps {
+  /** Neutral metric name. The finding goes in `takeaway`, computed from the
+   *  data — a live tile whose direction changes cannot carry a fixed claim.
+   *
+   *  ReactNode rather than string so a title can carry an adornment — the help
+   *  tooltip that holds a metric's measurement caveats, for instance. Plain
+   *  strings still work and remain the common case. */
+  title?: React.ReactNode;
+  /**
+   * Optional help affordance rendered beside the title — typically a
+   * {@link Tooltip} wrapping a {@link TooltipIcon} that holds the measurement
+   * detail a caption would otherwise spell out inline. Kept separate from
+   * `title` so `title` can stay a plain string for the expand button's
+   * `iconDescription` and the detail modal.
+   */
+  titleHelp?: React.ReactNode;
+  /**
+   * Stable admin analytics question id (e.g. `AAQ-042`). Rendered as a quiet
+   * {@link ChartIdBadge} beside the title. See the badge's doc for what it is
+   * and where the canonical id -> chart map lives.
+   */
+  chartId?: string;
+  /** Sub-text under the title: what the number means, caveats, denominators. */
+  caption?: string;
+  /**
+   * Fold the meta — `caption`, `source`, and any `metaExtra` — off the card face
+   * and into a help tooltip beside the title, leaving just the plot. Keeps a
+   * dense chart tab minimal while the detail is still one hover away (and the
+   * full provenance still shows in the expanded detail modal). When set, the
+   * caller need not also pass `titleHelp`; this builds it.
+   */
+  collapseMeta?: boolean;
+  /**
+   * Extra per-chart notes (e.g. a suppression or in-progress footnote) that used
+   * to render under the plot. Only shown when `collapseMeta` is set, appended
+   * inside the folded tooltip after the caption.
+   */
+  metaExtra?: ReactNode;
+  /**
+   * Provenance line: derivation · window · n · as-of. Build it with
+   * {@link buildSource}. Every tile should carry one — tiles get exported and
+   * screenshotted, and one without provenance is unanswerable later.
+   */
+  source?: string;
+  /** Computed finding, e.g. "↓ 8% vs previous 30 days". */
+  takeaway?: ReactNode;
+  loading?: boolean;
+  error?: boolean;
+  /** True when there's no data to show — renders a dashed placeholder. */
+  empty?: boolean;
+  /** Sample size behind the chart; with `minN`, drives the thin-data state. */
+  n?: number | null;
+  nUnit?: string;
+  minN?: number;
+  onRetry?: () => void;
+  /**
+   * Per-chart controls in the header — a {@link GroupingPicker}, typically.
+   * Rendered beside the expand button and left in place through loading, error
+   * and empty states: a control that vanishes while its own chart is reloading
+   * cannot be used to get out of the state it put the chart in.
+   */
+  controls?: ReactNode;
+  /** Opens the dense-tier view (bigger chart, zoomed axis, table, export). */
+  onExpand?: () => void;
+  errorTitle?: string;
+  errorSubtitle?: string;
+  emptyText?: string;
+  /** Span 2 columns in a grid (for wide charts). */
+  wide?: boolean;
+  /**
+   * Render without the outer {@link Tile} (a plain `<div>` instead) — for
+   * multi-panel layouts that already live inside one shared Tile.
+   */
+  bare?: boolean;
+  height?: string;
+  /**
+   * Swap the chart body for a {@link KpiTile} — the "All-time" collapse of a
+   * per-bucket series into one whole-window number. Purely additive: when
+   * omitted, `children` renders exactly as before. Header/caption/controls/
+   * source-footer are unaffected either way, so the grain picker does not move
+   * when a reader flips a chart to All-time.
+   */
+  kpi?: KpiTileProps;
+  children?: ReactNode;
+}
+
+/**
+ * One wrapper for every analytics chart: title/caption/takeaway header, the
+ * visual field, a provenance footer, and uniform loading, error, empty and
+ * thin-data states.
+ *
+ * Visual weighting follows roughly 12/8/75/5 (title/subtitle/plot/source) — the
+ * plot dominates and everything else serves it.
+ */
+export const ChartCard = ({
+  title,
+  titleHelp,
+  chartId,
+  caption,
+  collapseMeta = false,
+  metaExtra,
+  source,
+  takeaway,
+  loading = false,
+  error = false,
+  empty = false,
+  n,
+  nUnit,
+  minN,
+  onRetry,
+  controls,
+  onExpand,
+  errorTitle = "Couldn't load this chart",
+  errorSubtitle = "There was a problem fetching the data.",
+  emptyText = "No data for this range",
+  wide = false,
+  bare = false,
+  height = CHART_HEIGHT,
+  kpi,
+  children,
+}: ChartCardProps) => {
+  const thin = minN !== undefined && isThinSample(n, minN);
+
+  const visualField = loading ? (
+    <SkeletonPlaceholder className="analytics-chart-skeleton" />
+  ) : error ? (
+    <div className="flex flex-col items-start gap-4">
+      <InlineNotification
+        kind="error"
+        lowContrast
+        hideCloseButton
+        title={errorTitle}
+        subtitle={errorSubtitle}
+      />
+      {onRetry && (
+        <Button kind="tertiary" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      )}
+    </div>
+  ) : thin ? (
+    <div
+      className="flex flex-col items-center justify-center gap-1 rounded border border-dashed border-[#e0e0e0] text-center max-sm:px-4"
+      style={{ height }}
+    >
+      <p className="text-sm font-medium text-typography-600">Not enough data to show a trend</p>
+      <p className="text-xs text-typography-500">
+        {formatN(n, nUnit)} · need at least {minN}
+      </p>
+    </div>
+  ) : empty ? (
+    <div
+      className="flex items-center justify-center rounded border border-dashed border-[#e0e0e0] text-sm text-typography-500 max-sm:px-4 max-sm:text-center"
+      style={{ height }}
+    >
+      {emptyText}
+    </div>
+  ) : kpi ? (
+    <KpiTile {...kpi} />
+  ) : (
+    children
+  );
+
+  // When collapseMeta is set, the caption, source and any metaExtra come off the
+  // card face and into a single help tooltip beside the title. An explicit
+  // titleHelp always wins, so a card can still hand-build its own tooltip.
+  const folded = collapseMeta && (caption || source || metaExtra);
+  const resolvedTitleHelp =
+    titleHelp ??
+    (folded ? (
+      <Tooltip
+        label={
+          <div style={{ maxWidth: "22rem" }} className="text-xs leading-relaxed">
+            {caption && <p>{caption}</p>}
+            {metaExtra && <div className={caption ? "mt-2" : undefined}>{metaExtra}</div>}
+            {source && <p className="mt-2 text-typography-400">{source}</p>}
+          </div>
+        }
+        align="bottom"
+      >
+        <button
+          type="button"
+          className="cursor-pointer inline-flex items-center"
+          aria-label={typeof title === "string" ? `About ${title}` : "About this chart"}
+        >
+          <TooltipIcon />
+        </button>
+      </Tooltip>
+    ) : null);
+
+  const body = (
+    <>
+      {(title || onExpand || controls || chartId) && (
+        // On a phone the controls drop under the title when both do not fit,
+        // rather than squeezing the title into a narrow column beside them. The
+        // title leaves exactly one icon button's room (3rem), so a lone expand
+        // button still sits beside it and anything wider wraps.
+        <div className="flex items-start justify-between gap-2 max-sm:flex-wrap">
+          <div className="min-w-0 max-sm:basis-[calc(100%_-_3rem)]">
+            <div className="flex items-center gap-2">
+              {title && (
+                /* The native `title` attribute only accepts a string; a node
+                   title carries its own affordance (a tooltip) and needs none. */
+                <h3
+                  className="text-sm font-medium text-typography-900"
+                  title={typeof title === "string" ? title : undefined}
+                >
+                  {title}
+                </h3>
+              )}
+              <ChartIdBadge id={chartId} />
+              {resolvedTitleHelp}
+            </div>
+            {caption && !collapseMeta && <p className="text-xs text-typography-500">{caption}</p>}
+          </div>
+          <div className="analytics-card-controls ml-auto flex shrink-0 items-start gap-1 max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap max-sm:justify-end">
+            {controls}
+            {onExpand && (
+              <Button
+                kind="ghost"
+                size="sm"
+                hasIconOnly
+                iconDescription={title ? `Expand ${title}` : "Expand chart"}
+                tooltipPosition="left"
+                renderIcon={Maximize}
+                onClick={onExpand}
+                className="max-sm:!h-10 max-sm:!w-10"
+              />
+            )}
+          </div>
+        </div>
+      )}
+      {takeaway && <div className="text-xs font-medium mt-1">{takeaway}</div>}
+      <div className="mb-2" />
+      {visualField}
+      {source && !collapseMeta && (
+        <p className="mt-2 text-xs leading-tight text-typography-500">{source}</p>
+      )}
+    </>
+  );
+
+  if (bare) return <div>{body}</div>;
+  return <Tile className={wide ? "xl:col-span-2" : undefined}>{body}</Tile>;
+};

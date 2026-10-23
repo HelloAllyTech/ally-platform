@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TimePicker > should match snapshot when disabled 1`] = `
+<DocumentFragment>
+  <div
+    class="cds--form-item"
+  >
+    <label
+      class="cds--label cds--visually-hidden cds--label--disabled"
+      for="time-picker-input"
+    />
+    <div
+      class="cds--time-picker cds--time-picker--md"
+    >
+      <div
+        class="cds--time-picker__input"
+      >
+        <input
+          class="cds--time-picker__input-field cds--text-input"
+          disabled=""
+          id="time-picker-input"
+          maxlength="5"
+          pattern="(1[012]|[1-9]):[0-5][0-9](\\\\s)?"
+          placeholder="hh:mm"
+          type="text"
+          value=""
+        />
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`TimePicker > should match snapshot when fully rendered 1`] = `
+<DocumentFragment>
+  <div
+    class="cds--form-item"
+  >
+    <label
+      class="cds--label cds--visually-hidden"
+      for="time-picker-input"
+    />
+    <div
+      class="cds--time-picker cds--time-picker--md"
+    >
+      <div
+        class="cds--time-picker__input"
+      >
+        <input
+          class="cds--time-picker__input-field cds--text-input"
+          id="time-picker-input"
+          maxlength="5"
+          pattern="(1[012]|[1-9]):[0-5][0-9](\\\\s)?"
+          placeholder="hh:mm"
+          type="text"
+          value=""
+        />
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`TimePicker > should match snapshot with value 1`] = `
+<DocumentFragment>
+  <div
+    class="cds--form-item"
+  >
+    <label
+      class="cds--label cds--visually-hidden"
+      for="time-picker-input"
+    />
+    <div
+      class="cds--time-picker cds--time-picker--md"
+    >
+      <div
+        class="cds--time-picker__input"
+      >
+        <input
+          class="cds--time-picker__input-field cds--text-input"
+          id="time-picker-input"
+          maxlength="5"
+          pattern="(1[012]|[1-9]):[0-5][0-9](\\\\s)?"
+          placeholder="hh:mm"
+          type="text"
+          value="14:30"
+        />
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

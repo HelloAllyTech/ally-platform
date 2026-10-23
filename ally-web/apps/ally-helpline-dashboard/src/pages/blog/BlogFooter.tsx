@@ -1,0 +1,71 @@
+import { FC } from "react";
+
+import { Link } from "react-router-dom";
+
+import { ALLY_PRIVACY_POLICY_URL, ALLY_TERMS_URL, ALLY_URL, ROUTES } from "@constants";
+
+import { BLOG_NAME } from "./blogMeta";
+
+/**
+ * Shared footer for the public /blog pages. Holds the secondary navigation the
+ * header used to carry (the changelog link in particular), so the header stays
+ * a title and nothing else.
+ */
+export const BlogFooter: FC<{ containerClassName?: string; className?: string }> = ({
+  // Matches the width of the page's own content column so the footer lines up
+  // with it — the post page is narrower than the index and changelog.
+  containerClassName = "max-w-6xl",
+  className = "",
+}) => (
+  <footer className={`blog-serif mt-16 border-t border-[#29261f]/10 bg-[#FAF9F5] ${className}`}>
+    <div
+      className={`mx-auto flex ${containerClassName} flex-col gap-4 px-4 py-8 text-sm sm:px-6 text-[#928b7c] sm:flex-row sm:items-center sm:justify-between`}
+    >
+      <p>© {new Date().getFullYear()} Ally</p>
+      <nav className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Link
+          to={ROUTES.BLOG}
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+        >
+          {BLOG_NAME}
+        </Link>
+        <Link
+          to={ROUTES.CHANGELOG}
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+        >
+          Changelog
+        </Link>
+        <Link
+          to={ROUTES.ROADMAP}
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-gray-900 md:min-h-0"
+        >
+          Roadmap
+        </Link>
+        <a
+          href={ALLY_PRIVACY_POLICY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+        >
+          Privacy
+        </a>
+        <a
+          href={ALLY_TERMS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+        >
+          Terms
+        </a>
+        <a
+          href={ALLY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+        >
+          About Ally
+        </a>
+      </nav>
+    </div>
+  </footer>
+);

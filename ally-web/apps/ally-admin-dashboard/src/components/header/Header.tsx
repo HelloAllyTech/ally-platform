@@ -1,0 +1,125 @@
+import { FC, ReactNode } from "react";
+
+import { toast } from "sonner";
+
+import { Tooltip } from "@ally-ui-mono/ui-shared";
+import { ArrowDown } from "@assets";
+import { Button } from "@components";
+import { ButtonVariant } from "@components/types";
+import { en } from "@constants";
+
+interface HeaderProps {
+  isValid: boolean;
+  onBack: () => void;
+  onSaveDraft?: () => Promise<any[]>;
+  onPublish?: () => void;
+  onPreview?: () => void;
+  isPublishing?: boolean;
+  title: string;
+  showPreview?: boolean;
+  type?: "Simulation" | "Track" | "Case";
+  /**
+   * Extra controls, rendered before Save. Optional and additive: a page that has an action of its
+   * own (CreateTrack's "Ask Copilot") puts it here instead of absolutely positioning it over the
+   * header, which collided with the row's own wrapping at narrow widths.
+   */
+  extraActions?: ReactNode;
+  /**
+   * A line under the action buttons, right-aligned with them — CreateTrack's "N issues to fix
+   * before publishing". It lives inside the row so it can never cover the buttons: positioned
+   * over the header from outside at a fixed offset, it sat on top of Save and Publish at every
+   * desktop width and swallowed their clicks.
+   */
+  actionsFooter?: ReactNode;
+}
+
+export const Header: FC<HeaderProps> = ({
+  isValid,
+  onBack,
+  onSaveDraft,
+  onPublish,
+  onPreview,
+  isPublishing = false,
+  title,
+  showPreview = true,
+  type,
+  extraActions,
+  actionsFooter,
+}) => {
+  const handleSaveDraft = async () => {
+    const response = await onSaveDraft();
+    if (response) {
+      toast.success(`${type} changes saved successfully!`);
+    }
+  };
+
+  const publishButton = (
+    <Button
+      variant={ButtonVariant.PRIMARY}
+      onClick={onPublish}
+      disabled={!isValid || isPublishing}
+      className="px-4 py-1 h-[40px] text-white"
+    >
+      {isPublishing ? en.simulation.publishing : en.simulation.publish}
+    </Button>
+  );
+  const previewButton = (
+    <Button
+      variant={ButtonVariant.TEXT}
+      onClick={onPreview}
+      disabled={!isValid}
+      className={`${isValid ? "text-primary-500" : "text-typography-600 cursor-not-allowed"}`}
+    >
+      {en.simulation.preview}
+    </Button>
+  );
+
+  return (
+    <>
+      <div className="flex items-center px-0 md:px-2 py-2 md:py-4 gap-2">
+        <button
+          type="button"
+          className="text-typography-800 cursor-pointer max-md:min-h-10"
+          onClick={onBack}
+        >
+          {en.simulation.rolePlays}
+        </button>
+        <span className="-rotate-90">
+          <ArrowDown />
+        </span>
+        <span className="text-typography-900 min-w-0 truncate">{title}</span>
+      </div>
+      <div className="flex flex-wrap md:flex-nowrap gap-y-2 items-center justify-between w-full px-0 md:px-2 pb-2 md:h-[80px] relative">
+        <h1 className="text-xl md:text-2xl text-typography-900 md:whitespace-nowrap">{title}</h1>
+        <div className="flex flex-col items-start md:items-end gap-1">
+          <div className="flex items-center gap-3">
+            {extraActions}
+            <Button
+              variant={ButtonVariant.TEXT}
+              onClick={handleSaveDraft}
+              className="px-4 py-1 h-[36px] text-typography-900"
+            >
+              {en.simulation.save}
+            </Button>
+            {showPreview &&
+              (isValid ? (
+                previewButton
+              ) : (
+                <Tooltip label={en.simulation.previewTooltipMessage} align="top">
+                  <span>{previewButton}</span>
+                </Tooltip>
+              ))}
+            {isValid ? (
+              publishButton
+            ) : (
+              <Tooltip label={en.simulation.publishTooltipMessage} align="top">
+                <span>{publishButton}</span>
+              </Tooltip>
+            )}
+          </div>
+          {actionsFooter}
+        </div>
+      </div>
+    </>
+  );
+};

@@ -1,0 +1,2152 @@
+import { AppType, CallType, UserRole } from "@constants";
+
+export interface GenerateOTPRequest {
+  phone?: string;
+  email?: string;
+  appType?: AppType;
+}
+
+export interface VerifyOTPRequest {
+  phone?: string;
+  email?: string;
+  otp: string;
+}
+
+export interface GenerateOTPResponse {
+  success: boolean;
+  expiresIn: number;
+}
+
+export interface VerifyOTPResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface ImpersonateResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface User {
+  profileImageUrl?: string;
+  email: string;
+  id: number;
+  name: string;
+  /**
+   * The role to gate on. The backend collapses a user's roles to one; the
+   * getUser query re-resolves it from `roles` so a super-admin tier held
+   * alongside a tenant role is not lost (see resolveAdminRole).
+   */
+  role: UserRole;
+  /** Every role the user holds. Absent on responses predating the field. */
+  roles?: UserRole[];
+  /**
+   * The organizations a platform admin is restricted to; null (or absent) when
+   * they are not. Analytics pins its org picker to these.
+   */
+  restrictedTenantIds?: string[] | null;
+  userId: number;
+}
+
+export enum UserAvailabilityStatus {
+  OFFLINE = "offline",
+  AVAILABLE = "available",
+}
+
+// Per-user preferences blob stored in the backend `user_preferences.data` JSONB.
+// Keys are merged independently on save (see backend upsert), so the admin
+// dashboard can write `admin_sidebar_order` without clobbering mobile-owned keys.
+export interface UserPreferencesData {
+  default_language_id?: number;
+  // Ordered list of sidebar item ids (SIDEBAR_ITEMS values) for the left nav.
+  admin_sidebar_order?: string[];
+}
+
+export interface UserState {
+  isAuthenticated: boolean;
+  user: User;
+  userStatus: UserAvailabilityStatus;
+  permissions: string[];
+  /** Enabled feature-toggle keys for the current user (see GET /users/me/feature-toggles). */
+  features: string[];
+  availableChatTypes: CallType[];
+}
+
+// Common API types and interfaces
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface ApiErrorResponse {
+  message: string;
+  status: number;
+  errors?: Record<string, string[]>;
+  timestamp: string;
+  path: string;
+}
+
+// Authentication types
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  token: string;
+  expiresIn: number;
+}
+
+export interface CreateUserRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  role?: UserRole;
+  isActive?: boolean;
+}
+
+// Dashboard types
+export interface DashboardStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalRevenue: number;
+  monthlyGrowth: number;
+}
+
+export interface DashboardChartData {
+  labels: string[];
+  datasets: {
+    label: string;
+    data: number[];
+    backgroundColor?: string;
+    borderColor?: string;
+  }[];
+}
+
+// Analytics types
+export interface AnalyticsFilters {
+  startDate?: string;
+  endDate?: string;
+  userId?: string;
+  eventType?: string;
+}
+
+export interface AnalyticsData {
+  totalEvents: number;
+  uniqueUsers: number;
+  conversionRate: number;
+  topEvents: Array<{
+    event: string;
+    count: number;
+  }>;
+}
+
+// Platform analytics (super-admin overview) — mirrors the backend
+// AnalyticsOverviewResponseDto from GET /api/v1/analytics/overview.
+/**
+ * `all` spans the platform's whole history — the server resolves its start from
+ * the first row in the data rather than the calendar, so such a window has no
+ * equal-length predecessor and never carries a `previous` comparison.
+ */
+export type AnalyticsRange = "30d" | "90d" | "12m" | "all";
+
+/** Grouping grain for a trend. Surfaced per chart, not per page. */
+export type AnalyticsBucket = "day" | "week" | "month" | "quarter" | "year";
+
+/**
+ * The full grain vocabulary a chart's grouping control may offer: every
+ * SQL-bucketable {@link AnalyticsBucket} plus `"allTime"`, which collapses the
+ * chart's current window into a single KPI number instead of a bucketed series
+ * (see {@link ChartCard}'s `kpi` prop). Never passed to the server as a
+ * `bucket` param — a chart reading `"allTime"` requests a whole-window
+ * aggregate field on the same response instead (e.g. `practiceMinutesOverall`).
+ */
+export type AnalyticsGrain = AnalyticsBucket | "allTime";
+
+/**
+ * The window the server actually resolved, echoed back so every chart, caption
+ * and export can state the period it covers rather than leaving the reader to
+ * infer it from a dropdown that may since have moved.
+ */
+export interface AnalyticsWindow {
+  /** yyyy-mm-dd, inclusive. */
+  from: string;
+  /** yyyy-mm-dd, INCLUSIVE. */
+  to: string;
+  /** e.g. "Last 30 days" or "2026-01-01 → 2026-03-31". */
+  label: string;
+  days: number;
+  bucket: AnalyticsBucket;
+  /** True when the window covers all of the platform's history. */
+  allTime: boolean;
+  /**
+   * Bucket start of the period containing today, or null when the window ended
+   * in the past. That period is still accruing, so it belongs in tables (flagged)
+   * and NOT on a line or bar — an unfinished period draws as a fall.
+   */
+  inProgressBucket: string | null;
+  /** ISO 8601 server time the aggregates were computed. */
+  computedAt: string;
+}
+
+/**
+ * Which parts of a response honoured the tenant filter. Sections named in
+ * `unscopedSections` stayed platform-wide because their source tables cannot be
+ * attributed to one org — the UI must badge them rather than let them read as
+ * tenant-specific.
+ */
+export interface AnalyticsScoping {
+  tenantId: string | null;
+  unscopedSections: string[];
+}
+
+export interface AnalyticsSummary {
+  /** Cumulative as at the end of the window, not windowed. */
+  totalUsers: number;
+  /** Distinct users active WITHIN the window. */
+  activeUsers: number;
+  /** Simulations completed WITHIN the window. */
+  simulationsCompleted: number;
+  retentionRatePct: number;
+}
+
+export interface UserGrowthPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  date: string;
+  newUsers: number;
+  cumulativeUsers: number;
+}
+
+export interface ActiveUsersPoint {
+  /** Day (yyyy-mm-dd). */
+  date: string;
+  dau: number;
+  wau: number;
+  mau: number;
+}
+
+export interface SimulationsCompletedPoint {
+  /** Bucket start (yyyy-mm-dd) — the grain the request asked for. */
+  bucket: string;
+  count: number;
+}
+
+export interface RetentionPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  /** Active users whose account was created in this same bucket. */
+  newUsers: number;
+  returningUsers: number;
+}
+
+export interface UsersByRolePoint {
+  role: string;
+  count: number;
+}
+
+export interface AnalyticsOverviewResponse {
+  window: AnalyticsWindow;
+  summary: AnalyticsSummary;
+  /** Present only when `compare=prev` — the basis for a KPI delta. */
+  previous: AnalyticsSummary | null;
+  previousLabel: string | null;
+  userGrowth: UserGrowthPoint[];
+  activeUsers: ActiveUsersPoint[];
+  simulationsCompleted: SimulationsCompletedPoint[];
+  retention: RetentionPoint[];
+  usersByRole: UsersByRolePoint[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* XP growth — GET /v1/analytics/xp-growth                                    */
+/* -------------------------------------------------------------------------- */
+
+/** One bucket of the platform XP series. */
+export interface XpGrowthPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  /** XP awarded in this bucket — the change, which is the part that can fall. */
+  xpEarned: number;
+  /**
+   * Lifetime platform XP as at the end of this bucket. Monotonic, and a true
+   * lifetime figure on a narrowed window too: the server opens the curve at
+   * `summary.baselineXp` rather than restarting it at zero.
+   */
+  cumulativeXp: number;
+  /** Distinct learners who earned any XP in this bucket. */
+  earners: number;
+}
+
+export interface XpGrowthResponse {
+  window: AnalyticsWindow;
+  points: XpGrowthPoint[];
+  summary: {
+    /** XP earned before the window — the cumulative curve's opening value. */
+    baselineXp: number;
+    xpEarnedInWindow: number;
+    /** `baselineXp + xpEarnedInWindow`; includes the still-accruing bucket. */
+    cumulativeXp: number;
+    /** Distinct learners over the WHOLE window — never the sum of the buckets. */
+    earners: number;
+  };
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* XP goals — GET /v1/analytics/xp-goals                                      */
+/* -------------------------------------------------------------------------- */
+
+/** The grains a goal row can be seeded at in `analytics_xp_goals`. */
+export type XpGoalGrain = "month" | "quarter" | "year";
+
+/**
+ * The wire contract for `/v1/analytics/xp-goals` — the request `grain` param
+ * and the response's echoed `grain`. Wider than {@link XpGoalGrain}: day, week
+ * and all come back as actual XP only (`goalXp: null` throughout). The card's
+ * picker speaks the shared `AnalyticsGrain`, converted at the request boundary
+ * by `toXpChartGrain` in `goalsXpChart.ts`.
+ */
+export type XpChartGrain = "day" | "week" | XpGoalGrain | "all";
+
+/** One period's actual XP earned against its goal, if one has been set. */
+export interface GoalsXpPoint {
+  /** Period start (yyyy-mm-dd). */
+  periodStart: string;
+  /** e.g. "Jan 2026", "Q1 2026", "2026". */
+  periodLabel: string;
+  actualXp: number;
+  /** Target for this period, or null when no goal row exists for it — never a fabricated 0. */
+  goalXp: number | null;
+  hasGoal: boolean;
+  /** True for the period containing today — still accruing. */
+  inProgress: boolean;
+  /** True for a period after today's — nothing has happened yet, so actualXp is a true zero. */
+  upcoming: boolean;
+}
+
+export interface GoalsXpResponse {
+  grain: XpChartGrain;
+  points: GoalsXpPoint[];
+  /** Always platform-wide (tenantId null) — Goals has no tenant filter. */
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Leadership highlights — mirrors the backend AnalyticsHighlightsResponseDto
+// from GET /api/v1/analytics/highlights. Only the metrics NOT already served by
+// /overview or /scribe/overview live here; the tab composes all three.
+export interface HighlightsSummary {
+  activeOrgs: number;
+  completedSimulations: number;
+  practiceMinutes: number;
+  avgCompositeScore: number | null;
+  evaluatedSessions: number;
+  avgCsat: number | null;
+  csatResponses: number;
+  trackCompletionRatePct: number | null;
+  quizPassRatePct: number | null;
+  totalAiCostUsd: number;
+  /**
+   * Calls whose model has no pricing entry. They contribute $0, so
+   * `totalAiCostUsd` UNDERSTATES real spend whenever this is non-zero — say so
+   * on the surface rather than presenting the total as complete.
+   */
+  unpricedCalls: number;
+  costPerCompletedSimUsd: number | null;
+  avgPlayTimeMinutes: number | null;
+  playTimeSessions: number;
+}
+
+export interface TopOrgRow {
+  tenantId: string;
+  tenantName: string;
+  completedSimulations: number;
+}
+
+export interface PracticeMinutesPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  minutes: number;
+  activeLearners: number;
+}
+
+/**
+ * The exact whole-window KPI figure paired with `practiceMinutes`, for a
+ * chart's "All-time" grouping mode. `minutes` equals the sum of
+ * `practiceMinutes[].minutes` (a SUM is associative across buckets), but
+ * `activeLearners` does NOT equal the sum of `practiceMinutes[].activeLearners`
+ * — that would double-count a learner active in more than one bucket. Both are
+ * computed server-side in a single un-bucketed query rather than folded from
+ * the trend.
+ */
+export interface PracticeMinutesOverall {
+  minutes: number;
+  activeLearners: number;
+}
+
+/**
+ * How long one simulation lasts, per bucket. Median and p95 travel with the
+ * mean because session length is skewed. Nulls mark a bucket with no completed,
+ * timed session — the axis stays a real calendar and the line breaks.
+ */
+export interface PlayTimePoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  avgMinutes: number | null;
+  medianMinutes: number | null;
+  p95Minutes: number | null;
+  /** Timed sessions behind the bucket. A count, so its zero is a real zero. */
+  sessions: number;
+}
+
+export interface CsatTrendPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  avgRating: number | null;
+  responses: number;
+}
+
+export interface TrackFunnel {
+  enrolled: number;
+  started: number;
+  completed: number;
+  quizAttempts: number;
+  quizPassed: number;
+  quizPassRatePct: number | null;
+}
+
+export interface CostPerSimPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  estimatedCostUsd: number;
+  completedSimulations: number;
+  /** null when the bucket had no completed simulations. */
+  costPerSimUsd: number | null;
+  unpricedCalls: number;
+}
+
+/** Orgs too small to name, aggregated so the total stays honest. */
+export interface TopOrgsBelowFloor {
+  orgs: number;
+  completedSimulations: number;
+}
+
+export interface AnalyticsHighlightsResponse {
+  range: AnalyticsRange;
+  bucket: string;
+  window: AnalyticsWindow;
+  scoping: AnalyticsScoping;
+  summary: HighlightsSummary;
+  /** Present only when `compare=prev` — the basis for a KPI delta. */
+  previous: HighlightsSummary | null;
+  previousLabel: string | null;
+  /** Named orgs at or above the minimum group size, descending. */
+  topOrgs: TopOrgRow[];
+  topOrgsBelowFloor: TopOrgsBelowFloor;
+  /** Gap-filled to a contiguous bucket axis. */
+  practiceMinutes: PracticeMinutesPoint[];
+  /**
+   * The All-time KPI figure for `practiceMinutes` — a single query over the
+   * whole window, not a fold of the trend above (see the field's doc for why
+   * that matters for `activeLearners`).
+   */
+  practiceMinutesOverall: PracticeMinutesOverall;
+  /** Contiguous axis, gap-filled with NULLs — an average has no zero. */
+  playTime: PlayTimePoint[];
+  // `qualityTrend` was retired here: it plotted an unpinned judge composite
+  // with no coverage figures, superseded by the Roleplay Quality Index on
+  // GET /v1/analytics/quality-sentiment (see QualitySentimentResponse below).
+  /** Sparse — buckets with no ratings are absent. */
+  csatTrend: CsatTrendPoint[];
+  trackFunnel: TrackFunnel;
+  /** Gap-filled to a contiguous bucket axis. */
+  costPerSim: CostPerSimPoint[];
+}
+
+// Monthly learner cohort retention — mirrors CohortRetentionResponseDto from
+// GET /api/v1/analytics/cohort-retention. All-time and month-grained: it takes
+// no window params, because a cohort is only readable once it has been followed
+// for several months.
+export interface CohortRetentionCell {
+  /** Whole months since the cohort signed up. Always >= 1; month 0 is the cohort. */
+  monthIndex: number;
+  /** Calendar month the activity happened in (yyyy-mm-01). */
+  activityMonth: string;
+  /**
+   * Learners who cleared each minutes threshold that month, index-aligned with
+   * the response's `thresholds`. Counts, not rates — the rate is derived here
+   * against the row's `learners` so there is one definition of it.
+   */
+  activeByThreshold: number[];
+  /** True for the current, unfinished calendar month: these counts can only rise. */
+  partial: boolean;
+}
+
+export interface CohortRetentionRow {
+  /** Signup month (yyyy-mm-01) — the cohort key. */
+  cohortMonth: string;
+  /** Learner accounts created that month: the denominator, and the 100% anchor. */
+  learners: number;
+  /** True below `minCohortSize` — show the size, suppress the percentages. */
+  belowFloor: boolean;
+  /** Elapsed months only. A month that has not happened yet is absent, not zero. */
+  cells: CohortRetentionCell[];
+}
+
+export interface CohortRetentionResponse {
+  /** Selectable "active" definitions, in practice minutes per month. */
+  thresholds: number[];
+  minCohortSize: number;
+  /** First day of the current, incomplete month (yyyy-mm-01). */
+  currentMonth: string;
+  /** Oldest first, with signup-less months present at `learners: 0`. */
+  cohorts: CohortRetentionRow[];
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Monthly learner usage-level mix — mirrors UsageLevelResponseDto from
+// GET /api/v1/analytics/usage-levels. Month-grained and fixed-window (12 complete
+// months + the current one): it takes no window params, because a shift in a
+// distribution is only visible across several months.
+export interface UsageLevelBand {
+  /** Server-owned label, e.g. "25–50 min". */
+  label: string;
+  /** Inclusive lower bound, minutes. */
+  minMinutes: number;
+  /** Exclusive upper bound; null for the open-ended top band. */
+  maxMinutes: number | null;
+}
+
+export interface UsageLevelMonth {
+  /** First day of the month (yyyy-mm-01). */
+  month: string;
+  /** Learners per band, index-aligned with the response's `bands`. */
+  learnersByBand: number[];
+  /** Σ learnersByBand — learners with any practice that month. */
+  activeLearners: number;
+  /** Learner accounts that existed by the end of the month. */
+  registeredLearners: number;
+  /** Of those, the ones who had practised at least once by then. */
+  activatedLearners: number;
+  /** True for the current, unfinished month: its low bands are overstated. */
+  partial: boolean;
+}
+
+export interface UsageLevelResponse {
+  /** Bands lowest first, excluding the zero band (a residual — see below). */
+  bands: UsageLevelBand[];
+  /** Label for the residual "practised nothing this month" band. */
+  zeroBandLabel: string;
+  completeMonths: number;
+  /** Below this population, a month shows counts and no percentages. */
+  minPopulationSize: number;
+  /** First day of the current, incomplete month (yyyy-mm-01). */
+  currentMonth: string;
+  /** Oldest first, gap-free; months before the population existed carry zeros. */
+  months: UsageLevelMonth[];
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Practice stickiness — mirrors StickinessResponseDto from
+// GET /api/v1/analytics/practice-stickiness. Of the learners who practised once,
+// how many came back. A step is a DAY carrying >= `qualifyingMinutes` of
+// practice, so several sessions in one evening count once. All-time: "did they
+// ever come back" cannot be asked of a window.
+export interface StickinessStep {
+  /** Minimum qualifying days for this rung. */
+  step: number;
+  /** Behavioural label, e.g. "Came back once". */
+  label: string;
+  learners: number;
+  ofPreviousPct: number | null;
+  ofTopPct: number | null;
+}
+
+/** One band of the practice-spacing histogram (AAQ-224). */
+export interface StickinessSpacingBand {
+  /** Stable key: "0-1" | "2-6" | "7-13" | "14-29" | "30+". */
+  band: string;
+  /** Axis label, e.g. "2–6 days". */
+  label: string;
+  minDays: number;
+  /** Null for the open 30+ band. */
+  maxDays: number | null;
+  /** Gaps in the band — always present. */
+  gaps: number;
+  /** gaps ÷ totalGaps (%), 1 dp; null below `minGapSample` gaps in total. */
+  sharePct: number | null;
+  /** Distinct learners with a gap in the band (a learner can be in several). */
+  learners: number;
+}
+
+/**
+ * Days between consecutive countable sessions of the same learner, all time
+ * (GET practice-stickiness → `spacing`, since 2026-10).
+ */
+export interface StickinessSpacing {
+  window: "all";
+  bands: StickinessSpacingBand[];
+  totalGaps: number;
+  minGapSample: number;
+  learnersWithSessions: number;
+  /** Learners with 2+ countable sessions — the KPI's denominator. */
+  activeLearners: number;
+  /** The KPI threshold on a learner's median gap, in days (7). */
+  targetDays: number;
+  learnersWithinTarget: number;
+  /** learnersWithinTarget ÷ activeLearners (%), 1 dp; null below `minLearners`. */
+  withinTargetPct: number | null;
+  /** Median of each active learner's own median gap (days); null below `minLearners`. */
+  medianGapDays: number | null;
+  minLearners: number;
+  provenance: { derivation: string; note: string };
+}
+
+export interface StickinessResponse {
+  qualifyingMinutes: number;
+  steps: StickinessStep[];
+  /** Learners past the last rung, so the funnel still reconciles. */
+  beyondLastStep: number;
+  medianActiveDays: number | null;
+  /** Below this population the server has already nulled every share. */
+  minPopulation: number;
+  /** Practice spacing (AAQ-224). Optional: absent from a backend older than 2026-10. */
+  spacing?: StickinessSpacing;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Roleplay sessions long enough to be practice — mirrors
+// QualifiedSessionsResponseDto from GET /api/v1/analytics/qualified-sessions.
+export interface QualifiedSessionPoint {
+  bucket: string;
+  qualifiedSessions: number;
+  completedSessions: number;
+  /** null in a bucket with no completed session — 0/0 is not 0%. */
+  qualifiedSharePct: number | null;
+}
+
+export interface QualifiedSessionsResponse {
+  range: AnalyticsRange;
+  bucket: AnalyticsBucket;
+  window: AnalyticsWindow;
+  qualifyingMinutes: number;
+  points: QualifiedSessionPoint[];
+  totalQualifiedSessions: number;
+  totalCompletedSessions: number;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Org engagement — mirrors OrgEngagementResponseDto from
+// GET /api/v1/analytics/org-engagement. `tenantId` is ignored by this endpoint:
+// counting orgs cannot be narrowed to one org.
+export interface OrgActivityPoint {
+  month: string;
+  activeOrgs: number;
+  totalOrgs: number;
+  activeSharePct: number | null;
+}
+
+export interface OrgEngagementResponse {
+  /** Non-test, non-deleted orgs on the platform. */
+  orgs: number;
+  /** The trailing window the headline covers. */
+  activityDays: number;
+  activeOrgs: number;
+  /** Orgs that existed BEFORE the window opened — the honest denominator. */
+  eligibleOrgs: number;
+  activeSharePct: number | null;
+  /**
+   * Monthly trend. NOTE the grain differs from the headline: a point is "active
+   * in that CALENDAR MONTH", not "active in a trailing window ending there".
+   */
+  activityTrend: OrgActivityPoint[];
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// AI cost per 10 minutes of roleplay — mirrors RoleplayCostResponseDto from
+// GET /api/v1/analytics/roleplay-cost. Only LEARNER-CAUSED spend is in the
+// ratio; judges, authoring and internal tooling come back as `excludedCostUsd`.
+// USD only. Every figure is an estimate priced at read time.
+export interface CostBreakdown {
+  roleplay: number;
+  feedback: number;
+  quiz: number;
+  llm: number;
+  stt: number;
+  tts: number;
+}
+
+export interface RoleplayCostPoint {
+  bucket: string;
+  practiceMinutes: number;
+  attributableCostUsd: number;
+  /** null in a bucket with no practice — a ratio with no denominator. */
+  costPer10MinUsd: number | null;
+  breakdown: CostBreakdown;
+  /** Platform AI spend a learner did not cause. */
+  excludedCostUsd: number;
+  /** Attributable calls with no pricing entry: the total understates by this. */
+  unpricedCalls: number;
+}
+
+export interface RoleplayCostResponse {
+  range: AnalyticsRange;
+  bucket: AnalyticsBucket;
+  window: AnalyticsWindow;
+  /** Minutes the unit cost is quoted per (10). */
+  perMinutes: number;
+  areas: string[];
+  areaLabels: Record<string, string>;
+  points: RoleplayCostPoint[];
+  overallCostPer10MinUsd: number | null;
+  totalAttributableCostUsd: number;
+  totalExcludedCostUsd: number;
+  totalPracticeMinutes: number;
+  totalUnpricedCalls: number;
+  /** Must be surfaced: these are estimates, not billed amounts. */
+  estimateNote: string;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// AI cost to DELIVER a roleplay session, per minute of practice — mirrors
+// RoleplaySessionCostResponseDto from GET /api/v1/analytics/roleplay-session-cost.
+// The session is the unit: every model call tagged to it, opener to debrief
+// chat, bucketed by when the SESSION started. Analysis spend tagged to a session
+// (actor evaluation, judges) comes back as `excludedCostUsd`, never in the cost.
+export type SessionCostComponent =
+  | "dialogue"
+  | "stt"
+  | "tts"
+  | "fillers"
+  | "events"
+  | "coaching"
+  | "debrief";
+
+export type SessionCostComponents = Record<SessionCostComponent, number | null>;
+
+export interface SessionCostComponentDef {
+  key: SessionCostComponent;
+  label: string;
+  description: string;
+}
+
+export interface RoleplaySessionCostTotals {
+  /** Sessions started, however short. */
+  sessions: number;
+  minutes: number;
+  costUsd: number;
+  /** null when no minutes were recorded — a ratio with no denominator. */
+  costPerMinuteUsd: number | null;
+  costPerSessionUsd: number | null;
+  costByComponent: SessionCostComponents;
+  /** Sums to `costPerMinuteUsd`; all null over zero minutes. */
+  perMinuteByComponent: SessionCostComponents;
+  excludedCostUsd: number;
+  /** Delivery calls with no price entry: the cost understates by these. */
+  unpricedCalls: number;
+}
+
+export interface RoleplaySessionCostPoint extends RoleplaySessionCostTotals {
+  bucket: string;
+  /** Began before every delivery call was logged: cost is understated. */
+  partial: boolean;
+}
+
+export interface RoleplaySessionCostResponse {
+  bucket: AnalyticsBucket;
+  window: AnalyticsWindow;
+  components: SessionCostComponentDef[];
+  points: RoleplaySessionCostPoint[];
+  overall: RoleplaySessionCostTotals;
+  /** ISO timestamp full logging began; null until it has. */
+  fullCoverageFrom: string | null;
+  coverageNote: string;
+  estimateNote: string;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// XP earned per minute of roleplay — mirrors XpPerMinuteResponseDto from
+// GET /api/v1/analytics/xp-per-minute. ALL XP (the xp_events ledger) over
+// roleplay minutes only (user_daily_scores, same as Roleplay Minutes), split by
+// the XP source that paid it over the one shared denominator.
+export type XpSourceGroup = "roleplay" | "tracks" | "community" | "consistency" | "other";
+
+export type XpSourceGroups = Record<XpSourceGroup, number | null>;
+
+export interface XpSourceGroupDef {
+  key: XpSourceGroup;
+  label: string;
+  description: string;
+}
+
+export interface XpPerMinuteTotals {
+  xp: number;
+  minutes: number;
+  /** null when no roleplay minutes were recorded — a ratio with no denominator. */
+  xpPerMinute: number | null;
+  /** Roleplay-sourced XP as a % of all XP; null when no XP was awarded. */
+  roleplaySharePct: number | null;
+  xpBySource: XpSourceGroups;
+  /** Sums to `xpPerMinute`; all null over zero minutes. */
+  perMinuteBySource: XpSourceGroups;
+}
+
+export interface XpPerMinutePoint extends XpPerMinuteTotals {
+  bucket: string;
+}
+
+export interface XpPerMinuteResponse {
+  bucket: AnalyticsBucket;
+  window: AnalyticsWindow;
+  sources: XpSourceGroupDef[];
+  points: XpPerMinutePoint[];
+  overall: XpPerMinuteTotals;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Bug Hunter + Builder AI cost — mirrors CodingAgentCostResponseDto from
+// GET /api/v1/analytics/coding-agent-cost. NOT `llm_usage.service` (both
+// features write `service: 'llm'`) — the discriminator is `task`. Every
+// figure is an estimate priced at read time.
+export type CodingAgent = "bug-hunter" | "builder";
+
+export interface CodingAgentCostAmount {
+  "bug-hunter": number;
+  builder: number;
+}
+
+export interface CodingAgentCostPoint {
+  bucket: string;
+  costUsd: CodingAgentCostAmount;
+  calls: CodingAgentCostAmount;
+}
+
+export interface CodingAgentModelBreakdown {
+  agent: CodingAgent;
+  model: string;
+  costUsd: number;
+  calls: number;
+  /** False when this model has no pricing entry — its calls contribute $0. */
+  priced: boolean;
+}
+
+export interface CodingAgentCostResponse {
+  range: AnalyticsRange;
+  bucket: AnalyticsBucket;
+  window: AnalyticsWindow;
+  agentLabels: Record<string, string>;
+  points: CodingAgentCostPoint[];
+  modelBreakdown: CodingAgentModelBreakdown[];
+  totalCostUsd: CodingAgentCostAmount;
+  unpricedCalls: number;
+  /** Must be surfaced: these are estimates, not billed amounts. */
+  estimateNote: string;
+  computedAt: string;
+}
+
+// Average cost per COMPLETED Bug Hunter fix session, by engine — mirrors
+// FixSessionEngineCostResponseDto from GET
+// /api/v1/analytics/fix-session-engine-cost. The direct Claude-vs-Gemini
+// comparison CodingAgentCostResponse's per-model TOTAL can't give: the two
+// engines have run a very different number of times, so whichever ran less
+// often would always show the smaller total regardless of which is actually
+// cheaper per fix.
+export interface FixSessionEngineCost {
+  /** "claude-code" or "gemini" — whatever the run itself reported. */
+  engine: string;
+  /** Mean totalTokenCostUsd across this engine's completed fix sessions. */
+  avgCostUsd: number;
+  /** How many completed fix sessions the average is over — read this alongside avgCostUsd. */
+  sessionCount: number;
+}
+
+export interface FixSessionEngineCostResponse {
+  byEngine: FixSessionEngineCost[];
+  window: AnalyticsWindow;
+  computedAt: string;
+}
+
+// Bug Hunter's five headline performance trends, by calendar week — mirrors
+// BugAgentPerformanceResponseDto from GET /api/v1/analytics/bug-agent-performance.
+// Every rate is null (not 0) when its denominator was zero that week — a rate
+// over nothing is unmeasured, not zero.
+export interface BugAgentPerformanceSourceAccuracy {
+  source: string;
+  accuracy: number | null;
+  filed: number;
+  judged: number;
+}
+
+export interface BugAgentPerformanceThroughputWeek {
+  week: string;
+  approvedToMergedRate: number | null;
+  escalationRate: number | null;
+  fallbackRate: number | null;
+  approved: number;
+  merged: number;
+  fixSessionRuns: number;
+  escalations: number;
+  fallbacks: number;
+}
+
+export interface BugAgentPerformanceSpeedWeek {
+  week: string;
+  filedToDecidedMedianHours: number | null;
+  filedToMergedMedianHours: number | null;
+  mergedToReleasedMedianHours: number | null;
+  queueToStartMedianHours: number | null;
+}
+
+export interface BugAgentPerformanceCostWeek {
+  week: string;
+  totalUsd: number;
+  costPerMergedFixUsd: number | null;
+  merged: number;
+}
+
+export interface BugAgentPerformanceReliabilityWeek {
+  week: string;
+  completionRate: number | null;
+  fallbackRate: number | null;
+  regressionRate: number | null;
+  runs: number;
+  completed: number;
+  failed: number;
+}
+
+/** One week of Bug Hunter's goal numbers — mirrors ally-be's GoalWeekDto (OPP-0778). */
+export interface BugAgentPerformanceGoalWeek {
+  week: string;
+  humanReports: number;
+  agentBugs: number;
+  /** agentBugs / (agentBugs + humanReports); null when nobody found anything. */
+  firstFinderShare: number | null;
+  escapes: number;
+  escapeRate: number | null;
+  timeToFixHoursMedian: number | null;
+}
+
+export interface BugAgentPerformanceGoalWindow {
+  humanReports: number;
+  agentBugs: number;
+  firstFinderShare: number | null;
+  escapes: number;
+  escapeRate: number | null;
+  timeToFixHoursMedian: number | null;
+  /** Counts per miss reason over the window, plus "unclassified". */
+  missReasons: Record<string, number>;
+}
+
+export interface BugAgentPerformanceResponse {
+  /** The goal numbers: is Bug Hunter finding bugs before people do? */
+  goal: {
+    weekly: BugAgentPerformanceGoalWeek[];
+    window: BugAgentPerformanceGoalWindow;
+  };
+  precision: {
+    bySource: BugAgentPerformanceSourceAccuracy[];
+  };
+  throughput: BugAgentPerformanceThroughputWeek[];
+  speed: BugAgentPerformanceSpeedWeek[];
+  cost: BugAgentPerformanceCostWeek[];
+  reliability: BugAgentPerformanceReliabilityWeek[];
+  window: AnalyticsWindow;
+  computedAt: string;
+}
+
+// Roleplay quality vs learner sentiment — mirrors QualitySentimentResponseDto
+// from GET /api/v1/analytics/quality-sentiment.
+//
+// IMPORTANT: `proxyNps` is NOT NPS. Ally has never asked the 0-10 "would you
+// recommend" question; it is derived from the 1-5 post-session rating (5 =
+// promoter, 4 = passive, <=3 = detractor). Every surface MUST render
+// `proxyNote` alongside it and must never label it a plain NPS.
+export interface QualitySentimentPoint {
+  bucket: string;
+  /** Still the raw actor-goal mean; the plotted quality series is now qualityIndex. */
+  avgCompositeScore: number | null;
+  evaluatedSessions: number;
+  /** Proxy NPS, -100..+100. Null below `minResponses`. */
+  proxyNps: number | null;
+  avgRating: number | null;
+  responses: number;
+  promoters: number;
+  passives: number;
+  detractors: number;
+
+  // --- Roleplay Quality Index (the series the card now plots) ---
+  /** 0-100 blend of whatever dimensions had data, renormalised. Null if none did. */
+  qualityIndex: number | null;
+  /** Per-dimension stack heights; present layers sum to qualityIndex. */
+  indexContributions: Record<string, number>;
+  /** Each dimension's raw value in its own unit — see indexCoverage[].unit. */
+  indexRaw: Record<string, number>;
+  /** Rows behind each dimension here — sessions, or turns for latency. */
+  indexSampleSizes: Record<string, number>;
+  /** Dimensions with no data in this bucket. */
+  indexMissing: string[];
+}
+
+/**
+ * One dimension's standing in the index — weight, coverage, and whether its
+ * 0-100 anchors are measured or still the shipped placeholder.
+ *
+ * `calibrated: false` is the field a client must never ignore: an index
+ * normalised against invented anchors looks identical to one normalised
+ * against measured ones, so the card carries the caveat, not the number.
+ */
+export interface QualityIndexCoverage {
+  dimension: string;
+  label: string;
+  unit: string;
+  weight: number;
+  bucketsCovered: number;
+  bucketsTotal: number;
+  calibrated: boolean;
+  target: number;
+  ceiling: number;
+  sampleSize: number | null;
+  measuredAt: string | null;
+}
+
+/**
+ * Corpus retrieval quality — mirrors RagQualityResponseDto.
+ *
+ * COUNTS, not rates, by design. A corpus can legitimately see a handful of retrievals a day,
+ * and a percentage over six judged rows reads as authoritative when it is noise, so the server
+ * sends counts and `coverage.belowReportingFloor` says when a surface must not divide them.
+ */
+export interface RagCoverage {
+  retrievals: number;
+  /** Judged under the pinned (model, rubric) pair. Every count below is over THIS. */
+  judged: number;
+  passages: number;
+  judgedPassages: number;
+  /** True when the judged sample is too small for a percentage to mean anything. */
+  belowReportingFloor: boolean;
+}
+
+export interface RagLabelCount {
+  label: string;
+  count: number;
+}
+
+export interface RagConsumerBreakdown {
+  consumer: string;
+  retrievals: number;
+  judged: number;
+  /** Returned nothing at all — a corpus gap and a tight floor look identical here. */
+  emptyRetrievals: number;
+}
+
+/** One candidate floor: what it keeps, and what raising the floor to it would discard. */
+export interface RagFloorPoint {
+  floor: number;
+  kept: number;
+  relevant: number;
+  tangential: number;
+  irrelevant: number;
+  /** Relevant passages scoring BELOW this floor — the cost of tightening. */
+  relevantLost: number;
+}
+
+export interface RagGap {
+  /** Null when withheld: the WhatsApp bot's queries are health workers' own questions. */
+  query: string | null;
+  querySensitive: boolean;
+  sufficiency: string;
+  /** What the judge would have needed. The only thing that names a corpus hole. */
+  missing: string | null;
+  consumer: string;
+  returnedCount: number;
+  minSimilarity: number;
+  occurredAt: string;
+}
+
+export interface RagJudgeVersion {
+  judgeModel: string;
+  judgePromptVersion: string;
+  judgments: number;
+}
+
+export interface RagQualityResponse {
+  window: AnalyticsWindow;
+  coverage: RagCoverage;
+  sufficiency: RagLabelCount[];
+  relevance: RagLabelCount[];
+  superficialMatches: number;
+  byConsumer: RagConsumerBreakdown[];
+  floorCurve: RagFloorPoint[];
+  gaps: RagGap[];
+  /** More than one pair means the window mixes two judges and is not comparable. */
+  judgeVersions: RagJudgeVersion[];
+}
+
+export interface QualitySentimentResponse {
+  range: AnalyticsRange;
+  bucket: AnalyticsBucket;
+  window: AnalyticsWindow;
+  points: QualitySentimentPoint[];
+  overallCompositeScore: number | null;
+  overallProxyNps: number | null;
+  /**
+   * Whole-window Roleplay Quality Index — a fresh aggregate, not a fold of
+   * `points`. Distinct from `overallCompositeScore`, which is the raw
+   * actor-goal judge mean and only one of the index's four inputs.
+   */
+  overallQualityIndex: number | null;
+  totalEvaluatedSessions: number;
+  totalResponses: number;
+  minResponses: number;
+  /** Pearson r over paired buckets; null below three of them. Co-movement only. */
+  correlation: number | null;
+  pairedBuckets: number;
+  /** Mandatory caveat to render wherever proxyNps appears. */
+  proxyNote: string;
+  /** Bumped whenever a weight, direction or dimension's raw metric changes. */
+  indexVersion: string;
+  /** True only when EVERY dimension has measured (non-placeholder) anchors. */
+  indexCalibrated: boolean;
+  /** Per-dimension weight/coverage/calibration, in stacking order. */
+  indexCoverage: QualityIndexCoverage[];
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Per-user, per-chart saved window and grain — mirrors
+// ChartPreferencesResponseDto from GET/PUT /api/v1/analytics/chart-preferences.
+// The Highlights tab has no page-level range; each chart owns its controls, and
+// this is what makes that choice survive a reload.
+export interface ChartPreference {
+  /** Client-owned key, namespaced by tab, e.g. "highlights.practice". */
+  chartId: string;
+  range?: AnalyticsRange | null;
+  /** Named for its SQL-bucket origin; also accepts `"allTime"`, stored opaquely. */
+  bucket?: AnalyticsGrain | null;
+}
+
+export interface ChartPreferencesResponse {
+  preferences: ChartPreference[];
+}
+
+// Weekly changed-line volume across the Ally repos — mirrors
+// ShipVolumeResponseDto from GET /api/v1/analytics/ship-volume. An OUTPUT
+// measure: churn says how much code moved, never whether the right thing moved.
+// Weeks are SUNDAY-anchored, because that is how GitHub buckets the underlying
+// statistics. No tenant — this measures our own engineering, not customer data.
+export interface ShipVolumeTotals {
+  added: number;
+  /** Positive count (GitHub reports deletions negative; the API flips them). */
+  deleted: number;
+  /** added + deleted — the plotted quantity. Churn, not net. */
+  churn: number;
+}
+
+export interface ShipVolumeRepo extends ShipVolumeTotals {
+  /** Repository name without the org, e.g. `ally-be`. */
+  repo: string;
+}
+
+export interface ShipVolumeWeek extends ShipVolumeTotals {
+  /** The Sunday the week starts (yyyy-mm-dd, UTC). */
+  weekStart: string;
+  /** Repos that changed this week, in the response's repo order. */
+  repos: ShipVolumeRepo[];
+  /** True for the week in progress: its bar can only grow. */
+  partial: boolean;
+}
+
+export interface ShipVolumeUnavailableRepo {
+  repo: string;
+  /**
+   * `computing` — GitHub is rebuilding this repo's statistics after a push and
+   * answered 202. `unreachable` — the request failed. `not_configured` — no
+   * GitHub token in this environment.
+   */
+  reason: "computing" | "unreachable" | "not_configured";
+  /**
+   * True when this repo's numbers on the axis came from the last cached
+   * response, so the chart is complete but that slice may be behind. False
+   * means the repo is missing from every bar.
+   */
+  servedFromCache: boolean;
+}
+
+export interface ShipVolumeResponse {
+  /** Oldest first, gap-free: a week nobody pushed in is a zero, not a gap. */
+  weeks: ShipVolumeWeek[];
+  /** Every repo band, ranked by churn across the whole window. */
+  repos: string[];
+  /** The Sunday of the current, incomplete week. */
+  currentWeekStart: string;
+  weeksRequested: number;
+  plotted: ShipVolumeTotals;
+  /**
+   * Repos whose statistics could not be read. MUST be surfaced: churn is a sum
+   * across repos, so a missing one silently shortens every bar.
+   */
+  unavailableRepos: ShipVolumeUnavailableRepo[];
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+export interface ShipVolumeQuery {
+  /** 12 | 26 | 52. Defaults to 12 server-side. */
+  weeks?: number;
+  /** `all` = every week since the first change on any repo; overrides `weeks`. */
+  span?: "all";
+}
+
+// Vote-weighted product-roadmap delivery — mirrors RoadmapDeliveryResponseDto
+// from GET /api/v1/analytics/roadmap-delivery. All-time and month-grained; takes
+// no window and no tenant (the roadmap tables carry no tenant — it is Ally's own
+// backlog). Votes are the board's `priorityScore`: every voter, every period.
+export interface RoadmapDeliveryTotals {
+  opportunities: number;
+  ideaOpportunities: number;
+  bugOpportunities: number;
+  /** Σ priorityScore — ideaVotes + bugVotes, sent so both cannot disagree. */
+  votes: number;
+  ideaVotes: number;
+  bugVotes: number;
+}
+
+export interface RoadmapDeliveryOwner extends RoadmapDeliveryTotals {
+  /** Owner display name, or the reserved unassigned / other-owners labels. */
+  owner: string;
+}
+
+export interface RoadmapDeliveryMonth extends RoadmapDeliveryTotals {
+  /** First day of the release month (yyyy-mm-01). */
+  month: string;
+  /** Owners with something released this month, in the response's owner order. */
+  owners: RoadmapDeliveryOwner[];
+  /** True for the current, unfinished month: more can still ship into it. */
+  partial: boolean;
+}
+
+export interface RoadmapDeliveryResponse {
+  /** Oldest first, gap-free; empty when nothing released carries a date. */
+  months: RoadmapDeliveryMonth[];
+  /** Every owner band, ranked by all-time votes, context bands last. */
+  owners: string[];
+  /** Reserved `owner` value for released work with no owner. */
+  unassignedOwnerLabel: string;
+  /** Reserved `owner` value for the tail rolled up past `maxOwners`. */
+  otherOwnerLabel: string;
+  maxOwners: number;
+  /** Totals for everything on the axis. */
+  plotted: RoadmapDeliveryTotals;
+  /**
+   * Released work with NO `releasedAt`, which therefore cannot be plotted. The
+   * date is only stamped on the transition into `released`, so a large share of
+   * migrated rows have none. Must be stated on the surface — without it the
+   * plotted total reads as the whole history.
+   */
+  undated: RoadmapDeliveryTotals;
+  /** First day of the current, incomplete month (yyyy-mm-01). */
+  currentMonth: string;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Lifetime roleplay-volume distribution — mirrors RoleplayVolumeResponseDto from
+// GET /api/v1/analytics/roleplay-volume. All-time and takes no window params: the
+// quantity is a LIFETIME count per learner, so a 30-day window would put nearly
+// every learner in the lowest bands whatever their real depth.
+export interface RoleplayVolumeBand {
+  /** Server-owned label, and the x-axis tick: "1", "3–5", "51+". */
+  label: string;
+  /** Inclusive lower bound, completed roleplays. */
+  minCount: number;
+  /** INCLUSIVE upper bound (counts are discrete); null for the top band. */
+  maxCount: number | null;
+}
+
+export interface RoleplayVolumeResponse {
+  /** Bands lowest first, excluding the zero band (a residual — see below). */
+  bands: RoleplayVolumeBand[];
+  /** Label for the residual "never completed a roleplay" band. */
+  zeroBandLabel: string;
+  /** Below this population, shares must not be stated — counts only. */
+  minPopulationSize: number;
+  /** Every learner account in scope: the denominator for every share. */
+  registeredLearners: number;
+  /** Learners with >= 1 completed roleplay — Σ learnersByBand. */
+  learnersWithAny: number;
+  /** registeredLearners − learnersWithAny, derived server-side. */
+  learnersWithNone: number;
+  /** Learners per band, index-aligned with `bands`. */
+  learnersByBand: number[];
+  /** Completed roleplays across every learner in scope. */
+  totalCompletedRoleplays: number;
+  /** Median lifetime count among learners with >= 1; null when nobody has. */
+  medianAmongActiveLearners: number | null;
+  scoping: AnalyticsScoping;
+  computedAt: string;
+}
+
+// Scribe-session analytics from GET /api/v1/analytics/scribe/*.
+export interface ScribeTrendPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  count: number;
+}
+
+export interface ScribeCount {
+  key: string;
+  count: number;
+}
+
+export interface ScribeOverviewSummary {
+  totalSessions: number;
+  successRatePct: number;
+  processing: number;
+  noAudio: number;
+  failed: number;
+}
+
+export interface ScribeOverviewResponse {
+  range: AnalyticsRange;
+  bucket: string;
+  window: AnalyticsWindow;
+  scoping: AnalyticsScoping;
+  summary: ScribeOverviewSummary;
+  /** Present only when `compare=prev` — the basis for a KPI delta. */
+  previous: ScribeOverviewSummary | null;
+  previousLabel: string | null;
+  sessionsTrend: ScribeTrendPoint[];
+  outcomeBreakdown: ScribeCount[];
+  modeBreakdown: ScribeCount[];
+  captureBreakdown: ScribeCount[];
+}
+
+export interface ScribeFailureRatePoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  failed: number;
+  terminal: number;
+  /** failed / terminal (final, post-backfill), 0..1. */
+  failureRate: number;
+  /** Sessions whose FIRST attempt failed (write-once; post-rollout only). */
+  firstAttemptFailed: number;
+  firstAttemptTerminal: number;
+  /** first-attempt failed / first-attempt terminal, 0..1. */
+  firstAttemptFailureRate: number;
+}
+
+/** One phase on the pipeline drop-off funnel. */
+export interface ScribePhaseFunnelPoint {
+  phase: string;
+  /** Sessions that reached AT LEAST this phase. */
+  reached: number;
+  /** Sessions whose furthest phase was exactly this. */
+  stoppedHere: number;
+}
+
+/** Per-STT-provider try/success/fail over the per-attempt provider trail. */
+export interface ScribeProviderStat {
+  provider: string;
+  tried: number;
+  ok: number;
+  failed: number;
+}
+
+export interface ScribeFailureSummary {
+  totalTerminal: number;
+  totalFailed: number;
+  failureRatePct: number;
+  retryableSharePct: number;
+  timeoutSharePct: number;
+}
+
+export interface ScribeSummaryFailureResponse {
+  range: AnalyticsRange;
+  bucket: string;
+  window: AnalyticsWindow;
+  summary: ScribeFailureSummary;
+  failureRateTrend: ScribeFailureRatePoint[];
+  failureBreakdown: ScribeCount[];
+  failuresByMode: ScribeCount[];
+  failuresByCaptureMethod: ScribeCount[];
+  /** Pipeline drop-off funnel (replaces the flat failure breakdown). */
+  phaseFunnel: ScribePhaseFunnelPoint[];
+  /** Per-STT-provider try/success/fail (populated once ally-ai emits it). */
+  sttProviderStats: ScribeProviderStat[];
+  /** Successful summaries by LLM model (populated once ally-ai emits it). */
+  summaryModelStats: ScribeCount[];
+}
+
+// VoiceLatencyResponseDto from GET /api/v1/analytics/voice-latency.
+export interface VoiceLatencyPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  /** 'pipeline' (live agent) or 'transcript' (historical, derived). */
+  source: string;
+  turns: number;
+  avgMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  /** Live-instrumentation only; null for 'transcript' buckets. */
+  avgLlmTtftMs: number | null;
+  /** Live-instrumentation only; null for 'transcript' buckets. */
+  p50LlmTtftMs: number | null;
+  /** Live-instrumentation only; null for 'transcript' buckets. */
+  p95LlmTtftMs: number | null;
+  /**
+   * Prompt-cache hit rate (%), ratio-of-sums per bucket. Live-instrumentation
+   * only; null for 'transcript' buckets and for turns predating this being
+   * instrumented.
+   */
+  avgCacheHitRatePct: number | null;
+
+  // What the learner heard first. avgMs/p50Ms/p95Ms measure time to the agent's
+  // FIRST audio, which is a thinking-filler or interim reply when one played —
+  // so these counts are what keeps "we got faster" apart from "we masked more".
+  /**
+   * Turns whose first audio was a thinking-filler. Excludes opener-bridge turns
+   * (also recorded as 'filler'), so the split never counts a turn twice.
+   */
+  firstAudioFillerTurns: number;
+  /**
+   * Turns whose first audio was a filler played as an opener's bridge line
+   * (`openerBridge: true`; ally-ai-learn v1.48.0+).
+   */
+  firstAudioOpenerBridgeTurns: number;
+  /** Turns whose first audio was the legacy interim reply (and unlabelled older interim turns). */
+  firstAudioInterimTurns: number;
+  /** Turns whose first audio was the delivery plan's bridge line on its own. */
+  firstAudioBridgeTurns: number;
+  /** Turns whose first audio was the real reply (nothing masked it). */
+  firstAudioReplyTurns: number;
+  /**
+   * Turns with no provenance recorded: every 'transcript' row, and live rows
+   * predating the instrumentation. Charted as its own band rather than folded
+   * into 'reply' — those turns may have been masked and there is no way to tell.
+   */
+  firstAudioUnknownTurns: number;
+  /** Mean time-to-first-voice (ms) for filler-first turns, bridges excluded; null if none. */
+  avgFirstAudioFillerMs: number | null;
+  /** Mean time-to-first-voice (ms) for opener-bridge turns; null if none. */
+  avgFirstAudioOpenerBridgeMs: number | null;
+  /** Mean time-to-first-voice (ms) for legacy-interim-first turns; null if none. */
+  avgFirstAudioInterimMs: number | null;
+  /** Mean time-to-first-voice (ms) for bridge-line-first turns; null if none. */
+  avgFirstAudioBridgeMs: number | null;
+  /** Mean time-to-first-voice (ms) for reply-first turns; null if none. */
+  avgFirstAudioReplyMs: number | null;
+  /**
+   * Mean time to the REAL reply (ms) — the unmasked pipeline number, which does
+   * not move when filler coverage does. Instrumented turns only, so null for
+   * 'transcript' buckets and windows predating the instrumentation.
+   */
+  avgReplyLatencyMs: number | null;
+  /** Median (p50) time to the real reply (ms). Null as above. */
+  p50ReplyLatencyMs: number | null;
+  /** p95 time to the real reply (ms). Null as above. */
+  p95ReplyLatencyMs: number | null;
+}
+
+/** One language's live-pipeline latency over the whole window (no time bucketing). */
+export interface VoiceLatencyByLanguageRow {
+  language: string;
+  turns: number;
+  avgMs: number;
+  p95Ms: number;
+  /** Mean pure STT finalization time (ms); null when unpopulated for this window. */
+  avgSttFinalizeMs: number | null;
+}
+
+/**
+ * The first-audio split for one TTS voice model over the whole window (no time
+ * bucketing), live pipeline, same language filter as `points`. Generative voices
+ * (e.g. `elevenlabs/eleven_v3`) cannot play spoken masking, so their turns are
+ * all reply-first — a voice-mix shift moves the headline without the pipeline
+ * changing.
+ */
+export interface VoiceLatencyByVoiceModelRow {
+  /** `metadata.ttsModel` ("provider/model"), or 'unknown' when unrecorded. */
+  ttsModel: string;
+  turns: number;
+  /** Thinking-filler-first turns, opener bridges excluded. */
+  fillerTurns: number;
+  openerBridgeTurns: number;
+  interimTurns: number;
+  bridgeTurns: number;
+  replyTurns: number;
+  /** No first-audio source recorded — never assumed unmasked. */
+  unknownTurns: number;
+  /** Median time to the first audio of any kind (ms); null with no turns. */
+  p50FirstAudioMs: number | null;
+  /** Median time to the REAL reply (ms), instrumented turns only; null when none. */
+  p50ReplyLatencyMs: number | null;
+}
+
+/**
+ * Whole-window, un-bucketed live-pipeline latency — a fresh aggregate query,
+ * NOT a fold of `points`: percentiles do not average across buckets.
+ */
+export interface VoiceLatencyOverall {
+  /** Live-pipeline turns aggregated over the whole window. */
+  turns: number;
+  /** Mean voice-to-voice latency (ms); null with no turns. */
+  avgMs: number | null;
+  /** Median (p50) voice-to-voice latency (ms); null with no turns. */
+  p50Ms: number | null;
+  /** p95 voice-to-voice latency (ms); null with no turns. */
+  p95Ms: number | null;
+}
+
+export interface VoiceLatencyResponse {
+  range: AnalyticsRange;
+  window: AnalyticsWindow;
+  /** Bucket granularity for this range ('day' | 'week' | 'month'). */
+  bucket: string;
+  /** Voice-to-voice latency target line for reference (ms). */
+  targetMs: number;
+  /** LLM time-to-first-token target line for reference (ms). */
+  llmTtftTargetMs: number;
+  points: VoiceLatencyPoint[];
+  /** Live-pipeline latency by language, independent of the `language` filter. */
+  byLanguage: VoiceLatencyByLanguageRow[];
+  /** First-audio split per TTS voice model, honouring the `language` filter. */
+  byVoiceModel: VoiceLatencyByVoiceModelRow[];
+  /** The All-time KPI figure — see {@link VoiceLatencyOverall}. */
+  overall: VoiceLatencyOverall;
+}
+
+/**
+ * Shared per-session voice-pipeline latency fields, used both for a single
+ * session-wise row and for the whole-filtered-set summary. Null stage values
+ * mean no turns in the window had that field populated.
+ */
+export interface VoiceLatencySessionStages {
+  avgResponseLatencyMs: number | null;
+  p50ResponseLatencyMs: number | null;
+  p95ResponseLatencyMs: number | null;
+  avgEouDelayMs: number | null;
+  avgSttFinalizeMs: number | null;
+  avgLlmTtftMs: number | null;
+  avgTtsTtfbMs: number | null;
+  avgOrchestrationMs: number | null;
+  avgLlmResponseMs: number | null;
+  avgBranchingMs: number | null;
+  avgKnowledgeRetrievalMs: number | null;
+  avgProcessEventsMs: number | null;
+  avgBehaviorsMs: number | null;
+  interruptedTurns: number;
+  llmTimedOutTurns: number;
+}
+
+// VoiceLatencySessionRowDto from GET /api/v1/analytics/voice-latency/sessions.
+export interface VoiceLatencySessionRow extends VoiceLatencySessionStages {
+  scenarioSessionId: string;
+  occurredAt: string | null;
+  turnCount: number;
+}
+
+export interface ListVoiceLatencySessionsResponse {
+  data: VoiceLatencySessionRow[];
+  /** Total sessions matching the filter (for pagination). */
+  total: number;
+  window: AnalyticsWindow;
+}
+
+// VoiceLatencySessionsSummaryResponseDto from
+// GET /api/v1/analytics/voice-latency/sessions/summary.
+export interface VoiceLatencySessionsSummary extends VoiceLatencySessionStages {
+  sessionCount: number;
+  turnCount: number;
+  window: AnalyticsWindow;
+}
+
+// VoiceLatencyByScenarioRowDto from GET /api/v1/analytics/voice-latency/by-scenario.
+// "Which simulations are slow right now" (one row per simulation, worst-first),
+// distinct from VoiceLatencySessionRow ("this simulation's worst sessions").
+// Each row is that simulation's single MOST RECENT session, not a
+// whole-window average — see the backend repository method's doc-comment.
+export interface VoiceLatencyByScenarioRow extends VoiceLatencySessionStages {
+  scenarioId: number;
+  scenarioTitle: string;
+  /** When this simulation's most recent session started. */
+  occurredAt: string | null;
+  turnCount: number;
+}
+
+export interface VoiceLatencyByScenarioResponse {
+  rows: VoiceLatencyByScenarioRow[];
+  window: AnalyticsWindow;
+  /** True if the ranking's tail was cut by the backend's defensive cap. */
+  truncated: boolean;
+}
+
+// AgentJoinReliabilityResponseDto from GET /api/v1/analytics/agent-join-reliability.
+export interface AgentJoinReliabilityPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  totalSessions: number;
+  joinFailures: number;
+  failureRatePct: number;
+  midSessionDrops: number;
+  joinLatencyP50Sec: number | null;
+  joinLatencyP95Sec: number | null;
+  conversations: number;
+  suspectedFreezes: number;
+  freezeRatePct: number;
+}
+
+export interface SessionOutcomeMix {
+  completed: number;
+  noConversation: number;
+  inProgress: number;
+}
+
+export interface AgentJoinReliabilityResponse {
+  range: AnalyticsRange;
+  window: AnalyticsWindow;
+  bucket: string;
+  points: AgentJoinReliabilityPoint[];
+  outcomeMix: SessionOutcomeMix;
+}
+
+// StartLatencyResponseDto from GET /api/v1/analytics/start-latency.
+// "Time to first word": agent job start -> the agent begins its opening dialogue.
+export interface StartLatencyPoint {
+  /** Bucket start (yyyy-mm-dd). */
+  bucket: string;
+  /** 'pipeline' (live, full segment breakdown) or 'transcript' (total only). */
+  source: string;
+  sessions: number;
+  /** Total start latency (ms). For pipeline rows the 4 segments below sum to this. */
+  avgMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  /** Mean segment durations (ms); 0 for transcript rows. */
+  configureMs: number;
+  initializeMs: number;
+  connectMs: number;
+  prepMs: number;
+}
+
+export interface StartLatencyResponse {
+  range: AnalyticsRange;
+  window: AnalyticsWindow;
+  /** Bucket granularity for this range ('day' | 'week' | 'month'). */
+  bucket: string;
+  /** Start-latency target line for reference (ms). */
+  targetMs: number;
+  points: StartLatencyPoint[];
+}
+
+// ConversationDriftResponseDto from GET /api/v1/analytics/conversation-drift.
+export interface DriftRateByLanguage {
+  language: string;
+  totalSessions: number;
+  driftedSessions: number;
+  /** driftedSessions / totalSessions, 0..1. */
+  driftRate: number;
+}
+
+export interface DriftCount {
+  /** category value (topic / coherence / attribution / failure / STT). */
+  key: string;
+  /** distinct sessions with >=1 turn in this category. */
+  count: number;
+}
+
+/** Drift rate grouped by an experiment dimension (model / provider / prompt version). */
+export interface DriftRateByDimension {
+  /** dimension value, or 'unknown' if not yet captured for that session. */
+  key: string;
+  totalSessions: number;
+  driftedSessions: number;
+  driftRate: number;
+}
+
+export interface DriftSummary {
+  totalSessions: number;
+  driftedSessions: number;
+  driftRate: number;
+}
+
+export interface DriftHistogramBin {
+  turn: number;
+  sessions: number;
+}
+
+export interface DriftTrendPoint {
+  bucket: string;
+  /** session source: 'pipeline' (live) | 'transcript' (historical) | 'unknown'. */
+  source: string;
+  totalSessions: number;
+  driftedSessions: number;
+  driftRate: number;
+}
+
+export interface ConversationDriftResponse {
+  range: AnalyticsRange;
+  window: AnalyticsWindow;
+  summary: DriftSummary;
+  driftRateByLanguage: DriftRateByLanguage[];
+  attributionMix: DriftCount[];
+  failureModeBreakdown: DriftCount[];
+  kindsOfDrift: DriftCount[];
+  rootCause: DriftCount[];
+  topicMix: DriftCount[];
+  coherenceMix: DriftCount[];
+  sttGarbleMix: DriftCount[];
+  sttErrorTypeMix: DriftCount[];
+  firstDriftTurnHistogram: DriftHistogramBin[];
+  driftTrend: DriftTrendPoint[];
+  driftRateByModel: DriftRateByDimension[];
+  driftRateBySttModel: DriftRateByDimension[];
+  driftRateByPromptVersion: DriftRateByDimension[];
+  // Per scenario-version comparison; populated only when a scenarioId is set.
+  driftRateByScenarioVersion: DriftRateByDimension[];
+}
+
+// TokenConsumptionResponseDto from GET /api/v1/analytics/token-consumption.
+export interface TokenConsumptionPoint {
+  /** AI service: 'llm' | 'stt' | 'tts'. */
+  service: string;
+  /** Model id (LLM/STT) or voice/model id (TTS). */
+  model: string;
+  /** Provider, e.g. 'openai' | 'anthropic' | 'deepgram' | 'elevenlabs'. */
+  provider: string;
+  /** Task/operation that consumed the resource (LlmTask value). */
+  task: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Cached/prompt-cache tokens (subset of prompt). */
+  cachedTokens: number;
+  /** STT billable audio duration (ms). */
+  audioMs: number;
+  /** TTS billable synthesized characters. */
+  characters: number;
+  /** Number of calls in this slice. */
+  calls: number;
+  /** Estimated USD cost for this (service × model × task) slice. */
+  estimatedCostUsd: number;
+  /** false when the row has no pricing entry (cost shown as 0). */
+  priced: boolean;
+}
+
+export interface TokenConsumptionResponse {
+  range: AnalyticsRange;
+  window: AnalyticsWindow;
+  totalEstimatedCostUsd: number;
+  totalTokens: number;
+  points: TokenConsumptionPoint[];
+}
+
+/** Async drift-backfill job state (POST/GET conversation-drift/backfill). */
+export interface DriftBackfillJob {
+  jobId: string;
+  /** queued | running | done | error */
+  status: string;
+  total: number;
+  processed: number;
+  judged: number;
+  drifted: number;
+  skipped: number;
+  error?: string | null;
+}
+
+// Settings types
+export interface AppSettings {
+  id: string;
+  key: string;
+  value: any;
+  type: "string" | "number" | "boolean" | "object";
+  description?: string;
+  updatedAt: string;
+}
+
+export interface UpdateSettingsRequest {
+  settings: Array<{
+    key: string;
+    value: any;
+  }>;
+}
+
+export interface ApiResponse<T = any> {
+  data: T;
+  message?: string;
+  success: boolean;
+}
+
+export interface ApiError {
+  message: string;
+  status: number;
+  data?: any;
+}
+
+export interface GetProfileUrlRequest {
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}
+export interface GetProfileUrlResponse {
+  presignedUrl: string;
+  profileImageUrl: string;
+}
+
+export interface profileUrlRequest {
+  profileImageUrl: string;
+}
+
+// ---------------------------------------------------------------------------
+// Language-quality evaluation — LanguageQualityResponseDto from
+// GET /v1/analytics/language-quality. Categorized, severity-weighted error
+// rates only; there is deliberately NO scalar quality score anywhere.
+// ---------------------------------------------------------------------------
+
+export interface LanguageDimensionErrorRate {
+  dimension: string;
+  layer: string; // comprehension | content | appropriateness
+  nTurns: number;
+  minorCount: number;
+  majorCount: number;
+  criticalCount: number;
+  weightedRatePer100: number;
+  dominantCategory: string | null;
+}
+
+export interface LanguageRateByLanguage {
+  language: string;
+  sessionsJudged: number;
+  nTurns: number;
+  weightedRatePer100: number;
+}
+
+/** One row of the per-language performance overview (all-languages view). */
+export interface LanguageOverviewRow {
+  language: string;
+  sessionsJudged: number;
+  nTurns: number;
+  weightedRatePer100: number;
+  scriptFidelityPct: number | null;
+  roundTripWerPct: number | null;
+  garbledInputPct: number;
+  worstDimension: string | null;
+  worstDimensionRatePer100: number;
+}
+
+export interface LanguageCategoryCount {
+  dimension: string;
+  category: string;
+  count: number;
+  weighted: number;
+}
+
+export interface LanguageIsolationBasisCount {
+  basis: string;
+  count: number;
+}
+
+export interface LanguageErrorLogRow {
+  scenarioSessionId: string;
+  turnIndex: number;
+  language: string | null;
+  dimension: string;
+  category: string;
+  severity: string;
+  isolationBasis: string | null;
+  evidenceQuote: string | null;
+  reasoning: string | null;
+  aiText: string | null;
+  occurredAt: string | null;
+}
+
+export interface LanguageRateByExperiment {
+  value: string | null;
+  sessionsJudged: number;
+  nTurns: number;
+  weightedRatePer100: number;
+  /** changed_from_prev (scenario versions only): config elements that differ
+   *  from the parent version. >1 = not a one-variable experiment. */
+  changedFromPrev?: string[];
+}
+
+export interface LanguageEvalReference {
+  name: string;
+  filters: Record<string, string | null | undefined>;
+  pinnedAt: string;
+}
+
+export interface LanguageDimensionDelta {
+  dimension: string;
+  delta: number;
+  referenceRatePer100: number;
+}
+
+export interface LanguageLayerTrendPoint {
+  bucket: string;
+  layer: string;
+  nTurns: number;
+  weightedRatePer100: number;
+}
+
+export interface LanguageWerByVoice {
+  voiceId: string | null;
+  voiceName: string | null;
+  sessions: number;
+  avgRoundTripWerPct: number;
+}
+
+export interface LanguageObjectiveMetrics {
+  /** null = not yet measured (Phase 2) — render as masked, never as 0. */
+  scriptFidelityPct: number | null;
+  roundTripWerPct: number | null;
+}
+
+/** How far a weak-metric series can be trusted. */
+export type WeakMetricState = "measured" | "partial" | "none";
+
+export interface WeakMetricPoint {
+  bucket: string;
+  numerator: number;
+  denominator: number;
+  /** null when the denominator is 0 — an empty bucket, not a clean one. */
+  value: number | null;
+  /**
+   * Denominator below the platform's thin-sample minimum. The bucket is real —
+   * it stays in tables — but it is left off the plot and never supplies the
+   * delta, because a two-session week drawn beside a ninety-seven-session one
+   * became the headline.
+   */
+  sparse: boolean;
+}
+
+export interface WeakMetricSeries {
+  /** One plain line saying what this counts — the card's caption. */
+  description: string;
+  id: string;
+  label: string;
+  unit: "percent" | "per100turns" | "ratio" | "count" | string;
+  state: WeakMetricState;
+  /** null = no good direction; report movement without a verdict. */
+  lowerIsBetter: boolean | null;
+  /** The caveat needed to read this series honestly; rendered, not hidden. */
+  caveat: string | null;
+  points: WeakMetricPoint[];
+  latest: number | null;
+  previous: number | null;
+}
+
+export interface WeakMetricGroup {
+  id: string;
+  label: string;
+  description: string;
+  state: WeakMetricState;
+  series: WeakMetricSeries[];
+}
+
+export interface WeakMetricScenarioRow {
+  scenarioId: number;
+  title: string | null;
+  language: string | null;
+  sessions: number;
+  turns: number;
+  slips: number;
+  rate: number;
+}
+
+export interface JudgeVersionPin {
+  judgeModel: string;
+  judgePromptVersion: string;
+}
+
+export interface WeakMetricTurnBand {
+  /** A quartile key ("q1".."q4") or a flag value ("yes"/"fired"). */
+  band: string;
+  /**
+   * Observed range of the banded metric. Measured from the filtered data rather
+   * than a fixed threshold, so the edges move with the product instead of going
+   * stale. Null on a yes/no condition.
+   */
+  lo: number | null;
+  hi: number | null;
+  turns: number;
+  faults: number;
+  rate: number;
+}
+
+export interface WeakMetricTurnFactor {
+  id: string;
+  label: string;
+  description: string;
+  /** How to format a band edge. */
+  unit: "ms" | "count" | "flag" | string;
+  /** Worst band rate minus best. How much this condition discriminates. */
+  spread: number;
+  bands: WeakMetricTurnBand[];
+}
+
+export interface WeakMetricTurnConditions {
+  totalTurns: number;
+  baselineRate: number | null;
+  /** Most discriminating first. */
+  factors: WeakMetricTurnFactor[];
+}
+
+export interface WeakMetricsResponse {
+  metricsVersion: string;
+  parameters: Record<string, number>;
+  /** Drift pin, kept for compatibility — prefer judgeVersions. */
+  judgeModel: string | null;
+  judgePromptVersion: string | null;
+  /**
+   * One pin per judge family. Three judges feed this tab and they version
+   * independently, so a single number cannot describe all of them.
+   */
+  judgeVersions: {
+    drift: JudgeVersionPin | null;
+    language: JudgeVersionPin | null;
+    groundedness: JudgeVersionPin | null;
+  };
+  bucket: string;
+  start: string;
+  /**
+   * Start of the bucket containing today, or null when the window ended in the
+   * past. Still accruing, so it is left off plots and kept in the expanded
+   * view — the same contract `window.inProgressBucket` carries elsewhere.
+   */
+  inProgressBucket: string | null;
+  groups: WeakMetricGroup[];
+  worstScenarios: WeakMetricScenarioRow[];
+  /**
+   * What was measurably different about the turns a judge faulted. Unlike every
+   * other cut on this tab it compares turns against other turns in the SAME
+   * sessions, so a shift in traffic mix cannot move it.
+   */
+  turnConditions: WeakMetricTurnConditions;
+  scoreLengthCorrelation: number | null;
+  filterOptions: {
+    languages: string[];
+    models: string[];
+    /** Only versions with judged data behind them — see the backend note. */
+    promptVersions: string[];
+    scenarios: Array<{ id: number; title: string | null }>;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Thinking-filler quality — FillerQualityPointDto[] from
+// GET /v1/analytics/filler-quality.
+//
+// Read the denominator before reading anything else: every `Per100` field is
+// per 100 PLAYED FILLERS, not per session and not per turn. A session that
+// played forty fillers and one that played two are not comparable units, and
+// a turn can play two fillers when a continuation fires.
+//
+// Rates only, no scalar quality score — the judge emits labelled findings and
+// these rates are computed in SQL at read time, so a weighting change never
+// means re-judging the corpus.
+// ---------------------------------------------------------------------------
+
+export interface FillerQualityPoint {
+  /** Bucket start date, ISO yyyy-mm-dd. */
+  bucket: string;
+  /** Played fillers judged in this bucket — the denominator for every rate. */
+  fillersJudged: number;
+  /**
+   * "Did it sound like this character." Excludes findings conditioned out
+   * because the scenario configured no character voice; those are
+   * `unconfiguredStylePer100`.
+   */
+  characterFitPer100: number | null;
+  /** "Did it fit what the learner just said." */
+  contextFitPer100: number | null;
+  /**
+   * The filler committed to something the real reply — generated separately
+   * and afterwards — could then contradict.
+   */
+  safetyPer100: number | null;
+  /**
+   * Findings set aside because the character had no configured style. A
+   * CONFIGURATION gap, not a model failure: counting these in the rates above
+   * would make a push to configure more scenarios read as a regression.
+   */
+  unconfiguredStylePer100: number | null;
+  /** Share of played fillers that repeated a recent phrase. */
+  repeatedPct: number | null;
+  /**
+   * Distinct phrases over total played. A session can mask every gap perfectly
+   * and still sound like a soundboard; only this shows it.
+   */
+  distinctPhraseRatio: number | null;
+}
+
+export type FillerQualityResponse = FillerQualityPoint[];
+
+export interface LanguageQualityResponse {
+  judgeModel: string | null;
+  judgePromptVersion: string | null;
+  sessionsJudged: number;
+  turnsJudged: number;
+  turnsGarbled: number;
+  totalWeightedRatePer100: number;
+  errorRateByDimension: LanguageDimensionErrorRate[];
+  rateByLanguage: LanguageRateByLanguage[];
+  languageOverview: LanguageOverviewRow[];
+  categoryBreakdown: LanguageCategoryCount[];
+  isolationBasisBreakdown: LanguageIsolationBasisCount[];
+  errorLog: LanguageErrorLogRow[];
+  objectiveMetrics: LanguageObjectiveMetrics;
+  layerTrend: LanguageLayerTrendPoint[];
+  rateByScenarioVersion: LanguageRateByExperiment[];
+  rateByPromptVersion: LanguageRateByExperiment[];
+  rateByModel: LanguageRateByExperiment[];
+  werByVoice: LanguageWerByVoice[];
+  reference: LanguageEvalReference | null;
+  deltaByDimension: LanguageDimensionDelta[];
+}

@@ -1,0 +1,245 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PostCallSummary Component > Snapshot Testing > should match snapshot for BoxBreathing section 1`] = `
+<DocumentFragment>
+  <div
+    data-testid="browser-router"
+  >
+    <div
+      class="h-[100dvh] w-full px-4 lg:px-0 lg:w-[50%] pt-6 mx-auto flex flex-col gap-4 items-center bg-white"
+    >
+      <div
+        class="w-full border-b border-[#e3dbce]"
+      >
+        <div
+          class="flex flex-wrap items-center gap-2 font-secondary justify-between"
+        >
+          <div
+            class="flex items-center gap-2"
+          >
+            <button
+              aria-label="summaryLoading.backToSessionLogs"
+              type="button"
+            >
+              <svg
+                fill="none"
+                height="48"
+                viewBox="0 0 48 48"
+                width="48"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <g
+                  clip-path="url(#clip0_2523_4287)"
+                >
+                  <rect
+                    fill="#faf9f5"
+                    height="40"
+                    rx="20"
+                    width="40"
+                    x="4"
+                    y="4"
+                  />
+                  <path
+                    d="M19.825 25L25.425 30.6L24 32L16 24L24 16L25.425 17.4L19.825 23H32V25H19.825Z"
+                    fill="#3d3a34"
+                  />
+                </g>
+                <defs>
+                  <clippath
+                    id="clip0_2523_4287"
+                  >
+                    <rect
+                      fill="white"
+                      height="40"
+                      rx="20"
+                      width="40"
+                      x="4"
+                      y="4"
+                    />
+                  </clippath>
+                </defs>
+              </svg>
+            </button>
+            <span
+              class="text-2xl md:text-4xl"
+            >
+              postCallSummary.header.session
+            </span>
+            <span
+              class="text-2xl md:text-4xl font-semibold italic"
+            >
+              postCallSummary.header.summary
+            </span>
+          </div>
+          <div
+            class="flex items-center gap-2"
+          />
+        </div>
+        <div
+          data-testid="tabs"
+        >
+          <button
+            class="active"
+            data-testid="tab-Box breathing"
+          >
+            Return to Self
+          </button>
+          <button
+            class=""
+            data-testid="tab-Session summary"
+          >
+            Session summary
+          </button>
+        </div>
+      </div>
+      <div
+        class="h-fit overflow-hidden w-full"
+        data-testid="motion-div"
+        layout="position"
+        layoutid="content-container"
+        transition="[object Object]"
+      >
+        <div
+          class="flex flex-col gap-4"
+          data-testid="motion-div"
+        >
+          <div
+            data-testid="stress-buster-step"
+          >
+            <button
+              data-testid="proceed-btn"
+            >
+              Proceed
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`PostCallSummary Component > Snapshot Testing > should match snapshot for SessionSummary section 1`] = `
+<DocumentFragment>
+  <div
+    data-testid="browser-router"
+  >
+    <div
+      class="h-[100dvh] w-full px-4 lg:px-0 lg:w-[50%] pt-6 mx-auto flex flex-col gap-4 items-center bg-white"
+    >
+      <div
+        class="w-full border-b border-[#e3dbce]"
+      >
+        <div
+          class="flex flex-wrap items-center gap-2 font-secondary justify-between"
+        >
+          <div
+            class="flex items-center gap-2"
+          >
+            <button
+              aria-label="summaryLoading.backToSessionLogs"
+              type="button"
+            >
+              <svg
+                fill="none"
+                height="48"
+                viewBox="0 0 48 48"
+                width="48"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <g
+                  clip-path="url(#clip0_2523_4287)"
+                >
+                  <rect
+                    fill="#faf9f5"
+                    height="40"
+                    rx="20"
+                    width="40"
+                    x="4"
+                    y="4"
+                  />
+                  <path
+                    d="M19.825 25L25.425 30.6L24 32L16 24L24 16L25.425 17.4L19.825 23H32V25H19.825Z"
+                    fill="#3d3a34"
+                  />
+                </g>
+                <defs>
+                  <clippath
+                    id="clip0_2523_4287"
+                  >
+                    <rect
+                      fill="white"
+                      height="40"
+                      rx="20"
+                      width="40"
+                      x="4"
+                      y="4"
+                    />
+                  </clippath>
+                </defs>
+              </svg>
+            </button>
+            <span
+              class="text-2xl md:text-4xl"
+            >
+              postCallSummary.header.session
+            </span>
+            <span
+              class="text-2xl md:text-4xl font-semibold italic"
+            >
+              postCallSummary.header.summary
+            </span>
+          </div>
+          <div
+            class="flex items-center gap-2"
+          />
+        </div>
+        <div
+          data-testid="tabs"
+        >
+          <button
+            class=""
+            data-testid="tab-Box breathing"
+          >
+            Return to Self
+          </button>
+          <button
+            class="active"
+            data-testid="tab-Session summary"
+          >
+            Session summary
+          </button>
+        </div>
+      </div>
+      <div
+        class="h-fit overflow-hidden w-full"
+        data-testid="motion-div"
+        layout="position"
+        layoutid="content-container"
+        transition="[object Object]"
+      >
+        <div
+          class="flex flex-col gap-4"
+          data-testid="motion-div"
+        >
+          <div
+            class="max-h-[calc(100dvh-350px)]"
+            data-testid="call-summary"
+          >
+            <div
+              data-testid="chat-id"
+            >
+              123
+            </div>
+            <button
+              data-testid="post-process-btn"
+            >
+              Post Process
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

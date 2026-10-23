@@ -1,0 +1,54 @@
+import { Room } from "livekit-client";
+
+import type { MicrophoneError } from "@ally-ui-mono/ui-shared";
+import { RoomStatus } from "@types";
+
+export type AgentTurnStatus = "thinking" | "speaking" | "user_turn";
+
+export interface LiveKitEvent {
+  version: string;
+  type?: string;
+  state?: string;
+  data: {
+    score: number | null;
+    emoji: string;
+    message: string;
+    detected_event_ids: string[];
+  };
+  timestamp: string;
+}
+
+/**
+ * One live supervisor note, as published by ally-ai-learn on the "supervisor"
+ * data-channel topic. `seq` is 1-based per session and is what the client
+ * de-duplicates on, since LiveKit can redeliver a reliable packet.
+ */
+export interface SupervisorNote {
+  note: string;
+  seq: number;
+  turn_index?: number;
+  timestamp?: string;
+}
+
+export interface UseLiveKitRoomReturn {
+  error: string | null;
+  /** The room connected but the browser refused the microphone. */
+  microphoneError: MicrophoneError | null;
+  /** The room connected but no agent participant ever joined within the cap. */
+  agentJoinTimedOut: boolean;
+  /**
+   * How many supervisor hints the `seq` numbers prove never arrived (a gap,
+   * e.g. seq 5 then seq 8). Distinct from de-dup, which handles a redelivery.
+   */
+  missedSupervisorNoteCount: number;
+  events: LiveKitEvent[];
+  handleRetryConnection: () => void;
+  room: Room;
+  roomStatus: RoomStatus;
+  score: number;
+  startTime: Date;
+  roomData: any;
+  detectedEventIds: string[];
+  agentTurnStatus: AgentTurnStatus;
+  supervisorNotes: SupervisorNote[];
+}

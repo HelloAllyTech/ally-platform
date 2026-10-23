@@ -1,0 +1,366 @@
+export const ApiEndpoints = {
+  AUTH: {
+    SIGNUP: "/v1/auth/signup",
+    LOGIN: "/v1/auth/login",
+    GET_USER: "/v1/users/me",
+    COMPLETE_PROFILE: "/v1/users/me/complete-profile",
+    GENERATE_OTP: "/v2/auth/generate-otp",
+    VERIFY_OTP: "/v2/auth/verify-otp",
+    MAGIC_LINK_VERIFY: "/v1/auth/magic-link/verify",
+    REFRESH: "/v1/auth/refresh",
+    TERMS_AND_AGREEMENT: "/v1/users/terms-and-agreement-status",
+    GOOGLE_SIGN_IN: "/v1/auth/google",
+    PROFILE_IMAGE_URL: "/v1/users/profile-image-url",
+    PROFILE_IMAGE: "/v1/users/profile-image",
+    LOGO_URL: "/v1/users/tenant",
+  },
+  AUTHORIZATION: {
+    GET_PERMISSIONS: "/v1/authorization/permissions",
+  },
+  ANALYTICS: {
+    GET_DASHBOARD: "/v1/analytics/dashboard",
+    GET_COUNSELLOR_STATS: "/v1/analytics/counselor-stats",
+    GET_ORGANIZATION_METRICS: "/v1/tenant-analytics/organization-metrics",
+    GET_LEARNER_USAGE_TABLE: "/v1/tenant-analytics/learner-usage",
+    GET_COURSE_USAGE_TABLE: "/v1/tenant-analytics/course-usage",
+    // Template functions for dynamic endpoints
+    LEARNER_SCENARIO_ATTEMPTS: (userId: number) =>
+      `/v1/learn/admin/learners/${userId}/scenario-attempts`,
+    RESET_BRANCHING_ATTEMPTS: (trackItemId: string) =>
+      `/v1/learn/admin/tracks/items/${trackItemId}/branching-reset`,
+  },
+  AUDIO_CALL: {
+    GET_WAITING_CLIENTS: "/v1/users/waiting-list",
+    GET_CLIENT_CHAT: "/v1/chats/my-chat",
+    GET_COUNSELLOR_CHAT: "/v1/chats/counsellor-chat",
+    GET_NUDGE_STATUS: "/v1/settings/nudge-status",
+    // Template functions for dynamic endpoints
+    CANCEL_CHAT: (chatId: number) => `/v1/chats/${chatId}/cancel`,
+    END_CHAT: (chatId: number) => `/v1/chats/${chatId}/end`,
+    MESSAGE_FEEDBACK: (messageId: number) => `/v1/chats/messages/${messageId}/feedback`,
+    UPDATE_FEEDBACK: (feedbackId: number) => `/v1/chats/messages/feedback/${feedbackId}`,
+  },
+  CALLS: {
+    GET_CALL_LOGS: "/v1/chats/call-logs",
+    GET_ADMIN_CALL_LOGS: "/v1/chats/call-logs-summary",
+    GET_COUNSELLORS: "/v1/chats/counselors",
+    GET_CALL_TAGS: "/v1/chats/tags",
+    GET_CHAT_TYPES: "/v1/settings/chat-types",
+    GET_AUDIO_UPLOAD_URL: "/v1/chats/upload-url",
+    CREATE_NOTE: "/v1/chats/note",
+    GENERATE_NOTE_FROM_AUDIO: "/v1/chats/note/generate-from-audio",
+    SAVE_NOTE_TRANSCRIPT: (chatId: number) => `/v1/chats/${chatId}/transcript`,
+    CANCEL_AUDIO_UPLOAD: "/v1/chats/cancel-upload",
+    PROCESS_AUDIO_UPLOAD: "/v1/chats/process-audio-upload",
+    DELETE_CALL_LOG: (chatId: number) => `/v1/chats/${chatId}`,
+    ARCHIVE_CALL_LOG: (chatId: number) => `/v1/chats/call-logs/${chatId}/archive`,
+  },
+  CALL_SUMMARY: {
+    GET_SUMMARY_FIELDS: "/v1/settings/summary-fields",
+    GET_CALL_SUMMARY: "/v1/chats",
+    ENHANCE_CONTENT: "/v1/chats/enhance",
+    GET_TAG_POSITIVITY_RATINGS: "/v1/chats/summary/tag-positivity-ratings",
+    GET_LOCATIONS: "/v1/places",
+    SEARCH_LOCATIONS: "/v1/places/search",
+    UPDATE_CALL_INFO: (chatId: number) => `/v1/chats/${chatId}/call-info`,
+    UPDATE_CALL_SUMMARY: (chatId: number) => `/v1/chats/${chatId}/call-details`,
+    RETRY_SUMMARY: (chatId: number) => `/v1/chats/${chatId}/retry-summary`,
+    EXPORT_CALL_SUMMARY: (chatId: number) => `/v1/chats/${chatId}/export-summary`,
+    GET_TRANSCRIPT: (chatId: number) => `/v1/chats/${chatId}/messages`,
+    UPDATE_CALL_SUMMARY_NOTES: (chatId: string) => `/v1/chats/${chatId}/notes`,
+    SUBMIT_FEEDBACK: (chatId: string) => `/v1/chats/${chatId}/summary-feedback`,
+    SUMMARY_FIELDS: "/v1/settings/summary-fields",
+  },
+  SEARCH: {
+    GET_CATEGORIES: "/v1/reference-document/categories",
+    GET_SEARCH_RESULTS: "/v1/reference-document/search",
+  },
+  LEARN: {
+    END_SIMULATION: (sessionId: string) => `/v1/learn/scenario-session/${sessionId}/end`,
+    START_SIMULATION: "/v1/learn/scenario-session-start",
+    GET_SCENARIOS: "/v1/learn/scenarios/public",
+    GET_SCENARIOS_PRIVATE: "/v2/learn/scenarios",
+    GET_SCENARIO: (scenarioId: number) => `/v1/learn/scenarios/${scenarioId}`,
+    GET_SCENARIO_PUBLIC: (scenarioId: number) => `/v1/learn/scenarios/${scenarioId}/public`,
+    GET_SCENARIO_PATHWAYS: "/v1/learn/scenario-paths",
+    GET_SCENARIO_PATHWAY_DETAILS: (pathwayId: string) => `/v1/learn/scenario-paths/${pathwayId}`,
+    GET_SIMULATION_LOGS: "/v1/learn/scenario-sessions",
+    GET_ADMIN_SIMULATION_LOGS: "/v1/learn/admin-scenario-sessions",
+    GET_ADMIN_SIMULATION_LOG_FILTERS: "/v1/learn/admin-scenario-session-filters",
+    GET_SIMULATION_SUMMARY: (sessionId: string) => `/v1/learn/scenario-session/${sessionId}`,
+    SUBMIT_SIMULATION_FEEDBACK: (sessionId: string) =>
+      `/v1/learn/scenario-session/${sessionId}/feedback`,
+    SUBMIT_DEBRIEF_FEEDBACK: (sessionId: string) =>
+      `/v1/scenario-sessions/${sessionId}/debrief-feedback`,
+    GET_SIMULATION_TRANSCRIPT: (sessionId: string) =>
+      `/v1/learn/scenario-session/${sessionId}/messages`,
+    GET_UP_COMING_SIMULATION: (sessionId: string) =>
+      `/v1/learn/scenario-paths/${sessionId}/upcoming-scenario`,
+    START_PATHWAY_SIMULATION: (pathwayId: string) =>
+      `/v1/learn/scenario-paths/${pathwayId}/create-session`,
+    SCENARIO_SESSION_BY_PATH_ITEM: (pathSessionItemId: string) =>
+      `/v1/learn/scenario-session/scenario-path-session-item/${pathSessionItemId}`,
+    GET_AVAILABLE_LANGUAGES: "/v1/learn/scenario-languages",
+    GET_SCENARIO_CASES: "/v1/learn/cases",
+    GET_SCENARIO_CASE_DETAILS: (caseId: string) => `/v1/learn/cases/${caseId}`,
+    SCENARIO_SESSION_BY_CASE_ITEM: (caseSessionItemId: string) =>
+      `/v1/learn/scenario-session/case-session-item/${caseSessionItemId}`,
+    START_CASE_SIMULATION: (caseId: string) => `/v1/learn/cases/${caseId}/create-session`,
+    GET_UP_COMING_CASE_SIMULATION: (caseSessionItemId: string) =>
+      `/v1/learn/cases/${caseSessionItemId}/upcoming-scenario`,
+    GET_SIMULATION_CHECKLIST: (sessionId: string) =>
+      `/v1/learn/scenario-session/${sessionId}/event-checklist`,
+    GET_SIMULATION_SKILLS: (sessionId: string) => `/v1/learn/scenario-session/${sessionId}/skills`,
+    CHAT_STREAM: (sessionId: string) => `/v1/learn/scenario-sessions/${sessionId}/chat/stream`,
+    CHAT_HISTORY: (sessionId: string) => `/v1/learn/scenario-sessions/${sessionId}/chat/history`,
+    GET_AUDIO_URL: (sessionId: string) => `/v1/learn/scenario-session/${sessionId}/recording`,
+  },
+  // Track 2.0 learner endpoints (multi-component learning tracks)
+  TRACKS: {
+    GET_TRACKS: "/v1/learn/tracks",
+    GET_TRACK_DETAIL: (trackId: string) => `/v1/learn/tracks/${trackId}`,
+    /** No login: the outline behind a course's public share link. */
+    PUBLIC_OUTLINE: (trackId: string) => `/v1/learn/tracks/${trackId}/public`,
+    /** Can the signed-in learner take this course — `{hasAccess, enrolled, reason}`. */
+    ACCESS: (trackId: string) => `/v1/learn/tracks/${trackId}/access`,
+    GET_PROGRESS: (trackId: string) => `/v1/learn/tracks/${trackId}/progress`,
+    ENROLL: (trackId: string) => `/v1/learn/tracks/${trackId}/enroll`,
+    LANGUAGES: (trackId: string) => `/v1/learn/tracks/${trackId}/languages`,
+    SET_LANGUAGE: (trackId: string) => `/v1/learn/tracks/${trackId}/language`,
+    GET_NEXT_ITEM: (trackId: string) => `/v1/learn/tracks/${trackId}/next-item`,
+    START_ITEM: (itemId: string) => `/v1/learn/tracks/items/${itemId}/start`,
+    ARTICLE_READ: (itemId: string) => `/v1/learn/tracks/items/${itemId}/article-read`,
+    /** Per article resource: must it open in a new tab instead of embedded. */
+    RESOURCE_EMBEDDABILITY: (itemId: string) =>
+      `/v1/learn/tracks/items/${itemId}/resources/embeddability`,
+    ARTICLE_QUESTION_ANSWER: (itemId: string, questionId: string) =>
+      `/v1/learn/tracks/items/${itemId}/article-questions/${questionId}/answer`,
+    VIDEO_PROGRESS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/video-progress`,
+    QUIZ_ATTEMPTS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/quiz-attempts`,
+    QUIZ_REGRADE: (itemId: string, attemptId: string) =>
+      `/v1/learn/tracks/items/${itemId}/quiz-attempts/${attemptId}/regrade`,
+    INTERJECTION_ANSWER: (itemId: string, interjectionId: string) =>
+      `/v1/learn/tracks/items/${itemId}/interjections/${interjectionId}/answer`,
+    GAME_RESULT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/game-result`,
+    BUCKET_SORT_PLACE: (itemId: string) => `/v1/learn/tracks/items/${itemId}/bucket-sort/place`,
+    BUCKET_SORT_RESTART: (itemId: string) => `/v1/learn/tracks/items/${itemId}/bucket-sort/restart`,
+    BRANCHING_RESULT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/branching-result`,
+    JOURNAL_DRAFT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal`,
+    JOURNAL_SUBMIT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal/submit`,
+    ANNOTATION_ATTEMPTS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/annotation-attempts`,
+  },
+  // Course discussions — the thread beneath a Track 2.0 item.
+  COURSE_DISCUSSION: {
+    GET: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion`,
+    CREATE_POST: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion/posts`,
+    LOCK_DISCUSSION: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion/lock`,
+    REPLY: (postId: string) => `/v1/learn/discussion/posts/${postId}/replies`,
+    POST: (postId: string) => `/v1/learn/discussion/posts/${postId}`,
+    LOCK_POST: (postId: string) => `/v1/learn/discussion/posts/${postId}/lock`,
+  },
+  SIMULATION: {
+    SIMULATION_CREDITS: "/v1/simulation-credits",
+  },
+  USER: {
+    UPDATE_USER_PREFERENCES: "/v1/users/preferences",
+    GET_USER_PREFERENCES: "/v1/users/me/preferences",
+  },
+  LEADERBOARD: {
+    GET_LEADERBOARD: "/v1/community/leaderboard",
+    GET_CURRENT_USER: "/v1/community/leaderboard/my-rank",
+  },
+  PROGRESS: {
+    // Full dashboard payload: level state, lifetime totals and the ladder.
+    GET_PROGRESS: "/v1/progress/me",
+    // Level state only — for the persistent nav indicator, which mounts on every route.
+    GET_PROGRESS_SUMMARY: "/v1/progress/me/summary",
+    // One boolean about the caller's own org; readable by any authenticated user.
+    GET_PROGRESS_ENABLED: "/v1/progress/me/enabled",
+  },
+  PRACTICE_STREAK: {
+    GET_PRACTICE_STREAK: "/v1/community/practice-streak",
+    // Streak state without the heatmap cells — for callers that mount often
+    // (nav indicator, post-session) and don't need the timeline.
+    GET_PRACTICE_STREAK_SUMMARY: "/v1/community/practice-streak/summary",
+  },
+  REVIEWS: {
+    GET_REVIEWS: "/v1/scenario-session-reviews",
+    GET_SCRIBE_REVIEWS: "/v1/scribe-session-reviews",
+    GET_GENERAL_COMMENTS: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}/comments`,
+    GET_SCRIBE_GENERAL_COMMENTS: (reviewId: string) =>
+      `/v1/scribe-session-reviews/${reviewId}/comments`,
+    GET_GENERAL_COMMENTS_OVERVIEW: (reviewId: string) =>
+      `/v1/scenario-session-reviews/${reviewId}/comments-overview`,
+    GET_SCRIBE_GENERAL_COMMENTS_OVERVIEW: (reviewId: string) =>
+      `/v1/scribe-session-reviews/${reviewId}/comments-overview`,
+    GET_REVIEW_BY_ID: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}`,
+    GET_SCRIBE_REVIEW_BY_ID: (reviewId: string) => `/v1/scribe-session-reviews/${reviewId}`,
+    GET_REVIEW_DETAILS_AND_MESSAGES: (reviewId: string) =>
+      `/v1/scenario-session-reviews/${reviewId}/messages`,
+    GET_SCRIBE_REVIEW_DETAILS_AND_MESSAGES: (reviewId: string) =>
+      `/v1/scribe-session-reviews/${reviewId}/messages`,
+    CREATE_REVIEW: `/v1/scenario-session-reviews`,
+    CREATE_SCRIBE_REVIEW: `/v1/scribe-session-reviews`,
+    UPDATE_REVIEW: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}`,
+    UPDATE_SCRIBE_REVIEW: (scribeSessionId: number) =>
+      `/v1/scribe-session-reviews/${scribeSessionId}`,
+    CREATE_COMMENT: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}/comments`,
+    CREATE_SCRIBE_COMMENT: (reviewId: string) => `/v1/scribe-session-reviews/${reviewId}/comments`,
+    GET_REVIEW_THREADS: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}/threads`,
+    GET_SCRIBE_REVIEW_THREADS: (reviewId: string) =>
+      `/v1/scribe-session-reviews/${reviewId}/threads`,
+    ADD_REACTION: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}/reactions`,
+    ADD_SCRIBE_REACTION: (reviewId: string) => `/v1/scribe-session-reviews/${reviewId}/reactions`,
+    GET_REVIEW_REACTIONS: (reviewId: string) =>
+      `/v1/scenario-session-reviews/${reviewId}/reactions`,
+    GET_SCRIBE_REVIEW_REACTIONS: (reviewId: string) =>
+      `/v1/scribe-session-reviews/${reviewId}/reactions`,
+    GET_REVIEW_REACTIONS_COUNT: (reviewId: string) =>
+      `/v1/scenario-session-reviews/${reviewId}/reactions/count`,
+    GET_SCRIBE_REVIEW_REACTIONS_COUNT: (reviewId: string) =>
+      `/v1/scribe-session-reviews/${reviewId}/reactions/count`,
+    ADD_COMMENT_REACTION: (commentId: string) =>
+      `/v1/scenario-session-reviews/comments/${commentId}/reactions`,
+    ADD_SCRIBE_COMMENT_REACTION: (commentId: string) =>
+      `/v1/scribe-session-reviews/comments/${commentId}/reactions`,
+    TOGGLE_COMMENT_VISIBILITY: (commentId: string) =>
+      `/v1/scenario-session-reviews/comments/${commentId}/visibility`,
+    TOGGLE_SCRIBE_COMMENT_VISIBILITY: (commentId: string) =>
+      `/v1/scribe-session-reviews/comments/${commentId}/visibility`,
+    EDIT_COMMENT: (commentId: string) => `/v1/scenario-session-reviews/comments/${commentId}`,
+    EDIT_SCRIBE_COMMENT: (commentId: string) => `/v1/scribe-session-reviews/comments/${commentId}`,
+    DELETE_COMMENT: (commentId: string) => `/v1/scenario-session-reviews/comments/${commentId}`,
+    DELETE_SCRIBE_COMMENT: (commentId: string) =>
+      `/v1/scribe-session-reviews/comments/${commentId}`,
+    GET_COMMENT_REPLIES: (commentId: string) =>
+      `/v1/scenario-session-reviews/comments/${commentId}/replies`,
+    GET_SCRIBE_COMMENT_REPLIES: (commentId: string) =>
+      `/v1/scribe-session-reviews/comments/${commentId}/replies`,
+    GET_REVIEW_THREAD_COMMENTS: (threadId: string) =>
+      `/v1/scenario-session-reviews/threads/${threadId}/comments`,
+    GET_SCRIBE_REVIEW_THREAD_COMMENTS: (threadId: string) =>
+      `/v1/scribe-session-reviews/threads/${threadId}/comments`,
+    GET_UNREAD_COUNT: "/v1/scenario-session-reviews/unread-count",
+    GET_SCRIBE_UNREAD_COUNT: "/v1/scribe-session-reviews/unread-count",
+    MARK_READ: (reviewId: string) => `/v1/scenario-session-reviews/${reviewId}/mark-read`,
+    MARK_SCRIBE_READ: (reviewId: string) => `/v1/scribe-session-reviews/${reviewId}/mark-read`,
+  },
+  BADGES: {
+    GET_AVAILABLE_BADGES: "/v1/badges/me/available",
+    GET_MY_BADGES: "/v1/badges/me",
+    GET_BADGES_COUNT: "/v1/badges/me/count",
+    UPDATE_BADGE_VIEW_STATUS: (badgeId: string) => `/v1/badges/me/${badgeId}/viewed`,
+  },
+  CUSTOM_FIELDS: {
+    GET_DEFINITIONS: "/v1/custom-fields/definitions",
+    CREATE_DEFINITION: "/v1/custom-fields/definitions",
+    REORDER_DEFINITIONS: "/v1/custom-fields/definitions/reorder",
+    UPDATE_DEFINITION: (id: string) => `/v1/custom-fields/definitions/${id}`,
+    DELETE_DEFINITION: (id: string) => `/v1/custom-fields/definitions/${id}`,
+    GET_VALUES: (chatId: number) => `/v1/custom-fields/values/${chatId}`,
+    UPSERT_VALUES: (chatId: number) => `/v1/custom-fields/values/${chatId}`,
+  },
+  SETTINGS: {
+    GET_SUMMARY_SECTIONS: "/v1/settings/summary-sections",
+    GET_CUSTOM_FIELD_TYPES: "/v1/settings/custom-field-types",
+    GET_CUSTOM_FIELDS_ENABLED: "/v1/settings/custom-fields-enabled",
+    GET_SCRIBE_NOTE_CREATION_ENABLED: "/v1/settings/scribe-note-creation-enabled",
+    GET_SCRIBE_VOICE_NOTE_ENABLED: "/v1/settings/scribe-voice-note-enabled",
+    TERMS: "/v1/settings/terms",
+    PRIVACY: "/v1/settings/privacy",
+  },
+  BLOG: {
+    // Public (ungated) blog reads for the /blog pages.
+    GET_PUBLIC_BLOGS: "/v1/blog/public",
+    GET_PUBLIC_BLOG_TAGS: "/v1/blog/public/tags",
+    GET_PUBLIC_BLOG_BY_SLUG: (slug: string) => `/v1/blog/public/${slug}`,
+  },
+  CHANGELOG: {
+    // Public (ungated) changelog reads for the /blog/changelog page.
+    GET_PUBLIC: "/v1/changelog/public",
+    // Lines changed per day across the Ally repos — the heatmap on that page.
+    GET_PUBLIC_CODE_ACTIVITY: "/v1/changelog/public/code-activity",
+  },
+  TOOLTIPS: {
+    GET_ACTIVE_TOOLTIPS: "/v1/tooltips/active",
+  },
+  NOTIFICATIONS: {
+    LIST: "/v1/notifications",
+    UNREAD_COUNT: "/v1/notifications/unread-count",
+    MARK_READ: (id: string) => `/v1/notifications/${id}/read`,
+    MARK_ALL_READ: "/v1/notifications/read-all",
+  },
+  PRODUCT_ROADMAP: {
+    // "Report a problem" — any logged-in app user, not just admin staff. Backend tags the
+    // resulting opportunity source='consumer'; see ally-be src/product-roadmap.
+    CREATE_BUG_REPORT: "/v1/product-roadmap/bug-reports",
+  },
+  // Character Library + interview agent (ADMIN, view+create only — see
+  // migration 1905000000000-AddTenantScopedCharacterLibrary). Own-tenant only:
+  // the backend row-scopes GET by the caller's tenant.
+  CHARACTER_LIBRARY: {
+    GET_CHARACTERS: "/v1/scenario-characters",
+    CREATE_CHARACTER: "/v1/scenario-characters",
+    CHARACTER_LIBRARY_ENABLED: "/v1/settings/character-library-enabled",
+    INTERVIEW_SESSIONS: "/v1/scenario-characters/interview/sessions",
+    INTERVIEW_SESSION: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}`,
+    INTERVIEW_SESSION_STREAM: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+  },
+  PRODUCT_UPDATES: {
+    // Public (ungated) feature-level product updates for the /blog/changelog page.
+    GET_PUBLIC: "/v1/product-updates/public",
+  },
+  PUBLIC_ROADMAP: {
+    // Public (ungated) roadmap cards for the /blog/roadmap page.
+    GET_PUBLIC: "/v1/public-roadmap",
+  },
+  // Text helpline — ally-be docs/text-helpline.md §5.
+  HELPLINE: {
+    // Public (no auth) and guest (talker guest token) — served by helplineGuestAPI,
+    // which never touches the user session.
+    PUBLIC_STATUS: (tenantCode: string) =>
+      `/v1/helpline/public/${encodeURIComponent(tenantCode)}/status`,
+    PUBLIC_SESSION: (tenantCode: string) =>
+      `/v1/helpline/public/${encodeURIComponent(tenantCode)}/session`,
+    GUEST_CHAT: "/v1/helpline/guest/chat",
+    GUEST_REFRESH: "/v1/helpline/guest/refresh",
+    GUEST_END: "/v1/helpline/guest/end",
+    GUEST_ERASE: "/v1/helpline/guest/erase",
+    GUEST_FEEDBACK: "/v1/helpline/guest/feedback",
+    // Listener / supervisor (user JWT).
+    ENABLED: "/v1/helpline/enabled",
+    ME: "/v1/helpline/me",
+    ME_PROFILE: "/v1/helpline/me/profile",
+    ME_PRESENCE: "/v1/helpline/me/presence",
+    LOBBY: "/v1/helpline/lobby",
+    CHATS: "/v1/helpline/chats",
+    CHAT: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}`,
+    CHAT_MESSAGES: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/messages`,
+    CHAT_CLAIM: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/claim`,
+    CHAT_END: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/end`,
+    CHAT_SUMMARY: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/summary`,
+    RISK_FLAG_ACK: (chatId: string, flagId: string) =>
+      `/v1/helpline/chats/${encodeURIComponent(chatId)}/risk-flags/${encodeURIComponent(flagId)}/ack`,
+    COPILOT_FEEDBACK: (chatId: string) =>
+      `/v1/helpline/chats/${encodeURIComponent(chatId)}/copilot-feedback`,
+    // Supervision (§5.3, §10).
+    CHAT_TRANSFER: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/transfer`,
+    CHAT_ASSIGN: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/assign`,
+    CHAT_TAKE_OVER: (chatId: string) =>
+      `/v1/helpline/chats/${encodeURIComponent(chatId)}/take-over`,
+    CHAT_WHISPER: (chatId: string) => `/v1/helpline/chats/${encodeURIComponent(chatId)}/whisper`,
+    CHAT_ALERT_SUPERVISOR: (chatId: string) =>
+      `/v1/helpline/chats/${encodeURIComponent(chatId)}/alert-supervisor`,
+    TALKER_BLOCK: (talkerId: string) =>
+      `/v1/helpline/talkers/${encodeURIComponent(talkerId)}/block`,
+    MONITOR: "/v1/helpline/monitor",
+    RISK_FLAGS: "/v1/helpline/risk-flags",
+    QA: "/v1/helpline/qa",
+    QA_MINE: "/v1/helpline/qa/mine",
+    QA_DETAIL: (chatId: string) => `/v1/helpline/qa/${encodeURIComponent(chatId)}`,
+    TEAM: "/v1/helpline/team",
+    TEAM_MEMBER: (userId: number) => `/v1/helpline/team/${encodeURIComponent(String(userId))}`,
+  },
+};

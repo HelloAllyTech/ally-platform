@@ -1,0 +1,58 @@
+export interface User {
+  profileImageUrl?: string;
+  email: string;
+  id: number;
+  name: string;
+  /**
+   * The single role the backend collapses a user's roles down to. Lossy for
+   * anyone holding more than one — read `roles` when testing for a specific
+   * role.
+   */
+  role: UserRole;
+  /** Every role the user holds. Absent on responses predating the field. */
+  roles?: UserRole[];
+  userId: number;
+  status: string;
+  // False for accounts created in bulk by an admin (no name yet); gates the
+  // user into the Complete Profile screen on first login.
+  profileCompleted?: boolean;
+}
+
+export enum UserRole {
+  COUNSELLOR = "COUNSELOR",
+  ADMIN = "ADMIN",
+  LEARNER = "LEARNER",
+  SCRIBE_REVIEWER = "SCRIBE_REVIEWER",
+  SIMULATION_REVIEWER = "SIMULATION_REVIEWER",
+  /**
+   * Additive role marking the account as an evaluator — it is shown the extra
+   * evaluation questions attached to particular screens and events, on top of
+   * whatever its real app role (LEARNER, COUNSELLOR, ...) already shows it.
+   *
+   * It therefore almost never arrives alone, and it never arrives as the
+   * collapsed `role` for an account that holds anything else. Test for it on
+   * `roles`, or better, gate the surface on the `evaluator:access` permission.
+   */
+  EVALUATOR = "EVALUATOR",
+  // Platform/admin-console roles. A consumer account can hold one of these
+  // alongside its consumer role (roles are additive on a single user record),
+  // so they arrive on `roles` here even though none of them can log *into*
+  // this app on their own — see ALLY_ADMIN_ROLES in @constants.
+  SUPER_ADMIN = "SUPER_ADMIN",
+  SUPER_DUPER_ADMIN = "SUPER_DUPER_ADMIN",
+  MULTI_TENANT_ADMIN = "MULTI_TENANT_ADMIN",
+  // Text helpline groups (ally-be docs/text-helpline.md §2). A LISTENER-only or
+  // HELPLINE_SUPERVISOR-only account has nothing in the app but the Helpline
+  // workspace, so the landing page must send it there.
+  LISTENER = "LISTENER",
+  HELPLINE_SUPERVISOR = "HELPLINE_SUPERVISOR",
+}
+
+export enum AppType {
+  ADMIN = "ADMIN",
+  APP = "APP",
+}
+
+export interface UserPreferences {
+  [key: string]: any;
+}

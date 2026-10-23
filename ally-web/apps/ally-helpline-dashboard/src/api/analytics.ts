@@ -1,0 +1,151 @@
+/**
+ * This module provides all analytics and dashboard-related API endpoints including:
+ * - Dashboard URL generation and management
+ * - Counsellor statistics and performance metrics
+ * - Analytics data retrieval and processing
+ */
+
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
+import {
+  GetCounsellorStatsRequest,
+  GetCounsellorStatsResponse,
+  GetCourseUsageTableRequest,
+  GetCourseUsageTableResponse,
+  GetDashboardUrlResponse,
+  GetDashboardsResponse,
+  GetLearnerUsageTableRequest,
+  GetLearnerUsageTableResponse,
+  LearnerScenarioAttempt,
+  GetOrganizationMetricsRequest,
+  GetOrganizationMetricsResponse,
+  ResetBranchingAttemptsRequest,
+} from "@types";
+
+import { baseAPI } from "./baseAPI";
+
+const analyticsAPI = baseAPI.injectEndpoints({
+  endpoints: builder => ({
+    /**
+     * Get dashboard URL by ID
+     * @param {Object} data - Dashboard parameters
+     * @param {string} data.dashboardId - Unique identifier for the dashboard
+     * @returns {Promise<GetDashboardUrlResponse>} Dashboard URL response
+     */
+    getDashboardUrl: builder.query<GetDashboardUrlResponse, { dashboardId: string }>({
+      query: ({ dashboardId }) => `${ApiEndpoints.ANALYTICS.GET_DASHBOARD}/${dashboardId}`,
+    }),
+
+    /**
+     * Get available dashboards
+     * Retrieves the list of all available dashboards that the user
+     * has access to based on their permissions.
+     * @returns {Promise<GetDashboardsResponse>} List of available dashboards
+     */
+    getDashboards: builder.query<GetDashboardsResponse, void>({
+      query: () => ApiEndpoints.ANALYTICS.GET_DASHBOARD,
+    }),
+
+    /**
+     * Get counsellor statistics
+     * @param {GetCounsellorStatsRequest} params - Statistics request parameters
+     * @returns {Promise<GetCounsellorStatsResponse>} Counsellor statistics data
+     */
+    getCounsellorStats: builder.query<GetCounsellorStatsResponse, GetCounsellorStatsRequest>({
+      query: params => ({
+        url: ApiEndpoints.ANALYTICS.GET_COUNSELLOR_STATS,
+        method: HttpMethod.GET,
+        params: params ? params : undefined,
+      }),
+    }),
+
+    /**
+     * Get organization metrics (tenant-admin native dashboard)
+     * Tenant-scoped on the backend via the caller's JWT — no tenant id is
+     * sent from the client.
+     * @param {GetOrganizationMetricsRequest} params - Time range (30d/90d/12m)
+     * @returns {Promise<GetOrganizationMetricsResponse>} Totals + per-bucket trends
+     */
+    getOrganizationMetrics: builder.query<
+      GetOrganizationMetricsResponse,
+      GetOrganizationMetricsRequest
+    >({
+      query: params => ({
+        url: ApiEndpoints.ANALYTICS.GET_ORGANIZATION_METRICS,
+        method: HttpMethod.GET,
+        params,
+      }),
+    }),
+
+    /**
+     * Get the per-learner usage table (tenant-admin dashboard).
+     * Tenant-scoped on the backend via the caller's JWT, same as
+     * getOrganizationMetrics — no tenant id is sent from the client.
+     * @param {GetLearnerUsageTableRequest} params - Range, search, sort, pagination
+     * @returns {Promise<GetLearnerUsageTableResponse>} One row per learner
+     */
+    getLearnerUsageTable: builder.query<GetLearnerUsageTableResponse, GetLearnerUsageTableRequest>({
+      query: params => ({
+        url: ApiEndpoints.ANALYTICS.GET_LEARNER_USAGE_TABLE,
+        method: HttpMethod.GET,
+        params,
+      }),
+    }),
+
+    /**
+     * Get the per-course usage table (tenant-admin dashboard).
+     * Tenant-scoped on the backend via the caller's JWT. All-time — no range
+     * param, unlike the learner-usage table.
+     * @param {GetCourseUsageTableRequest} params - Search, sort, pagination
+     * @returns {Promise<GetCourseUsageTableResponse>} One row per course
+     */
+    getCourseUsageTable: builder.query<GetCourseUsageTableResponse, GetCourseUsageTableRequest>({
+      query: params => ({
+        url: ApiEndpoints.ANALYTICS.GET_COURSE_USAGE_TABLE,
+        method: HttpMethod.GET,
+        params,
+      }),
+    }),
+
+    /**
+     * Scenario quizzes a learner has started but not passed (trainer view).
+     * Tenant-scoped on the backend; needs `edit:user`.
+     * @param {number} userId - The learner
+     */
+    getLearnerScenarioAttempts: builder.query<LearnerScenarioAttempt[], number>({
+      query: userId => ({
+        url: ApiEndpoints.ANALYTICS.LEARNER_SCENARIO_ATTEMPTS(userId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, userId) => [
+        { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
+      ],
+    }),
+
+    /**
+     * Reopen a learner's attempts on one scenario quiz now, instead of waiting
+     * out the 24-hour pause. Invalidates that learner's list so the row updates.
+     */
+    resetBranchingAttempts: builder.mutation<{ success: true }, ResetBranchingAttemptsRequest>({
+      query: ({ trackItemId, userId }) => ({
+        url: ApiEndpoints.ANALYTICS.RESET_BRANCHING_ATTEMPTS(trackItemId),
+        method: HttpMethod.POST,
+        body: { userId },
+      }),
+      invalidatesTags: (_result, _error, { userId }) => [
+        { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useLazyGetDashboardUrlQuery,
+  useGetDashboardsQuery,
+  useLazyGetDashboardsQuery,
+  useLazyGetCounsellorStatsQuery,
+  useGetOrganizationMetricsQuery,
+  useGetLearnerUsageTableQuery,
+  useGetCourseUsageTableQuery,
+  useGetLearnerScenarioAttemptsQuery,
+  useResetBranchingAttemptsMutation,
+} = analyticsAPI;

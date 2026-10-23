@@ -1,0 +1,135 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Next.js
+.next/
+out/
+build
+dist
+
+# Nx
+.nx/
+tmp/
+
+# Production
+build
+dist
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+.env
+.env.development
+.env.test
+.env.production
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# OS
+.DS_Store
+
+# Secrets / certs / dumps (never commit)
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.dump
+*.sql
+*.swp
+scan_report.*
+.secrets/
+
+# Logs
+/logs
+*.log
+
+# Cache
+.cache
+.eslintcache
+.stylelintcache
+
+# Misc
+.DS_Store
+*.pem
+.vercel
+.turbo
+
+# PWA files
+**/public/sw.js
+**/public/workbox-*.js
+**/public/worker-*.js
+**/public/sw.js.map
+**/public/workbox-*.js.map
+**/public/worker-*.js.map
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+Thumbs.db
+
+.nx/cache
+.nx/workspace-data
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+
+.cursor
+
+test-output
+
+# .claude/ holds personal overrides *and* shared agent config. Ignore the
+# contents by default, then re-include the committed team pieces — the Stacks
+# skill and UserPromptSubmit hook only reach other engineers if they are
+# tracked. Re-include needs `.claude/*`, not `.claude`: git will not descend
+# into an excluded directory to un-exclude anything inside it.
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+!.claude/hooks/
+!.claude/agents/
+
+# Scratch clone of the wiki, created by the wiki-pr flow (see AGENTS.md)
+.wiki-tmp/

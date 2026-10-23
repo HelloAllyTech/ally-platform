@@ -1,0 +1,928 @@
+/**
+ * Wire types for the Bug Hunter admin tab.
+ * Mirrors ally-be src/bug-hunter DTOs.
+ */
+
+export enum BugHuntTrigger {
+  SCHEDULED = "scheduled",
+  MANUAL = "manual",
+  /** One admin, one bug, one click — a run scoped to a single finding. */
+  FIX_SESSION = "fix_session",
+  /** The Verifier's read-only pass over one fix PR, on the other vendor's model (OPP-0779). */
+  VERIFY_FIX = "verify_fix",
+  /** The independent verifier's pass over a closed sweep's unproven findings (OPP-0780). */
+  VERIFY_FINDINGS = "verify_findings",
+  /** A read-only review of one open pull request a person opened, on its head (OPP-0785). */
+  PR_REVIEW = "pr_review",
+  /** The weekly read-only run that writes the feature map for one repo (2026-10-13). */
+  FEATURE_MAP = "feature_map",
+}
+
+/**
+ * One feature card: how a user-facing feature works across repos, written by
+ * the weekly read-only map run and read by every study before it opens a
+ * file. `GET /v1/bug-hunter/feature-maps`.
+ */
+export interface BugHunterFeatureCard {
+  id: string;
+  repo: string;
+  slug: string;
+  title: string;
+  summary: string;
+  /** Where the value the user sees comes from — labels and content are different cards. */
+  valueSource: "database" | "locale_file" | "config" | "code" | "external";
+  entryPoints: string[];
+  endpoints: string[];
+  dataHomes: string[];
+  writtenBy: string | null;
+  relatedRepos: string[];
+  gotchas: string[];
+  sourceSha: string | null;
+  runId: string | null;
+  updatedAt: string;
+}
+
+export interface ListBugHunterFeatureMapsResponse {
+  cards: BugHunterFeatureCard[];
+}
+
+/**
+ * Repos a fix session can run in — i.e. those carrying `bug-fix-session.yml`.
+ * Mirrors ally-be's BUG_FIX_SESSION_REPOS; the admin picks from these when the
+ * bug has no repo of its own yet. ally-mobile is included but never
+ * auto-merges — Bug Hunter opens a PR there and a human always merges it.
+ */
+export const BUG_FIX_SESSION_REPOS = [
+  "ally-be",
+  "ally-web",
+  "ally-ai",
+  "ally-ai-learn",
+  "ally-mobile",
+] as const;
+
+export enum BugHuntRunStatus {
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  /** The kill switch was off when this trigger fired; the run did no work. */
+  SKIPPED_DISABLED = "skipped_disabled",
+  /** A scheduled sweep whose repo had nothing new since its last sweep — no commits, no log group to check either. */
+  SKIPPED_QUIET = "skipped_quiet",
+}
+
+export enum BugHuntEventStage {
+  SKIPPED_DISABLED = "skipped_disabled",
+  /** See BugHuntRunStatus.SKIPPED_QUIET. */
+  SKIPPED_QUIET = "skipped_quiet",
+  FINDER_RESULT = "finder_result",
+  VERIFY = "verify",
+  /** A fix session's study of the feature, posted before it changed any code — see BugFixStudy. */
+  STUDY = "study",
+  FIX_ATTEMPT = "fix_attempt",
+  TEST_WRITTEN = "test_written",
+  DOC_UPDATED = "doc_updated",
+  PR_OPENED = "pr_opened",
+  MERGED = "merged",
+  ESCALATED = "escalated",
+  ERROR = "error",
+  SETTINGS_CHANGED = "settings_changed",
+  SESSION_DISPATCHED = "session_dispatched",
+  PLAN_CREATED = "plan_created",
+  STEP_STARTED = "step_started",
+  RELEASE_DISPATCHED = "release_dispatched",
+  RELEASED = "released",
+  RELEASE_FAILED = "release_failed",
+  /** An admin pressed "Stop fix session" — see ally-be's BugFixSessionService.cancelFixSession. */
+  CANCELLED = "cancelled",
+  /** An admin rewrote the bug's description — the brief a fix session reads. */
+  DESCRIPTION_EDITED = "description_edited",
+  /** An admin pinned or un-pinned the coarse roadmap stage by hand — see ally-be's BugFindingService.setStage. */
+  STAGE_CHANGED = "stage_changed",
+  /** Somebody said no, and why — a human rejecting a bug, or the Verify phase refuting one. */
+  DECISION_RECORDED = "decision_recorded",
+  /** A bug already fixed and shipped has come back. Written on both rows — the return and the fix that failed. */
+  REGRESSED = "regressed",
+  /** A sweep re-found a bug that was already declined, and dedupe suppressed it rather than opening a second row. */
+  RECURRENCE_SUPPRESSED = "recurrence_suppressed",
+  /** This dismissal was proven wrong — a same-dedupe-key finding shipped. See ally-be's checkForAndRecordReversals. */
+  REVERSED = "reversed",
+  /** A fix turned out wrong — the payload names the chain link that broke. See ally-be's BugWrongFix. */
+  WRONG_FIX = "wrong_fix",
+}
+
+/**
+ * The coarse New → Prioritised → In development → Released ladder, mirroring
+ * ally-be's RoadmapOpportunityStage.
+ *
+ * It is the roadmap's own vocabulary, and it appears on a bug because bugs are
+ * no longer listed on the roadmap board — Bug Hunter is now the only place a bug
+ * is shown, so the ladder the team already reads has to be readable here. The
+ * value is DERIVED server-side from the pipeline status unless an admin pinned
+ * it; see `BugFinding.stageIsAuto`.
+ */
+export enum BugFindingStage {
+  NEW = "new",
+  PRIORITISED = "prioritised",
+  UNDER_DEVELOPMENT = "under_development",
+  RELEASED = "released",
+  ARCHIVED = "archived",
+}
+
+/**
+ * Who reported a bug, and what their client captured at the time — present only
+ * on rows a PERSON filed, null on every sweep-found row.
+ *
+ * Read server-side from the linked roadmap opportunity, which still stores the
+ * report even though the board no longer lists it.
+ */
+export interface ReportedBugContext {
+  opportunityId: string;
+  /** "consumer" = the in-app Report-a-problem form; "staff" = somebody internal filed it. */
+  reporterSource: "staff" | "consumer";
+  reportedBy: number | null;
+  reportedByName: string | null;
+  tenantId: string | null;
+  /**
+   * Silently captured at report time: screen/route, device, os, appVersion,
+   * clientTimestamp. Free-form — written by three different clients and never
+   * validated, so treat every key as optional.
+   */
+  reporterContext: Record<string, unknown> | null;
+  reportedAt: string;
+}
+
+/**
+ * The kill switch's three positions. OFF blocks every trigger. MANUAL and AI
+ * both let discovery run; only MANUAL gates the fix stage on an admin
+ * approving each finding first.
+ */
+export enum BugHunterMode {
+  OFF = "off",
+  MANUAL = "manual",
+  AI = "ai",
+}
+
+export enum BugFindingSource {
+  TEST_FAILURE = "test_failure",
+  LINT_ERROR = "lint_error",
+  CODE_REVIEW = "code_review",
+  PRODUCTION_LOG = "production_log",
+  REPORTED_BUG = "reported_bug",
+  ANALYTICS_SUGGESTION = "analytics_suggestion",
+  UX_SIGNAL = "ux_signal",
+  /** The sweep workflow's own locale-file check, a script and not a model (OPP-0782). */
+  LOCALE_PARITY = "locale_parity",
+}
+
+export enum BugFindingSeverity {
+  LOW = "low",
+  MEDIUM = "medium",
+  HIGH = "high",
+}
+
+/**
+ * Why a bug was declined. Mirrors ally-be's BugFindingDecisionReason.
+ *
+ * Required on every reject, which makes it the one triage action that cannot
+ * be taken silently. The reason has two readers: the next sweep, which is
+ * shown finder-error declines as "do not re-file these", and the metrics
+ * panel, which divides by them to say how often Bug Hunter is right.
+ */
+export enum BugFindingDecisionReason {
+  NOT_A_BUG = "not_a_bug",
+  DUPLICATE = "duplicate",
+  WRONG_REPO = "wrong_repo",
+  WONT_FIX = "wont_fix",
+  TOO_RISKY = "too_risky",
+  OTHER = "other",
+}
+
+/**
+ * Why Bug Hunter did not find a human-reported bug first — mirrors ally-be's
+ * `BugFindingMissReason` (OPP-0774). Every report a person files is a miss by
+ * definition; this says which kind.
+ */
+export enum BugFindingMissReason {
+  /** No current sense could have seen it; a new sense is needed. */
+  NO_SENSE = "no_sense",
+  /** An existing sense covers this kind of bug and did not flag it. */
+  SENSE_MISSED = "sense_missed",
+  /** A sense found it (or its cause) and a person declined it. */
+  DETECTED_DECLINED = "detected_declined",
+  /** A sense found it (or its cause) and it was not yet fixed or released. */
+  DETECTED_NOT_FIXED = "detected_not_fixed",
+  /** Test entry, duplicate report, feature request, or nothing to find. */
+  NOT_A_MISS = "not_a_miss",
+}
+
+/** The sense that would have caught a missed bug, or failed to. Mirrors ally-be's `BUG_FINDING_MISS_SENSES`. */
+export type BugFindingMissSense =
+  | "production_log"
+  | "browser_errors"
+  | "ux_signal"
+  | "code_review"
+  | "tests"
+  | "user_journey"
+  | "data_integrity"
+  | "voice_qa"
+  | "api_contract"
+  | "visual"
+  | "locale_parity"
+  | "mobile_crash"
+  | "static_content"
+  | "llm_output_eval";
+
+/** The case file's budget on a bug — mirrors ally-be's `BugCaseBudget` (OPP-0775). */
+export type BugCaseBudgetKind = "sessions" | "attempts" | "escalations" | "usd" | "minutes";
+
+export interface BugCaseBudget {
+  caps: Record<BugCaseBudgetKind, number>;
+  used: Record<BugCaseBudgetKind, number>;
+  /** The first cap reached and when; null while under budget or after an override. */
+  exhausted: { kind: BugCaseBudgetKind; at: string } | null;
+  overriddenBy: number | null;
+  overriddenAt: string | null;
+}
+
+/** One repo's day on the Work tab's board — mirrors ally-be's `BugHunterTodayRepo`. */
+export interface BugHunterTodayRepo {
+  repo: string;
+  sweeps: { completed: number; failed: number; skipped: number; running: number };
+  found: number;
+  verified: number;
+  refuted: number;
+  fixSessions: { byPerson: number; byAgent: number; running: number; failed: number };
+  fixesPassed: number;
+  fixesFailed: number;
+  /** Fix PRs open right now, whatever day they were opened. */
+  prsOpen: number;
+  merged: number;
+  released: number;
+  spendUsd: number;
+}
+
+export interface BugHunterToday {
+  date: string;
+  timeZone: string;
+  since: string;
+  repos: BugHunterTodayRepo[];
+  totals: Omit<BugHunterTodayRepo, "repo">;
+}
+
+/** The Verifier's judgement on a fix PR — mirrors ally-be's `BugFixVerdict` (OPP-0779). */
+export interface BugFixVerdictCheck {
+  name: string;
+  ok: boolean | null;
+  evidence: string | null;
+  skipped: string | null;
+}
+
+export interface BugFixVerdict {
+  verdict: "pass" | "fail";
+  confidence: number | null;
+  checks: BugFixVerdictCheck[];
+  scopeExceeded: boolean;
+  wouldBeWrongIf: string | null;
+  summary: string | null;
+  by: { engine: string | null; model: string | null };
+  prUrl: string | null;
+  prHeadSha: string | null;
+  runId: string | null;
+  at: string;
+}
+
+export interface BugFindingMiss {
+  reason: BugFindingMissReason;
+  /** Null only for `not_a_miss`. */
+  sense: BugFindingMissSense | null;
+  /** For detected_*: the earlier finding that was this bug or its cause. */
+  matchedFindingId: string | null;
+  confidence: number | null;
+  rationale: string;
+  classifiedAt: string;
+}
+
+/**
+ * Reasons that mean the FINDER was wrong, as opposed to the bug being real
+ * and unwanted. Mirrors ally-be's BUG_FINDING_FINDER_ERROR_REASONS.
+ *
+ * Only these count against accuracy. A team that declines nine real-but-minor
+ * findings has not been served badly by its bug hunter; one that declines two
+ * hallucinated bugs has.
+ */
+export const BUG_FINDING_FINDER_ERROR_REASONS: BugFindingDecisionReason[] = [
+  BugFindingDecisionReason.NOT_A_BUG,
+  BugFindingDecisionReason.WRONG_REPO,
+  BugFindingDecisionReason.DUPLICATE,
+];
+
+/** Cap on the optional free-text note beside a reason. Mirrors ally-be's BUG_FINDING_DECISION_NOTE_MAX_LENGTH. */
+export const BUG_FINDING_DECISION_NOTE_MAX_LENGTH = 500;
+
+/**
+ * Below this, a verified finding waits for a human even in AI mode. Mirrors
+ * ally-be's BUG_HUNT_LOW_CONFIDENCE_THRESHOLD.
+ *
+ * Duplicated rather than fetched: it is a display threshold here (which
+ * findings get a "low confidence" chip) and the server applies its own copy
+ * where it actually matters. If the server's moves, this has to move too.
+ */
+export const BUG_FINDING_LOW_CONFIDENCE_THRESHOLD = 0.7;
+
+/** See ally-be's BugFindingStatus doc for the full transition map. */
+export enum BugFindingStatus {
+  NEW = "new",
+  PENDING_APPROVAL = "pending_approval",
+  APPROVED = "approved",
+  /** Fix session dispatched to GitHub Actions; the agent hasn't reported in yet. */
+  QUEUED = "queued",
+  /** A step of a multi-repo plan whose turn hasn't come — an earlier repo has to land first. */
+  BLOCKED = "blocked",
+  /** A multi-repo bug whose plan Bug Hunter is working through, one repo at a time. */
+  COORDINATING = "coordinating",
+  FIXING = "fixing",
+  NEEDS_INPUT = "needs_input",
+  PR_OPENED = "pr_opened",
+  MERGED = "merged",
+  RELEASING = "releasing",
+  RELEASED = "released",
+  /** Merged to master, but the production deploy went red — a different thing to act on than FAILED. */
+  RELEASE_FAILED = "release_failed",
+  DISMISSED = "dismissed",
+  REJECTED = "rejected",
+  FAILED = "failed",
+  /** An admin stopped a running fix session. Distinct from FAILED: a human decision, not the agent giving up — see ally-be's BugFixSessionService.cancelFixSession. */
+  CANCELLED = "cancelled",
+}
+
+/** Statuses the "Start fix session" button is offered from. Mirrors ally-be's BUG_FINDING_FIX_SESSION_START_STATUSES. */
+export const BUG_FINDING_FIX_SESSION_START_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.NEW,
+  BugFindingStatus.PENDING_APPROVAL,
+  BugFindingStatus.APPROVED,
+  BugFindingStatus.NEEDS_INPUT,
+  BugFindingStatus.PR_OPENED,
+  BugFindingStatus.FAILED,
+  // A human stopped a stuck session, but the bug still needs fixing — same
+  // retry story as FAILED.
+  BugFindingStatus.CANCELLED,
+];
+
+/**
+ * Statuses the description may be rewritten from. Mirrors ally-be's
+ * BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES, which is itself the fix-session
+ * start list — the edit is offered exactly where "Put me on it" is, because
+ * the point of editing is to improve the brief that button hands over.
+ */
+export const BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES: BugFindingStatus[] =
+  BUG_FINDING_FIX_SESSION_START_STATUSES;
+
+/** Cap on an edited description. Mirrors ally-be's BUG_FINDING_DESCRIPTION_MAX_LENGTH. */
+export const BUG_FINDING_DESCRIPTION_MAX_LENGTH = 5000;
+
+export interface BugHunterSettings {
+  mode: BugHunterMode;
+  updatedBy: number | null;
+  updatedAt: string;
+}
+
+/** Which CLI the sweep/fix session runs on, and which models it and its escalation subagent use. */
+export interface BugHunterModelSettings {
+  engine: string;
+  defaultModel: string;
+  escalationModel: string;
+}
+
+export interface BugHuntEvent {
+  id: string;
+  runId: string | null;
+  repo: string | null;
+  stage: BugHuntEventStage;
+  summary: string;
+  payload: Record<string, unknown> | null;
+  suggestionId: string | null;
+  findingId: string | null;
+  createdAt: string;
+}
+
+export type BugFixStudyValueHome =
+  | "database"
+  | "locale_file"
+  | "config"
+  | "code"
+  | "other_repo"
+  | "mixed";
+
+/**
+ * Mirrors ally-be's BugFixStudy: what a fix session read and planned BEFORE
+ * it changed any code — how the feature works today, where the value lives,
+ * the fix that follows — plus a second model's review of it. The drawer shows
+ * it so a reviewer sees the reasoning behind a diff, not only the diff.
+ */
+export interface BugFixStudy {
+  feature: string;
+  entryPoints: string[];
+  howItWorksToday: string[];
+  valueLivesIn: BugFixStudyValueHome;
+  workingSibling: string | null;
+  rootCause: string;
+  approach: string;
+  filesToChange: string[];
+  leaveAlone: string[];
+  otherRepos: string[];
+  /** Who else reads the value the fix changes, and the search run to find them (since 2026-10-16; empty search on older studies). */
+  consumers?: { search: string; found: string[] };
+  risks: string[];
+  testPlan: string;
+  previousStudyWasWrongBecause: string | null;
+  recordedAt: string;
+  runId: string | null;
+  review: { concerns: string[]; model: string | null; at: string } | null;
+}
+
+/** Mirrors ally-be's BugCaseChain: six links from the symptom to the change. */
+export type BugChainLink = "observed" | "reproduced" | "located" | "changed" | "resolved" | "held";
+export type BugChainLinkStatus = "present" | "weak" | "missing" | "broken";
+export interface BugChainEntry {
+  link: BugChainLink;
+  status: BugChainLinkStatus;
+  evidence: string | null;
+}
+export interface BugCaseChain {
+  links: BugChainEntry[];
+  /** Links one to five all present or weak. */
+  mergeable: boolean;
+  /** Links one to five that are missing or broken. */
+  blocking: BugChainLink[];
+}
+
+/** Mirrors ally-be's BugFaultLocation. */
+export interface BugFaultLocation {
+  layer: "code" | "data" | "config" | "unknown";
+  repo: string | null;
+  evidence: string | null;
+  repair: string | null;
+}
+
+/** Mirrors ally-be's FixPostmortemDto plus the two fields setStatus stamps on it. */
+export interface BugFixPostmortem {
+  attempts?: number;
+  failingCheck?: string;
+  lastFailure?: string;
+  rootCauseHypothesis?: string;
+  whyItFailed?: string;
+  tryNext?: string;
+  repoGotcha?: string;
+  recordedAt?: string;
+  runId?: string | null;
+}
+
+export interface BugFinding {
+  id: string;
+  runId: string | null;
+  repo: string | null;
+  source: BugFindingSource;
+  title: string;
+  description: string;
+  /** The finder's or reporter's own words, before an admin rewrote them. Null when nobody has edited this bug. */
+  originalDescription: string | null;
+  descriptionEditedBy: number | null;
+  /**
+   * The names behind the five "who did this" ids, resolved server-side in the
+   * same lookup as `stageOverriddenByName`. Optional because a backend older
+   * than this build omits them; the drawer then says "An admin" rather than
+   * printing a raw user id.
+   */
+  descriptionEditedByName?: string | null;
+  descriptionEditedAt: string | null;
+  file: string | null;
+  evidence: string | null;
+  severity: BugFindingSeverity | null;
+  proven: boolean;
+  touchesGuardedPath: boolean;
+  reportedBugId: string | null;
+  status: BugFindingStatus;
+  /** The coarse roadmap ladder. Derived from `status` unless pinned — see `stageIsAuto`. */
+  stage: BugFindingStage;
+  /** True while the stage tracks `status`. False once an admin pinned it, after which transitions no longer move it. */
+  stageIsAuto: boolean;
+  stageOverriddenBy: number | null;
+  stageOverriddenByName: string | null;
+  stageOverriddenAt: string | null;
+  /** Present only when a person filed this bug. Null on every finder-discovered row. */
+  report: ReportedBugContext | null;
+  prUrl: string | null;
+  escalationQuestion: string | null;
+  escalationAnswer: string | null;
+  escalationAnsweredBy: number | null;
+  escalationAnsweredByName?: string | null;
+  escalationAnsweredAt: string | null;
+  decidedBy: number | null;
+  decidedByName?: string | null;
+  decidedAt: string | null;
+  /** Why this was declined. Null on anything not declined, and on rows declined before the reason was recorded. */
+  decisionReason: BugFindingDecisionReason | null;
+  decisionNote: string | null;
+  /**
+   * The Verify phase's LOWEST verifier certainty, 0-1.
+   *
+   * Null on a proven finding (nothing to verify) and on rows from before
+   * verifiers reported one — so "no score" and "scored zero" are different
+   * facts and must render differently.
+   */
+  confidence: number | null;
+  /** The earlier finding this one is a return of — set when a shipped fix did not hold. */
+  regressionOf: string | null;
+  /** True on the EARLIER finding whose own fix came back. Points the opposite way to `regressionOf`. */
+  regressed: boolean;
+  /** How many sweeps have re-found this bug since it was declined. */
+  rediscoveredCount: number;
+  /**
+   * On a human-reported bug: why Bug Hunter did not find it first and which
+   * sense would have. Null until the classifier has run, and on every other
+   * source.
+   */
+  miss: BugFindingMiss | null;
+  /** Caps and spend on this bug. Defaults with nothing spent until a move has been metered. */
+  budget: BugCaseBudget;
+  /** The open pull request this finding was found on by a PR review run (OPP-0785), with the review comment's URL once Bug Hunter has spoken there. */
+  pr: { number: number; url: string; headSha: string; commentUrl?: string | null } | null;
+  /** The Verifier's latest verdict on the current fix PR, or null until one has run. */
+  latestFixVerdict: BugFixVerdict | null;
+  /**
+   * Where an unproven finding stands with the independent verifier (OPP-0780).
+   * Null for proven findings, human reports, and findings from before it existed.
+   */
+  independentVerification: "pending" | "confirmed" | "refuted" | "unsure" | null;
+  /**
+   * Where the independent verifier located the fault, with its production
+   * evidence and, for data or config, the repair a person makes. Null until
+   * a verifier has located it. A located data or config fault never gets a
+   * fix session.
+   */
+  faultLocation: BugFaultLocation | null;
+  /** The case chain, derived on read — see BugCaseChain. */
+  chain: BugCaseChain;
+  /** Set when a fix turned out wrong — see BugWrongFix. */
+  wrongFix: BugWrongFix | null;
+  /**
+   * What the last failed fix session left behind, or null. Written by the
+   * fix protocol with `status: failed`; the next session reads it in its
+   * dossier and an admin reads it here before deciding whether to retry.
+   */
+  postmortem: BugFixPostmortem | null;
+  /** The latest study a fix session wrote before changing code, or null until one has. */
+  study: BugFixStudy | null;
+  /** GitHub Actions run doing the fixing. Null until the backend correlates the dispatch to a run. */
+  sessionRunUrl: string | null;
+  /** GitHub Actions run id for the fix session, once resolved. What "Stop fix session" cancels. */
+  sessionRunId: string | null;
+  /** Which CLI ran this finding's most recent session ("claude-code" or "gemini"). Null until that run reports it. */
+  engine: string | null;
+  /** The model within that engine, e.g. "claude-sonnet-5" or "gemini-2.5-pro". */
+  model: string | null;
+  releaseTag: string | null;
+  releaseRunUrl: string | null;
+  releasedBy: number | null;
+  releasedByName?: string | null;
+  releasedAt: string | null;
+  /** The admin who pressed "Stop fix session". */
+  cancelledBy: number | null;
+  cancelledByName?: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** How loud a notification is. Only ACTION_NEEDED means Bug Hunter has stopped and is waiting on you. */
+export enum BugHunterNotificationLevel {
+  INFO = "info",
+  PROBLEM = "problem",
+  ACTION_NEEDED = "action_needed",
+}
+
+export interface BugHunterNotification {
+  id: string;
+  findingId: string | null;
+  runId: string | null;
+  repo: string | null;
+  level: BugHunterNotificationLevel;
+  title: string;
+  body: string | null;
+  readAt: string | null;
+  readBy: number | null;
+  createdAt: string;
+}
+
+export interface ListBugHunterNotificationsResponse {
+  items: BugHunterNotification[];
+  /** Drives the badge — unread across all levels. */
+  unreadCount: number;
+}
+
+/** One repo's worth of a multi-repo fix. The array order IS the ship order. */
+export interface BugFixStep {
+  id: string;
+  stepIndex: number;
+  repo: string | null;
+  stepSummary: string | null;
+  status: BugFindingStatus;
+  prUrl: string | null;
+  releaseTag: string | null;
+  sessionRunUrl: string | null;
+  releaseRunUrl: string | null;
+}
+
+export interface BugFindingDetail extends BugFinding {
+  events: BugHuntEvent[];
+  /** Empty for an ordinary single-repo bug — its presence is what makes this a coordinated fix. */
+  steps: BugFixStep[];
+  /** Whether "Release to production" applies right now — the backend decides, since it depends on repo/file mapping and on whether this environment has GitHub credentials. */
+  releasable: boolean;
+  /** What would be deployed, e.g. "Admin dashboard (CloudFront)". */
+  releaseTarget: string | null;
+  /** Why releasing is unavailable despite the fix being merged. Null when releasable, or when it simply isn't merged yet. */
+  releaseBlockedReason: string | null;
+}
+
+export interface ListBugFindingsResponse {
+  items: BugFinding[];
+  count: number;
+}
+
+export interface ListBugFindingsQuery {
+  status?: BugFindingStatus | "all";
+  source?: BugFindingSource;
+  repo?: string;
+  /**
+   * Scope the table to one sweep's findings. Filtered server-side on purpose —
+   * a sweep stamps its id onto every row it touches, including a
+   * human-reported bug filed weeks earlier, so its findings are not the newest
+   * rows and cannot be found inside a newest-100 window.
+   */
+  runId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface BugHuntRun {
+  id: string;
+  trigger: BugHuntTrigger;
+  repo: string;
+  status: BugHuntRunStatus;
+  finishedAt: string | null;
+  foundCount: number;
+  autoMergedCount: number;
+  prOpenedCount: number;
+  dismissedCount: number;
+  /** USD, snapshotted from llm_usage at close time — not a live figure while RUNNING. Cache-blind; prefer cliReportedCostUsd when present. */
+  totalTokenCostUsd: string;
+  /** USD, from the Claude Code CLI's own total_cost_usd — prices cache reads/writes at their real rate. Null for runs closed before this was captured. */
+  cliReportedCostUsd: number | null;
+  /** Raw token counts behind totalTokenCostUsd. Null for runs closed before this was tracked. */
+  totalInputTokens: number | null;
+  totalOutputTokens: number | null;
+  createdAt: string;
+}
+
+export interface BugHuntRunDetail extends BugHuntRun {
+  events: BugHuntEvent[];
+}
+
+export interface ListBugHuntRunsResponse {
+  items: BugHuntRun[];
+}
+
+/**
+ * Where a roadmap bug went. Returned by the deep-link lookup so an
+ * `?opportunity=<id>` link to a bug can redirect rather than 404.
+ *
+ * `findingId` is null when no finding was ever opened for that roadmap row — a
+ * bug filed before Bug Hunter's table existed, or one whose inbox write failed
+ * (that write is best-effort by design).
+ */
+export interface BugFindingRef {
+  findingId: string | null;
+}
+
+// ── metrics (GET /v1/bug-hunter/metrics) ──────────────────────────────────
+
+export interface BugHunterOperationsDay {
+  /** YYYY-MM-DD in the database clock (UTC). */
+  date: string;
+  /** New findings filed that day — distinct bugs, child steps excluded. */
+  filed: number;
+  /** Of `filed`, now at a fix stage or beyond. */
+  accepted: number;
+  /** Of `filed`, now dismissed or rejected. */
+  declined: number;
+  /** Of `filed`, still new or pending approval. */
+  undecided: number;
+  /** Tokens and cost spent by runs that started that day, by trigger. Always every trigger. */
+  tokens: Record<BugHuntTrigger, BugHunterOperationsTokens>;
+}
+
+export interface BugHunterOperationsTokens {
+  runs: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+export interface BugHunterOperationsMetrics {
+  windowDays: number;
+  since: string;
+  /** Every calendar day in the window, oldest first, zeros included. */
+  days: BugHunterOperationsDay[];
+  totals: {
+    filed: number;
+    accepted: number;
+    declined: number;
+    undecided: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    runs: number;
+  };
+}
+
+// ── The notebook (agent memory) ────────────────────────────────────────────
+// ally-be src/agent-memory. Postgres is the system of record; search runs over a
+// derived Weaviate index. See docs/bug-hunter-memory-adr.md.
+
+export enum BugHunterMemoryStatus {
+  /** Written by the agent, waiting for the hourly curator. Not yet searched or shown to sweeps. */
+  CANDIDATE = "candidate",
+  ACTIVE = "active",
+  /** Folded into another entry by the curator. */
+  MERGED = "merged",
+  RETIRED = "retired",
+}
+
+/** Hard cap on an entry, in characters — mirrors ally-be's AGENT_MEMORY_BODY_MAX and the table's CHECK. */
+export const BUG_HUNTER_MEMORY_BODY_MAX = 600;
+
+export interface BugHunterMemoryEntry {
+  id: string;
+  body: string;
+  tags: string[];
+  /** Null means platform-wide. */
+  repos: string[] | null;
+  status: BugHunterMemoryStatus;
+  /** Pinned by a person: the curator never edits or retires it. */
+  pinned: boolean;
+  /** How many runs independently wrote this lesson. */
+  sourceCount: number;
+  timesApplied: number;
+  timesContradicted: number;
+  /** The run whose reflection wrote it; null for a human entry. */
+  runId: string | null;
+  findingId: string | null;
+  /** The admin who wrote it by hand; null for the agent's own entries. */
+  createdBy: number | null;
+  embeddingStatus: "pending" | "success" | "failed" | "skipped";
+  createdAt: string;
+  lastAppliedAt: string | null;
+  /** When it left the active set; null while active. */
+  retiredAt: string | null;
+  /** The admin who retired it, or null when the agent's own nightly pass did (OPP-0752). */
+  retiredBy: number | null;
+  /** The rule that fired, in the agent's words, when it retired the entry itself. */
+  retiredReason: string | null;
+}
+
+export interface ListBugHunterMemoryResponse {
+  items: BugHunterMemoryEntry[];
+}
+
+export interface WriteBugHunterMemoryBody {
+  body: string;
+  repos?: string[];
+  tags?: string[];
+  pinned?: boolean;
+}
+
+// ── the decision log, scoreboard and replay (OPP-0776 / OPP-0783) ─────────
+
+/** The eight orchestration points — mirrors ally-be's `DecisionPoint`. */
+export type BugHuntDecisionPoint = "D1" | "D2" | "D3" | "D4" | "D5" | "D6" | "D7" | "D8";
+export type BugHuntDecisionOwner = "rule" | "model";
+
+/** One row of `bug_hunt_decisions`: a choice about how to work, the pick, and the pick not taken. */
+export interface BugHuntDecision {
+  id: string;
+  runId: string | null;
+  findingId: string | null;
+  repo: string | null;
+  point: BugHuntDecisionPoint;
+  owner: BugHuntDecisionOwner;
+  menu: unknown;
+  pick: unknown;
+  shadowOwner: BugHuntDecisionOwner | null;
+  shadowPick: unknown;
+  reason: string | null;
+  /** The context both owners saw; `veto` is set when a budget or safety veto acted. */
+  inputs: (Record<string, unknown> & { veto?: { by: string; reason: string } }) | null;
+  model: string | null;
+  /** Set by the replay: did the pick lead to a better outcome than the shadow would have? */
+  outcome: "better" | "same" | "worse" | null;
+  createdAt: string;
+}
+
+export interface BugHunterScoreboardCounts {
+  filed: number;
+  accepted: number;
+  declined: number;
+  pending: number;
+}
+
+export interface BugHunterScoreboardRow extends BugHunterScoreboardCounts {
+  repo: string;
+  sense: string;
+  engine: string | null;
+  model: string | null;
+}
+
+export interface BugHunterScoreboardFixRow {
+  sessions: number;
+  merged: number;
+  failed: number;
+  passVerdicts: number;
+  failVerdicts: number;
+  /** Released and re-checked gone in production — link six of the chain. */
+  held: number;
+  /** Refused at the wrong layer, reverted, regressed or back in production. */
+  cameBack: number;
+}
+
+/** Mirrors ally-be's BugWrongFix: a fix that turned out wrong, by the chain link that broke. */
+export interface BugWrongFix {
+  link: BugChainLink;
+  source: "verifier" | "regression" | "revert" | "held_check";
+  reason: string;
+  prUrl: string | null;
+  sha: string | null;
+  by: string | null;
+  at: string;
+}
+
+/** `GET /v1/bug-hunter/metrics/wrong-fixes` */
+export interface BugHunterWrongFixSummary {
+  windowDays: number;
+  since: string;
+  total: number;
+  byLink: Record<BugChainLink, number>;
+  bySource: Record<BugWrongFix["source"], number>;
+  recent: {
+    findingId: string;
+    title: string;
+    repo: string | null;
+    link: BugChainLink;
+    source: BugWrongFix["source"];
+    reason: string;
+    prUrl: string | null;
+    at: string;
+  }[];
+}
+
+/** What each sense and model has produced on a repo — mirrors ally-be's `Scoreboard`. */
+export interface BugHunterScoreboard {
+  repo: string;
+  days: number;
+  since: string;
+  rows: BugHunterScoreboardRow[];
+  bySense: Record<string, BugHunterScoreboardCounts>;
+  byModel: Record<string, BugHunterScoreboardCounts>;
+  /** Keyed `engine/model`: what each pair did as a fixer. */
+  fixByModel: Record<string, BugHunterScoreboardFixRow>;
+}
+
+export interface BugHuntDecisionReplayPoint {
+  point: BugHuntDecisionPoint;
+  owner: BugHuntDecisionOwner;
+  fixed: boolean;
+  decisions: number;
+  withShadow: number;
+  agreed: number;
+  disagreed: number;
+  ownerWins: number;
+  shadowWins: number;
+  undecided: number;
+  vetoes: number;
+  flipThreshold: number;
+  verdict: "flip" | "keep" | "not_enough_cases" | "fixed";
+}
+
+export interface BugHuntDecisionReplay {
+  days: number;
+  since: string;
+  generatedAt: string;
+  points: BugHuntDecisionReplayPoint[];
+}
+
+export interface BugHuntDecisionOwners {
+  owners: Record<BugHuntDecisionPoint, BugHuntDecisionOwner>;
+  defaults: Record<BugHuntDecisionPoint, BugHuntDecisionOwner>;
+  fixed: BugHuntDecisionPoint[];
+  overrides: Record<string, string>;
+}

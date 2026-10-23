@@ -1,0 +1,1320 @@
+import { useMemo, useState } from "react";
+
+import { LineChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
+
+import {
+  useGetAgentJoinReliabilityQuery,
+  useGetFillerQualityQuery,
+  useGetStartLatencyQuery,
+  useGetVoiceLatencyQuery,
+} from "@api";
+import { AnalyticsBucket, AnalyticsGrain } from "@types";
+
+import { AnalyticsTabFilters, asOf, windowLabel } from "../analyticsFilters";
+import { grainAsBucket } from "../analyticsGrouping";
+import { ChartDetailModal, ChartTableData } from "../ChartDetailModal";
+import { LatencyByScenarioPanel } from "./LatencyByScenarioPanel";
+import { LatencySessionsPanel } from "./LatencySessionsPanel";
+import {
+  ChartCard,
+  GroupingPicker,
+  ScrollableChart,
+  buildSource,
+  hBarOpts,
+  lineOpts,
+  stackedBarOpts,
+} from "../chartKit";
+import { CONTEXT, PALETTE, languageScale } from "../chartScales";
+import {
+  FILLER_CONFIG_SCALE,
+  FILLER_DIVERSITY_SCALE,
+  FILLER_FINDING_SCALE,
+  buildFillerDiversitySeries,
+  buildFillerFindingSeries,
+  buildFillerUnconfiguredSeries,
+  countJudgedFillers,
+  unconfiguredPer100,
+} from "../fillerQualityChart";
+import {
+  JOIN_LATENCY_SCALE,
+  RELIABILITY_SCALE,
+  buildJoinLatencySeries,
+  buildReliabilitySeries,
+  countReliabilitySessions,
+  reliabilityBucketTitle,
+} from "../joinReliabilityChart";
+import {
+  CACHE_HIT_RATE_SCALE,
+  FIRST_AUDIO_SCALE,
+  LATENCY_GROUPS,
+  LATENCY_STAT_SCALE,
+  START_SEGMENT_SCALE,
+  START_TOTAL_SCALE,
+  buildFirstAudioByVoiceModelSeries,
+  buildFirstAudioLatencySeries,
+  buildFirstAudioMixSeries,
+  buildLlmTtftSeries,
+  buildPromptCacheHitRateSeries,
+  buildReplyLatencySeries,
+  buildStartLatencySegments,
+  buildStartTotalSeries,
+  buildVoiceLatencyByLanguageBars,
+  buildVoiceLatencySeries,
+  buildVoiceModelTable,
+  countFirstAudioTurns,
+  countStartLatencySessions,
+  countVoiceLatencyTurns,
+  countVoiceModelTurns,
+  latencyBucketTitle,
+} from "../latencyChart";
+
+const EMPTY_POINTS = [];
+const EMPTY_RELIABILITY_POINTS = [];
+
+/**
+ * This tab has a page-level date-range filter already (not a per-chart one), so
+ * one shared control here drives all 14 time-series cards from a single grain.
+ * `allTime` is deliberately left out: collapsing all 14 charts to a KPI tile at
+ * once via one control is a bigger, riskier change than widening the bucket
+ * vocabulary — see the mechanism-C migration task for the reasoning.
+ */
+const LATENCY_GRAIN_OPTIONS: AnalyticsGrain[] = ["day", "week", "month", "quarter", "year"];
+
+/**
+ * Reference ceiling for the join-failure rate (%).
+ *
+ * This is a frontend-set service objective, not a measured value — the threshold
+ * label says so, because an unlabelled reference line invites the reader to
+ * assume it came from the data.
+ */
+const FAILURE_RATE_TARGET_PCT = 2;
+
+/**
+ * A labelled threshold. The label carries the VALUE and what kind of bound it is
+ * ("ceiling" vs "target"), because a bare line labelled "Target" tells the reader
+ * neither what number it sits at nor which side of it is good.
+ */
+const threshold = (value: number, label: string) => ({
+  value,
+  label,
+  fillColor: PALETTE.green,
+});
+
+/** Axis block with a threshold, replacing the factory's own `axes`. */
+const axesWithThreshold = ({
+  leftTitle,
+  bottomTitle,
+  thresholdValue,
+  thresholdLabel,
+  stacked = false,
+}: {
+  leftTitle: string;
+  bottomTitle: string;
+  thresholdValue: number;
+  thresholdLabel: string;
+  stacked?: boolean;
+}) => ({
+  axes: {
+    left: {
+      mapsTo: "value",
+      scaleType: "linear",
+      title: leftTitle,
+      ...(stacked ? { stacked: true } : {}),
+      thresholds: [threshold(thresholdValue, thresholdLabel)],
+    },
+    bottom: { mapsTo: "key", scaleType: "labels", title: bottomTitle },
+  },
+});
+
+/**
+ * Latency & reliability.
+ *
+ * Two deliberate structural choices here, both because the alternative made the
+ * charts say things that were not true:
+ *
+ *  - **Live and Historical get separate charts.** They measure the same quantity
+ *    by different means (real-time pipeline instrumentation vs. values derived
+ *    from backfilled transcripts), so plotting them together invited comparison
+ *    of two numbers that are not comparable.
+ *  - **Start latency splits parts from wholes.** The segment breakdown
+ *    (configure/initialize/connect/prep) stacks to the live mean total; the
+ *    live-vs-historical totals are their own chart. Previously the historical
+ *    total sat in the same stack as the four parts, so the bar height meant
+ *    "sum of phases" in some buckets and "the whole measurement" in others.
+ */
+export const LatencyTab = ({ query, language }: AnalyticsTabFilters) => {
+  const [bucket, setBucket] = useState<AnalyticsBucket>("day");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  // Lifted so a click on a LatencyByScenarioPanel row can drive
+  // LatencySessionsPanel's simulation picker directly, without either owning
+  // the other's state. focusToken bumps on every click, even a repeat of the
+  // same scenario id, so a click that repeats the current value still forces
+  // LatencySessionsPanel to re-apply it -- otherwise a manual pick in that
+  // panel's own dropdown could diverge and a same-id click here would be a
+  // silent no-op (React bails on setState when the value is unchanged).
+  const [focusedScenarioId, setFocusedScenarioId] = useState<number | null>(null);
+  const [focusToken, setFocusToken] = useState(0);
+  const selectScenario = (scenarioId: number) => {
+    setFocusedScenarioId(scenarioId);
+    setFocusToken(token => token + 1);
+  };
+  const languageParam = language || undefined;
+  const scopedQuery = { ...query, bucket };
+
+  const { data, isLoading, isError, refetch } = useGetVoiceLatencyQuery({
+    ...scopedQuery,
+    language: languageParam,
+  });
+
+  const {
+    data: startData,
+    isLoading: startLoading,
+    isError: startError,
+    refetch: refetchStart,
+  } = useGetStartLatencyQuery({ ...scopedQuery, language: languageParam });
+
+  // Judge output, not pipeline telemetry — hence its own request. It exists
+  // only for sessions that both played a filler and have been judged, so
+  // folding it into the latency response would make that subset look like the
+  // whole window.
+  const {
+    data: fillerData,
+    isLoading: fillerLoading,
+    isError: fillerError,
+    refetch: refetchFiller,
+  } = useGetFillerQualityQuery({ ...scopedQuery, language: languageParam });
+
+  const {
+    data: reliabilityData,
+    isLoading: reliabilityLoading,
+    isError: reliabilityError,
+    refetch: refetchReliability,
+  } = useGetAgentJoinReliabilityQuery(scopedQuery);
+
+  const points = data?.points ?? EMPTY_POINTS;
+  const axisTitle = useMemo(() => latencyBucketTitle(data?.bucket), [data]);
+  const historySeries = useMemo(() => buildVoiceLatencySeries(points, "transcript"), [points]);
+  const liveTurns = useMemo(() => countVoiceLatencyTurns(points, "pipeline"), [points]);
+  const historyTurns = useMemo(() => countVoiceLatencyTurns(points, "transcript"), [points]);
+  // Live-instrumentation only — no historical counterpart, so no source
+  // param and no separate turn count (same `turns` field as liveTurns above,
+  // it's per-bucket, not per-metric).
+  const llmTtftSeries = useMemo(() => buildLlmTtftSeries(points), [points]);
+  // Same live-only caveat as llmTtftSeries — no transcript counterpart exists
+  // for a provider prompt-cache stat.
+  const cacheHitRateSeries = useMemo(() => buildPromptCacheHitRateSeries(points), [points]);
+  // What spoke first, and the unmasked reply time behind it. Live-only: a
+  // transcript-derived row carries no provenance at all, so a "historical"
+  // counterpart to these would be a chart of one grey band.
+  const firstAudioMixSeries = useMemo(() => buildFirstAudioMixSeries(points), [points]);
+  const firstAudioLatencySeries = useMemo(() => buildFirstAudioLatencySeries(points), [points]);
+  const replyLatencySeries = useMemo(() => buildReplyLatencySeries(points), [points]);
+  const firstAudioTurns = useMemo(() => countFirstAudioTurns(points), [points]);
+  // The same split per TTS voice model. Generative voices can't play spoken
+  // masking, so a voice-mix shift moves the headline with no pipeline change.
+  // `?? []` because a backend predating byVoiceModel simply omits it.
+  const voiceModelRows = useMemo(() => data?.byVoiceModel ?? [], [data]);
+  const voiceModelSeries = useMemo(
+    () => buildFirstAudioByVoiceModelSeries(voiceModelRows),
+    [voiceModelRows],
+  );
+  const voiceModelTurns = useMemo(() => countVoiceModelTurns(voiceModelRows), [voiceModelRows]);
+  // The quality half of the filler story. The mix chart above says how much of
+  // the window was masked; these say whether the masking was any good.
+  const fillerFindingSeries = useMemo(() => buildFillerFindingSeries(fillerData), [fillerData]);
+  const fillerDiversitySeries = useMemo(() => buildFillerDiversitySeries(fillerData), [fillerData]);
+  const fillerUnconfiguredSeries = useMemo(
+    () => buildFillerUnconfiguredSeries(fillerData),
+    [fillerData],
+  );
+  const judgedFillers = useMemo(() => countJudgedFillers(fillerData), [fillerData]);
+  const unconfiguredRate = useMemo(() => unconfiguredPer100(fillerData), [fillerData]);
+
+  const byLanguageBars = useMemo(
+    () => buildVoiceLatencyByLanguageBars(data?.byLanguage ?? []),
+    [data],
+  );
+
+  const targetSec = (data?.targetMs ?? 4000) / 1000;
+  const llmTtftTargetSec = (data?.llmTtftTargetMs ?? 1500) / 1000;
+  const startTargetSec = (startData?.targetMs ?? 4000) / 1000;
+  const languageNote = languageParam ? ` · language: ${languageParam}` : " · all languages";
+
+  const llmTtftOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Seconds",
+        bottomTitle: axisTitle,
+        colorScale: LATENCY_STAT_SCALE,
+        extra: axesWithThreshold({
+          leftTitle: "Seconds",
+          bottomTitle: axisTitle,
+          thresholdValue: llmTtftTargetSec,
+          thresholdLabel: `Target ${llmTtftTargetSec}s or under`,
+        }),
+      }),
+    [axisTitle, llmTtftTargetSec],
+  );
+
+  // No threshold line yet — same posture the LLM TTFT chart itself shipped
+  // with before a target was set. Add one via axesWithThreshold, the same
+  // way llmTtftTargetMs does, once product sets a target hit-rate.
+  const cacheHitRateOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Percent of turns",
+        bottomTitle: axisTitle,
+        colorScale: CACHE_HIT_RATE_SCALE,
+      }),
+    [axisTitle],
+  );
+
+  // Shares of a whole, so the axis is pinned to 0-100 rather than left to fit
+  // the data: a stack that reaches the top of the plot but only sums to 60%
+  // reads as "all turns" to anyone not checking the ticks.
+  const firstAudioMixOptions = useMemo(
+    () =>
+      stackedBarOpts({
+        leftTitle: "Percent of turns",
+        bottomTitle: axisTitle,
+        colorScale: FIRST_AUDIO_SCALE,
+        domain: [0, 100],
+      }),
+    [axisTitle],
+  );
+
+  // Same scale, domain and stack order as the per-bucket split above, so a
+  // band means the same thing on both; only the x-axis changes.
+  const voiceModelOptions = useMemo(
+    () =>
+      stackedBarOpts({
+        leftTitle: "Percent of turns",
+        bottomTitle: "Voice model",
+        colorScale: FIRST_AUDIO_SCALE,
+        domain: [0, 100],
+      }),
+    [],
+  );
+
+  // Same threshold as the headline chart: this is the same measure, split by
+  // what spoke, so the target has to sit in the same place on both.
+  const firstAudioLatencyOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Seconds",
+        bottomTitle: axisTitle,
+        colorScale: FIRST_AUDIO_SCALE,
+        extra: axesWithThreshold({
+          leftTitle: "Seconds",
+          bottomTitle: axisTitle,
+          thresholdValue: targetSec,
+          thresholdLabel: `Target ${targetSec}s or under`,
+        }),
+      }),
+    [axisTitle, targetSec],
+  );
+
+  // Deliberately shares the percentile scale AND the target line with the
+  // time-to-first-voice chart: the pair is meant to be read together, and a
+  // difference in palette or reference line between them would read as a
+  // difference in kind rather than the gap that masking opens up.
+  const replyLatencyOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Seconds",
+        bottomTitle: axisTitle,
+        colorScale: LATENCY_STAT_SCALE,
+        extra: axesWithThreshold({
+          leftTitle: "Seconds",
+          bottomTitle: axisTitle,
+          thresholdValue: targetSec,
+          thresholdLabel: `Target ${targetSec}s or under`,
+        }),
+      }),
+    [axisTitle, targetSec],
+  );
+
+  // Rates, not durations. No threshold line on any of these: there is no
+  // agreed service objective for "findings per 100 fillers", and an unlabelled
+  // reference would invite the reader to assume one was measured.
+  const fillerFindingOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Findings per 100 played fillers",
+        bottomTitle: axisTitle,
+        colorScale: FILLER_FINDING_SCALE,
+      }),
+    [axisTitle],
+  );
+
+  const fillerDiversityOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Percent of played fillers",
+        bottomTitle: axisTitle,
+        colorScale: FILLER_DIVERSITY_SCALE,
+        domain: [0, 100],
+      }),
+    [axisTitle],
+  );
+
+  const fillerUnconfiguredOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Findings per 100 played fillers",
+        bottomTitle: axisTitle,
+        colorScale: FILLER_CONFIG_SCALE,
+        legend: false,
+      }),
+    [axisTitle],
+  );
+
+  // Historical is context, so its own chart is drawn in greys rather than
+  // competing with the live chart for attention.
+  const historyOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Seconds",
+        bottomTitle: axisTitle,
+        colorScale: {
+          [LATENCY_GROUPS.p50]: CONTEXT.faint,
+          [LATENCY_GROUPS.avg]: CONTEXT.line,
+          [LATENCY_GROUPS.p95]: CONTEXT.strong,
+        },
+      }),
+    [axisTitle],
+  );
+
+  const languageColors = useMemo(
+    () => languageScale(byLanguageBars.avg.map(b => b.group)),
+    [byLanguageBars],
+  );
+
+  // Both by-language charts share ONE language colour scale, so a language is
+  // the same colour in the avg chart and the p95 chart beside it.
+  const languageBarOptions = useMemo(
+    () => hBarOpts({ bottomTitle: "Seconds", leftTitle: "", colorScale: languageColors }),
+    [languageColors],
+  );
+
+  const startSegments = useMemo(
+    () => buildStartLatencySegments(startData?.points ?? []),
+    [startData],
+  );
+  const startTotals = useMemo(() => buildStartTotalSeries(startData?.points ?? []), [startData]);
+  const startAxisTitle = useMemo(() => latencyBucketTitle(startData?.bucket), [startData]);
+  const startLiveSessions = useMemo(
+    () => countStartLatencySessions(startData?.points ?? [], "pipeline"),
+    [startData],
+  );
+  const startAllSessions = useMemo(
+    () => countStartLatencySessions(startData?.points ?? []),
+    [startData],
+  );
+
+  const startSegmentOptions = useMemo(
+    () =>
+      stackedBarOpts({
+        leftTitle: "Seconds",
+        bottomTitle: startAxisTitle,
+        colorScale: START_SEGMENT_SCALE,
+        extra: axesWithThreshold({
+          leftTitle: "Seconds",
+          bottomTitle: startAxisTitle,
+          thresholdValue: startTargetSec,
+          thresholdLabel: `Target ${startTargetSec}s or under`,
+          stacked: true,
+        }),
+      }),
+    [startAxisTitle, startTargetSec],
+  );
+
+  const startTotalOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Seconds",
+        bottomTitle: startAxisTitle,
+        colorScale: START_TOTAL_SCALE,
+      }),
+    [startAxisTitle],
+  );
+
+  const reliabilityPoints = reliabilityData?.points ?? EMPTY_RELIABILITY_POINTS;
+  const reliabilityAxisTitle = useMemo(
+    () => reliabilityBucketTitle(reliabilityData?.bucket),
+    [reliabilityData],
+  );
+  const reliabilitySessions = useMemo(
+    () => countReliabilitySessions(reliabilityPoints),
+    [reliabilityPoints],
+  );
+
+  const rateSeries = useMemo(() => buildReliabilitySeries(reliabilityPoints), [reliabilityPoints]);
+  const joinLatencySeries = useMemo(
+    () => buildJoinLatencySeries(reliabilityPoints),
+    [reliabilityPoints],
+  );
+
+  const rateOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Percent of sessions",
+        bottomTitle: reliabilityAxisTitle,
+        colorScale: RELIABILITY_SCALE,
+        extra: axesWithThreshold({
+          leftTitle: "Percent of sessions",
+          bottomTitle: reliabilityAxisTitle,
+          thresholdValue: FAILURE_RATE_TARGET_PCT,
+          thresholdLabel: `Ceiling ${FAILURE_RATE_TARGET_PCT}% (service objective)`,
+        }),
+      }),
+    [reliabilityAxisTitle],
+  );
+
+  const joinLatencyOptions = useMemo(
+    () =>
+      lineOpts({
+        leftTitle: "Seconds",
+        bottomTitle: reliabilityAxisTitle,
+        colorScale: JOIN_LATENCY_SCALE,
+      }),
+    [reliabilityAxisTitle],
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* Provenance lines — one per chart, so an exported tile explains itself.  */
+  /* ---------------------------------------------------------------------- */
+
+  const voiceWindow = windowLabel(data?.window);
+  const startWindow = windowLabel(startData?.window);
+  const reliabilityWindow = windowLabel(reliabilityData?.window);
+
+  // Same window/turn count as the (now relocated) live-pipeline voice-latency
+  // chart on Goals — llmTtft rides the same query and
+  // the same per-bucket `turns` field, just a different column within it.
+  const llmTtftSource = buildSource({
+    derivation: "Live pipeline turn metrics, graph-start-to-first-token latency",
+    window: `${voiceWindow}${languageNote}`,
+    n: liveTurns,
+    nUnit: "turns",
+    asOf: asOf(data?.window),
+  });
+
+  // Same window/turn count as llmTtftSource — ratio-of-sums over the same
+  // per-turn rows, just a different column.
+  const cacheHitRateSource = buildSource({
+    derivation: "Live pipeline turn metrics, OpenAI prompt-cache hit rate",
+    window: `${voiceWindow}${languageNote}`,
+    n: liveTurns,
+    nUnit: "turns",
+    asOf: asOf(data?.window),
+  });
+
+  // n for the split charts is the INSTRUMENTED turn count, not liveTurns:
+  // pre-instrumentation turns are in the tab's other charts but cannot appear
+  // in these, and quoting the bigger number would overstate what they cover.
+  const firstAudioSource = buildSource({
+    derivation: "Live pipeline turn metrics, first-audio source per turn",
+    window: `${voiceWindow}${languageNote}`,
+    n: firstAudioTurns,
+    nUnit: "turns",
+    asOf: asOf(data?.window),
+  });
+
+  // n is every live turn the per-model split covers, unrecorded ones included —
+  // unlike firstAudioSource, the unknown band is part of this chart's body.
+  const voiceModelSource = buildSource({
+    derivation: "Live pipeline turn metrics, first-audio source per TTS voice model",
+    window: `${voiceWindow}${languageNote}`,
+    n: voiceModelTurns,
+    nUnit: "turns",
+    asOf: asOf(data?.window),
+  });
+
+  const replyLatencySource = buildSource({
+    derivation:
+      "Live pipeline turn metrics, user speech end to the real reply " +
+      "(excludes filler/interim masking)",
+    window: `${voiceWindow}${languageNote}`,
+    n: firstAudioTurns,
+    nUnit: "turns",
+    asOf: asOf(data?.window),
+  });
+
+  // n is PLAYED FILLERS, not turns and not sessions — the same denominator the
+  // rates use. Quoting the session count here would flatter a window where a
+  // few sessions played a great many fillers.
+  const fillerSource = buildSource({
+    derivation: "Thinking-filler judge findings over played fillers",
+    window: `${voiceWindow}${languageNote}`,
+    n: judgedFillers,
+    nUnit: "played fillers",
+    asOf: asOf(data?.window),
+  });
+
+  const bucketPicker = (
+    <div className="flex justify-end">
+      <GroupingPicker
+        id="latency-bucket"
+        value={bucket}
+        onChange={g => setBucket(grainAsBucket(g))}
+        options={LATENCY_GRAIN_OPTIONS}
+      />
+    </div>
+  );
+
+  /** Pivot a group/key/value series into a chart-detail table. */
+  const seriesTable = (
+    series: { group: string; key: string; value: number | null }[],
+    keyHeader: string,
+  ): ChartTableData => {
+    const groups = Array.from(new Set(series.map(d => d.group)));
+    const keys = Array.from(new Set(series.map(d => d.key)));
+    const byPair = new Map(series.map(d => [`${d.key}__${d.group}`, d.value]));
+    return {
+      columns: [keyHeader, ...groups],
+      rows: keys.map(k => [k, ...groups.map(g => byPair.get(`${k}__${g}`) ?? null)]),
+    };
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      {bucketPicker}
+
+      {/* "Time to first voice — live pipeline" moved to Goals (Highlights →
+          Goals → "Roleplay voice latency"), where it carries its own grain
+          control (including All-time) rather than sharing this tab's shared
+          bucket. The two cards below exist so the headline that used to sit
+          here stays readable: this one measures time to the first audio of
+          ANY kind, so it improves both when the pipeline gets faster and when
+          more turns are masked by a filler — the mix chart says which
+          happened, and the reply chart says what the pipeline did
+          underneath. */}
+      <ChartCard
+        title="What the learner heard first"
+        caption="Share of turns where the learner first heard a thinking filler (a sound like 'hmm…'), an interim reply (a few holding words), or the reply itself."
+        source={firstAudioSource}
+        loading={isLoading && !data}
+        error={isError}
+        onRetry={refetch}
+        onExpand={() => setExpanded("firstAudioMix")}
+        errorTitle="Couldn't load the first-audio split"
+        errorSubtitle="There was a problem fetching turn-latency metrics."
+        empty={!isLoading && firstAudioMixSeries.length === 0}
+        emptyText="No turns with a recorded first-audio source in this range"
+        chartId="AAQ-085"
+      >
+        <ScrollableChart data={firstAudioMixSeries}>
+          <StackedBarChart data={firstAudioMixSeries} options={firstAudioMixOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      {/* The split above, per TTS voice model over the whole window. Generative
+          voices (e.g. elevenlabs/eleven_v3) can't play spoken masking, so all
+          their turns are reply-first: when the voice mix shifts toward them
+          the time-to-first-voice trend rises with no pipeline change. The
+          detail view carries each model's p50 first voice vs p50 real reply. */}
+      <ChartCard
+        title="Heard first, by voice model"
+        caption={
+          "The same split per voice model, whole window. Voices that can't play " +
+          "spoken masking are all reply-first, so a shift in the voice mix " +
+          "shows up here rather than as an unexplained latency regression. " +
+          "Expand for each model's median time to first voice and to the real reply."
+        }
+        source={voiceModelSource}
+        loading={isLoading && !data}
+        error={isError}
+        onRetry={refetch}
+        onExpand={() => setExpanded("firstAudioByVoiceModel")}
+        errorTitle="Couldn't load the split by voice model"
+        errorSubtitle="There was a problem fetching turn-latency metrics."
+        empty={!isLoading && voiceModelSeries.length === 0}
+        emptyText="No live turns in this range"
+        chartId="AAQ-167"
+      >
+        <ScrollableChart data={voiceModelSeries}>
+          <StackedBarChart data={voiceModelSeries} options={voiceModelOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      {/* The mix chart above says how much of the window was masked. These
+          three say whether the masking was any good — which the latency charts
+          structurally cannot, because the filler IS the character's first
+          words: a filler that lands instantly and sounds nothing like the
+          character improves every chart on this tab while making the roleplay
+          worse. Judge output, so a separate n from everything above. */}
+      <ChartCard
+        title="Was the filler any good?"
+        caption={
+          "Findings per 100 played fillers, from the thinking-filler judge. " +
+          "The denominator is played fillers, not turns or sessions — one turn " +
+          "plays two whenever a continuation fires." +
+          (unconfiguredRate !== null && unconfiguredRate > 0
+            ? ` A further ${unconfiguredRate} findings per 100 were set aside ` +
+              "because the scenario configured no character voice, and are not " +
+              "counted above — see the chart below."
+            : "")
+        }
+        source={fillerSource}
+        loading={fillerLoading && !fillerData}
+        error={fillerError}
+        onRetry={refetchFiller}
+        onExpand={() => setExpanded("fillerFindings")}
+        errorTitle="Couldn't load filler quality"
+        errorSubtitle="There was a problem fetching thinking-filler judge results."
+        empty={!fillerLoading && fillerFindingSeries.length === 0}
+        emptyText="No judged fillers in this range — run the filler judge backfill to populate it"
+        chartId="AAQ-086"
+      >
+        <ScrollableChart data={fillerFindingSeries}>
+          <LineChart data={fillerFindingSeries} options={fillerFindingOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Did it sound like a soundboard?"
+        caption={
+          "Counted, not judged: no LLM in this path. A session can mask every " +
+          "gap perfectly and still draw on four phrases all day, which is what " +
+          "the distinct-phrase share catches and the repeat rate alone does not."
+        }
+        source={fillerSource}
+        loading={fillerLoading && !fillerData}
+        error={fillerError}
+        onRetry={refetchFiller}
+        onExpand={() => setExpanded("fillerDiversity")}
+        errorTitle="Couldn't load filler diversity"
+        errorSubtitle="There was a problem fetching thinking-filler judge results."
+        empty={!fillerLoading && fillerDiversitySeries.length === 0}
+        emptyText="No judged fillers in this range"
+        chartId="AAQ-087"
+      >
+        <ScrollableChart data={fillerDiversitySeries}>
+          <LineChart data={fillerDiversitySeries} options={fillerDiversityOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Fillers the judge couldn't assess for character"
+        caption={
+          "Set aside, not counted as failures: the judge cannot call a filler " +
+          "generic for a character it was told nothing about. This is a " +
+          "scenario-configuration gap, so it is kept out of the rates above — " +
+          "otherwise configuring more scenarios would read there as a quality " +
+          "regression."
+        }
+        source={fillerSource}
+        loading={fillerLoading && !fillerData}
+        error={fillerError}
+        onRetry={refetchFiller}
+        onExpand={() => setExpanded("fillerUnconfigured")}
+        errorTitle="Couldn't load unconfigured-style findings"
+        errorSubtitle="There was a problem fetching thinking-filler judge results."
+        empty={!fillerLoading && fillerUnconfiguredSeries.length === 0}
+        emptyText="No judged fillers in this range"
+        chartId="AAQ-088"
+      >
+        <ScrollableChart data={fillerUnconfiguredSeries}>
+          <LineChart data={fillerUnconfiguredSeries} options={fillerUnconfiguredOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Time to first voice, by what spoke"
+        caption={
+          "Average wait for each kind of first audio. Turns with no recorded " +
+          "source have no mean to state and are absent here — see the share " +
+          "chart above for how much of the window that is."
+        }
+        source={firstAudioSource}
+        loading={isLoading && !data}
+        error={isError}
+        onRetry={refetch}
+        onExpand={() => setExpanded("firstAudioLatency")}
+        errorTitle="Couldn't load latency by first-audio source"
+        errorSubtitle="There was a problem fetching turn-latency metrics."
+        empty={!isLoading && firstAudioLatencySeries.length === 0}
+        emptyText="No turns with a recorded first-audio source in this range"
+        chartId="AAQ-089"
+      >
+        <ScrollableChart data={firstAudioLatencySeries}>
+          <LineChart data={firstAudioLatencySeries} options={firstAudioLatencyOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Time to the real reply — live pipeline"
+        caption={
+          "The same turns measured to the agent's actual answer, ignoring any " +
+          "filler or interim in front of it. This is the pipeline's own number: " +
+          "it does not improve when more turns are masked."
+        }
+        source={replyLatencySource}
+        loading={isLoading && !data}
+        error={isError}
+        onRetry={refetch}
+        onExpand={() => setExpanded("replyLatency")}
+        errorTitle="Couldn't load reply latency"
+        errorSubtitle="There was a problem fetching turn-latency metrics."
+        empty={!isLoading && replyLatencySeries.length === 0}
+        emptyText="No turns with a recorded first-audio source in this range"
+        chartId="AAQ-090"
+      >
+        <ScrollableChart data={replyLatencySeries}>
+          <LineChart data={replyLatencySeries} options={replyLatencyOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="LLM time-to-first-token — live pipeline"
+        caption="Median, average and slow tail (p95) of graph-start-to-first-token latency."
+        source={llmTtftSource}
+        loading={isLoading && !data}
+        error={isError}
+        onRetry={refetch}
+        onExpand={() => setExpanded("llmTtft")}
+        errorTitle="Couldn't load LLM TTFT"
+        errorSubtitle="There was a problem fetching turn-latency metrics."
+        empty={!isLoading && llmTtftSeries.length === 0}
+        chartId="AAQ-091"
+      >
+        <ScrollableChart data={llmTtftSeries}>
+          <LineChart data={llmTtftSeries} options={llmTtftOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Prompt cache hit rate — live pipeline"
+        caption="Share of prompt tokens served from OpenAI's cache, ratio-of-sums per bucket."
+        source={cacheHitRateSource}
+        loading={isLoading && !data}
+        error={isError}
+        onRetry={refetch}
+        onExpand={() => setExpanded("cacheHitRate")}
+        errorTitle="Couldn't load prompt cache hit rate"
+        errorSubtitle="There was a problem fetching turn-latency metrics."
+        empty={!isLoading && cacheHitRateSeries.length === 0}
+        chartId="AAQ-092"
+      >
+        <ScrollableChart data={cacheHitRateSeries}>
+          <LineChart data={cacheHitRateSeries} options={cacheHitRateOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      {/* Only rendered when backfilled data actually exists — an empty context
+          chart is a panel nobody can act on. */}
+      {historySeries.length > 0 && (
+        <ChartCard
+          title="Voice-to-voice latency — historical (backfilled)"
+          caption="Derived from backfilled transcripts, so not directly comparable with the live pipeline above. Shown for context only."
+          source={buildSource({
+            derivation: "Transcript-derived latency, backfilled",
+            window: `${voiceWindow}${languageNote}`,
+            n: historyTurns,
+            nUnit: "turns",
+            asOf: asOf(data?.window),
+          })}
+          loading={isLoading && !data}
+          onExpand={() => setExpanded("history")}
+          chartId="AAQ-093"
+        >
+          <ScrollableChart data={historySeries}>
+            <LineChart data={historySeries} options={historyOptions} />
+          </ScrollableChart>
+        </ChartCard>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <ChartCard
+          title="Average latency by language"
+          caption="Live pipeline, whole window. Sorted slowest first."
+          source={buildSource({
+            derivation: "Live pipeline turn metrics, mean per language",
+            window: voiceWindow,
+            n: byLanguageBars.totalTurns,
+            nUnit: "turns",
+          })}
+          loading={isLoading && !data}
+          error={isError}
+          onRetry={refetch}
+          errorTitle="Couldn't load latency by language"
+          errorSubtitle="There was a problem fetching turn-latency metrics."
+          empty={!isLoading && byLanguageBars.avg.length === 0}
+          onExpand={() => setExpanded("byLanguage")}
+          chartId="AAQ-094"
+        >
+          <SimpleBarChart data={byLanguageBars.avg} options={languageBarOptions} />
+        </ChartCard>
+        <ChartCard
+          title="p95 latency by language"
+          caption="Live pipeline, whole window. Same language order and colours as the chart beside it."
+          source={buildSource({
+            derivation: "Live pipeline turn metrics, p95 per language",
+            window: voiceWindow,
+            n: byLanguageBars.totalTurns,
+            nUnit: "turns",
+          })}
+          loading={isLoading && !data}
+          error={isError}
+          onRetry={refetch}
+          errorTitle="Couldn't load latency by language"
+          errorSubtitle="There was a problem fetching turn-latency metrics."
+          empty={!isLoading && byLanguageBars.p95.length === 0}
+          onExpand={() => setExpanded("byLanguage")}
+          chartId="AAQ-095"
+        >
+          <SimpleBarChart data={byLanguageBars.p95} options={languageBarOptions} />
+        </ChartCard>
+        <ChartCard
+          title="STT finalize time by language"
+          caption="Pure STT finalization time (time to transcript after end of speech), isolated from the broader end-to-end latency beside it. Same language order and colours."
+          source={buildSource({
+            derivation: "Live pipeline turn metrics, mean STT finalize per language",
+            window: voiceWindow,
+            n: byLanguageBars.totalTurns,
+            nUnit: "turns",
+          })}
+          loading={isLoading && !data}
+          error={isError}
+          onRetry={refetch}
+          errorTitle="Couldn't load STT finalize time by language"
+          errorSubtitle="There was a problem fetching turn-latency metrics."
+          empty={!isLoading && byLanguageBars.sttFinalize.length === 0}
+          onExpand={() => setExpanded("byLanguage")}
+          chartId="AAQ-096"
+        >
+          <SimpleBarChart data={byLanguageBars.sttFinalize} options={languageBarOptions} />
+        </ChartCard>
+      </div>
+
+      <ChartCard
+        title="Simulation start latency by startup phase"
+        caption="Live pipeline. Bar height is the mean total time to first word; segments are the ordered phases that make it up."
+        source={buildSource({
+          derivation: "Live start metrics, mean per phase",
+          window: `${startWindow}${languageNote}`,
+          n: startLiveSessions,
+          nUnit: "sessions",
+          asOf: asOf(startData?.window),
+        })}
+        loading={startLoading && !startData}
+        error={startError}
+        onRetry={refetchStart}
+        onExpand={() => setExpanded("startSegments")}
+        errorTitle="Couldn't load start latency"
+        errorSubtitle="There was a problem fetching start-latency metrics."
+        empty={!startLoading && startSegments.length === 0}
+        chartId="AAQ-097"
+      >
+        <ScrollableChart data={startSegments}>
+          <StackedBarChart data={startSegments} options={startSegmentOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Time to first word — live vs historical total"
+        caption="Both series are whole measurements, so they share an axis honestly. Historical is backfilled and shown as context."
+        source={buildSource({
+          derivation: "Start metrics, mean total time to first word",
+          window: `${startWindow}${languageNote}`,
+          n: startAllSessions,
+          nUnit: "sessions",
+          asOf: asOf(startData?.window),
+        })}
+        loading={startLoading && !startData}
+        error={startError}
+        onRetry={refetchStart}
+        onExpand={() => setExpanded("startTotals")}
+        errorTitle="Couldn't load start latency"
+        errorSubtitle="There was a problem fetching start-latency metrics."
+        empty={!startLoading && startTotals.length === 0}
+        chartId="AAQ-098"
+      >
+        <ScrollableChart data={startTotals}>
+          <LineChart data={startTotals} options={startTotalOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Agent-join latency (dispatch → join)"
+        caption="Agent-infrastructure timing. Not filtered by language."
+        source={buildSource({
+          derivation: "Session lifecycle log, dispatch→join percentiles",
+          window: reliabilityWindow,
+          n: reliabilitySessions,
+          nUnit: "sessions",
+          asOf: asOf(reliabilityData?.window),
+        })}
+        loading={reliabilityLoading && !reliabilityData}
+        error={reliabilityError}
+        onRetry={refetchReliability}
+        onExpand={() => setExpanded("joinLatency")}
+        errorTitle="Couldn't load join latency"
+        errorSubtitle="There was a problem fetching reliability metrics."
+        empty={!reliabilityLoading && joinLatencySeries.length === 0}
+        chartId="AAQ-099"
+      >
+        <ScrollableChart data={joinLatencySeries}>
+          <LineChart data={joinLatencySeries} options={joinLatencyOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <ChartCard
+        title="Agent-join failure, mid-session drop and suspected freeze rate"
+        caption="Join failure = agent never joined · Mid-session drop = agent joined then left · Suspected freeze = agent went quiet mid-conversation. Gaps are periods with no sessions, not clean ones. Not filtered by language."
+        source={buildSource({
+          derivation: "Session lifecycle log, failures ÷ sessions per period",
+          window: reliabilityWindow,
+          n: reliabilitySessions,
+          nUnit: "sessions",
+          asOf: asOf(reliabilityData?.window),
+        })}
+        loading={reliabilityLoading && !reliabilityData}
+        error={reliabilityError}
+        onRetry={refetchReliability}
+        onExpand={() => setExpanded("rates")}
+        errorTitle="Couldn't load join reliability"
+        errorSubtitle="There was a problem fetching reliability metrics."
+        empty={!reliabilityLoading && reliabilityPoints.length === 0}
+        chartId="AAQ-100"
+      >
+        <ScrollableChart data={rateSeries}>
+          <LineChart data={rateSeries} options={rateOptions} />
+        </ScrollableChart>
+      </ChartCard>
+
+      <LatencyByScenarioPanel query={query} language={language} onSelectScenario={selectScenario} />
+
+      <LatencySessionsPanel
+        query={query}
+        language={language}
+        initialScenarioId={focusedScenarioId ?? undefined}
+        focusToken={focusToken}
+      />
+
+      {/* ---------------------------- Detail views ---------------------------- */}
+
+      {expanded === "firstAudioMix" && (
+        <ChartDetailModal
+          open={expanded === "firstAudioMix"}
+          onClose={() => setExpanded(null)}
+          title="What the learner heard first"
+          caption="Share of turns where the learner first heard a thinking filler (a sound like 'hmm…'), an interim reply (a few holding words), or the reply itself."
+          source={firstAudioSource}
+          table={seriesTable(firstAudioMixSeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={firstAudioMixSeries}>
+              <StackedBarChart
+                data={firstAudioMixSeries}
+                options={{ ...firstAudioMixOptions, height }}
+              />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "firstAudioByVoiceModel" && (
+        <ChartDetailModal
+          open={expanded === "firstAudioByVoiceModel"}
+          onClose={() => setExpanded(null)}
+          title="Heard first, by voice model"
+          caption="Share of each voice model's turns by what spoke first, with its median time to first voice and to the real reply. 'unknown' is turns recorded before the agent logged a voice model."
+          source={voiceModelSource}
+          table={buildVoiceModelTable(voiceModelRows)}
+          exportContext={[`Window: ${voiceWindow}`]}
+          render={({ height }) => (
+            <ScrollableChart data={voiceModelSeries}>
+              <StackedBarChart data={voiceModelSeries} options={{ ...voiceModelOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "fillerFindings" && (
+        <ChartDetailModal
+          open={expanded === "fillerFindings"}
+          onClose={() => setExpanded(null)}
+          title="Was the filler any good?"
+          caption="Findings per 100 played fillers, from the thinking-filler judge. The denominator is played fillers, not turns or sessions."
+          source={fillerSource}
+          table={seriesTable(fillerFindingSeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={fillerFindingSeries}>
+              <LineChart data={fillerFindingSeries} options={{ ...fillerFindingOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "fillerDiversity" && (
+        <ChartDetailModal
+          open={expanded === "fillerDiversity"}
+          onClose={() => setExpanded(null)}
+          title="Did it sound like a soundboard?"
+          caption="Counted, not judged. Share of played fillers that repeated a recent phrase, against the share of played fillers that were distinct."
+          source={fillerSource}
+          table={seriesTable(fillerDiversitySeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={fillerDiversitySeries}>
+              <LineChart
+                data={fillerDiversitySeries}
+                options={{ ...fillerDiversityOptions, height }}
+              />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "fillerUnconfigured" && (
+        <ChartDetailModal
+          open={expanded === "fillerUnconfigured"}
+          onClose={() => setExpanded(null)}
+          title="Fillers the judge couldn't assess for character"
+          caption="Findings set aside because the scenario configured no character voice. A configuration gap, not a model failure — kept out of the rates above."
+          source={fillerSource}
+          table={seriesTable(fillerUnconfiguredSeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={fillerUnconfiguredSeries}>
+              <LineChart
+                data={fillerUnconfiguredSeries}
+                options={{ ...fillerUnconfiguredOptions, height }}
+              />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "firstAudioLatency" && (
+        <ChartDetailModal
+          open={expanded === "firstAudioLatency"}
+          onClose={() => setExpanded(null)}
+          title="Time to first voice, by what spoke"
+          caption="Average wait for each kind of first audio. Turns with no recorded source are absent."
+          source={firstAudioSource}
+          table={seriesTable(firstAudioLatencySeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={firstAudioLatencySeries}>
+              <LineChart
+                data={firstAudioLatencySeries}
+                options={{ ...firstAudioLatencyOptions, height }}
+              />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "replyLatency" && (
+        <ChartDetailModal
+          open={expanded === "replyLatency"}
+          onClose={() => setExpanded(null)}
+          title="Time to the real reply — live pipeline"
+          caption="The same turns measured to the agent's actual answer, ignoring any filler or interim in front of it."
+          source={replyLatencySource}
+          table={seriesTable(replyLatencySeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={replyLatencySeries}>
+              <LineChart data={replyLatencySeries} options={{ ...replyLatencyOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "llmTtft" && (
+        <ChartDetailModal
+          open={expanded === "llmTtft"}
+          onClose={() => setExpanded(null)}
+          title="LLM time-to-first-token — live pipeline"
+          caption="Median, average and slow tail (p95) of graph-start-to-first-token latency."
+          source={llmTtftSource}
+          table={seriesTable(llmTtftSeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={llmTtftSeries}>
+              <LineChart data={llmTtftSeries} options={{ ...llmTtftOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "cacheHitRate" && (
+        <ChartDetailModal
+          open={expanded === "cacheHitRate"}
+          onClose={() => setExpanded(null)}
+          title="Prompt cache hit rate — live pipeline"
+          caption="Share of prompt tokens served from OpenAI's cache, ratio-of-sums per bucket."
+          source={cacheHitRateSource}
+          table={seriesTable(cacheHitRateSeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={cacheHitRateSeries}>
+              <LineChart data={cacheHitRateSeries} options={{ ...cacheHitRateOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "history" && (
+        <ChartDetailModal
+          open={expanded === "history"}
+          onClose={() => setExpanded(null)}
+          title="Voice-to-voice latency — historical (backfilled)"
+          source={buildSource({
+            derivation: "Transcript-derived latency, backfilled",
+            window: voiceWindow,
+            n: historyTurns,
+            nUnit: "turns",
+          })}
+          table={seriesTable(historySeries, axisTitle)}
+          exportContext={[`Window: ${voiceWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={historySeries}>
+              <LineChart data={historySeries} options={{ ...historyOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "byLanguage" && (
+        <ChartDetailModal
+          open={expanded === "byLanguage"}
+          onClose={() => setExpanded(null)}
+          title="Latency by language"
+          caption="Live pipeline, whole window. Sample size per language is the column the bars cannot show."
+          source={buildSource({
+            derivation: "Live pipeline turn metrics per language",
+            window: voiceWindow,
+            n: byLanguageBars.totalTurns,
+            nUnit: "turns",
+          })}
+          table={{
+            columns: ["Language", "Average (s)", "p95 (s)", "STT finalize (avg, s)", "Turns"],
+            rows: byLanguageBars.avg.map((row, i) => [
+              row.group,
+              row.value,
+              byLanguageBars.p95[i]?.value ?? null,
+              byLanguageBars.sttFinalizeByLanguage[row.group] ?? null,
+              byLanguageBars.turnsByLanguage[row.group] ?? null,
+            ]),
+          }}
+          exportContext={[`Window: ${voiceWindow}`]}
+          render={({ height }) => (
+            <SimpleBarChart data={byLanguageBars.avg} options={{ ...languageBarOptions, height }} />
+          )}
+        />
+      )}
+
+      {expanded === "startSegments" && (
+        <ChartDetailModal
+          open={expanded === "startSegments"}
+          onClose={() => setExpanded(null)}
+          title="Simulation start latency by startup phase"
+          source={buildSource({
+            derivation: "Live start metrics, mean per phase",
+            window: startWindow,
+            n: startLiveSessions,
+            nUnit: "sessions",
+          })}
+          table={seriesTable(startSegments, startAxisTitle)}
+          exportContext={[`Window: ${startWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={startSegments}>
+              <StackedBarChart data={startSegments} options={{ ...startSegmentOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "startTotals" && (
+        <ChartDetailModal
+          open={expanded === "startTotals"}
+          onClose={() => setExpanded(null)}
+          title="Time to first word — live vs historical total"
+          source={buildSource({
+            derivation: "Start metrics, mean total time to first word",
+            window: startWindow,
+            n: startAllSessions,
+            nUnit: "sessions",
+          })}
+          table={seriesTable(startTotals, startAxisTitle)}
+          exportContext={[`Window: ${startWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={startTotals}>
+              <LineChart data={startTotals} options={{ ...startTotalOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "joinLatency" && (
+        <ChartDetailModal
+          open={expanded === "joinLatency"}
+          onClose={() => setExpanded(null)}
+          title="Agent-join latency (dispatch → join)"
+          source={buildSource({
+            derivation: "Session lifecycle log, dispatch→join percentiles",
+            window: reliabilityWindow,
+            n: reliabilitySessions,
+            nUnit: "sessions",
+          })}
+          table={seriesTable(joinLatencySeries, reliabilityAxisTitle)}
+          exportContext={[`Window: ${reliabilityWindow}`, `Granularity: ${bucket}`]}
+          render={({ height }) => (
+            <ScrollableChart data={joinLatencySeries}>
+              <LineChart data={joinLatencySeries} options={{ ...joinLatencyOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+
+      {expanded === "rates" && (
+        <ChartDetailModal
+          open={expanded === "rates"}
+          onClose={() => setExpanded(null)}
+          title="Agent-join failure, mid-session drop and suspected freeze rate"
+          caption="Blank cells are periods with no sessions — nothing was measured, rather than nothing went wrong."
+          source={buildSource({
+            derivation: "Session lifecycle log, failures ÷ sessions per period",
+            window: reliabilityWindow,
+            n: reliabilitySessions,
+            nUnit: "sessions",
+          })}
+          table={{
+            columns: [
+              reliabilityAxisTitle,
+              "Sessions",
+              "Join failure %",
+              "Mid-session drop %",
+              "Suspected freeze %",
+            ],
+            rows: reliabilityPoints.map(p => [
+              p.bucket,
+              p.totalSessions,
+              p.totalSessions > 0 ? p.failureRatePct : null,
+              p.totalSessions > 0
+                ? Math.round((p.midSessionDrops / p.totalSessions) * 1000) / 10
+                : null,
+              p.conversations > 0 ? p.freezeRatePct : null,
+            ]),
+          }}
+          exportContext={[
+            `Window: ${reliabilityWindow}`,
+            `Granularity: ${bucket}`,
+            `Failure-rate ceiling: ${FAILURE_RATE_TARGET_PCT}% (frontend service objective, not measured)`,
+          ]}
+          render={({ height }) => (
+            <ScrollableChart data={rateSeries}>
+              <LineChart data={rateSeries} options={{ ...rateOptions, height }} />
+            </ScrollableChart>
+          )}
+        />
+      )}
+    </div>
+  );
+};

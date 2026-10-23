@@ -1,0 +1,489 @@
+import { ReactNode, useMemo, useState } from "react";
+
+import { useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
+
+import "@carbon/charts/styles.css";
+import "./analytics-carbon.scss";
+
+import {
+  CarbonDropdown as Dropdown,
+  Heading,
+  Section,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  CarbonTabs as Tabs,
+  Theme,
+} from "@ally-ui-mono/ui-shared";
+import { AnalyticsWindowQuery, useGetScenarioLanguagesQuery, useGetTenantsQuery } from "@api";
+import { en, FeatureToggleKey } from "@constants";
+import { RootState } from "@store";
+import { AnalyticsRange } from "@types";
+import { hasFeature } from "@utils";
+
+import { AnalyticsTabFilters } from "./analyticsFilters";
+import { AnalyticsOrgScopeProvider } from "./analyticsOrgScope";
+import { BugAgentPerformance } from "./BugAgentPerformance";
+import { CodingAgentCost } from "./CodingAgentCost";
+import { FixSessionEngineCost } from "./FixSessionEngineCost";
+import { TabControlsSlotProvider } from "./tabControlsSlot";
+import { AnalyticsAgentTab } from "./tabs/AnalyticsAgentTab";
+import { GlossaryAdherenceTab } from "./tabs/GlossaryAdherenceTab";
+import { HighlightsTab } from "./tabs/HighlightsTab";
+import { LanguageQualityTab } from "./tabs/LanguageQualityTab";
+import { LatencyTab } from "./tabs/LatencyTab";
+import { ProductManagementTab } from "./tabs/ProductManagementTab";
+import { RetrievalQualityTab } from "./tabs/RetrievalQualityTab";
+import { ScribeTab } from "./tabs/ScribeTab";
+import { SuggestionsTab } from "./tabs/suggestions/SuggestionsTab";
+import { WeakPerformingMetricsTab } from "./tabs/WeakPerformingMetricsTab";
+import { TokenConsumption } from "./TokenConsumption";
+import { ConversationDrift } from "../ConversationDrift/ConversationDrift";
+
+const RANGE_ITEMS: { id: AnalyticsRange; label: string }[] = [
+  { id: "30d", label: "Last 30 days" },
+  { id: "90d", label: "Last 90 days" },
+  { id: "12m", label: "Last 12 months" },
+];
+
+/**
+ * Tab registry — the single place to add/reorder analytics tabs. Each entry
+ * declares which page-level pickers it consumes (`uses`) and renders its own
+ * component with the shared filter values. Adding a tab = one entry + a
+ * component under ./tabs; tab-local pickers live inside that component.
+ *
+ * `uses.range: false` means the tab reads ALL-TIME data and the time-range
+ * picker is hidden for it. That is one switch, not two: the picker's visibility
+ * and the window actually queried are both derived from this flag, so a tab
+ * cannot end up showing a picker that changes nothing — or worse, hiding one
+ * that still silently constrains its charts.
+ */
+interface TabDef {
+  id: string;
+  label: string;
+  uses: { language: boolean; range: boolean };
+  render: (f: AnalyticsTabFilters) => ReactNode;
+  /**
+   * Optional extra gate, on top of the route's analytics feature toggle. Only
+   * two tabs need it today (Analytics Agent and Suggestions), and a tab
+   * without it stays visible to everyone who can reach the page — which is
+   * how every other tab here already behaved.
+   *
+   * A hidden tab, not a disabled one: a reader who can never use it is better
+   * served by not knowing it exists than by a tab whose every request 403s.
+   */
+  visibleTo?: (ctx: { features: string[] }) => boolean;
+  /**
+   * Open to a platform admin restricted to some organizations: every request
+   * the tab makes narrows to the page's org (or is skipped for them). Every
+   * other tab is hidden from them — the backend would refuse its requests.
+   */
+  orgScoped?: true;
+}
+
+/** Query-string key that selects an Analytics tab by its `TabDef.id`. */
+export const ANALYTICS_TAB_PARAM = "tab";
+/** The Bug Agent tab's id, exported so the Bug Hunter page can link to it. */
+export const ANALYTICS_BUG_AGENT_TAB_ID = "bug-agent-performance";
+
+const TABS: TabDef[] = [
+  // Highlights is the whole-platform picture; it absorbed the former separate
+  // "Overview" tab, which rendered four of the same charts from the same data,
+  // and later the "Testing" staging tab, whose twenty charts were distributed
+  // into the Highlights sub-tab that answers the same question as each — so a
+  // metric now lives in exactly one place rather than in a reviewed copy and a
+  // provisional one.
+  //
+  // It takes no time range: a leadership view of "how is the platform doing" is
+  // a question about the whole history, and the reader who wants a narrower read
+  // gets it per chart via the grouping control rather than by re-scoping every
+  // panel on the page at once.
+  {
+    id: "highlights",
+    label: "Highlights",
+    uses: { language: false, range: false },
+    orgScoped: true,
+    render: f => <HighlightsTab {...f} />,
+  },
+  {
+    // The five simulator-quality metrics under active repair, on one filter
+    // tuple. Placed directly after Highlights because it is the working view
+    // for the current quality push, not a reference tab.
+    //
+    // It takes BOTH pickers, and unusually the tab adds two more of its own
+    // (model, scenario) rather than leaving them to a drill-in: three findings
+    // in this data turned out to be composition artefacts rather than
+    // regressions, so segmentation here is part of the metric rather than a
+    // convenience.
+    id: "weak-metrics",
+    label: "Actor quality metrics",
+    uses: { language: true, range: true },
+    render: f => <WeakPerformingMetricsTab {...f} />,
+  },
+  {
+    id: "latency",
+    label: "Latency & reliability",
+    uses: { language: true, range: true },
+    render: f => <LatencyTab {...f} />,
+  },
+  {
+    id: "drift",
+    label: "Drift",
+    uses: { language: true, range: true },
+    render: f => <ConversationDrift {...f} />,
+  },
+  {
+    id: "language",
+    label: "Language",
+    uses: { language: true, range: true },
+    render: f => <LanguageQualityTab {...f} />,
+  },
+  {
+    // Deterministic avoid-list adherence — a sibling to the Language tab's
+    // judge-based error rates, but no time range: a scan is triggered
+    // on-demand per language (Rescan), not read over a rolling window, and
+    // glossary_adherence_reports has no occurredAt-per-window field to slice
+    // by. Same per-language drill-in pattern as Language: overview table by
+    // default, pick a language above for its violated terms.
+    id: "glossary",
+    label: "Language glossary",
+    uses: { language: true, range: false },
+    render: f => <GlossaryAdherenceTab {...f} />,
+  },
+  {
+    // Corpus retrieval quality: does what the agent retrieves actually answer what it asked?
+    //
+    // Sits beside the other judge-backed quality tabs rather than under the knowledge-base
+    // pages, because the question it answers is a quality question, not a curation one — and
+    // because the curator's own surface (the corpus panel's retrieval preview) already covers
+    // "is this one query working". This is the population view.
+    //
+    // Takes the range picker and no language: a corpus document is language-tagged but a
+    // retrieval is not, and offering a language filter that narrowed nothing would be worse
+    // than offering none.
+    id: "retrieval-quality",
+    label: en.ragQuality.tab,
+    uses: { language: false, range: true },
+    render: f => <RetrievalQualityTab {...f} />,
+  },
+  {
+    // Labelled for what it measures. It was "Tokens" while its heading said "AI
+    // cost" and its axis was USD.
+    id: "cost",
+    label: "AI cost",
+    uses: { language: false, range: true },
+    render: f => (
+      <div className="flex flex-col gap-6">
+        <TokenConsumption {...f} />
+        <CodingAgentCost {...f} />
+        {/* Its own day-window control, not the tab-wide range picker above —
+            see the component's own doc for why. */}
+        <FixSessionEngineCost />
+      </div>
+    ),
+  },
+  {
+    id: ANALYTICS_BUG_AGENT_TAB_ID,
+    label: "Bug Agent",
+    uses: { language: false, range: true },
+    render: f => <BugAgentPerformance {...f} />,
+  },
+  {
+    id: "scribe",
+    orgScoped: true,
+    label: "Scribe",
+    uses: { language: false, range: true },
+    render: f => <ScribeTab {...f} />,
+  },
+  {
+    // The only tab here that measures OUR OWN work rather than the product's.
+    // Everything above reads tenant-scoped learner and session data; this reads
+    // the internal vote-based roadmap, which carries no tenant. Its own tab
+    // rather than a panel on Highlights, so nobody takes "180 votes shipped" for
+    // a platform metric.
+    //
+    // No page-level pickers: the roadmap has no language dimension, and its
+    // charts are all-time by construction — a release log is slow enough that a
+    // quarter can hold a handful of items, so a range picker would either draw
+    // one bar or hide the years before it.
+    //
+    // Visible to everyone who can reach this page, like every tab except the
+    // two below: the endpoint it calls is gated on the same route-level
+    // feature toggle, and reading a delivery chart is not the privilege that
+    // filing onto the roadmap is.
+    id: "product",
+    label: "Product management",
+    uses: { language: false, range: false },
+    render: () => <ProductManagementTab />,
+  },
+  {
+    // Ask-anything, in English. Visible to everyone who can reach this page,
+    // like every other tab — this used to sit behind the elevated
+    // super-duper-admin tier (the other tabs answer fixed, reviewed
+    // questions, while this one writes its own query across every readable
+    // table at platform scope), but the product decision was made to give
+    // every admin tier parity across all analytics surfaces. ally-be's
+    // ALLOWED_TABLES backs every tenant-attributable table with a filtered
+    // view that already excludes test-tenant rows, so widening who can ask a
+    // question does not widen what it can see.
+    //
+    // No page-level pickers: the reader states the period and the grouping in
+    // the question itself, and a range picker that silently re-scoped a typed
+    // question would be a filter nobody could see being applied.
+    id: "agent",
+    label: "Analytics Agent",
+    uses: { language: false, range: false },
+    render: () => <AnalyticsAgentTab />,
+    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
+  },
+  {
+    // "What should we build next?", answered from the platform's own numbers and
+    // reviewed card by card. Visible to everyone who can reach this page, like
+    // every other tab — this used to sit on the elevated tier because accepting
+    // a suggestion WRITES onto the product roadmap, a different privilege from
+    // reading a chart, but the product decision was made to give every admin
+    // tier parity across all analytics surfaces instead.
+    //
+    // No page-level pickers: the period belongs to a Generate run that already
+    // happened and is stamped on every card, so a picker at the top of the page
+    // would imply it re-scopes a queue it cannot touch.
+    id: "suggestions",
+    label: en.analyticsSuggestions.tabLabel,
+    uses: { language: false, range: false },
+    render: () => <SuggestionsTab />,
+    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_SUGGESTIONS),
+  },
+];
+
+export const Analytics = () => {
+  // 90 days, not 30. The judge backfill now reaches months back, and a
+  // 30-day window truncated every trend on this page to about four
+  // buckets — enough to draw a line, not enough to read one. The wider
+  // default costs a slower first paint on tabs that run many aggregates.
+  const [range, setRange] = useState<AnalyticsRange>("90d");
+  // Page-level filters, shared across tabs (language id "" = all). Each tab
+  // opts in via TabDef.uses; the picker only renders for tabs that use it.
+  const [language, setLanguage] = useState<string>("");
+  // The open tab lives in `?tab=<id>`, so "look at the Bug Agent numbers" is
+  // a link — the Bug Hunter page sends its retired Performance section here
+  // (OPP-0749). An unknown or absent id is the first tab, never an error.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get(ANALYTICS_TAB_PARAM);
+
+  // Most tabs are visible to everyone who can reach this page (the route
+  // gates on the analytics feature toggle); a tab may declare a narrower gate
+  // of its own.
+  const features = useSelector((state: RootState) => state.user.features);
+  // A platform admin restricted to some organizations sees one of them at a
+  // time, and only the tabs that can narrow to it (TabDef.orgScoped).
+  const restrictedTenantIds = useSelector(
+    (state: RootState) => state.user.user?.restrictedTenantIds ?? null,
+  );
+  const restricted = restrictedTenantIds !== null;
+  const { data: tenantData } = useGetTenantsQuery({ limit: 200 }, { skip: !restricted });
+  const orgItems = useMemo(
+    () =>
+      (restrictedTenantIds ?? [])
+        .map(id => ({
+          id,
+          label: tenantData?.data?.find(t => t.id === id)?.name ?? "Your organisation",
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [restrictedTenantIds, tenantData],
+  );
+  const [pickedOrgId, setPickedOrgId] = useState<string>("");
+  const selectedOrg = orgItems.find(o => o.id === pickedOrgId) ?? orgItems[0];
+  const orgScope = useMemo(
+    () => ({ restricted, tenantId: restricted ? selectedOrg?.id : undefined }),
+    [restricted, selectedOrg],
+  );
+  const tabs = useMemo(
+    () => TABS.filter(t => (restricted ? t.orgScoped : !t.visibleTo || t.visibleTo({ features }))),
+    [features, restricted],
+  );
+  const tabIndex = Math.max(
+    0,
+    tabs.findIndex(t => t.id === requestedTab),
+  );
+  const setTabIndex = (index: number) =>
+    setSearchParams(
+      current => {
+        const params = new URLSearchParams(current);
+        const id = tabs[index]?.id;
+        // The first tab is the default, so it is the absent value and the
+        // page's own address stays `/analytics`.
+        if (!id || index === 0) params.delete(ANALYTICS_TAB_PARAM);
+        else params.set(ANALYTICS_TAB_PARAM, id);
+        return params;
+      },
+      { replace: true },
+    );
+
+  const { data: scenarioLanguages } = useGetScenarioLanguagesQuery({ active: true });
+  const languageItems = useMemo(
+    () => [
+      { id: "", label: "All languages" },
+      ...(scenarioLanguages ?? []).map(l => ({ id: l.value, label: l.label })),
+    ],
+    [scenarioLanguages],
+  );
+
+  const selectedRange = RANGE_ITEMS.find(i => i.id === range) ?? RANGE_ITEMS[0];
+  const selectedLanguage = languageItems.find(i => i.id === language) ?? languageItems[0];
+  const activeTab = tabs[tabIndex] ?? tabs[0];
+
+  // Callback ref into state, not a plain ref: a portal needs a re-render once
+  // its target node exists, and a ref mutation does not trigger one.
+  const [controlsSlot, setControlsSlot] = useState<HTMLDivElement | null>(null);
+
+  // A tab with no range picker reads all-time data. Derived from the same flag
+  // that hides the picker, so the two cannot disagree.
+  const query: AnalyticsWindowQuery = useMemo(
+    () => ({
+      range: activeTab.uses.range ? range : "all",
+      ...(orgScope.tenantId ? { tenantId: orgScope.tenantId } : {}),
+    }),
+    [range, activeTab, orgScope.tenantId],
+  );
+  const filters: AnalyticsTabFilters = useMemo(
+    () => ({ query, language, onSelectLanguage: setLanguage }),
+    [query, language],
+  );
+
+  return (
+    <div className="analytics-page font-primary pr-1">
+      <Theme theme="white">
+        <Section>
+          {/* Heading, then filters on their own full-width line. They used to
+              sit beside the heading, which fits four controls and breaks at
+              six: a tab that adds its own slice dimensions pushed the row into
+              two ragged lines split across the middle of the filter set. */}
+          <div className="flex flex-col gap-4 mb-6">
+            <div>
+              <Heading className="text-2xl">Analytics</Heading>
+              <p className="text-sm text-typography-500 mt-1">
+                {restricted
+                  ? `Metrics for ${selectedOrg?.label ?? "your organisation"} only. Charts that span every organisation are not shown to admins restricted to some organisations.`
+                  : "Platform-wide metrics, excluding internal and test organisations."}{" "}
+                Each panel states what it is derived from and how many observations back it.
+                {/* Says where the window went, for a tab that has no picker. A
+                    missing control reads as an omission unless it is explained. */}
+                {!activeTab.uses.range &&
+                  " This tab covers all of the platform's history; each chart carries its own day/week/month/year grouping."}
+              </p>
+            </div>
+            {/* Wraps rather than overflows: with a tab's own pickers portalled
+                in, the group is wider than a 1000px viewport, and an unwrapped
+                flex row puts the last control off-screen with no scrollbar to
+                reach it. Wrapped, it stays one contiguous block of filters. */}
+            <div className="flex flex-wrap items-end gap-3">
+              {restricted && orgItems.length > 1 && (
+                <div className="w-full sm:w-56">
+                  <Dropdown
+                    id="analytics-org"
+                    size="md"
+                    titleText="Organisation"
+                    hideLabel
+                    label="Organisation"
+                    items={orgItems}
+                    selectedItem={selectedOrg}
+                    itemToString={item => item?.label ?? ""}
+                    onChange={({ selectedItem }) => {
+                      if (selectedItem) setPickedOrgId(selectedItem.id);
+                    }}
+                  />
+                </div>
+              )}
+              {activeTab.uses.language && (
+                <div className="w-full sm:w-44">
+                  <Dropdown
+                    id="analytics-language"
+                    size="md"
+                    titleText="Language"
+                    hideLabel
+                    label="Language"
+                    items={languageItems}
+                    selectedItem={selectedLanguage}
+                    itemToString={item => item?.label ?? ""}
+                    onChange={({ selectedItem }) => {
+                      if (selectedItem) setLanguage(selectedItem.id);
+                    }}
+                  />
+                </div>
+              )}
+              {activeTab.uses.range && (
+                <div className="w-full sm:w-48">
+                  <Dropdown
+                    id="analytics-range"
+                    size="md"
+                    titleText="Time range"
+                    hideLabel
+                    label="Time range"
+                    items={RANGE_ITEMS}
+                    selectedItem={selectedRange}
+                    itemToString={item => item?.label ?? ""}
+                    onChange={({ selectedItem }) => {
+                      if (selectedItem) setRange(selectedItem.id);
+                    }}
+                  />
+                </div>
+              )}
+              {/* Tabs with slice dimensions of their own portal them here, so
+                  the whole filter bar stays one row above the content it
+                  scopes. Page-wide filters first, then the tab's own. Empty for
+                  tabs that add nothing. On phones the slot dissolves into the
+                  row, so each portalled control stacks full-width like the
+                  page's own pickers. */}
+              <div
+                ref={setControlsSlot}
+                className="flex flex-wrap items-end gap-3 max-sm:contents"
+              />
+            </div>
+          </div>
+
+          {restricted && orgItems.length === 0 ? (
+            <p className="text-sm text-typography-700">
+              You are not assigned to any organisation yet, so there is nothing to show here. Ask
+              whoever manages admin access to assign you one.
+            </p>
+          ) : (
+            <AnalyticsOrgScopeProvider value={orgScope}>
+              <Tabs
+                selectedIndex={tabIndex}
+                onChange={({ selectedIndex }) => setTabIndex(selectedIndex)}
+              >
+                <TabList aria-label="Analytics sections">
+                  {tabs.map(t => (
+                    <Tab key={t.id}>{t.label}</Tab>
+                  ))}
+                </TabList>
+                <TabPanels>
+                  {/*
+                Only the ACTIVE panel's component is mounted. Carbon's TabPanel
+                merely sets `hidden`, so rendering every tab's children fired one
+                query per chart across all tabs on first paint — most of them for
+                panels nobody was looking at. Depth stays available on demand; it
+                just is not all fetched up front.
+              */}
+                  {tabs.map((t, i) => (
+                    // No side padding on phones: the page wrapper already has its
+                    // gutter, and Carbon's panel padding stacks on top of it.
+                    <TabPanel key={t.id} className="max-sm:!px-0">
+                      {i === tabIndex ? (
+                        <TabControlsSlotProvider value={controlsSlot}>
+                          {t.render(filters)}
+                        </TabControlsSlotProvider>
+                      ) : null}
+                    </TabPanel>
+                  ))}
+                </TabPanels>
+              </Tabs>
+            </AnalyticsOrgScopeProvider>
+          )}
+        </Section>
+      </Theme>
+    </div>
+  );
+};

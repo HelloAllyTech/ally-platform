@@ -1,0 +1,658 @@
+import { FC, useCallback, useEffect, useRef, useState } from "react";
+
+import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+
+import { logger, Loading, Tooltip } from "@ally-ui-mono/ui-shared";
+import {
+  useGetSummaryFieldsQuery,
+  useUpdateCallSummaryMutation,
+  useRetrySummaryMutation,
+  useGetLocationsQuery,
+  useLazySearchLocationsQuery,
+  useUpdateCallSummaryNotesMutation,
+  useGetCustomFieldValuesQuery,
+  useUpsertCustomFieldValuesMutation,
+} from "@api";
+import { Assessment, PageNotFoundIllustration, Warning } from "@assets";
+import { Accordion, Button, InfoBanner, FallbackUI, SaveStatus } from "@components";
+import { LanguageMap, Permissions, ROUTES } from "@constants";
+import { FeedbackDialog } from "@containers";
+import {
+  CUSTOM_CHANNEL,
+  SUMMARY_CHANNEL,
+  useCustomFieldsEnabled,
+  useDebounce,
+  useEnhance,
+  useFieldAutosave,
+} from "@hooks";
+import type { PendingEdits } from "@hooks";
+import CustomFieldValuesPanel from "@pages/calls/components/custom-fields/CustomFieldValuesPanel";
+import { RootState } from "@store";
+import { ChatSummaryStatus, SessionType, SummaryFieldKey } from "@types";
+import { CustomFieldEditPermission, CustomFieldValue } from "@types";
+import { getEstimatedSummaryGenerationTime, getFormattedDateTime, hasPermissions } from "@utils";
+
+import { SummaryLoading } from ".";
+import SummaryFieldInput from "./SummaryFieldInput";
+import { getSummaryFields, getSummarySections, labelShownSections } from "../constants";
+import { CallSummaryProps, FieldType, SummaryField, SummarySectionKey } from "../types";
+import { getSectionFields } from "../utils";
+
+// TODO: Keep it outside the pages since two pages are using this componentß
+
+const CallSummary: FC<CallSummaryProps> = ({
+  chatId,
+  isInSidebar = false,
+  className,
+  headerContent,
+  postProcess,
+  canEditSummary = true,
+  canEditCustomFields,
+  callSummary,
+  onRefetchSummary,
+  isSummaryLoading,
+  summaryLoadingError,
+  onCustomFieldValuesSaved,
+}) => {
+  const { t } = useTranslation();
+  const { permissions, user } = useSelector((state: RootState) => state.user);
+  const sections = getSummarySections(t);
+  const translatedFields = getSummaryFields(t);
+
+  const [summaryData, setSummaryData] = useState(null);
+  const [searchedLocations, setSearchedLocations] = useState(null);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [canShowSummary, setCanShowSummary] = useState<boolean>(true);
+
+  const initialNotes = summaryData?.details?.callInfo?.notes || "";
+
+  const [notes, setNotes] = useState<string>(initialNotes);
+
+  const navigate = useNavigate();
+
+  const { data: visibleFields } = useGetSummaryFieldsQuery(undefined, {
+    skip: !hasPermissions(permissions, Permissions.VIEW_SUMMARY_FIELDS),
+  });
+  const [updateCallSummary] = useUpdateCallSummaryMutation();
+  const [retrySummary, { isLoading: isRetrying }] = useRetrySummaryMutation();
+  const { data: locations } = useGetLocationsQuery();
+  const [searchLocations] = useLazySearchLocationsQuery();
+  const [updateCallSummaryNotes, { isLoading: isUpdateNotesLoading }] =
+    useUpdateCallSummaryNotesMutation();
+
+  const { enhancing, EnhanceButton, EnhancementLoadingSkeleton } = useEnhance();
+
+  // Custom field state
+  const { data: customFieldsEnabled } = useCustomFieldsEnabled();
+  const customFieldsActive = customFieldsEnabled !== false;
+  const { data: customFieldValues } = useGetCustomFieldValuesQuery(chatId, {
+    skip: !chatId || !customFieldsActive,
+  });
+  const [upsertCustomFieldValues] = useUpsertCustomFieldValuesMutation();
+  const [customLocalValues, setCustomLocalValues] = useState<Record<string, string | null>>({});
+  const seededChatIdRef = useRef<number | null>(null);
+  // The chat whose summary is currently loaded into summaryData. Seeding is
+  // keyed on this, not on summaryStatus — see the seeding effect below.
+  const seededSummaryChatIdRef = useRef<number | null>(null);
+
+  // Seed local edit state once per chat. Re-seeding on every customFieldValues
+  // change would clobber the user's in-progress edits: a background refetch
+  // (window focus, polling, or a tag invalidation from another mutation) resets
+  // typed values back to the stale server value before the user can save.
+  useEffect(() => {
+    if (customFieldValues && seededChatIdRef.current !== chatId) {
+      const initial: Record<string, string | null> = {};
+      customFieldValues.forEach((f: CustomFieldValue) => {
+        initial[f.fieldDefinitionId] = f.value ?? null;
+      });
+      setCustomLocalValues(initial);
+      seededChatIdRef.current = chatId;
+    }
+  }, [customFieldValues, chatId]);
+
+  // Determine if editing should be allowed
+  // If canEditSummary is explicitly false (from ConsolidatedLogs), respect that
+  // Otherwise (true/undefined/default), check permissions and counselor match
+  const hasEditSummaryPermission = permissions?.includes(Permissions.EDIT_CALL_DETAILS);
+  const isAdmin = permissions?.includes(Permissions.MANAGE_CUSTOM_FIELD_DEFINITIONS);
+  const isCounsellorForCall = Boolean(
+    user?.userId && callSummary?.counselorId && callSummary.counselorId === user.userId,
+  );
+  const shouldAllowEdit =
+    canEditSummary !== false && hasEditSummaryPermission && isCounsellorForCall;
+  const hasAdminEditableCustomFields =
+    isAdmin &&
+    customFieldsActive &&
+    (customFieldValues?.some(
+      (f: CustomFieldValue) =>
+        f.editPermission === CustomFieldEditPermission.ADMIN_ONLY ||
+        f.editPermission === CustomFieldEditPermission.BOTH,
+    ) ??
+      false);
+  const hasCounsellorEditableCustomFields =
+    isCounsellorForCall &&
+    customFieldsActive &&
+    (customFieldValues?.some(
+      (f: CustomFieldValue) =>
+        f.editPermission === CustomFieldEditPermission.COUNSELLOR_ONLY ||
+        f.editPermission === CustomFieldEditPermission.BOTH,
+    ) ??
+      false);
+  const canSave =
+    shouldAllowEdit ||
+    (canEditCustomFields !== false &&
+      (hasAdminEditableCustomFields || hasCounsellorEditableCustomFields));
+
+  // Write the pending edits. Each channel goes to its own endpoint, and only the
+  // keys the counsellor actually touched are sent — the backend merges the
+  // summary patch, so an untouched field keeps whatever the server has (an
+  // AI-filled value, or a regeneration that landed mid-edit).
+  const persistEdits = useCallback(
+    async (pending: PendingEdits) => {
+      const summaryPatch: Record<string, unknown> = { ...(pending[SUMMARY_CHANNEL] ?? {}) };
+      if (SummaryFieldKey.Tags in summaryPatch) {
+        // The field holds comma-separated text; the API takes tag names and
+        // rates them server-side, after the write.
+        summaryPatch[SummaryFieldKey.Tags] = String(summaryPatch[SummaryFieldKey.Tags] ?? "")
+          .split(",")
+          .map(tag => tag.trim())
+          .filter(Boolean);
+      }
+      const customValues = Object.entries(pending[CUSTOM_CHANNEL] ?? {}).map(
+        ([fieldDefinitionId, value]) => ({
+          fieldDefinitionId,
+          // Coalesce to null, not undefined: a cleared field has to reach the
+          // backend as an explicit null to be cleared, and JSON.stringify drops
+          // undefined keys.
+          value: (value as string | null) ?? null,
+        }),
+      );
+
+      await Promise.all([
+        Object.keys(summaryPatch).length > 0
+          ? updateCallSummary({ chatId, data: { summary: summaryPatch } }).unwrap()
+          : Promise.resolve(),
+        customValues.length > 0
+          ? upsertCustomFieldValues({ chatId, values: customValues }).unwrap()
+          : Promise.resolve(),
+      ]);
+
+      if (customValues.length > 0) {
+        // Let a parent list reflect the edit on its row immediately; the list
+        // only refetches its current page, so rows elsewhere would stay stale.
+        onCustomFieldValuesSaved?.(chatId, customValues);
+      }
+    },
+    [chatId, updateCallSummary, upsertCustomFieldValues, onCustomFieldValuesSaved],
+  );
+
+  // Autosave. Scribe used to hold every edit in component state until the
+  // counsellor pressed Save, so switching tabs, closing the sidebar or
+  // navigating away threw the work away silently. Edits now reach the server
+  // within a second of typing, and the Save button is a force-flush.
+  const autosave = useFieldAutosave({
+    onPersist: persistEdits,
+    enabled: canSave,
+  });
+
+  // Switching sessions must drop the previous session's values *immediately*,
+  // before its replacement has loaded — otherwise the form still holds session
+  // A's values under session B's chatId, and a save writes A's summary onto B.
+  //
+  // Initialised to the mounting chatId so this does not fire on mount: the two
+  // seeding effects populate state on mount and a reset would wipe them. Hosts
+  // that swap sessions by remounting (the sidebar keys on session id) flush
+  // pending edits on unmount instead, against the session they belong to.
+  const resetChatIdRef = useRef<number | null>(chatId);
+  useEffect(() => {
+    if (resetChatIdRef.current === chatId) return;
+    resetChatIdRef.current = chatId;
+    setSummaryData(null);
+    setCustomLocalValues({});
+    autosave.reset();
+    seededChatIdRef.current = null;
+  }, [chatId, autosave]);
+
+  const handleCustomFieldChange = (fieldDefinitionId: string, value: string | null) => {
+    setCustomLocalValues(prev => ({ ...prev, [fieldDefinitionId]: value }));
+    autosave.edit(CUSTOM_CHANNEL, fieldDefinitionId, value);
+  };
+
+  const handleSummaryFieldChange = (key: string, value: unknown) => {
+    setSummaryData(prev => ({ ...prev, [key]: value }));
+    autosave.edit(SUMMARY_CHANNEL, key, value);
+  };
+
+  useEffect(() => {
+    // Never seed from a summary that belongs to a different chat. RTK Query can
+    // hand back another session's cached payload for a render after chatId
+    // changes, and the id check is what stops those values being adopted (and
+    // then saved) under the new chat's id.
+    if (callSummary?.id != null && callSummary.id !== chatId) return;
+
+    // A different chat than the one currently loaded: take the server copy
+    // wholesale. Merging would be wrong here — the "edits to preserve" belong
+    // to the session we just navigated away from.
+    const isNewChat = seededSummaryChatIdRef.current !== chatId;
+
+    // Merge the generated summary into state without discarding edits that
+    // haven't reached the server yet. Untouched fields take the generated value;
+    // fields still pending in the autosave queue are kept, so an async
+    // generation landing mid-keystroke can't wipe what the user just typed.
+    // (Already-written edits need no protection — the server copy *is* them.)
+    const seedPreservingEdits = (generated: Record<string, unknown>) => {
+      setSummaryData(prev => {
+        if (isNewChat || !prev) return generated;
+        const merged = { ...generated };
+        for (const key of Object.keys(autosave.getPending()[SUMMARY_CHANNEL] ?? {})) {
+          if (key in prev) merged[key] = prev[key];
+        }
+        return merged;
+      });
+      seededSummaryChatIdRef.current = chatId;
+    };
+
+    if (callSummary?.summaryStatus === ChatSummaryStatus.SUCCESS) {
+      const tags = callSummary.details.summary?.tags;
+      seedPreservingEdits({
+        ...callSummary.details.summary,
+        tags: tags?.map(({ tag }) => tag).join(", "),
+      });
+      if (isInSidebar) {
+        postProcess?.(ChatSummaryStatus.SUCCESS);
+      }
+      setTimeout(() => {
+        setCanShowSummary(true);
+      }, 4000);
+    } else if (callSummary?.summaryStatus === ChatSummaryStatus.FAILED) {
+      // Summary generation failed but the transcript was saved. Seed whatever
+      // (possibly empty) summary exists so the fields render as editable blanks
+      // for manual entry, and show the form + a Retry action instead of a
+      // dead-end error screen.
+      const existing = callSummary.details?.summary;
+      const tags = existing?.tags;
+      seedPreservingEdits({
+        ...(existing ?? {}),
+        tags: tags?.map(({ tag }) => tag).join(", ") ?? "",
+      });
+      setCanShowSummary(true);
+    }
+    // chatId is a dependency because summaryStatus alone never changes when the
+    // user switches between two sessions that have both finished generating —
+    // the effect wouldn't fire, and the previous session's summary would stay
+    // in the form.
+  }, [callSummary?.summaryStatus, callSummary?.id, chatId, isInSidebar]);
+
+  useEffect(() => {
+    if (initialNotes?.length > 0) {
+      setNotes(initialNotes);
+    }
+  }, [initialNotes]);
+
+  const onHandleSearch = async (query: string) => {
+    if (query) {
+      const response = await searchLocations({ query });
+      if (response.error) {
+        logger.info(`Error searching locations: ${response.error}`);
+      } else if (response.data) {
+        setSearchedLocations(response.data);
+      }
+    } else {
+      setSearchedLocations(null);
+    }
+  };
+
+  const getDropdownOptions = (key: string, options: string[]) => {
+    if (key === SummaryFieldKey.Location) {
+      const locationData = searchedLocations || locations?.data || [];
+      return locationData.map(({ city, state }) => `${city} - ${state}`) || [];
+    }
+    return options ?? [];
+  };
+
+  const getFieldValue = (key: string, type: string) => {
+    if (!summaryData) {
+      return type !== FieldType.Dropdown ? "--" : "";
+    }
+    switch (key) {
+      case SummaryFieldKey.CallId:
+        return callSummary?.details?.chatId || summaryData.callId;
+      case SummaryFieldKey.CallDuration: {
+        const duration = callSummary?.details?.callDuration || summaryData.callDuration;
+        return duration
+          ? `${Math.floor(Number(duration) / 60)} ${t("common.minutes_other", { count: Math.floor(Number(duration) / 60) })}`
+          : "--";
+      }
+      case SummaryFieldKey.CallDate:
+        return getFormattedDateTime(callSummary?.details?.startTime, "do MMMM yyyy");
+      case SummaryFieldKey.CallTime: {
+        return `${getFormattedDateTime(callSummary?.startedAt, "HH:mm")} - ${getFormattedDateTime(
+          callSummary?.endedAt,
+          "HH:mm",
+        )}`;
+      }
+      case SummaryFieldKey.ClientId: {
+        const clientId = callSummary?.clientId || summaryData.clientId;
+        if (clientId === -1) {
+          return "N/A";
+        }
+        return clientId;
+      }
+      case SummaryFieldKey.Languages:
+        return (
+          summaryData.languages
+            ?.map(({ language, percentage }) => `${LanguageMap[language]} (${percentage}%)`)
+            .join(", ") || ""
+        );
+      case SummaryFieldKey.ListeningShare:
+        return `${(callSummary?.details?.callInfo?.clientTalkingPercentage ?? 0) * 100}%`;
+      case SummaryFieldKey.Mode: {
+        const mode = callSummary?.details?.callInfo?.mode || summaryData?.mode;
+        return mode === "DICTATION" ? "Dictation" : "Scribe";
+      }
+      default:
+        return summaryData[key];
+    }
+  };
+
+  const isFieldDisabled = (field: SummaryField) => {
+    return !field.isEditable || !shouldAllowEdit;
+  };
+
+  const getFieldDisplay = (field: SummaryField) => {
+    const value = getFieldValue(field.key, field.type);
+    const isEnhancing = enhancing === field.key;
+    const enhanceEndAdornment =
+      field.isEnhanceable && shouldAllowEdit && value && value.trim() ? (
+        <Tooltip label={t("summary.enhance")} align="bottom">
+          <span className="absolute bottom-2 right-2">
+            <EnhanceButton
+              fieldName={field.key}
+              inputText={value}
+              updateValue={text => handleSummaryFieldChange(field.key, text)}
+            />
+          </span>
+        </Tooltip>
+      ) : undefined;
+
+    return (
+      <SummaryFieldInput
+        key={field.key}
+        field={field}
+        value={value}
+        disabled={isFieldDisabled(field)}
+        options={
+          field.type === FieldType.Dropdown
+            ? getDropdownOptions(field.key, field.options)
+            : undefined
+        }
+        showLabel={labelShownSections?.includes(field.sectionKey)}
+        onChange={handleSummaryFieldChange}
+        onSearch={onHandleSearch}
+        isEnhancing={isEnhancing}
+        enhanceStartAdornment={isEnhancing ? EnhancementLoadingSkeleton : undefined}
+        enhanceEndAdornment={enhanceEndAdornment}
+      />
+    );
+  };
+
+  const navigateToCallLogs = () => {
+    navigate(ROUTES.SCRIBE_LOGS, { state: { refetch: true } });
+  };
+
+  /**
+   * Save is now a force-flush: edits are already being written as they're made,
+   * so this only pushes out whatever is still inside the debounce window and
+   * then moves the counsellor on. A failed flush must NOT fall through to
+   * postProcess/navigate as if it worked — the edit would live on in component
+   * state, still looking saved on screen, while the DB keeps the old value.
+   */
+  const handleSave = async () => {
+    try {
+      await autosave.flush();
+    } catch {
+      // The edits stay pending so the next flush retries them.
+      toast.error(t("summary.saveFailed", "Couldn't save your changes. Please try again."));
+      return;
+    }
+    postProcess?.();
+    if (!isInSidebar && shouldAllowEdit) {
+      if (callSummary?.details?.callInfo?.isSummaryFeedbackAdded) {
+        navigateToCallLogs();
+      } else {
+        setShowFeedbackDialog(true);
+      }
+    }
+  };
+
+  const handleRetrySummary = async () => {
+    try {
+      const res = await retrySummary(chatId).unwrap();
+      if (res?.success) {
+        toast.success(t("summary.retrySuccess"));
+      } else {
+        toast.warning(res?.message || t("summary.retryFailed"));
+      }
+    } catch {
+      toast.error(t("summary.retryFailed"));
+    }
+    // Refetch so a regenerated summary (or the still-failed state) is reflected.
+    await onRefetchSummary();
+  };
+
+  const debouncedUpdateNotes = useDebounce((notes: string) => {
+    updateCallSummaryNotes({
+      chatId: chatId.toString(),
+      notes,
+    });
+  }, 500);
+
+  const handleNotesChange = (newNotes: string) => {
+    setNotes(newNotes);
+    debouncedUpdateNotes(newNotes);
+  };
+
+  const onSubmitFeedback = () => {
+    setShowFeedbackDialog(false);
+    navigateToCallLogs();
+  };
+
+  if (canShowSummary && isSummaryLoading) {
+    return (
+      <div className="flex justify-center items-center h-[calc(100dvh-80px)]">
+        <Loading withOverlay={false} />
+      </div>
+    );
+  }
+
+  // Only when the fetch left us with nothing to render. RTK Query keeps the
+  // last good `data` on a rejected refetch, so a summary already open on
+  // screen would otherwise be replaced by "Summary Not Found" the moment a
+  // background refetch blips — and every autosave triggers one, because
+  // updateCallSummary invalidates the CallSummary tag. The error is only
+  // genuinely "not found" when there is no summary to fall back on.
+  if (summaryLoadingError && !callSummary) {
+    return (
+      <div className="flex h-[90vh] items-center justify-center">
+        <FallbackUI
+          icon={<PageNotFoundIllustration />}
+          mainMessage={t("summary.notFoundTitle")}
+          description={t("summary.notFoundDesc")}
+          button={{
+            text: t("summary.goHome"),
+            onClick: () => navigate(ROUTES.HOME),
+          }}
+        />
+      </div>
+    );
+  }
+
+  const isFailedSummary = callSummary?.summaryStatus === ChatSummaryStatus.FAILED;
+
+  // A manual note (created via "Create Note") has summaryStatus SUCCESS but no
+  // AI-generated `details.summary` — there was no audio to summarise. Treat that
+  // as ready-to-edit too, otherwise the panel is stuck forever on SummaryLoading's
+  // "Setting up your summary screen" and the fields (incl. custom fields) never
+  // render. FAILED already renders the form for manual entry; SUCCESS-with-empty
+  // -summary must as well.
+  const isResolvedEmptySummary = callSummary?.summaryStatus === ChatSummaryStatus.SUCCESS;
+
+  if (
+    canShowSummary &&
+    (callSummary?.details?.summary || isFailedSummary || isResolvedEmptySummary)
+  ) {
+    return (
+      <>
+        {isFailedSummary ? (
+          // Summary generation failed but the transcript was saved: let the
+          // user retry generation or fill the fields in manually and save.
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#c4901f] bg-[#f3e6c9] px-4 py-3 mb-2">
+            <span className="text-[#6b4f22] font-primary text-sm">
+              {t("summary.generationFailedEditable")}
+            </span>
+            <Button onClick={handleRetrySummary} disabled={isRetrying} className="shrink-0">
+              {isRetrying && <Loading small withOverlay={false} className="mr-2 !h-4 !w-4" />}
+              {t("summary.retrySummary")}
+            </Button>
+          </div>
+        ) : (
+          <InfoBanner
+            message={t("summary.disclaimer")}
+            icon={() => (
+              <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+            )}
+            wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
+            messageClassName="text-[#6b4f22]"
+          />
+        )}
+        {headerContent}
+        <div className={`overflow-y-auto font-primary pb-[60px] ${className}`}>
+          {sections.map(({ title, icon, key }, index) => {
+            const sectionFields = getSectionFields(key, visibleFields, translatedFields);
+            if (sectionFields?.length === 0) return null;
+
+            return (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.4,
+                  delay: index * 0.1,
+                  ease: "easeOut",
+                }}
+              >
+                <Accordion
+                  title={title}
+                  titleIcon={icon}
+                  defaultExpanded={[
+                    SummarySectionKey.FeaturesAndDemographics,
+                    SummarySectionKey.SessionSummary,
+                  ]?.includes(key)}
+                >
+                  {sectionFields.map(field => getFieldDisplay(field))}
+                  {chatId && customFieldsActive && (
+                    <CustomFieldValuesPanel
+                      chatId={chatId}
+                      canEdit={canEditCustomFields}
+                      isCounsellor={isCounsellorForCall}
+                      filterSectionKey={key}
+                      externalFieldValues={customFieldValues ?? []}
+                      externalLocalValues={customLocalValues}
+                      onValueChange={handleCustomFieldChange}
+                    />
+                  )}
+                </Accordion>
+              </motion.div>
+            );
+          })}
+          {/* TO DO: For now Additional Notes is not conditionally rendered, because it is not generated by the AI( and not involved in config).
+          In future, we will conditionally render this accordion based on the notes field */}
+          <motion.div
+            key="notes"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.4,
+              delay: ((sections?.length ?? 0) + 1) * 0.1,
+              ease: "easeOut",
+            }}
+          >
+            <Accordion
+              key="notes"
+              title={t("summary.additionalNotes")}
+              titleIcon={{ icon: Assessment, alt: "Notes" }}
+              defaultExpanded={false}
+            >
+              <div className="text-lg font-primary text-typography-800 mb-[8px]">
+                {callSummary?.details?.callInfo?.notes || "--"}
+              </div>
+            </Accordion>
+          </motion.div>
+        </div>
+
+        {canSave && (
+          <div className="flex flex-col items-center gap-2">
+            {/* Autosave is invisible unless we say so; without this the
+                counsellor has no way to tell a written edit from a pending one. */}
+            <SaveStatus state={autosave.saveState} />
+            <Button
+              onClick={handleSave}
+              // Only the save itself gates this. It used to also wait on the
+              // locations and location-search queries, so a slow or failed
+              // /locations call left Save permanently greyed out with no
+              // explanation — read by counsellors as "I can't save".
+              disabled={autosave.saveState === "saving" || (isInSidebar && !autosave.isDirty)}
+            >
+              {autosave.saveState === "saving" ? t("summary.saving") : t("summary.save")}
+            </Button>
+          </div>
+        )}
+        <FeedbackDialog
+          id={chatId}
+          open={showFeedbackDialog}
+          sessionType={SessionType.CALL}
+          onClose={onSubmitFeedback}
+        />
+      </>
+    );
+  }
+
+  const retriggerSummary = async () => {
+    setCanShowSummary(false);
+    const result = await onRefetchSummary();
+    if (
+      [ChatSummaryStatus.PENDING, ChatSummaryStatus.IN_PROGRESS].includes(
+        result?.data?.summaryStatus,
+      )
+    ) {
+      toast.warning("The summary isn't available yet. It will be available shortly.");
+    }
+  };
+
+  const onViewCallLogs = () => {
+    navigateToCallLogs();
+  };
+
+  return (
+    <SummaryLoading
+      summaryStatus={callSummary?.summaryStatus}
+      estimatedTime={getEstimatedSummaryGenerationTime(
+        callSummary?.details?.callDuration,
+        callSummary?.details?.callInfo?.provider,
+      )}
+      isNotesSaving={isUpdateNotesLoading}
+      onNotesChange={handleNotesChange}
+      onViewCallLogs={onViewCallLogs}
+      notes={notes}
+      refetchSummary={retriggerSummary}
+      inSummarySidebar={isInSidebar}
+    />
+  );
+};
+
+export default CallSummary;

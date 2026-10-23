@@ -1,0 +1,254 @@
+/**
+ * This module provides all call summary and transcript-related API endpoints including:
+ * - Call summary retrieval and updates
+ * - Content enhancement using AI
+ * - Tag management and positivity ratings
+ * - Location data and search
+ * - Transcript retrieval and management
+ * - Export functionality
+ */
+
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
+import {
+  EnhanceContentRequest,
+  EnhanceContentResponse,
+  ExportCallSummaryRequest,
+  GetLocationsResponse,
+  SummaryFieldKey,
+  Tag,
+  UpdateCallInfoRequest,
+  GetTranscriptResponse,
+  GetTranscriptRequest,
+  UpdateCallSummaryNotesRequest,
+  SubmitFeedbackRequest,
+  SubmitFeedbackResponse,
+} from "@types";
+
+import { baseAPI } from "./baseAPI";
+import { patchCachedCallLogRow } from "./calls";
+
+const callSummaryAPI = baseAPI.injectEndpoints({
+  endpoints: builder => ({
+    /**
+     * Retrieves the list of available fields that can be used
+     * in call summaries for categorization and organization.
+     * @returns {Promise<SummaryFieldKey[]>} Array of available summary field keys
+     */
+    getSummaryFields: builder.query<SummaryFieldKey[], void>({
+      query: () => ApiEndpoints.CALL_SUMMARY.GET_SUMMARY_FIELDS,
+    }),
+
+    /**
+     * Retrieves the complete summary data for a specific call session.
+     * Provides tags for automatic cache invalidation.
+     * @param {string} chatId - Unique identifier for the call session
+     * @returns {Promise<any>} Call summary data
+     */
+    getCallSummary: builder.query({
+      query: chatId => `${ApiEndpoints.CALL_SUMMARY.GET_CALL_SUMMARY}/${chatId}`,
+      providesTags: [TAG_TYPES.CALL_SUMMARY],
+    }),
+
+    /**
+     * Updates the summary data for a specific call session.
+     * Invalidates related cache tags to ensure data consistency.
+     * @param {Object} params - Update parameters
+     * @param {string} params.chatId - Unique identifier for the call session
+     * @param {any} params.data - Updated summary data
+     * @returns {Promise<any>} Update response
+     */
+    updateCallSummary: builder.mutation({
+      query: ({ chatId, data }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.UPDATE_CALL_SUMMARY(chatId),
+        method: HttpMethod.PUT,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.CALL_SUMMARY],
+      /**
+       * This is the hottest writer on the platform: scribe autosaves every
+       * field edit on an 800ms debounce, so one note write-up fires it dozens
+       * of times. It used to invalidate the whole `CallLogs` tag, and each of
+       * those invalidations re-read the counsellor's 25-row page and made
+       * ally-be decrypt all 25 `CallDetails` again.
+       *
+       * The endpoint answers with the updated chat, so the only thing the list
+       * shows that a summary edit can change — the tag chips, with the
+       * positivity ratings the server assigns *after* the write — is already in
+       * hand. Patch the row with it and read nothing back.
+       */
+      async onQueryStarted({ chatId }, { dispatch, getState, queryFulfilled }) {
+        try {
+          const { data: updatedChat } = await queryFulfilled;
+          const details = (updatedChat as { details?: unknown })?.details;
+          if (!details) return;
+          patchCachedCallLogRow({ dispatch, getState }, chatId, row => {
+            row.details = details;
+          });
+        } catch {
+          // The write failed; the list keeps the last row it was told about,
+          // and the form surfaces the failure itself.
+        }
+      },
+    }),
+
+    /**
+     * Re-runs AI summary generation from the chat's saved transcript, for a
+     * session whose transcript was captured but whose summary failed.
+     * Invalidates the summary/logs cache so the regenerated summary is shown.
+     * @param {number} chatId - The chat/session id.
+     * @returns {Promise<{ success: boolean; message: string }>}
+     */
+    retrySummary: builder.mutation<{ success: boolean; message: string }, number>({
+      query: chatId => ({
+        url: ApiEndpoints.CALL_SUMMARY.RETRY_SUMMARY(chatId),
+        method: HttpMethod.POST,
+      }),
+      // A regenerated summary comes from the server, not from anything we sent,
+      // so this one genuinely needs a re-read — scoped to the row, so it only
+      // refetches the lists that actually show it.
+      invalidatesTags: (_result, _error, chatId) => [
+        TAG_TYPES.CALL_SUMMARY,
+        { type: TAG_TYPES.CALL_LOGS, id: chatId },
+      ],
+    }),
+
+    /**
+     * Uses AI to improve and enhance the provided content,
+     * typically used for improving call summaries or notes.
+     * @param {EnhanceContentRequest} data - Content to be enhanced
+     * @returns {Promise<EnhanceContentResponse>} Enhanced content response
+     */
+    enhanceContent: builder.mutation<EnhanceContentResponse, EnhanceContentRequest>({
+      query: ({ content }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.ENHANCE_CONTENT,
+        method: HttpMethod.POST,
+        body: { content },
+      }),
+    }),
+
+    /**
+     * Retrieves positivity ratings for a list of tags,
+     * used for sentiment analysis and call categorization.
+     * @param {Object} data - Tag data
+     * @param {string[]} data.tags - Array of tags to analyze
+     * @returns {Promise<Tag[]>} Tag data with positivity ratings
+     */
+    getTags: builder.mutation<Tag[], { tags: string[] }>({
+      query: body => ({
+        url: ApiEndpoints.CALL_SUMMARY.GET_TAG_POSITIVITY_RATINGS,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /**
+     * Updates metadata and information about a specific call session.
+     * @param {UpdateCallInfoRequest} data - Call information update data
+     * @returns {Promise<void>} Update response
+     */
+    updateCallInfo: builder.mutation<void, UpdateCallInfoRequest>({
+      query: ({ chatId, callInfo }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.UPDATE_CALL_INFO(chatId),
+        method: HttpMethod.PATCH,
+        body: callInfo,
+      }),
+      invalidatesTags: [TAG_TYPES.CALL_SUMMARY],
+      // Renaming a session changes exactly one cell of one row, and the
+      // response carries the updated chat — patch it in rather than re-reading
+      // the page. Same reasoning as `updateCallSummary` above.
+      async onQueryStarted({ chatId }, { dispatch, getState, queryFulfilled }) {
+        try {
+          const { data: updatedChat } = await queryFulfilled;
+          const details = (updatedChat as unknown as { details?: unknown })?.details;
+          if (!details) return;
+          patchCachedCallLogRow({ dispatch, getState }, chatId, row => {
+            row.details = details;
+          });
+        } catch {
+          // Leave the list showing the name it last knew about.
+        }
+      },
+    }),
+
+    /**
+     * Generates and exports a call summary in various formats
+     * @param {ExportCallSummaryRequest} data - Export parameters
+     * @returns {Promise<void>} Export response
+     */
+    exportCallSummary: builder.query<void, ExportCallSummaryRequest>({
+      query: ({ chatId }) => ApiEndpoints.CALL_SUMMARY.EXPORT_CALL_SUMMARY(chatId),
+    }),
+
+    /**
+     * Retrieves the list of available locations for call categorization
+     * and geographical analysis.
+     * @returns {Promise<GetLocationsResponse>} Available locations data
+     */
+    getLocations: builder.query<GetLocationsResponse, void>({
+      query: () => ApiEndpoints.CALL_SUMMARY.GET_LOCATIONS,
+    }),
+
+    /**
+     * Searches for locations based on a query string,
+     * used for location-based call filtering and analysis.
+     * @param {Object} data - Search parameters
+     * @param {string} data.query - Search query string
+     * @returns {Promise<GetLocationsResponse>} Search results
+     */
+    searchLocations: builder.query<GetLocationsResponse, { query: string }>({
+      query: ({ query }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.SEARCH_LOCATIONS,
+        params: { query },
+      }),
+    }),
+
+    /**
+     * Retrieves the transcript data for a specific call session
+     * with pagination and sorting options.
+     * @param {GetTranscriptRequest} data - Transcript request parameters
+     * @returns {Promise<GetTranscriptResponse>} Transcript data
+     */
+    getTranscript: builder.query<GetTranscriptResponse, GetTranscriptRequest>({
+      query: ({ chatId, offset, limit, sortBy }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.GET_TRANSCRIPT(chatId),
+        params: { offset, limit, sortOrder: "ASC", sortBy, includeTags: true },
+      }),
+    }),
+
+    /**
+     * Updates the notes section of a call summary with new content.
+     * @param {UpdateCallSummaryNotesRequest} data - Notes update data
+     * @returns {Promise<void>} Update response
+     */
+    updateCallSummaryNotes: builder.mutation<void, UpdateCallSummaryNotesRequest>({
+      query: ({ chatId, notes }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.UPDATE_CALL_SUMMARY_NOTES(chatId),
+        method: HttpMethod.POST,
+        body: { content: notes },
+      }),
+    }),
+    submitCallFeedback: builder.mutation<SubmitFeedbackResponse, SubmitFeedbackRequest>({
+      query: ({ chatId, rating, feedback }) => ({
+        url: ApiEndpoints.CALL_SUMMARY.SUBMIT_FEEDBACK(chatId),
+        method: HttpMethod.POST,
+        body: { rating, feedback },
+      }),
+    }),
+  }),
+});
+
+export const {
+  useGetSummaryFieldsQuery,
+  useGetCallSummaryQuery,
+  useUpdateCallSummaryMutation,
+  useRetrySummaryMutation,
+  useEnhanceContentMutation,
+  useGetTagsMutation,
+  useUpdateCallInfoMutation,
+  useLazyExportCallSummaryQuery,
+  useGetLocationsQuery,
+  useLazySearchLocationsQuery,
+  useGetTranscriptQuery,
+  useUpdateCallSummaryNotesMutation,
+  useSubmitCallFeedbackMutation,
+} = callSummaryAPI;

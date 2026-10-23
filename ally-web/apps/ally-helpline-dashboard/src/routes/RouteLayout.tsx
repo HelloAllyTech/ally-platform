@@ -1,0 +1,91 @@
+import { Route, Routes, BrowserRouter } from "react-router-dom";
+
+import { ROUTES } from "@constants";
+import {
+  Health,
+  Login,
+  Learn,
+  MagicLinkVerify,
+  Scenario,
+  CaseTrackDetails,
+  TrackOverview,
+  TrackPlayer,
+  TrackProgress,
+  CourseLanding,
+  SuspendedUser,
+  ImpersonateHandler,
+  Terms,
+  Privacy,
+  Blog,
+  BlogPost,
+  Changelog,
+  Roadmap,
+  Sjt1,
+  SjtEdit,
+  SjtReport1,
+  HelplineTalk,
+  HomeV2,
+} from "@pages";
+
+import { PageviewTracker } from "../analytics";
+import HybridRouteLayout from "./HybridRouteLayout";
+import PrivateRouteLayout from "./PrivateRouteLayout";
+import PublicLayout from "./PublicRouteLayout";
+
+const RouteLayout = () => {
+  return (
+    <BrowserRouter>
+      {/* Fires $pageview to PostHog on every route transition */}
+      <PageviewTracker />
+      <Routes>
+        {/* Public Routes */}
+        <Route element={<PublicLayout />}>
+          <Route path={ROUTES.LOGIN} element={<Login />} />
+          <Route path={ROUTES.IMPERSONATE} element={<ImpersonateHandler />} />
+          <Route path={ROUTES.HEALTH} element={<Health />} />
+          <Route path={ROUTES.MAGIC_VERIFY} element={<MagicLinkVerify />} />
+          {/* Legal pages — public, accessible whether or not signed in */}
+          <Route path={ROUTES.TERMS} element={<Terms />} />
+          <Route path={ROUTES.PRIVACY} element={<Privacy />} />
+          {/* Blog — public, accessible whether or not signed in */}
+          <Route path={ROUTES.BLOG} element={<Blog />} />
+          <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
+          <Route path={ROUTES.CHANGELOG} element={<Changelog />} />
+          <Route path={ROUTES.ROADMAP} element={<Roadmap />} />
+          {/* Standalone situational-judgement self-check — no nav, no sign-in */}
+          <Route path={ROUTES.SJT1} element={<Sjt1 />} />
+          {/* Same page, every line editable in place — see SjtEdit */}
+          <Route path={ROUTES.SJT1_EDIT} element={<SjtEdit />} />
+          {/* Teacher readiness report for school leadership — no nav, no sign-in */}
+          <Route path={ROUTES.SJT_REPORT1} element={<SjtReport1 />} />
+          {/* Text helpline talker page — anonymous, no nav, no sign-in. Uses its
+              own API slice so a rejected guest token never logs anyone out. */}
+          <Route path={ROUTES.TALK} element={<HelplineTalk />} />
+          {/* Conversational homepage, trialled beside /login — no nav, sign-in
+              happens inside the conversation */}
+          <Route path={ROUTES.HOME_V2} element={<HomeV2 />} />
+        </Route>
+
+        {/* Hybrid routes - routes which are public but have navbar upon login */}
+        <Route element={<HybridRouteLayout />}>
+          <Route path={ROUTES.LEARN} element={<Learn />} />
+          <Route path={ROUTES.SCENARIO} element={<Scenario />} />
+          <Route path={ROUTES.PATHWAY} element={<CaseTrackDetails type="track" />} />
+          <Route path={ROUTES.CASE} element={<CaseTrackDetails type="case" />} />
+          {/* Track 2.0 (multi-component learning tracks) */}
+          <Route path={ROUTES.TRACK} element={<TrackOverview />} />
+          <Route path={ROUTES.TRACK_ITEM} element={<TrackPlayer />} />
+          <Route path={ROUTES.TRACK_PROGRESS} element={<TrackProgress />} />
+          {/* A course's public share link — outline for anyone, login on Start */}
+          <Route path={ROUTES.COURSE_LANDING} element={<CourseLanding />} />
+        </Route>
+
+        {/* Private Routes */}
+        <Route path="/*" element={<PrivateRouteLayout />} />
+        <Route path={ROUTES.SUSPENDED_USER} element={<SuspendedUser />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+export default RouteLayout;

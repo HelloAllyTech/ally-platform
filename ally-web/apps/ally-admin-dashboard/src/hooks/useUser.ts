@@ -1,0 +1,234 @@
+import { useCallback, useMemo } from "react";
+
+import { useSelector } from "react-redux";
+import { toast } from "sonner";
+
+import { logger } from "@ally-ui-mono/ui-shared";
+import {
+  useLazyGetUserQuery,
+  useLazyGetPermissionsQuery,
+  useLazyGetFeatureTogglesQuery,
+  baseAPI,
+  authAPI,
+  useGetProfileImageUrlMutation,
+  useDeleteProfileImageMutation,
+  useUploadProfileImageMutation,
+  useGetUserPreferencesQuery,
+  useLazyGetUserPreferencesQuery,
+  useUpdateUserPreferencesMutation,
+  useGetCharacterLibraryEnabledQuery,
+} from "@api";
+import { LOCAL_STORAGE_KEYS, OrgToggle, Permissions } from "@constants";
+import { setUser, authenticate, unauthenticate, setPermissions, setFeatures } from "@reducer";
+import { RootState, store } from "@store";
+import { deriveNavigationItems, hasPermissions } from "@utils";
+
+export const useUser = () => {
+  const isAuthenticated = useSelector((state: RootState) => state.user.isAuthenticated);
+  const { availableChatTypes, user, userStatus } = useSelector((state: RootState) => state.user);
+  const permissions = useSelector((state: RootState) => state.user.permissions);
+  const features = useSelector((state: RootState) => state.user.features);
+  // Read preferences (e.g. saved sidebar order) straight from the RTK Query cache
+  // rather than a Redux mirror, so the saved order is available on the same render
+  // the cache is warm — no dispatch-on-effect lag (which previously caused the nav
+  // to flash the default order before settling). Mirrors DefaultRedirect's approach.
+  // Skip on the auth flag so it never fires on the unauthenticated Login page.
+  const isAuthed = localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
+  const { data: preferences } = useGetUserPreferencesQuery(undefined, { skip: !isAuthed });
+  const adminSidebarOrder = preferences?.admin_sidebar_order;
+
+  const [getUser, { isLoading: isUserLoading }] = useLazyGetUserQuery();
+  const [getPermissions, { isLoading: isPermissionsLoading }] = useLazyGetPermissionsQuery();
+  const [getFeatureToggles] = useLazyGetFeatureTogglesQuery();
+  const [getProfileUrl] = useGetProfileImageUrlMutation();
+  const [deleteProfile] = useDeleteProfileImageMutation();
+  const [uploadProfileImage] = useUploadProfileImageMutation();
+  const [getUserPreferences] = useLazyGetUserPreferencesQuery();
+  const [updateUserPreferences] = useUpdateUserPreferencesMutation();
+
+  /**
+   * Refetches user data and updates Redux store
+   * Used when profile is updated to reflect changes immediately
+   */
+  const refetchUser = async () => {
+    try {
+      const userData = await getUser();
+      if (userData?.data) {
+        store.dispatch(setUser(userData.data));
+      }
+      return userData?.data;
+    } catch (error) {
+      logger.info(`Error refetching user: ${error}`);
+      return null;
+    }
+  };
+
+  /**
+   * Checks user authentication status and fetches user data if authenticated.
+   * - Checks for access token in localStorage
+   * - Fetches user data and permissions if token exists
+   * - Updates Redux store with user information
+   * - Handles authentication errors by logging out
+   * @returns {Promise<Object|null>} User data object if authenticated, null otherwise
+   */
+  const checkAuth = useCallback(async () => {
+    try {
+      const token = localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN);
+      if (token) {
+        try {
+          const userData = await getUser();
+          const permissionsData = await getPermissions();
+          store.dispatch(setUser(userData?.data));
+          store.dispatch(setPermissions(permissionsData?.data as any));
+          store.dispatch(authenticate());
+          // Warm the preferences cache (e.g. saved sidebar order) so the nav renders
+          // in the saved order on first paint after navigate("/"). Non-fatal: roles
+          // without the preference permission (e.g. MULTI_TENANT_ADMIN) get a 403 here
+          // and simply fall back to the default nav order. The cache is the single
+          // source of truth — useGetUserPreferencesQuery reads this same entry.
+          try {
+            await getUserPreferences().unwrap();
+          } catch (prefError) {
+            logger.info(`No user preferences loaded: ${prefError}`);
+          }
+          // Feature toggles replaced role-tier gating, but this endpoint can
+          // still 403/404 (older backend, or a transient outage), which must
+          // not block login — same non-fatal handling as preferences above.
+          // Falls back to an empty array, which fails every hasFeature()
+          // check closed.
+          try {
+            const featureTogglesData = await getFeatureToggles().unwrap();
+            store.dispatch(setFeatures(featureTogglesData ?? []));
+          } catch (featuresError) {
+            logger.info(`No feature toggles loaded: ${featuresError}`);
+            store.dispatch(setFeatures([]));
+          }
+          return userData?.data;
+        } catch (error) {
+          logger.info(`Error fetching user or permissions:, ${error}`);
+          logout();
+          return null;
+        }
+      } else {
+        logout();
+        return null;
+      }
+    } catch (error) {
+      logger.info(`Error authenticating - ${error}`);
+      logout();
+      return null;
+    }
+  }, [getUser, getPermissions, getUserPreferences, getFeatureToggles]);
+
+  /**
+   * Logs out the user by clearing all authentication data and state.
+   * - Clears RTK Query cache
+   * - Resets user state in Redux store
+   * - Removes authentication tokens from localStorage
+   * - Dispatches unauthenticate action
+   */
+  const logout = () => {
+    // Clear RTK Query cache (this also drops the cached user preferences).
+    store.dispatch(baseAPI.util.resetApiState());
+
+    // Clear user state
+    store.dispatch(setUser(null));
+    store.dispatch(setPermissions([]));
+    store.dispatch(setFeatures([]));
+    store.dispatch(unauthenticate());
+
+    // Clear tokens
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
+  };
+
+  // Org-level Character Library switch — the second way the Characters tab can
+  // appear, for a tenant's own admins who have no per-user feature toggles.
+  const { data: isCharacterLibraryOrgEnabled } = useGetCharacterLibraryEnabledQuery(undefined, {
+    skip: !isAuthenticated,
+  });
+
+  const filteredNavigationItems = useMemo(
+    () =>
+      deriveNavigationItems({
+        permissions,
+        features,
+        savedOrder: adminSidebarOrder,
+        orgToggles: {
+          [OrgToggle.CHARACTER_LIBRARY]: Boolean(isCharacterLibraryOrgEnabled),
+        },
+      }),
+    [permissions, features, adminSidebarOrder, isCharacterLibraryOrgEnabled],
+  );
+
+  /**
+   * Gate personalisation on the permission the backend actually enforces on
+   * `POST /users/preferences` (EDIT_USER_PREFERENCES), not on a role-tier name.
+   *
+   * This previously read `isSuperAdminRole(user?.role)`, whose list is only
+   * [SUPER_ADMIN, SUPER_DUPER_ADMIN] — so PLATFORM_ADMIN, the role that
+   * *replaced* those tiers, was refused a feature the backend grants it
+   * (it inherited both preference permissions from SUPER_DUPER_ADMIN in the
+   * collapse migration). Same class of bug as the Tracks/Cases/Courses tabs
+   * vanishing for a PLATFORM_ADMIN — see SimulationStudio's hasContentAccess.
+   *
+   * It was latent rather than visible because the collapse migration
+   * deliberately left the old `user_groups` rows in place for rollback safety,
+   * so a *migrated* admin still resolves to a legacy super tier and kept the
+   * drag handle; only admins minted fresh from the Ally admins tab lost it.
+   * Dropping those old groups would have broken reorder for every platform
+   * admin at once.
+   *
+   * Permission over role also settles the multi-role case structurally, rather
+   * than depending on ADMIN_ROLE_PRECEDENCE picking the right winner: a user's
+   * permissions are the union across every group they hold, so a dual-role
+   * account is judged on what it can actually do instead of on whichever single
+   * tier the collapse happened to report. Fails closed while the list is still
+   * loading, matching the non-fatal 403 handling in checkAuth above.
+   */
+  const canReorder = hasPermissions(permissions, [Permissions.EDIT_USER_PREFERENCES]);
+
+  /**
+   * Persists a new sidebar order to the current user's preferences.
+   * Optimistically patches the RTK Query cache so the nav reorders immediately,
+   * then undoes the patch and surfaces a toast if the save fails. On success the
+   * mutation invalidates USER_PREFERENCES, which refetches and reconciles.
+   */
+  const reorderSidebar = useCallback(
+    async (nextIds: string[]) => {
+      const patch = store.dispatch(
+        authAPI.util.updateQueryData("getUserPreferences", undefined, draft => {
+          draft.admin_sidebar_order = nextIds;
+        }),
+      );
+      try {
+        await updateUserPreferences({ admin_sidebar_order: nextIds }).unwrap();
+      } catch (error) {
+        patch.undo();
+        toast.error("Failed to save sidebar order");
+        logger.info(`Failed to save sidebar order: ${error}`);
+      }
+    },
+    [updateUserPreferences],
+  );
+
+  return {
+    availableChatTypes,
+    checkAuth,
+    refetchUser,
+    isAuthLoading: isUserLoading || isPermissionsLoading,
+    isAuthenticated,
+    logout,
+    permissions,
+    features,
+    setUser,
+    user,
+    userStatus,
+    filteredNavigationItems,
+    canReorder,
+    reorderSidebar,
+    getProfileUrl,
+    deleteProfile,
+    uploadProfileImage,
+  };
+};

@@ -1,0 +1,713 @@
+/**
+ * Which knowledge corpus a request is about.
+ *
+ * One pipeline, several consumers; on the backend each corpus resolves to its own Weaviate
+ * collection, so this is a scope that cannot be forgotten rather than a filter that can. The
+ * WhatsApp Q&A bot was the first, which is why these endpoints live in this file — the data
+ * layer is shared, the screens are not.
+ */
+export enum KbCorpus {
+  WHATSAPP_QA = "whatsapp_qa",
+  CHARACTER_LIBRARY = "character_library",
+}
+
+/**
+ * Which part of a character a document helps ground. A curator's hint that BOOSTS those topics
+ * in retrieval — mapped documents are searched first and the rest of the corpus tops up a short
+ * result — never a restriction. Empty is the default and a perfectly good answer.
+ *
+ * Named for the SUBJECT, not for the interviewer prompt's phase numbering: that wording and
+ * ordering change without a migration, so a mapping keyed to "phase 4" would be stale on
+ * arrival.
+ */
+export enum KbCharacterTopic {
+  IDENTITY = "identity",
+  LIFE_CONTEXT = "life_context",
+  INNER_LIFE = "inner_life",
+  HISTORY_AND_PRESENTING_CONCERN = "history_and_presenting_concern",
+  SPEECH_AND_LANGUAGE = "speech_and_language",
+}
+
+/** Types for the WhatsApp Q&A bot admin tab. Mirrors ally-be's DTOs. */
+
+export enum KbDocumentSourceType {
+  PASTE = "paste",
+  PDF = "pdf",
+  DOCX = "docx",
+  EPUB = "epub",
+  URL = "url",
+}
+
+/**
+ * Ingest lifecycle. Finer-grained than a plain pending/done/failed because extraction can fail
+ * independently of indexing, and "this PDF is encrypted" and "the index was down" have different
+ * fixes — the admin needs to tell them apart.
+ */
+export enum KbDocumentStatus {
+  PENDING = "pending",
+  EXTRACTING = "extracting",
+  CHUNKING = "chunking",
+  INDEXING = "indexing",
+  INDEXED = "indexed",
+  FAILED = "failed",
+}
+
+/** The statuses the corpus table treats as still in flight, which is what drives polling. */
+export const KB_IN_FLIGHT_STATUSES: KbDocumentStatus[] = [
+  KbDocumentStatus.PENDING,
+  KbDocumentStatus.EXTRACTING,
+  KbDocumentStatus.CHUNKING,
+  KbDocumentStatus.INDEXING,
+];
+
+export interface KbDocument {
+  id: string;
+  corpus: KbCorpus;
+  /** Only meaningful for the character library; empty elsewhere. */
+  characterTopics: KbCharacterTopic[];
+  title: string;
+  sourceType: KbDocumentSourceType;
+  sourceUrl: string | null;
+  fileName: string | null;
+  contentType: string | null;
+  sizeBytes: number | null;
+  language: string | null;
+  tags: string[];
+  status: KbDocumentStatus;
+  /** The failure reason verbatim — rendered in the table, not swallowed into a generic message. */
+  statusMessage: string | null;
+  chunkCount: number;
+  indexedChunkCount: number;
+  /** Available to every organisation. When true, `tenantIds` is always empty. */
+  isGlobal: boolean;
+  /**
+   * The organisations that can retrieve it. Empty AND `isGlobal` false means the document
+   * reaches nobody — a real state an admin can save, so the table names it rather than
+   * rendering it as if it were unrestricted.
+   */
+  tenantIds: string[];
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetKbDocumentsParams {
+  /**
+   * Which corpus to list. Optional on the wire for one reason only — ally-be deploys before
+   * ally-web and defaults it to the WhatsApp corpus so the shipped dashboard keeps working in
+   * between. Always send it.
+   */
+  corpus?: KbCorpus;
+  /** Whitelisted server-side; an unknown key falls back to the default order. */
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+  search?: string;
+  status?: KbDocumentStatus;
+  sourceType?: KbDocumentSourceType;
+  /** Only what this organisation can retrieve: its own documents plus the global ones. */
+  tenantId?: string;
+  includeArchived?: boolean;
+}
+
+export interface GetKbDocumentsResponse {
+  documents: KbDocument[];
+  count: number;
+}
+
+export interface CreateKbUploadUrlRequest {
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}
+
+export interface CreateKbUploadUrlResponse {
+  presignedUrl: string;
+  /** Pass back as fileUrl when creating the document. */
+  fileUrl: string;
+}
+
+export interface CreateKbDocumentRequest {
+  corpus?: KbCorpus;
+  characterTopics?: KbCharacterTopic[];
+  title: string;
+  sourceType: KbDocumentSourceType;
+  text?: string;
+  sourceUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  language?: string;
+  tags?: string[];
+  isGlobal?: boolean;
+  tenantIds?: string[];
+}
+
+/**
+ * Retargeting is its own request, not a field on the metadata update.
+ *
+ * PATCH /documents/:id is metadata-only and never touches the search index; this rewrites the
+ * audience on every indexed chunk, so it can fail in ways a title edit cannot.
+ */
+export interface UpdateKbDocumentAudienceRequest {
+  id: string;
+  isGlobal: boolean;
+  tenantIds: string[];
+}
+
+export interface UpdateKbDocumentRequest {
+  id: string;
+  title?: string;
+  tags?: string[];
+  language?: string;
+  /**
+   * Free to change: a ranking hint read at query time, so it invalidates no chunk and
+   * triggers no re-index. `[]` clears it, which is a real answer ("no hint"), not a no-op.
+   */
+  characterTopics?: KbCharacterTopic[];
+}
+
+export interface ReplaceKbDocumentContentRequest {
+  id: string;
+  text: string;
+}
+
+export interface KbChunk {
+  id: string;
+  chunkIndex: number;
+  text: string;
+  charStart: number;
+  charEnd: number;
+  /** 0 when the source format has no pages. */
+  pageFrom: number;
+  pageTo: number;
+  sectionPath: string | null;
+  tokenCount: number;
+  uploadStatus: string;
+  uploadError: string | null;
+}
+
+export interface GetKbChunksResponse {
+  chunks: KbChunk[];
+  count: number;
+}
+
+export interface KbStats {
+  byStatus: Record<string, number>;
+  totalChunks: number;
+  indexedChunks: number;
+}
+
+export interface KbSearchRequest {
+  corpus?: KbCorpus;
+  /** Boosts documents a curator mapped to these topics; never restricts to them. */
+  characterTopics?: KbCharacterTopic[];
+  query: string;
+  limit?: number;
+  minSimilarity?: number;
+}
+
+export interface KbPassage {
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  chunk_index: number;
+  text: string;
+  page_from: number;
+  page_to: number;
+  section_path: string;
+  similarity: number;
+}
+
+export interface KbSearchResponse {
+  passages: KbPassage[];
+}
+
+// ── Keyword templates ────────────────────────────────────────────────────────
+
+export enum WaTemplateKind {
+  CRISIS = "crisis",
+  COMMAND = "command",
+  CONSENT = "consent",
+  FAQ = "faq",
+}
+
+export enum WaTemplateMatchType {
+  EXACT = "exact",
+  CONTAINS = "contains",
+  ANY_OF = "any_of",
+  REGEX = "regex",
+}
+
+export interface WaTemplate {
+  id: string;
+  kind: WaTemplateKind;
+  name: string;
+  matchType: WaTemplateMatchType;
+  patterns: string[];
+  languageCode: string | null;
+  /** Ascending evaluation order. Bands: crisis 0-99, consent 100-199, command 200-299, faq 300+. */
+  priority: number;
+  responseText: string;
+  bypassRag: boolean;
+  terminal: boolean;
+  active: boolean;
+  /**
+   * A seeded safety template. Its wording is editable, but it cannot be deactivated or removed —
+   * a bot for this audience with its crisis reply switched off is unsafe, not merely degraded.
+   */
+  mandatory: boolean;
+  archivedAt: string | null;
+}
+
+export interface GetWaTemplatesResponse {
+  templates: WaTemplate[];
+  count: number;
+}
+
+export interface CreateWaTemplateRequest {
+  kind: WaTemplateKind;
+  name: string;
+  matchType: WaTemplateMatchType;
+  patterns: string[];
+  languageCode?: string;
+  priority: number;
+  responseText: string;
+  bypassRag?: boolean;
+  terminal?: boolean;
+  active?: boolean;
+}
+
+export interface UpdateWaTemplateRequest extends Partial<CreateWaTemplateRequest> {
+  id: string;
+}
+
+export interface TestWaTemplateRequest {
+  text: string;
+  language?: string;
+}
+
+export interface TestWaTemplateResponse {
+  matched: boolean;
+  normalisedText: string;
+  template?: { id: string; name: string; kind: WaTemplateKind; priority: number };
+  reply?: string;
+  terminal?: boolean;
+  wouldReachRetrieval: boolean;
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export interface WaRetrievalSettings {
+  topK: number;
+  /** Permissive retrieval floor. */
+  minSimilarity: number;
+  /** The actual decline decision — deliberately higher than the floor. */
+  declineSimilarity: number;
+  maxPassages: number;
+  maxContextTokens: number;
+  similarityBand: number;
+  translateQuery: boolean;
+}
+
+export interface WaBotSettings {
+  /** The kill switch. */
+  enabled: boolean;
+  provider: string;
+  consentRequired: boolean;
+  disclaimerText: string;
+  crisisEscalationText: string;
+  fallbackText: string;
+  declineText: string;
+  unsupportedMediaText: string;
+  /**
+   * Sent when the sender's number is not on any Ally profile, so the corpus cannot be scoped.
+   * Should carry the way out — adding the number to the profile — since a refusal with no next
+   * step reads as a broken bot.
+   */
+  unrecognisedNumberText: string;
+  rateLimitText: string;
+  rateLimit: { perMinute: number; perHour: number; perDay: number };
+  retrieval: WaRetrievalSettings;
+  maxAnswerChars: number;
+  maxReplyChars: number;
+  maxCitations: number;
+  conversationIdleMinutes: number;
+  /** Days before message bodies and phone numbers are blanked. 0 disables the sweep. */
+  retentionDays: number;
+  /** Run the LLM crisis classifier alongside retrieval. Keyword rules are unaffected by this. */
+  crisisClassifierEnabled: boolean;
+  helplineNumbers: string;
+}
+
+/** Booleans and counts only — the endpoint never returns a secret's value. */
+export interface WaProviderHealth {
+  enabled: boolean;
+  provider: string;
+  verifyTokenConfigured: boolean;
+  appSecretConfigured: boolean;
+  phoneNumberIdConfigured: boolean;
+  accessTokenConfigured: boolean;
+  inboundQueueConfigured: boolean;
+  // Optional: a backend one release behind this build does not send them, and "unknown" must not
+  // render as "missing".
+  businessAccountIdConfigured?: boolean;
+  inboundDlqConfigured?: boolean;
+  kbIngestQueueConfigured?: boolean;
+  helplineNumbersSet?: boolean;
+  mappedNumbers?: number;
+  indexedDocuments?: number;
+}
+
+/** Meta's live answer about the configured token and number. */
+export interface WaConnectionCheck {
+  ok: boolean;
+  error?: string;
+  phoneNumber?: {
+    displayPhoneNumber?: string;
+    verifiedName?: string;
+    qualityRating?: string;
+    nameStatus?: string;
+    platformType?: string;
+    status?: string;
+  };
+  /** null = not checked (no business account id configured), never "not subscribed". */
+  subscribedApps?: string[] | null;
+  subscriptionError?: string;
+}
+
+// ── Preview console ──────────────────────────────────────────────────────────
+
+export interface WaPreviewCitation {
+  passage_number: number;
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  page_from: number;
+  page_to: number;
+  section_path: string;
+  similarity: number;
+}
+
+export interface WaPreviewRetrieval {
+  top_k: number;
+  min_similarity: number;
+  decline_similarity: number;
+  hit_count: number;
+  top_similarity: number;
+  passages_used: number;
+  query_language: string;
+  /** The English text actually embedded; null when searched as written. */
+  translated_query: string | null;
+  /** True when the model answered but cited nothing. */
+  unsupported: boolean;
+}
+
+export interface WaPreviewResponse {
+  intent: "answer" | "decline" | "clarify";
+  declineReason: string;
+  /** The exact message a worker would receive, including source lines and truncation. */
+  reply: string;
+  replyLength: number;
+  language: string;
+  citations: WaPreviewCitation[];
+  retrieval: WaPreviewRetrieval;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  latencyMs: number;
+  /**
+   * Which corpus answered. Echoed back because "the bot found this fine" from an unscoped
+   * preview is otherwise indistinguishable from what one customer's worker would actually get.
+   */
+  audience: { tenantId: string | null; includesGlobal: boolean };
+}
+
+export interface WaPreviewRequest {
+  question: string;
+  retrieval?: Partial<WaRetrievalSettings>;
+  /** Answer as a worker from this organisation would be. Omitted searches the whole corpus. */
+  tenantId?: string;
+}
+
+// ── Conversation log ─────────────────────────────────────────────────────────
+
+export enum WaHandledBy {
+  TEMPLATE = "template",
+  CRISIS = "crisis",
+  CONSENT = "consent",
+  RAG = "rag",
+  DECLINED = "declined",
+  CLARIFIED = "clarified",
+  RATE_LIMITED = "rate_limited",
+  UNSUPPORTED_MEDIA = "unsupported_media",
+  /**
+   * The number is not linked to an Ally account, so there was no organisation to scope the
+   * corpus to and no answer was attempted. Distinct from DECLINED: that means the corpus is
+   * thin, this means a real worker cannot get in.
+   */
+  UNIDENTIFIED = "unidentified",
+  ERROR = "error",
+}
+
+/** A thread summary. Note there is no full phone number — only the last four digits. */
+export interface WaConversationSummary {
+  id: string;
+  contactId: string;
+  startedAt: string;
+  lastMessageAt: string;
+  messageCount: number;
+  lastLanguage: string | null;
+  phoneLast4: string;
+  consentStatus: string;
+  blockedAt: string | null;
+  /** Null for a number that is not on any Ally profile — which is why the thread was refused. */
+  tenantId: string | null;
+  tenantName: string | null;
+}
+
+export interface GetWaConversationsResponse {
+  conversations: WaConversationSummary[];
+  count: number;
+}
+
+export interface WaConversationMessage {
+  id: string;
+  direction: "inbound" | "outbound";
+  body: string;
+  language: string | null;
+  handledBy: WaHandledBy | null;
+  citations: WaPreviewCitation[];
+  /** Includes the provider and model that ACTUALLY ran, so a behaviour change is explainable. */
+  retrievalMeta:
+    | (WaPreviewRetrieval & {
+        provider?: string;
+        model?: string;
+        prompt_version?: string;
+      })
+    | null;
+  latencyMs: number | null;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface WaConversationDetail {
+  conversation: WaConversationSummary;
+  contact: {
+    id: string;
+    phoneLast4: string;
+    consentStatus: string;
+    locale: string | null;
+    blockedAt: string | null;
+    messageCount: number;
+    tenantId: string | null;
+    identifiedAt: string | null;
+    identitySource: string | null;
+    /** Named rather than an id. Null is meaningful: it is why the corpus could not be scoped. */
+    organisation: { id: string; name: string } | null;
+  } | null;
+  messages: WaConversationMessage[];
+}
+
+export interface GetWaConversationsParams {
+  limit?: number;
+  offset?: number;
+  from?: string;
+  to?: string;
+  handledBy?: WaHandledBy;
+  language?: string;
+  declinedOnly?: boolean;
+  search?: string;
+  /** Whitelisted server-side; an unknown key falls back to the default order rather than erroring. */
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+}
+
+// ── Unanswered queue ─────────────────────────────────────────────────────────
+
+export enum WaUnansweredReason {
+  NO_HITS = "no_hits",
+  BELOW_THRESHOLD = "below_threshold",
+  MODEL_DECLINED = "model_declined",
+  ERROR = "error",
+}
+
+export enum WaUnansweredStatus {
+  OPEN = "open",
+  TRIAGED = "triaged",
+  ANSWERED = "answered",
+  DISMISSED = "dismissed",
+}
+
+export interface WaUnansweredQuestion {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  questionText: string;
+  language: string | null;
+  reason: WaUnansweredReason;
+  /** Numeric string from Postgres — how close the corpus came. */
+  topSimilarity: string | null;
+  hitCount: number;
+  status: WaUnansweredStatus;
+  assignedTo: number | null;
+  resolutionNote: string | null;
+  linkedDocumentId: string | null;
+  createdAt: string;
+}
+
+export interface GetWaUnansweredResponse {
+  questions: WaUnansweredQuestion[];
+  count: number;
+}
+
+// ── Usage dashboard ──────────────────────────────────────────────────────────
+
+export interface WaAnalyticsOverview {
+  inbound: number;
+  outbound: number;
+  uniqueContacts: number;
+  answered: number;
+  declined: number;
+  clarified: number;
+  crisis: number;
+  template: number;
+  errors: number;
+  rateLimited: number;
+  /**
+   * Messages from a number that is not on any Ally profile, so no organisation's documents could
+   * be searched. Counted apart from `declined`: that one means the corpus is thin, this one means
+   * a real worker is locked out and someone has to add their number.
+   */
+  unidentified: number;
+  /** Null when there were too few answered-or-declined messages to form a ratio. */
+  declineRate: number | null;
+  latencyP50Ms: number | null;
+  latencyP95Ms: number | null;
+}
+
+export interface WaAnalyticsBucket {
+  bucket: string;
+  handledBy: string;
+  count: number;
+}
+
+export interface WaLanguageRow {
+  language: string;
+  total: number;
+  answered: number;
+  declined: number;
+  /** Null below the minimum sample — a rate from three messages is noise that reads as signal. */
+  declineRate: number | null;
+}
+
+export interface WaCorpusCoverageRow {
+  documentId: string;
+  title: string;
+  chunkCount: number;
+  citations: number;
+  /** Archived documents are shown but excluded from the dead-corpus worklist — see below. */
+  isArchived: boolean;
+}
+
+export interface WaCorpusCoverageResponse {
+  rows: WaCorpusCoverageRow[];
+  totalDocuments: number;
+  /**
+   * Documents beyond the server's fetch bound. Non-zero means this view is a partial picture and
+   * must say so — a truncated worklist read as a complete one is worse than no worklist.
+   */
+  omittedDocuments: number;
+}
+
+// ── Phone → organisation mappings ────────────────────────────────────────────
+// Managed under User Management, because it is about people — but owned by the bot, because a
+// mapping decides which organisation's material a number can be answered from.
+
+export interface WaPhoneMapping {
+  id: string;
+  /** Digits only, no `+`. Shown in full: this is reference data being managed, not traffic. */
+  phoneE164: string;
+  tenantId: string;
+  tenantName: string | null;
+  /** Who the number belongs to, in the admin's words. The table's only human handle. */
+  label: string | null;
+  /** Attribution only — the organisation always comes from `tenantId`. */
+  userId: number | null;
+  /**
+   * The organisation on the matching user's profile, when it disagrees with this mapping.
+   * The mapping still wins; this exists so the disagreement is visible somewhere.
+   */
+  conflictingTenantName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetWaPhoneMappingsParams {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  tenantId?: string;
+}
+
+export interface GetWaPhoneMappingsResponse {
+  mappings: WaPhoneMapping[];
+  count: number;
+}
+
+export interface CreateWaPhoneMappingRequest {
+  phone: string;
+  tenantId: string;
+  label?: string;
+}
+
+export interface UpdateWaPhoneMappingRequest {
+  id: string;
+  tenantId?: string;
+  label?: string;
+}
+
+export interface BulkWaPhoneMappingRow {
+  phone: string;
+  /** Per-row organisation, for a file spanning several. Falls back to `defaultTenantId`. */
+  tenantId?: string;
+  label?: string;
+}
+
+export interface BulkWaPhoneMappingsRequest {
+  rows: BulkWaPhoneMappingRow[];
+  defaultTenantId?: string;
+  /** Move numbers already mapped to a different organisation. Off by default, deliberately. */
+  overwriteConflicts?: boolean;
+}
+
+/** What happened to one uploaded row. */
+export type WaPhoneMappingOutcome =
+  | "created"
+  | "updated"
+  | "unchanged"
+  | "conflict"
+  | "invalid"
+  | "duplicate";
+
+export interface BulkWaPhoneMappingResult {
+  /** 1-based position in the submitted rows, so a reported line matches what the admin pasted. */
+  line: number;
+  phone: string;
+  outcome: WaPhoneMappingOutcome;
+  reason: string | null;
+}
+
+export interface BulkWaPhoneMappingsResponse {
+  created: number;
+  updated: number;
+  unchanged: number;
+  conflicts: number;
+  invalid: number;
+  duplicates: number;
+  /** Per row, not a total: the admin needs the lines to fix. */
+  results: BulkWaPhoneMappingResult[];
+}

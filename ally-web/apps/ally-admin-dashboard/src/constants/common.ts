@@ -1,0 +1,1181 @@
+export const HttpMethod = {
+  GET: "GET",
+  POST: "POST",
+  PUT: "PUT",
+  DELETE: "DELETE",
+  PATCH: "PATCH",
+};
+
+export const DASHBOARD_TABS = {
+  ORG_ANALYTICS: "ORG_ANALYTICS",
+  CALL_LOG_ANALYTICS: "CALL_LOG_ANALYTICS",
+  SIMULATION_ANALYTICS: "SIMULATION_ANALYTICS",
+};
+
+export const ApiEndpoints = {
+  AUTH: {
+    SIGNUP: "/v1/auth/signup",
+    LOGIN: "/v1/auth/login",
+    GOOGLE_SIGN_IN: "/v1/auth/google",
+    GET_USER: "/v1/users/me",
+    GENERATE_OTP: "/v2/auth/generate-otp",
+    VERIFY_OTP: "/v2/auth/verify-otp",
+    MAGIC_LINK_VERIFY: "/v1/auth/magic-link/verify",
+    REFRESH: "/v1/auth/refresh",
+    PROFILE_IMAGE_URL: "/v1/users/profile-image-url",
+    PROFILE_IMAGE: "/v1/users/profile-image",
+    GET_USER_IMPERSONATED_TOKENS: "/v1/auth/impersonate",
+    GET_USER_PREFERENCES: "/v1/users/me/preferences",
+    UPDATE_USER_PREFERENCES: "/v1/users/preferences",
+    GET_MY_FEATURE_TOGGLES: "/v1/users/me/feature-toggles",
+  },
+  AI: {
+    GET_PREVIEW_VOICE: (voiceId: string) => `/v1/voice-preview/generate/${voiceId}`,
+  },
+  SIMULATION_STUDIO: {
+    GET_SIMULATIONS: "/v1/learn/admin-scenarios",
+    GET_ADMIN_SIMULATION_BY_ID: (id: string) => `/v1/learn/admin-scenarios/${id}`,
+    CREATE_SIMULATION: "/v1/learn/scenarios",
+    UPDATE_SIMULATION_BY_ID: (id: string | number) => `/v1/learn/scenarios/${id}`,
+    SIMULATION_BY_ID: (id: string | number) => `/v1/learn/admin-scenarios/${id}`,
+    START_SIMULATION: "/v1/learn/scenario-session-start",
+    START_V2V_TEST: "/v1/learn/v2v-test-session-start",
+    END_SIMULATION: (sessionId: string) => `/v1/learn/scenario-session/${sessionId}/end`,
+    SCENARIO_VOICES: "/v1/learn/scenario-voices",
+    CREATE_SCENARIO_VOICE: "/v1/learn/scenario-voices",
+    SYNC_ELEVENLABS_VOICE: (id: string) => `/v1/learn/scenario-voices/${id}/sync-elevenlabs`,
+    LOOKUP_ELEVENLABS_VOICE: "/v1/learn/scenario-voices/elevenlabs-lookup",
+    BULK_SYNC_ELEVENLABS_VOICES: "/v1/learn/scenario-voices/sync-elevenlabs/bulk",
+    TTS_CATALOG: "/v1/learn/scenario-voices/tts-catalog",
+    VIDEO_ACTOR_PROVIDERS: "/v1/learn/scenarios/video-actor-providers",
+    VIDEO_ACTOR_FACES: "/v1/learn/scenarios/video-actor-faces",
+    VIDEO_ACTOR_FACE_COVER: "/v1/learn/scenarios/video-actor-face-cover",
+    UPDATE_SCENARIO_VOICE: (id: string | number) => `/v1/learn/scenario-voices/${id}`,
+    SCENARIO_VOICE_LANGUAGES: "/v1/learn/scenario-voice-languages",
+    STT_CONFIGS: "/v1/learn/stt-configs",
+    UPDATE_STT_CONFIG: (id: string) => `/v1/learn/stt-configs/${id}`,
+    LLM_CONFIGS: "/v1/learn/llm-configs",
+    PREVIEW_LLM_CONFIG: (id: string) => `/v1/llm-preview/generate/${id}`,
+    LLM_MODEL_CATALOG: "/v1/llm/catalog",
+    // The AI task registry: every platform action that calls a model, and which
+    // model serves it. Read-only — ally-be derives it from code.
+    AI_TASKS: "/v1/llm/tasks",
+    LLM_MODEL_CATALOG_BY_ID: (id: string) => `/v1/llm/catalog/${id}`,
+    PREVIEW_LLM_MODEL: (id: string) => `/v1/llm-preview/model/${id}`,
+    UPDATE_LLM_CONFIG: (id: string) => `/v1/learn/llm-configs/${id}`,
+    SCENARIO_LANGUAGES: "/v1/learn/scenario-languages",
+    GET_LANGUAGES: "/v1/language",
+    CREATE_LANGUAGE: "/v1/language",
+    UPDATE_LANGUAGE: (id: string | number) => `/v1/language/${id}`,
+    GET_LANGUAGE_GLOSSARY: (id: string | number) => `/v1/language/${id}/glossary`,
+    UPSERT_GLOSSARY_SECTION: (id: string | number, sectionCode: string) =>
+      `/v1/language/${id}/glossary/${sectionCode}`,
+    PUBLISH_GLOSSARY_SECTION: (id: string | number, sectionCode: string) =>
+      `/v1/language/${id}/glossary/${sectionCode}/publish`,
+    ARCHIVE_GLOSSARY_SECTION: (id: string | number, sectionCode: string) =>
+      `/v1/language/${id}/glossary/${sectionCode}/archive`,
+    GENERATE_LANGUAGE_GLOSSARY: (id: string | number) => `/v1/language/${id}/glossary/generate`,
+    ACCEPT_GLOSSARY_PROPOSAL: (id: string | number, sectionCode: string, entryId: string) =>
+      `/v1/language/${id}/glossary/${sectionCode}/proposals/${entryId}/accept`,
+    REJECT_GLOSSARY_PROPOSAL: (id: string | number, sectionCode: string, entryId: string) =>
+      `/v1/language/${id}/glossary/${sectionCode}/proposals/${entryId}/reject`,
+    GET_VARIETY_PROFILES: (id: string | number) => `/v1/language/${id}/variety-profiles`,
+    CONSOLIDATE_LANGUAGE_GLOSSARY: (id: string | number) =>
+      `/v1/language/${id}/glossary/consolidate`,
+    BACKFILL_LANGUAGE_GLOSSARIES: "/v1/language/glossary/backfill",
+    GET_GLOSSARY_ADHERENCE_OVERVIEW: "/v1/language/glossary/adherence/overview",
+    GET_GLOSSARY_ADHERENCE: (id: string | number) => `/v1/language/${id}/glossary/adherence`,
+    BACKFILL_GLOSSARY_ADHERENCE: (id: string | number) =>
+      `/v1/language/${id}/glossary/adherence/backfill`,
+    SESSION_EVENTS: "/v1/session-events",
+    GET_SESSION_EVENT_BY_ID: (eventId: string) => `/v1/session-events/events/${eventId}`,
+    UPDATE_SESSION_EVENT: (eventId: string) => `/v1/session-events/events/${eventId}`,
+    DELETE_SESSION_EVENTS: "/v1/session-events/events",
+    GENERATE_EVENT_BUILDER_FIELD: "/v1/session-events/generate-field",
+    GET_COVER_IMAGE_URL: "/v1/learn/scenarios/cover-image-url",
+    DELETE_COVER_IMAGE: "/v1/learn/cover-image",
+    GET_COVER_VIDEO_URL: "/v1/learn/scenarios/cover-video-url",
+    DELETE_COVER_VIDEO: "/v1/learn/cover-video",
+    MAP_SCENARIO_EVENTS: "/v1/learn/scenarios/map-events",
+    GET_MAPPED_SCENARIO_EVENTS: (id: number | string) => `/v1/learn/scenarios/${id}/events`,
+    SCENARIO_EVENTS: "/v1/learn/scenarios/events",
+    SCENARIO_PREVIEW: "/v1/learn/scenarios/preview",
+    DISPATCH_PREVIEW_AGENT: "/v1/learn/scenarios/preview/dispatch-agent",
+    PREVIEW_MONOLOGUES: (scenarioId: number) =>
+      `/v1/learn/scenarios/${scenarioId}/preview-monologues`,
+    PREVIEW_MONOLOGUE_RUN: (runId: string) => `/v1/learn/preview-monologues/${runId}`,
+    END_SCENARIO_PREVIEW: (sessionId: number | string) =>
+      `/v1/learn/scenarios/preview/${sessionId}/end`,
+    SIMULATION_TENANT_VISIBILITY: (tenantId: string) => `v1/learn/scenario/tenant/${tenantId}`,
+    CASE_TENANT_VISIBILITY: (tenantId: string) => `v1/learn/admin/cases/tenant/${tenantId}`,
+    SCENARIO_PATHS: "v1/learn/admin/scenario-paths",
+    SCENARIO_PATH_BY_ID: (id: string | number) => `/v1/learn/admin/scenario-paths/${id}`,
+    DUPLICATE_SCENARIO_PATH: (id: string | number) =>
+      `/v1/learn/admin/scenario-paths/${id}/duplicate`,
+    DUPLICATE_SIMULATION: (id: string | number) => `/v1/learn/scenarios/${id}/duplicate`,
+    PATH_TENANT_VISIBILITY: (tenantId: string | number) =>
+      `v1/learn/admin/scenario-paths/tenant/${tenantId}`,
+    TRIGGER_WARNINGS: "/v1/learn/trigger-warnings",
+    POST_LOGO_URL: "v1/tenants/logo-url",
+    DELETE_LOGO: "v1/tenants/logo",
+    DYNAMIC_BRANCHING_INSTRUCTIONS: "/v1/learn/branching-instruction-dynamic-shortcuts",
+    SESSION_EVENT_TAGS: "/v1/session-events/tags",
+    SCENARIO_CASES: "/v1/learn/admin/cases",
+    SCENARIO_CASE_BY_ID: (id: string | number) => `/v1/learn/admin/cases/${id}`,
+    DUPLICATE_SCENARIO_CASE: (id: string | number) => `/v1/learn/admin/cases/${id}/duplicate`,
+    UPDATE_SIMULATION_CASE_BY_ID: (id: string | number) => `/v1/learn/admin/cases/${id}`,
+    GET_PROMPTS: "/v1/prompts",
+    GET_PROMPTS_BY_TYPE: (promptType: string) => `/v1/prompts/by-type/${promptType}`,
+    CREATE_PROMPT: "/v1/prompts",
+    UPDATE_PROMPT: (id: string | number) => `/v1/prompts/${id}`,
+    DUPLICATE_PROMPT: (id: string | number) => `/v1/prompts/${id}/duplicate`,
+    REVERT_PROMPT: (id: string | number) => `/v1/prompts/${id}/revert`,
+    GET_PROMPT_USAGE: (id: string | number) => `/v1/prompts/${id}/usage`,
+    GET_PROMPT_TRANSLATIONS: (id: string | number) => `/v1/prompts/${id}/translations`,
+    RETRANSLATE_PROMPT: (id: string | number) => `/v1/prompts/${id}/translations`,
+    RETRANSLATE_PROMPT_LANGUAGE: (id: string | number, languageId: string | number) =>
+      `/v1/prompts/${id}/translations/${languageId}`,
+    SET_TRANSLATION_RUNTIME_MODEL: (id: string | number, languageId: string | number) =>
+      `/v1/prompts/${id}/translations/${languageId}/runtime-model`,
+    BACKFILL_PROMPT_TRANSLATIONS: "/v1/prompts/translations/backfill",
+    GET_LLM_MODELS: "/v1/llm/models",
+    GET_REPORT_BY_ID: (reportId: string) => `/v1/learn/scenarios/reports/${reportId}`,
+    GET_REPORTS: (scenarioId: string) => `/v1/learn/scenarios/${scenarioId}/reports`,
+    GENERATE_REPORT: (scenarioId: string) => `/v1/learn/scenarios/${scenarioId}/reports`,
+    SCENARIO_VERSIONS: (scenarioId: string | number) =>
+      `/v1/learn/scenarios/${scenarioId}/versions`,
+    SCENARIO_VERSION_BY_ID: (scenarioId: string | number, versionId: string) =>
+      `/v1/learn/scenarios/${scenarioId}/versions/${versionId}`,
+    PUBLISH_SCENARIO_VERSION: (scenarioId: string | number, versionId: string) =>
+      `/v1/learn/scenarios/${scenarioId}/versions/${versionId}/publish`,
+    CANCEL_REPORT_GENERATION: (reportId: string) =>
+      `/v1/learn/scenarios/reports/${reportId}/cancel`,
+    GET_REPORT_TRANSCRIPT: (reportId: string) =>
+      `/v1/learn/scenarios/reports/${reportId}/transcripts`,
+    SCENARIO_COVER_IMAGE_LIBRARY: "/v1/scenario-cover-image-library",
+    // AI cover generation runs as a job: start, then poll until it settles.
+    COVER_IMAGE_JOBS: "/v1/scenario-cover-image-library/generate-jobs",
+    COVER_IMAGE_JOB: (jobId: string) => `/v1/scenario-cover-image-library/generate-jobs/${jobId}`,
+    COMFORT_AUDIO_LIBRARY: "/v1/comfort-audio",
+    COMFORT_AUDIO_UPLOAD_URL: "/v1/comfort-audio/upload-url",
+    COMFORT_AUDIO_BY_ID: (id: string) => `/v1/comfort-audio/${id}`,
+    CONVERSATIONAL_GUARDRAILS: "/v1/learn/conversational-guardrails",
+    HELPER_TAGS: "/v1/learn/scenario-behaviors",
+    FILLER_TAGS: "/v1/learn/filler-tags",
+    GET_AUTOFILL_MODELS: "/v1/learn/models",
+    ENHANCE_FIELD: "/v1/learn/scenarios/enhance-field",
+    GENERATE_AGENT_BUILDER_FIELD: "/v1/learn/agent-builder/generate-field",
+    COMPETENCIES: "/v1/learn/competencies",
+    COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
+    COMPETENCY_BEHAVIOURS: (id: string) => `/v1/learn/competencies/${id}/behaviours`,
+    COMPETENCY_CLUSTERS: "/v1/learn/competency-clusters",
+    COMPETENCY_CLUSTER_BY_ID: (id: string) => `/v1/learn/competency-clusters/${id}`,
+    AGENT_TEST_CASES: "/v1/learn/agent-test-cases",
+    AGENT_TEST_CASE_BY_ID: (id: string) => `/v1/learn/agent-test-cases/${id}`,
+  },
+
+  // Track 2.0 ("Courses") — multi-component learning tracks
+  TRACKS: {
+    LIST: "/v1/learn/admin/tracks",
+    BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
+    STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
+    TENANT_VISIBILITY: (tenantId: string) => `/v1/learn/admin/tracks/tenant/${tenantId}`,
+    MEDIA_UPLOAD_URL: "/v1/learn/admin/tracks/media/upload-url",
+    MEDIA: "/v1/learn/admin/tracks/media",
+    GENERATE_COVER_IMAGE: "/v1/learn/admin/tracks/cover-image/generate",
+    COVER_IMAGE_JOB: (jobId: string) => `/v1/learn/admin/tracks/cover-image/generate/${jobId}`,
+    // Per-language course translation.
+    TRANSLATIONS: (id: string) => `/v1/learn/admin/tracks/${id}/translations`,
+    TRANSLATE: (id: string) => `/v1/learn/admin/tracks/${id}/translations/translate`,
+    TRANSLATION: (id: string, languageId: number) =>
+      `/v1/learn/admin/tracks/${id}/translations/${languageId}`,
+    TRANSLATION_FIELDS: (id: string, languageId: number) =>
+      `/v1/learn/admin/tracks/${id}/translations/${languageId}/fields`,
+    TRANSLATION_REVIEW: (id: string, languageId: number) =>
+      `/v1/learn/admin/tracks/${id}/translations/${languageId}/review`,
+    TRANSLATION_MEDIA: (id: string, languageId: number) =>
+      `/v1/learn/admin/tracks/${id}/translations/${languageId}/media`,
+    TRANSLATION_PUBLISH: (id: string, languageId: number) =>
+      `/v1/learn/admin/tracks/${id}/translations/${languageId}/publish`,
+    TRANSLATION_UNPUBLISH: (id: string, languageId: number) =>
+      `/v1/learn/admin/tracks/${id}/translations/${languageId}/unpublish`,
+  },
+
+  // Component Library — global, cross-tenant Track/Course item templates.
+  COMPONENT_TEMPLATES: {
+    LIST: "/v1/learn/admin/component-templates",
+    GET_BY_ID: (id: string) => `/v1/learn/admin/component-templates/${id}`,
+    CREATE: "/v1/learn/admin/component-templates",
+    UPDATE: (id: string) => `/v1/learn/admin/component-templates/${id}`,
+    DELETE_BULK: "/v1/learn/admin/component-templates",
+    DELETE_ONE: (id: string) => `/v1/learn/admin/component-templates/${id}`,
+  },
+
+  // Course discussions — per-item, per-organisation threads on Track 2.0
+  // items. Moderators (edit:admin:track) pass `tenantId` to read/lock any
+  // organisation's thread.
+  COURSE_DISCUSSION: {
+    GET: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion`,
+    TENANTS: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion/tenants`,
+    LOCK_DISCUSSION: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion/lock`,
+    POST: (postId: string) => `/v1/learn/discussion/posts/${postId}`,
+    LOCK_POST: (postId: string) => `/v1/learn/discussion/posts/${postId}/lock`,
+  },
+
+  CHARACTERS: {
+    GET_CHARACTERS: "/v1/scenario-characters",
+    CREATE_CHARACTER: "/v1/scenario-characters",
+    GET_CHARACTER_BY_ID: (id: string) => `/v1/scenario-characters/${id}`,
+    UPDATE_CHARACTER: (id: string) => `/v1/scenario-characters/${id}`,
+    DELETE_CHARACTER: "/v1/scenario-characters",
+    // Interview agent (SSE chat that builds a character draft).
+    INTERVIEW_SESSIONS: "/v1/scenario-characters/interview/sessions",
+    INTERVIEW_SESSION: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}`,
+    INTERVIEW_SESSION_STREAM: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+  },
+
+  USER_MANAGEMENT: {
+    USERS: "/v1/users",
+    TENANT: "/v1/tenant",
+    TENANTS: "/v1/tenants",
+    TENANTS_BY_ID: (id: string) => `/v1/tenants/${id}`,
+    ADD_USER: "/v1/users",
+    BULK_ADD_USERS: "/v1/users/bulk",
+    SIMULATION_CREDITS: "/v1/simulation-credits",
+    SUMMARY_SECTIONS: `/v1/settings/summary-sections`,
+    SUMMARY_FIELDS: `/v1/settings/summary-fields`,
+    DASHBOARD_SETTINGS_ALL: `/v1/analytics/dashboard/all`,
+    CUSTOM_FIELD_TYPES: `/v1/settings/custom-field-types`,
+    CUSTOM_FIELDS_ENABLED: `/v1/settings/custom-fields-enabled`,
+    CHARACTER_LIBRARY_ENABLED: `/v1/settings/character-library-enabled`,
+    PROGRESS_DASHBOARD_ENABLED: `/v1/settings/progress-dashboard-enabled`,
+    TEXT_CHAT_ROLEPLAY_ENABLED: `/v1/settings/text-chat-roleplay-enabled`,
+    SCRIBE_NOTE_CREATION_ENABLED: `/v1/settings/scribe-note-creation-enabled`,
+    SCRIBE_VOICE_NOTE_ENABLED: `/v1/settings/scribe-voice-note-enabled`,
+    CUSTOM_FIELD_DEFINITIONS: `/v1/custom-fields/definitions`,
+    CUSTOM_FIELD_DEFINITION_BY_ID: (id: string) => `/v1/custom-fields/definitions/${id}`,
+    USER_ADMIN_TENANTS: (userId: number) => `/v1/users/${userId}/admin-tenants`,
+    ADMIN_TENANTS: "/v1/users/admin-tenants",
+    // One PLATFORM_ADMIN's full toggle state; same URL for the GET (list) and
+    // the PATCH (batch upsert).
+    USER_FEATURE_TOGGLES: (userId: number) => `/v1/users/${userId}/feature-toggles`,
+  },
+  PLATFORM_ADMINS: {
+    LIST: "/v1/platform-admins",
+    ELIGIBLE: "/v1/platform-admins/eligible",
+    ASSIGN: "/v1/platform-admins",
+    REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
+  },
+  SUPER_DUPER_ADMINS: {
+    LIST: "/v1/super-duper-admins",
+    ELIGIBLE: "/v1/super-duper-admins/eligible",
+    PROMOTE: "/v1/super-duper-admins",
+    DEMOTE: (userId: number) => `/v1/super-duper-admins/${userId}`,
+    // Super-admin management (same SDA-only surface): list/add/remove
+    // SUPER_ADMINs and list candidates eligible to become one.
+    SUPER_ADMINS_LIST: "/v1/super-duper-admins/super-admins",
+    SUPER_ADMINS_ELIGIBLE: "/v1/super-duper-admins/super-admins/eligible",
+    SUPER_ADMINS_PROMOTE: "/v1/super-duper-admins/super-admins",
+    SUPER_ADMINS_REMOVE: (userId: number) => `/v1/super-duper-admins/super-admins/${userId}`,
+  },
+  USER_BADGES: {
+    GET_BADGES: "/v1/badges",
+    UPLOAD_BADGE_ICON: "/v1/badges/badge-image-url",
+    DELETE_BADGE_ICON: `/v1/badges/badge-image`,
+    CREATE_BADGE: "/v1/badges",
+    UPDATE_BADGE: (id: string) => `/v1/badges/${id}`,
+    DELETE_BADGE: (id: string) => `/v1/badges/${id}`,
+    BATCH_DELETE_BADGES: "/v1/badges/batch",
+    BADGES_TENANT_VISIBILITY: (tenantId: string) => `/v1/badges/tenants/${tenantId}`,
+    ADD_BADGES_TO_TENANT: "/v1/badges/tenants",
+    REMOVE_BADGES_FROM_TENANT: "/v1/badges/tenants",
+  },
+  I18N: {
+    STATUS: "/v1/i18n/status",
+    TRANSLATIONS: "/v1/i18n/translations",
+    DIFF: "/v1/i18n/diff",
+    PUBLISH: "/v1/i18n/publish",
+    ROLLBACK: "/v1/i18n/rollback",
+    AUDIT_LOG: "/v1/i18n/audit-log",
+  },
+  TOOLTIPS: {
+    GET_TOOLTIPS: "/v1/tooltips",
+    GET_ACTIVE_TOOLTIPS: "/v1/tooltips/active",
+    CREATE_TOOLTIP: "/v1/tooltips",
+    UPDATE_TOOLTIP: (id: string) => `/v1/tooltips/${id}`,
+  },
+  BLOG: {
+    GET_BLOGS: "/v1/blog",
+    GET_BLOG: (id: string) => `/v1/blog/${id}`,
+    CREATE_BLOG: "/v1/blog",
+    UPDATE_BLOG: (id: string) => `/v1/blog/${id}`,
+    DELETE_BLOG: (id: string) => `/v1/blog/${id}`,
+    PUBLISH_BLOG: (id: string) => `/v1/blog/${id}/publish`,
+    UNPUBLISH_BLOG: (id: string) => `/v1/blog/${id}/unpublish`,
+    UPLOAD_IMAGE_URL: "/v1/blog/upload-url",
+  },
+  PRODUCT_UPDATES: {
+    LIST: "/v1/product-updates",
+    STATUS: "/v1/product-updates/status",
+    RUN: "/v1/product-updates/run",
+    GET: (id: string) => `/v1/product-updates/${id}`,
+    UPDATE: (id: string) => `/v1/product-updates/${id}`,
+  },
+  PRODUCT_ROADMAP: {
+    OPPORTUNITIES: "/v1/product-roadmap/opportunities",
+    /**
+     * Quick add: the same filing as OPPORTUNITIES with the readiness gate off. Behind the
+     * `product_roadmap_quick_add` admin toggle server-side; a caller without it gets a 403.
+     */
+    OPPORTUNITIES_QUICK: "/v1/product-roadmap/opportunities/quick",
+    /**
+     * The same route helpline and mobile file a bug on. Not `/opportunities` with
+     * type=bug: this one captures the reporter's screen/device context for triage and
+     * stamps `source` from the reporter's own roles, so a staff report and a consumer
+     * report arrive in Bug Hunter's findings table in identical shape.
+     */
+    BUG_REPORTS: "/v1/product-roadmap/bug-reports",
+    OPPORTUNITY_BY_ID: (id: string) => `/v1/product-roadmap/opportunities/${id}`,
+    OPPORTUNITY_SPLIT: (id: string) => `/v1/product-roadmap/opportunities/${id}/split`,
+    OPPORTUNITY_MERGE: "/v1/product-roadmap/opportunities/merge",
+    /**
+     * Presigns one reference-image upload. NOT under `/opportunities/:id`: the drawer uploads
+     * before the opportunity exists, and the image is attached by the create or update call
+     * that follows.
+     */
+    REFERENCE_IMAGE_UPLOAD_URL: "/v1/product-roadmap/reference-images/upload-url",
+    OPPORTUNITY_COMMENTS: (id: string) => `/v1/product-roadmap/opportunities/${id}/comments`,
+    OPPORTUNITY_VOTERS: (id: string) => `/v1/product-roadmap/opportunities/${id}/voters`,
+    /** The copilot's brief, as filed. Fetched by the drawer only when `hasBrief` is true. */
+    OPPORTUNITY_BRIEF: (id: string) => `/v1/product-roadmap/opportunities/${id}/brief`,
+    COMMENT_BY_ID: (id: string) => `/v1/product-roadmap/comments/${id}`,
+    BOARD: "/v1/product-roadmap/board",
+    BOARD_LANE: "/v1/product-roadmap/board/lane",
+    ALLOCATIONS: "/v1/product-roadmap/allocations",
+    VOTE_BUDGET: "/v1/product-roadmap/me/vote-budget",
+    FACETS: "/v1/product-roadmap/facets",
+    PRODUCT_GOALS: "/v1/product-roadmap/product-goals",
+    PRODUCT_GOAL_BY_ID: (id: string) => `/v1/product-roadmap/product-goals/${id}`,
+    PRODUCT_GOALS_ORDER: "/v1/product-roadmap/product-goals/order",
+    PRODUCT_GOALS_USAGE: "/v1/product-roadmap/product-goals/usage",
+    // Product STRATEGY goals — the outcomes the composite rank scores against. A different
+    // concept from PRODUCT_GOALS above, which is the one-per-opportunity filing category.
+    STRATEGY_GOALS: "/v1/product-roadmap/strategy-goals",
+    STRATEGY_GOAL_BY_ID: (id: string) => `/v1/product-roadmap/strategy-goals/${id}`,
+    STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
+    STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
+    RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Vision & strategy page the opportunity copilot reads on every turn. */
+    STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
+    OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,
+    OWNERS: "/v1/product-roadmap/opportunity-owners",
+    OWNERS_ELIGIBLE: "/v1/product-roadmap/opportunity-owners/eligible",
+    OWNER_BY_ID: (id: string) => `/v1/product-roadmap/opportunity-owners/${id}`,
+    OWNERS_ORDER: "/v1/product-roadmap/opportunity-owners/order",
+    OWNERS_USAGE: "/v1/product-roadmap/opportunity-owners/usage",
+    INTERVIEW_NOTES: "/v1/product-roadmap/interview-notes",
+    INTERVIEW_NOTE_BY_ID: (id: string) => `/v1/product-roadmap/interview-notes/${id}`,
+    VIEWS: "/v1/product-roadmap/views",
+    VIEW_BY_ID: (id: string) => `/v1/product-roadmap/views/${id}`,
+    VIEW_PIN: (id: string) => `/v1/product-roadmap/views/${id}/pin`,
+    VIEW_TAB_ORDER: "/v1/product-roadmap/views/tab-order",
+    AI_READINESS_CRITERIA: "/v1/product-roadmap/ai/readiness/criteria",
+    AI_DUPLICATES: "/v1/product-roadmap/ai/duplicates",
+    AI_CLASSIFY: "/v1/product-roadmap/ai/classify",
+    AI_SUMMARISE: "/v1/product-roadmap/ai/summarise",
+    /**
+     * One turn of the opportunity copilot, as Server-Sent Events — research progress, then the
+     * turn. Stateless: the whole conversation and the previous brief go with each call.
+     */
+    AI_OPPORTUNITY_INTERVIEW_STREAM: "/v1/product-roadmap/ai/opportunity-interview/stream",
+    /**
+     * Open or resume the Builder session for an opportunity. Replaced
+     * AI_GENERATE_CLAUDE_PROMPT, whose output a human pasted into a terminal by hand.
+     */
+    BUILDER_SESSION: (opportunityId: string) =>
+      `/v1/product-roadmap/opportunities/${opportunityId}/builder-session`,
+    ADMIN_REINDEX: "/v1/product-roadmap/admin/reindex",
+  },
+  AI_LAB: {
+    SKILLS: "/v1/lab/skills",
+    SKILL_BY_ID: (id: string) => `/v1/lab/skills/${id}`,
+    VARIABLES: "/v1/lab/variables",
+    VARIABLE_BY_ID: (id: string) => `/v1/lab/variables/${id}`,
+    VALUES: "/v1/lab/values",
+    VALUE_BY_ID: (id: string) => `/v1/lab/values/${id}`,
+    RUNS: "/v1/lab/runs",
+    RUN_BY_ID: (id: string) => `/v1/lab/runs/${id}`,
+    RUN_PUBLISH: (id: string) => `/v1/lab/runs/${id}/publish`,
+    RUN_QUESTIONS: (id: string) => `/v1/lab/runs/${id}/questions`,
+    RUN_ASSIGNMENTS: (id: string) => `/v1/lab/runs/${id}/assignments`,
+    RUN_RESULTS: (id: string) => `/v1/lab/runs/${id}/results`,
+    RUN_AUTO_EVALUATIONS: (id: string) => `/v1/lab/runs/${id}/auto-evaluations`,
+    ASSIGNMENT_BY_ID: (id: string) => `/v1/lab/runs/assignments/${id}`,
+    EVALUATORS: "/v1/lab/evaluators",
+    EVALUATOR_BY_ID: (id: string) => `/v1/lab/evaluators/${id}`,
+    EVALUATOR_REGENERATE_PASSWORD: (id: string) => `/v1/lab/evaluators/${id}/regenerate-password`,
+    // Evaluator portal (the /evaluate micro-app; evaluator JWT, not admin)
+    EVAL_LOGIN: "/v1/lab/eval/login",
+    EVAL_ASSIGNMENTS: "/v1/lab/eval/assignments",
+    EVAL_ASSIGNMENT_BY_ID: (id: string) => `/v1/lab/eval/assignments/${id}`,
+    EVAL_ASSIGNMENT_SUBMIT: (id: string) => `/v1/lab/eval/assignments/${id}/submit`,
+    // Question Sets (reusable human-eval question lists)
+    QUESTION_SETS: "/v1/lab/question-sets",
+    QUESTION_SET_BY_ID: (id: string) => `/v1/lab/question-sets/${id}`,
+    QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
+    QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
+  },
+  SKILL_EXPERIMENTS: {
+    LIST: "/v1/skill-experiments",
+    BY_PROMPT: (promptId: string) => `/v1/skill-experiments/${promptId}`,
+    START: (promptId: string) => `/v1/skill-experiments/${promptId}/start`,
+    STOP: (promptId: string) => `/v1/skill-experiments/${promptId}/stop`,
+    RESUME: (promptId: string) => `/v1/skill-experiments/${promptId}/resume`,
+    APPLY: (promptId: string) => `/v1/skill-experiments/${promptId}/apply`,
+    OBSERVATIONS: (promptId: string) => `/v1/skill-experiments/${promptId}/observations`,
+  },
+  AUTHORIZATION: {
+    GET_PERMISSIONS: "/v1/authorization/permissions",
+    GET_ROLES: "/v1/authorization/roles",
+    CHANGE_USER_ROLES: "/v1/authorization/change-roles",
+    // Full feature-toggle registry (~24 keys, with labels/descriptions) — the
+    // one place a new toggle key is declared. Drives both the nav-gating map
+    // and the toggle-editor UI.
+    GET_FEATURE_TOGGLE_REGISTRY: "/v1/authorization/feature-toggles/registry",
+  },
+  ANALYTICS: {
+    OVERVIEW: "/v1/analytics/overview",
+    HIGHLIGHTS: "/v1/analytics/highlights",
+    COHORT_RETENTION: "/v1/analytics/cohort-retention",
+    USAGE_LEVELS: "/v1/analytics/usage-levels",
+    XP_GROWTH: "/v1/analytics/xp-growth",
+    XP_GOALS: "/v1/analytics/xp-goals",
+    ROLEPLAY_VOLUME: "/v1/analytics/roleplay-volume",
+    PRACTICE_STICKINESS: "/v1/analytics/practice-stickiness",
+    PRACTICE_QUALITY: "/v1/analytics/practice-quality",
+    QUALIFIED_SESSIONS: "/v1/analytics/qualified-sessions",
+    ORG_ENGAGEMENT: "/v1/analytics/org-engagement",
+    ROLEPLAY_COST: "/v1/analytics/roleplay-cost",
+    ROLEPLAY_SESSION_COST: "/v1/analytics/roleplay-session-cost",
+    XP_PER_MINUTE: "/v1/analytics/xp-per-minute",
+    CODING_AGENT_COST: "/v1/analytics/coding-agent-cost",
+    FIX_SESSION_ENGINE_COST: "/v1/analytics/fix-session-engine-cost",
+    BUG_AGENT_PERFORMANCE: "/v1/analytics/bug-agent-performance",
+    QUALITY_SENTIMENT: "/v1/analytics/quality-sentiment",
+    RAG_QUALITY: "/v1/analytics/rag-quality",
+    CHART_PREFERENCES: "/v1/analytics/chart-preferences",
+    ROADMAP_DELIVERY: "/v1/analytics/roadmap-delivery",
+    SHIP_VOLUME: "/v1/analytics/ship-volume",
+    VOICE_LATENCY: "/v1/analytics/voice-latency",
+    VOICE_LATENCY_SESSIONS: "/v1/analytics/voice-latency/sessions",
+    VOICE_LATENCY_SESSIONS_SUMMARY: "/v1/analytics/voice-latency/sessions/summary",
+    VOICE_LATENCY_BY_SCENARIO: "/v1/analytics/voice-latency/by-scenario",
+    AGENT_JOIN_RELIABILITY: "/v1/analytics/agent-join-reliability",
+    START_LATENCY: "/v1/analytics/start-latency",
+    CONVERSATION_DRIFT: "/v1/analytics/conversation-drift",
+    CONVERSATION_DRIFT_BACKFILL: "/v1/analytics/conversation-drift/backfill",
+    LANGUAGE_QUALITY: "/v1/analytics/language-quality",
+    LANGUAGE_QUALITY_REFERENCE: "/v1/analytics/language-quality/reference",
+    // Thinking-filler quality. Separate from LANGUAGE_QUALITY because the
+    // denominator is different in kind: played fillers, not judged turns.
+    FILLER_QUALITY: "/v1/analytics/filler-quality",
+    // The five simulator-quality metrics under active repair. One endpoint
+    // rather than five: they share a filter tuple, and reading them apart is
+    // how a composition artefact gets mistaken for a regression.
+    WEAK_PERFORMING_METRICS: "/v1/analytics/weak-performing-metrics",
+    TOKEN_CONSUMPTION: "/v1/analytics/token-consumption",
+    SCRIBE_OVERVIEW: "/v1/analytics/scribe/overview",
+    SCRIBE_SUMMARY_FAILURES: "/v1/analytics/scribe/summary-failures",
+    // Endpoints behind the Testing tab. Named for what they measure, not for the
+    // tab: charts graduate from Testing onto Highlights (or are cut), and an
+    // endpoint called /testing would have to be renamed the day one moved.
+    ACTIVATION: "/v1/analytics/activation",
+    COMPLETION_RATE: "/v1/analytics/completion-rate",
+    LANGUAGE_MIX: "/v1/analytics/language-mix",
+    SKILL_GROWTH: "/v1/analytics/skill-growth",
+    // The drill-down behind the curve: the list, and one learner's timeline.
+    // Sub-paths of skill-growth because they answer the SAME question at a
+    // different grain — a separate top-level name would invite a second
+    // definition of an evaluated session.
+    SKILL_GROWTH_LEARNERS: "/v1/analytics/skill-growth/learners",
+    // Scenario-independent counterpart to skill-growth: one fixed rubric scored
+    // on fixed amounts of each learner's own speech (Priority tab, AAQ-166).
+    FOUNDATIONAL_SKILLS: "/v1/analytics/foundational-skills",
+    FOUNDATIONAL_SKILLS_PROGRESS: "/v1/analytics/foundational-skills/progress",
+    FOUNDATIONAL_SKILLS_LEARNERS: "/v1/analytics/foundational-skills/learners",
+    FOUNDATIONAL_SKILLS_BENCHMARK: "/v1/analytics/foundational-skills/benchmark",
+    FOUNDATIONAL_SKILLS_BEHAVIOURS: "/v1/analytics/foundational-skills/behaviours",
+    FOUNDATIONAL_SKILLS_ADVANCED_BEHAVIOURS:
+      "/v1/analytics/foundational-skills/advanced-behaviours",
+    // Highlights → Effectiveness (AAQ-203/204) and Helping skills' time,
+    // breaks and difficulty cards (AAQ-205/206/207/219). All-time; tenantId only.
+    EFFECTIVENESS_FUNNEL: "/v1/analytics/effectiveness/funnel",
+    FOUNDATIONAL_SKILLS_SEGMENTS: "/v1/analytics/foundational-skills/progress/segments",
+    FOUNDATIONAL_SKILLS_TIME_TO_COMPETENCE: "/v1/analytics/foundational-skills/time-to-competence",
+    FOUNDATIONAL_SKILLS_RETENTION: "/v1/analytics/foundational-skills/retention",
+    PRACTICE_PROGRESSION: "/v1/analytics/practice-progression",
+    // Effectiveness AAQ-218: a calendar window, platform-wide by construction.
+    EFFECTIVENESS_COST_PER_IMPROVEMENT: "/v1/analytics/effectiveness/cost-per-improvement",
+    // Helping skills before vs after each course (Highlights → Course impact).
+    COURSE_IMPACT: "/v1/analytics/course-impact",
+    // Highlights → Curriculum: course funnel, quizzes, roleplay gates, scenarios as content.
+    CURRICULUM_COURSE_FUNNEL: "/v1/analytics/curriculum/course-funnel",
+    CURRICULUM_QUIZ_OUTCOMES: "/v1/analytics/curriculum/quiz-outcomes",
+    CURRICULUM_ROLEPLAY_GATES: "/v1/analytics/curriculum/roleplay-gates",
+    SCENARIO_OPPORTUNITY_COVERAGE: "/v1/analytics/scenarios/opportunity-coverage",
+    SCENARIO_REPEAT_IMPROVEMENT: "/v1/analytics/scenarios/repeat-improvement",
+    CURRICULUM_PROGRESS_CURVE: "/v1/analytics/curriculum/progress-curve",
+    CURRICULUM_KNOWLEDGE_VS_SKILL: "/v1/analytics/curriculum/knowledge-vs-skill",
+    SCENARIO_CALIBRATION: "/v1/analytics/scenarios/calibration",
+    SCENARIO_PROGRESSION: "/v1/analytics/scenarios/progression",
+    QUALITY_DISTRIBUTION: "/v1/analytics/quality-distribution",
+    COMPETENCY_MAP: "/v1/analytics/competency-map",
+    TRACK_DROPOFF: "/v1/analytics/track-dropoff",
+    COACHING_LOOP: "/v1/analytics/coaching-loop",
+    ORG_HEALTH: "/v1/analytics/org-health",
+    // Helping skills → "Is the measure sound?" (AAQ-220..223), Quality &
+    // sentiment confidence (AAQ-230/231) and the Orgs scorecard (AAQ-232).
+    // All-time by construction; tenantId only (judge agreement takes none).
+    FOUNDATIONAL_SKILLS_TRANSFER: "/v1/analytics/foundational-skills/transfer",
+    FOUNDATIONAL_SKILLS_FEEDBACK_UPTAKE: "/v1/analytics/foundational-skills/feedback-uptake",
+    MEASUREMENT_CONVERGENCE: "/v1/analytics/measurement/convergence",
+    FOUNDATIONAL_SKILLS_JUDGE_AGREEMENT: "/v1/analytics/foundational-skills/judge-agreement",
+    FOUNDATIONAL_SKILLS_SELF_EFFICACY: "/v1/analytics/foundational-skills/self-efficacy",
+    EFFECTIVENESS_ORGS: "/v1/analytics/effectiveness/orgs",
+    ORG_SESSION_DISTRIBUTION: "/v1/analytics/org-session-distribution",
+    LEARNER_KPIS: "/v1/analytics/learner-kpis",
+    SCENARIO_USAGE: "/v1/analytics/scenario-usage",
+    SCRIBE_ADOPTION: "/v1/analytics/scribe-adoption",
+  },
+  // The Analytics Agent's own namespace, not another entry under ANALYTICS: it
+  // is gated on the elevated super-duper-admin tier rather than on the pair of
+  // super-admin roles the rest of the analytics endpoints accept.
+  ANALYTICS_AGENT: {
+    ASK: "/v1/analytics/agent/ask",
+    CATALOG: "/v1/analytics/agent/catalog",
+  },
+  // Analytics Suggestions — its own namespace for the same reason as the agent's:
+  // the elevated super-duper-admin tier, because accepting a suggestion writes
+  // onto the product roadmap rather than only reading a chart.
+  ANALYTICS_SUGGESTIONS: {
+    LIST: "/v1/analytics/suggestions",
+    GENERATE: "/v1/analytics/suggestions/generate",
+    ACCEPT: (id: string) => `/v1/analytics/suggestions/${id}/accept`,
+    REJECT: (id: string) => `/v1/analytics/suggestions/${id}/reject`,
+  },
+  // UX Signals — the PostHog scan that files into Bug Hunter and the Suggestions
+  // queue. Its own namespace because it is a producer for both, owned by neither.
+  UX_SIGNALS: {
+    SCAN: "/v1/ux-signals/scan",
+    SCANS: "/v1/ux-signals/scans",
+  },
+  BUG_HUNTER: {
+    SETTINGS: "/v1/bug-hunter/settings",
+    MODEL_SETTINGS: "/v1/bug-hunter/settings/models",
+    RUNS: "/v1/bug-hunter/runs",
+    RUNS_TRIGGER: "/v1/bug-hunter/runs/trigger",
+    RUN_BY_ID: (id: string) => `/v1/bug-hunter/runs/${id}`,
+    RUN_STREAM: (id: string) => `/v1/bug-hunter/runs/${id}/stream`,
+    FINDINGS: "/v1/bug-hunter/findings",
+    FINDING_BY_ID: (id: string) => `/v1/bug-hunter/findings/${id}`,
+    FINDING_APPROVE: (id: string) => `/v1/bug-hunter/findings/${id}/approve`,
+    FINDING_REJECT: (id: string) => `/v1/bug-hunter/findings/${id}/reject`,
+    FINDING_ANSWER: (id: string) => `/v1/bug-hunter/findings/${id}/answer`,
+    FINDING_DESCRIPTION: (id: string) => `/v1/bug-hunter/findings/${id}/description`,
+    FINDING_STAGE: (id: string) => `/v1/bug-hunter/findings/${id}/stage`,
+    FINDING_BY_REPORTED_BUG: (opportunityId: string) =>
+      `/v1/bug-hunter/findings/by-reported-bug/${opportunityId}`,
+    FINDING_FIX_SESSION: (id: string) => `/v1/bug-hunter/findings/${id}/fix-session`,
+    FINDING_CANCEL_FIX_SESSION: (id: string) => `/v1/bug-hunter/findings/${id}/cancel-fix-session`,
+    FINDING_MERGE: (id: string) => `/v1/bug-hunter/findings/${id}/merge`,
+    FINDING_RELEASE: (id: string) => `/v1/bug-hunter/findings/${id}/release`,
+    TODAY: "/v1/bug-hunter/today",
+    METRICS_WRONG_FIXES: "/v1/bug-hunter/metrics/wrong-fixes",
+    METRICS_OPERATIONS: "/v1/bug-hunter/metrics/operations",
+    NOTIFICATIONS: "/v1/bug-hunter/notifications",
+    NOTIFICATION_READ: (id: string) => `/v1/bug-hunter/notifications/${id}/read`,
+    NOTIFICATIONS_READ_ALL: "/v1/bug-hunter/notifications/read-all",
+    // The notebook Bug Hunter reads before hunting and writes at close —
+    // ally-be src/agent-memory, docs/bug-hunter-memory-adr.md.
+    MEMORY: "/v1/bug-hunter/memory",
+    FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
+    FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
+    FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
+    MEMORY_RETIRE: (id: string) => `/v1/bug-hunter/memory/${id}/retire`,
+    // What the agent retired on its own recently, with its reason (OPP-0752), and the undo.
+    MEMORY_RETIRED: "/v1/bug-hunter/memory/retired",
+    MEMORY_RESTORE: (id: string) => `/v1/bug-hunter/memory/${id}/restore`,
+    // The decision log, scoreboard and replay (OPP-0776, OPP-0783).
+    FINDING_DECISIONS: (id: string) => `/v1/bug-hunter/findings/${id}/decisions`,
+    RUN_DECISIONS: (id: string) => `/v1/bug-hunter/runs/${id}/decisions`,
+    SCOREBOARD: "/v1/bug-hunter/scoreboard",
+    DECISION_REPLAY: "/v1/bug-hunter/decisions/replay",
+    DECISION_OWNERS: "/v1/bug-hunter/decisions/owners",
+  },
+  BUILDER: {
+    SESSIONS: "/v1/builder/sessions",
+    SESSION_BY_ID: (id: string) => `/v1/builder/sessions/${id}`,
+    SESSION_CANCEL: (id: string) => `/v1/builder/sessions/${id}/cancel`,
+    SESSION_ARCHIVE: (id: string) => `/v1/builder/sessions/${id}/archive`,
+    SESSION_UNARCHIVE: (id: string) => `/v1/builder/sessions/${id}/unarchive`,
+    SESSION_PRD: (id: string) => `/v1/builder/sessions/${id}/prd`,
+    SESSION_PRD_VERSIONS: (id: string) => `/v1/builder/sessions/${id}/prd/versions`,
+    SESSION_PRD_REVIEW_DISMISS: (id: string, findingId: string) =>
+      `/v1/builder/sessions/${id}/prd/review/findings/${encodeURIComponent(findingId)}/dismiss`,
+    // SSE — driven by useBuilderStream (fetch + getReader), not RTK Query.
+    SESSION_MESSAGES_STREAM: (id: string) => `/v1/builder/sessions/${id}/messages/stream`,
+    REPO_COMMANDS: "/v1/builder/repo-commands",
+    REPO_MAPS: "/v1/builder/repo-maps",
+    // Builds
+    SESSION_START_BUILD: (id: string) => `/v1/builder/sessions/${id}/start-build`,
+    // The technical design: drafted by a read-only run, then approved before a build may start.
+    SESSION_DESIGN: (id: string) => `/v1/builder/sessions/${id}/design`,
+    SESSION_DESIGN_APPROVE: (id: string) => `/v1/builder/sessions/${id}/design/approve`,
+    SESSION_RUNS: (id: string) => `/v1/builder/sessions/${id}/runs`,
+    // The per-repo chain an issue build walks, in build order.
+    SESSION_MILESTONES: (id: string) => `/v1/builder/sessions/${id}/milestones`,
+    // Raising the ceiling is a POST, not part of the session PATCH: it
+    // authorises spend, so it stands on its own.
+    SESSION_BUDGET: (id: string) => `/v1/builder/sessions/${id}/budget`,
+    RUN_EVENTS: (runId: string) => `/v1/builder/runs/${runId}/events`,
+    SESSION_PULL_REQUESTS: (id: string) => `/v1/builder/sessions/${id}/pull-requests`,
+    SESSION_PULL_REQUEST_MERGE: (id: string, prId: string) =>
+      `/v1/builder/sessions/${id}/pull-requests/${prId}/merge`,
+    // Hand a pull request Builder gave up on back to its review-and-fix loop.
+    SESSION_PULL_REQUEST_RESUME: (id: string, prId: string) =>
+      `/v1/builder/sessions/${id}/pull-requests/${prId}/resume-automation`,
+    SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
+    SETTINGS: "/v1/builder/settings",
+    NOTIFICATIONS: "/v1/builder/notifications",
+    NOTIFICATION_READ: (id: string) => `/v1/builder/notifications/${id}/read`,
+    NOTIFICATIONS_READ_ALL: "/v1/builder/notifications/read-all",
+    // Scoreboard + knowledge (lessons/exemplars) — the visibility surfaces.
+    SCOREBOARD: "/v1/builder/scoreboard",
+    // Where a run's time and money go. The scoreboard answers "is Builder
+    // getting better"; this answers "and what would make it faster".
+    PIPELINE_HEALTH: "/v1/builder/pipeline-health",
+    LESSONS: "/v1/builder/lessons",
+    LESSON_BY_ID: (id: string) => `/v1/builder/lessons/${id}`,
+    LESSONS_CONSOLIDATE: "/v1/builder/lessons/consolidate",
+    EXEMPLARS: "/v1/builder/exemplars",
+    // Replay eval: recorded interviews (fixtures), suites of runs, and the gate
+    // that publishes a Builder prompt change only when its suite passes.
+    EVAL_GATED_PROMPTS: "/v1/builder/eval/gated-prompts",
+    EVAL_FIXTURES: "/v1/builder/eval/fixtures",
+    EVAL_FIXTURES_EXPORT: "/v1/builder/eval/fixtures/export",
+    EVAL_FIXTURES_IMPORT: "/v1/builder/eval/fixtures/import",
+    EVAL_FIXTURE_FROM_SESSION: (sessionId: string) =>
+      `/v1/builder/eval/fixtures/from-session/${sessionId}`,
+    EVAL_FIXTURE_FROM_EXPORT: "/v1/builder/eval/fixtures/from-export",
+    EVAL_FIXTURE_BY_ID: (id: string) => `/v1/builder/eval/fixtures/${id}`,
+    EVAL_SUITES: "/v1/builder/eval/suites",
+    EVAL_SUITE_BY_ID: (id: string) => `/v1/builder/eval/suites/${id}`,
+    EVAL_SUITE_CANCEL: (id: string) => `/v1/builder/eval/suites/${id}/cancel`,
+    EVAL_RUN_BY_ID: (id: string) => `/v1/builder/eval/runs/${id}`,
+    EVAL_PROMPT_CANDIDATES: "/v1/builder/eval/prompt-candidates",
+  },
+  COURSE_COPILOT: {
+    SESSIONS: "/v1/course-copilot/sessions",
+    SESSION_BY_ID: (id: string) => `/v1/course-copilot/sessions/${id}`,
+    // SSE — driven by useCourseCopilotStream (fetch + getReader), not RTK Query.
+    SESSION_MESSAGES_STREAM: (id: string) => `/v1/course-copilot/sessions/${id}/messages/stream`,
+    SESSION_BLUEPRINT: (id: string) => `/v1/course-copilot/sessions/${id}/blueprint`,
+    SESSION_BLUEPRINT_APPROVE: (id: string) =>
+      `/v1/course-copilot/sessions/${id}/blueprint/approve`,
+    SESSION_BUILD_RETRY: (id: string) => `/v1/course-copilot/sessions/${id}/build/retry`,
+    SESSION_BUILD_CANCEL: (id: string) => `/v1/course-copilot/sessions/${id}/build/cancel`,
+    // Raising the ceiling is a POST on the same path as the read, like Builder's:
+    // it authorises spend, so it is not folded into a session PATCH.
+    SESSION_BUDGET: (id: string) => `/v1/course-copilot/sessions/${id}/budget`,
+    SESSION_ARCHIVE: (id: string) => `/v1/course-copilot/sessions/${id}/archive`,
+    // Drafts the story fields of a SAVED course's landing page. Returns the draft; saves nothing.
+    TRACK_LANDING_PAGE_DRAFT: (trackId: string) =>
+      `/v1/course-copilot/tracks/${trackId}/landing-page-draft`,
+  },
+  WHATSAPP_BOT: {
+    // Corpus (ally-be src/knowledge-base)
+    DOCUMENTS: "/v1/knowledge-base/documents",
+    DOCUMENT_UPLOAD_URL: "/v1/knowledge-base/documents/upload-url",
+    DOCUMENT_BY_ID: (id: string) => `/v1/knowledge-base/documents/${id}`,
+    DOCUMENT_CONTENT: (id: string) => `/v1/knowledge-base/documents/${id}/content`,
+    DOCUMENT_TENANTS: (id: string) => `/v1/knowledge-base/documents/${id}/tenants`,
+    DOCUMENT_CHUNKS: (id: string) => `/v1/knowledge-base/documents/${id}/chunks`,
+    DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
+    DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
+    DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
+    CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
+    SEARCH: "/v1/knowledge-base/search",
+    STATS: "/v1/knowledge-base/stats",
+    // Bot (ally-be src/whatsapp)
+    // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
+    // a mapping decides which organisation's material a number can be answered from.
+    PHONE_MAPPINGS: "/v1/whatsapp/phone-mappings",
+    PHONE_MAPPINGS_BULK: "/v1/whatsapp/phone-mappings/bulk",
+    PHONE_MAPPING_BY_ID: (id: string) => `/v1/whatsapp/phone-mappings/${id}`,
+    TEMPLATES: "/v1/whatsapp/templates",
+    TEMPLATE_BY_ID: (id: string) => `/v1/whatsapp/templates/${id}`,
+    TEMPLATE_ARCHIVE: (id: string) => `/v1/whatsapp/templates/${id}/archive`,
+    TEMPLATES_REORDER: "/v1/whatsapp/templates/reorder",
+    TEMPLATES_TEST: "/v1/whatsapp/templates/test",
+    SETTINGS: "/v1/whatsapp/settings",
+    PROVIDER_HEALTH: "/v1/whatsapp/settings/provider-health",
+    PROVIDER_CHECK: "/v1/whatsapp/settings/provider-check",
+    PROVIDER_REGISTER: "/v1/whatsapp/settings/provider-register",
+    PROVIDER_SUBSCRIBE: "/v1/whatsapp/settings/provider-subscribe",
+    PREVIEW_ASK: "/v1/whatsapp/preview/ask",
+    // Conversations, unanswered queue and usage dashboard
+    CONVERSATIONS: "/v1/whatsapp/conversations",
+    CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
+    CONVERSATION_LANGUAGES: "/v1/whatsapp/conversations/languages",
+    CITATION_BY_CHUNK: (chunkId: string) => `/v1/whatsapp/citations/${chunkId}`,
+    CONTACT_REVEAL: (id: string) => `/v1/whatsapp/contacts/${id}/reveal`,
+    CONTACT_BLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/block`,
+    CONTACT_UNBLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/unblock`,
+    UNANSWERED: "/v1/whatsapp/unanswered",
+    UNANSWERED_BY_ID: (id: string) => `/v1/whatsapp/unanswered/${id}`,
+    UNANSWERED_CREATE_DOCUMENT: (id: string) => `/v1/whatsapp/unanswered/${id}/create-document`,
+    ANALYTICS_OVERVIEW: "/v1/whatsapp/analytics/overview",
+    ANALYTICS_TIMESERIES: "/v1/whatsapp/analytics/timeseries",
+    ANALYTICS_LANGUAGES: "/v1/whatsapp/analytics/languages",
+    ANALYTICS_CORPUS_COVERAGE: "/v1/whatsapp/analytics/corpus-coverage",
+  },
+  ROLEPLAY_SESSION_LOGS: {
+    LIST: "/v1/roleplay-session-logs",
+    BY_ID: (id: string) => `/v1/roleplay-session-logs/${id}`,
+  },
+  AWS_LOGS: {
+    LIST: "/v1/aws-logs",
+    STREAMS: "/v1/aws-logs/streams",
+  },
+  MOBILE_RELEASES: {
+    RUNS: "/v1/mobile-releases/runs",
+    CURRENT_VERSION: "/v1/mobile-releases/current-version",
+    TRIGGER: "/v1/mobile-releases/trigger",
+    PROMOTE_ANDROID: "/v1/mobile-releases/promote-android",
+    ANDROID_PRODUCTION_STATUS: "/v1/mobile-releases/android-production-status",
+    IOS_TESTFLIGHT_STATUS: "/v1/mobile-releases/ios-testflight-status",
+    IOS_TESTFLIGHT_HISTORY: "/v1/mobile-releases/ios-testflight-history",
+    IOS_APP_STORE_REVIEW_HISTORY: "/v1/mobile-releases/ios-app-store-review-history",
+    SUBMIT_APP_STORE_REVIEW: "/v1/mobile-releases/submit-ios-app-store-review",
+    IOS_WHATS_NEW_SUGGESTION: "/v1/mobile-releases/ios-whats-new-suggestion",
+    ANDROID_WHATS_NEW_SUGGESTION: "/v1/mobile-releases/android-whats-new-suggestion",
+  },
+  APP_VERSION: {
+    IOS: "/v1/app-version/ios",
+    ANDROID: "/v1/app-version/android",
+    UPDATE: "/v1/app-version/app-version",
+  },
+  SETTINGS: {
+    TERMS: "/v1/settings/terms",
+    PRIVACY: "/v1/settings/privacy",
+    TURN_ENDPOINTING: "/v1/settings/turn-endpointing",
+    VALIDATED_AGENT_TURNS: "/v1/settings/validated-agent-turns",
+  },
+  // Cards on the public product roadmap (app.helloally.ai/blog/roadmap), edited
+  // from Settings → Roadmap. Same gate as Terms/Privacy: Settings toggle + system access.
+  PUBLIC_ROADMAP: {
+    ITEMS: "/v1/public-roadmap/items",
+    ITEM: (id: string) => `/v1/public-roadmap/items/${id}`,
+    ORDER: "/v1/public-roadmap/items/order",
+  },
+  // Text helpline org settings (platform admin only; EDIT_GLOBAL_SETTINGS).
+  HELPLINE_ADMIN: {
+    SETTINGS: "/v1/helpline/admin/settings",
+  },
+};
+
+export const ROUTES = {
+  LOGIN: "/login",
+  MAGIC_VERIFY: "/auth/verify",
+  SIMULATION_STUDIO: "/simulation-studio",
+  USER_MANAGEMENT: "/user-management",
+  MANAGE_EVENTS: "/manage-events",
+  CHARACTER_LIBRARY: "/character-library",
+  CHARACTER_LIBRARY_INTERVIEW: "/character-library/interview",
+  COMPONENT_LIBRARY: "/component-library",
+  MANAGE_SCENARIO_VOICES: "/manage-scenario-voices",
+  MANAGE_STT_CONFIGS: "/manage-stt-configs",
+  MANAGE_LLM_CONFIGS: "/manage-llm-configs",
+  MANAGE_LLM_MODEL_CATALOG: "/manage-llm-model-catalog",
+  AI_TASKS: "/ai-tasks",
+  MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
+  MANAGE_LANGUAGE_GLOSSARY: (id: string | number) => `/manage-scenario-languages/${id}/glossary`,
+  MANAGE_PROMPTS: "/manage-prompts",
+  CREATE_SIMULATION: "/create-simulation",
+  SIMULATION_PREVIEW: (id: string | number) => `/simulation-preview/${id}`,
+  EDIT_SIMULATION: (id: string | number) => `/create-simulation/edit/${id}`,
+  VIEW_SIMULATION: (id: string | number) => `/create-simulation/view/${id}`,
+  ORGANIZATION_DETAIL: (id: string | number) => `/user-management/organization/${id}`,
+  CREATE_PATH: "/create-path",
+  EDIT_PATH: (id: string | number) => `/create-path/edit/${id}`,
+  CREATE_CASE: "/create-case",
+  CREATE_TRACK: "/create-track",
+  EDIT_TRACK: (id: string | number) => `/edit-track/${id}`,
+  USER_BADGES: "/user-badges",
+  MANAGE_GUARDRAILS: "/manage-guardrails",
+  EDIT_CASE: (id: string | number) => `/create-case/edit/${id}`,
+  MANAGE_TRANSLATIONS: "/manage-translations",
+  MANAGE_TOOLTIPS: "/manage-tooltips",
+  ANALYTICS: "/analytics",
+  AGENT_TEST_CASES: "/agent-test-cases",
+  COMPETENCIES: "/competencies",
+  ROLEPLAY_SESSION_LOGS: "/roleplay-session-logs",
+  ROLEPLAY_SESSION_LOG_DETAIL: (id: string | number) => `/roleplay-session-logs/${id}`,
+  SETTINGS: "/settings",
+  LOGS: "/logs",
+  MOBILE_RELEASES: "/mobile-releases",
+  WHATSAPP_BOT: "/whatsapp-bot",
+  TERMS: "/terms",
+  PRIVACY: "/privacy",
+  // Fully public, no-login gallery of the centralised design-system components.
+  DESIGN_SYSTEM: "/designsystem",
+  BLOG: "/blog",
+  PRODUCT_UPDATES: "/product-updates",
+  AI_LAB: "/ai-lab",
+  PRODUCT_ROADMAP: "/product-roadmap",
+  BUG_HUNTER: "/bug-hunter",
+  BUILDER: "/builder",
+  BUILDER_SESSION: (id: string) => `/builder/${id}`,
+  BUILDER_SETTINGS: "/builder/settings",
+  BUILDER_SCOREBOARD: "/builder/scoreboard",
+  BUILDER_PIPELINE: "/builder/pipeline",
+  BUILDER_KNOWLEDGE: "/builder/knowledge",
+  BUILDER_EVAL: "/builder/eval",
+  COURSE_COPILOT: "/course-copilot",
+  // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
+  // Optional `?trackId=` binds the session to an existing course (EDIT mode).
+  COURSE_COPILOT_NEW: "/course-copilot/new",
+  COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
+  // Evaluator micro-app (public routes; evaluator email+password auth)
+  EVALUATE: "/evaluate",
+  EVALUATE_RECORDS: "/evaluate/records",
+  EVALUATE_RECORD: (assignmentId: string | number) => `/evaluate/records/${assignmentId}`,
+};
+
+export const LOCAL_STORAGE_KEYS = {
+  ADMIN_ACCESS_TOKEN: "adminAccessToken",
+  ADMIN_REFRESH_TOKEN: "adminRefreshToken",
+  ADMIN_USER_STATUS: "adminUserStatus",
+  ADMIN_IS_AUTHENTICATED: "adminIsAuthenticated",
+  PREVIEW_ROOM_DATA: "previewRoomData",
+  ROLEPLAY_PREVIEW_ROOM_DATA: "roleplayPreviewRoomData",
+  // Evaluator micro-app session (separate from the admin session)
+  EVALUATOR_ACCESS_TOKEN: "evaluatorAccessToken",
+  EVALUATOR_EMAIL: "evaluatorEmail",
+  EVALUATOR_ID: "evaluatorId",
+  // Prefix — the copilot session id is stored per spec as `${prefix}:${specId}`
+  // so a page refresh can resume the same interview session.
+  ROLEPLAY_COPILOT_SESSION_PREFIX: "roleplayCopilotSession",
+  // The character-interview-agent session id, so a page refresh mid-interview
+  // resumes the same conversation instead of silently starting a new one.
+  CHARACTER_INTERVIEW_SESSION_ID: "characterInterviewSessionId",
+  // The Course Copilot session being worked on, so a reload resumes it. Cleared on archive.
+  COURSE_COPILOT_SESSION_ID: "courseCopilotSessionId",
+};
+
+export enum KeyboardKeys {
+  KEYDOWN = "keydown",
+  BACKSPACE = "Backspace",
+  ARROW_LEFT = "ArrowLeft",
+  ARROW_RIGHT = "ArrowRight",
+  ARROW_UP = "ArrowUp",
+  ARROW_DOWN = "ArrowDown",
+  ENTER = "Enter",
+  ESCAPE = "Escape",
+  TAB = "Tab",
+  DELETE = "Delete",
+  SPACE = " ",
+}
+
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const SINGLE_DIGIT_REGEX = /^\d$/;
+
+export const ALLY_URL = "https://www.helloally.ai";
+// In-app legal pages (see ROUTES.TERMS / ROUTES.PRIVACY). Opened in a new tab
+// via openLinkInNewTab, which resolves the relative path against this origin.
+export const ALLY_TERMS_URL = "/terms";
+export const ALLY_PRIVACY_POLICY_URL = "/privacy";
+export const ALLY_DATA_POLICY_URL = "/privacy";
+
+export const SORT_BY = {
+  CREATED_AT: "createdAt",
+  UPDATED_AT: "updatedAt",
+};
+
+export const SORT_ORDER = {
+  ASC: "ASC",
+  DESC: "DESC",
+};
+
+export const INITIAL_EVENTS_LIMIT = 30;
+
+export const TAG_TYPES = {
+  USERS: "users",
+  TENANTS: "tenants",
+  SESSION_EVENTS: "sessionEvents",
+  SESSION_EVENT_TAGS: "sessionEventTags",
+  SIMULATION: "simulation",
+  SCENARIO_VERSIONS: "scenarioVersions",
+  SIMULATION_EVENTS: "simulationEvents",
+  SIMULATION_PATHS: "simulationPaths",
+  SCENARIO_PATHS: "scenarioPaths",
+  EACH_SESSION: "eachSession",
+  SIMULATION_CASES: "simulationCases",
+  TRIGGER_WARNINGS: "triggerWarnings",
+  SCENARIO_VOICES: "scenarioVoices",
+  STT_CONFIGS: "sttConfigs",
+  LLM_CONFIGS: "llmConfigs",
+  LLM_MODEL_CATALOG: "llmModelCatalog",
+  LLM_MODELS: "llmModels",
+  SCENARIO_LANGUAGES: "scenarioLanguages",
+  LANGUAGE_GLOSSARY: "languageGlossary",
+  GLOSSARY_ADHERENCE: "glossaryAdherence",
+  SUMMARY_SECTIONS: "summarySections",
+  UPDATE_SUMMARY_SECTIONS: "updateSummarySections",
+  CUSTOM_FIELD_TYPES: "customFieldTypes",
+  CUSTOM_FIELDS_ENABLED: "customFieldsEnabled",
+  CHARACTER_LIBRARY_ENABLED: "characterLibraryEnabled",
+  PROGRESS_DASHBOARD_ENABLED: "progressDashboardEnabled",
+  TEXT_CHAT_ROLEPLAY_ENABLED: "textChatRoleplayEnabled",
+  SCRIBE_NOTE_CREATION_ENABLED: "scribeNoteCreationEnabled",
+  SCRIBE_VOICE_NOTE_ENABLED: "scribeVoiceNoteEnabled",
+  CUSTOM_FIELD_DEFINITIONS: "customFieldDefinitions",
+  CHARACTERS: "characters",
+  IMAGE_LIBRARY: "imageLibrary",
+  PROMPTS: "prompts",
+  CONVERSATIONAL_GUARDRAILS: "conversationalGuardrails",
+  USER_BADGES: "userBadges",
+  I18N_TRANSLATIONS: "i18nTranslations",
+  TOOLTIPS: "tooltips",
+  HELPER_TAGS: "helperTags",
+  FILLER_TAGS: "fillerTags",
+  COMPETENCIES: "competencies",
+  COMPETENCY_BEHAVIOURS: "competencyBehaviours",
+  COMPETENCY_CLUSTERS: "competencyClusters",
+  AGENT_TEST_CASES: "agentTestCases",
+  ADMIN_TENANTS: "adminTenants",
+  SETTINGS: "settings",
+  USER_PREFERENCES: "userPreferences",
+  ROLEPLAY_SESSION_LOGS: "roleplaySessionLogs",
+  COMFORT_AUDIO_LIBRARY: "comfortAudioLibrary",
+  WHATSAPP_BOT_DOCUMENTS: "whatsAppBotDocuments",
+  WHATSAPP_BOT_DOCUMENT_CHUNKS: "whatsAppBotDocumentChunks",
+  WHATSAPP_BOT_STATS: "whatsAppBotStats",
+  WHATSAPP_BOT_TEMPLATES: "whatsAppBotTemplates",
+  WHATSAPP_BOT_SETTINGS: "whatsAppBotSettings",
+  WHATSAPP_BOT_CONVERSATIONS: "whatsAppBotConversations",
+  WHATSAPP_BOT_UNANSWERED: "whatsAppBotUnanswered",
+  WHATSAPP_BOT_ANALYTICS: "whatsAppBotAnalytics",
+  WHATSAPP_BOT_PHONE_MAPPINGS: "whatsAppBotPhoneMappings",
+
+  // Cohorts (per-organization user grouping). Restrictions are a separate tag so
+  // a restriction edit refreshes the content tab without refetching the roster.
+  COHORTS: "cohorts",
+  COHORT_MEMBERS: "cohortMembers",
+  COHORT_RESTRICTIONS: "cohortRestrictions",
+
+  TRACKS_V2: "tracksV2",
+  TRACK_TRANSLATIONS: "trackTranslations",
+  // Component Library. Also registered in baseApi.ts's `tagTypes` — an
+  // unregistered tag is silently ignored and its invalidation never fires.
+  COMPONENT_LIBRARY: "componentLibrary",
+  // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
+  COURSE_DISCUSSION: "courseDiscussion",
+  BLOGS: "blogs",
+  // Product updates. Also registered in baseApi.ts's `tagTypes`.
+  PRODUCT_UPDATES: "productUpdates",
+  SUPER_DUPER_ADMINS: "superDuperAdmins",
+  // Feature toggles (PLATFORM_ADMIN collapse). Kept apart from USERS/permissions
+  // so a toggle-editor save doesn't force an unrelated re-render elsewhere.
+  MY_FEATURE_TOGGLES: "myFeatureToggles",
+  FEATURE_TOGGLE_REGISTRY: "featureToggleRegistry",
+  USER_FEATURE_TOGGLES: "userFeatureToggles",
+  PLATFORM_ADMINS: "platformAdmins",
+  // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
+  // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
+  PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
+  PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
+  PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
+  PRODUCT_ROADMAP_GOALS: "productRoadmapGoals",
+  PRODUCT_ROADMAP_STRATEGY_GOALS: "productRoadmapStrategyGoals",
+  PRODUCT_ROADMAP_RANK_WEIGHTS: "productRoadmapRankWeights",
+  PRODUCT_ROADMAP_STRATEGY_CONTEXT: "productRoadmapStrategyContext",
+  PRODUCT_ROADMAP_GOAL_IMPACT: "productRoadmapGoalImpact",
+  PRODUCT_ROADMAP_OWNERS: "productRoadmapOwners",
+  PRODUCT_ROADMAP_COMMENTS: "productRoadmapComments",
+  PRODUCT_ROADMAP_VOTERS: "productRoadmapVoters",
+  PRODUCT_ROADMAP_INTERVIEWS: "productRoadmapInterviews",
+  PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
+  PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
+  // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
+  ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
+  ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
+  BUG_HUNTER_SETTINGS: "bugHunterSettings",
+  // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
+  // silently ignored and its invalidation never fires.
+  BUG_HUNTER_MODEL_SETTINGS: "bugHunterModelSettings",
+  // Course Copilot's and the character interview's validated-turn switches. Also registered in
+  // baseApi.ts's `tagTypes`.
+  VALIDATED_AGENT_TURNS: "validatedAgentTurns",
+  BUG_HUNTER_RUNS: "bugHunterRuns",
+  BUG_HUNTER_FINDINGS: "bugHunterFindings",
+  BUG_HUNTER_NOTIFICATIONS: "bugHunterNotifications",
+  // Bug Hunter's notebook. Also registered in baseApi.ts's `tagTypes`.
+  BUG_HUNTER_MEMORY: "bugHunterMemory",
+  // Bug Hunter's feature map. Also registered in baseApi.ts's `tagTypes`.
+  BUG_HUNTER_FEATURE_MAP: "bugHunterFeatureMap",
+  // Who owns each orchestration decision point (OPP-0783). Also registered in baseApi.ts's `tagTypes`.
+  BUG_HUNTER_DECISION_OWNERS: "bugHunterDecisionOwners",
+  // UX Signals scan log. Also registered in baseApi.ts's `tagTypes`.
+  UX_SIGNAL_SCANS: "uxSignalScans",
+  // Builder. Also registered in baseApi.ts's `tagTypes` — an unregistered tag
+  // is silently ignored and its invalidation never fires.
+  BUILDER_SESSIONS: "builderSessions",
+  BUILDER_SESSION: "builderSession",
+  BUILDER_PRD_VERSIONS: "builderPrdVersions",
+  BUILDER_SETTINGS: "builderSettings",
+  BUILDER_NOTIFICATIONS: "builderNotifications",
+  BUILDER_LESSONS: "builderLessons",
+  BUILDER_EXEMPLARS: "builderExemplars",
+  BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
+  BUILDER_EVAL_SUITES: "builderEvalSuites",
+  // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
+  COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
+  COURSE_COPILOT_SESSION: "courseCopilotSession",
+  AI_LAB_SKILLS: "aiLabSkills",
+  AI_LAB_VARIABLES: "aiLabVariables",
+  AI_LAB_VALUES: "aiLabValues",
+  AI_LAB_RUNS: "aiLabRuns",
+  AI_LAB_EVALUATORS: "aiLabEvaluators",
+  AI_LAB_ASSIGNMENTS: "aiLabAssignments",
+  AI_LAB_AUTO_EVALS: "aiLabAutoEvals",
+  AI_LAB_QUESTION_SETS: "aiLabQuestionSets",
+  // Evaluator portal (separate evaluatorAPI)
+  EVAL_ASSIGNMENTS: "evalAssignments",
+  // Mobile Releases. Also registered in baseApi.ts's `tagTypes` — an
+  // unregistered tag is silently ignored and its invalidation never fires.
+  MOBILE_RELEASE_RUNS: "mobileReleaseRuns",
+  // Force-update minimum app version (ally-be's app-version module, not
+  // mobile-releases — shared with the same admin page though). Also
+  // registered in baseApi.ts's `tagTypes`, same caveat as above.
+  MIN_APP_VERSION: "minAppVersion",
+  // Text helpline org settings. Also registered in baseApi.ts's `tagTypes` — an
+  // unregistered tag is silently ignored and its invalidation never fires.
+  HELPLINE_ADMIN_SETTINGS: "helplineAdminSettings",
+  // Skill experiments (auto-improve on System Skills). Also registered in
+  // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
+  SKILL_EXPERIMENTS: "skillExperiments",
+  // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
+  // `tagTypes` — an unregistered tag is silently ignored.
+  PUBLIC_ROADMAP: "publicRoadmap",
+};
+
+/**
+ * Stable identifiers for data-driven tooltips. Each value is the unique
+ * `location` slug of a row in the backend `tooltips` table; superadmins edit
+ * the text under Manage Tooltips and it renders wherever the matching
+ * `location` is consumed (see ToggleSection). Add a key here, wrap the UI with
+ * the location, and seed/author the row so it shows up.
+ */
+export enum TooltipLocation {
+  // WhatsApp Bot. Seeded blank + inactive by migration 1892000000010; a superadmin authors the text
+  // and enables each under Manage Tooltips. Placed on the controls whose wrong setting is hardest to
+  // notice from the screen alone — a threshold that silently declines, a safety net that is off, a
+  // retention window that keeps identifiable data indefinitely.
+  WA_CRISIS_CLASSIFIER = "wa_crisis_classifier",
+  WA_RETENTION_DAYS = "wa_retention_days",
+  WA_DECLINE_SIMILARITY = "wa_decline_similarity",
+  WA_MIN_SIMILARITY = "wa_min_similarity",
+  WA_TRANSLATE_QUERY = "wa_translate_query",
+  WA_RATE_LIMIT = "wa_rate_limit",
+  WA_CONVERSATION_IDLE = "wa_conversation_idle",
+  WA_CORPUS_STATUS = "wa_corpus_status",
+  WA_CORPUS_CHUNKS = "wa_corpus_chunks",
+  WA_CORPUS_SOURCE_TYPE = "wa_corpus_source_type",
+  WA_REVEAL_PHONE = "wa_reveal_phone",
+  WA_BLOCK_CONTACT = "wa_block_contact",
+  WA_RETRIEVAL_META = "wa_retrieval_meta",
+  WA_UNANSWERED_REASON = "wa_unanswered_reason",
+  WA_UNANSWERED_SCORE = "wa_unanswered_score",
+  WA_USAGE_DECLINE_RATE = "wa_usage_decline_rate",
+  WA_USAGE_LANGUAGE_DECLINE = "wa_usage_language_decline",
+  WA_USAGE_CORPUS_COVERAGE = "wa_usage_corpus_coverage",
+
+  // Edit Simulation → Basic Settings voice-session toggles
+  THINKING_FILLER = "thinking_filler",
+  COMFORT_AUDIO = "comfort_audio",
+  TRIM_HISTORY = "trim_history",
+  FHS_BENCHMARK = "fhs_benchmark",
+  CONTINUOUS_BACKCHANNELING = "continuous_backchanneling",
+  INTERIM_REPLY = "interim_reply",
+  // Edit Simulation → Basic Settings (other toggles). Seeded blank + inactive;
+  // superadmins author the text and enable each under Manage Tooltips.
+  SESSION_TIMER = "session_timer",
+  SCORE = "score",
+  // The two post-session tab toggles. The `ai_feedback_summary` (master
+  // switch) and `feedback_tab_skills` slugs were dropped on 2026-08-31 when
+  // those controls were retired — any Manage Tooltips row a superadmin
+  // already authored against them is left in the DB rather than deleted: the
+  // Tooltips page lists rows from the DB, not from this enum, so the text
+  // stays visible and editable there, it simply no longer attaches to a
+  // control. Seeded blank + inactive; superadmins author the text and enable
+  // each under Manage Tooltips.
+  FEEDBACK_TAB_DEBRIEF = "feedback_tab_debrief",
+  FEEDBACK_TAB_TRANSCRIPT = "feedback_tab_transcript",
+  ALLOW_PAUSE_RESUME = "allow_pause_resume",
+  // Live supervisor notes: an AI supervisor watching the session sends the
+  // learner short coaching hints in a Supervisor sidebar tab, and those notes
+  // also inform the post-session debrief. Off by default — mid-session
+  // feedback suits a novice but breaks the pressure a confident learner
+  // practises for, so it is a per-roleplay judgement call.
+  SUPERVISOR_NOTES_ENABLED = "supervisor_notes_enabled",
+  // Offer the roleplay as a text chat too (opt-in). The field also carries a
+  // static fallback tooltip, so this row is optional.
+  TEXT_CHAT_ENABLED = "text_chat_enabled",
+  // Learner-facing Live events tab. Unlike supervisor notes above,
+  // this is on by default (opt-out) — only an explicit false hides it.
+  LIVE_TAB_ENABLED = "live_tab_enabled",
+  DEFAULT_ORG_VISIBILITY = "default_org_visibility",
+  PUBLIC_VISIBILITY = "public_visibility",
+  CONVERSATIONAL_GUARDRAILS = "conversational_guardrails",
+  CURRENT_STATE = "current_state",
+  REMINDERS_ENABLED = "reminders_enabled",
+  // Edit Simulation → form fields (seeded disabled; review + enable in Manage Tooltips)
+  CHARACTER_PROFILE_SELECTOR = "character_profile_selector",
+  CHARACTER_BACKSTORY = "character_backstory",
+  CUSTOM_FIELDS = "custom_fields",
+  KNOWLEDGE_SOURCES = "knowledge_sources",
+  TRIGGER_WARNINGS = "trigger_warnings",
+  SESSION_MAX_TIME = "session_max_time",
+  EXPERIENCE_MODE_TYPE = "experience_mode_type",
+  CHECKLIST_TYPE_VARIANT = "checklist_type_variant",
+  LINGUISTIC_STYLE_SAMPLES = "linguistic_style_samples",
+  OPENING_DIALOGUE_TEMPLATES = "opening_dialogue_templates",
+  AUTO_TERMINATION_RULES = "auto_termination_rules",
+  LANGUAGE_VOICE_MAPPING = "language_voice_mapping",
+  SESSION_STATES_PROGRESSION = "session_states_progression",
+  // Edit Simulation / studio actions
+  PUBLISH_SIMULATION_VERSION = "publish_simulation_version",
+  UNPUBLISH_SIMULATION = "unpublish_simulation",
+  ARCHIVE_SIMULATION = "archive_simulation",
+  EVENT_BRANCH_INSTRUCTION = "event_branch_instruction",
+  EVENT_TRIGGER_CONDITIONS = "event_trigger_conditions",
+}
+
+export const CUSTOM_CHARACTER_ID = "custom";
+
+// Live supervisor notes arrive on their own LiveKit data-channel topic so they
+// can never be mistaken for scored coaching events. Must match
+// SUPERVISOR_DATA_TOPIC in ally-ai-learn's app/core/supervisor/service.py.
+export const SUPERVISOR_TOPIC = "supervisor" as const;
+export const SUPERVISOR_NOTE_EVENT_TYPE = "supervisor.note" as const;
+
+// Topics whose packets belong to the scored coaching-event feed. Coaching
+// events are published on "events"; AGENT_STATE and the pause/resume control
+// packets carry no topic at all. Anything else — notably the v2 "director"
+// feed, which has its own observer panel — is dropped rather than folded into
+// `events`, where it would silently contribute to the preview's score.
+export const EVENT_FEED_TOPICS: readonly (string | undefined)[] = [undefined, "", "events"];

@@ -1,0 +1,983 @@
+import type { ArtifactSwatch } from "@ally-ui-mono/ui-shared";
+
+import { SimulationStatus } from "./createSimulation";
+import { AssignmentStatus } from "./organizationAccess";
+
+/**
+ * Track 2.0 (admin "Courses") — types for the multi-component learning track
+ * builder. Mirrors the ally-be contract under `v1/learn/admin/tracks`.
+ */
+
+export enum TrackItemType {
+  ROLEPLAY = "ROLEPLAY",
+  CASE = "CASE",
+  QUIZ = "QUIZ",
+  ARTICLE = "ARTICLE",
+  VIDEO = "VIDEO",
+  JOURNAL = "JOURNAL",
+  ANNOTATED_ARTIFACT = "ANNOTATED_ARTIFACT",
+  GAME = "GAME",
+  BRANCHING_SCENARIO = "BRANCHING_SCENARIO",
+  BUCKET_SORT = "BUCKET_SORT",
+}
+
+/**
+ * Games available to drop into a course. Each key maps to a self-contained
+ * bundle the learner app serves from `public/games/<key>/`; adding one here
+ * without adding that folder gives the learner an empty frame.
+ */
+export enum TrackGameKey {
+  TREX_RUNNER = "TREX_RUNNER",
+  TIC_TAC_TOE = "TIC_TAC_TOE",
+  MEMORY_MATCH = "MEMORY_MATCH",
+  CUB_N_PUP = "CUB_N_PUP",
+  SNAKE = "SNAKE",
+  SPROUT = "SPROUT",
+  BREATHING_EXERCISE = "BREATHING_EXERCISE",
+}
+
+/* -------------------------------------------------------------------------- */
+/* Inline content payloads (track_items.content JSONB)                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A curated external link shown in the "Resources" list after an article's
+ * body. Supplementary reading only — never gates completion.
+ */
+export interface ArticleResource {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export interface ArticleContent {
+  html: string;
+  imageUrls?: string[];
+  /**
+   * Single-select MCQs the learner answers in place. Where each one sits is
+   * anchored in `html` by an empty `<div data-ally-question="<id>"></div>`
+   * placeholder — the question, its options and its answer key live here and
+   * never in the body, so the key is not something the rich-text sanitizer or
+   * the learner's payload ever carries.
+   */
+  questions?: McqSingleQuestion[];
+  resources?: ArticleResource[];
+}
+
+export type VideoSource = "s3" | "youtube" | "vimeo" | "loom";
+
+export interface VideoContent {
+  source: VideoSource;
+  url: string;
+  durationSeconds?: number;
+  /** Quiz questions that hard-pause playback at a specific timestamp. `s3` sources only. */
+  interjections?: VideoInterjection[];
+}
+
+/**
+ * A quiz question that hard-pauses playback at `timestampSeconds` until the
+ * learner answers it. Only authored/played for `source: "s3"` videos — an
+ * embed player (YouTube/Vimeo/Loom) has no reliable way to pause and overlay
+ * content. `open_ended` is excluded from `QuizQuestion` here since it is
+ * LLM-graded and doesn't fit a synchronous hard-pause.
+ */
+export interface VideoInterjection {
+  id: string;
+  timestampSeconds: number;
+  question: QuizQuestion;
+}
+
+export interface JournalPromptDef {
+  id: string; // uuid
+  prompt: string;
+  promptHtml?: string;
+  required?: boolean;
+  placeholder?: string;
+}
+
+export interface JournalContent {
+  prompts: JournalPromptDef[];
+}
+
+export type QuizShowExplanations = "after_each" | "after_submit" | "never";
+
+export interface QuizSettings {
+  passScore: number; // 0-100, default 70
+  maxAttempts: number | null; // null = unlimited
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showExplanations?: QuizShowExplanations;
+}
+
+export interface QuizOption {
+  id: string; // uuid
+  text: string;
+}
+
+/**
+ * A picture or clip shown with a question, so a question can ask what the
+ * learner *observes* rather than only what they can read. Mirrors ally-be's
+ * `QuestionMedia` — see `track/type/quiz.type.ts` there for the contract.
+ */
+export type QuestionMediaKind = "image" | "video";
+
+export type QuestionMediaSource = "s3" | "youtube" | "vimeo" | "loom";
+
+export interface QuestionMedia {
+  kind: QuestionMediaKind;
+  /** `s3` = uploaded file; the rest are third-party embeds. */
+  source: QuestionMediaSource;
+  url: string;
+  /** Images only — what the picture shows, for screen readers. */
+  alt?: string;
+  /**
+   * Uploaded video only: a still frame captured in the browser at upload
+   * time, so the learner sees the clip's content before pressing play
+   * rather than whatever their player paints for a paused-at-zero video.
+   */
+  posterUrl?: string;
+}
+
+interface QuizQuestionBase {
+  id: string; // uuid
+  prompt: string;
+  promptHtml?: string;
+  explanation?: string;
+  points?: number; // default 1
+  /** Optional picture or clip shown above the answer controls. */
+  media?: QuestionMedia;
+  /**
+   * `false` = no points, excluded from the quiz score — lets a quiz mix
+   * assessment with survey/reflection prompts. Absent = graded (every
+   * question written before this field existed). An ungraded question may
+   * omit its answer key; `likert_scale` is never graded whatever this says.
+   * Quiz items only — article/video questions are always graded.
+   */
+  isGraded?: boolean;
+  /**
+   * `false` = after submitting, the learner is told whether they were right
+   * but not what the right answer was. Absent = shown. Independent of
+   * `isGraded`, and meaningless for `likert_scale`/`open_ended` (no fixed
+   * answer). Quiz items only.
+   */
+  showCorrectAnswer?: boolean;
+}
+
+export interface McqSingleQuestion extends QuizQuestionBase {
+  type: "mcq_single";
+  options: QuizOption[];
+  correctOptionIds: string[]; // exactly one
+}
+
+export interface McqMultiQuestion extends QuizQuestionBase {
+  type: "mcq_multi";
+  options: QuizOption[];
+  correctOptionIds: string[];
+  partialCredit?: boolean; // left undefined/false in v1
+}
+
+export interface TrueFalseQuestion extends QuizQuestionBase {
+  type: "true_false";
+  correctAnswer: boolean;
+}
+
+export interface OrderingQuestion extends QuizQuestionBase {
+  type: "ordering";
+  items: QuizOption[];
+  /** Derived from authored row order on save. */
+  correctOrder: string[];
+}
+
+export interface MatchingPair {
+  leftId: string;
+  rightId: string;
+}
+
+export interface MatchingQuestion extends QuizQuestionBase {
+  type: "matching";
+  left: QuizOption[];
+  right: QuizOption[]; // can include distractors
+  correctPairs: MatchingPair[];
+}
+
+export interface FillBlankDef {
+  id: string; // token id, e.g. "b1"
+  acceptedAnswers: string[];
+  caseSensitive?: boolean;
+}
+
+export interface FillBlankQuestion extends QuizQuestionBase {
+  type: "fill_blank";
+  /** Text with `{{b1}}` tokens. `prompt` can be "". */
+  template: string;
+  blanks: FillBlankDef[];
+}
+
+export interface OpenEndedRubricCriterion {
+  name: string;
+  description?: string;
+  weight?: number;
+}
+
+export interface OpenEndedRubric {
+  guidance: string;
+  criteria?: OpenEndedRubricCriterion[];
+  maxScore: number;
+}
+
+export interface OpenEndedQuestion extends QuizQuestionBase {
+  type: "open_ended";
+  minWords?: number;
+  rubric: OpenEndedRubric;
+}
+
+/**
+ * One rating scale applied to several statements — "rate each of these from
+ * Strongly disagree to Strongly agree". Opinion, not knowledge: there is no
+ * answer key and it is never graded. The scale is shared by every statement;
+ * a matrix of per-row scales is deliberately out of scope.
+ */
+export interface LikertScaleQuestion extends QuizQuestionBase {
+  type: "likert_scale";
+  /** The things being rated, one row each. 1-20. */
+  statements: QuizOption[];
+  /** The scale points, lowest first — e.g. Strongly disagree … Strongly agree. 2-10. */
+  scale: QuizOption[];
+}
+
+export type QuizQuestion =
+  | McqSingleQuestion
+  | McqMultiQuestion
+  | TrueFalseQuestion
+  | OrderingQuestion
+  | MatchingQuestion
+  | FillBlankQuestion
+  | OpenEndedQuestion
+  | LikertScaleQuestion;
+
+export type QuizQuestionType = QuizQuestion["type"];
+
+export interface QuizContent {
+  settings: QuizSettings;
+  questions: QuizQuestion[];
+}
+
+/* ---- Annotation (ANNOTATED_ARTIFACT) ---- */
+
+export type AnnotationArtifactKind = "TRANSCRIPT" | "DOCUMENT";
+
+export type AnnotationRevealKey = "after_each_attempt" | "after_pass_or_last_attempt";
+
+export interface AnnotationUnit {
+  id: string; // uuid
+  /** TRANSCRIPT only. */
+  speaker?: string;
+  text: string;
+}
+
+export interface AnnotationLabelDef {
+  id: string; // uuid
+  text: string;
+  description?: string;
+  color: ArtifactSwatch;
+}
+
+/** One (unit, label) pair the author expects the learner to find. */
+export interface AnnotationTarget {
+  unitId: string;
+  labelId: string;
+  points?: number; // default 1
+  /** The teaching moment, shown to the learner on reveal. */
+  note?: string;
+}
+
+export interface AnnotationSettings {
+  passScore: number; // 0-100, default 70
+  maxAttempts: number | null; // null = unlimited
+  /** Points deducted per mark that isn't a target. 0 disables the penalty. */
+  falsePositivePenalty: number;
+  revealKey: AnnotationRevealKey;
+}
+
+export interface AnnotationContent {
+  kind: AnnotationArtifactKind;
+  intro?: string;
+  units: AnnotationUnit[];
+  labels: AnnotationLabelDef[];
+  targets: AnnotationTarget[];
+  settings: AnnotationSettings;
+}
+
+/**
+ * A game has no settings beyond which game it is: games are a break between
+ * the demanding parts of a course and deliberately never gate progression, so
+ * there is no score, threshold or attempt limit to configure.
+ */
+export interface GameContent {
+  gameKey: TrackGameKey;
+  /** Optional framing shown above the game. */
+  intro?: string;
+  /** Configuration for the breathing exercise. Only present when gameKey is BREATHING_EXERCISE. */
+  breathingExercise?: BreathingExerciseContent;
+}
+
+export interface BreathingExerciseContent {
+  inhale: number;
+  holdIn: number;
+  exhale: number;
+  holdOut: number;
+  cycles: number;
+  inhaleText: string;
+  holdInText: string;
+  exhaleText: string;
+  holdOutText: string;
+}
+
+/* ---- Branching scenario (BRANCHING_SCENARIO) ---- */
+
+export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
+
+export interface BranchingImage {
+  /** An uploaded file (https). */
+  url: string;
+  alt?: string;
+}
+
+export interface BranchingChoice {
+  id: string;
+  text: string;
+  /** The scene this choice leads to; "" while the trainer has not picked one yet. */
+  nextNodeId: string;
+}
+
+/** A scene with no choices is an ending; only endings carry outcome/score/takeaway. */
+export interface BranchingNode {
+  id: string;
+  title?: string;
+  text: string;
+  image?: BranchingImage;
+  choices?: BranchingChoice[];
+  outcome?: BranchingOutcomeTone;
+  /** 0-100; defaults from `outcome` (100 / 50 / 0) when absent. */
+  score?: number;
+  takeaway?: string;
+}
+
+export interface BranchingScenarioSettings {
+  /** 0-100; 0 or absent = ungated. Server mirrors it into completionCriteria.passScore. */
+  passScore?: number;
+  /** null = unlimited. */
+  maxAttempts?: number | null;
+}
+
+export interface BranchingScenarioContent {
+  intro?: string;
+  settings?: BranchingScenarioSettings;
+  startNodeId: string;
+  nodes: BranchingNode[];
+}
+
+/* ---- Bucket sort (BUCKET_SORT) ---- */
+
+export interface BucketSortBucket {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface BucketSortItem {
+  id: string;
+  text: string;
+  /** The bucket this item belongs in. */
+  bucketId: string;
+  /** Why it belongs there; shown to the learner as feedback after they place it. */
+  explanation?: string;
+}
+
+export interface BucketSortContent {
+  intro?: string;
+  buckets: BucketSortBucket[];
+  items: BucketSortItem[];
+}
+
+export type TrackItemContent =
+  | ArticleContent
+  | VideoContent
+  | JournalContent
+  | QuizContent
+  | AnnotationContent
+  | GameContent
+  | BranchingScenarioContent
+  | BucketSortContent;
+
+export interface CompletionCriteria {
+  /** Roleplay, 0 or above (score depends on configured behaviours and can exceed 100). */
+  minScore?: number;
+  minDurationSeconds?: number;
+  /** Quiz — server mirrors from settings, never sent by the client. */
+  passScore?: number;
+  /** Video 1-100, default 90. */
+  watchPct?: number;
+  /** Article. */
+  minReadSeconds?: number;
+}
+
+/** Source text an author pastes, kept in form state so re-segmentation is live. */
+export interface AnnotationFormValue extends AnnotationContent {
+  /** The raw pasted artifact. Not persisted — units are the source of truth. */
+  sourceText: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Component Library — global, cross-tenant templates for a single track item */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A saved, pre-configured Track/Course item, reusable as the starting point
+ * for a new item. Restricted in practice to JOURNAL | QUIZ | ARTICLE | VIDEO |
+ * ANNOTATED_ARTIFACT — Roleplay/Case reference an external entity rather than
+ * carrying inline content, and a Game has nothing worth templating. Inserting
+ * a template copies its content into a brand-new item with no live link back:
+ * editing one never touches the other.
+ */
+export interface TrackComponentTemplate {
+  id: string;
+  type: TrackItemType;
+  title: string;
+  content: TrackItemContent;
+  completionCriteria: CompletionCriteria | null;
+  createdBy: number;
+  updatedBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetComponentTemplatesQueryParams {
+  type?: TrackItemType;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface GetComponentTemplatesResponse {
+  items: TrackComponentTemplate[];
+  total: number;
+}
+
+export interface CreateComponentTemplateInput {
+  type: TrackItemType;
+  title: string;
+  content: TrackItemContent;
+  completionCriteria?: CompletionCriteria;
+}
+
+export interface UpdateComponentTemplateInput {
+  title?: string;
+  content?: TrackItemContent;
+  completionCriteria?: CompletionCriteria;
+}
+
+/* -------------------------------------------------------------------------- */
+/* API shapes                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface TrackListItem {
+  id: string;
+  title: string;
+  description: string;
+  coverImageUrl: string;
+  status: SimulationStatus;
+  isGlobal: boolean;
+  /** Share link shows the outline to logged-out visitors. Absent on older backends. */
+  isPublicView?: boolean;
+  totalItems: number;
+  estimatedDurationMinutes?: number;
+  isAssignedToTenant?: boolean;
+  updatedAt: string;
+}
+
+export interface GetTracksQueryParams {
+  status?: string;
+  offset?: number;
+  limit?: number;
+  search?: string;
+  tenantId?: string;
+  /** Only applied together with `tenantId`; the API ignores it otherwise. */
+  assignmentStatus?: AssignmentStatus;
+  sortBy?: string;
+  order?: string;
+}
+
+export interface GetTracksResponse {
+  data: TrackListItem[];
+  count?: number;
+}
+
+export interface TrackItemDetail {
+  id: string;
+  type: TrackItemType;
+  order: number;
+  title: string;
+  description?: string;
+  scenarioId?: number | null;
+  caseId?: string | null;
+  content?: TrackItemContent | null;
+  completionCriteria?: CompletionCriteria | null;
+  /** Learners who can open the item can post and reply beneath it. */
+  hasDiscussion?: boolean;
+}
+
+export interface TrackSectionDetail {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  items: TrackItemDetail[];
+}
+
+export interface TrackDetail {
+  id: string;
+  title: string;
+  description: string;
+  coverImageUrl: string;
+  status: SimulationStatus;
+  isGlobal: boolean;
+  /**
+   * `tracks.isPublicView`: the course's share link (`/course/:id` on the learner app) shows its
+   * outline to anyone while the course is published. Absent on a backend that predates the column.
+   */
+  isPublicView?: boolean;
+  totalItems: number;
+  estimatedDurationMinutes?: number;
+  /**
+   * `tracks.competencyIds`: the competencies the author tagged this course with,
+   * or null when untagged (Analytics → Course impact then uses the competencies
+   * of the course's roleplays). Absent on a backend that predates the column.
+   */
+  competencyIds?: string[] | null;
+  /**
+   * `tracks.landingPage`: the story-led layout of the course's public page. Null until an author
+   * fills something in; absent on a backend that predates the column.
+   */
+  landingPage?: TrackLandingPage | null;
+  updatedAt?: string;
+  sections: TrackSectionDetail[];
+}
+
+export interface TrackMetadataInput {
+  title?: string;
+  description?: string;
+  coverImageUrl?: string;
+  isGlobal?: boolean;
+  isPublicView?: boolean;
+  estimatedDurationMinutes?: number;
+  /**
+   * Omit to leave the tag unchanged; `[]` clears it (stored as null). New ids
+   * must be shared competencies; ids already on the course are never rejected.
+   */
+  competencyIds?: string[];
+  /** Omit to leave the page unchanged; `null` clears it. */
+  landingPage?: TrackLandingPage | null;
+}
+
+export interface UpdateTrackInput extends TrackMetadataInput {
+  status?: SimulationStatus;
+}
+
+export interface CreateTrackResponse {
+  id: string;
+  title: string;
+  description: string;
+  coverImageUrl: string;
+  status: SimulationStatus;
+  competencyIds?: string[] | null;
+}
+
+export interface TrackStructureItemInput {
+  id?: string;
+  type: TrackItemType;
+  order: number; // 1-indexed
+  title: string;
+  description?: string;
+  scenarioId?: number;
+  caseId?: string;
+  content?: TrackItemContent;
+  completionCriteria?: CompletionCriteria;
+  /** Omitted leaves the stored value untouched. */
+  hasDiscussion?: boolean;
+}
+
+export interface TrackStructureSectionInput {
+  id?: string;
+  title: string;
+  description?: string;
+  order: number; // 1-indexed
+  items: TrackStructureItemInput[];
+}
+
+export interface TrackStructureInput {
+  sections: TrackStructureSectionInput[];
+}
+
+export interface TrackTenantVisibilityInput {
+  tenantId: string;
+  trackIds: string[];
+}
+
+export interface TrackMediaUploadUrlInput {
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+  kind: "image" | "video" | "question_image" | "question_video";
+  duration?: number;
+}
+
+export interface TrackMediaUploadUrlResponse {
+  presignedUrl: string;
+  publicUrl: string;
+}
+
+/** Track settings → Generate cover image. The prompt is sent exactly as edited. Starts a job. */
+export interface GenerateTrackCoverImageInput {
+  prompt: string;
+  /** Names the stored file only; omitted for an untitled course. */
+  trackTitle?: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Story-led landing page (tracks.landingPage)                                */
+/* -------------------------------------------------------------------------- */
+
+/** Position of a chapter on the story-arc curve. */
+export enum StoryBeat {
+  SETUP = "SETUP",
+  CONFLICT = "CONFLICT",
+  CHALLENGE = "CHALLENGE",
+  CLIMAX = "CLIMAX",
+  RESOLUTION = "RESOLUTION",
+}
+
+/** How long one sitting is expected to take. */
+export enum LandingSittingLength {
+  /** 5-10 min */
+  SHORT = "SHORT",
+  /** 10-15 min */
+  MEDIUM = "MEDIUM",
+  /** 15-20 min */
+  LONG = "LONG",
+}
+
+export interface LandingReply {
+  text: string;
+  label: string;
+  why: string | null;
+}
+
+export interface LandingChapter {
+  /** `track_sections.id` of the section this chapter configures. */
+  sectionId: string;
+  beat: StoryBeat | null;
+  teaser: string | null;
+}
+
+/**
+ * Mirrors ally-be's `TrackLandingPage`. The backend always stores the full shape (every key
+ * present, strings trimmed, "" stored as null), so the builder always edits the full shape too.
+ */
+export interface TrackLandingPage {
+  version: 1;
+  hero: {
+    hook: string | null;
+    question: string | null;
+    courseLine: string | null;
+    buttonLabel: string | null;
+  };
+  persona: {
+    name: string | null;
+    descriptor: string | null;
+    imageUrl: string | null;
+    /** Character Library id, kept for traceability only. The public page never reads the row. */
+    characterId: string | null;
+  };
+  firstMove: {
+    enabled: boolean;
+    sceneLine: string | null;
+    personaLine: string | null;
+    prompt: string | null;
+    replies: LandingReply[];
+  };
+  arc: {
+    enabled: boolean;
+    chapters: LandingChapter[];
+    hardCallSectionId: string | null;
+  };
+  outcomes: { enabled: boolean; items: string[] };
+  howItPlays: { enabled: boolean; sittingLength: LandingSittingLength | null };
+  cast: {
+    enabled: boolean;
+    callerLine: string | null;
+    guide: { name: string | null; role: string | null; line: string | null };
+  };
+  xp: { enabled: boolean };
+  contentNotes: { extraNote: string | null };
+}
+
+/** `POST /v1/course-copilot/tracks/:trackId/landing-page-draft`. Nothing is saved server-side. */
+export interface TrackLandingPageDraftResponse {
+  draft: TrackLandingPage;
+}
+
+/**
+ * Limits the backend enforces on PUT (400 on a violation) and the Copilot draft truncates to.
+ * Characters unless named `MAX_*` counts.
+ */
+export const LANDING_LIMITS = {
+  hookMax: 140,
+  questionMax: 100,
+  courseLineMax: 200,
+  buttonLabelMax: 32,
+  personaNameMax: 60,
+  personaDescriptorMax: 160,
+  personaImageUrlMax: 2048,
+  sceneLineMax: 80,
+  personaLineMax: 240,
+  promptMax: 100,
+  repliesMax: 4,
+  repliesMin: 2,
+  replyTextMax: 200,
+  replyLabelMax: 60,
+  replyWhyMax: 280,
+  chaptersMax: 100,
+  teaserMax: 160,
+  outcomesMax: 3,
+  outcomeMax: 120,
+  callerLineMax: 160,
+  guideNameMax: 60,
+  guideRoleMax: 60,
+  guideLineMax: 200,
+  extraNoteMax: 300,
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Builder form state                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One item row in the builder form. Discriminated by `type` with the matching
+ * content slot populated (`article` / `video` / `journal` / `quiz` /
+ * `annotation`); roleplay and case items carry their picked reference plus
+ * display fields.
+ * `localId` is a client uuid used as the stable RHF/dnd key; `serverId` is the
+ * persisted `track_items.id` when the item already exists on the server.
+ */
+export interface TrackItemFormValue {
+  localId: string;
+  serverId?: string;
+  type: TrackItemType;
+  title: string;
+  description: string;
+  scenarioId?: number | null;
+  caseId?: string | null;
+  /** Display-only metadata for the picked roleplay/case card. */
+  refTitle?: string;
+  refCoverImageUrl?: string;
+  article?: ArticleContent;
+  video?: VideoContent;
+  journal?: JournalContent;
+  quiz?: QuizContent;
+  annotation?: AnnotationFormValue;
+  game?: GameContent;
+  branching?: BranchingScenarioContent;
+  bucketSort?: BucketSortContent;
+  completionCriteria: CompletionCriteria;
+  /** Per-item "Enable discussion" switch; defaults off. */
+  hasDiscussion?: boolean;
+}
+
+export interface TrackSectionFormValue {
+  localId: string;
+  serverId?: string;
+  title: string;
+  description: string;
+  items: TrackItemFormValue[];
+}
+
+export interface TrackFormValues {
+  title: string;
+  description: string;
+  coverImageUrl: string;
+  isGlobal: boolean;
+  /** Public view: the share link shows the outline to logged-out visitors. Off by default. */
+  isPublicView: boolean;
+  estimatedDurationMinutes?: number | null;
+  /** Competency ids this course teaches; `[]` = untagged. */
+  competencyIds?: string[];
+  /** The story-led landing page. Null for a course that has not been saved yet. */
+  landingPage?: TrackLandingPage | null;
+  sections: TrackSectionFormValue[];
+}
+
+/** A publish-blocking validation error, keyed to the rail node it belongs to. */
+export interface PublishError {
+  /** `settings` | `section:{index}` | `item:{sectionIndex}:{itemIndex}` */
+  nodeKey: string;
+  message: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Per-language translation (track_translations)                              */
+/* -------------------------------------------------------------------------- */
+
+/** Per-language lifecycle. Learners are only ever served PUBLISHED. */
+export enum TrackTranslationStatus {
+  NOT_STARTED = "NOT_STARTED",
+  TRANSLATING = "TRANSLATING",
+  READY_FOR_REVIEW = "READY_FOR_REVIEW",
+  PUBLISHED = "PUBLISHED",
+  FAILED = "FAILED",
+}
+
+export enum TrackTranslationFallbackReason {
+  VIDEO_NOT_LOCALISED = "VIDEO_NOT_LOCALISED",
+  SCENARIO_NOT_TRANSLATED = "SCENARIO_NOT_TRANSLATED",
+  CASE_NOT_TRANSLATED = "CASE_NOT_TRANSLATED",
+}
+
+export interface TrackTranslationFallback {
+  trackItemId: string;
+  itemTitle: string;
+  reason: TrackTranslationFallbackReason;
+}
+
+export interface TrackTranslationSummary {
+  languageId: number;
+  languageCode: string;
+  languageLabel: string;
+  status: TrackTranslationStatus;
+  publishedAt: string | null;
+  totalFields: number;
+  translatedFields: number;
+  /** Scoring fields still awaiting confirmation. Blocks publish. */
+  pendingScoringReview: number;
+  sourceChanged: number;
+  editedFields: number;
+  fallbackItems: TrackTranslationFallback[];
+  canPublish: boolean;
+  blockedReason: string | null;
+  error: string | null;
+}
+
+export interface TrackAvailableLanguage {
+  languageId: number;
+  languageCode: string;
+  label: string;
+}
+
+export interface TrackTranslationsResponse {
+  availableLanguages: TrackAvailableLanguage[];
+  languages: TrackTranslationSummary[];
+}
+
+export type TrackTranslationFieldScope = "track" | "section" | "item";
+
+/** One translatable string, English beside its translation. */
+export interface TrackTranslationField {
+  /** Stable-id path, e.g. `content.questions[q3].options[o1].text`. */
+  path: string;
+  kind: string;
+  /** Feeds grading — must be reviewed before the language can publish. */
+  scoring: boolean;
+  english: string;
+  translated: string | null;
+  edited: boolean;
+  reviewed: boolean;
+  sourceChanged: boolean;
+  needsReview: boolean;
+}
+
+/**
+ * One question's media, and whatever the trainer has pointed it at for this
+ * language. Only questions that actually carry media appear — a text-only
+ * quiz produces an empty list rather than a column of empty URL boxes.
+ */
+export interface TrackTranslationQuestionMedia {
+  questionId: string;
+  /** So the trainer can tell which picture they are overriding. */
+  prompt: string;
+  kind: QuestionMediaKind;
+  /** The English original, shown as the thing being replaced. */
+  sourceUrl: string;
+  /** The localised URL, or null when this language uses the original. */
+  url: string | null;
+}
+
+export interface TrackTranslationItem {
+  id: string;
+  type: TrackItemType;
+  order: number;
+  fields: TrackTranslationField[];
+  /** VIDEO only: the per-language cut, if the trainer supplied one. */
+  media: { url: string | null } | null;
+  /** Any question on this component that carries a picture or clip. */
+  questionMedia: TrackTranslationQuestionMedia[];
+  /** ROLEPLAY/CASE defer to the linked entity's own translation. */
+  deferredTo: { kind: "SCENARIO" | "CASE"; id: string } | null;
+}
+
+export interface TrackTranslationSection {
+  id: string;
+  order: number;
+  fields: TrackTranslationField[];
+  items: TrackTranslationItem[];
+}
+
+export interface TrackTranslationDetail {
+  trackId: string;
+  languageId: number;
+  languageCode: string;
+  label: string;
+  status: TrackTranslationStatus;
+  publishedAt: string | null;
+  error: string | null;
+  summary: TrackTranslationSummary | null;
+  track: { id: string; fields: TrackTranslationField[] };
+  sections: TrackTranslationSection[];
+}
+
+export interface TrackTranslationFieldEdit {
+  scope: TrackTranslationFieldScope;
+  entityId?: string;
+  path: string;
+  value: string;
+}
+
+export interface TrackTranslationFieldRef {
+  scope: TrackTranslationFieldScope;
+  entityId?: string;
+  path: string;
+}
+
+/** Live progress over the `/tracks/translations` socket. */
+export enum TrackTranslationJobStatus {
+  STARTED = "STARTED",
+  TRANSLATING = "TRANSLATING",
+  LANGUAGE_COMPLETED = "LANGUAGE_COMPLETED",
+  LANGUAGE_FAILED = "LANGUAGE_FAILED",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
+export interface TrackTranslationProgress {
+  jobId: string;
+  trackId: string;
+  trackTitle?: string;
+  status: TrackTranslationJobStatus;
+  language?: string;
+  languageId?: number;
+  completed: number;
+  total: number;
+  fieldsCompleted?: number;
+  fieldsTotal?: number;
+  error?: string;
+  emittedAt: string;
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
+    />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Ally</title>
+    <!--
+      Link-preview scrapers (WhatsApp, Slack, LinkedIn) don't run JavaScript, so
+      these are the tags they see for every route, including /blog/:slug. The
+      per-page tags set in usePageMeta only reach the browser tab and JS-rendering
+      crawlers; serving per-post tags to scrapers needs server-rendered HTML.
+    -->
+    <meta name="description" content="Ally — training and support tools for helplines." />
+    <meta name="author" content="Ally" />
+    <meta property="og:site_name" content="Ally" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ally" />
+    <meta property="og:description" content="Ally — training and support tools for helplines." />
+    <meta name="twitter:card" content="summary" />
+    <!--
+      No external font request. The app's two serif families (Source Serif 4,
+      Newsreader) are self-hosted variable faces declared in src/index.css; the
+      Replay Pro link that used to sit here fetched a family nothing rendered.
+    -->
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

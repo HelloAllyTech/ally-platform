@@ -1,0 +1,1217 @@
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { useForm } from "react-hook-form";
+import { Provider } from "react-redux";
+import { BrowserRouter } from "react-router-dom";
+import { configureStore } from "@reduxjs/toolkit";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { toast } from "sonner";
+
+import { CreateSimulation } from "../CreateSimulation";
+import { ChecklistType, ExperienceMode } from "@constants";
+import reportUploadReducer from "@reducer/reportUploadReducer";
+
+// Hoist constants mock
+const mockEn = vi.hoisted(() => ({
+  // The header's "Past runs" control opens the recorded preview monologues.
+  previewMonologueRuns: { trigger: "Past runs" },
+  simulation: {
+    unsaved: "Unsaved",
+    changes: "Changes",
+    discardDescription: "Are you sure you want to discard changes?",
+    saveAndExit: "Save and Exit",
+    discardChanges: "Discard Changes",
+    save: "Save Draft",
+    publish: "Publish",
+    publishing: "Publishing",
+    preview: "Preview",
+    rolePlays: "Roleplays",
+    editSimulation: "Edit Simulation",
+    createNewSimulation: "Create Simulation",
+    liveUnpublishedChanges: "Unpublished changes — Publish to apply them",
+    liveVersionSwitchBlocked: "This roleplay is live — publish your changes first.",
+    takeOfflineTitle: "Take this roleplay",
+    takeOfflineTitleItalic: "offline?",
+    takeOfflineDescription: "Saving it as a draft takes it offline for learners.",
+    saveAsDraft: "Save as draft",
+    keepEditing: "Keep editing",
+    advancedEventsLatencyWarning: (count: number) =>
+      `Heads up: ${count} advanced events are selected for this simulation. Selecting more than 10 can increase response latency during a session.`,
+    versions: {
+      title: "Versions",
+      switchVersion: "Switch version",
+      readOnly: "read-only",
+      published: "Version published",
+      editingToast: (label: string) => `Editing ${label}`,
+    },
+    agentBuilder: {
+      tabTitle: "Agent Builder Copilot",
+    },
+  },
+  errors: {
+    failedToProceed: "Fill atleast title field to proceed to Event Configuration!",
+    failedSimulationChange: "Failed to save simulation changes!",
+    failedSaveDraft: "Failed to save draft. Please try again.",
+    failedSimulationCreation: "Failed to create simulation. Please try again.",
+    fileUploadFailed: "Failed to upload file. Please try again.",
+  },
+}));
+
+// Mock react-hook-form
+vi.mock("react-hook-form", () => ({
+  useForm: vi.fn(),
+}));
+
+// Mock react-router-dom hooks
+const mockNavigate = vi.fn();
+const mockParams = { id: undefined };
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useParams: () => mockParams,
+  };
+});
+
+// Mock sonner toast
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+// Mock API hooks
+const mockCreateSimulation = vi.fn();
+const mockUpdateSimulation = vi.fn();
+const mockGetSimulationById = vi.fn();
+const mockDeleteCoverImage = vi.fn();
+// Mutable count of mapped (advanced) events returned to the page; tests vary it
+// to exercise the latency warning threshold.
+const mockMappedEvents = vi.hoisted(() => ({ count: 0 }));
+// The scenario record the lazy load hands the page; tests set its status to
+// put the editor on a live (published) or a draft roleplay.
+const mockAdminSimulation = vi.hoisted(() => ({ data: null as any }));
+// Props of the latest ScenarioVersionPanel render, so a test can drive its
+// callbacks (open a version, create one) without the real panel.
+const mockVersionPanel = vi.hoisted(() => ({ props: null as any }));
+
+vi.mock("@api", () => ({
+  useCreateSimulationMutation: () => [mockCreateSimulation, { isLoading: false }],
+  useUpdateSimulationByIdMutation: () => [mockUpdateSimulation],
+  useLazyGetAdminSimulationByIdQuery: () => [
+    mockGetSimulationById,
+    { data: mockAdminSimulation.data },
+  ],
+  useDeleteCoverImageMutation: () => [mockDeleteCoverImage],
+  useGetAvailableLanguageVoicesQuery: () => ({ data: [] }),
+  useGetPromptsQuery: () => ({ data: [] }),
+  useGetMappedScenarioEventsQuery: () => ({
+    data: { data: Array.from({ length: mockMappedEvents.count }, (_, i) => ({ id: String(i) })) },
+  }),
+  useGetScenarioVersionsQuery: () => ({ data: [] }),
+  useUpdateScenarioVersionMutation: () => [vi.fn(() => ({ unwrap: async () => ({}) }))],
+  usePublishScenarioVersionMutation: () => [
+    vi.fn(() => ({ unwrap: async () => ({}) })),
+    { isLoading: false },
+  ],
+}));
+
+// Mock hooks
+vi.mock("@hooks", () => ({
+  useDebounce: (fn: any) => fn, // Return the function immediately without debouncing
+  useScenarioTranslationsSocket: () => undefined,
+  useUser: () => ({ user: { email: "test@example.com" } }),
+}));
+
+// Mock components
+vi.mock("@ally-ui-mono/ui-shared", () => ({
+  Tabs: ({ items, activeId, onChange }: any) => (
+    <div data-testid="tabs">
+      {items.map((item: any) => (
+        <button key={item.id} onClick={() => onChange(item.id)} data-active={activeId === item.id}>
+          {item.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock("@assets", () => ({
+  ArrowDown: () => <span data-testid="arrow-down" />,
+  DoubleArrowRight: () => <span data-testid="double-arrow-right" />,
+  WarningAlt: () => <span data-testid="warning-alt" />,
+}));
+
+vi.mock("@components", () => ({
+  AppTooltip: ({ children }: any) => children,
+  Button: ({ children, onClick, disabled, className }: any) => (
+    <button onClick={onClick} disabled={disabled} className={className}>
+      {children}
+    </button>
+  ),
+  ActionConfirmationPopup: ({ isOpen, onClose, primaryButton, secondaryButton, title }: any) =>
+    isOpen ? (
+      <div data-testid="confirmation-popup">
+        <h2>{title}</h2>
+        <button onClick={primaryButton?.onClick}>{primaryButton?.label}</button>
+        <button onClick={secondaryButton?.onClick}>{secondaryButton?.label}</button>
+        <button onClick={onClose}>Close</button>
+      </div>
+    ) : null,
+  PreviewMonologueRuns: ({ isOpen }: any) =>
+    isOpen ? <div data-testid="preview-monologue-runs" /> : null,
+  SimulationPreview: ({ isOpen, onClose, simulation }: any) =>
+    isOpen ? (
+      <div data-testid="simulation-preview">
+        <h2>{simulation?.title}</h2>
+        <button onClick={onClose}>Close Preview</button>
+      </div>
+    ) : null,
+  CreateSimulationSubSection: ({ items }: any) => (
+    <div data-testid="simulation-subsection">
+      {items.map((item: any) => (
+        <div key={item.id}>{item.label}</div>
+      ))}
+    </div>
+  ),
+  SimulationEventMapTable: ({ simulationId }: any) => (
+    <div data-testid="event-map-table">Event Map Table for {simulationId}</div>
+  ),
+  AgentBuilderCopilotWizard: () => <div data-testid="agent-builder-wizard" />,
+  ReportSection: () => <div data-testid="report-section" />,
+  ScenarioVersionPanel: (props: any) => {
+    mockVersionPanel.props = props;
+    return <div data-testid="scenario-version-panel" />;
+  },
+  TranslationProgressToast: () => null,
+}));
+
+// Mock constants
+vi.mock("@constants", () => ({
+  en: mockEn,
+  ADVANCED_EVENTS_LATENCY_THRESHOLD: 10,
+  TooltipLocation: { PUBLISH_SIMULATION_VERSION: "publish_simulation_version" },
+  ExperienceMode: {
+    FEEDBACK: "FEEDBACK",
+    CHECKLIST: "CHECKLIST",
+  },
+  ChecklistType: {
+    GUIDED: "GUIDED",
+    UNGUIDED: "UNGUIDED",
+  },
+  // Provide FORM_FIELD_IDS to satisfy CreateSimulation import
+  FORM_FIELD_IDS: {
+    LANGUAGES_VOICES: "languageVoices",
+    CHARACTER_PROFILE_TEXT: "characterProfileText",
+    PROMPT: "prompt",
+    BEHAVIOR_INSTRUCTIONS: "behaviorInstructions",
+    LINGUISTIC_STYLE_SAMPLES: "linguisticStyleSamples",
+  },
+  isValidStateInstructionId: (id: any) => ["-1", "1", "2", "3"].includes(String(id)),
+  // Per-simulation STT override: empty selection clears it, anything else keeps
+  // whatever is already stored. The real preset expansion is covered in
+  // utils/__tests__/createSimulation.test.ts.
+  resolveSttConfigFromPreset: (presetId: any, existing: any) => (presetId ? existing : null),
+  ROLE_INSTRUCTION_PROMPT_CODE: "openai_simulation_role_instruction",
+  SIMULATION_CATEGORY: { PARTNER_SIM: "PARTNER_SIM" },
+  ROUTES: {
+    SIMULATION_STUDIO: "/simulation-studio",
+    EDIT_SIMULATION: (id: string | number) => `/create-simulation/edit/${id}`,
+    VIEW_SIMULATION: (id: string | number) => `/create-simulation/view/${id}`,
+  },
+  // Basic Settings is no longer a standalone tab; the Agent Builder Copilot tab
+  // is prepended by the component itself. These tabs follow it.
+  StepperList: [
+    { id: "advanced-settings", title: "Event Configuration" },
+    { id: "report", title: "Report" },
+  ],
+  StepperListOld: [
+    { id: "basic-info", label: "Basic Information" },
+    { id: "character-identity", label: "Character Identity" },
+    { id: "traits-and-needs", label: "Traits & Needs" },
+    { id: "conversation-style", label: "Conversation Style" },
+    { id: "event-configuration", label: "Event Configuration" },
+  ],
+  SIMULATION_CREATOR_STEP_IDS: {
+    basicSettings: "basic-settings",
+    advancedSettings: "advanced-settings",
+    report: "report",
+    agentBuilderCopilot: "agent-builder-copilot",
+  },
+  SIMULATION_CREATOR_STEP_IDS_OLD: {
+    basicInfo: "basic-info",
+    characterIdentity: "character-identity",
+    traitsNeeds: "traits-and-needs",
+    conversationStyle: "conversation-style",
+    eventConfiguration: "event-configuration",
+  },
+  SIMULATION_CREATOR_FIELD_GROUPS: [
+    {
+      id: "overview",
+      label: "Overview",
+      fields: [
+        { id: "title", isMandatory: true },
+        { id: "description", isMandatory: true },
+        // Include language-voice mapping as mandatory to match app behavior
+        { id: "languageVoices", isMandatory: true },
+        { id: "age", isMandatory: false },
+      ],
+    },
+  ],
+}));
+
+// Mock utils
+vi.mock("@utils", () => ({
+  getCreateSimulationSubSectionById: (id: string) => ({
+    label: "Test Section",
+    fields: [{ id: "field1", label: "Field 1" }],
+  }),
+  extractValidData: (_fields: any, data: any) => data,
+  formatSimulationResponseData: (data: any) => data,
+  // Mirrors the real helper's absent-means-ON semantics — a Boolean() stub
+  // here would hide the very regression the real one exists to prevent.
+  buildFeedbackTabsPayload: (form: any) => ({
+    debrief: form?.feedbackTabDebrief !== false,
+    skills: form?.feedbackTabSkills !== false,
+    transcript: form?.feedbackTabTranscript !== false,
+  }),
+  // Real implementation in spirit: every toggle id mapped to its declared
+  // default. CreateSimulation feeds this straight into useForm's defaultValues,
+  // so a stub returning undefined would silently drop the create-path defaults.
+  buildToggleDefaultValues: (groups: any[]) =>
+    Object.fromEntries(
+      (groups ?? [])
+        .flatMap((group: any) => group?.fields ?? [])
+        .filter((field: any) => field?.type === "toggle_button")
+        .map((field: any) => [field.id, field.defaultValue === true]),
+    ),
+  isNonEmptyString: (str: string) => str && str.length > 0,
+  isNonEmptyArray: <T,>(value: unknown): value is T[] => {
+    return Array.isArray(value) && value?.length > 0;
+  },
+  isEmpty: (value: unknown) => {
+    if (value === undefined || value === null) return true;
+    if (typeof value === "string" && value.trim().length === 0) return true;
+    if (Array.isArray(value) && value.length === 0) return true;
+    return false;
+  },
+}));
+
+describe("CreateSimulation", () => {
+  const mockFormMethods = {
+    handleSubmit: vi.fn(fn => () => fn()),
+    formState: { dirtyFields: {} },
+    watch: vi.fn(() => ({
+      title: "Test Title",
+      description: "Test Description",
+      triggerWarningIds: [],
+      // Provide at least one language->voice mapping by default so header is enabled
+      languageVoices: { "1": "voice-1" },
+      // Populate optional fields so tests bypass the optional-fields warning modal
+      characterProfileText: "Test backstory",
+      prompt: "Test prompt",
+      behaviorInstructions: [{ category: "test" }],
+      linguisticStyleSamples: ["sample"],
+    })),
+    getValues: vi.fn(() => ({
+      title: "Test Title",
+      description: "Test Description",
+      triggerWarningIds: [],
+      languageVoices: { "1": "voice-1" },
+    })) as any,
+    setValue: vi.fn(),
+    reset: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useForm as any).mockReturnValue(mockFormMethods);
+    mockParams.id = undefined;
+    mockMappedEvents.count = 0;
+    mockAdminSimulation.data = null;
+    mockVersionPanel.props = null;
+
+    // Mock scrollTo function for containerRef
+    Element.prototype.scrollTo = vi.fn();
+  });
+
+  const createTestStore = () =>
+    configureStore({
+      reducer: { reportUpload: reportUploadReducer.reducer },
+      preloadedState: {
+        reportUpload: { uploads: [], currentScenarioId: undefined },
+      },
+    });
+
+  const renderCreateSimulation = () => {
+    const store = createTestStore();
+    return render(
+      <Provider store={store}>
+        <BrowserRouter>
+          <CreateSimulation />
+        </BrowserRouter>
+      </Provider>,
+    );
+  };
+
+  describe("Rendering", () => {
+    it("should render create simulation page", () => {
+      renderCreateSimulation();
+
+      expect(screen.getByTestId("tabs")).toBeInTheDocument();
+      expect(screen.getByText("Save Draft")).toBeInTheDocument();
+      expect(screen.getByText("Publish")).toBeInTheDocument();
+    });
+
+    it("should not render the deprecated 'Voice' standalone field", () => {
+      renderCreateSimulation();
+
+      expect(screen.queryByText("Voice")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("voice-dropdown-voice")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Advanced events latency warning", () => {
+    it("does not show the latency warning at or below the threshold", () => {
+      mockMappedEvents.count = 10;
+      renderCreateSimulation();
+
+      expect(screen.queryByTestId("warning-alt")).not.toBeInTheDocument();
+      expect(screen.queryByText(/advanced events/)).not.toBeInTheDocument();
+    });
+
+    it("shows the latency warning when advanced events exceed the threshold", () => {
+      mockMappedEvents.count = 11;
+      renderCreateSimulation();
+
+      expect(screen.getByTestId("warning-alt")).toBeInTheDocument();
+      expect(screen.getByText(/11 advanced events/)).toBeInTheDocument();
+    });
+  });
+
+  describe("Navigation", () => {
+    it("should navigate to a step when its tab is clicked", async () => {
+      // With an existing simulation, switching to Event Configuration needs no
+      // create round-trip, so the tab activates directly (mandatory Basic
+      // Settings fields are satisfied by the default watch() mock).
+      mockParams.id = "existing-id";
+      renderCreateSimulation();
+
+      const eventConfigTab = screen.getByText("Event Configuration");
+      fireEvent.click(eventConfigTab);
+
+      await waitFor(() => {
+        expect(eventConfigTab).toHaveAttribute("data-active", "true");
+      });
+    });
+
+    it("should show all steps as tabs", () => {
+      renderCreateSimulation();
+
+      // Agent Builder Copilot is the canonical builder tab (Basic Settings is
+      // its left pane, not a separate tab).
+      expect(screen.getByText("Agent Builder Copilot")).toBeInTheDocument();
+      expect(screen.getByText("Event Configuration")).toBeInTheDocument();
+      expect(screen.getByText("Report")).toBeInTheDocument();
+      expect(screen.queryByText("Basic Settings")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Back Navigation", () => {
+    it("should navigate back without popup when no changes", () => {
+      renderCreateSimulation();
+
+      const backButton = screen.getByText("Roleplays");
+      fireEvent.click(backButton);
+
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
+    });
+
+    it("should show discard popup when there are unsaved changes", () => {
+      mockFormMethods.formState.dirtyFields = { title: true };
+      renderCreateSimulation();
+
+      const backButton = screen.getByText("Roleplays");
+      fireEvent.click(backButton);
+
+      expect(screen.getByTestId("confirmation-popup")).toBeInTheDocument();
+      expect(screen.getByText("Unsaved")).toBeInTheDocument();
+    });
+
+    it("should discard changes and navigate when discard is clicked", () => {
+      mockFormMethods.formState.dirtyFields = { title: true };
+      renderCreateSimulation();
+
+      const backButton = screen.getByText("Roleplays");
+      fireEvent.click(backButton);
+
+      const discardButton = screen.getByText("Discard Changes");
+      fireEvent.click(discardButton);
+
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
+    });
+
+    it("should close discard popup when close is clicked", () => {
+      mockFormMethods.formState.dirtyFields = { title: true };
+      renderCreateSimulation();
+
+      const backButton = screen.getByText("Roleplays");
+      fireEvent.click(backButton);
+
+      const closeButton = screen.getByText("Close");
+      fireEvent.click(closeButton);
+
+      expect(screen.queryByTestId("confirmation-popup")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Browser unload guard", () => {
+    // Background autosave runs on an interval and closes most of the gap, but
+    // a real tab close in between ticks previously lost whatever changed
+    // since the last one with no warning at all.
+    const fireBeforeUnload = () => {
+      const event = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+      window.dispatchEvent(event);
+      return event;
+    };
+
+    it("warns before unload when there are unsaved changes", () => {
+      mockFormMethods.formState.dirtyFields = { title: true };
+      renderCreateSimulation();
+
+      const event = fireBeforeUnload();
+
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("does not warn before unload when the form is clean", () => {
+      mockFormMethods.formState.dirtyFields = {};
+      renderCreateSimulation();
+
+      const event = fireBeforeUnload();
+
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("does not warn before unload in view-only mode, even with dirty fields", () => {
+      mockFormMethods.formState.dirtyFields = { title: true };
+      const store = createTestStore();
+      render(
+        <Provider store={store}>
+          <BrowserRouter>
+            <CreateSimulation viewMode />
+          </BrowserRouter>
+        </Provider>,
+      );
+
+      const event = fireBeforeUnload();
+
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
+
+  describe("Save Draft", () => {
+    it("should call save draft when save draft button is clicked", async () => {
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalled();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("should show error if title is missing when saving draft", async () => {
+      const { toast } = await import("sonner");
+      mockFormMethods.getValues.mockReturnValue({ title: "", description: "Test" });
+      mockCreateSimulation.mockResolvedValue({ error: { data: { message: "Title is required" } } });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          // Check that toast.error was called (the message might be undefined due to mock issues)
+          expect(toast.error).toHaveBeenCalled();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("should update simulation if id exists", async () => {
+      mockParams.id = "existing-id";
+      mockUpdateSimulation.mockResolvedValue({ data: [{ id: "existing-id" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockUpdateSimulation).toHaveBeenCalled();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("stops autosave retries and shows the backend reason when the sim can't move to draft", async () => {
+      // Tracks/Case members may not be moved to draft — the backend 400s every
+      // draft save. The autosave must attempt once, surface the server's
+      // message, and stop retrying (previously it hammered the API every 10s
+      // behind a generic "couldn't save" banner).
+      const blockedMessage =
+        "This simulation is part of a Simulation Pathway and can’t be moved to draft. Please publish the changes.";
+      vi.useFakeTimers();
+      try {
+        mockParams.id = "existing-id";
+        mockFormMethods.formState = { dirtyFields: { title: true } } as any;
+        mockUpdateSimulation.mockResolvedValue({ error: { data: { message: blockedMessage } } });
+
+        renderCreateSimulation();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(mockUpdateSimulation).toHaveBeenCalledTimes(1);
+        expect(screen.getByText(blockedMessage)).toBeInTheDocument();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30_000);
+        });
+        expect(mockUpdateSimulation).toHaveBeenCalledTimes(1);
+      } finally {
+        mockFormMethods.formState = { dirtyFields: {} };
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  // Every editor save sends status DRAFT. On a published roleplay that takes it
+  // offline for learners — which a background save did, with no click, to a
+  // production roleplay on 2026-10-06. Live roleplays are never saved in the
+  // background, and an explicit Save asks first.
+  describe("Live roleplay", () => {
+    const openRoleplay = (status: "ACTIVE" | "DRAFT") => {
+      mockParams.id = "105";
+      mockAdminSimulation.data = { id: "105", title: "Nikhil [3]", status };
+      mockFormMethods.formState = { dirtyFields: { title: true } } as any;
+      mockUpdateSimulation.mockResolvedValue({ data: [{ id: "105" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Nikhil [3]",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+      renderCreateSimulation();
+    };
+    const savedStatus = (call = 0) => mockUpdateSimulation.mock.calls[call][0].simulation.status;
+
+    afterEach(() => {
+      mockFormMethods.formState = { dirtyFields: {} };
+      vi.useRealTimers();
+    });
+
+    it("never autosaves a live roleplay, and says its edits are unpublished", async () => {
+      vi.useFakeTimers();
+      openRoleplay("ACTIVE");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+      expect(screen.getByText("Unpublished changes — Publish to apply them")).toBeInTheDocument();
+    });
+
+    it("still autosaves a draft roleplay", async () => {
+      vi.useFakeTimers();
+      openRoleplay("DRAFT");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(mockUpdateSimulation).toHaveBeenCalledTimes(1);
+      expect(savedStatus()).toBe("DRAFT");
+      expect(screen.queryByText(/Unpublished changes/)).not.toBeInTheDocument();
+    });
+
+    it("asks before Save takes a live roleplay offline, and saves as a draft once confirmed", async () => {
+      openRoleplay("ACTIVE");
+
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+      expect(screen.getByText("Take this roleplay")).toBeInTheDocument();
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("Save as draft"));
+      await waitFor(() => expect(mockUpdateSimulation).toHaveBeenCalledTimes(1));
+      expect(savedStatus()).toBe("DRAFT");
+    });
+
+    it("leaves a live roleplay alone when the author keeps editing", () => {
+      openRoleplay("ACTIVE");
+
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+      fireEvent.click(screen.getByText("Keep editing"));
+
+      expect(screen.queryByText("Take this roleplay")).not.toBeInTheDocument();
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+    });
+
+    it("saves a draft roleplay straight away, without asking", async () => {
+      openRoleplay("DRAFT");
+
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+
+      expect(screen.queryByText("Take this roleplay")).not.toBeInTheDocument();
+      await waitFor(() => expect(mockUpdateSimulation).toHaveBeenCalledTimes(1));
+    });
+
+    it("asks the same question when the author saves and exits a live roleplay", async () => {
+      openRoleplay("ACTIVE");
+
+      fireEvent.click(screen.getByText("Roleplays"));
+      fireEvent.click(screen.getByText("Save and Exit"));
+      expect(screen.getByText("Take this roleplay")).toBeInTheDocument();
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("Save as draft"));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(-1));
+      expect(savedStatus()).toBe("DRAFT");
+    });
+
+    it("won't switch or branch versions over unpublished live edits", async () => {
+      const { toast } = await import("sonner");
+      openRoleplay("ACTIVE");
+
+      let proceed: boolean | void = true;
+      await act(async () => {
+        proceed = await mockVersionPanel.props.onBeforeCreate();
+      });
+      expect(proceed).toBe(false);
+
+      await act(async () => {
+        await mockVersionPanel.props.onEditVersion({ id: "v2", status: "DRAFT", config: {} });
+      });
+
+      // Stopped with a reason, not saved as a draft, and the form kept.
+      expect(toast.error).toHaveBeenCalledWith(
+        "This roleplay is live — publish your changes first.",
+      );
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Publish", () => {
+    it("should publish simulation and navigate to studio", async () => {
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const publishButton = screen.getByText("Publish");
+      fireEvent.click(publishButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalled();
+          // First navigates to edit page, then to simulation studio
+          expect(mockNavigate).toHaveBeenCalledWith("/create-simulation/edit/new-id", {
+            replace: true,
+          });
+          expect(mockNavigate).toHaveBeenCalledWith("/simulation-studio");
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("should show error message on publish failure", async () => {
+      const { toast } = await import("sonner");
+      mockCreateSimulation.mockRejectedValue(new Error("Failed"));
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const publishButton = screen.getByText("Publish");
+      fireEvent.click(publishButton);
+
+      await waitFor(
+        () => {
+          expect(toast.error).toHaveBeenCalledWith(
+            "Failed to create simulation. Please try again.",
+          );
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Preview", () => {
+    it("should open and close preview", async () => {
+      // Set simulationId to skip the navigation to edit page during save
+      mockParams.id = "existing-id";
+      mockUpdateSimulation.mockResolvedValue({ data: [{ id: "existing-id" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        coverImageUrl: "test.jpg",
+        openingStatements: "",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const previewButton = screen.getByText("Preview");
+      fireEvent.click(previewButton);
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("simulation-preview")).toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
+
+      const closePreviewButton = screen.getByText("Close Preview");
+      fireEvent.click(closePreviewButton);
+
+      await waitFor(
+        () => {
+          expect(screen.queryByTestId("simulation-preview")).not.toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Event Configuration", () => {
+    it("should render event map table when on event configuration step", async () => {
+      mockParams.id = "existing-id";
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const eventConfigButton = screen.getByText("Event Configuration");
+      fireEvent.click(eventConfigButton);
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("event-map-table")).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    it("should save draft before navigating to event configuration if no simulation id", async () => {
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const eventConfigButton = screen.getByText("Event Configuration");
+      fireEvent.click(eventConfigButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalled();
+        },
+        { timeout: 1000 },
+      );
+
+      await waitFor(
+        () => {
+          // Navigation to edit page happens after creating simulation
+          expect(mockNavigate).toHaveBeenCalledWith("/create-simulation/edit/new-id", {
+            replace: true,
+          });
+        },
+        { timeout: 1000 },
+      );
+    });
+  });
+
+  describe("Form Validation", () => {
+    it("should disable publish button when mandatory fields are not filled", () => {
+      mockFormMethods.watch.mockReturnValue({
+        title: "",
+        description: "",
+        triggerWarningIds: [],
+        languageVoices: { "1": "" },
+      });
+      renderCreateSimulation();
+
+      const publishButton = screen.getByText("Publish");
+      expect(publishButton).toBeDisabled();
+    });
+
+    it("should enable publish button when all mandatory fields are filled", () => {
+      mockFormMethods.watch.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+        languageVoices: { "1": "voice-1" },
+      });
+      renderCreateSimulation();
+
+      const publishButton = screen.getByText("Publish");
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    it("should enable publish button when optional fields (prompt, characterProfileText, behaviorInstructions, linguisticStyleSamples) are empty", () => {
+      mockFormMethods.watch.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+        languageVoices: { "1": "voice-1" },
+        prompt: "",
+        characterProfileText: "",
+        behaviorInstructions: [],
+        linguisticStyleSamples: {},
+        allowedFillerWords: {},
+      });
+      renderCreateSimulation();
+
+      const publishButton = screen.getByText("Publish");
+      expect(publishButton).not.toBeDisabled();
+    });
+  });
+
+  describe("Edit Mode", () => {
+    it("should load simulation data when id is provided", async () => {
+      mockParams.id = "existing-id";
+      const mockSimulationData = {
+        id: "existing-id",
+        title: "Existing Simulation",
+        description: "Existing Description",
+      };
+      mockGetSimulationById.mockResolvedValue(mockSimulationData);
+
+      renderCreateSimulation();
+
+      await waitFor(
+        () => {
+          expect(mockGetSimulationById).toHaveBeenCalledWith("existing-id");
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Opening Statements Processing", () => {
+    it("should convert opening statements string to array", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        openingStatements: "Statement 1\nStatement 2\nStatement 3",
+        triggerWarningIds: [],
+      });
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              scenarios: expect.arrayContaining([
+                expect.objectContaining({
+                  openingStatements: ["Statement 1", "Statement 2", "Statement 3"],
+                }),
+              ]),
+            }),
+          );
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Reminders Processing", () => {
+    it("should convert reminders string to array, one reminder per line", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        reminders: "Maintain eye contact\nAsk open-ended questions",
+        triggerWarningIds: [],
+      });
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              scenarios: expect.arrayContaining([
+                expect.objectContaining({
+                  reminders: ["Maintain eye contact", "Ask open-ended questions"],
+                }),
+              ]),
+            }),
+          );
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("should split translationReminders per-language text into arrays", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        reminders: "",
+        translationReminders: { "7": "Mantén la calma\nEscucha activamente" },
+        triggerWarningIds: [],
+      });
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              scenarios: expect.arrayContaining([
+                expect.objectContaining({
+                  translationReminders: { "7": ["Mantén la calma", "Escucha activamente"] },
+                }),
+              ]),
+            }),
+          );
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Timer Mode Validation", () => {
+    it("should validate maxTimeValue when timerMode is enabled", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test Title",
+        description: "Test Description",
+        timerMode: true,
+        maxTimeValue: "00:05:00",
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          // Valid time should not show error
+          expect(screen.queryByText(/maxTimeError/)).not.toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("should show error when maxTimeValue exceeds max time", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test Title",
+        description: "Test Description",
+        timerMode: true,
+        maxTimeValue: "02:00:00", // Exceeds 02:00:00
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(() => {
+        // Should call toast.error for invalid time
+        expect(toast.error).toHaveBeenCalled();
+      });
+    });
+
+    it("should skip maxTimeValue validation when timerMode is disabled", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test Title",
+        description: "Test Description",
+        timerMode: false,
+        maxTimeValue: undefined,
+        triggerWarningIds: [],
+      });
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalled();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("should skip validation when timerMode is true but maxTimeValue is not provided", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test Title",
+        description: "Test Description",
+        timerMode: true,
+        maxTimeValue: undefined,
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      // Should not validate if maxTimeValue is not provided
+      await waitFor(
+        () => {
+          expect(screen.queryByText(/titleIsRequired/)).not.toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Experience Mode and Checklist Type", () => {
+    it("should keep checklistType when experienceMode is CHECKLIST", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test Title",
+        description: "Test Description",
+        experienceMode: ExperienceMode.CHECKLIST,
+        checklistType: ChecklistType.GUIDED,
+        triggerWarningIds: [],
+      });
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              scenarios: expect.arrayContaining([
+                expect.objectContaining({
+                  experienceMode: ExperienceMode.CHECKLIST,
+                  checklistType: ChecklistType.GUIDED,
+                }),
+              ]),
+            }),
+          );
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("State Names Filtering", () => {
+    it("should filter out stateNames with invalid stateIds during save", async () => {
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test Title",
+        description: "Test Description",
+        stateNames: [
+          { stateId: "-1", name: "Valid state" },
+          { stateId: "99", name: "Invalid state" },
+        ],
+        triggerWarningIds: [],
+      });
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+
+      renderCreateSimulation();
+
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(
+        () => {
+          expect(mockCreateSimulation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              scenarios: expect.arrayContaining([
+                expect.objectContaining({
+                  stateNames: [{ stateId: "-1", name: "Valid state" }],
+                }),
+              ]),
+            }),
+          );
+        },
+        { timeout: 500 },
+      );
+    });
+  });
+
+  describe("Knowledge Source Unlocks", () => {
+    it("should clear unlocksFromStateId for knowledge sources when the state is unnamed and filtered out on save", async () => {
+      mockParams.id = "existing-id";
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        states: [
+          { id: "state-1", name: "Named State" },
+          { id: "state-2", name: "" },
+        ],
+        knowledgeSources: [
+          { id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: "state-2" },
+        ],
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+      const saveDraftButton = screen.getAllByText("Save Draft")[0];
+      fireEvent.click(saveDraftButton);
+
+      await waitFor(() => {
+        expect(mockUpdateSimulation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "existing-id",
+            simulation: expect.objectContaining({
+              states: [{ id: "state-1", name: "Named State" }],
+              knowledgeSources: [
+                { id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: null },
+              ],
+            }),
+          }),
+        );
+      });
+    });
+  });
+});

@@ -1,0 +1,449 @@
+/**
+ * Track 2.0 learner APIs (multi-component learning tracks).
+ *
+ * Caching strategy: mutations invalidate detail + list + next EXCEPT
+ * `reportVideoProgress`, which fires every ~10s — that one optimistically
+ * patches the cached track detail and only invalidates when the response
+ * flips `completed: true` — and `recordGameResult`, which changes no progress
+ * state at all.
+ */
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
+import {
+  AnnotationAttemptResult,
+  AnnotationMarkInput,
+  BranchingResult,
+  BucketSortPlacementResult,
+  ArticleResourceEmbeddabilityResponse,
+  EnrollTrackResponse,
+  GetLearnTracksResponse,
+  GetNextTrackItemResponse,
+  GetTrackLanguagesResponse,
+  PublicTrackOutline,
+  QuizAnswerInput,
+  QuizAttemptResult,
+  SetTrackLanguageResponse,
+  StartTrackItemResponse,
+  SubmitArticleQuestionAnswerResponse,
+  SubmitInterjectionAnswerResponse,
+  TrackAccessResponse,
+  TrackDetail,
+  TrackItemCompletionResult,
+  TrackItemStatus,
+  TrackProgressDashboard,
+  VideoProgressResult,
+} from "@types";
+
+import { baseAPI } from "./baseAPI";
+
+const ALL_TRACK_TAGS = [
+  TAG_TYPES.LEARN_TRACKS,
+  TAG_TYPES.LEARN_TRACK_DETAIL,
+  TAG_TYPES.LEARN_TRACK_NEXT,
+];
+
+/**
+ * Applies a completion result to a cached TrackDetail draft in place:
+ * marks the item COMPLETED, unlocks the ids the server reported and bumps
+ * the enrollment counters. Keeps the player responsive between refetches.
+ */
+export const applyCompletionToDetailDraft = (
+  draft: TrackDetail,
+  itemId: string,
+  result: TrackItemCompletionResult,
+): void => {
+  if (!result.completed) return;
+  for (const section of draft.sections) {
+    for (const item of section.items) {
+      if (item.id === itemId && item.status !== TrackItemStatus.COMPLETED) {
+        item.status = TrackItemStatus.COMPLETED;
+        item.completedAt = item.completedAt ?? new Date().toISOString();
+        draft.completedItems = Math.min(draft.totalItems, draft.completedItems + 1);
+      } else if (
+        result.unlockedItemIds?.includes(item.id) &&
+        item.status === TrackItemStatus.LOCKED
+      ) {
+        item.status = TrackItemStatus.UNLOCKED;
+      }
+    }
+  }
+  if (result.trackCompleted) {
+    draft.completedAt = draft.completedAt ?? new Date().toISOString();
+  }
+};
+
+const tracksAPI = baseAPI.injectEndpoints({
+  endpoints: builder => ({
+    /** List Track 2.0 tracks visible to the learner (with progress). */
+    getLearnTracks: builder.query<GetLearnTracksResponse, { languageCode: string }>({
+      query: ({ languageCode }) => ({
+        url: ApiEndpoints.TRACKS.GET_TRACKS,
+        method: HttpMethod.GET,
+        params: { languageCode },
+      }),
+      providesTags: [TAG_TYPES.LEARN_TRACKS],
+    }),
+
+    /**
+     * Full track detail: sections + items with per-item progress status.
+     *
+     * `languageCode` is the app language the learner is browsing in. The
+     * server reads the course in it when the course is published in it — an
+     * enrolled learner's saved per-course choice wins over it — and otherwise
+     * falls back to English. Without it, a Hindi-UI learner always got English.
+     */
+    getLearnTrackDetail: builder.query<TrackDetail, { trackId: string; languageCode?: string }>({
+      query: ({ trackId, languageCode }) => ({
+        url: ApiEndpoints.TRACKS.GET_TRACK_DETAIL(trackId),
+        method: HttpMethod.GET,
+        params: languageCode ? { languageCode } : undefined,
+      }),
+      providesTags: [TAG_TYPES.LEARN_TRACK_DETAIL],
+    }),
+
+    /**
+     * The outline behind a course's public share link. Needs no login (the
+     * endpoint is @Public), so it is safe to call for a logged-out visitor;
+     * 404 whenever public view is off or the course is not published.
+     */
+    getPublicTrackOutline: builder.query<
+      PublicTrackOutline,
+      { trackId: string; languageCode?: string }
+    >({
+      query: ({ trackId, languageCode }) => ({
+        url: ApiEndpoints.TRACKS.PUBLIC_OUTLINE(trackId),
+        method: HttpMethod.GET,
+        params: languageCode ? { languageCode } : undefined,
+      }),
+    }),
+
+    /**
+     * Whether the signed-in learner can take this course. Not cached: it is
+     * asked right after login, when the answer belongs to a different account
+     * than any earlier one.
+     */
+    getTrackAccess: builder.query<TrackAccessResponse, { trackId: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.TRACKS.ACCESS(trackId),
+        method: HttpMethod.GET,
+      }),
+      keepUnusedDataFor: 0,
+    }),
+
+    /** Languages this course is published in, plus the learner's saved choice. */
+    getTrackLanguages: builder.query<GetTrackLanguagesResponse, { trackId: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.TRACKS.LANGUAGES(trackId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.LEARN_TRACK_DETAIL],
+    }),
+
+    /**
+     * Persist the learner's language for ONE course (requires enrollment).
+     * Every title, prompt and option changes with it, so the whole track cache
+     * is invalidated.
+     */
+    setTrackLanguage: builder.mutation<
+      SetTrackLanguageResponse,
+      { trackId: string; languageCode: string }
+    >({
+      query: ({ trackId, languageCode }) => ({
+        url: ApiEndpoints.TRACKS.SET_LANGUAGE(trackId),
+        method: HttpMethod.PUT,
+        body: { languageCode },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Progress + consolidated feedback dashboard: percent complete plus
+     * skill-category feedback aggregated across every evaluated roleplay
+     * session in the course. Shares the track-detail tag — it goes stale on
+     * exactly the same completion mutations that already invalidate it.
+     */
+    getLearnTrackProgress: builder.query<TrackProgressDashboard, { trackId: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.TRACKS.GET_PROGRESS(trackId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.LEARN_TRACK_DETAIL],
+    }),
+
+    /** Next unlocked-but-incomplete item for deep-linking into the player. */
+    getNextTrackItem: builder.query<GetNextTrackItemResponse, { trackId: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.TRACKS.GET_NEXT_ITEM(trackId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.LEARN_TRACK_NEXT],
+    }),
+
+    /**
+     * Idempotent enrollment — creates all progress rows server-side.
+     *
+     * `languageCode` seeds the enrollment's course language (the language every
+     * lesson is served and marked in), when the course is published in it.
+     */
+    enrollTrack: builder.mutation<EnrollTrackResponse, { trackId: string; languageCode?: string }>({
+      query: ({ trackId, languageCode }) => ({
+        url: ApiEndpoints.TRACKS.ENROLL(trackId),
+        method: HttpMethod.POST,
+        body: languageCode ? { languageCode } : undefined,
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Start (or resume) a track item. Returns the type-discriminated content
+     * payload. 400s when the item is still locked.
+     */
+    startTrackItem: builder.mutation<StartTrackItemResponse, { itemId: string }>({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.START_ITEM(itemId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /** Which of an article's resources must skip the embed and open in a new tab. */
+    getArticleResourceEmbeddability: builder.query<
+      ArticleResourceEmbeddabilityResponse,
+      { itemId: string }
+    >({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.RESOURCE_EMBEDDABILITY(itemId),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /** Mark an article read (completes the item when criteria are met). */
+    markArticleRead: builder.mutation<TrackItemCompletionResult, { itemId: string }>({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.ARTICLE_READ(itemId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Answer one inline article question. Final — the server refuses a second
+     * answer to the same question. Invalidates the track tags only when the
+     * answer completed the article, which is the one case where the outline's
+     * completion state has actually moved.
+     */
+    submitArticleQuestionAnswer: builder.mutation<
+      SubmitArticleQuestionAnswerResponse,
+      { itemId: string; questionId: string; selectedOptionId: string }
+    >({
+      query: ({ itemId, questionId, selectedOptionId }) => ({
+        url: ApiEndpoints.TRACKS.ARTICLE_QUESTION_ANSWER(itemId, questionId),
+        method: HttpMethod.POST,
+        body: { selectedOptionId },
+      }),
+      onQueryStarted: async (_arg, { dispatch, queryFulfilled }) => {
+        const { data } = await queryFulfilled;
+        if (data.completion?.completed) {
+          dispatch(baseAPI.util.invalidateTags(ALL_TRACK_TAGS));
+        }
+      },
+    }),
+
+    /**
+     * Throttled video watch reporting (~10s cadence). Never blanket-
+     * invalidates: optimistically patches the cached detail and only
+     * invalidates the track tags when the response flips `completed`.
+     */
+    reportVideoProgress: builder.mutation<
+      VideoProgressResult,
+      { itemId: string; trackId: string; watchedPct: number }
+    >({
+      query: ({ itemId, watchedPct }) => ({
+        url: ApiEndpoints.TRACKS.VIDEO_PROGRESS(itemId),
+        method: HttpMethod.POST,
+        body: { watchedPct },
+      }),
+      onQueryStarted: async ({ itemId, trackId, watchedPct }, { dispatch, queryFulfilled }) => {
+        // Optimistic patch of the item's maxWatchedPct in the cached detail.
+        const patch = dispatch(
+          tracksAPI.util.updateQueryData("getLearnTrackDetail", { trackId }, draft => {
+            for (const section of draft.sections) {
+              for (const item of section.items) {
+                if (item.id === itemId) {
+                  item.maxWatchedPct = Math.max(item.maxWatchedPct ?? 0, watchedPct);
+                }
+              }
+            }
+          }),
+        );
+        try {
+          const { data } = await queryFulfilled;
+          if (data.completed) {
+            dispatch(baseAPI.util.invalidateTags(ALL_TRACK_TAGS));
+          }
+        } catch {
+          patch.undo();
+        }
+      },
+    }),
+
+    /** Submit a full quiz attempt (single-shot answers payload). */
+    submitQuizAttempt: builder.mutation<
+      QuizAttemptResult,
+      { itemId: string; answers: QuizAnswerInput[] }
+    >({
+      query: ({ itemId, answers }) => ({
+        url: ApiEndpoints.TRACKS.QUIZ_ATTEMPTS(itemId),
+        method: HttpMethod.POST,
+        body: { answers },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Answer one video interjection (hard-pause quiz question). Graded and
+     * recorded server-side immediately; unlike `submitQuizAttempt` this
+     * gates nothing about item completion, so — like the journal draft
+     * autosave below — it invalidates no caches.
+     */
+    submitInterjectionAnswer: builder.mutation<
+      SubmitInterjectionAnswerResponse,
+      { itemId: string; interjectionId: string; answer: QuizAnswerInput }
+    >({
+      query: ({ itemId, interjectionId, answer }) => ({
+        url: ApiEndpoints.TRACKS.INTERJECTION_ANSWER(itemId, interjectionId),
+        method: HttpMethod.POST,
+        body: answer,
+      }),
+    }),
+
+    /** Re-run grading for a PENDING_GRADING attempt (LLM grader retry). */
+    regradeQuizAttempt: builder.mutation<QuizAttemptResult, { itemId: string; attemptId: string }>({
+      query: ({ itemId, attemptId }) => ({
+        url: ApiEndpoints.TRACKS.QUIZ_REGRADE(itemId, attemptId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Journal draft autosave (debounced ~1s upstream). Like
+     * reportVideoProgress this must not thrash the caches — a draft save
+     * changes no progress state, so it invalidates nothing.
+     */
+    saveJournalDraft: builder.mutation<
+      { success: boolean },
+      { itemId: string; responses: { promptId: string; response: string }[] }
+    >({
+      query: ({ itemId, responses }) => ({
+        url: ApiEndpoints.TRACKS.JOURNAL_DRAFT(itemId),
+        method: HttpMethod.POST,
+        body: { responses },
+      }),
+    }),
+
+    /** Submit the journal (400 when required prompts are unanswered). */
+    submitJournal: builder.mutation<TrackItemCompletionResult, { itemId: string }>({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.JOURNAL_SUBMIT(itemId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Submit annotation marks. Graded synchronously server-side (pure set
+     * comparison — no LLM), so the result comes back on this response and
+     * there is no regrade counterpart.
+     */
+    submitAnnotationAttempt: builder.mutation<
+      AnnotationAttemptResult,
+      { itemId: string; marks: AnnotationMarkInput[] }
+    >({
+      query: ({ itemId, marks }) => ({
+        url: ApiEndpoints.TRACKS.ANNOTATION_ATTEMPTS(itemId),
+        method: HttpMethod.POST,
+        body: { marks },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Personal best for a game run. A game item is already complete by the
+     * time this fires, so it unlocks nothing and invalidates nothing — the
+     * player treats a failure as a non-event.
+     */
+    recordGameResult: builder.mutation<
+      { bestScore: number; playCount: number; score: number },
+      { itemId: string; score: number }
+    >({
+      query: ({ itemId, score }) => ({
+        url: ApiEndpoints.TRACKS.GAME_RESULT(itemId),
+        method: HttpMethod.POST,
+        body: { score },
+      }),
+    }),
+
+    /**
+     * The path a learner walked through a branching scenario. The server
+     * scores it and the response is the truth for pass/fail and attempts.
+     */
+    recordBranchingResult: builder.mutation<BranchingResult, { itemId: string; path: string[] }>({
+      query: ({ itemId, path }) => ({
+        url: ApiEndpoints.TRACKS.BRANCHING_RESULT(itemId),
+        method: HttpMethod.POST,
+        body: { path },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /** One placement in a bucket sort; the response is that item's verdict and explanation. */
+    placeBucketSortItem: builder.mutation<
+      BucketSortPlacementResult,
+      { itemId: string; sortItemId: string; bucketId: string }
+    >({
+      query: ({ itemId, sortItemId, bucketId }) => ({
+        url: ApiEndpoints.TRACKS.BUCKET_SORT_PLACE(itemId),
+        method: HttpMethod.POST,
+        body: { sortItemId, bucketId },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    restartBucketSort: builder.mutation<{ success: boolean }, { itemId: string }>({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.BUCKET_SORT_RESTART(itemId),
+        method: HttpMethod.POST,
+      }),
+    }),
+  }),
+});
+
+export const {
+  useGetLearnTracksQuery,
+  useGetLearnTrackDetailQuery,
+  useGetPublicTrackOutlineQuery,
+  useLazyGetTrackAccessQuery,
+  useGetTrackLanguagesQuery,
+  useSetTrackLanguageMutation,
+  useGetLearnTrackProgressQuery,
+  useGetNextTrackItemQuery,
+  useLazyGetNextTrackItemQuery,
+  useEnrollTrackMutation,
+  useStartTrackItemMutation,
+  useMarkArticleReadMutation,
+  useGetArticleResourceEmbeddabilityQuery,
+  useReportVideoProgressMutation,
+  useSubmitQuizAttemptMutation,
+  useSubmitArticleQuestionAnswerMutation,
+  useSubmitInterjectionAnswerMutation,
+  useRegradeQuizAttemptMutation,
+  useSaveJournalDraftMutation,
+  useSubmitJournalMutation,
+  useSubmitAnnotationAttemptMutation,
+  useRecordGameResultMutation,
+  useRecordBranchingResultMutation,
+  usePlaceBucketSortItemMutation,
+  useRestartBucketSortMutation,
+} = tracksAPI;
+
+export { tracksAPI };

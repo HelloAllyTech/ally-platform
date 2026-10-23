@@ -1,0 +1,311 @@
+import { useEffect, useMemo, useState } from "react";
+
+import { toast } from "sonner";
+
+import { Tooltip } from "@ally-ui-mono/ui-shared";
+import {
+  useGetDashboardSettingsAllQuery,
+  useGetTenantByIdQuery,
+  useUpdateTenantMutation,
+  useGetCharacterLibraryEnabledQuery,
+  useUpdateCharacterLibraryEnabledMutation,
+  useGetProgressDashboardEnabledQuery,
+  useUpdateProgressDashboardEnabledMutation,
+  useGetTextChatRoleplayEnabledQuery,
+  useUpdateTextChatRoleplayEnabledMutation,
+} from "@src/api";
+import { TooltipIcon } from "@src/assets";
+import { ToggleSwitch } from "@src/components/toggle-switch";
+import { en } from "@src/constants";
+import { CreateTenantBody } from "@src/types";
+
+import { SIMULATION_SETTINGS_ITEMS } from "./constants";
+
+const SimulationsSettings = ({
+  organizationId,
+  onUpdateTenant,
+}: {
+  organizationId: string;
+  onUpdateTenant: () => void;
+}) => {
+  const [enabledItems, setEnabledItems] = useState<string[]>([]);
+  const { data: dashboardSettingsAll } = useGetDashboardSettingsAllQuery();
+  const { data: tenant } = useGetTenantByIdQuery(organizationId);
+  const [enabledDashboardIds, setEnabledDashboardIds] = useState<string[]>([]);
+  const [updateTenant] = useUpdateTenantMutation();
+
+  // Org-level Character Library switch. Stored as a `preference` row rather
+  // than on the tenant, so it has its own query/mutation pair.
+  const { data: characterLibraryEnabled } = useGetCharacterLibraryEnabledQuery(organizationId);
+  const [updateCharacterLibraryEnabled] = useUpdateCharacterLibraryEnabledMutation();
+  const [localCharacterLibraryEnabled, setLocalCharacterLibraryEnabled] = useState(false);
+
+  useEffect(() => {
+    if (characterLibraryEnabled !== undefined) {
+      setLocalCharacterLibraryEnabled(characterLibraryEnabled);
+    }
+  }, [characterLibraryEnabled]);
+
+  const handleCharacterLibraryToggle = async () => {
+    const next = !localCharacterLibraryEnabled;
+    setLocalCharacterLibraryEnabled(next);
+    try {
+      await updateCharacterLibraryEnabled({
+        tenantId: organizationId,
+        enabled: next,
+      }).unwrap();
+    } catch (error: any) {
+      // Roll the switch back rather than leaving the UI claiming a state the
+      // server never accepted.
+      setLocalCharacterLibraryEnabled(!next);
+      toast.error(error?.data?.message || en.errors.failedUpdateAccess);
+    }
+  };
+
+  // Org-level Learner Progress (XP/levels) switch. Same shape as Character
+  // Library above: a `preference` row, not a tenant column, off by default.
+  const { data: progressDashboardEnabled } = useGetProgressDashboardEnabledQuery(organizationId);
+  const [updateProgressDashboardEnabled] = useUpdateProgressDashboardEnabledMutation();
+  const [localProgressDashboardEnabled, setLocalProgressDashboardEnabled] = useState(false);
+
+  useEffect(() => {
+    if (progressDashboardEnabled !== undefined) {
+      setLocalProgressDashboardEnabled(progressDashboardEnabled);
+    }
+  }, [progressDashboardEnabled]);
+
+  const handleProgressDashboardToggle = async () => {
+    const next = !localProgressDashboardEnabled;
+    setLocalProgressDashboardEnabled(next);
+    try {
+      await updateProgressDashboardEnabled({
+        tenantId: organizationId,
+        enabled: next,
+      }).unwrap();
+    } catch (error: any) {
+      setLocalProgressDashboardEnabled(!next);
+      toast.error(error?.data?.message || en.errors.failedUpdateAccess);
+    }
+  };
+
+  // Org-level text-chat roleplays switch. Same shape again: a `preference`
+  // row, off by default. It only opens the door — each roleplay still has to
+  // offer text chat itself (Simulation Studio), and voice stays available.
+  const { data: textChatRoleplayEnabled } = useGetTextChatRoleplayEnabledQuery(organizationId);
+  const [updateTextChatRoleplayEnabled] = useUpdateTextChatRoleplayEnabledMutation();
+  const [localTextChatRoleplayEnabled, setLocalTextChatRoleplayEnabled] = useState(false);
+
+  useEffect(() => {
+    if (textChatRoleplayEnabled !== undefined) {
+      setLocalTextChatRoleplayEnabled(textChatRoleplayEnabled);
+    }
+  }, [textChatRoleplayEnabled]);
+
+  const handleTextChatRoleplayToggle = async () => {
+    const next = !localTextChatRoleplayEnabled;
+    setLocalTextChatRoleplayEnabled(next);
+    try {
+      await updateTextChatRoleplayEnabled({
+        tenantId: organizationId,
+        enabled: next,
+      }).unwrap();
+    } catch (error: any) {
+      setLocalTextChatRoleplayEnabled(!next);
+      toast.error(error?.data?.message || en.errors.failedUpdateAccess);
+    }
+  };
+
+  // Engagement-reminder nudges. Stored on the tenant itself (settings.engagementReminder.remindersEnabled),
+  // same as hideRankInCommunity above, so it rides the existing updateTenant mutation rather than a
+  // dedicated query/mutation pair like Character Library/Progress Dashboard above.
+  const [localEngagementReminderEnabled, setLocalEngagementReminderEnabled] = useState(false);
+
+  useEffect(() => {
+    if (tenant) {
+      setLocalEngagementReminderEnabled(Boolean(tenant.engagementReminderEnabled));
+    }
+  }, [tenant]);
+
+  const handleEngagementReminderToggle = async () => {
+    const next = !localEngagementReminderEnabled;
+    setLocalEngagementReminderEnabled(next);
+    try {
+      await updateTenant({
+        id: organizationId,
+        data: { engagementReminderEnabled: next },
+      }).unwrap();
+      onUpdateTenant?.();
+    } catch (error: any) {
+      setLocalEngagementReminderEnabled(!next);
+      toast.error(error?.data?.message || en.errors.failedUpdateAccess);
+    }
+  };
+
+  useEffect(() => {
+    if (tenant && dashboardSettingsAll) {
+      setEnabledDashboardIds(tenant.enabledDashboardIds ?? []);
+      const newEnabledItems = [];
+      if (tenant.hideRankInCommunity) {
+        newEnabledItems.push("hideRankInCommunity");
+      }
+      setEnabledItems(newEnabledItems);
+      for (const dashboardId of tenant.enabledDashboardIds) {
+        const dashboard = dashboardSettingsAll?.find(setting => setting.id === dashboardId);
+        if (dashboard) {
+          newEnabledItems.push(dashboard.id);
+        }
+      }
+    }
+  }, [tenant, dashboardSettingsAll]);
+  const optionValues = useMemo(() => {
+    return SIMULATION_SETTINGS_ITEMS.map(item => {
+      let id = "";
+      if (item.id !== "") {
+        id = item.id;
+      } else {
+        const dashboardId =
+          dashboardSettingsAll?.find(setting => setting.analyticsType === item.type)?.id ?? "";
+        id = dashboardId;
+      }
+      return {
+        id,
+        label: item.label,
+        type: item.type,
+      };
+    });
+  }, [dashboardSettingsAll]);
+  const handleToggle = async (item: { id: string; type: string }) => {
+    try {
+      const data: Partial<CreateTenantBody> = {};
+      if (item.type) {
+        if (enabledDashboardIds.includes(item.id)) {
+          data.enabledDashboardIds = enabledDashboardIds.filter(id => id !== item.id);
+        } else {
+          data.enabledDashboardIds = [...enabledDashboardIds, item.id];
+        }
+        setEnabledDashboardIds(data.enabledDashboardIds);
+      } else {
+        data.hideRankInCommunity = !enabledItems.includes(item.id);
+      }
+      await updateTenant({ id: organizationId, data });
+      onUpdateTenant?.();
+    } catch (error: any) {
+      toast.error(error?.data?.message || en.errors.failedUpdateAccess);
+      throw error;
+    }
+    setEnabledItems(prev =>
+      prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id],
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-4 w-full md:w-1/2">
+      {optionValues.map(item => (
+        <div
+          key={item.id}
+          className="flex min-h-9 md:h-9 flex-row justify-between items-center gap-3 font-primary"
+        >
+          <div className="text-sm text-typography-700 font-normal">{item.label}</div>
+          <div className="flex flex-row items-center gap-2">
+            <ToggleSwitch
+              enabled={enabledItems.includes(item.id)}
+              onChange={() => handleToggle(item)}
+            />
+            <span className="text-sm text-typography-900 font-normal">
+              {enabledItems.includes(item.id) ? en.common.enabled : en.common.disabled}
+            </span>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex min-h-9 md:h-9 flex-row justify-between items-center gap-3 font-primary">
+        <div className="flex flex-row items-center gap-2 text-sm text-typography-700 font-normal">
+          {en.userManagement.characterLibraryEnabled}
+          <Tooltip label={en.userManagement.characterLibraryEnabledHint} align="top">
+            <button type="button" className="cursor-pointer inline-flex items-center">
+              <TooltipIcon />
+            </button>
+          </Tooltip>
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <ToggleSwitch
+            enabled={localCharacterLibraryEnabled}
+            onChange={handleCharacterLibraryToggle}
+            label={en.userManagement.characterLibraryEnabled}
+          />
+          <span className="text-sm text-typography-900 font-normal">
+            {localCharacterLibraryEnabled ? en.common.enabled : en.common.disabled}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex min-h-9 md:h-9 flex-row justify-between items-center gap-3 font-primary">
+        <div className="flex flex-row items-center gap-2 text-sm text-typography-700 font-normal">
+          {en.userManagement.progressDashboardEnabled}
+          <Tooltip label={en.userManagement.progressDashboardEnabledHint} align="top">
+            <button type="button" className="cursor-pointer inline-flex items-center">
+              <TooltipIcon />
+            </button>
+          </Tooltip>
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <ToggleSwitch
+            enabled={localProgressDashboardEnabled}
+            onChange={handleProgressDashboardToggle}
+            label={en.userManagement.progressDashboardEnabled}
+          />
+          <span className="text-sm text-typography-900 font-normal">
+            {localProgressDashboardEnabled ? en.common.enabled : en.common.disabled}
+          </span>
+        </div>
+      </div>
+
+      <div
+        data-testid="text-chat-roleplay-setting"
+        className="flex min-h-9 md:h-9 flex-row justify-between items-center gap-3 font-primary"
+      >
+        <div className="flex flex-row items-center gap-2 text-sm text-typography-700 font-normal">
+          {en.userManagement.textChatRoleplayEnabled}
+          <Tooltip label={en.userManagement.textChatRoleplayEnabledHint} align="top">
+            <button type="button" className="cursor-pointer inline-flex items-center">
+              <TooltipIcon />
+            </button>
+          </Tooltip>
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <ToggleSwitch
+            enabled={localTextChatRoleplayEnabled}
+            onChange={handleTextChatRoleplayToggle}
+            label={en.userManagement.textChatRoleplayEnabled}
+          />
+          <span className="text-sm text-typography-900 font-normal">
+            {localTextChatRoleplayEnabled ? en.common.enabled : en.common.disabled}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex min-h-9 md:h-9 flex-row justify-between items-center gap-3 font-primary">
+        <div className="flex flex-row items-center gap-2 text-sm text-typography-700 font-normal">
+          {en.userManagement.engagementReminderEnabled}
+          <Tooltip label={en.userManagement.engagementReminderEnabledHint} align="top">
+            <button type="button" className="cursor-pointer inline-flex items-center">
+              <TooltipIcon />
+            </button>
+          </Tooltip>
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <ToggleSwitch
+            enabled={localEngagementReminderEnabled}
+            onChange={handleEngagementReminderToggle}
+            label={en.userManagement.engagementReminderEnabled}
+          />
+          <span className="text-sm text-typography-900 font-normal">
+            {localEngagementReminderEnabled ? en.common.enabled : en.common.disabled}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { SimulationsSettings };

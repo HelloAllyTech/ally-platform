@@ -1,0 +1,880 @@
+// This component is used to display the event map table for the simulation
+
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { toast } from "sonner";
+
+import { Tooltip } from "@ally-ui-mono/ui-shared";
+import {
+  useGetSessionEventsQuery,
+  useMapScenarioEventsMutation,
+  useDeleteScenarioEventsMutation,
+  useGetMappedScenarioEventsQuery,
+  useCreateSessionEventsMutation,
+} from "@api";
+import { Add, Refresh, Trash } from "@assets";
+import {
+  NotionTable,
+  cellTypes,
+  Button,
+  MappedEventSidePanel,
+  EventMapTableLoader,
+  BulkAddEventsSidePanel,
+  SegmentedToggle,
+  AddEventMethodDialog,
+  ADD_EVENT_METHOD,
+  GenerateEventPanel,
+  type AddEventMethod,
+} from "@components";
+import { ButtonVariant } from "@components/types";
+import {
+  ADVANCED_EVENTS_LATENCY_THRESHOLD,
+  SESSION_EVENT_STATUS_OPTIONS,
+  SORT_BY,
+  SORT_ORDER,
+  en,
+} from "@constants";
+import { UpdateScenarioEventDataParam } from "@types";
+import {
+  createNewEvent,
+  formatToMappedEvent,
+  convertToApiFormat,
+  formatApiResponseToMappedEvent,
+  createSessionEventsMap,
+  MAPPED_EVENT_FIELDS,
+  isNonEmptyString,
+  addScoreColors,
+  getErrorMessage,
+  convertEventToApiPayload,
+  draftToEventParam,
+  type EventDraft,
+} from "@utils";
+
+interface SimulationEventMapTableProps {
+  simulationId: string | undefined;
+  /**
+   * When set, the table operates in version mode: it loads from `versionEvents`
+   * (the draft version's snapshot) and reports every change up via
+   * `onVersionEventsChange` instead of writing to the live scenario. The live
+   * scenario is only touched when the version is published.
+   */
+  versionId?: string;
+  versionEvents?: any[];
+  onVersionEventsChange?: (events: any[]) => void;
+}
+
+const DEBOUNCE_DELAY = 500;
+const CHECKLIST_VIEW_COLUMN_IDS = new Set([
+  "name",
+  "message",
+  "score",
+  "checklistVisibilityStatus",
+  "tags",
+]);
+
+type EventMapViewMode = "full" | "checklist";
+const VIEW_MODE_OPTIONS = [
+  { label: "Full View", value: "full" },
+  { label: "Checklist View", value: "checklist" },
+] as const;
+
+export const SimulationEventMapTable: FC<SimulationEventMapTableProps> = ({
+  simulationId,
+  versionId,
+  versionEvents,
+  onVersionEventsChange,
+}) => {
+  const [mappedEvents, setMappedEvents] = useState<UpdateScenarioEventDataParam[]>([
+    createNewEvent(),
+  ]);
+  const [eventOrderMapping, setEventOrderMapping] = useState<Record<string, number>>({});
+  const [selectedEventRows, setSelectedEventRows] = useState<UpdateScenarioEventDataParam[]>([]);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [selectedEventForEdit, setSelectedEventForEdit] =
+    useState<UpdateScenarioEventDataParam | null>(null);
+  const [isBulkAddPanelOpen, setIsBulkAddPanelOpen] = useState(false);
+  const [isAddMethodDialogOpen, setIsAddMethodDialogOpen] = useState(false);
+  const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<EventMapViewMode>("full");
+
+  // The whole active-event catalogue backs the event picker, so this one
+  // request decides whether an event can be found at all. It gets
+  // `refetchOnMountOrArgChange` for the same reason the mapped-events query
+  // below does: a cached failure must not survive as a silently empty
+  // catalogue — that reads as "no such event" and only a full page reload
+  // cleared it. `isError` is carried through to the picker so a failed load
+  // never masquerades as an empty one.
+  const {
+    data: sessionEventsData,
+    isLoading: isSessionEventsLoading,
+    isError: isSessionEventsError,
+    refetch: refetchSessionEvents,
+  } = useGetSessionEventsQuery(
+    {
+      visibilityType: SESSION_EVENT_STATUS_OPTIONS.ACTIVE,
+      sortBy: SORT_BY.CREATED_AT,
+      order: SORT_ORDER.DESC,
+    },
+    {
+      refetchOnMountOrArgChange: true,
+    },
+  );
+  const {
+    data: mappedScenarioEventsData,
+    isLoading: isMappedEventsLoading,
+    refetch: refetchMappedEvents,
+  } = useGetMappedScenarioEventsQuery(
+    {
+      id: String(simulationId || ""),
+    },
+    {
+      refetchOnMountOrArgChange: true,
+    },
+  );
+
+  const [mapScenarioEvents] = useMapScenarioEventsMutation();
+  const [deleteScenarioEvents] = useDeleteScenarioEventsMutation();
+  const [createSessionEvents, { isLoading: isCreatingSessionEvent }] =
+    useCreateSessionEventsMutation();
+
+  const sessionEvents = useMemo(() => sessionEventsData?.data || [], [sessionEventsData]);
+  const isLoading = isSessionEventsLoading || isMappedEventsLoading;
+
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // Tracks edits that are queued (debounced) or in-flight to the API. The
+  // server-sync effect below must not overwrite local state while this is
+  // non-empty/true, or a save made shortly after another save's refetch
+  // resolves gets silently reverted (and never re-sent).
+  const changedEventsRef = useRef<Map<string, UpdateScenarioEventDataParam>>(new Map());
+  const isSavingRef = useRef(false);
+  const reloadTimeoutRef = useRef<NodeJS.Timeout>();
+
+  /**
+   * Row count for the server-sync effect to read, deliberately NOT a dependency
+   * of it. The effect re-seeds local state from the server, so depending on a
+   * count the effect's own callers change made every local edit re-trigger it:
+   * adding a row grew the count, the effect re-seeded the server's rows, and the
+   * blank row the admin had just added vanished while its side panel stayed
+   * open on it. Version-mode deletes came back the same way, since that path
+   * only filters local state.
+   */
+  const mappedEventsLengthRef = useRef(0);
+
+  // Create a memoized map for quick event lookup
+  const sessionEventsMap = useMemo(() => createSessionEventsMap(sessionEvents), [sessionEvents]);
+
+  // Real mapped events, excluding the blank placeholder row the table always
+  // keeps. Feeds the latency warning, which is about how many classifiers the
+  // runtime has to evaluate — a row bound to nothing costs it nothing.
+  const mappedEventCount = useMemo(
+    () => mappedEvents.filter(event => isNonEmptyString(event.id?.value)).length,
+    [mappedEvents],
+  );
+
+  // Calculate available session events options (excluding already mapped events)
+  const sessionEventsOptions = useMemo(() => {
+    const sessionEventIds = new Set(sessionEvents.map(event => event.id));
+    const mappedEventIds = new Set(
+      mappedEvents
+        .map(mappedEvent => mappedEvent.id?.value)
+        .filter(eventId => sessionEventIds.has(eventId as string)),
+    );
+    return sessionEvents
+      .filter(event => !mappedEventIds.has(event.id))
+      .map(event => ({ label: event.name, value: event.id }));
+  }, [sessionEvents, mappedEvents]);
+
+  // Initialize mapped events. In version mode, seed from the version snapshot
+  // when it has events; otherwise fall back to the live mapping (so branching
+  // an older scenario that predates event-versioning still shows its events,
+  // which then get captured into the draft on first edit).
+  useEffect(() => {
+    // Skip syncing from the server while a save is queued or in-flight — this
+    // effect also re-runs on the refetch that every save triggers (they share
+    // the SIMULATION_EVENTS tag), and overwriting local state mid-edit would
+    // silently drop whatever hasn't round-tripped yet.
+    if (changedEventsRef.current.size > 0 || isSavingRef.current) return;
+
+    // An array (even empty) is authoritative — the version captured its events.
+    // Only `undefined` (a version predating event-versioning) falls back to the
+    // live mapping so branching an older scenario keeps its events.
+    const sourceData =
+      versionId && Array.isArray(versionEvents) ? versionEvents : mappedScenarioEventsData?.data;
+
+    if (sourceData && sourceData.length > 0) {
+      const formattedEvents = sourceData.map((event: any) =>
+        formatApiResponseToMappedEvent(
+          event,
+          sessionEventsMap.get(event.eventId ?? event.id)?.detectionType,
+        ),
+      );
+
+      if (mappedEventsLengthRef.current <= 1) updateEventOrderMapping(formattedEvents);
+      setMappedEvents(formattedEvents);
+    } else {
+      setMappedEvents([createNewEvent()]);
+    }
+  }, [mappedScenarioEventsData, sessionEventsMap, versionId, versionEvents]);
+
+  useEffect(() => {
+    mappedEventsLengthRef.current = mappedEvents.length;
+  }, [mappedEvents]);
+
+  // Version mode: report the full event set to the parent on every change so it
+  // can be saved into the version config (never to the live scenario). Deps are
+  // intentionally limited to the event set + version id.
+  useEffect(() => {
+    if (!versionId || !onVersionEventsChange) return;
+    onVersionEventsChange(convertToApiFormat(mappedEvents));
+  }, [mappedEvents, onVersionEventsChange, versionId]);
+
+  // Table columns configuration
+  const tableColumns = useMemo(() => {
+    return [
+      {
+        id: MAPPED_EVENT_FIELDS.NAME,
+        label: "Event name",
+        accessor: MAPPED_EVENT_FIELDS.NAME,
+        placeholder: "Select an event",
+        dataType: cellTypes.dropdownSearchable,
+        options: sessionEventsOptions,
+        minWidth: 180,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.FEEDBACK_STATUS,
+        label: "Real time feedback status",
+        accessor: MAPPED_EVENT_FIELDS.FEEDBACK_STATUS,
+        dataType: cellTypes.switch,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.EMOJI,
+        label: "Real time feedback emoji",
+        accessor: MAPPED_EVENT_FIELDS.EMOJI,
+        dataType: cellTypes.emoji_select,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.MESSAGE,
+        label: "Real time feedback message",
+        accessor: MAPPED_EVENT_FIELDS.MESSAGE,
+        placeholder: "Add feedback",
+        dataType: cellTypes.editableText,
+        options: [],
+        minWidth: 180,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.SCORE,
+        label: "Session quality score",
+        accessor: MAPPED_EVENT_FIELDS.SCORE,
+        placeholder: "Add score",
+        dataType: cellTypes.number,
+        options: [],
+        minWidth: 120,
+      },
+
+      {
+        id: MAPPED_EVENT_FIELDS.START_TIME,
+        label: "Applicable from",
+        accessor: MAPPED_EVENT_FIELDS.START_TIME,
+        dataType: cellTypes.timeInput,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.END_TIME,
+        label: "Applicable till",
+        accessor: MAPPED_EVENT_FIELDS.END_TIME,
+        dataType: cellTypes.timeInput,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.MAX_OCCURRENCES,
+        label: "Max occurrences",
+        accessor: MAPPED_EVENT_FIELDS.MAX_OCCURRENCES,
+        dataType: cellTypes.score,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.MIN_GAP_TIME,
+        label: "Min gap time",
+        accessor: MAPPED_EVENT_FIELDS.MIN_GAP_TIME,
+        dataType: cellTypes.timeInput,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.OCCURRENCE_INTERVAL,
+        label: "Occurrence Interval",
+        accessor: MAPPED_EVENT_FIELDS.OCCURRENCE_INTERVAL,
+        dataType: cellTypes.number,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.MIN_SCORE,
+        label: "Min score",
+        accessor: MAPPED_EVENT_FIELDS.MIN_SCORE,
+        dataType: cellTypes.score,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.MAX_SCORE,
+        label: "Max score",
+        accessor: MAPPED_EVENT_FIELDS.MAX_SCORE,
+        dataType: cellTypes.score,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.BRANCHING_STATUS,
+        label: "Branching status",
+        accessor: MAPPED_EVENT_FIELDS.BRANCHING_STATUS,
+        dataType: cellTypes.switch,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.BRANCH_INSTRUCTION,
+        label: "Branch to state",
+        accessor: MAPPED_EVENT_FIELDS.BRANCH_INSTRUCTION,
+        placeholder: "Add branch to state",
+        dataType: cellTypes.textAreaWithDropdown,
+        options: [],
+        minWidth: 180,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.CHECKLIST_VISIBILITY_STATUS,
+        label: "Checklist visibility",
+        accessor: MAPPED_EVENT_FIELDS.CHECKLIST_VISIBILITY_STATUS,
+        dataType: cellTypes.switch,
+        options: [],
+        minWidth: 120,
+      },
+      {
+        id: MAPPED_EVENT_FIELDS.TAGS,
+        label: "Tags",
+        accessor: MAPPED_EVENT_FIELDS.TAGS,
+        dataType: cellTypes.tags,
+        options: [],
+        minWidth: 150,
+      },
+    ];
+  }, [sessionEventsOptions]);
+
+  const visibleColumns = useMemo(() => {
+    if (viewMode === "full") {
+      return tableColumns;
+    }
+
+    return tableColumns.filter(column => CHECKLIST_VIEW_COLUMN_IDS.has(column.id));
+  }, [tableColumns, viewMode]);
+
+  const updateEventOrderMapping = (events: UpdateScenarioEventDataParam[]) => {
+    const sortedEvents = [...events].sort((a, b) => (a.score?.value ?? 0) - (b.score?.value ?? 0));
+    const orderMapping = sortedEvents.reduce(
+      (acc, event, index) => {
+        acc[event.id?.value || ""] = index + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    setEventOrderMapping(orderMapping);
+  };
+
+  // The refresh control used to only re-sort the rows already on screen, so
+  // when the catalogue or the mapping had failed to load, the one control that
+  // looks like "reload" changed nothing and a full page reload was the only way
+  // out. Refetch both queries first, then re-sort.
+  const onReloadMappedEvents = () => {
+    refetchSessionEvents?.();
+    refetchMappedEvents?.();
+    if (reloadTimeoutRef.current) {
+      clearTimeout(reloadTimeoutRef.current);
+    }
+    reloadTimeoutRef.current = setTimeout(() => {
+      updateEventOrderMapping(mappedEvents);
+      // Target the NotionTable's scrollable container (has overflow-auto class)
+      const scrollableElement = tableRef.current?.querySelector(".overflow-auto");
+      scrollableElement?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 100);
+  };
+
+  const sortMappedEvents = useMemo(() => {
+    return [...mappedEvents].sort((a, b) => {
+      const orderA = eventOrderMapping[a.id.value] ?? Number.MAX_SAFE_INTEGER;
+      const orderB = eventOrderMapping[b.id.value] ?? Number.MAX_SAFE_INTEGER;
+
+      return orderA - orderB;
+    });
+  }, [mappedEvents, eventOrderMapping]);
+
+  const tableData = useMemo(() => {
+    return addScoreColors(sortMappedEvents);
+  }, [sortMappedEvents]);
+
+  // Helper function to save events to API. Returns whether the save succeeded
+  // so callers that applied an optimistic local update can roll it back on
+  // failure instead of leaving state that was never actually persisted.
+  const saveEventsToApi = useCallback(
+    async (events: UpdateScenarioEventDataParam[]): Promise<boolean> => {
+      if (!simulationId) return true;
+      // Version mode persists through onVersionEventsChange (see effect above);
+      // never write event changes to the live scenario.
+      if (versionId) return true;
+      const apiEvents = convertToApiFormat(events);
+      isSavingRef.current = true;
+      try {
+        const response: any = await mapScenarioEvents({
+          scenarioId: Number(simulationId),
+          events: apiEvents,
+        });
+        if (response?.error) {
+          toast.error(getErrorMessage(response.error, en.errors.failedToSaveEvents));
+          return false;
+        }
+        return true;
+      } catch {
+        toast.error(en.errors.failedToSaveEvents);
+        return false;
+      } finally {
+        isSavingRef.current = false;
+      }
+    },
+    [simulationId, mapScenarioEvents, versionId],
+  );
+
+  // Debounced save for cell updates (to prevent multiple saves when typing quickly in number input)
+  const debouncedSaveTimeoutRef = useRef<NodeJS.Timeout>();
+  const debouncedSaveEventsToApi = useCallback(
+    (event: UpdateScenarioEventDataParam) => {
+      if (event.id?.value) {
+        changedEventsRef.current.set(event.id.value as string, event);
+      }
+
+      if (debouncedSaveTimeoutRef.current) {
+        clearTimeout(debouncedSaveTimeoutRef.current);
+      }
+      debouncedSaveTimeoutRef.current = setTimeout(() => {
+        const eventsToSave = Array.from(changedEventsRef.current.values());
+        if (eventsToSave.length > 0) {
+          saveEventsToApi(eventsToSave);
+          changedEventsRef.current.clear();
+        }
+      }, DEBOUNCE_DELAY);
+    },
+    [saveEventsToApi],
+  );
+
+  // Both timers above outlive the component if they are not cancelled: the
+  // reload one calls setState from its callback, which after an unmount threw
+  // from inside React and surfaced in CI as an unhandled error attributed to
+  // whichever test happened to be running.
+  useEffect(
+    () => () => {
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
+      if (debouncedSaveTimeoutRef.current) {
+        clearTimeout(debouncedSaveTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  // Helper function to update an event by ID
+  const updateEventById = useCallback(
+    (
+      eventId: string,
+      updater: (event: UpdateScenarioEventDataParam) => UpdateScenarioEventDataParam,
+    ) => {
+      let updatedEvent: UpdateScenarioEventDataParam | null = null;
+      const updatedEvents = mappedEvents.map(event => {
+        if (event.id?.value === eventId) {
+          updatedEvent = updater(event);
+          return updatedEvent;
+        }
+        return event;
+      });
+      setMappedEvents(updatedEvents);
+      if (updatedEvent) {
+        debouncedSaveEventsToApi(updatedEvent);
+      }
+    },
+    [mappedEvents, debouncedSaveEventsToApi],
+  );
+
+  // Add a new event row
+  const handleAddEventInternal = () => {
+    const newEvent = createNewEvent();
+    setMappedEvents(previousEvents => [newEvent, ...previousEvents]);
+    setSelectedEventForEdit(newEvent);
+    setIsSidePanelOpen(true);
+  };
+
+  const handleAddMethodSelect = useCallback((method: AddEventMethod) => {
+    if (method === ADD_EVENT_METHOD.DESCRIBE) {
+      setIsGeneratePanelOpen(true);
+      return;
+    }
+    handleAddEventInternal();
+  }, []);
+
+  /**
+   * Create the drafted event in the shared catalogue, then map it onto this
+   * simulation.
+   *
+   * Two steps because they are two different things: `session_events` is a
+   * global library row (no tenant column), and `scenario_events` is this
+   * simulation's use of it. Returns false on failure so the panel stays open
+   * with the author's work rather than discarding a brief they would have to
+   * write again.
+   *
+   * The created event is mapped from the CREATE RESPONSE rather than by waiting
+   * for the catalogue query to refetch — `sessionEventsMap` is built from that
+   * query, and a brand-new event is not in it yet, so going through the picker
+   * path would map a row whose name resolves to nothing.
+   */
+  const handleCreateGeneratedEvent = useCallback(
+    async (draft: EventDraft): Promise<boolean> => {
+      const payload = convertEventToApiPayload(draftToEventParam(draft));
+      if (!payload) return false;
+
+      try {
+        const response: any = await createSessionEvents({ events: [payload] });
+        if (response?.error) {
+          toast.error(getErrorMessage(response.error, en.errors.failedToCreateEvent));
+          return false;
+        }
+        const createdEvent = response?.data?.[0];
+        if (!createdEvent?.id) {
+          toast.error(en.errors.failedToCreateEvent);
+          return false;
+        }
+
+        const mappedEvent = formatToMappedEvent(createdEvent);
+        const previousEvents = mappedEvents;
+        setMappedEvents(current => [mappedEvent, ...current]);
+
+        const saved = await saveEventsToApi([mappedEvent]);
+        if (!saved) {
+          // The catalogue row exists but this simulation never got it. Roll the
+          // table back rather than showing a row that is not actually mapped —
+          // the event is in the library, so the author can add it from there.
+          setMappedEvents(previousEvents);
+          return false;
+        }
+
+        toast.success(en.simulation.eventCreatedSuccessfully);
+        return true;
+      } catch (error) {
+        toast.error(getErrorMessage(error, en.errors.failedToCreateEvent));
+        return false;
+      }
+    },
+    [createSessionEvents, mappedEvents, saveEventsToApi],
+  );
+
+  // Handle event selection changes in the table
+  const handleEventSelectionChange = useCallback(
+    (selectedEvents: UpdateScenarioEventDataParam[]) => {
+      setSelectedEventRows(previousSelected => {
+        if (previousSelected.length === selectedEvents.length) {
+          const previousIds = new Set(previousSelected.map(event => event.id.value));
+          const allSame = selectedEvents.every(event => previousIds.has(event.id.value));
+          if (allSame) return previousSelected;
+        }
+        return selectedEvents;
+      });
+    },
+    [],
+  );
+
+  // Delete selected events
+  const handleDeleteSelectedEvents = async () => {
+    try {
+      const eventIds = selectedEventRows.map(event => event.id.value)?.filter(isNonEmptyString);
+      // Version mode: removal is reflected in local state and reported up via
+      // the version-events effect; don't delete from the live scenario.
+      if (eventIds?.length > 0 && !versionId) {
+        await deleteScenarioEvents({
+          scenarioId: Number(simulationId),
+          eventIds: selectedEventRows.map(event => event.id.value),
+        });
+      }
+      setMappedEvents(previousEvents =>
+        previousEvents.filter(event => !selectedEventRows.includes(event)),
+      );
+      setSelectedEventRows([]);
+      toast.success(en.simulation.eventsDeletedSuccessfully);
+    } catch {
+      toast.error(en.errors.failedToSaveEvents);
+    }
+  };
+
+  // Handle table cell updates
+  const handleUpdateEventTable = useCallback(
+    action => {
+      const { columnId, value, rowId } = action;
+
+      if (columnId === MAPPED_EVENT_FIELDS.NAME) {
+        // When updating name, value is the event ID, so find the event details
+        const selectedEvent = sessionEventsMap.get(value);
+        if (selectedEvent) {
+          const formattedEvent = formatToMappedEvent(selectedEvent);
+          const updatedEvents = mappedEvents.map(mappedEvent =>
+            mappedEvent?.id?.value === rowId ? formattedEvent : mappedEvent,
+          );
+          setMappedEvents(updatedEvents);
+          saveEventsToApi([formattedEvent]);
+        }
+      } else {
+        // For other columns, just update that specific field using rowId
+        updateEventById(rowId, mappedEvent => ({
+          ...mappedEvent,
+          [columnId]: { value, disabled: false, rowId },
+        }));
+      }
+    },
+    [mappedEvents, sessionEventsMap, saveEventsToApi, updateEventById],
+  );
+
+  // Open side panel for event editing
+  const handleOpenMappedEventSidePanel = (rowIndex: number) => {
+    const selectedEvent = tableData[rowIndex];
+    if (selectedEvent && selectedEvent.id?.value) {
+      setSelectedEventForEdit(selectedEvent);
+    } else {
+      setSelectedEventForEdit(createNewEvent());
+    }
+    setIsSidePanelOpen(true);
+  };
+
+  // Close side panel
+  const handleCloseSidePanel = () => {
+    setIsSidePanelOpen(false);
+    setSelectedEventForEdit(null);
+  };
+
+  // Update mapped event from side panel
+  const handleUpdateMappedEvent = (updatedEvent: UpdateScenarioEventDataParam) => {
+    const updatedEvents = mappedEvents.map(event =>
+      event.id?.value === updatedEvent.id?.value ? updatedEvent : event,
+    );
+    setMappedEvents(updatedEvents);
+    saveEventsToApi([updatedEvent]);
+  };
+
+  // Delete mapped event from side panel
+  const handleDeleteMappedEvent = async (eventId?: string) => {
+    try {
+      if (isNonEmptyString(eventId)) {
+        await deleteScenarioEvents({
+          scenarioId: Number(simulationId),
+          eventIds: [eventId],
+        });
+        toast.success("Event deleted successfully");
+      }
+      setMappedEvents(previousEvents =>
+        previousEvents.filter(event => event.id?.value !== eventId),
+      );
+      handleCloseSidePanel();
+    } catch {
+      toast.error(en.errors.failedToDeleteEvent);
+    }
+  };
+
+  // Handle event selection from side panel
+  const handleEventSelect = useCallback(
+    (eventId: string) => {
+      const selectedSessionEvent = sessionEventsMap.get(eventId);
+      if (selectedSessionEvent) {
+        const formattedEvent = formatToMappedEvent(selectedSessionEvent);
+        setSelectedEventForEdit(formattedEvent);
+
+        const updatedEvents = mappedEvents.map(event =>
+          event.id?.value === "" ? formattedEvent : event,
+        );
+        setMappedEvents(updatedEvents);
+        saveEventsToApi([formattedEvent]);
+      }
+    },
+    [sessionEventsMap, mappedEvents, saveEventsToApi],
+  );
+
+  // Handle bulk add events
+  const handleBulkAddEvents = useCallback(
+    async (events: UpdateScenarioEventDataParam[]) => {
+      if (events.length === 0) {
+        setIsBulkAddPanelOpen(false);
+        return;
+      }
+
+      // Keep the pre-add snapshot so we can roll back if the save fails —
+      // the mapScenarioEvents call persists the whole batch in one request,
+      // so a failure means none of these events were actually saved.
+      const previousEvents = mappedEvents;
+      const updatedEvents = [...events, ...mappedEvents];
+      setMappedEvents(updatedEvents);
+
+      // Close panel optimistically; on failure we reopen state via the toast,
+      // but keep the panel closed so the admin isn't stuck mid-flow.
+      setIsBulkAddPanelOpen(false);
+
+      const saved = await saveEventsToApi(events);
+
+      if (saved) {
+        toast.success(en.simulation.bulkAddSuccess(events.length));
+      } else {
+        // Roll back the optimistic insert — none of the batch persisted.
+        setMappedEvents(previousEvents);
+        toast.error(en.errors.failedToBulkAddEvents(events.length));
+      }
+    },
+    [mappedEvents, saveEventsToApi],
+  );
+
+  const renderBulkAddButton = () => {
+    return (
+      <Button variant={ButtonVariant.PRIMARY} onClick={() => setIsBulkAddPanelOpen(true)}>
+        <Add />
+        {en.simulation.bulkAddEvents}
+      </Button>
+    );
+  };
+
+  // Render action buttons (Add or Delete)
+  const renderActionButtons = () => {
+    const disabled = Boolean(mappedEvents?.find(event => event?.id?.value === ""));
+    if (selectedEventRows?.length > 0) {
+      return (
+        <Button variant={ButtonVariant.SECONDARY} onClick={handleDeleteSelectedEvents}>
+          <Trash /> {` ${en.common.delete}`}
+        </Button>
+      );
+    }
+    return (
+      <Button
+        disabled={disabled}
+        variant={ButtonVariant.PRIMARY}
+        onClick={() => setIsAddMethodDialogOpen(true)}
+      >
+        <Add />
+        {`${en.simulation.addEvent}`}
+      </Button>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full w-full">
+      <div className="md:sticky flex flex-row flex-wrap gap-y-3 justify-between top-0 z-10 pt-3 md:mx-6 pb-4 border-b border-border-light">
+        <div className="flex flex-row flex-wrap items-center gap-2 text-lg font-semibold text-typography-900 font-primary">
+          {/* Opens downward: this row is the top of a scrolling panel, and the
+              tooltip has no auto-flip. */}
+          <Tooltip label={en.simulation.reloadEvents} align="bottom">
+            <button
+              type="button"
+              aria-label={en.simulation.reloadEvents}
+              className="cursor-pointer inline-flex items-center max-md:h-10 max-md:w-10 max-md:justify-center"
+              onClick={onReloadMappedEvents}
+            >
+              <Refresh className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <SegmentedToggle
+            label="Advanced settings view"
+            value={viewMode}
+            options={VIEW_MODE_OPTIONS}
+            onChange={setViewMode}
+          />
+          {/*
+            A failed catalogue fetch is not an empty catalogue: without this the
+            only sign was every event search answering "No options found".
+          */}
+          {isSessionEventsError && (
+            <span className="flex items-center gap-2 text-sm font-normal text-destructive-500">
+              {en.simulation.eventCatalogLoadFailed}
+              <button
+                type="button"
+                className="underline text-primary-600"
+                onClick={() => refetchSessionEvents?.()}
+              >
+                {en.common.retry}
+              </button>
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!isLoading && (
+            <>
+              {renderBulkAddButton()}
+              {renderActionButtons()}
+            </>
+          )}
+        </div>
+      </div>
+      <div
+        ref={tableRef}
+        className="py-4 md:p-6 md:pt-4 md:pr-0 overflow-y-hidden overflow-x-scroll w-full custom-scrollbar"
+      >
+        {isLoading ? (
+          <EventMapTableLoader />
+        ) : (
+          <NotionTable
+            tableData={{
+              data: tableData,
+              columns: visibleColumns,
+            }}
+            onRowChange={handleUpdateEventTable}
+            onRowClick={handleOpenMappedEventSidePanel}
+            onSelectionChange={handleEventSelectionChange}
+            tableFooter={<div className="h-[200px]" />}
+          />
+        )}
+      </div>
+      <MappedEventSidePanel
+        selectedEvent={selectedEventForEdit}
+        isOpen={isSidePanelOpen}
+        onClose={handleCloseSidePanel}
+        onDelete={handleDeleteMappedEvent}
+        onUpdate={handleUpdateMappedEvent}
+        sessionEvents={sessionEvents}
+        availableEventOptions={sessionEventsOptions}
+        onEventSelect={handleEventSelect}
+        catalogFailedToLoad={isSessionEventsError}
+        onRetryCatalog={() => refetchSessionEvents?.()}
+      />
+      <BulkAddEventsSidePanel
+        isOpen={isBulkAddPanelOpen}
+        onClose={() => setIsBulkAddPanelOpen(false)}
+        sessionEvents={sessionEvents}
+        mappedEvents={mappedEvents}
+        onBulkAdd={handleBulkAddEvents}
+      />
+      <AddEventMethodDialog
+        isOpen={isAddMethodDialogOpen}
+        onClose={() => setIsAddMethodDialogOpen(false)}
+        onSelect={handleAddMethodSelect}
+      />
+      <GenerateEventPanel
+        isOpen={isGeneratePanelOpen}
+        onClose={() => setIsGeneratePanelOpen(false)}
+        onCreate={handleCreateGeneratedEvent}
+        isCreating={isCreatingSessionEvent}
+        latencyWarning={
+          // Counting the event about to be added, so the warning appears on the
+          // one that crosses the line rather than one event late.
+          mappedEventCount + 1 > ADVANCED_EVENTS_LATENCY_THRESHOLD
+            ? en.simulation.advancedEventsLatencyWarning(mappedEventCount + 1)
+            : undefined
+        }
+      />
+    </div>
+  );
+};

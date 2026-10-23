@@ -1,0 +1,857 @@
+import { UseFormReturn } from "react-hook-form";
+
+import { EventDetectionConfig } from "@types";
+
+import { AssignmentStatus } from "./organizationAccess";
+import {
+  SessionEventDetectionData,
+  triggerWarning,
+  stateInstruction,
+  behaviourInstruction,
+  Competency,
+  SimulationCustomField,
+  knowledgeSource,
+} from "./simulation";
+import { TriggerCondition } from "./triggerConditions";
+
+export type FormData = {
+  title: string;
+  competency?: Competency;
+  // Every competency the simulation assesses. `competency` mirrors the
+  // first entry for readers that predate multi-competency selection.
+  competencies?: Competency[];
+  category?: string;
+  partnerOrgName?: string;
+  difficultyLevel: string;
+  characterProfileSelector?: string;
+  characterProfileText: string;
+  coverImageUrl: string;
+  coverVideoUrl?: string;
+  isGlobal: boolean;
+  isPublic: boolean;
+  languageVoices?: Record<string, string>;
+  linguisticStyleSamples?: Record<string, string[]>;
+  allowedFillerWords?: Record<string, string[]>;
+  languageCharacteristics?: Record<string, string>;
+  fillerEnabled?: boolean;
+  languageGlossaryEnabled?: boolean;
+  comfortAudioEnabled?: boolean;
+  comfortAudioUrl?: string;
+  comfortAudioVolume?: number;
+  videoActorEnabled?: boolean;
+  videoActorAvatarId?: string;
+  videoActorProvider?: string;
+  historyTrimEnabled?: boolean;
+  /** Score every session of this scenario as the foundational-skills benchmark. */
+  fhsBenchmark?: boolean;
+  continuousBackchanneling?: boolean;
+  interimReplyEnabled?: boolean;
+  temperature?: number;
+  triggerWarningIds: triggerWarning[];
+  description: string;
+  prompt: string;
+  behaviorInstructions?: behaviourInstruction[];
+  stateInstructions?: stateInstruction[];
+  customFields?: SimulationCustomField[];
+  openingStatements: string;
+  translationOpeningStatements?: Record<string, string[]>;
+  openingDialoguePrimaryLanguageId?: number | null;
+  translationDescription?: Record<string, string>;
+  challengeDescriptionPrimaryLanguageId?: number | null;
+  translationTitle?: Record<string, string>;
+  reminders: string;
+  /** Raw newline-joined text per language while editing — split into string[] at save time, mirroring `reminders`. */
+  translationReminders?: Record<string, string>;
+  remindersPrimaryLanguageId?: number | null;
+  autoTerminationStatus?: boolean;
+  experienceMode?: string;
+  checklistType?: string;
+  summaryChecklistEnabled?: boolean;
+  timerMode?: boolean;
+  maxTimeValue?: string;
+  showScoreMeter?: boolean;
+  /**
+   * Post-session tab visibility — one form toggle per tab the learner gets.
+   * See SimulationInput.feedbackTabs. The `enableFeedback` master switch and
+   * the Skills sub-toggle were retired on 2026-08-31.
+   */
+  feedbackTabDebrief?: boolean;
+  feedbackTabTranscript?: boolean;
+  pauseEnabled?: boolean;
+  /** Live in-session coaching hints in the learner's Supervisor sidebar tab. Opt-in. */
+  supervisorNotesEnabled?: boolean;
+  /**
+   * Also offer this roleplay as a text chat (typed both ways). Opt-in; learners
+   * see it only where their org has text-chat roleplays switched on.
+   */
+  textChatEnabled?: boolean;
+  /** Learner-facing Live events tab. Opt-out — only an explicit false hides it. */
+  liveTabEnabled?: boolean;
+  optGuardrails?: boolean;
+  currentState?: boolean;
+  remindersEnabled?: boolean;
+  knowledgeSources?: knowledgeSource[];
+  /** Per-language main-agent prompt variant choice (GENERIC vs MULTILINGUAL). */
+  mainPromptVariantByLanguage?: Record<string, "GENERIC" | "MULTILINGUAL">;
+  /**
+   * Per-language STT choices for this simulation, keyed by language ID and
+   * pointing at stt_configs rows — the same shape as `languageVoices`. A
+   * language absent from the map (or mapped to "") inherits its own default.
+   */
+  sttConfigByLanguage?: Record<string, string>;
+};
+
+/** A row from the STT registry (the Speech Recognition admin tab). */
+export interface SttConfig {
+  id: string;
+  name: string;
+  provider: string;
+  config: Record<string, any>;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type SttConfigPayload = Omit<SttConfig, "id" | "createdAt" | "updatedAt">;
+
+/** A row from the LLM registry (the Language Model admin tab). */
+export interface LlmConfig {
+  id: string;
+  name: string;
+  provider: string;
+  /** Shape is governed by the registry's field schema, not this type. */
+  config: Record<string, any>;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type LlmConfigPayload = Omit<LlmConfig, "id" | "createdAt" | "updatedAt">;
+
+/**
+ * A row in the LLM model catalog.
+ *
+ * Note there is no `runtimes` field: which runtimes can execute a model is a
+ * property of deployed code, not of this row, and is joined in by the backend
+ * when serving the pickers. Adding a model here is a config change; adding a
+ * provider is a code change.
+ */
+export interface LlmCatalogModel {
+  id: string;
+  provider: string;
+  model: string;
+  label: string;
+  supportsTemperature: boolean;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type LlmCatalogModelPayload = Omit<LlmCatalogModel, "id" | "createdAt" | "updatedAt">;
+
+/**
+ * One entry in a picker, with ElevenLabs' own verdict for THIS voice already
+ * applied server-side — ally-be owns the ElevenLabs integration and the
+ * classification rule (which voice types suit v3, which models a voice's
+ * fine-tune actually supports), so it computes the verdict once. This panel
+ * renders it, rather than keeping its own copy of the same rule — a real
+ * production voice ("Meenakshi") is exactly what went wrong when it had one.
+ */
+export interface ElevenLabsModelOption {
+  value: string;
+  label: string;
+  /** true = the recommendation for this voice; false = flagged; null = no signal either way. */
+  recommended: boolean | null;
+}
+
+/**
+ * Outcome of pulling an ElevenLabs voice's creation type.
+ *
+ * `voiceIdMismatch` matters as much as `voiceType`: 7 of 77 production ids
+ * resolve to a different voice, so a stored id does not necessarily name the
+ * voice that renders.
+ */
+export interface ElevenLabsVoiceSyncResult {
+  storedVoiceId: string;
+  resolvedVoiceId: string | null;
+  voiceIdMismatch: boolean;
+  category: string | null;
+  resolvedName: string | null;
+  voiceType: string | null;
+  persisted: boolean;
+  /**
+   * Models THIS voice's fine-tune supports, per ElevenLabs — raw annotation
+   * data. Prefer {@link ElevenLabsVoiceSyncResult.modelOptions} for
+   * rendering; this is what it was built from.
+   */
+  availableModels: string[];
+  /** A safe starting model, or null when there's nothing to prefer. */
+  recommendedModel: string | null;
+  /** The account-wide catalog, pre-labeled for THIS voice — what the Model picker renders directly. */
+  modelOptions: ElevenLabsModelOption[];
+}
+
+/**
+ * Outcome of looking up a voice id that has no saved voice row yet —
+ * same facts as {@link ElevenLabsVoiceSyncResult} minus `persisted` (nothing to
+ * write to), plus `gender`/`language` for autofilling a new voice's form.
+ */
+export interface ElevenLabsVoiceLookupResult {
+  voiceId: string;
+  resolvedVoiceId: string | null;
+  voiceIdMismatch: boolean;
+  category: string | null;
+  resolvedName: string | null;
+  voiceType: string | null;
+  gender: string | null;
+  language: string | null;
+  /**
+   * Models THIS voice's fine-tune supports, per ElevenLabs — raw annotation
+   * data. Prefer {@link ElevenLabsVoiceLookupResult.modelOptions} for
+   * rendering; this is what it was built from.
+   */
+  availableModels: string[];
+  /** A safe starting model, or null when there's nothing to prefer. */
+  recommendedModel: string | null;
+  /** The account-wide catalog, pre-labeled for THIS voice — what the Model picker renders directly. */
+  modelOptions: ElevenLabsModelOption[];
+}
+
+/** Outcome of syncing every ElevenLabs voice row's type in one pass. */
+export interface ElevenLabsBulkSyncSummary {
+  checked: number;
+  updated: number;
+  mismatched: Array<{
+    voiceId: string;
+    name: string;
+    storedVoiceId: string;
+    resolvedVoiceId: string;
+    resolvedName: string;
+  }>;
+  failed: Array<{
+    voiceId: string;
+    name: string;
+    storedVoiceId: string;
+    error: string;
+  }>;
+}
+
+/**
+ * One selectable entry in a TTS provider's account-wide model/voice catalog
+ * — not tied to any one voice. Every provider's underlying fetch is
+ * different (auth, base URL, response shape); this is the one shape they
+ * all get mapped to so the picker doesn't care which provider it's showing.
+ */
+/**
+ * A face's preview media after we've copied it into our own storage.
+ *
+ * Both keys are optional: a vendor that publishes no preview media yields
+ * neither, and the caller must then leave the roleplay's cover untouched
+ * rather than clearing it.
+ */
+export interface VideoActorCoverMedia {
+  /** Absent when the vendor publishes no still (Beyond Presence publishes none). */
+  coverImageUrl?: string;
+}
+
+/** One video-actor vendor a roleplay can be pointed at. */
+export interface VideoActorProviderEntry {
+  /** Stored on the roleplay as `videoActorProvider`. */
+  value: string;
+  /** What the picker shows, e.g. "Beyond Presence". */
+  label: string;
+}
+
+/**
+ * One selectable face, already normalised by ally-be.
+ *
+ * Deliberately carries no vendor field: Tavus publishes preview media and
+ * Beyond Presence does not, so a picker branches on whether `thumbnailImageUrl`
+ * is present, never on which vendor it is looking at. That keeps vendor
+ * knowledge in the backend, where adding a third one is a single-file change.
+ */
+export interface VideoActorFaceEntry {
+  /** Stored on the roleplay as `videoActorAvatarId`. */
+  value: string;
+  label: string;
+  /**
+   * Which vendor this face belongs to, stored alongside the id as
+   * `videoActorProvider`.
+   *
+   * An opaque token here: the picker writes it back verbatim and never branches
+   * on it, so the author chooses a face and the vendor follows.
+   */
+  provider: string;
+  /** A still, where the vendor publishes one. Absent for Beyond Presence. */
+  thumbnailImageUrl?: string;
+  /** A short talking clip, where the vendor publishes one. Tavus only. */
+  thumbnailVideoUrl?: string;
+  /** Pre-formatted vendor note for the secondary line (e.g. "phoenix-3"). */
+  detail?: string;
+}
+
+export interface TtsCatalogEntry {
+  /** What gets written into the voice's config field (e.g. `model`, `voice_name`). */
+  value: string;
+  /** What the picker shows. */
+  label: string;
+  /**
+   * This voice's gender, where the provider publishes one — used to narrow the
+   * picker to the gender being configured. Absent rather than guessed whenever
+   * the provider says nothing usable: Deepgram exposes no gender at all,
+   * ElevenLabs' catalog is models rather than voices, and Google reports
+   * NEUTRAL for some voices. Treat absent as "unknown" and keep the entry — as
+   * "no match" it would empty those pickers.
+   */
+  gender?: string;
+  /**
+   * ElevenLabs' verdict for the voice named by `TtsCatalogParams.voiceId` —
+   * `true` the recommendation, `false` flagged, `null` no signal. Only present
+   * when a voiceId was asked for, so a plain catalog carries no verdict rather
+   * than an implied one.
+   */
+  recommended?: boolean | null;
+}
+
+/** Params for the shared TTS catalog query — only some providers use `languageCode`/`voiceProvider`. */
+export interface TtsCatalogParams {
+  provider: string;
+  languageCode?: string;
+  voiceProvider?: string;
+  /**
+   * ElevenLabs only: ask for the catalog already marked up for this voice.
+   *
+   * The per-voice verdict lives in ElevenLabs' `high_quality_base_model_ids`
+   * and is never stored on the row, so without this the picker stays unlabelled
+   * until someone triggers a sync by hand — even for a voice whose `voice_type`
+   * the bulk sync already filled in.
+   */
+  voiceId?: string;
+  /**
+   * Which config field the options are for, when a provider populates more than
+   * one. ElevenLabs takes `voice_id` for every voice in the workspace; omitted
+   * it serves that provider's model list. No other provider has a second field.
+   */
+  field?: string;
+}
+
+/**
+ * Outcome of testing a saved LLM config against its provider.
+ *
+ * `ok: false` is a normal 200 response, not an HTTP error: a model that has
+ * been retired is exactly what this call exists to report, and `error` carries
+ * the provider's own wording so it can be shown verbatim.
+ */
+export interface LlmPreviewResult {
+  ok: boolean;
+  text: string;
+  latencyMs: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  error?: string;
+  configName: string;
+  provider: string;
+  model: string;
+}
+
+export interface DemographicsSectionProps {
+  formMethods: UseFormReturn<FormData>;
+}
+
+export interface FormFieldConfig {
+  id: keyof FormData;
+  label: string;
+  placeholder?: string;
+  type: string;
+  options?: Array<{ value: string; label: string }>;
+  isMandatory?: boolean;
+  isDashedLineAbove?: boolean;
+  fullWidth?: boolean;
+  /** SELECT only: show a clear (×) control that resets the value to "". */
+  allowDeselect?: boolean;
+  maxLength?: number;
+  multiline?: boolean;
+  /**
+   * Initial value for a brand-new record, before anything has been `reset()`
+   * into the form from a loaded response. TEXT fields declare a string,
+   * SLIDER a number, TOGGLE_BUTTON a boolean — each consuming field component
+   * is responsible for seeding it into its own controller (see ToggleSection /
+   * SliderField), and CreateSimulation additionally seeds every toggle up
+   * front via `buildToggleDefaultValues` so a field the author never scrolled
+   * to still saves its declared default rather than `undefined`.
+   */
+  defaultValue?: string | number | boolean;
+  /** Slider (FORM_FIELD_TYPES.SLIDER) bounds. */
+  min?: number;
+  max?: number;
+  step?: number;
+  component?: React.ReactNode;
+  dependsOn?: keyof FormData;
+  note?: string;
+  /**
+   * When set, render a field-level "Improve" (Enhance) control for this field.
+   * The value is one of ENHANCE_TYPE and identifies the field to the backend.
+   */
+  enhanceType?: string;
+  visibleWhen?: (formValues: Partial<FormData>) => boolean;
+  /**
+   * CUSTOM.RADIO_BUTTONS only: fires when the user picks a different option
+   * (never on initial mount or on `formMethods.reset(...)` hydration — see
+   * RadioButtonGroup's `handleChange`). Lets one field's user-driven change
+   * imperatively drive another's value, e.g. Experience Mode → Live Events
+   * tab (see `syncLiveTabEnabledWithExperienceMode`).
+   */
+  onValueChange?: (value: string, formMethods: UseFormReturn<any>) => void;
+  /**
+   * Snake-case placeholder name this field fills in the main-agent prompt
+   * (e.g. "tone" for the Tone input). When set, the studio cross-checks
+   * the selected prompt's `availableVariables`; if the placeholder isn't
+   * referenced, the field is rendered with a muted "Not used by selected
+   * prompt" badge. Editing is still allowed because most of these fields
+   * also feed evaluator / branching independently of the main
+   * prompt.
+   */
+  promptVariable?: string;
+  /**
+   * When true together with `promptVariable`, hide the field entirely
+   * (return null from FormField) instead of soft-labeling with a badge.
+   * Use this for editors that exist purely to feed a prompt placeholder
+   * (e.g. behavior_instructions_json, custom_fields_text). Don't use for
+   * fields with parallel consumers (evaluator / branching).
+   */
+  hideWhenUnused?: boolean;
+  /**
+   * Gate this field behind a per-user feature flag (key under the current
+   * user's `featureFlags` from /users/me). When set and the user lacks the
+   * flag, the field is not rendered. Used for email-allowlisted features.
+   */
+  featureFlag?: string;
+  /**
+   * Hide the field unless the current user holds this permission. Used for
+   * production rollout toggles (glossary / multilingual defaults) that are
+   * SUPER_DUPER_ADMIN-only — the server enforces the same rule, this just
+   * keeps the field out of other editors' forms.
+   */
+  requiredPermission?: string;
+  /**
+   * Per-admin feature-toggle key (see `FeatureToggleKey`) that must be granted
+   * for this field to render. Distinct from `requiredPermission`: a permission
+   * comes with the role, whereas a toggle is handed to one admin at a time from
+   * Admin User Management — which is what an experimental authoring surface
+   * wants, so it can be opened to a couple of people rather than a whole tier.
+   */
+  requiredFeature?: string;
+  /** When true, wrap the field in a collapsed accordion. */
+  accordion?: boolean;
+  /**
+   * IMAGE_UPLOAD only: render the "Generate with AI" controls under the
+   * upload tile. Generation uses the scenario's title/description form
+   * values via the managed `cover_image_generation` prompt.
+   */
+  aiGenerate?: boolean;
+  /**
+   * `location` slug of a data-driven tooltip (see TooltipLocation). When set,
+   * the field renders an info-icon tooltip whose text superadmins author under
+   * Manage Tooltips. Currently consumed by toggle fields (ToggleSection).
+   */
+  tooltipLocation?: string;
+  /**
+   * Engineer-written fallback tooltip text, shown when no active data-driven
+   * tooltip exists for `tooltipLocation` (or none is set). Lets a new toggle
+   * explain itself from day one without seeding a Manage Tooltips row; an
+   * authored tooltip still takes precedence once it is switched on.
+   */
+  tooltip?: string;
+}
+
+export interface FieldGroupType {
+  title?: string;
+  fields: FormFieldConfig[];
+}
+
+export interface FormFieldProps {
+  config: FormFieldConfig;
+  formMethods: any;
+  /** Render the field inert (View Details mode) — content visible, inputs untouchable. */
+  readOnly?: boolean;
+}
+
+export interface FieldGroupProps {
+  group: FieldGroupType;
+  formMethods: any;
+}
+
+export interface CreatorFieldGroups {
+  id: string;
+  label: string;
+  fields: FormFieldConfig[];
+}
+
+export interface Simulation {
+  id: number;
+  title: string;
+  description: string;
+  coverImageUrl: string;
+  coverVideoUrl?: string;
+  createdBy: string;
+  updatedAt: string;
+  status: SimulationStatus;
+  category?: string | null;
+  partnerOrgName?: string | null;
+  isPreviewEnabled: boolean;
+  isAssignedToTenant: boolean;
+  usage: string;
+  triggerWarnings?: triggerWarning[];
+  createdByUserId: number;
+  availableLanguages?: ScenarioLanguage[] | null;
+}
+
+export interface GetSimulationsQueryParams {
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  order?: string;
+  search?: string;
+  /** Comma-separated SimulationStatus values. */
+  status?: string;
+  /** Comma-separated ScenarioCategory values (ORIGINALS, DEMO, PARTNER_SIM…). */
+  category?: string;
+  /** Substring match on the partner organisation tag. */
+  partnerOrgName?: string;
+  tenantId?: string;
+  assignmentStatus?: AssignmentStatus;
+}
+export interface GetSimulationsResponse {
+  data: Simulation[];
+  count?: number;
+}
+
+export interface GetSimulationByIdInput {
+  id: string;
+}
+
+export enum SimulationStatus {
+  ACTIVE = "ACTIVE",
+  DRAFT = "DRAFT",
+  ARCHIVED = "ARCHIVED",
+  PUBLISHED = "PUBLISHED",
+}
+
+export type SimulationPreviewType = {
+  id: string | number;
+  title: string;
+  coverImageUrl: string;
+  coverVideoUrl?: string;
+  description: string;
+  triggerWarnings?: triggerWarning[];
+  status: SimulationStatus;
+  availableLanguages?: ScenarioLanguage[] | null;
+  /**
+   * The roleplay offers text chat, so the preview lets the author try it as
+   * one. Absent (e.g. previews opened from the Studio list) means voice only,
+   * exactly as before.
+   */
+  textChatEnabled?: boolean;
+};
+
+export interface SimulationPreviewProps {
+  simulation: SimulationPreviewType;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export interface UpdateEventDataParam {
+  id?: string;
+  name?: string;
+  eventCode?: string;
+  description?: string;
+  branchInstruction?: string;
+  score?: number;
+  message?: string;
+  detectionType?: string;
+  emoji?: string;
+  visibilityType?: string;
+  triggerCondition?: TriggerCondition;
+  detectionData?: SessionEventDetectionData;
+  detectionConfig?: EventDetectionConfig;
+  isEditable?: boolean;
+  tags?: string[];
+}
+
+export interface UpdateScenarioEventDataParam {
+  id: { value: string; disabled: boolean; rowId?: string };
+  name?: { value: string; disabled: boolean; rowId?: string };
+  score?: { value: number; disabled: boolean; rowId?: string };
+  emoji?: { value: string; disabled: boolean; rowId?: string };
+  message?: { value: string; disabled: boolean; rowId?: string };
+  feedbackStatus?: { value: boolean; disabled: boolean; rowId?: string };
+  branchingStatus?: { value: boolean; disabled: boolean; rowId?: string };
+  branchInstruction?: { value: string; disabled: boolean; rowId?: string };
+  // Detection config fields
+  maxOccurrences?: { value: number | null; disabled: boolean; rowId?: string };
+  minGapTime?: { value: string | null; disabled: boolean; rowId?: string };
+  startTime?: { value: string | null; disabled: boolean; rowId?: string };
+  endTime?: { value: string | null; disabled: boolean; rowId?: string };
+  minScore?: { value: number | null; disabled: boolean; rowId?: string };
+  maxScore?: { value: number | null; disabled: boolean; rowId?: string };
+  occurrenceInterval?: { value: number | null; disabled: boolean; rowId?: string };
+  // Checklist visibility field
+  checklistVisibilityStatus?: { value: boolean; disabled: boolean; rowId?: string };
+  // Tags field
+  tags?: { value: string[]; disabled: boolean; rowId?: string };
+}
+
+export interface ScenarioVoiceConfig {
+  [key: string]: any;
+}
+
+export interface ScenarioVoice {
+  createdAt?: string;
+  updatedAt?: string;
+  id?: string;
+  name: string;
+  provider: string;
+  languageId?: number;
+  languageLabel?: string | null;
+  config: ScenarioVoiceConfig;
+  active?: boolean;
+}
+
+export interface ScenarioLanguageConfig {
+  [key: string]: any;
+}
+
+interface BaseLanguage {
+  label: string;
+  value: string;
+  translationCode?: string;
+  active?: boolean;
+  llmProviderConfig?: ScenarioLanguageConfig;
+  /**
+   * @deprecated Superseded by `sttConfigId` (the Speech Recognition registry).
+   * Still returned by the API as a fallback for rows the registry migration
+   * could not map.
+   */
+  sttProviderConfig?: ScenarioLanguageConfig;
+  /** This language's default STT, referencing an stt_configs row. */
+  sttConfigId?: string | null;
+  /** This language's default LLM, referencing an llm_configs row. */
+  llmConfigId?: string | null;
+  /** Catalog model this language runs; supersedes llmConfigId. */
+  llmModelId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ScenarioLanguage extends BaseLanguage {
+  id?: number;
+  language_id?: number;
+}
+
+export interface Language extends BaseLanguage {
+  id?: number;
+}
+
+export interface GetLanguagesQuery {
+  searchName?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  order?: string;
+  active?: boolean;
+}
+
+/**
+ * Per-variable metadata used by the studio editor. Stored alongside (or
+ * replacing) the bare placeholder names in {@link Prompt.availableVariables}.
+ */
+export interface AvailableVariable {
+  /** Placeholder name as it appears in the prompt text (`{name}`). */
+  name: string;
+  /** Optional display label shown in the studio. */
+  label?: string;
+  /** Whether the studio should treat this field as required. */
+  required?: boolean;
+}
+
+export type AvailableVariableEntry = string | AvailableVariable;
+
+export interface Prompt {
+  id?: string;
+  name: string;
+  description: string;
+  category?: string;
+  promptCode: string;
+  prompt: string;
+  version?: number;
+  useDashboardOverride?: boolean;
+  defaultPrompt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isObsolete?: boolean;
+  /**
+   * Source-synced variable placeholders available for runtime substitution.
+   * Each entry is either a bare placeholder name (legacy) or an
+   * `AvailableVariable` object with label / required metadata. Readers
+   * should normalize via `getAvailableVariableName()`.
+   */
+  availableVariables?: AvailableVariableEntry[];
+  kind?: string;
+  /**
+   * Role/category of this prompt in the agent pipeline.
+   * Examples: 'main_agent', 'branching', 'multilingual'. Variants share the
+   * same promptType — the studio prompt picker lists rows by promptType.
+   */
+  promptType?: string;
+  /**
+   * Whether the studio's variant pickers offer this prompt as a choice.
+   *
+   * A future-visibility switch, not a capability toggle. `false` removes the
+   * variant from the Skill Version / evaluator dropdowns so no NEW simulation
+   * can be pointed at it; simulations already referencing its promptCode keep
+   * running on it, and the editor keeps resolving it (the by-type endpoint
+   * still returns hidden rows — see `getPromptsByType` in ally-be). Undefined
+   * is treated as visible, so pre-flag rows and any reader that hasn't
+   * refetched behave as before.
+   */
+  visibleInStudio?: boolean;
+  /**
+   * When true, this prompt declares a States section; the studio renders
+   * the state editor and runtime substitutes the matched state's
+   * guidelines into {state_x_guidelines} and gates RAG per state.
+   */
+  hasStates?: boolean;
+  usesBlocks?: string[];
+  /**
+   * Runtimes that read this prompt. Absent means undeclared, and the model
+   * picker then offers only models every runtime can execute — correct, but
+   * narrower than a single-consumer prompt actually needs.
+   */
+  runtimes?: string[];
+  /**
+   * Prompt-level LLM provider override ('openai' | 'gemini' | 'anthropic'),
+   * sent alongside `model` so runtimes don't infer it from the model name.
+   */
+  provider?: string;
+  /**
+   * Prompt-level LLM model override (OpenAI/Gemini). Sits between the
+   * code/language defaults and any simulation-level value. Undefined =
+   * inherit the code/language default.
+   */
+  model?: string;
+  /**
+   * Prompt-level LLM sampling temperature override (0–2). Undefined = inherit
+   * the code/language default; a simulation-level temperature still wins.
+   */
+  temperature?: number;
+  /**
+   * Opt-in: when true, this English main_agent/branching source is auto-translated
+   * into the eligible Indian languages and re-translated when its body changes.
+   * Translations are read-only (shown in the Translations panel, not editable).
+   */
+  translationEnabled?: boolean;
+  /** Count of languages whose translation is currently `ready` (drives the list coverage badge). */
+  translationsReady?: number;
+}
+
+/** Lifecycle of one (prompt, language) translation (mirrors ally-be). */
+export type PromptTranslationStatus = "pending" | "translating" | "ready" | "failed";
+
+/** A stored translation row for a prompt in one language (read-only in the UI). */
+export interface PromptTranslation {
+  id: string;
+  promptId: string;
+  languageId: number;
+  promptVersionId?: string | null;
+  translatedPrompt?: string | null;
+  sourceHash: string;
+  status: PromptTranslationStatus;
+  provider?: string | null;
+  model?: string | null;
+  /** Per-language runtime engine override: which model runs the main agent when this body is served. */
+  runtimeProvider?: string | null;
+  runtimeModel?: string | null;
+  translationPromptVersion?: string | null;
+  error?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Result of translating a prompt into all eligible languages. */
+export interface TranslatePromptResult {
+  promptId: string;
+  eligible: boolean;
+  reason?: string;
+  translated: number;
+  skipped: number;
+  failed: number;
+}
+
+export type LlmProviderName = "openai" | "gemini" | "anthropic";
+
+/** Runtimes that execute LLM calls (mirrors the ally-be LlmRuntime enum). */
+export type LlmRuntime = "ai-learn" | "ally-ai" | "ally-be";
+
+/**
+ * One selectable LLM model from the backend registry
+ * (GET /api/v1/llm/models). Single source of truth for the Prompt Management
+ * model picker — see prompt-llm-config-standardization-adr.md.
+ */
+export interface LlmModelInfo {
+  provider: LlmProviderName;
+  /** Model id passed to the provider (e.g. 'gpt-4o', 'gemini-2.5-pro'). */
+  model: string;
+  /** Human-readable label for the picker. */
+  label: string;
+  /** False for reasoning models (o-series, gpt-5) that reject a custom temperature. */
+  supportsTemperature: boolean;
+  /** Runtimes that can actually run this model today. */
+  runtimes: LlmRuntime[];
+}
+
+export interface GetPromptsQuery {
+  searchName?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  order?: string;
+  /** When false, excludes prompts with kind="block" */
+  includeBlocks?: boolean;
+}
+
+/**
+ * One row of the AI task registry — an action on the platform that reaches a
+ * model over an API, and the model serving it.
+ *
+ * Read-only and served whole from `GET /v1/llm/tasks`. ally-be owns the list
+ * (`src/llm/constants/ai-task-registry.constants.ts`) and a jest guard fails CI
+ * when a new task label arrives without a row, so this type describes a
+ * contract that is enforced rather than merely agreed.
+ *
+ * `effectiveModel` and `defaultModel` differ only when this deployment's env
+ * overrides the committed default, and `modelSource` says which happened —
+ * "documented" means ally-be could not read that service's env and is repeating
+ * what the registry records.
+ */
+export interface AiTaskRow {
+  id: string;
+  task: string | null;
+  runtime: string;
+  trigger: string;
+  detail: string | null;
+  hotPath: boolean;
+  kind: string;
+  provider: string;
+  defaultModel: string;
+  effectiveModel: string;
+  modelSource: "deployment" | "documented";
+  configuredBy: string;
+  /**
+   * Prompt row whose own provider/model beats `configuredBy`, or null.
+   *
+   * Non-null means `provider` and `defaultModel` on this row are the FALLBACK,
+   * not a fixed fact — an admin who set a model on that prompt row is running
+   * it whatever the registry says.
+   */
+  promptOverride: string | null;
+}

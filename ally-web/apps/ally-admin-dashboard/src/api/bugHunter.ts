@@ -1,0 +1,612 @@
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
+import {
+  BugFinding,
+  BugFindingDecisionReason,
+  BugFindingDetail,
+  BugFindingRef,
+  BugFindingStage,
+  BugHuntDecision,
+  BugHuntDecisionOwner,
+  BugHuntDecisionOwners,
+  BugHuntDecisionPoint,
+  BugHuntDecisionReplay,
+  BugHunterMemoryEntry,
+  BugHunterMode,
+  BugHunterModelSettings,
+  BugHunterNotification,
+  BugHunterOperationsMetrics,
+  BugHunterScoreboard,
+  BugHunterSettings,
+  BugHunterToday,
+  BugHunterWrongFixSummary,
+  BugHuntRun,
+  BugHuntRunDetail,
+  ListBugFindingsQuery,
+  ListBugFindingsResponse,
+  ListBugHunterFeatureMapsResponse,
+  ListBugHunterMemoryResponse,
+  ListBugHunterNotificationsResponse,
+  ListBugHuntRunsResponse,
+  WriteBugHunterMemoryBody,
+} from "@types";
+
+import { baseAPI } from "./baseApi";
+
+/**
+ * Bug Hunter admin surface: the kill switch, the comprehensive findings
+ * table, and run history/detail.
+ */
+export const bugHunterAPI = baseAPI.injectEndpoints({
+  endpoints: builder => ({
+    getBugHunterSettings: builder.query<BugHunterSettings, void>({
+      query: () => ({
+        url: ApiEndpoints.BUG_HUNTER.SETTINGS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_SETTINGS],
+    }),
+
+    updateBugHunterSettings: builder.mutation<BugHunterSettings, { mode: BugHunterMode }>({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.SETTINGS,
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_SETTINGS],
+    }),
+
+    getBugHunterModelSettings: builder.query<BugHunterModelSettings, void>({
+      query: () => ({
+        url: ApiEndpoints.BUG_HUNTER.MODEL_SETTINGS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_MODEL_SETTINGS],
+    }),
+
+    updateBugHunterModelSettings: builder.mutation<
+      BugHunterModelSettings,
+      { defaultModel?: string; escalationModel?: string }
+    >({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.MODEL_SETTINGS,
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_MODEL_SETTINGS],
+    }),
+
+    /**
+     * Ask Bug Hunter to sweep a repo now. Returns the opened run, or
+     * `{skipped:true}` when the kill switch is off — the backend records a
+     * `skipped_disabled` run in that case, so an off-duty press still leaves an
+     * audit trail rather than appearing to do nothing.
+     */
+    triggerBugHuntSweep: builder.mutation<
+      BugHuntRun | { skipped: true; reason: string },
+      { repo: string; deep?: boolean }
+    >({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.RUNS_TRIGGER,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
+    }),
+
+    getBugHuntRuns: builder.query<ListBugHuntRunsResponse, void>({
+      query: () => ({
+        url: ApiEndpoints.BUG_HUNTER.RUNS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
+    }),
+
+    getBugHuntRun: builder.query<BugHuntRunDetail, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.RUN_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, id) => [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id }],
+    }),
+
+    getBugFindings: builder.query<ListBugFindingsResponse, ListBugFindingsQuery | void>({
+      query: query => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDINGS,
+        method: HttpMethod.GET,
+        params: query || undefined,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }],
+    }),
+
+    getBugFinding: builder.query<BugFindingDetail, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, id) => [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id }],
+    }),
+
+    approveBugFinding: builder.mutation<BugFindingDetail, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_APPROVE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * Decline a bug, with a reason.
+     *
+     * `reason` is required by the backend, not merely validated there: it is
+     * read back into the next sweep's prompt as a known non-bug, and it is the
+     * denominator of the accuracy figure on the Performance section. A
+     * rejection without one used to record who and when and nothing about what
+     * they concluded, which is why the same non-bug came back every night.
+     */
+    rejectBugFinding: builder.mutation<
+      BugFindingDetail,
+      { id: string; reason: BugFindingDecisionReason; note?: string }
+    >({
+      query: ({ id, reason, note }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_REJECT(id),
+        method: HttpMethod.POST,
+        body: { reason, ...(note?.trim() ? { note: note.trim() } : {}) },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * Merge a fix's open, green PR without leaving the tab.
+     *
+     * On ally-be, ally-web and ally-ai the agent cannot merge its own work —
+     * master wants an approving review and the bot has push access — so every
+     * fix there ends at a green PR. 89 of the 122 bot PRs merged so far were
+     * clicked through by hand on GitHub, nearly all within the hour: the
+     * judgement was never the bottleneck, the trip was.
+     *
+     * The backend refuses a PR that is red, still running, or has no checks,
+     * and passes GitHub's own refusal through — so a failure here is worth
+     * showing verbatim rather than replacing with a generic line.
+     */
+    mergeBugFinding: builder.mutation<BugFinding, { id: string; force?: boolean }>({
+      query: ({ id, force }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_MERGE(id),
+        method: HttpMethod.POST,
+        body: force ? { force: true } : {},
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * How often Bug Hunter is right, how fast, and what a landed fix costs.
+     *
+     * Computed server-side over every row in the window, which is the whole
+     * reason it is an endpoint: `scorecard.ts` deliberately refuses to derive
+     * a finding-level funnel from `GET /runs`, because run totals and finding
+     * statuses have different denominators there. This has one.
+     */
+    /**
+     * The Work tab's "Today, by repo" board (since midnight in the team's time
+     * zone). Polled by the board itself; tagged with findings and runs so a
+     * triage or a dispatch refreshes it without waiting for the poll.
+     */
+    // ── the decision log, scoreboard and replay (OPP-0776, OPP-0783) ──────
+    getBugFindingDecisions: builder.query<BugHuntDecision[], string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_DECISIONS(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, id) => [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id }],
+    }),
+
+    getBugHuntRunDecisions: builder.query<BugHuntDecision[], string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.RUN_DECISIONS(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, id) => [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id }],
+    }),
+
+    getBugHunterScoreboard: builder.query<BugHunterScoreboard, { repo: string; days?: number }>({
+      query: ({ repo, days }) => ({
+        url: ApiEndpoints.BUG_HUNTER.SCOREBOARD,
+        method: HttpMethod.GET,
+        params: days ? { repo, days } : { repo },
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }],
+    }),
+
+    getBugHunterDecisionReplay: builder.query<BugHuntDecisionReplay, { days?: number } | void>({
+      query: arg => {
+        const days = arg && typeof arg === "object" ? arg.days : undefined;
+        return {
+          url: ApiEndpoints.BUG_HUNTER.DECISION_REPLAY,
+          method: HttpMethod.GET,
+          params: days ? { days } : undefined,
+        };
+      },
+      providesTags: [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+        TAG_TYPES.BUG_HUNTER_DECISION_OWNERS,
+      ],
+    }),
+
+    getBugHunterDecisionOwners: builder.query<BugHuntDecisionOwners, void>({
+      query: () => ({
+        url: ApiEndpoints.BUG_HUNTER.DECISION_OWNERS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_DECISION_OWNERS],
+    }),
+
+    updateBugHunterDecisionOwner: builder.mutation<
+      BugHuntDecisionOwners,
+      { point: BugHuntDecisionPoint; owner: BugHuntDecisionOwner | null }
+    >({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.DECISION_OWNERS,
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_DECISION_OWNERS],
+    }),
+
+    getBugHunterToday: builder.query<BugHunterToday, { timeZone: string }>({
+      query: ({ timeZone }) => ({
+        url: ApiEndpoints.BUG_HUNTER.TODAY,
+        method: HttpMethod.GET,
+        params: { timeZone },
+      }),
+      providesTags: [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+        { type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * The volume view: what gets filed each day beside where each bug stands
+     * now. Shares the findings list's tag — a triage decision moves a day's
+     * accepted/declined split, so the card refreshes with the table.
+     */
+    /**
+     * The wrong-fix table (2026-10-12): fixes that turned out wrong, by the
+     * chain link that broke. Same tag as findings: a reopened bug moves it.
+     */
+    getBugHunterWrongFixes: builder.query<BugHunterWrongFixSummary, { days?: number } | void>({
+      query: arg => {
+        const days = arg && typeof arg === "object" ? arg.days : undefined;
+        return {
+          url: ApiEndpoints.BUG_HUNTER.METRICS_WRONG_FIXES,
+          method: HttpMethod.GET,
+          params: days ? { days } : undefined,
+        };
+      },
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }],
+    }),
+
+    getBugHunterOperationsMetrics: builder.query<
+      BugHunterOperationsMetrics,
+      { days?: number } | void
+    >({
+      query: arg => {
+        const days = arg && typeof arg === "object" ? arg.days : undefined;
+        return {
+          url: ApiEndpoints.BUG_HUNTER.METRICS_OPERATIONS,
+          method: HttpMethod.GET,
+          params: days ? { days } : undefined,
+        };
+      },
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }],
+    }),
+
+    /**
+     * Start a fix session for one bug. `repo` is only sent when the finding
+     * doesn't already have one — the usual case for a bug a human reported as
+     * free text, where the admin picks the codebase in the confirm dialog.
+     */
+    startBugFixSession: builder.mutation<
+      BugFinding,
+      { id: string; repo?: string; force?: boolean }
+    >({
+      query: ({ id, repo, force }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_FIX_SESSION(id),
+        method: HttpMethod.POST,
+        body: { ...(repo ? { repo } : {}), ...(force ? { force: true } : {}) },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+        // A fix session opens a bug_hunt_runs row, so run history is stale too.
+        { type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * The manual kill switch for a fix session that's clearly stuck or
+     * looping: cancels the actual GitHub Actions run — real compute/token
+     * savings, not just a status change — and lands the finding at
+     * CANCELLED. Only valid from QUEUED or FIXING; the backend 403s
+     * otherwise, which is why the button gates on the same condition.
+     */
+    cancelBugFixSession: builder.mutation<BugFinding, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_CANCEL_FIX_SESSION(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * Promote a merged fix to production. The response only confirms the
+     * release was *dispatched* — the outcome lands minutes later, reconciled
+     * from the GitHub run, so the UI must not present this as "released".
+     */
+    releaseBugFinding: builder.mutation<BugFinding, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_RELEASE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * Bug Hunter's inbox. This is the ONLY channel it speaks on — escalations,
+     * run summaries and release outcomes used to go to Slack and now land here.
+     */
+    getBugHunterNotifications: builder.query<
+      ListBugHunterNotificationsResponse,
+      { unreadOnly?: boolean } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUG_HUNTER.NOTIFICATIONS,
+        method: HttpMethod.GET,
+        params: params || undefined,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_NOTIFICATIONS, id: "LIST" }],
+    }),
+
+    markBugHunterNotificationRead: builder.mutation<BugHunterNotification, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.NOTIFICATION_READ(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_NOTIFICATIONS, id: "LIST" }],
+    }),
+
+    markAllBugHunterNotificationsRead: builder.mutation<{ unreadCount: number }, void>({
+      query: () => ({
+        url: ApiEndpoints.BUG_HUNTER.NOTIFICATIONS_READ_ALL,
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_NOTIFICATIONS, id: "LIST" }],
+    }),
+
+    // ── The notebook ────────────────────────────────────────────────────────
+    // What past sweeps and admins wrote down for the next one. Active entries
+    // for a repo (plus platform-wide ones), strongest evidence first.
+    /**
+     * Bug Hunter's feature map: one card per user-facing feature, how it works
+     * across repos. Written by a weekly read-only run; read by every study.
+     */
+    getBugHunterFeatureMaps: builder.query<
+      ListBugHunterFeatureMapsResponse,
+      { repo?: string } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUG_HUNTER.FEATURE_MAPS,
+        method: HttpMethod.GET,
+        params: params || undefined,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" }],
+    }),
+
+    /** Remove a wrong card; the reason becomes a notebook lesson the next map run reads. */
+    removeBugHunterFeatureMap: builder.mutation<{ removed: true }, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FEATURE_MAP_REMOVE(id),
+        method: HttpMethod.POST,
+        body: { reason },
+      }),
+      invalidatesTags: [
+        { type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" },
+        { type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" },
+      ],
+    }),
+
+    /** Start a read-only map run now, for one repo or all of them. Returns the run ids started. */
+    refreshBugHunterFeatureMaps: builder.mutation<{ runIds: string[] }, { repo?: string }>({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.FEATURE_MAPS_REFRESH,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
+    }),
+
+    getBugHunterMemory: builder.query<
+      ListBugHunterMemoryResponse,
+      { repo?: string; limit?: number } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUG_HUNTER.MEMORY,
+        method: HttpMethod.GET,
+        params: params || undefined,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
+    }),
+
+    /**
+     * Add an entry by hand. A person's note lands ACTIVE at once — it is
+     * already curated — and a pinned one is never edited or retired by the
+     * hourly curator.
+     */
+    addBugHunterMemory: builder.mutation<BugHunterMemoryEntry, WriteBugHunterMemoryBody>({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.MEMORY,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
+    }),
+
+    retireBugHunterMemory: builder.mutation<BugHunterMemoryEntry, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.MEMORY_RETIRE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
+    }),
+
+    /**
+     * Entries the agent retired on its own in the last month, each with the
+     * rule that fired (OPP-0752). Shares the list tag with the active set:
+     * a restore moves a row from one list to the other, so both refetch.
+     */
+    getBugHunterRetiredMemory: builder.query<
+      ListBugHunterMemoryResponse,
+      { repo?: string; limit?: number } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUG_HUNTER.MEMORY_RETIRED,
+        method: HttpMethod.GET,
+        params: params || undefined,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
+    }),
+
+    /** The undo for a retirement, the agent's or a person's. */
+    restoreBugHunterMemory: builder.mutation<BugHunterMemoryEntry, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER.MEMORY_RESTORE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
+    }),
+
+    /**
+     * Rewrite the bug's description before putting Bug Hunter on it. This text
+     * is the fix agent's entire brief — see ally-be's `buildFixSessionPrompt`
+     * — so an edit here changes what the NEXT session is asked to fix, and
+     * nothing about the bug's status.
+     */
+    editBugFindingDescription: builder.mutation<BugFinding, { id: string; description: string }>({
+      query: ({ id, description }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_DESCRIPTION(id),
+        method: HttpMethod.PATCH,
+        body: { description },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        // The table's row shows the title, not the description — but the
+        // duplicate-title grouping and the drawer both read the list cache,
+        // and a row whose drawer disagrees with it reads as a bug.
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+
+    /**
+     * Resolve a roadmap opportunity id to the bug it became, for the roadmap's
+     * deep-link redirect. See ally-be's `getFindingByReportedBug`.
+     */
+    getBugFindingByReportedBug: builder.query<BugFindingRef, string>({
+      query: opportunityId => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_BY_REPORTED_BUG(opportunityId),
+      }),
+    }),
+
+    /**
+     * Pin the coarse roadmap stage by hand, or (with `stage: null`) hand it back
+     * to being derived from the pipeline status.
+     *
+     * For the bug fixed OUTSIDE Bug Hunter — a hand-written PR, a config change,
+     * a fix that rode along with unrelated work — where the pipeline never moved
+     * and the status therefore still reads NEW. Pinning sticks: later transitions
+     * no longer move the stage.
+     */
+    setBugFindingStage: builder.mutation<BugFinding, { id: string; stage: BugFindingStage | null }>(
+      {
+        query: ({ id, stage }) => ({
+          url: ApiEndpoints.BUG_HUNTER.FINDING_STAGE(id),
+          method: HttpMethod.PATCH,
+          body: { stage },
+        }),
+        invalidatesTags: (_result, _error, { id }) => [
+          { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+          // The stage renders in the table row as well as the drawer, so the list
+          // cache has to go too — a row still reading "New" behind a drawer saying
+          // "Released" is exactly the kind of disagreement that reads as a bug.
+          { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+        ],
+      },
+    ),
+
+    answerBugFinding: builder.mutation<BugFindingDetail, { id: string; answer: string }>({
+      query: ({ id, answer }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FINDING_ANSWER(id),
+        method: HttpMethod.POST,
+        body: { answer },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
+        { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useGetBugHunterSettingsQuery,
+  useUpdateBugHunterSettingsMutation,
+  useGetBugHunterModelSettingsQuery,
+  useUpdateBugHunterModelSettingsMutation,
+  useGetBugHuntRunsQuery,
+  useTriggerBugHuntSweepMutation,
+  useGetBugHuntRunQuery,
+  useGetBugFindingsQuery,
+  useGetBugFindingQuery,
+  useApproveBugFindingMutation,
+  useRejectBugFindingMutation,
+  useAnswerBugFindingMutation,
+  useEditBugFindingDescriptionMutation,
+  useSetBugFindingStageMutation,
+  useGetBugFindingByReportedBugQuery,
+  useStartBugFixSessionMutation,
+  useCancelBugFixSessionMutation,
+  useMergeBugFindingMutation,
+  useReleaseBugFindingMutation,
+  useGetBugHunterTodayQuery,
+  useGetBugFindingDecisionsQuery,
+  useGetBugHuntRunDecisionsQuery,
+  useGetBugHunterScoreboardQuery,
+  useGetBugHunterDecisionReplayQuery,
+  useGetBugHunterDecisionOwnersQuery,
+  useUpdateBugHunterDecisionOwnerMutation,
+  useGetBugHunterOperationsMetricsQuery,
+  useGetBugHunterWrongFixesQuery,
+  useGetBugHunterNotificationsQuery,
+  useMarkBugHunterNotificationReadMutation,
+  useMarkAllBugHunterNotificationsReadMutation,
+  useGetBugHunterFeatureMapsQuery,
+  useRefreshBugHunterFeatureMapsMutation,
+  useRemoveBugHunterFeatureMapMutation,
+  useGetBugHunterMemoryQuery,
+  useAddBugHunterMemoryMutation,
+  useRetireBugHunterMemoryMutation,
+  useGetBugHunterRetiredMemoryQuery,
+  useRestoreBugHunterMemoryMutation,
+} = bugHunterAPI;

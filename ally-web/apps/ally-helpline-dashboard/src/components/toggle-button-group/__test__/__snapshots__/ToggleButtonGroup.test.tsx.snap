@@ -1,0 +1,72 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToggleButtonGroup > should match snapshot when disabled 1`] = `
+<DocumentFragment>
+  <div
+    class="inline-flex h-10 md:h-9 max-w-full items-stretch overflow-x-auto rounded-[4px] border-[0.5px] border-border-medium bg-neutral-100 p-0.5 font-tertiary"
+    role="group"
+  >
+    <button
+      aria-checked="false"
+      class="whitespace-nowrap rounded-[4px] px-6 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 text-sm shrink-0 text-typography-700 hover:bg-black/5"
+      disabled=""
+      role="radio"
+      type="button"
+    >
+      Option A
+    </button>
+    <button
+      aria-checked="true"
+      class="whitespace-nowrap rounded-[4px] px-6 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 text-sm shrink-0 bg-white text-typography-800 shadow-sm"
+      disabled=""
+      role="radio"
+      type="button"
+    >
+      Option B
+    </button>
+    <button
+      aria-checked="false"
+      class="whitespace-nowrap rounded-[4px] px-6 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 text-sm shrink-0 text-typography-700 hover:bg-black/5"
+      disabled=""
+      role="radio"
+      type="button"
+    >
+      Option C
+    </button>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`ToggleButtonGroup > should match snapshot when rendered with default props 1`] = `
+<DocumentFragment>
+  <div
+    class="inline-flex h-10 md:h-9 max-w-full items-stretch overflow-x-auto rounded-[4px] border-[0.5px] border-border-medium bg-neutral-100 p-0.5 font-tertiary"
+    role="group"
+  >
+    <button
+      aria-checked="true"
+      class="whitespace-nowrap rounded-[4px] px-6 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 text-sm shrink-0 bg-white text-typography-800 shadow-sm"
+      role="radio"
+      type="button"
+    >
+      Option A
+    </button>
+    <button
+      aria-checked="false"
+      class="whitespace-nowrap rounded-[4px] px-6 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 text-sm shrink-0 text-typography-700 hover:bg-black/5"
+      role="radio"
+      type="button"
+    >
+      Option B
+    </button>
+    <button
+      aria-checked="false"
+      class="whitespace-nowrap rounded-[4px] px-6 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 text-sm shrink-0 text-typography-700 hover:bg-black/5"
+      role="radio"
+      type="button"
+    >
+      Option C
+    </button>
+  </div>
+</DocumentFragment>
+`;

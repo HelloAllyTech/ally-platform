@@ -1,0 +1,1766 @@
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
+import {
+  GlossaryListResponse,
+  VarietyProfileView,
+  LanguageGlossarySection,
+  UpsertGlossarySectionPayload,
+  GenerateGlossaryResult,
+  ConsolidateGlossaryResult,
+  BackfillGlossariesOutcome,
+  GlossaryAdherenceOverviewRow,
+  GlossaryAdherenceSummary,
+  BackfillGlossaryAdherenceResult,
+  SessionEvent,
+  GetSessionEventsQuery,
+  SessionEventResponse,
+  GetSimulationsQueryParams,
+  GetSimulationsResponse,
+  CreateSimulationInput,
+  CreateSimulationResponse,
+  GetSimulationByIdResponse,
+  UpdateSimulationByIdInput,
+  UpdateSimulationByIdResponse,
+  GetCoverImageUrlRequest,
+  GetCoverImageUrlResponse,
+  DeleteCoverImageRequest,
+  GetCoverVideoUrlRequest,
+  GetCoverVideoUrlResponse,
+  DeleteCoverVideoRequest,
+  ScenarioVoice,
+  GetScenarioVoicesQuery,
+  getTriggerWarningsQueryParams,
+  triggerWarningsRequest,
+  createTriggerResponse,
+  ScenarioLanguage,
+  PreviewMonologueRun,
+  PreviewMonologueRunSummary,
+  triggerWarning,
+  GetLanguagesQuery,
+  Language,
+  CharacterData,
+  DeleteCharacterRequest,
+  Prompt,
+  PromptTranslation,
+  TranslatePromptResult,
+  GetPromptsQuery,
+  LlmModelInfo,
+  GetReportsInput,
+  ReportData,
+  GenerateReportInput,
+  GenerateReportResponse,
+  ScenarioVersion,
+  CreateScenarioVersionInput,
+  UpdateScenarioVersionInput,
+  GetImageLibraryQueryParams,
+  GetImageLibraryResponse,
+  GetFillerTagsQueryParams,
+  GetHelperTagsQueryParams,
+  HelperTagInput,
+  FillerTagListResponse,
+  CreateFillerTagResponse,
+  CompetenciesResponse,
+  GetCompetenciesArgs,
+  Competency,
+  CreateCompetencyRequest,
+  UpdateCompetencyRequest,
+  CompetencyBehavioursResponse,
+  SetCompetencyBehavioursRequest,
+  CompetencyClustersResponse,
+  CompetencyCluster,
+  CreateCompetencyClusterRequest,
+  UpdateCompetencyClusterRequest,
+  AgentTestCase,
+  AgentTestCasesResponse,
+  CreateAgentTestCaseRequest,
+  UpdateAgentTestCaseRequest,
+  AutofillModelOption,
+  EnhanceFieldRequest,
+  EnhanceFieldResponse,
+  GetReportTranscriptInput,
+  GetReportTranscriptResponse,
+  GenerateCoverImageRequest,
+  ImageGenerationJob,
+  SttConfig,
+  SttConfigPayload,
+  LlmConfig,
+  LlmConfigPayload,
+  LlmPreviewResult,
+  AiTaskRow,
+  LlmCatalogModel,
+  LlmCatalogModelPayload,
+  ElevenLabsVoiceSyncResult,
+  ElevenLabsVoiceLookupResult,
+  ElevenLabsBulkSyncSummary,
+  TtsCatalogEntry,
+  VideoActorCoverMedia,
+  VideoActorFaceEntry,
+  VideoActorProviderEntry,
+  TtsCatalogParams,
+} from "@types";
+
+import { baseAPI } from "./baseApi";
+
+export const simulationStudioAPI = baseAPI.injectEndpoints({
+  endpoints: builder => ({
+    /**
+     * Get all simulations available in the Simulation Studio.
+     * @returns {Promise<GetSimulationsResponse>} List of simulations
+     */
+    getSimulations: builder.query<GetSimulationsResponse, GetSimulationsQueryParams>({
+      query: (params: GetSimulationsQueryParams) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_SIMULATIONS,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Get simulation by Id
+     */
+    getAdminSimulationById: builder.query<GetSimulationByIdResponse, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_ADMIN_SIMULATION_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Create a new simulation.
+     */
+    createSimulation: builder.mutation<CreateSimulationResponse, CreateSimulationInput>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.CREATE_SIMULATION,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Update simulation.
+     */
+    updateSimulationById: builder.mutation<UpdateSimulationByIdResponse, UpdateSimulationByIdInput>(
+      {
+        query: ({ id, simulation: body }) => ({
+          url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_SIMULATION_BY_ID(id),
+          method: HttpMethod.PUT,
+          body,
+        }),
+        invalidatesTags: [TAG_TYPES.SIMULATION],
+      },
+    ),
+
+    /**
+     * Delete simulation by Id.
+     */
+    deleteSimulationById: builder.mutation<void, string | number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SIMULATION_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Get custom events for a simulation.
+     */
+    getSessionEvents: builder.query<SessionEventResponse, GetSessionEventsQuery>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SESSION_EVENTS,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.SESSION_EVENTS],
+    }),
+
+    /**
+     * Get session event by ID
+     */
+    getSessionEventById: builder.query<SessionEvent, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_SESSION_EVENT_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.SESSION_EVENTS],
+    }),
+
+    /**
+     * Create Session Event
+     */
+    createSessionEvent: builder.mutation<void, { event: SessionEvent }>({
+      query: ({ event }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SESSION_EVENTS,
+        method: HttpMethod.POST,
+        body: event,
+      }),
+      invalidatesTags: [TAG_TYPES.SESSION_EVENTS],
+    }),
+
+    /**
+     * Create Session Events (bulk)
+     */
+    createSessionEvents: builder.mutation<Array<{ id?: string }>, { events: SessionEvent[] }>({
+      query: ({ events }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SESSION_EVENTS,
+        method: HttpMethod.POST,
+        body: { events },
+      }),
+      invalidatesTags: [TAG_TYPES.SESSION_EVENTS],
+    }),
+
+    /**
+     * Update Events
+     */
+    updateSessionEvent: builder.mutation<
+      { messages?: string[] },
+      { id: string; event: SessionEvent }
+    >({
+      query: ({ id, event }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_SESSION_EVENT(id),
+        method: HttpMethod.PUT,
+        body: event,
+      }),
+      invalidatesTags: [TAG_TYPES.SESSION_EVENTS],
+    }),
+
+    /**
+     * Delete Session Events
+     */
+    deleteSessionEvents: builder.mutation<void, { eventIds: string[] }>({
+      query: ({ eventIds }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DELETE_SESSION_EVENTS,
+        method: HttpMethod.DELETE,
+        body: { eventIds },
+      }),
+      invalidatesTags: [TAG_TYPES.SESSION_EVENTS],
+    }),
+
+    /**
+     * Get session event tags with optional search
+     */
+    getSessionEventTags: builder.query<{ data: string[] }, { search?: string } | undefined>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SESSION_EVENT_TAGS,
+        method: HttpMethod.GET,
+        params: params || {},
+      }),
+      providesTags: [TAG_TYPES.SESSION_EVENT_TAGS],
+    }),
+
+    /**
+     * Get presigned URL for S3 upload
+     */
+    getCoverImageUrl: builder.mutation<GetCoverImageUrlResponse, GetCoverImageUrlRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_COVER_IMAGE_URL,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /**
+     * Delete cover image from S3
+     */
+    deleteCoverImage: builder.mutation<void, DeleteCoverImageRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DELETE_COVER_IMAGE,
+        method: HttpMethod.DELETE,
+        body,
+      }),
+    }),
+
+    /**
+     * Get presigned URL for cover video S3 upload
+     */
+    getCoverVideoUrl: builder.mutation<GetCoverVideoUrlResponse, GetCoverVideoUrlRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_COVER_VIDEO_URL,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /**
+     * Delete cover video from S3
+     */
+    deleteCoverVideo: builder.mutation<void, DeleteCoverVideoRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DELETE_COVER_VIDEO,
+        method: HttpMethod.DELETE,
+        body,
+      }),
+    }),
+
+    /**
+     * Get all scenario voices
+     */
+    getScenarioVoices: builder.query<ScenarioVoice[], GetScenarioVoicesQuery>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_VOICES,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.SCENARIO_VOICES],
+    }),
+
+    /**
+     * Create a new scenario voice
+     */
+
+    createScenarioVoice: builder.mutation<ScenarioVoice[], { voices: ScenarioVoice[] }>({
+      query: ({ voices }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.CREATE_SCENARIO_VOICE,
+        method: HttpMethod.POST,
+        body: { voices },
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VOICES],
+    }),
+
+    /**
+     * Update a scenario voice
+     */
+    updateScenarioVoice: builder.mutation<
+      ScenarioVoice,
+      { id: string; voice: Omit<ScenarioVoice, "id" | "createdAt" | "updatedAt"> }
+    >({
+      query: ({ id, voice: body }) => ({
+        url: `${ApiEndpoints.SIMULATION_STUDIO.UPDATE_SCENARIO_VOICE(id)}`,
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VOICES],
+    }),
+
+    /**
+     * Named STT configurations. `activeOnly` is what the pickers pass —
+     * a retired config must stay resolvable for whatever already points at it,
+     * but must not be offered as a new choice.
+     */
+    getSttConfigs: builder.query<SttConfig[], { activeOnly?: boolean } | void>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.STT_CONFIGS,
+        method: HttpMethod.GET,
+        ...(params && params.activeOnly ? { params: { activeOnly: true } } : {}),
+      }),
+      providesTags: [TAG_TYPES.STT_CONFIGS],
+    }),
+
+    createSttConfig: builder.mutation<SttConfig, SttConfigPayload>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.STT_CONFIGS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.STT_CONFIGS],
+    }),
+
+    updateSttConfig: builder.mutation<
+      SttConfig,
+      { id: string; sttConfig: Partial<SttConfigPayload> }
+    >({
+      query: ({ id, sttConfig }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_STT_CONFIG(id),
+        method: HttpMethod.PUT,
+        body: sttConfig,
+      }),
+      invalidatesTags: [TAG_TYPES.STT_CONFIGS],
+    }),
+
+    deleteSttConfig: builder.mutation<{ deleted: true }, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_STT_CONFIG(id),
+        method: HttpMethod.DELETE,
+      }),
+      // Languages also change when a config they referenced is removed.
+      invalidatesTags: [TAG_TYPES.STT_CONFIGS, TAG_TYPES.SCENARIO_LANGUAGES],
+    }),
+
+    /** Named LLM configurations — the registry behind the Language Model tab. */
+    getLlmConfigs: builder.query<LlmConfig[], { activeOnly?: boolean } | void>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LLM_CONFIGS,
+        method: HttpMethod.GET,
+        ...(params && params.activeOnly ? { params: { activeOnly: true } } : {}),
+      }),
+      providesTags: [TAG_TYPES.LLM_CONFIGS],
+    }),
+
+    createLlmConfig: builder.mutation<LlmConfig, LlmConfigPayload>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LLM_CONFIGS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.LLM_CONFIGS],
+    }),
+
+    updateLlmConfig: builder.mutation<
+      LlmConfig,
+      { id: string; llmConfig: Partial<LlmConfigPayload> }
+    >({
+      query: ({ id, llmConfig }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_LLM_CONFIG(id),
+        method: HttpMethod.PUT,
+        body: llmConfig,
+      }),
+      invalidatesTags: [TAG_TYPES.LLM_CONFIGS],
+    }),
+
+    deleteLlmConfig: builder.mutation<{ deleted: true }, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_LLM_CONFIG(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.LLM_CONFIGS, TAG_TYPES.SCENARIO_LANGUAGES],
+    }),
+
+    /**
+     * The LLM model catalog as stored, inactive rows included. Distinct from
+     * getLlmModels (the pickers' feed), which hides inactive rows and falls
+     * back to the in-code list.
+     */
+    getLlmModelCatalog: builder.query<LlmCatalogModel[], { runtime?: string } | void>({
+      query: args => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LLM_MODEL_CATALOG,
+        method: HttpMethod.GET,
+        // Runtime filtering is the backend's job — it owns the
+        // provider x runtime matrix, and a client-side copy would drift.
+        ...(args && args.runtime ? { params: { runtime: args.runtime } } : {}),
+      }),
+      providesTags: [TAG_TYPES.LLM_MODEL_CATALOG],
+    }),
+
+    /**
+     * The AI task registry: every platform action that calls a model, and which
+     * model serves it.
+     *
+     * No tag and no invalidation — the list is derived from ally-be's code and
+     * cannot change while the app is open, so there is nothing for a mutation
+     * here to invalidate.
+     */
+    getAiTasks: builder.query<AiTaskRow[], void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AI_TASKS,
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Pull an ElevenLabs voice's creation type so v3 compatibility is visible.
+     * Invalidates the voices list because it writes voice_type onto the row.
+     */
+    syncElevenLabsVoice: builder.mutation<ElevenLabsVoiceSyncResult, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SYNC_ELEVENLABS_VOICE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VOICES],
+    }),
+
+    /**
+     * Look up a voice id before it has a saved row — read-only, so a query
+     * (not a mutation), triggered lazily as the id is typed rather than on
+     * every render.
+     */
+    lookupElevenLabsVoice: builder.query<ElevenLabsVoiceLookupResult, string>({
+      query: voiceId => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LOOKUP_ELEVENLABS_VOICE,
+        method: HttpMethod.GET,
+        params: { voiceId },
+      }),
+    }),
+
+    /** Sync every ElevenLabs voice's type from the workspace listing in one pass. */
+    bulkSyncElevenLabsVoices: builder.mutation<ElevenLabsBulkSyncSummary, void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.BULK_SYNC_ELEVENLABS_VOICES,
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VOICES],
+    }),
+
+    /**
+     * A TTS provider's account-wide model/voice catalog — not tied to any
+     * one voice, so this is what a picker's options come from. One endpoint
+     * for every provider that has a real catalog (ElevenLabs, Deepgram,
+     * Google, Hume today); `languageCode`/`voiceProvider` are only used by
+     * the providers that need them. Barely ever changes, so RTK Query's
+     * default cache is enough — same provider+params share one cached result.
+     */
+    getTtsCatalog: builder.query<TtsCatalogEntry[], TtsCatalogParams>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.TTS_CATALOG,
+        method: HttpMethod.GET,
+        params,
+      }),
+    }),
+
+    /**
+     * Video-actor vendors a roleplay can be pointed at.
+     *
+     * Served by ally-be rather than hardcoded here so adding a vendor never
+     * touches this app.
+     */
+    getVideoActorProviders: builder.query<VideoActorProviderEntry[], void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.VIDEO_ACTOR_PROVIDERS,
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Selectable faces for one vendor, already normalised by ally-be.
+     *
+     * `thumbnailImageUrl`/`thumbnailVideoUrl` are present only where the vendor
+     * publishes preview media, so render on their presence — never on the
+     * provider. Listing is unmetered at both vendors, and the default cache is
+     * enough since one provider's roster is stable within a session.
+     */
+    getVideoActorFaces: builder.query<VideoActorFaceEntry[], string>({
+      query: provider => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.VIDEO_ACTOR_FACES,
+        method: HttpMethod.GET,
+        params: { provider },
+      }),
+    }),
+
+    /**
+     * Copy a face's preview media into our storage and get back OUR urls.
+     *
+     * Not the vendor's: a cover image is long-lived learner-facing content and
+     * vendor CDN paths are account-scoped, so a roleplay card must not depend
+     * on one. Either key comes back absent when the vendor publishes no such
+     * asset — Beyond Presence publishes none, so bey yields nothing and the
+     * caller leaves the cover alone.
+     */
+    importVideoActorFaceCover: builder.mutation<
+      VideoActorCoverMedia,
+      { provider: string; faceId: string }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.VIDEO_ACTOR_FACE_COVER,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /** Test a catalog model against its provider. */
+    previewLlmModel: builder.mutation<LlmPreviewResult, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_LLM_MODEL(id),
+        method: HttpMethod.POST,
+      }),
+    }),
+
+    createLlmModel: builder.mutation<LlmCatalogModel, LlmCatalogModelPayload>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LLM_MODEL_CATALOG,
+        method: HttpMethod.POST,
+        body,
+      }),
+      // LLM_MODELS is the pickers' feed, so it has to refresh too.
+      invalidatesTags: [TAG_TYPES.LLM_MODEL_CATALOG, TAG_TYPES.LLM_MODELS],
+    }),
+
+    updateLlmModel: builder.mutation<
+      LlmCatalogModel,
+      { id: string; model: Partial<LlmCatalogModelPayload> }
+    >({
+      query: ({ id, model: body }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LLM_MODEL_CATALOG_BY_ID(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.LLM_MODEL_CATALOG, TAG_TYPES.LLM_MODELS],
+    }),
+
+    deleteLlmModel: builder.mutation<{ deleted: true }, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.LLM_MODEL_CATALOG_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.LLM_MODEL_CATALOG, TAG_TYPES.LLM_MODELS],
+    }),
+
+    /**
+     * Run a one-line completion against a saved LLM config to check the model
+     * still answers. Invalidates nothing — it reads from the provider, not us.
+     */
+    previewLlmConfig: builder.mutation<LlmPreviewResult, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_LLM_CONFIG(id),
+        method: HttpMethod.POST,
+      }),
+    }),
+
+    /**
+     * Get all available scenario languages
+     */
+    getAvailableLanguageVoices: builder.query<
+      ScenarioLanguage[],
+      { active?: boolean; voicesNeeded: boolean }
+    >({
+      query: (params = { active: true, voicesNeeded: true }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_VOICE_LANGUAGES,
+        method: HttpMethod.GET,
+        params: params, // This will pass through any params you provide
+      }),
+    }),
+
+    /**
+     * Map scenario events
+     */
+    mapScenarioEvents: builder.mutation<void, { scenarioId: number; events: any[] }>({
+      query: ({ scenarioId, events }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.MAP_SCENARIO_EVENTS,
+        method: HttpMethod.POST,
+        body: { scenarioId, events },
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION, TAG_TYPES.SIMULATION_EVENTS],
+    }),
+
+    /**
+     * Map scenario events
+     */
+    getMappedScenarioEvents: builder.query<{ data: any[] }, { id: string }>({
+      query: ({ id }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_MAPPED_SCENARIO_EVENTS(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.SIMULATION_EVENTS],
+    }),
+
+    /**
+     * Delete scenario events
+     */
+    deleteScenarioEvents: builder.mutation<void, { scenarioId: number; eventIds: string[] }>({
+      query: ({ scenarioId, eventIds }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_EVENTS,
+        method: HttpMethod.DELETE,
+        body: { scenarioId, eventIds },
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION, TAG_TYPES.SIMULATION_EVENTS],
+    }),
+
+    /**
+     * Get scenario preview
+     */
+    scenarioPreview: builder.mutation<
+      any,
+      {
+        scenarioId: number;
+        languageId?: number;
+        scenarioVersionId?: string;
+        /** Sent only for a text-chat preview; a voice preview's body is unchanged. */
+        interactionMode?: "VOICE" | "TEXT";
+      }
+    >({
+      query: ({ scenarioId, languageId, scenarioVersionId, interactionMode }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_PREVIEW,
+        method: HttpMethod.POST,
+        body: {
+          scenarioId,
+          languageId,
+          ...(scenarioVersionId && { scenarioVersionId }),
+          ...(interactionMode === "TEXT" && { interactionMode }),
+        },
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Get scenario languages
+     */
+    getScenarioLanguages: builder.query<
+      ScenarioLanguage[],
+      { active?: boolean; hasVoices?: boolean }
+    >({
+      query: (params = {}) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_LANGUAGES,
+        method: HttpMethod.GET,
+        params: params, // This will pass through any params you provide
+      }),
+    }),
+
+    /**
+     * Internal-monologue runs recorded for this scenario's previews, newest
+     * first, without their turns. Previews are ephemeral everywhere else in
+     * the platform, so this is the only way to read one back after it ended.
+     */
+    getPreviewMonologues: builder.query<PreviewMonologueRunSummary[], { scenarioId: number }>({
+      query: ({ scenarioId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_MONOLOGUES(scenarioId),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * One recorded run, with its turns.
+     */
+    getPreviewMonologueRun: builder.query<PreviewMonologueRun, { runId: string }>({
+      query: ({ runId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_MONOLOGUE_RUN(runId),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Dispatch agent to preview room (local dev only, when webhook unreachable)
+     */
+    dispatchPreviewAgent: builder.mutation<void, { roomName: string }>({
+      query: ({ roomName }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DISPATCH_PREVIEW_AGENT,
+        method: HttpMethod.POST,
+        body: { roomName },
+      }),
+    }),
+
+    /**
+     * End scenario preview
+     */
+    endScenarioPreview: builder.mutation<void, { roomName: string }>({
+      query: ({ roomName }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.END_SCENARIO_PREVIEW(roomName),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION],
+    }),
+
+    //Trigger warnings
+    getTriggerWarnings: builder.query<triggerWarning[], getTriggerWarningsQueryParams>({
+      query: (params: GetSimulationsQueryParams) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.TRIGGER_WARNINGS,
+        params,
+      }),
+      providesTags: [TAG_TYPES.TRIGGER_WARNINGS],
+    }),
+
+    createTriggerWarning: builder.mutation<createTriggerResponse, triggerWarningsRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.TRIGGER_WARNINGS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.TRIGGER_WARNINGS],
+    }),
+
+    duplicateSimulation: builder.mutation<{ success: boolean }, string | number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DUPLICATE_SIMULATION(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Get all scenario languages with pagination and search
+     */
+    getLanguages: builder.query<Language[], GetLanguagesQuery>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_LANGUAGES,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.SCENARIO_LANGUAGES],
+    }),
+
+    /**
+     * Create a new scenario language
+     */
+    createLanguage: builder.mutation<Language[], { languages: Language[] }>({
+      query: ({ languages }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.CREATE_LANGUAGE,
+        method: HttpMethod.POST,
+        body: { languages },
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_LANGUAGES],
+    }),
+
+    /**
+     * Update a scenario language
+     */
+    updateLanguage: builder.mutation<
+      Language,
+      { id: number; language: Omit<Language, "id" | "createdAt" | "updatedAt"> }
+    >({
+      query: ({ id, language: body }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_LANGUAGE(id),
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_LANGUAGES],
+    }),
+
+    /**
+     * Get all prompts with pagination and search
+     */
+    getPrompts: builder.query<Prompt[], GetPromptsQuery>({
+      query: params => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_PROMPTS,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Canonical LLM model registry (single source of truth for the
+     * Prompt Management model picker). Optionally filtered to a runtime.
+     */
+    getLlmModels: builder.query<LlmModelInfo[], string | void>({
+      query: runtime => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_LLM_MODELS,
+        method: HttpMethod.GET,
+        ...(runtime ? { params: { runtime } } : {}),
+      }),
+      // Now that the catalog is editable, adding or retiring a model has to
+      // reach every picker fed by this query without a page reload.
+      providesTags: [TAG_TYPES.LLM_MODELS],
+    }),
+
+    /**
+     * List prompt variants by promptType (e.g. 'main_agent').
+     * Powers the studio prompt picker and the prompt-management Type filter.
+     */
+    getPromptsByType: builder.query<Prompt[], string>({
+      query: promptType => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_PROMPTS_BY_TYPE(promptType),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Duplicate an existing prompt to start a new variant. Returns the new
+     * Prompt row with useDashboardOverride=true and an initial v1 version
+     * cloned from the source. Caller typically navigates to the new id.
+     */
+    duplicatePrompt: builder.mutation<Prompt, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DUPLICATE_PROMPT(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Create a new prompt
+     */
+    createPrompt: builder.mutation<Prompt, { prompts: Prompt[] }>({
+      query: ({ prompts }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.CREATE_PROMPT,
+        method: HttpMethod.POST,
+        body: { prompts },
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Update a prompt
+     */
+    updatePrompt: builder.mutation<
+      Prompt,
+      { id: string; prompt: Omit<Prompt, "id" | "createdAt" | "updatedAt"> }
+    >({
+      query: ({ id, prompt: body }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_PROMPT(id),
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Revert prompt to codebase default
+     */
+    revertPrompt: builder.mutation<boolean, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.REVERT_PROMPT(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Delete an obsolete prompt
+     */
+    deletePrompt: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_PROMPT(id), // DELETE /prompts/:id
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * In-use count + a small sample of referencing scenarios for a prompt
+     * variant. Drives the in-use guard and tooltip on the studio's
+     * "Delete variant" button — fetched on demand only when the side panel
+     * opens for a duplicated variant.
+     */
+    getPromptUsage: builder.query<
+      { count: number; scenarios: Array<{ id: number; title: string }> },
+      string
+    >({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_PROMPT_USAGE(id),
+        method: HttpMethod.GET,
+      }),
+      // Re-fetch when a simulation is created/updated (which may change
+      // which variant it points at) or when the prompts list refreshes.
+      providesTags: [TAG_TYPES.PROMPTS, TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Read-only: stored translations for a prompt (one row per language).
+     * Drives the read-only Translations panel; refreshes when prompts change.
+     */
+    getPromptTranslations: builder.query<PromptTranslation[], string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_PROMPT_TRANSLATIONS(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Re-translate a prompt into all eligible languages ("Re-translate all"). */
+    retranslatePrompt: builder.mutation<TranslatePromptResult, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.RETRANSLATE_PROMPT(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Re-translate a prompt into a single language (per-language retry). */
+    retranslatePromptLanguage: builder.mutation<unknown, { id: string; languageId: number }>({
+      query: ({ id, languageId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.RETRANSLATE_PROMPT_LANGUAGE(id, languageId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Set (or clear, with empty provider/model) the per-language runtime model
+     * that runs the main agent when this translated body is served.
+     */
+    setTranslationRuntimeModel: builder.mutation<
+      unknown,
+      { id: string; languageId: number; provider?: string; model?: string }
+    >({
+      query: ({ id, languageId, provider, model }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SET_TRANSLATION_RUNTIME_MODEL(id, languageId),
+        method: HttpMethod.PUT,
+        body: { provider, model },
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Backfill: (re)translate every enabled source across eligible languages. */
+    backfillPromptTranslations: builder.mutation<unknown, void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.BACKFILL_PROMPT_TRANSLATIONS,
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * Per-language glossary sections + Tier 0 token accounting.
+     * Sections are the unit of publish; entries render only when published.
+     */
+    getLanguageGlossary: builder.query<GlossaryListResponse, number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_LANGUAGE_GLOSSARY(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** Create/update a glossary section (draft edit; cap-checked when published+always). */
+    upsertGlossarySection: builder.mutation<
+      LanguageGlossarySection,
+      { languageId: number; sectionCode: string; payload: UpsertGlossarySectionPayload }
+    >({
+      query: ({ languageId, sectionCode, payload }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.UPSERT_GLOSSARY_SECTION(languageId, sectionCode),
+        method: HttpMethod.PUT,
+        body: payload,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** Publish a section (backend blocks when the Tier 0 set would exceed the
+     * cap). `profileId` targets a style-overlay section. */
+    publishGlossarySection: builder.mutation<
+      LanguageGlossarySection,
+      { languageId: number; sectionCode: string; profileId?: string | null }
+    >({
+      query: ({ languageId, sectionCode, profileId }) => ({
+        url:
+          ApiEndpoints.SIMULATION_STUDIO.PUBLISH_GLOSSARY_SECTION(languageId, sectionCode) +
+          (profileId ? `?profileId=${profileId}` : ""),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    archiveGlossarySection: builder.mutation<
+      LanguageGlossarySection,
+      { languageId: number; sectionCode: string; profileId?: string | null }
+    >({
+      query: ({ languageId, sectionCode, profileId }) => ({
+        url:
+          ApiEndpoints.SIMULATION_STUDIO.ARCHIVE_GLOSSARY_SECTION(languageId, sectionCode) +
+          (profileId ? `?profileId=${profileId}` : ""),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** Seed job: LLM-generated DRAFT sections; never overwrites published ones. */
+    generateLanguageGlossary: builder.mutation<GenerateGlossaryResult, number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GENERATE_LANGUAGE_GLOSSARY(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /**
+     * Variety profiles ("styles") for a language, with the orgs attached to
+     * each — who speaks which style. Read-only surface for the glossary page.
+     */
+    getVarietyProfiles: builder.query<VarietyProfileView[], number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_VARIETY_PROFILES(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** Accept a consolidation proposal — appends its markdown to the section
+     * content. `profileId` targets a style-overlay section's proposal. */
+    acceptGlossaryProposal: builder.mutation<
+      LanguageGlossarySection,
+      { languageId: number; sectionCode: string; entryId: string; profileId?: string | null }
+    >({
+      query: ({ languageId, sectionCode, entryId, profileId }) => ({
+        url:
+          ApiEndpoints.SIMULATION_STUDIO.ACCEPT_GLOSSARY_PROPOSAL(
+            languageId,
+            sectionCode,
+            entryId,
+          ) + (profileId ? `?profileId=${profileId}` : ""),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    rejectGlossaryProposal: builder.mutation<
+      LanguageGlossarySection,
+      { languageId: number; sectionCode: string; entryId: string; profileId?: string | null }
+    >({
+      query: ({ languageId, sectionCode, entryId, profileId }) => ({
+        url:
+          ApiEndpoints.SIMULATION_STUDIO.REJECT_GLOSSARY_PROPOSAL(
+            languageId,
+            sectionCode,
+            entryId,
+          ) + (profileId ? `?profileId=${profileId}` : ""),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** Consolidation: judge error annotations -> PROPOSED entries (never auto-published). */
+    consolidateLanguageGlossary: builder.mutation<ConsolidateGlossaryResult, number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.CONSOLIDATE_LANGUAGE_GLOSSARY(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** Backfill: generate DRAFT glossaries for all active non-English languages (or given ids). */
+    backfillLanguageGlossaries: builder.mutation<
+      BackfillGlossariesOutcome[],
+      { languageIds?: number[] } | void
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.BACKFILL_LANGUAGE_GLOSSARIES,
+        method: HttpMethod.POST,
+        body: body ?? {},
+      }),
+      invalidatesTags: [TAG_TYPES.LANGUAGE_GLOSSARY],
+    }),
+
+    /** All-languages adherence rollup — the dashboard's landing view. */
+    getGlossaryAdherenceOverview: builder.query<GlossaryAdherenceOverviewRow[], void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_GLOSSARY_ADHERENCE_OVERVIEW,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.GLOSSARY_ADHERENCE],
+    }),
+
+    /** Per-language adherence rollup (violation rate + top violated terms). */
+    getGlossaryAdherence: builder.query<GlossaryAdherenceSummary, number>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_GLOSSARY_ADHERENCE(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.GLOSSARY_ADHERENCE],
+    }),
+
+    /** Rescan: deterministic avoid-list scan of recent sessions for a language. */
+    backfillGlossaryAdherence: builder.mutation<
+      BackfillGlossaryAdherenceResult,
+      { languageId: number; sinceDays?: number; limit?: number }
+    >({
+      query: ({ languageId, ...body }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.BACKFILL_GLOSSARY_ADHERENCE(languageId),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.GLOSSARY_ADHERENCE],
+    }),
+
+    getDynamicBranchingInstruction: builder.query<string[], number | void>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.DYNAMIC_BRANCHING_INSTRUCTIONS,
+        method: HttpMethod.GET,
+        params: id ? { scenarioId: id } : undefined,
+      }),
+    }),
+
+    /**
+     * Get all characters
+     */
+    getCharacters: builder.query<
+      { characters: CharacterData[]; count: number },
+      { limit?: number; offset?: number; search?: string; sortBy?: string; order?: string }
+    >({
+      query: params => ({
+        url: ApiEndpoints.CHARACTERS.GET_CHARACTERS,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.CHARACTERS],
+    }),
+
+    /**
+     * Get character by ID
+     */
+    getCharacterById: builder.query<CharacterData, string>({
+      query: id => ({
+        url: ApiEndpoints.CHARACTERS.GET_CHARACTER_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.CHARACTERS],
+    }),
+
+    /**
+     * Create a new character
+     */
+    createCharacter: builder.mutation<
+      CharacterData,
+      Omit<CharacterData, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">
+    >({
+      query: body => ({
+        url: ApiEndpoints.CHARACTERS.CREATE_CHARACTER,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.CHARACTERS],
+    }),
+
+    /**
+     * Update a character
+     */
+    updateCharacter: builder.mutation<
+      CharacterData,
+      {
+        id: string;
+        data: Omit<CharacterData, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
+      }
+    >({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.CHARACTERS.UPDATE_CHARACTER(id),
+        method: HttpMethod.PUT,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.CHARACTERS],
+    }),
+
+    /**
+     * Delete a character
+     */
+    deleteCharacter: builder.mutation<{ success: boolean }, DeleteCharacterRequest>({
+      query: body => ({
+        url: ApiEndpoints.CHARACTERS.DELETE_CHARACTER,
+        method: HttpMethod.DELETE,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.CHARACTERS],
+    }),
+
+    /**
+     * Start generating a scenario cover image with AI. The backend renders the
+     * managed `cover_image_generation` prompt (editable via Prompt Management)
+     * with the given title/description and returns a job at once — generation
+     * outlasts the load balancer's 60 s timeout, so it is polled, not awaited.
+     * A succeeded job's image is already in S3 and the shared image library;
+     * the client saves it on the scenario through the normal update flow.
+     */
+    startCoverImageJob: builder.mutation<ImageGenerationJob, GenerateCoverImageRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COVER_IMAGE_JOBS,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    getCoverImageJob: builder.query<ImageGenerationJob, string>({
+      query: jobId => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COVER_IMAGE_JOB(jobId),
+        method: HttpMethod.GET,
+      }),
+      keepUnusedDataFor: 0,
+      // A succeeded job's image is now in the shared library — refresh the
+      // picker. Here rather than on the start, when nothing new existed yet.
+      async onQueryStarted(_jobId, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data.status === "succeeded") {
+            dispatch(baseAPI.util.invalidateTags([TAG_TYPES.IMAGE_LIBRARY]));
+          }
+        } catch {
+          // A failed poll is the caller's to handle.
+        }
+      },
+    }),
+
+    getHelperTags: builder.query<HelperTagInput, GetHelperTagsQueryParams>({
+      query: (params: GetHelperTagsQueryParams) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.HELPER_TAGS,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.HELPER_TAGS],
+    }),
+
+    createHelperTag: builder.mutation<HelperTagInput, { name: string }>({
+      query: ({ name }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.HELPER_TAGS,
+        method: HttpMethod.POST,
+        body: { name },
+      }),
+      invalidatesTags: [TAG_TYPES.HELPER_TAGS],
+    }),
+
+    getFillerTags: builder.query<FillerTagListResponse, GetFillerTagsQueryParams>({
+      query: (params: GetFillerTagsQueryParams) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.FILLER_TAGS,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.FILLER_TAGS],
+    }),
+
+    createFillerTag: builder.mutation<CreateFillerTagResponse, { name: string }>({
+      query: ({ name }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.FILLER_TAGS,
+        method: HttpMethod.POST,
+        body: { name },
+      }),
+      invalidatesTags: [TAG_TYPES.FILLER_TAGS],
+    }),
+
+    getImageLibrary: builder.query<GetImageLibraryResponse, GetImageLibraryQueryParams>({
+      query: (params: GetImageLibraryQueryParams) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_COVER_IMAGE_LIBRARY,
+        method: HttpMethod.GET,
+        params: {
+          limit: params.limit,
+          offset: params.offset,
+          sortBy: params.sortBy || "createdAt",
+          sortOrder: params.sortOrder || "desc",
+          ...(params.searchName && { searchName: params.searchName }),
+        },
+      }),
+      providesTags: [TAG_TYPES.IMAGE_LIBRARY],
+    }),
+
+    /**
+     * Get reports for a specific scenario.
+     * @param {string} scenarioId - Scenario identifier
+     * @returns {Promise<ReportData[]>} List of reports
+     */
+    getReports: builder.query<{ data: ReportData[]; count?: number }, { input: GetReportsInput }>({
+      query: ({ input }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_REPORTS(input.scenarioId),
+        method: HttpMethod.GET,
+        params: {
+          ...(input?.statuses && { statuses: input.statuses }),
+          ...(input?.limit != null && { limit: input.limit }),
+          ...(input?.offset != null && { offset: input.offset }),
+          ...(input?.sortBy && { sortBy: input.sortBy }),
+          ...(input?.order && { order: input.order }),
+        },
+      }),
+    }),
+
+    /**
+     * Get report by ID.
+     * @param {string} id - Report identifier
+     * @returns {Promise<ReportData>} Report data
+     */
+    getReportById: builder.query<ReportData, { id: string }>({
+      query: ({ id }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_REPORT_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Generate a report for a specific scenario.
+     * @param {string} scenarioId - Scenario identifier
+     * @returns {Promise<ReportData>} Report data
+     */
+    generateReport: builder.mutation<GenerateReportResponse, { input: GenerateReportInput }>({
+      query: ({ input }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GENERATE_REPORT(input.scenarioId),
+        method: HttpMethod.POST,
+        body: {
+          languageId: input.config.languageId,
+          turns: input.config.turns,
+          helperAgentPrompt: input.config.helperAgentPrompt,
+          selectedEvaluatorPromptCode: input.config.selectedEvaluatorPromptCode,
+          ...(input.scenarioVersionId && {
+            scenarioVersionId: input.scenarioVersionId,
+          }),
+        },
+      }),
+    }),
+
+    /**
+     * List saved versions of a scenario (newest first). The server lazily
+     * seeds a v1 from the live scenario if none exist yet.
+     */
+    getScenarioVersions: builder.query<ScenarioVersion[], { scenarioId: string | number }>({
+      query: ({ scenarioId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_VERSIONS(scenarioId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.SCENARIO_VERSIONS],
+    }),
+
+    /**
+     * Create a new draft version, optionally branched from an existing one.
+     */
+    createScenarioVersion: builder.mutation<ScenarioVersion, CreateScenarioVersionInput>({
+      query: ({ scenarioId, name, fromVersionId, empty }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_VERSIONS(scenarioId),
+        method: HttpMethod.POST,
+        body: {
+          ...(name && { name }),
+          ...(fromVersionId && { fromVersionId }),
+          ...(empty && { empty: true }),
+        },
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VERSIONS],
+    }),
+
+    /**
+     * Autosave a draft version (config and/or name). Does not touch the live
+     * scenario; only publish materialises a version.
+     */
+    updateScenarioVersion: builder.mutation<ScenarioVersion, UpdateScenarioVersionInput>({
+      query: ({ scenarioId, versionId, name, config }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_VERSION_BY_ID(scenarioId, versionId),
+        method: HttpMethod.PUT,
+        body: { ...(name !== undefined && { name }), ...(config !== undefined && { config }) },
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VERSIONS],
+    }),
+
+    /**
+     * Publish a version: materialise its config into the live scenario.
+     */
+    publishScenarioVersion: builder.mutation<
+      ScenarioVersion,
+      { scenarioId: string | number; versionId: string }
+    >({
+      query: ({ scenarioId, versionId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PUBLISH_SCENARIO_VERSION(scenarioId, versionId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VERSIONS, TAG_TYPES.SIMULATION],
+    }),
+
+    /**
+     * Soft-delete a draft version (the published version cannot be deleted).
+     */
+    deleteScenarioVersion: builder.mutation<
+      boolean,
+      { scenarioId: string | number; versionId: string }
+    >({
+      query: ({ scenarioId, versionId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SCENARIO_VERSION_BY_ID(scenarioId, versionId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.SCENARIO_VERSIONS],
+    }),
+
+    /**
+     * Cancel a report generation.
+     * @param {Object} params - Cancel report parameters
+     * @param {string} params.reportId - Report identifier
+     * @returns {Promise<{ success: boolean }>} Success response
+     */
+    cancelReportGeneration: builder.mutation<{ success: boolean }, { reportId: string }>({
+      query: ({ reportId }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.CANCEL_REPORT_GENERATION(reportId),
+        method: HttpMethod.POST,
+      }),
+    }),
+
+    /**
+     * Get transcript for a specific report (paginated).
+     * @param {string} reportId - Report identifier
+     * @param {number} limit - Page size
+     * @param {number} offset - Offset for pagination
+     * @returns {Promise<GetReportTranscriptResponse>} Paginated transcript messages
+     */
+    getReportTranscript: builder.query<GetReportTranscriptResponse, GetReportTranscriptInput>({
+      query: ({ reportId, limit, offset }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_REPORT_TRANSCRIPT(reportId),
+        method: HttpMethod.GET,
+        params:
+          limit != null || offset != null
+            ? { ...(limit != null && { limit }), ...(offset != null && { offset }) }
+            : undefined,
+      }),
+    }),
+
+    /**
+     * Get all competencies
+     */
+    getCompetencies: builder.query<CompetenciesResponse, GetCompetenciesArgs>({
+      query: ({ name, includeOwnCustom } = {}) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCIES,
+        method: HttpMethod.GET,
+        params: {
+          ...(name ? { name } : {}),
+          ...(includeOwnCustom ? { includeOwnCustom: true } : {}),
+        },
+      }),
+      providesTags: [TAG_TYPES.COMPETENCIES],
+    }),
+
+    /**
+     * Create a new competency
+     */
+    createCompetency: builder.mutation<Competency, CreateCompetencyRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCIES,
+        method: HttpMethod.POST,
+        body,
+      }),
+      // Clustering is edited from the competency form, so a save here can
+      // create a cluster or change its membership.
+      invalidatesTags: [TAG_TYPES.COMPETENCIES, TAG_TYPES.COMPETENCY_CLUSTERS],
+    }),
+
+    /**
+     * Update an existing competency
+     */
+    updateCompetency: builder.mutation<Competency, UpdateCompetencyRequest>({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_BY_ID(id),
+        method: HttpMethod.PUT,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.COMPETENCIES, TAG_TYPES.COMPETENCY_CLUSTERS],
+    }),
+
+    /**
+     * Delete a competency
+     */
+    deleteCompetency: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.COMPETENCIES, TAG_TYPES.COMPETENCY_CLUSTERS],
+    }),
+
+    /**
+     * Get the helpful/unhelpful behaviours mapped to a competency
+     */
+    getCompetencyBehaviours: builder.query<CompetencyBehavioursResponse, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_BEHAVIOURS(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.COMPETENCY_BEHAVIOURS],
+    }),
+
+    /**
+     * Replace the helpful/unhelpful behaviours mapped to a competency
+     */
+    setCompetencyBehaviours: builder.mutation<
+      CompetencyBehavioursResponse,
+      SetCompetencyBehavioursRequest
+    >({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_BEHAVIOURS(id),
+        method: HttpMethod.PUT,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.COMPETENCY_BEHAVIOURS],
+    }),
+
+    /**
+     * Competency clusters, each carrying its member competency ids so the
+     * builder can expand a cluster without a second round-trip.
+     */
+    getCompetencyClusters: builder.query<CompetencyClustersResponse, { name?: string } | void>({
+      query: (arg = {}) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_CLUSTERS,
+        method: HttpMethod.GET,
+        params: arg && "name" in arg && arg.name ? { name: arg.name } : undefined,
+      }),
+      providesTags: [TAG_TYPES.COMPETENCY_CLUSTERS],
+    }),
+
+    createCompetencyCluster: builder.mutation<CompetencyCluster, CreateCompetencyClusterRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_CLUSTERS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      // A cluster change moves competencies between groups, so the competency
+      // list (which carries each row's clusters) is stale too.
+      invalidatesTags: [TAG_TYPES.COMPETENCY_CLUSTERS, TAG_TYPES.COMPETENCIES],
+    }),
+
+    updateCompetencyCluster: builder.mutation<CompetencyCluster, UpdateCompetencyClusterRequest>({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_CLUSTER_BY_ID(id),
+        method: HttpMethod.PUT,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.COMPETENCY_CLUSTERS, TAG_TYPES.COMPETENCIES],
+    }),
+
+    deleteCompetencyCluster: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.COMPETENCY_CLUSTER_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.COMPETENCY_CLUSTERS, TAG_TYPES.COMPETENCIES],
+    }),
+
+    /**
+     * Agent test cases — superadmin-managed list, also consumed by the
+     * Agent Builder Copilot V2 wizard.
+     */
+    getAgentTestCases: builder.query<AgentTestCasesResponse, { search?: string } | void>({
+      query: arg => {
+        const search = arg ? arg.search : undefined;
+        return {
+          url: ApiEndpoints.SIMULATION_STUDIO.AGENT_TEST_CASES,
+          method: HttpMethod.GET,
+          params: search ? { search } : undefined,
+        };
+      },
+      providesTags: [TAG_TYPES.AGENT_TEST_CASES],
+    }),
+
+    createAgentTestCase: builder.mutation<AgentTestCase, CreateAgentTestCaseRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_TEST_CASES,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.AGENT_TEST_CASES],
+    }),
+
+    updateAgentTestCase: builder.mutation<AgentTestCase, UpdateAgentTestCaseRequest>({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_TEST_CASE_BY_ID(id),
+        method: HttpMethod.PUT,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.AGENT_TEST_CASES],
+    }),
+
+    deleteAgentTestCase: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_TEST_CASE_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.AGENT_TEST_CASES],
+    }),
+
+    /**
+     * Models for the autofill/regenerate/improve dropdown. Served from the
+     * universal LLM registry (GET /v1/learn/models), filtered server-side to
+     * the providers autofill can execute (OpenAI + Anthropic). Includes
+     * `supportsTemperature` per model.
+     */
+    getAutofillModels: builder.query<AutofillModelOption[], void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.GET_AUTOFILL_MODELS,
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Enhance the existing content of a field using AI (preset/custom guidance)
+     */
+    enhanceField: builder.mutation<EnhanceFieldResponse, EnhanceFieldRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.ENHANCE_FIELD,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+  }),
+});
+
+export const {
+  useGetSimulationsQuery,
+  useLazyGetAdminSimulationByIdQuery,
+  useCreateSimulationMutation,
+  useUpdateSimulationByIdMutation,
+  useDeleteSimulationByIdMutation,
+  useGetSessionEventsQuery,
+  useLazyGetSessionEventsQuery,
+  useGetSessionEventByIdQuery,
+  useCreateSessionEventMutation,
+  useCreateSessionEventsMutation,
+  useUpdateSessionEventMutation,
+  useDeleteSessionEventsMutation,
+  useGetSessionEventTagsQuery,
+  useGetCoverImageUrlMutation,
+  useDeleteCoverImageMutation,
+  useGetCoverVideoUrlMutation,
+  useDeleteCoverVideoMutation,
+  useGetScenarioVoicesQuery,
+  useCreateScenarioVoiceMutation,
+  useUpdateScenarioVoiceMutation,
+  useGetAvailableLanguageVoicesQuery,
+  useGetSttConfigsQuery,
+  useCreateSttConfigMutation,
+  useUpdateSttConfigMutation,
+  useDeleteSttConfigMutation,
+  useGetLlmConfigsQuery,
+  useCreateLlmConfigMutation,
+  useUpdateLlmConfigMutation,
+  useDeleteLlmConfigMutation,
+  usePreviewLlmConfigMutation,
+  useGetAiTasksQuery,
+  useGetLlmModelCatalogQuery,
+  usePreviewLlmModelMutation,
+  useSyncElevenLabsVoiceMutation,
+  useLazyLookupElevenLabsVoiceQuery,
+  useBulkSyncElevenLabsVoicesMutation,
+  useGetTtsCatalogQuery,
+  useGetVideoActorProvidersQuery,
+  useGetVideoActorFacesQuery,
+  useImportVideoActorFaceCoverMutation,
+  useCreateLlmModelMutation,
+  useUpdateLlmModelMutation,
+  useDeleteLlmModelMutation,
+  useGetScenarioLanguagesQuery,
+  useScenarioPreviewMutation,
+  useDispatchPreviewAgentMutation,
+  useGetPreviewMonologuesQuery,
+  useLazyGetPreviewMonologueRunQuery,
+  useEndScenarioPreviewMutation,
+  useMapScenarioEventsMutation,
+  useDeleteScenarioEventsMutation,
+  useGetMappedScenarioEventsQuery,
+  useGetTriggerWarningsQuery,
+  useCreateTriggerWarningMutation,
+  useDuplicateSimulationMutation,
+  useGetLanguagesQuery,
+  useCreateLanguageMutation,
+  useUpdateLanguageMutation,
+  useGetPromptsQuery,
+  useGetLlmModelsQuery,
+  useGetPromptsByTypeQuery,
+  useCreatePromptMutation,
+  useUpdatePromptMutation,
+  useDuplicatePromptMutation,
+  useRevertPromptMutation,
+  useDeletePromptMutation,
+  useGetPromptUsageQuery,
+  useGetPromptTranslationsQuery,
+  useRetranslatePromptMutation,
+  useRetranslatePromptLanguageMutation,
+  useSetTranslationRuntimeModelMutation,
+  useBackfillPromptTranslationsMutation,
+  useGetLanguageGlossaryQuery,
+  useGetVarietyProfilesQuery,
+  useUpsertGlossarySectionMutation,
+  usePublishGlossarySectionMutation,
+  useArchiveGlossarySectionMutation,
+  useGenerateLanguageGlossaryMutation,
+  useConsolidateLanguageGlossaryMutation,
+  useBackfillLanguageGlossariesMutation,
+  useGetGlossaryAdherenceOverviewQuery,
+  useGetGlossaryAdherenceQuery,
+  useBackfillGlossaryAdherenceMutation,
+  useAcceptGlossaryProposalMutation,
+  useRejectGlossaryProposalMutation,
+  useGetDynamicBranchingInstructionQuery,
+  useGetCharactersQuery,
+  useGetCharacterByIdQuery,
+  useCreateCharacterMutation,
+  useUpdateCharacterMutation,
+  useDeleteCharacterMutation,
+  useStartCoverImageJobMutation,
+  useLazyGetCoverImageJobQuery,
+  useGetHelperTagsQuery,
+  useCreateHelperTagMutation,
+  useGetFillerTagsQuery,
+  useCreateFillerTagMutation,
+  useGetImageLibraryQuery,
+  useGetReportsQuery,
+  useLazyGetReportsQuery,
+  useGetReportByIdQuery,
+  useLazyGetReportByIdQuery,
+  useGenerateReportMutation,
+  useGetScenarioVersionsQuery,
+  useLazyGetScenarioVersionsQuery,
+  useCreateScenarioVersionMutation,
+  useUpdateScenarioVersionMutation,
+  usePublishScenarioVersionMutation,
+  useDeleteScenarioVersionMutation,
+  useCancelReportGenerationMutation,
+  useGetCompetenciesQuery,
+  useCreateCompetencyMutation,
+  useUpdateCompetencyMutation,
+  useDeleteCompetencyMutation,
+  useGetCompetencyBehavioursQuery,
+  useLazyGetCompetencyBehavioursQuery,
+  useSetCompetencyBehavioursMutation,
+  useGetCompetencyClustersQuery,
+  useCreateCompetencyClusterMutation,
+  useUpdateCompetencyClusterMutation,
+  useDeleteCompetencyClusterMutation,
+  useGetAgentTestCasesQuery,
+  useCreateAgentTestCaseMutation,
+  useUpdateAgentTestCaseMutation,
+  useDeleteAgentTestCaseMutation,
+  useGetReportTranscriptQuery,
+  useLazyGetReportTranscriptQuery,
+  useGetAutofillModelsQuery,
+  useEnhanceFieldMutation,
+} = simulationStudioAPI;

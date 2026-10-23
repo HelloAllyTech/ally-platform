@@ -1,0 +1,20 @@
+export enum TabId {
+  ANALYTICS = "ANALYTICS",
+  CALENDER = "CALENDER",
+  SCRIBE_LOGS = "SCRIBE_LOGS",
+  ROLEPLAY_LOGS = "ROLEPLAY_LOGS",
+  LEARN = "LEARN",
+  SEARCH = "SEARCH",
+  SETTINGS = "SETTINGS",
+  STRESS_BUSTERS = "STRESS BUSTERS",
+  LEADERBOARD = "LEADERBOARD",
+  PROGRESS = "PROGRESS",
+  REVIEW = "REVIEW",
+  BADGES = "BADGES",
+  CHARACTER_LIBRARY = "CHARACTER_LIBRARY",
+  HELPLINE = "HELPLINE",
+  // Not an in-app tab: opens the Ally Admin console in a new tab.
+  ALLY_ADMIN = "ALLY_ADMIN",
+  // Not a route: opens the report-a-problem modal in place, handled in NavSideBar.
+  REPORT_PROBLEM = "REPORT_PROBLEM",
+}

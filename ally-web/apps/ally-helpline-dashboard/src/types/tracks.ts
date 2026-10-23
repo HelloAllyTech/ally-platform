@@ -1,0 +1,887 @@
+/**
+ * Track 2.0 learner types — multi-component learning tracks (sections of
+ * roleplay/case/quiz/article/video/journal/annotation items).
+ * Mirrors the ally-be `v1/learn/tracks` learner API contract.
+ */
+import type { ArtifactSwatch } from "@ally-ui-mono/ui-shared";
+
+export enum TrackItemType {
+  ROLEPLAY = "ROLEPLAY",
+  CASE = "CASE",
+  QUIZ = "QUIZ",
+  ARTICLE = "ARTICLE",
+  VIDEO = "VIDEO",
+  JOURNAL = "JOURNAL",
+  ANNOTATED_ARTIFACT = "ANNOTATED_ARTIFACT",
+  GAME = "GAME",
+  BRANCHING_SCENARIO = "BRANCHING_SCENARIO",
+  BUCKET_SORT = "BUCKET_SORT",
+}
+
+/** Games the app can serve; each maps to `public/games/<key>/index.html`. */
+export enum TrackGameKey {
+  TREX_RUNNER = "TREX_RUNNER",
+  TIC_TAC_TOE = "TIC_TAC_TOE",
+  MEMORY_MATCH = "MEMORY_MATCH",
+  CUB_N_PUP = "CUB_N_PUP",
+  SNAKE = "SNAKE",
+  SPROUT = "SPROUT",
+  BREATHING_EXERCISE = "BREATHING_EXERCISE",
+}
+
+/**
+ * NOTE: there is no IN_PROGRESS status server-side — "in progress" is
+ * derived as `status === UNLOCKED && startedAt != null`.
+ */
+export enum TrackItemStatus {
+  LOCKED = "LOCKED",
+  UNLOCKED = "UNLOCKED",
+  COMPLETED = "COMPLETED",
+}
+
+export type TrackVideoSource = "s3" | "youtube" | "vimeo" | "loom";
+
+export interface TrackListItem {
+  id: string;
+  title: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  totalItems: number;
+  simulationsCount: number;
+  estimatedDurationMinutes: number | null;
+  enrolled: boolean;
+  completedItems: number;
+  completedAt: string | null;
+  lastActivityAt: string | null;
+  trackEnrollmentId: string | null;
+}
+
+export interface GetLearnTracksResponse {
+  data: TrackListItem[];
+  count: number;
+}
+
+export interface TrackCompletionCriteria {
+  minScore?: number;
+  minDurationSeconds?: number;
+  passScore?: number;
+  watchPct?: number;
+  minReadSeconds?: number;
+}
+
+/** Type-specific display metadata for the overview meta line. */
+export interface TrackItemContentMeta {
+  // QUIZ
+  questionCount?: number;
+  passScore?: number;
+  // VIDEO
+  durationSeconds?: number;
+  source?: TrackVideoSource;
+  // JOURNAL
+  promptCount?: number;
+  // ANNOTATED_ARTIFACT — deliberately no target count, that would give the
+  // answer away before the learner has looked.
+  kind?: AnnotationArtifactKind;
+  unitCount?: number;
+  labelCount?: number;
+  // GAME
+  gameKey?: TrackGameKey;
+  // BUCKET_SORT — counts only; which bucket an item belongs in is the answer.
+  itemCount?: number;
+  bucketCount?: number;
+}
+
+export interface TrackDetailItem {
+  id: string;
+  type: TrackItemType;
+  order: number;
+  title: string;
+  description: string | null;
+  scenarioId: number | null;
+  caseId: string | null;
+  completionCriteria: TrackCompletionCriteria | null;
+  contentMeta: TrackItemContentMeta | null;
+  status: TrackItemStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  score: number | null;
+  attemptCount: number | null;
+  maxWatchedPct: number | null;
+  /** The author enabled a discussion thread beneath this item. */
+  hasDiscussion?: boolean;
+  /**
+   * Non-null when this component reads in English despite the course being
+   * read in another language — the card tells the learner why up front.
+   */
+  languageFallbackReason?: TrackLanguageFallbackReason | null;
+}
+
+/** Why a component reads in English inside a translated course. */
+export enum TrackLanguageFallbackReason {
+  VIDEO_NOT_LOCALISED = "VIDEO_NOT_LOCALISED",
+  SCENARIO_NOT_TRANSLATED = "SCENARIO_NOT_TRANSLATED",
+  CASE_NOT_TRANSLATED = "CASE_NOT_TRANSLATED",
+}
+
+/** A language a course is published in — English first, then translations. */
+export interface TrackLanguageOption {
+  languageId: number;
+  /** e.g. `hi` — what the learner sends back and what is persisted. */
+  languageCode: string;
+  /** Endonym where the backend has one, e.g. `हिन्दी`. */
+  label: string;
+  isSource: boolean;
+}
+
+export interface GetTrackLanguagesResponse {
+  languages: TrackLanguageOption[];
+  selectedLanguageCode: string | null;
+}
+
+export interface SetTrackLanguageResponse {
+  languageCode: string;
+}
+
+export interface TrackSection {
+  id: string;
+  title: string;
+  description: string | null;
+  order: number;
+  items: TrackDetailItem[];
+}
+
+export interface TrackDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  status: string;
+  totalItems: number;
+  simulationsCount: number;
+  estimatedDurationMinutes: number | null;
+  enrolled: boolean;
+  trackEnrollmentId: string | null;
+  completedItems: number;
+  completedAt: string | null;
+  /** What the learner is reading the course in right now. */
+  languageCode?: string | null;
+  /** Every language the course is published in, English included. */
+  availableLanguages?: TrackLanguageOption[];
+  sections: TrackSection[];
+}
+
+export interface EnrollTrackResponse {
+  trackEnrollmentId: string;
+  alreadyEnrolled: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Public share link (`/course/:trackId`)
+// ---------------------------------------------------------------------------
+
+/** A component as the public outline shows it: no content, no progress. */
+export interface PublicTrackOutlineItem {
+  id: string;
+  type: TrackItemType;
+  order: number;
+  title: string;
+  description: string | null;
+  contentMeta: TrackItemContentMeta | null;
+}
+
+export interface PublicTrackOutlineSection {
+  id: string;
+  title: string;
+  description: string | null;
+  order: number;
+  items: PublicTrackOutlineItem[];
+}
+
+/** Where a chapter sits in the course's story (mirrors ally-be `StoryBeat`). */
+export enum StoryBeat {
+  SETUP = "SETUP",
+  CONFLICT = "CONFLICT",
+  CHALLENGE = "CHALLENGE",
+  CLIMAX = "CLIMAX",
+  RESOLUTION = "RESOLUTION",
+}
+
+/** How long one sitting runs (mirrors ally-be `LandingSittingLength`). */
+export enum LandingSittingLength {
+  SHORT = "SHORT",
+  MEDIUM = "MEDIUM",
+  LONG = "LONG",
+}
+
+/**
+ * The story layout of a course's landing page — present only once the author
+ * has written a hook. The server applies every show/hide rule before sending
+ * it: a block that is switched off, or too empty to show, arrives as null.
+ */
+export interface PublicTrackStory {
+  hook: string;
+  question: string | null;
+  courseLine: string | null;
+  buttonLabel: string | null;
+  persona: { name: string; descriptor: string | null; imageUrl: string | null } | null;
+  firstMove: {
+    sceneLine: string | null;
+    personaLine: string;
+    prompt: string | null;
+    replies: { text: string; label: string; why: string | null }[];
+  } | null;
+  arc: {
+    /** One per public section, in course order. */
+    chapters: { sectionId: string; beat: StoryBeat | null; teaser: string | null }[];
+    hardCallSectionId: string | null;
+  } | null;
+  outcomes: string[] | null;
+  howItPlays: { sittingLength: LandingSittingLength | null } | null;
+  cast: {
+    caller: { name: string; line: string | null; imageUrl: string | null } | null;
+    guide: { name: string; role: string | null; line: string | null } | null;
+  } | null;
+  /** An upper bound from the XP rules — roleplay practice minutes come on top. */
+  xp: { activityXp: number; hasRoleplays: boolean } | null;
+  contentNotes: {
+    /** `chapters` are 1-based positions, ascending. */
+    warnings: { name: string; chapters: number[] }[];
+    extraNote: string | null;
+  } | null;
+}
+
+/** `GET /v1/learn/tracks/:id/public` — served only while public view is on and the course is published. */
+export interface PublicTrackOutline {
+  id: string;
+  title: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  totalItems: number;
+  simulationsCount: number;
+  estimatedDurationMinutes: number | null;
+  languageCode: string;
+  sections: PublicTrackOutlineSection[];
+  /** Null (or absent from an older server) means the classic outline page. */
+  story?: PublicTrackStory | null;
+}
+
+/** Why a signed-in learner cannot take a course (mirrors ally-be `TrackAccessDenialReason`). */
+export enum TrackAccessDenialReason {
+  NOT_AVAILABLE = "NOT_AVAILABLE",
+  NO_ORGANIZATION = "NO_ORGANIZATION",
+  NOT_IN_ORGANIZATION = "NOT_IN_ORGANIZATION",
+  NOT_IN_GROUP = "NOT_IN_GROUP",
+}
+
+export interface TrackAccessResponse {
+  hasAccess: boolean;
+  enrolled: boolean;
+  reason: TrackAccessDenialReason | null;
+}
+
+export interface NextTrackItem extends TrackDetailItem {
+  sectionId: string;
+  sectionTitle: string;
+}
+
+export interface GetNextTrackItemResponse {
+  trackCompleted: boolean;
+  nextItem: NextTrackItem | null;
+}
+
+// ---------------------------------------------------------------------------
+// Progress + consolidated feedback dashboard
+// ---------------------------------------------------------------------------
+
+export type SkillFeedbackClassification = "demonstrated" | "needs_practice" | "insufficient_data";
+
+export interface TrackProgressSectionSummary {
+  id: string;
+  title: string;
+  order: number;
+  completedItems: number;
+  totalItems: number;
+}
+
+/**
+ * One skillCoverage category, averaged across every evaluated roleplay
+ * session in this course. `category` is a raw pass-through string — both
+ * label generations seen across the platform's history can appear.
+ */
+export interface TrackSkillCategoryFeedback {
+  category: string;
+  averagePercentage: number | null;
+  sampleSize: number;
+  classification: SkillFeedbackClassification;
+}
+
+export interface TrackRoleplaySessionFeedback {
+  trackItemId: string;
+  trackItemTitle: string | null;
+  scenarioSessionId: string;
+  compositeScore: number | null;
+  occurredAt: string | null;
+  evaluationMarkdown: string | null;
+}
+
+export interface TrackProgressDashboard {
+  trackId: string;
+  title: string;
+  trackEnrollmentId: string;
+  totalItems: number;
+  completedItems: number;
+  completionPct: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  lastActivityAt: string | null;
+  sections: TrackProgressSectionSummary[];
+  evaluatedRoleplaySessionCount: number;
+  averageCompositeScore: number | null;
+  skillCategories: TrackSkillCategoryFeedback[];
+  roleplaySessions: TrackRoleplaySessionFeedback[];
+}
+
+// ---------------------------------------------------------------------------
+// Quiz (sanitized — answer keys stripped server-side)
+// ---------------------------------------------------------------------------
+
+export type QuizQuestionType =
+  | "mcq_single"
+  | "mcq_multi"
+  | "true_false"
+  | "ordering"
+  | "matching"
+  | "fill_blank"
+  | "open_ended"
+  | "likert_scale";
+
+export interface QuizOption {
+  id: string;
+  text: string;
+}
+
+/**
+ * A picture or clip shown with a question, part of the stem rather than
+ * decoration. Mirrors ally-be's `QuestionMedia`. Present on any sanitized
+ * question — quiz, video interjection or inline article question.
+ */
+export interface QuestionMedia {
+  kind: "image" | "video";
+  /** `s3` = a file the trainer uploaded; the rest are third-party embeds. */
+  source: "s3" | "youtube" | "vimeo" | "loom";
+  url: string;
+  /** Images only — what the picture shows, for screen readers. */
+  alt?: string;
+  /**
+   * Uploaded video only: a still frame captured at author time, so the
+   * learner sees the clip's content before pressing play instead of
+   * whatever their player paints for a paused-at-zero video.
+   */
+  posterUrl?: string;
+}
+
+export interface SanitizedQuizQuestion {
+  id: string;
+  type: QuizQuestionType;
+  prompt: string;
+  promptHtml?: string;
+  /** 0 for an ungraded question. */
+  points: number;
+  /**
+   * false = answered but not scored (a survey or reflection question, or any
+   * Likert). Missing on payloads from before ungraded questions existed —
+   * treat as true.
+   */
+  graded?: boolean;
+  /** Optional picture or clip shown above the answer controls. */
+  media?: QuestionMedia;
+  /** mcq_single / mcq_multi */
+  options?: QuizOption[];
+  /** ordering (pre-shuffled server-side) */
+  items?: QuizOption[];
+  /** matching */
+  left?: QuizOption[];
+  /** matching (pre-shuffled server-side, may include distractors) */
+  right?: QuizOption[];
+  /** fill_blank — template with `{{blankId}}` tokens */
+  template?: string;
+  blankIds?: string[];
+  /** open_ended */
+  minWords?: number;
+  /** likert_scale — the rows to rate */
+  statements?: QuizOption[];
+  /** likert_scale — the shared scale, lowest point first */
+  scale?: QuizOption[];
+}
+
+export interface SanitizedQuiz {
+  settings: {
+    passScore: number;
+    maxAttempts: number | null;
+    showExplanations: string;
+  };
+  questions: SanitizedQuizQuestion[];
+  /** Graded questions only — 0 means a survey, with no score to pass. */
+  totalPoints: number;
+}
+
+export interface QuizAnswerInput {
+  questionId: string;
+  selectedOptionIds?: string[];
+  booleanAnswer?: boolean;
+  orderedItemIds?: string[];
+  pairs?: { leftId: string; rightId: string }[];
+  blanks?: { blankId: string; answer: string }[];
+  text?: string;
+  /** likert_scale — one scale point per statement */
+  ratings?: { statementId: string; scaleOptionId: string }[];
+}
+
+/**
+ * A quiz question that hard-pauses a Track video at `timestampSeconds` until
+ * answered. `source: "s3"` videos only — an embed player can't reliably
+ * pause and overlay content, so the server sends an empty list otherwise.
+ * `question` is sanitized the same way as a regular quiz question (no
+ * answer key), and never `open_ended` (LLM-graded, doesn't fit a
+ * synchronous hard-pause).
+ */
+export interface VideoInterjection {
+  id: string;
+  timestampSeconds: number;
+  question: SanitizedQuizQuestion;
+  /** Present once the learner has answered — skips re-triggering the overlay. */
+  answered?: { passed: boolean; pointsAwarded?: number };
+}
+
+export interface InterjectionGrading {
+  questionId: string;
+  correct: boolean | null;
+  pointsAwarded: number;
+  pointsPossible: number;
+  llm?: { feedback?: string };
+}
+
+/** Response to `POST .../interjections/:interjectionId/answer`. */
+export interface SubmitInterjectionAnswerResponse {
+  correct: boolean | null;
+  grading: InterjectionGrading;
+}
+
+export type QuizAttemptStatus = "GRADED" | "PENDING_GRADING";
+
+/**
+ * The answer key, as the results screen reveals it. Same field names as
+ * `QuizAnswerInput` so both render the same way; fill-blank carries every
+ * accepted answer rather than one.
+ */
+export interface QuizCorrectAnswer {
+  selectedOptionIds?: string[];
+  booleanAnswer?: boolean;
+  orderedItemIds?: string[];
+  pairs?: { leftId: string; rightId: string }[];
+  blanks?: { blankId: string; acceptedAnswers: string[] }[];
+}
+
+export interface QuizQuestionResult {
+  questionId: string;
+  /**
+   * null = pending LLM grading, OR an ungraded question with no answer key
+   * to be right or wrong against. Use `isPendingResult` to tell them apart.
+   */
+  correct: boolean | null;
+  /** false = not scored. Missing on older attempts — treat as true. */
+  graded?: boolean;
+  pointsAwarded: number;
+  pointsPossible: number;
+  explanation?: string;
+  llmFeedback?: string;
+  /** Present only when there is a key and the trainer lets learners see it. */
+  correctAnswer?: QuizCorrectAnswer;
+}
+
+export interface QuizAttemptResult {
+  attemptId: string;
+  attemptNumber: number;
+  status: QuizAttemptStatus;
+  /** null when the quiz has no graded questions — a survey has no score. */
+  scorePct: number | null;
+  passed: boolean;
+  passScore: number;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  questions: QuizQuestionResult[];
+  itemCompleted: boolean;
+  unlockedItemIds: string[];
+  sectionCompleted: boolean;
+  trackCompleted: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Journal
+// ---------------------------------------------------------------------------
+
+/* -------------------------------------------------------------------------- */
+/* Annotation (ANNOTATED_ARTIFACT)                                            */
+/* -------------------------------------------------------------------------- */
+
+export type AnnotationArtifactKind = "TRANSCRIPT" | "DOCUMENT";
+
+export type AnnotationRevealKey = "after_each_attempt" | "after_pass_or_last_attempt";
+
+export type AnnotationVerdict = "FOUND" | "MISSED" | "NOT_HERE";
+
+export interface AnnotationUnit {
+  id: string;
+  speaker?: string;
+  text: string;
+}
+
+export interface AnnotationLabel {
+  id: string;
+  text: string;
+  description?: string;
+  color: ArtifactSwatch;
+}
+
+/** What the server sends the player — the answer key is never in here. */
+export interface SanitizedAnnotation {
+  kind: AnnotationArtifactKind;
+  intro?: string;
+  units: AnnotationUnit[];
+  labels: AnnotationLabel[];
+  settings: {
+    passScore: number;
+    maxAttempts: number | null;
+    /** Points lost per wrong mark. Told to the learner before they start. */
+    falsePositivePenalty: number;
+    revealKey: AnnotationRevealKey;
+  };
+}
+
+export interface AnnotationMarkInput {
+  unitId: string;
+  labelId: string;
+}
+
+export interface AnnotationResultEntry {
+  unitId: string;
+  labelId: string;
+  verdict: AnnotationVerdict;
+  points: number;
+  /** The author's teaching note. Only present once the key is revealed. */
+  note?: string;
+}
+
+export interface AnnotationAttemptResult extends TrackItemCompletionResult {
+  attemptId: string;
+  attemptNumber: number;
+  scorePct: number;
+  passed: boolean;
+  passScore: number;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  /** Whether misses and author notes are included below. */
+  revealed: boolean;
+  found: number;
+  notHere: number;
+  /** Present only when `revealed` — otherwise it would leak the target count. */
+  missed?: number;
+  pointsAwarded?: number;
+  pointsPossible?: number;
+  entries: AnnotationResultEntry[];
+  itemCompleted: boolean;
+}
+
+export interface JournalPrompt {
+  id: string;
+  prompt: string;
+  promptHtml?: string;
+  required: boolean;
+  placeholder: string | null;
+}
+
+export interface JournalSavedResponse {
+  promptId: string;
+  response: string;
+  submittedAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Start-item payload (type-discriminated)
+// ---------------------------------------------------------------------------
+
+interface StartTrackItemBase {
+  trackItemProgressId: string;
+}
+
+export interface StartRoleplayItemPayload extends StartTrackItemBase {
+  type: TrackItemType.ROLEPLAY;
+  scenarioId: number;
+  completionCriteria: TrackCompletionCriteria | null;
+  /** Latest ended scenario session for this item, when already completed. */
+  lastScenarioSessionId: string | null;
+}
+
+export interface StartCaseItemPayload extends StartTrackItemBase {
+  type: TrackItemType.CASE;
+  caseId: string;
+  caseSessionId: string;
+  caseCompleted: boolean;
+}
+
+export interface StartQuizItemPayload extends StartTrackItemBase {
+  type: TrackItemType.QUIZ;
+  quiz: SanitizedQuiz;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+}
+
+/**
+ * How the learner has already answered one inline article question. Present
+ * on a resumed article so the reader redraws the resolved state rather than
+ * offering a second go at a question that is already spent.
+ */
+export interface AnsweredArticleQuestion {
+  selectedOptionId: string;
+  correct: boolean;
+  /** ISO timestamp. */
+  answeredAt: string;
+}
+
+/**
+ * A single-select MCQ embedded in an article's prose. Where it sits is marked
+ * in `html` by an empty `<div data-ally-question="<id>">` placeholder, which
+ * the player splits the body on. Sanitized like any other learner-bound
+ * question: `correctOptionId` and `explanation` arrive only once the question
+ * has been answered and can never be answered again.
+ */
+export interface ArticleQuestion extends SanitizedQuizQuestion {
+  answered: AnsweredArticleQuestion | null;
+  correctOptionId: string | null;
+  explanation: string | null;
+}
+
+/** A curated external link shown after the article body. Supplementary — never gates completion. */
+export interface ArticleResource {
+  id: string;
+  title: string;
+  url: string;
+}
+
+/**
+ * Response to `GET .../resources/embeddability`. The server requests each
+ * resource URL itself — a 403/bot-check, a framing block or any failure
+ * reads `openExternally: true`, which the embedded frame cannot report.
+ */
+export interface ArticleResourceEmbeddabilityResponse {
+  resources: { id: string; openExternally: boolean }[];
+}
+
+export interface StartArticleItemPayload extends StartTrackItemBase {
+  type: TrackItemType.ARTICLE;
+  html: string;
+  minReadSeconds: number;
+  /** Empty for an article authored without questions. */
+  questions?: ArticleQuestion[];
+  answeredQuestionCount?: number;
+  resources?: ArticleResource[];
+}
+
+/** Response to `POST .../article-questions/:questionId/answer`. */
+export interface SubmitArticleQuestionAnswerResponse {
+  correct: boolean;
+  selectedOptionId: string;
+  correctOptionId: string;
+  explanation: string | null;
+  answeredQuestionCount: number;
+  totalQuestionCount: number;
+  /** Non-null only when this answer completed the article. */
+  completion: TrackItemCompletionResult | null;
+}
+
+export interface StartVideoItemPayload extends StartTrackItemBase {
+  type: TrackItemType.VIDEO;
+  source: TrackVideoSource;
+  url: string;
+  durationSeconds: number;
+  requiredWatchPct: number;
+  maxWatchedPct: number;
+  /** Empty/absent unless `source === "s3"`. */
+  interjections?: VideoInterjection[];
+}
+
+export interface StartJournalItemPayload extends StartTrackItemBase {
+  type: TrackItemType.JOURNAL;
+  prompts: JournalPrompt[];
+  savedResponses: JournalSavedResponse[];
+}
+
+export interface StartAnnotationItemPayload extends StartTrackItemBase {
+  type: TrackItemType.ANNOTATED_ARTIFACT;
+  annotation: SanitizedAnnotation;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  /** The last graded attempt, so reopening a finished item shows the reveal. */
+  lastResult: AnnotationAttemptResult | null;
+}
+
+/**
+ * A game completes the moment it is opened, so the payload carries the
+ * completion result the other players get back from a submit — the player
+ * reports it on mount and Next is live immediately.
+ */
+export interface StartGameItemPayload extends StartTrackItemBase {
+  type: TrackItemType.GAME;
+  gameKey: TrackGameKey;
+  intro: string | null;
+  /** Personal best across every run so far, or null before the first. */
+  bestScore: number | null;
+  playCount: number;
+  completion: TrackItemCompletionResult;
+}
+
+export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
+
+export interface BranchingChoice {
+  id: string;
+  text: string;
+  nextNodeId: string;
+}
+
+export interface BranchingNode {
+  id: string;
+  title?: string;
+  text: string;
+  image?: { url: string; alt?: string };
+  /** Absent or empty means this scene is an ending. */
+  choices?: BranchingChoice[];
+  outcome?: BranchingOutcomeTone;
+  score?: number;
+  takeaway?: string;
+}
+
+/** One finished run of the current round, as the recap lists it. */
+export interface BranchingRecapRun {
+  endingNodeId: string;
+  score: number;
+  /** ISO timestamp the run finished. */
+  at: string;
+}
+
+/** The whole story ships to the learner; the server scores the path walked. */
+export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
+  type: TrackItemType.BRANCHING_SCENARIO;
+  intro: string | null;
+  startNodeId: string;
+  nodes: BranchingNode[];
+  passScore: number | null;
+  maxAttempts: number | null;
+  /** Attempts used in the current round. */
+  attemptsUsed: number;
+  bestScore: number | null;
+  completed: boolean;
+  endingsReached: string[];
+  /** True while the round's attempts are spent and the next round hasn't opened. */
+  exhausted: boolean;
+  /** ISO timestamp the next round opens; only set while exhausted. */
+  nextRoundAt: string | null;
+  /** The round's runs, in order; non-empty only while exhausted. */
+  recap: BranchingRecapRun[];
+}
+
+export interface BranchingResult {
+  endingNodeId: string;
+  score: number;
+  passScore: number | null;
+  passed: boolean;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  /** null = unlimited. */
+  attemptsLeft: number | null;
+  bestScore: number | null;
+  endingsReached: string[];
+  itemCompleted: boolean;
+  completion: TrackItemCompletionResult;
+  /** True when this run used the round's last attempt without passing. */
+  exhausted: boolean;
+  nextRoundAt: string | null;
+  recap: BranchingRecapRun[];
+}
+
+export interface BucketSortBucket {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+/** What the server says about one placed item; the key reaches the client only through this. */
+export interface BucketSortFeedback {
+  correct: boolean;
+  /** The bucket the learner chose on their first try. */
+  placedBucketId: string;
+  correctBucketId: string;
+  explanation: string | null;
+}
+
+export interface StartBucketSortItemPayload extends StartTrackItemBase {
+  type: TrackItemType.BUCKET_SORT;
+  bucketSort: {
+    intro?: string;
+    buckets: BucketSortBucket[];
+    /** The answer key is stripped: an item says what it is, never where it goes. */
+    items: { id: string; text: string }[];
+    /** Items already placed (this round), so a reload resumes with their feedback. */
+    answered: Record<string, BucketSortFeedback>;
+  };
+  rounds: number;
+  bestFirstTryPct: number | null;
+}
+
+export interface BucketSortPlacementResult extends BucketSortFeedback {
+  sortItemId: string;
+  placedCount: number;
+  totalCount: number;
+  finished: boolean;
+  /** Share of items right on the first try; only once the round is finished. */
+  firstTryPct: number | null;
+  itemCompleted: boolean;
+  completion: TrackItemCompletionResult | null;
+}
+
+export type StartTrackItemResponse =
+  | StartRoleplayItemPayload
+  | StartCaseItemPayload
+  | StartQuizItemPayload
+  | StartArticleItemPayload
+  | StartVideoItemPayload
+  | StartJournalItemPayload
+  | StartAnnotationItemPayload
+  | StartGameItemPayload
+  | StartBranchingScenarioItemPayload
+  | StartBucketSortItemPayload;
+
+// ---------------------------------------------------------------------------
+// Completion results
+// ---------------------------------------------------------------------------
+
+export interface TrackItemCompletionResult {
+  completed: boolean;
+  unlockedItemIds: string[];
+  sectionCompleted: boolean;
+  trackCompleted: boolean;
+}
+
+export interface VideoProgressResult extends TrackItemCompletionResult {
+  maxWatchedPct: number;
+}
+
+/**
+ * Roleplay/case return-to-track context persisted in sessionStorage before
+ * launching a simulation from the track player.
+ */
+export interface ActiveTrackContext {
+  trackId: string;
+  itemId: string;
+}
+
+export const ACTIVE_TRACK_CONTEXT_KEY = "activeTrackContext";

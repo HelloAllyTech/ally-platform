@@ -1,0 +1,103 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SimulationTranscriptTab > should match snapshot when rendered 1`] = `
+<DocumentFragment>
+  <div
+    class="relative flex h-full min-h-0 flex-col border border-gray-200 rounded-md p-2 custom-scrollbar undefined"
+  >
+    <div
+      class="flex items-center justify-between gap-2"
+    >
+      <span
+        class="text-typography-900 font-primary text-base font-medium"
+      >
+        Transcript
+      </span>
+      <div
+        class="w-full max-w-[200px] min-w-[140px]"
+      >
+        <div
+          data-testid="dropdown-field"
+        >
+          <span>
+            English (Original)
+          </span>
+          <button>
+            English (Original)
+          </button>
+          <button>
+            हिंदी
+          </button>
+          <button>
+            मराठी
+          </button>
+          <button>
+            தமிழ்
+          </button>
+          <button>
+            ಕನ್ನಡ
+          </button>
+        </div>
+      </div>
+    </div>
+    <p
+      class="text-xs text-typography-500 mt-1"
+    >
+      Transcription may not always be fully accurate.
+    </p>
+    <hr
+      class="mb-5 mt-2 border-border-light"
+    />
+    <div
+      data-testid="transcript-tab"
+    >
+      <div
+        data-testid="transcript-list"
+      >
+        <div
+          data-testid="transcript-item-0"
+        >
+          <div
+            data-testid="sender-0"
+          >
+            Client
+          </div>
+          <div
+            data-testid="content-0"
+          >
+            Client message 1
+          </div>
+        </div>
+        <div
+          data-testid="transcript-item-1"
+        >
+          <div
+            data-testid="sender-1"
+          >
+            Counsellor
+          </div>
+          <div
+            data-testid="content-1"
+          >
+            Counsellor message 1
+          </div>
+        </div>
+        <div
+          data-testid="transcript-item-2"
+        >
+          <div
+            data-testid="sender-2"
+          >
+            Client
+          </div>
+          <div
+            data-testid="content-2"
+          >
+            Client message 2
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

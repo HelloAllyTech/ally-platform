@@ -1,0 +1,507 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * shadcn-style HSL aliases. Nothing in this app reads them today (no
+ * `hsl(var(--…))` call sites remain, and tailwind.config.ts resolves from the
+ * `--color-*` triplets below instead) — they are retinted to the Claude
+ * palette rather than left on the old brand blue so that a component pasted in
+ * from a shadcn recipe inherits the right identity instead of a stale #264d8e.
+ */
+@layer base {
+  :root {
+    --background: 44 24% 95%; /* #F5F4EE */
+    --foreground: 40 15% 14%; /* #29261F */
+    --card: 45 30% 98%; /* #FAF9F5 */
+    --card-foreground: 40 15% 14%;
+    --popover: 45 30% 98%;
+    --popover-foreground: 40 15% 14%;
+    --primary: 218 58% 35%; /* #264D8E Ally Blue */
+    --primary-foreground: 45 30% 98%;
+    --secondary: 42 22% 89%; /* #EAE7DE */
+    --secondary-foreground: 40 15% 14%;
+    --muted: 42 22% 89%;
+    --muted-foreground: 37 12% 40%; /* #6E6656 */
+    --accent: 218 58% 35%;
+    --accent-foreground: 45 30% 98%;
+    --destructive: 6 51% 42%; /* #A03E33 */
+    --destructive-foreground: 45 30% 98%;
+    --border: 35 25% 85%; /* #E3DBCE */
+    --input: 35 25% 85%;
+    --ring: 218 58% 35%;
+    --radius: 0.75rem;
+  }
+}
+
+/*
+ * ===== Design tokens — Claude design system, serif only =====
+ * ONE locked theme, as before: the previous multi-theme switcher
+ * (current/claude/carbon behind a `data-theme` attribute) is still gone. What
+ * changed is which theme is locked in. The values below are the `claude` theme
+ * this repo carried before the Carbon consolidation (commit f8918ee5), the same
+ * ones the public /SJT1 self-check already ships (commit 73327ac7) — warm creams on a #29261F warm near-black. They are the team's
+ * own prior values, not invented ones, so a reviewer can trace every hex.
+ *
+ * Tailwind tokens (see tailwind.config.ts) resolve from these `--color-*` /
+ * `--font-*` / `--radius` variables. Opaque colour scales are space-separated
+ * RGB triplets ("R G B") consumed via rgb(var(...) / <alpha-value>); the
+ * typography scale bakes its alpha into a full rgba() value; fonts/radius hold
+ * their full value.
+ *
+ * THE ADMIN CONSOLE IS NOT AFFECTED. It has its own tailwind.config.js with
+ * literal font families and its own styles.css, which defines none of these
+ * variables. Keep it that way: a shared ui-shared component must name a token,
+ * never a hex, so it can resolve to Carbon blue there and clay here.
+ *
+ * THE ACCENT IS NOT THE TEXT COLOUR. --color-primary-* is Ally Blue: links,
+ * selected and focus states, the brand mark, and the surfaces where the AI is
+ * acting or speaking. Ordinary primary CTAs take near-black
+ * --color-secondary-900 / --color-typography-Default, and body copy takes the
+ * ink ramp. Spending the accent on every button is what turns it into
+ * wallpaper — and pointing `body` at it, which this file used to do, turns
+ * every unstyled paragraph into an accent-coloured one.
+ */
+@layer base {
+  :root {
+    /*
+     * Ally Blue — the brand accent, and the interactive colour.
+     *
+     * This ramp is the product's own brand blue, byte-identical to the one the
+     * admin console carries in its tailwind.config.js, so both apps agree on
+     * what Ally Blue is. It replaces the clay this app briefly ran on: clay is
+     * Claude's colour, and the design system is worth borrowing, but the brand
+     * inside it is Ally's.
+     *
+     * It is the INTERACTIVE colour — links, selected states, focus rings, the
+     * brand mark — not the default text colour. Body copy stays on the ink
+     * ramp; see the `body` rule below, which is the one place that has already
+     * gone wrong once.
+     */
+    --color-primary-DEFAULT: 38 77 142; /* #264D8E */
+    --color-primary-50: 235 240 250; /* #EBF0FA (lightest tint) */
+    --color-primary-100: 215 226 244; /* #D7E2F4 */
+    --color-primary-200: 174 197 234; /* #AEC5EA */
+    --color-primary-300: 126 162 221; /* #7EA2DD */
+    --color-primary-400: 74 125 207; /* #4A7DCF */
+    --color-primary-500: 38 77 142; /* #264D8E (interactive) */
+    --color-primary-600: 31 63 117; /* #1F3F75 (hover) */
+    --color-primary-700: 24 48 89; /* #183059 (active) */
+    --color-primary-800: 16 33 60; /* #10213C */
+    --color-primary-900: 10 20 36; /* #0A1424 */
+
+    /*
+     * The AI accent — warm clay, deliberately NOT the brand blue.
+     *
+     * Ally Blue says "this is Ally, and this is interactive". This ramp says
+     * something narrower: a machine wrote what you are looking at. It marks
+     * AI-authored surfaces only — the supervisor's coaching notes, the AI side
+     * of a transcript, the ask-about-this-session affordances, the live session
+     * while the agent is listening.
+     *
+     * Two colours earn their keep only if the split is held. A link inside an
+     * AI note is still part of what the AI said, so it stays warm; an ordinary
+     * button on a page that happens to contain AI output is not, and stays
+     * blue. When in doubt the answer is blue — this ramp should stay rare
+     * enough that seeing it means something.
+     */
+    --color-ai-DEFAULT: 204 120 92; /* #CC785C */
+    --color-ai-50: 247 236 231; /* #F7ECE7 */
+    --color-ai-100: 240 218 208; /* #F0DAD0 */
+    --color-ai-200: 230 191 175; /* #E6BFAF */
+    --color-ai-300: 221 159 137; /* #DD9F89 */
+    --color-ai-400: 218 119 86; /* #DA7756 */
+    --color-ai-500: 204 120 92; /* #CC785C */
+    --color-ai-600: 181 100 74; /* #B5644A */
+    --color-ai-700: 150 79 57; /* #964F39 (text on cream) */
+    --color-ai-800: 112 60 44; /* #703C2C */
+    --color-ai-900: 74 41 31; /* #4A291F */
+
+    /* Warm greys — the ink ramp. 900 is the primary-CTA fill. */
+    --color-secondary-DEFAULT: 61 58 52;
+    --color-secondary-50: 245 244 238;
+    --color-secondary-100: 234 231 222;
+    --color-secondary-200: 216 210 197;
+    --color-secondary-300: 188 180 164;
+    --color-secondary-400: 150 142 126;
+    --color-secondary-500: 120 112 98;
+    --color-secondary-600: 94 87 76;
+    --color-secondary-700: 71 66 57;
+    --color-secondary-800: 52 48 42;
+    --color-secondary-900: 41 38 31; /* #29261F */
+
+    --color-neutral-DEFAULT: 94 87 76;
+    --color-neutral-50: 247 246 240;
+    --color-neutral-100: 240 238 231;
+    --color-neutral-200: 230 227 218;
+    --color-neutral-300: 214 209 197;
+    --color-neutral-400: 181 175 161;
+    --color-neutral-500: 146 139 124;
+    --color-neutral-600: 110 102 86; /* #6E6656 — the value the app settled on */
+    --color-neutral-700: 86 80 69;
+    --color-neutral-800: 61 57 48;
+    --color-neutral-900: 41 38 31;
+
+    /*
+     * Semantic tones. Warm enough to sit on cream, distinct enough to still
+     * read as good / caution / bad. Shared: the session-status chips, the
+     * rating scale and the /SJT1 result bands all key off these, which is why
+     * they live here rather than being re-declared per surface.
+     */
+    --color-tone-sage: 78 107 84; /* #4E6B54 — demonstrated, passed, good */
+    --color-tone-ochre: 136 89 27; /* #88591B — needs practice, in progress */
+    --color-tone-alarm: 160 62 51; /* #A03E33 — failed, ended, bad */
+
+    --color-scrollbar-track: 234 231 222;
+    --color-scrollbar-thumb: 181 172 156;
+    --color-scrollbar-thumbHover: 146 139 124;
+
+    /* Grounds — page sits on the deeper cream, cards lift off it. */
+    --color-background-DEFAULT: 245 244 238; /* #F5F4EE */
+    --color-background-secondary: 240 238 231; /* #F0EEE7 */
+    --color-background-tertiary: 234 231 222; /* #EAE7DE */
+    /* The lightest surface in the system. Tailwind's `white` resolves here. */
+    --color-background-raised: 250 249 245; /* #FAF9F5 */
+
+    --color-border-DEFAULT: 227 219 206;
+    --color-border-light: 234 228 218;
+    --color-border-medium: 214 205 190;
+    --color-border-dark: 181 172 156;
+
+    /* Ink, as alpha over the warm ground rather than over white. */
+    --color-typography-Default: rgba(41, 38, 31, 0.9);
+    --color-typography-50: rgba(41, 38, 31, 0.04);
+    --color-typography-100: rgba(41, 38, 31, 0.08);
+    --color-typography-200: rgba(41, 38, 31, 0.12);
+    --color-typography-300: rgba(41, 38, 31, 0.16);
+    --color-typography-400: rgba(41, 38, 31, 0.24);
+    --color-typography-500: rgba(41, 38, 31, 0.32);
+    --color-typography-600: rgba(41, 38, 31, 0.46);
+    --color-typography-700: rgba(41, 38, 31, 0.62);
+    --color-typography-800: rgba(41, 38, 31, 0.72);
+    --color-typography-900: rgba(41, 38, 31, 0.9);
+
+    /*
+     * TYPE — serif only, two families, mirroring Claude's display/text pairing
+     * and matching what /SJT1 already ships. Source Serif 4 stands in for
+     * Copernicus (headings, controls, labels, numerals); Newsreader stands in
+     * for Tiempos Text (running prose). Both are variable, so 300..600 and
+     * italic cost two files each, not twelve.
+     *
+     * --font-primary and --font-tertiary are the UI/display role and
+     * --font-secondary the prose role; --font-sans is aliased to the display
+     * face so Tailwind preflight and any stray `font-sans` stay serif. The
+     * names are legacy (they predate this pairing) and are kept so no call
+     * site has to change.
+     */
+    --font-primary: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --font-secondary: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-tertiary: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --font-sans: "Source Serif 4", Georgia, "Times New Roman", serif;
+
+    /*
+     * Carbon's sharp 2px is gone. 0.75rem gives Tailwind lg/md/sm = 12/10/8px,
+     * which is Claude's own card/control/chip scale.
+     */
+    --radius: 0.75rem;
+  }
+}
+
+/* IBM Plex Serif - Local Font Faces */
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Claude serif pair — local variable font faces.
+ *
+ * Self-hosted rather than linked from fonts.googleapis.com: these load on every
+ * route of a mental-health product, and a third-party origin on first paint is
+ * a request we don't need to make on a learner's behalf. They replaced /SJT1's
+ * route-scoped <link> loader, which is gone — every route renders in them now.
+ *
+ * One file per style per subset, not per weight — both families are variable,
+ * so `font-weight` here is the supported RANGE. A browser fetches only the
+ * subsets the page actually needs; an English UI pulls the two `latin` files
+ * (~254KB) against the ~1.2MB of static IBM Plex TTFs these replace.
+ */
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("./assets/fonts/SourceSerif4-latin-normal.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("./assets/fonts/SourceSerif4-latin-italic.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: italic;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("./assets/fonts/SourceSerif4-latin-ext-normal.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("./assets/fonts/SourceSerif4-latin-ext-italic.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: italic;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Newsreader";
+  src: url("./assets/fonts/Newsreader-latin-normal.woff2") format("woff2");
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Newsreader";
+  src: url("./assets/fonts/Newsreader-latin-italic.woff2") format("woff2");
+  font-weight: 300 500;
+  font-style: italic;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Newsreader";
+  src: url("./assets/fonts/Newsreader-latin-ext-normal.woff2") format("woff2");
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Newsreader";
+  src: url("./assets/fonts/Newsreader-latin-ext-italic.woff2") format("woff2");
+  font-weight: 300 500;
+  font-style: italic;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  /*
+   * Body text is INK, not the accent.
+   *
+   * This rule used to say `text-primary`, which was survivable while
+   * --color-primary was the brand blue and merely looked odd. With primary now
+   * clay it is actively wrong: every unstyled paragraph in the app renders in
+   * the accent, which is the one thing Claude's system reserves for surfaces
+   * where the AI is acting. Clay stays available as `text-primary-*` for those;
+   * the default text colour is the ink ramp these typography tokens exist for.
+   */
+  body {
+    @apply bg-background text-typography-Default antialiased;
+  }
+}
+
+/* ===== Public /blog pages — marketing-style look =====
+ * The blog is serif throughout — body and display type both. One scoped class
+ * on each page root keeps it out of the token layer; the elements below default
+ * to a monospace or system font in the browser rather than inheriting, so they
+ * are pulled back onto the serif stack explicitly. */
+.blog-serif,
+.blog-serif pre,
+.blog-serif code,
+.blog-serif kbd,
+.blog-serif samp,
+.blog-serif input,
+.blog-serif button,
+.blog-serif select,
+.blog-serif textarea {
+  font-family: "IBM Plex Serif", Georgia, serif;
+}
+
+/* ===== Changing colors in an SVG ===== */
+
+.path-fill-current path {
+  @apply fill-current;
+}
+
+.rect-fill-white rect {
+  @apply fill-white;
+}
+
+.rect-fill-current rect {
+  @apply fill-current;
+}
+
+.rect-stroke-current rect {
+  @apply stroke-current;
+}
+
+.path-stroke-current path {
+  @apply stroke-current;
+}
+
+.circle-stroke-current circle {
+  @apply stroke-current;
+}
+
+.circle-fill-current circle {
+  @apply fill-current;
+}
+
+.line-stroke-current line {
+  @apply stroke-current;
+}
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: "transparent";
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ===== Touch & small-screen baseline =====
+ * App-wide rules every screen gets for free on a phone, so no page has to
+ * remember them:
+ *  - iOS Safari zooms the whole page into any focused field whose font is
+ *    under 16px, and never zooms back out. Fields here are 13–14px, so on
+ *    touch devices they are lifted to 16px — readable, and no zoom jump.
+ *  - `touch-action: manipulation` drops the double-tap-to-zoom wait on
+ *    controls, so taps register immediately.
+ *  - No grey tap flash; the focus/active styles already show the press.
+ *  - Text size stays as authored when a phone rotates to landscape. */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="link"] {
+    touch-action: manipulation;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    /* Fields deliberately set larger (title inputs, OTP boxes) keep their size. */
+    :is(
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]),
+      select,
+      textarea,
+      [contenteditable="true"]
+    ):not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, [class*="text-["]) {
+      font-size: 16px !important;
+    }
+  }
+}
+
+/* Carbon's inline/actionable notifications are a fixed 18rem on small
+ * screens. Inside a card, a two-up tile or a padded panel on a phone that is
+ * wider than the space they sit in, so an error state pushes the page
+ * sideways. On phones they fill whatever width they are given instead. */
+@media (max-width: 767px) {
+  /* :root lifts specificity over Carbon's own rule, whatever the load order. */
+  :root .cds--inline-notification,
+  :root .cds--actionable-notification {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+}

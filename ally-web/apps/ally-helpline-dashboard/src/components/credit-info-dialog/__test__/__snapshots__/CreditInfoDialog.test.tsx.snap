@@ -1,0 +1,59 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CreditInfoDialog > should match snapshot when fully populated 1`] = `
+<DocumentFragment>
+  <div
+    aria-hidden="false"
+    class="cds--layer-one cds--modal is-visible"
+    role="presentation"
+  >
+    <div
+      aria-modal="true"
+      class="cds--modal-container cds--modal-container--sm"
+      role="dialog"
+    >
+      <button
+        class="cds--visually-hidden"
+        type="button"
+      >
+        Focus sentinel
+      </button>
+      <div
+        class="cds--modal-container-body"
+      >
+        <div
+          class="cds--layer-two cds--modal-content cds--modal-scroll-content--no-fade p-0"
+        >
+          <div
+            class="bg-white h-fit w-[min(400px,95vw)] flex flex-col gap-6 rounded-[8px] items-center justify-center pb-10"
+          >
+            <svg
+              class="cursor-pointer self-end"
+              data-testid="mock-close-icon"
+            />
+            <div
+              class="font-medium text-typography-800 text-2xl font-secondary"
+            >
+              No Credits Available
+            </div>
+            <svg
+              data-testid="mock-no-credit-left-icon"
+            />
+            <div
+              class="w-[min(300px,90vw)] flex  justify-center text-center font-primary text-xl"
+            >
+              You have run out of credits. Please purchase more to continue.
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        class="cds--visually-hidden"
+        type="button"
+      >
+        Focus sentinel
+      </button>
+    </div>
+  </div>
+</DocumentFragment>
+`;

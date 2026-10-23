@@ -1,0 +1,87 @@
+import { FC } from "react";
+
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+
+import { ActionDialogFooter, ComposedModal, ModalBody, ImageUpload } from "@ally-ui-mono/ui-shared";
+import { CloseIcon } from "@assets";
+
+import { profileSettingsProps } from "./types";
+import { Button, ButtonVariant } from "../button";
+
+export const ProfileSettings: FC<profileSettingsProps> = ({
+  isOpen,
+  onClose,
+  userData,
+  formMethods,
+  onButtonClick,
+  getProfileUrl,
+}) => {
+  const { t } = useTranslation();
+
+  const handleUploadFailure = () => {
+    toast.error(t("profile.settings.error_image_size"));
+  };
+
+  return (
+    <ComposedModal open={isOpen} onClose={onClose} size="sm">
+      <ModalBody className="flex flex-col p-5">
+        <button
+          type="button"
+          aria-label={t("common.close")}
+          onClick={onClose}
+          className="absolute right-1 top-1 z-10 inline-flex h-11 w-11 items-center justify-center md:right-4 md:top-4 md:h-auto md:w-auto"
+        >
+          <CloseIcon className="cursor-pointer" />
+        </button>
+        <div className="flex flex-col gap-3">
+          <div className="flex item-center justify-center text-2xl font-secondary">
+            {t("profile.settings.title")}
+          </div>
+          <ImageUpload
+            formMethods={formMethods}
+            uploadId="profileImageUrl"
+            uploadButtonName={t("profile.settings.upload_image")}
+            uploadTitle={t("profile.settings.profile_image")}
+            uploadHint={t("profile.settings.upload_hint")}
+            onUpload={getProfileUrl}
+            details={userData}
+            onFailed={handleUploadFailure}
+          />
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col">
+              <label className="text-sm text-typography-900 cursor-pointer font-primary">
+                {t("profile.settings.name")}
+              </label>
+
+              <input
+                placeholder={userData?.name ?? ""}
+                disabled
+                className="border rounded-md px-2 py-2 outline-none text-base font-primary"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-typography-900 cursor-pointer font-primary">
+                {t("profile.settings.email")}
+              </label>
+              <input
+                placeholder={userData?.email ?? ""}
+                disabled
+                className="border rounded-md px-2 py-2 outline-none text-base font-primary"
+              />
+            </div>
+          </div>
+        </div>
+      </ModalBody>
+      <ActionDialogFooter>
+        <Button onClick={onClose} variant={ButtonVariant.SECONDARY} className="flex-1">
+          {t("profile.settings.cancel")}
+        </Button>
+
+        <Button onClick={onButtonClick} variant={ButtonVariant.PRIMARY} className="flex-1">
+          {t("profile.settings.done")}
+        </Button>
+      </ActionDialogFooter>
+    </ComposedModal>
+  );
+};

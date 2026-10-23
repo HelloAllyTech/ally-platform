@@ -1,0 +1,53 @@
+import i18n from "i18next";
+import LanguageDetector from "i18next-browser-languagedetector";
+import { initReactI18next } from "react-i18next";
+
+import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared/featureFlag";
+
+import { startDynamicI18n } from "./dynamic";
+import { en, hi, mr, ta, kn } from "./locales";
+
+// Keys
+export const DEFAULT_FALLBACK_LNG = "en" as const;
+// Expanded language support including regional/script variants where relevant
+export const SUPPORTED_LANGUAGES = ["en", "hi", "mr", "ta", "kn"] as const;
+
+const i18nInit = i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources: {
+      en: { translation: en },
+      hi: { translation: hi },
+      mr: { translation: mr },
+      ta: { translation: ta },
+      kn: { translation: kn },
+    },
+    fallbackLng: DEFAULT_FALLBACK_LNG,
+    // An empty value is a missing value. The sync script writes "" for a key it
+    // could not translate (no OpenAI key on the runner), and i18next's default
+    // is to show that "" as the translation — which is how 385 strings per
+    // language went blank in Marathi on 2026-10-01 instead of falling back to
+    // English. With this off, a blank falls through to the fallback language.
+    returnEmptyString: false,
+    supportedLngs: SUPPORTED_LANGUAGES as unknown as string[],
+    interpolation: {
+      escapeValue: false, // React already escapes by default
+    },
+    detection: {
+      // Persist and read language from localStorage to satisfy requirement
+      order: ["localStorage", "navigator", "htmlTag"],
+      caches: ["localStorage"],
+      lookupLocalStorage: "i18nextLng",
+    },
+    // Allow regional/script variants (e.g., pt-BR, zh-Hant)
+    load: "all",
+  });
+
+void i18nInit.then(() => {
+  if (FEATURE_FLAGS_MAP.LANGUAGE_SELECTOR_FLAG) {
+    startDynamicI18n(i18n);
+  }
+});
+
+export default i18n;

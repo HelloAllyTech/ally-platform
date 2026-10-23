@@ -1,0 +1,207 @@
+"use client";
+
+// Stateful form, so client-only — and exported from the ui-shared barrel that
+// `apps/ally-web`'s server components import, which makes the directive
+// required rather than optional. See ArtifactLabelPalette for the same note.
+
+import { FC, ReactNode, useState } from "react";
+
+import {
+  Button,
+  ComposedModal,
+  InlineLoading,
+  InlineNotification,
+  ModalBody,
+  ModalHeader,
+  TextArea,
+} from "../../primitives";
+import { ActionDialogFooter } from "../action-dialog-footer/ActionDialogFooter";
+
+/**
+ * Matches ally-be's `ROADMAP_LIMITS.DESCRIPTION_MAX` (src/product-roadmap/constants/
+ * product-roadmap.constants.ts) — the backend rejects anything longer, so the form must
+ * never let a user type past the point where submit would 400.
+ */
+export const BUG_REPORT_DESCRIPTION_MAX = 1000;
+
+export interface BugReportFormLabels {
+  title: string;
+  prompt: string;
+  placeholder: string;
+  submit: string;
+  submitting: string;
+  cancel: string;
+  close: string;
+  rateLimitedError: string;
+  genericError: string;
+  /** Shown under the box while the description is shorter than `minLength`; `{remaining}` is filled in. */
+  tooShort: string;
+}
+
+export const DEFAULT_BUG_REPORT_LABELS: BugReportFormLabels = {
+  title: "Report a problem",
+  prompt: "What were you trying to do?",
+  placeholder: "Describe what you were doing when the problem happened",
+  submit: "Send report",
+  submitting: "Sending…",
+  cancel: "Cancel",
+  close: "Close",
+  rateLimitedError: "You've submitted a few reports recently — please try again in a bit.",
+  genericError: "Something went wrong sending that. Please try again.",
+  tooShort: "A sentence or two is enough — {remaining} more characters.",
+};
+
+/**
+ * Thrown (or rejected with) by the caller's `onSubmit` to distinguish a 429 from any other
+ * failure, without this component knowing anything about the caller's API client.
+ */
+export interface BugReportSubmitError {
+  rateLimited?: boolean;
+}
+
+const isRateLimited = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  (error as BugReportSubmitError).rateLimited === true;
+
+export interface BugReportFormProps {
+  open: boolean;
+  /** Dismiss with no side effect — backdrop click, close icon, Cancel. */
+  onClose: () => void;
+  /**
+   * Performs the actual network call. Resolves on success. On failure, reject with a
+   * `BugReportSubmitError` (or anything with `rateLimited: true`) so a 429 gets its own
+   * message instead of the generic one.
+   */
+  onSubmit: (description: string) => Promise<void>;
+  /**
+   * Called once `onSubmit` resolves. The caller owns what "one-time confirmation" looks
+   * like in its own app (toast, snackbar, inline banner) and is expected to close the form
+   * from here — this component does not show its own success state or close itself, so
+   * there is exactly one place per app that decides what a submitted report looks like.
+   */
+  onSuccess: () => void;
+  /** Defaults to `BUG_REPORT_DESCRIPTION_MAX`, mirroring the backend limit. */
+  maxLength?: number;
+  /**
+   * Fewest characters the description needs before it can be sent. Default 1,
+   * which is the consumer form's rule; the staff form asks for a sentence,
+   * since one-word reports cost a verifier run and go nowhere.
+   */
+  minLength?: number;
+  /** The caller's own required fields, rendered in `extraFields`: false holds Send until they are filled. */
+  canSubmitExtra?: boolean;
+  /** Mirrors the description as it is typed, for a caller that reacts to it (a duplicate hint, say). */
+  onDescriptionChange?: (value: string) => void;
+  /** Override any subset of the copy — e.g. to route it through the app's own i18n. */
+  labels?: Partial<BugReportFormLabels>;
+  /**
+   * Rendered under the prompt. For the one caller whose reporters can answer
+   * something a consumer cannot — the admin dashboard's codebase picker. Keep
+   * it optional in both senses: the consumer form passes nothing.
+   */
+  extraFields?: ReactNode;
+}
+
+/**
+ * The "Report a problem" form shared by every consumer-facing app.
+ *
+ * Deliberately just one field: a guided free-text prompt, no severity/category picker, no
+ * attachments. `context` (screen, device, os, app version, timestamp) is captured entirely
+ * by the caller and is never shown here — the user is never asked to confirm metadata they
+ * didn't type. See ally-be's `POST /v1/product-roadmap/bug-reports` for the contract this
+ * feeds.
+ */
+export const BugReportForm: FC<BugReportFormProps> = ({
+  open,
+  onClose,
+  onSubmit,
+  onSuccess,
+  maxLength = BUG_REPORT_DESCRIPTION_MAX,
+  minLength = 1,
+  canSubmitExtra = true,
+  onDescriptionChange,
+  labels: labelOverrides,
+  extraFields,
+}) => {
+  const labels = { ...DEFAULT_BUG_REPORT_LABELS, ...labelOverrides };
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const trimmed = description.trim();
+  const remaining = Math.max(0, minLength - trimmed.length);
+  const canSubmit =
+    trimmed.length > 0 &&
+    remaining === 0 &&
+    trimmed.length <= maxLength &&
+    canSubmitExtra &&
+    !submitting;
+
+  const handleClose = () => {
+    if (submitting) return;
+    setDescription("");
+    setError(null);
+    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit(trimmed);
+      setDescription("");
+      onSuccess();
+    } catch (err) {
+      setError(isRateLimited(err) ? labels.rateLimitedError : labels.genericError);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ComposedModal open={open} onClose={handleClose} size="sm">
+      <ModalHeader title={labels.title} iconDescription={labels.close} />
+      <ModalBody>
+        <TextArea
+          id="bug-report-description"
+          labelText={labels.prompt}
+          placeholder={labels.placeholder}
+          value={description}
+          onChange={e => {
+            setDescription(e.target.value);
+            onDescriptionChange?.(e.target.value);
+          }}
+          maxCount={maxLength}
+          enableCounter
+          rows={5}
+          disabled={submitting}
+          helperText={
+            trimmed.length > 0 && remaining > 0
+              ? labels.tooShort.replace("{remaining}", String(remaining))
+              : undefined
+          }
+        />
+        {extraFields}
+        {error && (
+          <InlineNotification
+            kind="error"
+            title={error}
+            hideCloseButton
+            lowContrast
+            className="mt-3"
+          />
+        )}
+      </ModalBody>
+      <ActionDialogFooter>
+        <Button kind="secondary" onClick={handleClose} disabled={submitting} className="flex-1">
+          {labels.cancel}
+        </Button>
+        <Button onClick={handleSubmit} disabled={!canSubmit} className="flex-1">
+          {submitting ? <InlineLoading description={labels.submitting} /> : labels.submit}
+        </Button>
+      </ActionDialogFooter>
+    </ComposedModal>
+  );
+};

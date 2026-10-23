@@ -1,0 +1,562 @@
+import React, { useEffect, useState } from "react";
+
+import { toast } from "sonner";
+
+import {
+  Button,
+  CarbonToggle,
+  InlineNotification,
+  Select,
+  SelectItem,
+  SkeletonText,
+  Tooltip,
+} from "@ally-ui-mono/ui-shared";
+import {
+  useGetBugHunterDecisionOwnersQuery,
+  useGetBugHunterModelSettingsQuery,
+  useGetBuilderSettingsQuery,
+  useGetValidatedAgentTurnsQuery,
+  useUpdateBugHunterDecisionOwnerMutation,
+  useUpdateBugHunterModelSettingsMutation,
+  useUpdateBuilderSettingsMutation,
+  useUpdateValidatedAgentTurnsMutation,
+} from "@api";
+import { TooltipIcon } from "@assets";
+import { en } from "@constants";
+import {
+  BugHuntDecisionOwner,
+  BugHuntDecisionPoint,
+  BugHunterModelSettings,
+  ValidatedAgentTurnsSettings,
+} from "@types";
+
+/**
+ * The Claude Code models Bug Hunter's pipeline runs on. Not the full platform
+ * model catalog (that includes OpenAI entries neither pipeline can use — there's no autonomous
+ * coding-agent CLI for OpenAI's models wired in here). Ordered cheap to
+ * expensive so the trade-off reads directly from the list.
+ */
+const CLAUDE_CODE_MODEL_OPTIONS = [
+  { value: "claude-haiku-4-5", text: "claude-haiku-4-5 (fastest, cheapest)" },
+  { value: "claude-sonnet-5", text: "claude-sonnet-5 (balanced — current default)" },
+  { value: "claude-opus-5", text: "claude-opus-5 (strongest, most expensive)" },
+];
+
+/**
+ * Builder's default engine, proven end to end: a full unattended run on
+ * 2026-09-23 planned, coded, caught its own missed requirement, remediated,
+ * reviewed and merged ally-web#694.
+ */
+const GEMINI_MODEL_OPTIONS = [
+  { value: "gemini-2.5-flash", text: "gemini-2.5-flash (fastest, cheapest)" },
+  { value: "gemini-2.5-pro", text: "gemini-2.5-pro (strongest)" },
+];
+
+/**
+ * Gemini CLI has no equivalent to the Task-tool subagent dispatch
+ * `.claude/agents/bug-escalation.md` relies on, so a gemini-engine sweep/fix
+ * session skips escalation entirely rather than pretending to honor it — see
+ * bug-hunt-sweep.yml's/bug-fix-session.yml's engine-resolution step.
+ */
+const BUG_HUNTER_ENGINE_OPTIONS = [
+  { value: "claude-code", text: "Claude Code" },
+  { value: "gemini", text: "Gemini CLI (skips escalation)" },
+  // A multi-provider harness with Task-tool subagents, so Verify and
+  // escalation work on any vendor's model — the thing Gemini CLI cannot do.
+  // Builder already runs on it. Its model list is every model the other two
+  // engines offer, because it runs them all.
+  { value: "opencode", text: "OpenCode (any provider, keeps verification and escalation)" },
+];
+
+/** Everything opencode can run: it is a harness over the same vendors, so both lists apply. */
+const OPENCODE_MODEL_OPTIONS = [...GEMINI_MODEL_OPTIONS, ...CLAUDE_CODE_MODEL_OPTIONS];
+
+/**
+ * opencode is a harness rather than a vendor: it runs whichever provider it
+ * holds a key for, and Builder points it at Gemini models by default.
+ *
+ * ally-be no longer filters models by engine at all — the filter existed for
+ * engines that ran one vendor each, and they are gone. run-engine.sh derives
+ * the provider from the model id, so naming a model is how a vendor is chosen.
+ * Bug Hunter keeps its own engines and its own picker above; it is a separate
+ * harness with a separate lifecycle.
+ */
+const modelOptionsForEngine = (engine: string) => {
+  if (engine === "claude-code") return CLAUDE_CODE_MODEL_OPTIONS;
+  if (engine === "opencode") return OPENCODE_MODEL_OPTIONS;
+  return GEMINI_MODEL_OPTIONS;
+};
+
+const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode }> = ({
+  label,
+  hint,
+  children,
+}) => (
+  <div className="flex flex-col gap-1">
+    <div className="flex items-center gap-1.5">
+      <span className="text-sm font-medium text-typography-900">{label}</span>
+      {hint && (
+        <Tooltip label={hint} align="top">
+          <button type="button" className="inline-flex cursor-pointer items-center">
+            <TooltipIcon />
+          </button>
+        </Tooltip>
+      )}
+    </div>
+    {children}
+  </div>
+);
+
+/** Builder's three tiers, trimmed to just the fields this tab edits. */
+type BuilderModelDraft = {
+  plannerModel: string | null;
+  coderModel: string | null;
+  verifierModel: string | null;
+};
+
+/**
+ * Bug Hunter's model settings. Uses
+ * `useUpdateBugHunterModelSettingsMutation` — a `GlobalSettings` row, not a
+ * bespoke column, so this tab doesn't repeat the one-off settings table
+ * Builder's own `builder_settings` already copied from Bug Hunter's.
+ */
+const BugHunterModelSection: React.FC = () => {
+  const strings = en.settings.aiModels;
+  const { data, isLoading, isError } = useGetBugHunterModelSettingsQuery();
+  const [updateSettings, { isLoading: isSaving }] = useUpdateBugHunterModelSettingsMutation();
+  const [draft, setDraft] = useState<BugHunterModelSettings | null>(null);
+
+  useEffect(() => {
+    if (data) setDraft(data);
+  }, [data]);
+
+  const set = <K extends keyof BugHunterModelSettings>(key: K, value: BugHunterModelSettings[K]) =>
+    setDraft(current => (current ? { ...current, [key]: value } : current));
+
+  const engine = draft?.engine ?? "claude-code";
+
+  const handleEngineChange = (nextEngine: string) =>
+    setDraft(current =>
+      current
+        ? {
+            ...current,
+            engine: nextEngine,
+            // A Claude model id left behind under Gemini (or the reverse)
+            // would be silently meaningless rather than caught early — same
+            // reasoning as Builder's engine switch below.
+            defaultModel: modelOptionsForEngine(nextEngine)[0].value,
+          }
+        : current,
+    );
+
+  const handleSave = async () => {
+    if (!draft) return;
+    try {
+      await updateSettings(draft).unwrap();
+      toast.success(strings.saved);
+    } catch {
+      toast.error(strings.bugHunterSaveFailed);
+    }
+  };
+
+  return (
+    <section className="rounded-md border border-border-light p-4">
+      <h3 className="text-base font-secondary text-typography-900">{strings.bugHunterHeading}</h3>
+
+      {isError && (
+        <InlineNotification
+          kind="error"
+          lowContrast
+          hideCloseButton
+          title={strings.bugHunterLoadFailed}
+        />
+      )}
+
+      {isLoading || !draft ? (
+        <SkeletonText paragraph lineCount={4} className="mt-3" />
+      ) : (
+        <>
+          <div className="mt-3">
+            <Field label={strings.bugHunterEngineLabel} hint={strings.bugHunterEngineHelp}>
+              <Select
+                id="settings-ai-models-bug-hunter-engine"
+                labelText={strings.bugHunterEngineLabel}
+                hideLabel
+                value={engine}
+                onChange={event => handleEngineChange(event.target.value)}
+              >
+                {BUG_HUNTER_ENGINE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value} text={option.text} />
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label={strings.defaultModelLabel} hint={strings.defaultModelHelp}>
+              <Select
+                id="settings-ai-models-bug-hunter-default-model"
+                labelText={strings.defaultModelLabel}
+                hideLabel
+                value={draft.defaultModel}
+                onChange={event => set("defaultModel", event.target.value)}
+              >
+                {modelOptionsForEngine(engine).map(option => (
+                  <SelectItem key={option.value} value={option.value} text={option.text} />
+                ))}
+              </Select>
+            </Field>
+            {engine === "gemini" ? (
+              <Field
+                label={strings.escalationModelLabel}
+                hint={strings.escalationModelDisabledHelp}
+              >
+                <Select
+                  id="settings-ai-models-bug-hunter-escalation-model"
+                  labelText={strings.escalationModelLabel}
+                  hideLabel
+                  disabled
+                  value=""
+                >
+                  <SelectItem value="" text={strings.escalationModelDisabledOption} />
+                </Select>
+              </Field>
+            ) : (
+              <Field label={strings.escalationModelLabel} hint={strings.escalationModelHelp}>
+                <Select
+                  id="settings-ai-models-bug-hunter-escalation-model"
+                  labelText={strings.escalationModelLabel}
+                  hideLabel
+                  value={draft.escalationModel}
+                  onChange={event => set("escalationModel", event.target.value)}
+                >
+                  {/* The escalation subagent runs on whatever the engine can
+                      run: Claude models on Claude Code, any of them on opencode. */}
+                  {(engine === "opencode" ? OPENCODE_MODEL_OPTIONS : CLAUDE_CODE_MODEL_OPTIONS).map(
+                    option => (
+                      <SelectItem key={option.value} value={option.value} text={option.text} />
+                    ),
+                  )}
+                </Select>
+              </Field>
+            )}
+          </div>
+          <div className="mt-4">
+            <Button kind="primary" size="sm" disabled={isSaving} onClick={() => void handleSave()}>
+              {strings.save}
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+};
+
+/**
+ * Builder's planner/coder/verifier tiers. Its other settings (kill switch,
+ * concurrency, budget, repo maps) stay on `/builder/settings` — this section
+ * only edits the three model fields, via the same
+ * `useUpdateBuilderSettingsMutation` that page already uses (every field on
+ * it is optional, so sending just these three is a normal partial update).
+ */
+const BuilderModelSection: React.FC = () => {
+  const strings = en.settings.aiModels;
+  const builderStrings = en.builder.settings;
+  const { data, isLoading, isError } = useGetBuilderSettingsQuery();
+  const [updateSettings, { isLoading: isSaving }] = useUpdateBuilderSettingsMutation();
+  const [draft, setDraft] = useState<BuilderModelDraft | null>(null);
+
+  useEffect(() => {
+    if (data) {
+      setDraft({
+        plannerModel: data.plannerModel,
+        coderModel: data.coderModel,
+        verifierModel: data.verifierModel,
+      });
+    }
+  }, [data]);
+
+  const set = (key: keyof BuilderModelDraft, value: string | null) =>
+    setDraft(current => (current ? { ...current, [key]: value } : current));
+
+  const handleSave = async () => {
+    if (!draft) return;
+    try {
+      await updateSettings({
+        // "" clears a tier back to the platform default — see api/builder.ts.
+        plannerModel: draft.plannerModel ?? "",
+        coderModel: draft.coderModel ?? "",
+        verifierModel: draft.verifierModel ?? "",
+      }).unwrap();
+      toast.success(strings.saved);
+    } catch {
+      toast.error(strings.builderSaveFailed);
+    }
+  };
+
+  return (
+    <section className="mt-4 rounded-md border border-border-light p-4">
+      <h3 className="text-base font-secondary text-typography-900">{strings.builderHeading}</h3>
+
+      {isError && (
+        <InlineNotification
+          kind="error"
+          lowContrast
+          hideCloseButton
+          title={strings.builderLoadFailed}
+        />
+      )}
+
+      {isLoading || !draft ? (
+        <SkeletonText paragraph lineCount={4} className="mt-3" />
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Select
+              id="settings-ai-models-builder-planner-model"
+              labelText={builderStrings.plannerModelLabel}
+              value={draft.plannerModel ?? ""}
+              onChange={event => set("plannerModel", event.target.value || null)}
+            >
+              <SelectItem value="" text={builderStrings.modelPlaceholder} />
+              {OPENCODE_MODEL_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value} text={option.text} />
+              ))}
+            </Select>
+            <Select
+              id="settings-ai-models-builder-coder-model"
+              labelText={builderStrings.coderModelLabel}
+              value={draft.coderModel ?? ""}
+              onChange={event => set("coderModel", event.target.value || null)}
+            >
+              <SelectItem value="" text={builderStrings.modelPlaceholder} />
+              {OPENCODE_MODEL_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value} text={option.text} />
+              ))}
+            </Select>
+            <Select
+              id="settings-ai-models-builder-verifier-model"
+              labelText={builderStrings.verifierModelLabel}
+              value={draft.verifierModel ?? ""}
+              onChange={event => set("verifierModel", event.target.value || null)}
+            >
+              <SelectItem value="" text={builderStrings.modelPlaceholder} />
+              {OPENCODE_MODEL_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value} text={option.text} />
+              ))}
+            </Select>
+          </div>
+          <div className="mt-4">
+            <Button kind="primary" size="sm" disabled={isSaving} onClick={() => void handleSave()}>
+              {strings.save}
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+};
+
+/**
+ * Bug Hunter's and Builder's model tiers, one tab. Each section still reads
+ * and writes its own feature's backend independently — Bug Hunter's a
+ * `GlobalSettings` row, Builder's its own `builder_settings` columns — so
+ * this tab is a UI convenience layered on top of two separate storage
+ * locations, not a merge of them. Builder's model fields stay editable from
+ * `/builder/settings` too; this doesn't replace that page, only adds a
+ * second, combined way to reach the same data.
+ */
+/**
+ * Who owns each of the orchestrator's decision points (OPP-0783): the rule
+ * or the model. Reads the effective owner per point and lets an admin hand a
+ * point to the other owner, or back to its default, one Select per point.
+ * D4 and D8 are fixed in code and shown as such. The replay on Analytics →
+ * Bug Agent is what says when a flip has been earned; this is where it is
+ * done.
+ */
+const DecisionOwnersSection: React.FC = () => {
+  const strings = en.settings.aiModels;
+  const labels = en.bugHunter.decisions;
+  const { data, isLoading, isError } = useGetBugHunterDecisionOwnersQuery();
+  const [updateOwner, { isLoading: isSaving }] = useUpdateBugHunterDecisionOwnerMutation();
+
+  const ownerWord = (owner: BugHuntDecisionOwner) =>
+    owner === "model" ? strings.decisionOwnerModel : strings.decisionOwnerRule;
+
+  const handleChange = async (point: BugHuntDecisionPoint, value: string) => {
+    const owner = value === "rule" || value === "model" ? value : null;
+    try {
+      const next = await updateOwner({ point, owner }).unwrap();
+      toast.success(
+        strings.decisionOwnerSaved
+          .replace("{point}", point)
+          .replace("{owner}", ownerWord(next.owners[point]).toLowerCase()),
+      );
+    } catch {
+      toast.error(strings.decisionOwnersSaveFailed);
+    }
+  };
+
+  return (
+    <section
+      data-testid="decision-owners"
+      className="mt-6 rounded-md border border-border-light p-4"
+    >
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-base font-secondary text-typography-900">
+          {strings.decisionOwnersHeading}
+        </h3>
+        <Tooltip label={strings.decisionOwnersHelp} align="top">
+          <button type="button" className="inline-flex cursor-pointer items-center">
+            <TooltipIcon />
+          </button>
+        </Tooltip>
+      </div>
+
+      {isError && (
+        <InlineNotification
+          kind="error"
+          lowContrast
+          hideCloseButton
+          title={strings.decisionOwnersLoadFailed}
+        />
+      )}
+
+      {isLoading || !data ? (
+        <SkeletonText paragraph lineCount={4} className="mt-3" />
+      ) : (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {(Object.keys(data.defaults) as BugHuntDecisionPoint[]).map(point => {
+            const fixed = data.fixed.includes(point);
+            const override = data.overrides[point];
+            const pointLabel = {
+              D1: labels.pointD1,
+              D2: labels.pointD2,
+              D3: labels.pointD3,
+              D4: labels.pointD4,
+              D5: labels.pointD5,
+              D6: labels.pointD6,
+              D7: labels.pointD7,
+              D8: labels.pointD8,
+            }[point];
+            return (
+              <Field key={point} label={`${point} — ${pointLabel}`}>
+                {fixed ? (
+                  <span data-testid={`owner-${point}`} className="text-sm text-typography-600">
+                    {strings.decisionOwnerFixed}
+                  </span>
+                ) : (
+                  <div data-testid={`owner-${point}`}>
+                    <Select
+                      id={`settings-decision-owner-${point}`}
+                      labelText={`${point} — ${pointLabel}`}
+                      hideLabel
+                      size="sm"
+                      disabled={isSaving}
+                      value={override === "rule" || override === "model" ? override : ""}
+                      onChange={event => handleChange(point, event.target.value)}
+                    >
+                      <SelectItem
+                        value=""
+                        text={strings.decisionOwnerDefault.replace(
+                          "{owner}",
+                          ownerWord(data.defaults[point]).toLowerCase(),
+                        )}
+                      />
+                      <SelectItem value="rule" text={strings.decisionOwnerRule} />
+                      <SelectItem value="model" text={strings.decisionOwnerModel} />
+                    </Select>
+                  </div>
+                )}
+              </Field>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+};
+
+/**
+ * The validated-turn kill switches for Course Copilot and the character interview: on, a turn's
+ * reply reaches the person only once it has been checked against what the turn did; off, that
+ * agent runs its previous loop. Each toggle saves on its own — a kill switch that waits for a
+ * Save button is one more step between noticing a problem and stopping it.
+ */
+const ValidatedTurnsSection: React.FC = () => {
+  const strings = en.settings.aiModels;
+  const { data, isLoading, isError } = useGetValidatedAgentTurnsQuery();
+  const [update, { isLoading: isSaving }] = useUpdateValidatedAgentTurnsMutation();
+
+  const agents: { key: keyof ValidatedAgentTurnsSettings; label: string; id: string }[] = [
+    {
+      key: "courseCopilot",
+      label: strings.validatedTurnsCourseCopilot,
+      id: "settings-validated-turns-course-copilot",
+    },
+    {
+      key: "characterInterview",
+      label: strings.validatedTurnsCharacterInterview,
+      id: "settings-validated-turns-character-interview",
+    },
+  ];
+
+  const handleToggle = async (
+    key: keyof ValidatedAgentTurnsSettings,
+    label: string,
+    on: boolean,
+  ) => {
+    try {
+      await update({ [key]: on }).unwrap();
+      toast.success(strings.validatedTurnsSaved(label, on));
+    } catch {
+      toast.error(strings.validatedTurnsSaveFailed);
+    }
+  };
+
+  return (
+    <section className="mt-4 rounded-md border border-border-light p-4">
+      <h3 className="text-base font-secondary text-typography-900">
+        {strings.validatedTurnsHeading}
+      </h3>
+      <p className="pt-1 text-xs text-typography-500">{strings.validatedTurnsHelp}</p>
+
+      {isError && (
+        <InlineNotification
+          kind="error"
+          lowContrast
+          hideCloseButton
+          title={strings.validatedTurnsLoadFailed}
+        />
+      )}
+
+      {isLoading ? (
+        <SkeletonText paragraph lineCount={2} className="mt-3" />
+      ) : (
+        data && (
+          <div className="relative mt-3 flex flex-col gap-3">
+            {agents.map(agent => (
+              <CarbonToggle
+                key={agent.key}
+                id={agent.id}
+                labelText={agent.label}
+                size="sm"
+                toggled={data[agent.key]}
+                disabled={isSaving}
+                onToggle={(checked: boolean) => void handleToggle(agent.key, agent.label, checked)}
+              />
+            ))}
+          </div>
+        )
+      )}
+    </section>
+  );
+};
+
+export const AiModelsTab: React.FC = () => (
+  <div>
+    <BugHunterModelSection />
+    <DecisionOwnersSection />
+    <BuilderModelSection />
+    <ValidatedTurnsSection />
+  </div>
+);

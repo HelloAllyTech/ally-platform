@@ -1,0 +1,361 @@
+import { FC, useState } from "react";
+
+import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
+
+import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
+import { Plus, TooltipIcon, Trash } from "@assets";
+import { ToggleSwitch } from "@components";
+import { RichTextEditor } from "@components/rich-text-editor";
+import { QUIZ_QUESTION_TYPE_LABELS } from "@constants";
+import { QuizQuestion, QuizQuestionType, TrackFormValues, TrackItemType } from "@types";
+
+import { createQuestionOfType, QuestionPath } from "../../../trackFormUtils";
+import { ItemEditorFrame } from "../ItemEditorFrame";
+import { FillBlankEditor } from "./FillBlankEditor";
+import { LikertScaleEditor } from "./LikertScaleEditor";
+import { MatchingEditor } from "./MatchingEditor";
+import { McqEditor } from "./McqEditor";
+import { OpenEndedEditor } from "./OpenEndedEditor";
+import { OrderingEditor } from "./OrderingEditor";
+import { QuestionMediaField } from "./QuestionMediaField";
+import { QuizSettingsFields } from "./QuizSettingsFields";
+import { TrueFalseEditor } from "./TrueFalseEditor";
+
+interface QuizItemEditorProps {
+  sectionIndex: number;
+  itemIndex: number;
+  onDelete: () => void;
+}
+
+/**
+ * Types the QUIZ add-menu offers. `likert_scale` (and the Graded/Show
+ * correct answer toggles below) are quiz-only — the server 400s on either
+ * from an article inline question or a video interjection — so this list is
+ * never reused directly by those pickers; `VideoItemEditor` derives its own
+ * filtered copy instead of exporting this one unfiltered.
+ */
+export const QUESTION_TYPE_ORDER: QuizQuestionType[] = [
+  "mcq_single",
+  "mcq_multi",
+  "true_false",
+  "ordering",
+  "matching",
+  "fill_blank",
+  "open_ended",
+  "likert_scale",
+];
+
+/**
+ * Dispatches a question type to its type-specific editor body. Exported so
+ * `VideoItemEditor`'s interjection authoring can reuse it unchanged — an
+ * interjection question is the same `QuizQuestion` union (minus
+ * `open_ended` and `likert_scale`, filtered out at the type-picker level,
+ * not here). `graded` defaults to `true` since an interjection has no
+ * Graded toggle of its own and is always graded.
+ */
+export const renderTypeBody = (
+  type: QuizQuestionType,
+  questionPath: QuestionPath,
+  graded = true,
+) => {
+  switch (type) {
+    case "mcq_single":
+      return <McqEditor questionPath={questionPath} multi={false} graded={graded} />;
+    case "mcq_multi":
+      return <McqEditor questionPath={questionPath} multi graded={graded} />;
+    case "true_false":
+      return <TrueFalseEditor questionPath={questionPath} graded={graded} />;
+    case "ordering":
+      return <OrderingEditor questionPath={questionPath} />;
+    case "matching":
+      return <MatchingEditor questionPath={questionPath} graded={graded} />;
+    case "fill_blank":
+      return <FillBlankEditor questionPath={questionPath} graded={graded} />;
+    case "open_ended":
+      return <OpenEndedEditor questionPath={questionPath} graded={graded} />;
+    case "likert_scale":
+      return <LikertScaleEditor questionPath={questionPath} />;
+    default:
+      return null;
+  }
+};
+
+export const QuizItemEditor: FC<QuizItemEditorProps> = ({ sectionIndex, itemIndex, onDelete }) => {
+  const { control, setValue } = useFormContext<TrackFormValues>();
+  const base = `sections.${sectionIndex}.items.${itemIndex}` as const;
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `${base}.quiz.questions`,
+    keyName: "fieldId",
+  });
+
+  const questions = (useWatch({ control, name: `${base}.quiz.questions` }) ?? []) as QuizQuestion[];
+
+  const addQuestion = (type: QuizQuestionType) => {
+    append(createQuestionOfType(type));
+    setActiveIndex(fields.length);
+    setShowAddMenu(false);
+  };
+
+  const removeQuestion = (index: number) => {
+    remove(index);
+    setActiveIndex(prev => Math.max(0, prev >= index ? prev - 1 : prev));
+  };
+
+  const activeQuestion = questions[activeIndex];
+  const questionPath = `${base}.quiz.questions.${activeIndex}` as QuestionPath;
+  const isLikert = activeQuestion?.type === "likert_scale";
+  const isOpenEnded = activeQuestion?.type === "open_ended";
+  // Likert is never graded whatever the (nonexistent, for that type) toggle
+  // would say; every other type follows its own Graded toggle, absent = true.
+  const isGraded = !isLikert && activeQuestion?.isGraded !== false;
+
+  return (
+    <ItemEditorFrame
+      sectionIndex={sectionIndex}
+      itemIndex={itemIndex}
+      type={TrackItemType.QUIZ}
+      onDelete={onDelete}
+    >
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-[220px_1fr] gap-4 min-h-[320px]">
+          {/* Question list */}
+          <div className="border border-border-light rounded-md p-2 flex flex-col gap-1 overflow-y-auto max-h-[420px]">
+            {fields.map((field, index) => {
+              const type = questions[index]?.type;
+              return (
+                <button
+                  key={field.fieldId}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  className={`text-left rounded-md px-2 py-2 text-sm flex items-center justify-between gap-2 ${
+                    index === activeIndex
+                      ? "bg-primary-50 text-primary-700"
+                      : "hover:bg-secondary-50 text-typography-800"
+                  }`}
+                >
+                  <span className="truncate">
+                    {index + 1}. {type ? QUIZ_QUESTION_TYPE_LABELS[type] : "Question"}
+                  </span>
+                  <Trash
+                    className="w-3.5 h-3.5 text-destructive-500 flex-shrink-0"
+                    onClick={(event: React.MouseEvent) => {
+                      event.stopPropagation();
+                      removeQuestion(index);
+                    }}
+                  />
+                </button>
+              );
+            })}
+
+            <div className="relative mt-1">
+              <button
+                type="button"
+                onClick={() => setShowAddMenu(prev => !prev)}
+                className="w-full inline-flex items-center justify-center gap-1 border border-dashed border-border-dark rounded-md py-2 text-sm text-typography-600 hover:bg-secondary-50"
+              >
+                <Plus className="w-4 h-4" />
+                Add question
+              </button>
+              {showAddMenu && (
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-border-light rounded-md shadow-lg py-1">
+                  {QUESTION_TYPE_ORDER.map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => addQuestion(type)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-secondary-50 text-typography-800"
+                    >
+                      {QUIZ_QUESTION_TYPE_LABELS[type]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Active question editor */}
+          <div className="border border-border-light rounded-md p-4">
+            {activeQuestion ? (
+              <div className="flex flex-col gap-4">
+                {activeQuestion.type !== "fill_blank" && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-typography-800">Question</label>
+                    <Controller
+                      control={control}
+                      name={`${questionPath}.promptHtml`}
+                      render={({ field }) => (
+                        <RichTextEditor
+                          value={
+                            field.value && field.value.length > 0
+                              ? field.value
+                              : (activeQuestion.prompt ?? "")
+                                  .split("\n")
+                                  .map(line => `<p>${escapeHtml(line)}</p>`)
+                                  .join("")
+                          }
+                          onChange={html => {
+                            field.onChange(html);
+                            setValue(`${questionPath}.prompt`, htmlToPlainText(html), {
+                              shouldDirty: true,
+                            });
+                          }}
+                          placeholder="Question text"
+                          className="w-full"
+                        />
+                      )}
+                    />
+                  </div>
+                )}
+
+                {/* Media sits between the prompt and the answer controls
+                    because that is where it belongs in the question: the
+                    learner reads the stem, looks at the picture, then
+                    answers. Combining words with a picture is also simply
+                    better than either alone. */}
+                <QuestionMediaField questionPath={questionPath} />
+
+                {renderTypeBody(activeQuestion.type, questionPath, isGraded)}
+
+                <div className="flex flex-col gap-2 border-t border-border-light pt-3">
+                  {isLikert ? (
+                    <p className="text-xs text-typography-500">
+                      Rating-scale questions are never graded.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-1">
+                          <label className="text-sm font-medium text-typography-800">Graded</label>
+                          <Tooltip
+                            label="Counts towards the quiz score. Turn off for survey or reflection questions — the correct answer then becomes optional."
+                            align="top"
+                          >
+                            <button
+                              type="button"
+                              className="cursor-pointer inline-flex items-center"
+                            >
+                              <TooltipIcon />
+                            </button>
+                          </Tooltip>
+                        </span>
+                        <Controller
+                          control={control}
+                          name={`${questionPath}.isGraded`}
+                          render={({ field }) => (
+                            <ToggleSwitch
+                              enabled={field.value !== false}
+                              onChange={field.onChange}
+                            />
+                          )}
+                        />
+                      </div>
+                      {!isOpenEnded && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="inline-flex items-center gap-1">
+                            <label className="text-sm font-medium text-typography-800">
+                              Show correct answer after submitting
+                            </label>
+                            <Tooltip
+                              label="When off, learners still see whether they were right, but not the answer. Your explanation (if shown) may still give it away."
+                              align="top"
+                            >
+                              <button
+                                type="button"
+                                className="cursor-pointer inline-flex items-center"
+                              >
+                                <TooltipIcon />
+                              </button>
+                            </Tooltip>
+                          </span>
+                          <Controller
+                            control={control}
+                            name={`${questionPath}.showCorrectAnswer`}
+                            render={({ field }) => (
+                              <ToggleSwitch
+                                enabled={field.value !== false}
+                                onChange={field.onChange}
+                              />
+                            )}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="inline-flex items-center gap-1">
+                    <label className="text-sm font-medium text-typography-800">
+                      Explanation (optional)
+                    </label>
+                    <Tooltip
+                      label="Only shown to learners if enabled under Quiz settings → Show explanations, below."
+                      align="top"
+                    >
+                      <button type="button" className="cursor-pointer inline-flex items-center">
+                        <TooltipIcon />
+                      </button>
+                    </Tooltip>
+                  </span>
+                  <Controller
+                    control={control}
+                    name={`${questionPath}.explanation`}
+                    render={({ field }) => (
+                      <TextArea
+                        id={`${questionPath}.explanation`}
+                        labelText="Explanation (optional)"
+                        hideLabel
+                        {...field}
+                        value={field.value ?? ""}
+                        rows={2}
+                        placeholder="Shown after answering, per quiz settings"
+                        className="w-full"
+                      />
+                    )}
+                  />
+                </div>
+
+                {isGraded && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-typography-800">Points</label>
+                    <Controller
+                      control={control}
+                      name={`${questionPath}.points`}
+                      render={({ field }) => (
+                        <input
+                          type="number"
+                          min={1}
+                          className="w-20 border border-border-light rounded-md px-2 py-1 text-sm outline-none focus:border-primary-400"
+                          value={field.value ?? ""}
+                          onChange={event =>
+                            field.onChange(
+                              event.target.value === "" ? undefined : Number(event.target.value),
+                            )
+                          }
+                          onWheel={event => event.currentTarget.blur()}
+                        />
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-sm text-typography-500">
+                Add a question to get started.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-border-light pt-4">
+          <p className="text-sm font-semibold text-typography-900 mb-2">Quiz settings</p>
+          <QuizSettingsFields sectionIndex={sectionIndex} itemIndex={itemIndex} />
+        </div>
+      </div>
+    </ItemEditorFrame>
+  );
+};

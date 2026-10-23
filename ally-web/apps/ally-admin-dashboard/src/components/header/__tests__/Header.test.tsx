@@ -1,0 +1,253 @@
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock constants early - plain mock with ReportGenerationStatus for transitive imports (report-section)
+vi.mock("@constants", () => ({
+  ReportGenerationStatus: {
+    STARTED: "STARTED",
+    IN_PROGRESS: "IN_PROGRESS",
+    COMPLETED: "COMPLETED",
+    CANCELLED: "CANCELLED",
+    FAILED: "FAILED",
+  },
+  en: {
+    simulation: {
+      rolePlays: "Roleplays",
+      createSimulation: "Create Simulation",
+      editSimulation: "Edit Simulation",
+      createNewSimulation: "Create New Simulation",
+      save: "Save",
+      preview: "Preview",
+      publish: "Publish",
+      publishing: "Publishing",
+      publishTooltipMessage: "",
+      previewTooltipMessage: "",
+    },
+  },
+  toolTipStyles: {
+    tooltip: { sx: {} },
+  },
+  TAG_TYPES: {
+    USERS: "users",
+    TENANTS: "tenants",
+    SESSION_EVENTS: "sessionEvents",
+    SIMULATION: "simulation",
+    SIMULATION_EVENTS: "simulationEvents",
+  },
+}));
+
+import { Header } from "../Header";
+
+vi.mock("react-router-dom", () => ({
+  useParams: vi.fn(() => ({})),
+}));
+
+vi.mock("@assets", async importOriginal => {
+  const actual = await importOriginal<typeof import("@assets")>();
+  return {
+    ...actual,
+    ArrowDown: () => <svg data-testid="arrow-down" />,
+  };
+});
+
+// Use real Button to avoid affecting other modules
+
+vi.mock("sonner", () => {
+  const success = vi.fn();
+  const error = vi.fn();
+  return { toast: { success, error } };
+});
+
+// Using mocked constants above
+
+describe("Header", () => {
+  const onBack = vi.fn();
+  const onSaveDraft = vi.fn();
+  const onPublish = vi.fn();
+  const onPreview = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders create breadcrumb when no id present", () => {
+    render(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Create Simulation"
+      />,
+    );
+
+    expect(screen.getAllByText("Create Simulation").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("Roleplays"));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  // CreateTrack puts "Ask Copilot" here; every other caller passes nothing and sees no change.
+  it("renders extraActions before Save, and nothing extra when there are none", () => {
+    const { rerender } = render(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        title="Edit Course"
+        extraActions={<button>Ask Copilot</button>}
+      />,
+    );
+
+    const extra = screen.getByText("Ask Copilot");
+    const save = screen.getByText("Save");
+    expect(extra.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    rerender(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        title="Edit Course"
+      />,
+    );
+    expect(screen.queryByText("Ask Copilot")).not.toBeInTheDocument();
+  });
+
+  // CreateTrack's "N issues to fix before publishing". It used to be positioned over the header
+  // from outside and covered Save and Publish; inside the action group it can only come after them.
+  it("renders actionsFooter after the action buttons, inside the same group", () => {
+    render(
+      <Header
+        isValid={false}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        title="Edit Course"
+        actionsFooter={<button>2 issues to fix before publishing</button>}
+      />,
+    );
+
+    const footer = screen.getByText("2 issues to fix before publishing");
+    const publish = screen.getByText("Publish");
+    expect(publish.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Same wrapper as the buttons, so it is laid out in their column rather than over them.
+    expect(footer.parentElement).toBe(screen.getByText("Save").closest("div")?.parentElement);
+  });
+
+  it("renders edit breadcrumb when id present", async () => {
+    const { useParams } = await import("react-router-dom");
+    (useParams as any).mockReturnValue({ id: "123" });
+
+    render(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Edit Simulation"
+      />,
+    );
+
+    expect(screen.getAllByText("Edit Simulation").length).toBeGreaterThan(0);
+  });
+
+  it("enables/disables preview and publish based on isValid and isPublishing", () => {
+    const { rerender } = render(
+      <Header
+        isValid={false}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Test Simulation"
+      />,
+    );
+
+    // Preview disabled
+    expect(screen.getByText("Preview")).toBeDisabled();
+
+    // Enable
+    rerender(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Test Simulation"
+      />,
+    );
+    expect(screen.getByText("Preview")).not.toBeDisabled();
+
+    // Publishing state disables publish and shows text
+    rerender(
+      <Header
+        isValid={true}
+        isPublishing={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Test Simulation"
+      />,
+    );
+    expect(screen.getByText("Publishing")).toBeInTheDocument();
+  });
+
+  it("saves draft and shows toast based on response", async () => {
+    onSaveDraft.mockResolvedValueOnce([{}]);
+    render(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Test Simulation"
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(async () => {
+      const { toast } = await import("sonner");
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    // Failure case - when onSaveDraft returns null, no toast is shown
+    {
+      const { toast } = await import("sonner");
+      (toast.success as any).mockClear();
+    }
+    onSaveDraft.mockResolvedValueOnce(null);
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(async () => {
+      const { toast } = await import("sonner");
+      // When response is null/falsy, no toast is shown
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+  });
+
+  it("calls onPreview and onPublish when enabled", () => {
+    render(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        onPreview={onPreview}
+        title="Test Simulation"
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Preview"));
+    expect(onPreview).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Publish"));
+    expect(onPublish).toHaveBeenCalled();
+  });
+});

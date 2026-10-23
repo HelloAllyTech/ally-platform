@@ -1,0 +1,205 @@
+import { FC, useCallback, useEffect, useRef, useState } from "react";
+
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+
+import { TextArea, RichTextRenderer, htmlToPlainText } from "@ally-ui-mono/ui-shared";
+import { useSaveJournalDraftMutation, useSubmitJournalMutation } from "@api";
+import { Cloud, RoundCheckmark, CrossRedBackground, TickGreenBackground } from "@assets";
+import { useDebounce } from "@hooks";
+import { StartJournalItemPayload, TrackItemCompletionResult } from "@types";
+
+interface JournalItemPlayerProps {
+  payload: StartJournalItemPayload;
+  itemId: string;
+  alreadyCompleted: boolean;
+  onCompleted: (result: TrackItemCompletionResult) => void;
+}
+
+const AUTOSAVE_DELAY = 1000;
+
+/**
+ * Journal item: one card per prompt with a debounced draft autosave and a
+ * Submit that completes the item once every required prompt is answered.
+ */
+export const JournalItemPlayer: FC<JournalItemPlayerProps> = ({
+  payload,
+  itemId,
+  alreadyCompleted,
+  onCompleted,
+}) => {
+  const { t } = useTranslation();
+  const { prompts, savedResponses } = payload;
+
+  const initial = prompts.map(
+    prompt => savedResponses.find(r => r.promptId === prompt.id)?.response ?? "",
+  );
+  const [responses, setResponses] = useState<string[]>(initial);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [submitted, setSubmitted] = useState(alreadyCompleted);
+  const responsesRef = useRef(responses);
+  responsesRef.current = responses;
+
+  const [saveJournalDraft] = useSaveJournalDraftMutation();
+  const [submitJournal, { isLoading: isSubmitting }] = useSubmitJournalMutation();
+
+  const persist = useCallback(async () => {
+    setSaving(true);
+    try {
+      await saveJournalDraft({
+        itemId,
+        responses: prompts.map((prompt, i) => ({
+          promptId: prompt.id,
+          response: responsesRef.current[i] ?? "",
+        })),
+      }).unwrap();
+      setSaveFailed(false);
+    } catch {
+      setSaveFailed(true);
+    }
+    setSaving(false);
+  }, [itemId, prompts, saveJournalDraft]);
+
+  const debouncedPersist = useDebounce(persist, AUTOSAVE_DELAY);
+
+  const updateResponse = (index: number, value: string) => {
+    setResponses(prev => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+    if (!submitted) debouncedPersist();
+  };
+
+  const allRequiredAnswered = prompts.every(
+    (prompt, i) => !prompt.required || (responses[i] ?? "").trim().length > 0,
+  );
+
+  const handleSubmit = useCallback(async () => {
+    if (!allRequiredAnswered || isSubmitting || submitted) return;
+    try {
+      // Persist one last time
+      await persist();
+      const result = await submitJournal({ itemId }).unwrap();
+      setSubmitted(true);
+      onCompleted(result);
+    } catch {
+      toast.error(t("common.somethingWentWrong"));
+    }
+  }, [
+    allRequiredAnswered,
+    isSubmitting,
+    submitted,
+    persist,
+    submitJournal,
+    itemId,
+    onCompleted,
+    t,
+  ]);
+
+  useEffect(() => {
+    const allOptional = prompts.every(p => !p.required);
+    if (allOptional && !alreadyCompleted) {
+      handleSubmit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const renderAutosave = () => {
+    if (submitted) {
+      return (
+        <span className="inline-flex items-center gap-1 text-sm text-success-800">
+          <TickGreenBackground className="h-4 w-4" />
+          {t("tracks2.journal.submitted")}
+        </span>
+      );
+    }
+    if (saving) {
+      return (
+        <span className="inline-flex items-center gap-1 text-sm text-neutral-500">
+          <Cloud />
+          {t("tracks2.journal.saving")}
+        </span>
+      );
+    }
+    if (saveFailed) {
+      return (
+        <span className="inline-flex items-center gap-1 text-sm text-destructive-500">
+          <CrossRedBackground className="h-4 w-4" />
+          {t("tracks2.journal.saveFailed")}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-sm text-neutral-500">
+        <RoundCheckmark color="#928b7c" />
+        {t("tracks2.journal.saved")}
+      </span>
+    );
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        <div className="mx-auto flex max-w-2xl flex-col gap-5">
+          <div className="flex justify-end">{renderAutosave()}</div>
+          {prompts.map((prompt, index) => (
+            <div
+              key={prompt.id}
+              className="rounded-[16px] border border-border-light bg-white p-4 shadow-sm sm:p-5"
+            >
+              <div className="mb-3 flex items-start gap-3">
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-500 text-sm font-semibold text-white">
+                  {index + 1}
+                </span>
+                <div className="flex flex-col gap-1 pt-1">
+                  <div className="text-base font-medium leading-relaxed text-typography-900">
+                    {prompt.promptHtml && htmlToPlainText(prompt.promptHtml).trim().length > 0 ? (
+                      <RichTextRenderer content={prompt.promptHtml} />
+                    ) : (
+                      prompt.prompt
+                    )}
+                  </div>
+                  {prompt.required && (
+                    <span className="text-xs font-normal text-destructive-500">
+                      ({t("tracks2.journal.required")})
+                    </span>
+                  )}
+                </div>
+              </div>
+              <TextArea
+                id={`journal-response-${prompt.id}`}
+                labelText={prompt.prompt}
+                hideLabel
+                value={responses[index] ?? ""}
+                onChange={e => updateResponse(index, e.target.value)}
+                placeholder={prompt.placeholder ?? t("tracks2.journal.placeholder")}
+                disabled={submitted}
+                rows={4}
+                className="w-full"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-shrink-0 items-center justify-center border-t border-border-light bg-white px-4 py-3">
+        {submitted ? (
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-success-800">
+            <TickGreenBackground className="h-4 w-4" />
+            {t("tracks2.journal.submitted")}
+          </span>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={!allRequiredAnswered || isSubmitting}
+            className="w-full rounded-full bg-primary-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-40 max-md:min-h-11 sm:w-auto"
+          >
+            {t("tracks2.journal.submit")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};

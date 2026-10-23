@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* You can add global styles to this file, and also import other style files */
+
+/* Material Symbols (Outlined) — used for the terminal icon in Agent Builder Copilot */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 100,
+    "GRAD" -25,
+    "opsz" 24;
+}
+
+/* Standard tooltip trigger glyph (Material Symbols "sticky_note", thin). The
+   compound selector keeps these settings scoped to tooltip icons so the
+   Agent Builder "terminal" glyph above is unaffected. See the TooltipIcon
+   component in components/icons. */
+.tooltip-icon.material-symbols-outlined {
+  /* Ligature icon fonts show the glyph's NAME as plain text until the font has loaded (cold
+     cache, slow or blocked fonts.gstatic.com). The stand-in face below draws nothing, so the
+     icon is blank for that moment instead of reading "sticky_note" beside every label. */
+  font-family: "Material Symbols Outlined", "Tooltip Icon Stand-in";
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 100,
+    "GRAD" -25,
+    "opsz" 20;
+  font-size: 18px;
+  line-height: 1;
+  /* Hold the icon's box open so nothing jumps when the real glyph arrives. */
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
+}
+
+/* The glyph name lives in data-icon, not in the DOM text — see TooltipIcon. */
+.tooltip-icon.material-symbols-outlined::before {
+  content: attr(data-icon);
+}
+
+/* Zero-size stand-in for the rule above: any installed sans, scaled to nothing. */
+@font-face {
+  font-family: "Tooltip Icon Stand-in";
+  src:
+    local("Arial"), local("Helvetica"), local("Helvetica Neue"), local("Liberation Sans"),
+    local("DejaVu Sans"), local("Noto Sans"), local("Roboto"), local("Segoe UI");
+  size-adjust: 0%;
+}
+
+/* IBM Plex Serif - Local Font Faces */
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Serif";
+  src: url("./assets/fonts/IBMPlexSerif-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Carbon's three weights only: there is deliberately no Medium (500) or Bold (700) face. A
+   stray 500 from a third-party stylesheet then matches Regular and a stray 700 matches
+   SemiBold, so nothing can render a weight Carbon doesn't use (see fontWeight in
+   tailwind.config.js for the utility-class side). */
+
+/* IBM Plex Mono — code, IDs and token values (Tailwind `font-mono`, Carbon's `mono` stack).
+   carbon-serif.scss turns off Carbon's own @font-face imports, so without these the family
+   was named everywhere but never loaded, and code rendered in whatever monospace the OS had. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("./assets/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("./assets/fonts/IBMPlexMono-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Toasts (sonner) set their own system-sans stack and a 500-weight title, so every toast in
+   the console rendered in San Francisco / Segoe UI. Sonner appends its <style> to <head> at
+   runtime — after this stylesheet — so each rule here carries `html` for the extra
+   specificity it needs to win in a production build. Title and action weights follow
+   Carbon's notification title (heading-compact-01, SemiBold). */
+html [data-sonner-toaster] {
+  font-family: "IBM Plex Serif", serif;
+}
+
+html [data-sonner-toast][data-styled="true"] [data-title],
+html [data-sonner-toast][data-styled="true"] [data-button] {
+  font-weight: 600;
+}
+
+@layer base {
+  /* Serif everywhere. The app is serif-only (IBM Plex Serif): this sets the
+     base font for all unstyled elements so nothing falls back to a system
+     sans-serif stack, and forces Carbon Charts' SVG <text> nodes serif too
+     (chart text is rendered as SVG and won't inherit the body font otherwise). */
+  html,
+  body {
+    font-family: "IBM Plex Serif", serif;
+    /* Carbon text-primary. carbon-serif.scss turns off Carbon's own body rule, so text
+       with no colour class fell back to the browser's pure black. */
+    color: theme("colors.typography.900");
+  }
+
+  svg text {
+    font-family: "IBM Plex Serif", serif;
+  }
+
+  /* Custom Scrollbar Styles */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: "transparent";
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  /* Fix for Sonner toast rendering issues on M1 Macs */
+  [data-sonner-toaster] {
+    transform: translateZ(0) !important;
+    -webkit-transform: translateZ(0) !important;
+    will-change: transform !important;
+    backface-visibility: hidden !important;
+    -webkit-backface-visibility: hidden !important;
+    perspective: 1000px !important;
+    -webkit-perspective: 1000px !important;
+  }
+
+  [data-sonner-toast] {
+    transform: translateZ(0) !important;
+    -webkit-transform: translateZ(0) !important;
+    backface-visibility: hidden !important;
+    -webkit-backface-visibility: hidden !important;
+  }
+}
+
+/*
+ * Builder — feed and card entrance.
+ *
+ * A single shared keyframe rather than per-component animations so every
+ * arriving row moves the same way; the stagger that sequences them lives in
+ * pages/Builder/builderMotion.ts. Guarded by prefers-reduced-motion at the
+ * call site (staggerDelayMs / prefersReducedMotion) AND here, so a component
+ * that forgets the guard still respects the setting.
+ */
+@keyframes builderFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes builderFadeIn {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* ===== Touch & small-screen baseline =====
+ * App-wide rules every screen gets for free on a phone, so no page has to
+ * remember them:
+ *  - iOS Safari zooms the whole page into any focused field whose font is
+ *    under 16px, and never zooms back out. Fields here are 13–14px, so on
+ *    touch devices they are lifted to 16px — readable, and no zoom jump.
+ *  - `touch-action: manipulation` drops the double-tap-to-zoom wait on
+ *    controls, so taps register immediately.
+ *  - No grey tap flash; the focus/active styles already show the press.
+ *  - Text size stays as authored when a phone rotates to landscape. */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="link"] {
+    touch-action: manipulation;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    /* Fields deliberately set larger (title inputs, OTP boxes) keep their size. */
+    :is(
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]),
+      select,
+      textarea,
+      [contenteditable="true"]
+    ):not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, [class*="text-["]) {
+      font-size: 16px !important;
+    }
+  }
+}
+
+/* Carbon's inline/actionable notifications are a fixed 18rem on small
+ * screens. Inside a card, a two-up tile or a padded panel on a phone that is
+ * wider than the space they sit in, so an error state pushes the page
+ * sideways. On phones they fill whatever width they are given instead. */
+@media (max-width: 767px) {
+  /* :root lifts specificity over Carbon's own rule, whatever the load order. */
+  :root .cds--inline-notification,
+  :root .cds--actionable-notification {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+}

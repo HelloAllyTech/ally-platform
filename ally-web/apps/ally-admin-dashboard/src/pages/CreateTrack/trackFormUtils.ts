@@ -1,0 +1,1398 @@
+import {
+  DEFAULT_ANNOTATION_SETTINGS,
+  DEFAULT_BREATHING_EXERCISE_CONTENT,
+  DEFAULT_COMPLETION_CRITERIA,
+  DEFAULT_GAME_CONTENT,
+  DEFAULT_LIKERT_SCALE_PRESET,
+  DEFAULT_QUIZ_SETTINGS,
+  DEFAULT_VIDEO_WATCH_PCT,
+  itemNodeKey,
+  MAX_ANNOTATION_LABELS,
+  MAX_ANNOTATION_UNITS,
+  MAX_ARTICLE_QUESTIONS,
+  MAX_ARTICLE_RESOURCES,
+  MAX_JOURNAL_PROMPTS,
+  MAX_LIKERT_SCALE_POINTS,
+  MAX_LIKERT_STATEMENTS,
+  MAX_MCQ_OPTIONS,
+  MAX_QUESTION_MEDIA_ALT_LENGTH,
+  MIN_LIKERT_SCALE_POINTS,
+  MIN_LIKERT_STATEMENTS,
+  MIN_MCQ_OPTIONS,
+  sectionNodeKey,
+  TRACK_ITEM_TYPE_LABELS,
+  TRACK_SETTINGS_NODE_KEY,
+} from "@constants";
+import {
+  AnnotationContent,
+  AnnotationFormValue,
+  ArticleContent,
+  BranchingScenarioContent,
+  BucketSortContent,
+  CompletionCriteria,
+  FillBlankQuestion,
+  GameContent,
+  JournalContent,
+  LandingReply,
+  LandingSittingLength,
+  LANDING_LIMITS,
+  LikertScaleQuestion,
+  MatchingQuestion,
+  McqMultiQuestion,
+  McqSingleQuestion,
+  OpenEndedQuestion,
+  OrderingQuestion,
+  PublishError,
+  QuestionMedia,
+  QuizContent,
+  QuizQuestion,
+  QuizQuestionType,
+  StoryBeat,
+  TrackDetail,
+  TrackFormValues,
+  TrackGameKey,
+  TrackItemContent,
+  TrackItemFormValue,
+  TrackItemType,
+  TrackLandingPage,
+  TrackMetadataInput,
+  TrackSectionFormValue,
+  TrackStructureInput,
+  TrackStructureItemInput,
+  TrueFalseQuestion,
+  VideoContent,
+  VideoSource,
+} from "@types";
+
+import { unitsToSourceText } from "./annotationSegmentation";
+import {
+  createBranchingTemplate,
+  serializeBranching,
+  validateBranching,
+} from "./branchingScenario";
+import { createBucketSortTemplate, serializeBucketSort, validateBucketSort } from "./bucketSort";
+
+const newId = () => crypto.randomUUID();
+
+/**
+ * Absolute RHF path to a question node — either a quiz item's own question,
+ * or a video item's interjection question. Shared by `QuizItemEditor`'s
+ * question-type editors (`McqEditor` and siblings) so they can be reused
+ * unchanged for interjection authoring; each editor casts sub-paths to a
+ * fixed dummy literal for RHF's `Path<T>` typing regardless of which branch
+ * this resolves to; see `McqEditor.tsx` for the pattern.
+ */
+export type QuestionPath =
+  | `sections.${number}.items.${number}.quiz.questions.${number}`
+  | `sections.${number}.items.${number}.article.questions.${number}`
+  | `sections.${number}.items.${number}.video.interjections.${number}.question`;
+
+/* -------------------------------------------------------------------------- */
+/* Factories                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const createEmptySection = (index: number): TrackSectionFormValue => ({
+  localId: newId(),
+  title: `Section ${index + 1}`,
+  description: "",
+  items: [],
+});
+
+export const createItemOfType = (type: TrackItemType): TrackItemFormValue => {
+  const base: TrackItemFormValue = {
+    localId: newId(),
+    type,
+    title: "",
+    description: "",
+    completionCriteria: { ...DEFAULT_COMPLETION_CRITERIA[type] },
+  };
+
+  switch (type) {
+    case TrackItemType.ARTICLE:
+      return { ...base, article: { html: "", questions: [] } };
+    case TrackItemType.VIDEO:
+      return { ...base, video: { source: "s3", url: "" } };
+    case TrackItemType.JOURNAL:
+      return {
+        ...base,
+        journal: { prompts: [{ id: newId(), prompt: "", required: true, placeholder: "" }] },
+      };
+    case TrackItemType.QUIZ:
+      return { ...base, quiz: { settings: { ...DEFAULT_QUIZ_SETTINGS }, questions: [] } };
+    case TrackItemType.ANNOTATED_ARTIFACT:
+      return {
+        ...base,
+        annotation: {
+          kind: "TRANSCRIPT",
+          intro: "",
+          units: [],
+          labels: [{ id: newId(), text: "", description: "", color: "amber" }],
+          targets: [],
+          settings: { ...DEFAULT_ANNOTATION_SETTINGS },
+          sourceText: "",
+        },
+      };
+    case TrackItemType.GAME:
+      return { ...base, game: { ...DEFAULT_GAME_CONTENT } };
+    case TrackItemType.BRANCHING_SCENARIO:
+      return { ...base, branching: createBranchingTemplate() };
+    case TrackItemType.BUCKET_SORT:
+      return { ...base, bucketSort: createBucketSortTemplate() };
+    case TrackItemType.ROLEPLAY:
+      return { ...base, scenarioId: null };
+    case TrackItemType.CASE:
+      return { ...base, caseId: null };
+    default:
+      return base;
+  }
+};
+
+/**
+ * Builds a `TrackItemFormValue` from a saved Component Library template (or
+ * from a fresh `{ type, title, content, completionCriteria }` tuple), for
+ * inserting into a course as a brand-new, fully independent item. Mirrors
+ * `deserializeTrack`'s per-item mapping below, but starting from a template's
+ * shape rather than a `TrackItemDetail`.
+ *
+ * Callers (the type-picker's "Choose from library" flow, and the Component
+ * Library page loading an existing template into its own editor) are
+ * responsible for deep-copying `content`/`completionCriteria` before calling
+ * this — this function does not clone, so a caller re-using a cached template
+ * object across multiple inserts must clone per-insert.
+ */
+export const createItemFormValueFromTemplate = (template: {
+  type: TrackItemType;
+  title: string;
+  content?: TrackItemContent | null;
+  completionCriteria?: CompletionCriteria | null;
+}): TrackItemFormValue => {
+  const base = createItemOfType(template.type);
+  const item: TrackItemFormValue = {
+    ...base,
+    title: template.title,
+    completionCriteria: {
+      ...DEFAULT_COMPLETION_CRITERIA[template.type],
+      ...(template.completionCriteria ?? {}),
+    },
+  };
+
+  switch (template.type) {
+    case TrackItemType.ARTICLE:
+      item.article = (template.content as ArticleContent) ?? base.article;
+      break;
+    case TrackItemType.VIDEO:
+      item.video = (template.content as VideoContent) ?? base.video;
+      break;
+    case TrackItemType.JOURNAL:
+      item.journal = (template.content as JournalContent) ?? base.journal;
+      break;
+    case TrackItemType.QUIZ:
+      item.quiz = (template.content as QuizContent) ?? base.quiz;
+      break;
+    case TrackItemType.GAME:
+      item.game = (template.content as GameContent) ?? base.game;
+      break;
+    case TrackItemType.ANNOTATED_ARTIFACT: {
+      const annotation = template.content as AnnotationContent | undefined;
+      const units = annotation?.units ?? [];
+      item.annotation = {
+        kind: annotation?.kind ?? "TRANSCRIPT",
+        intro: annotation?.intro ?? "",
+        units,
+        labels: annotation?.labels ?? base.annotation!.labels,
+        targets: annotation?.targets ?? [],
+        settings: annotation?.settings ?? { ...DEFAULT_ANNOTATION_SETTINGS },
+        sourceText: unitsToSourceText(units, annotation?.kind ?? "TRANSCRIPT"),
+      };
+      break;
+    }
+    default:
+      break;
+  }
+
+  return item;
+};
+
+export const createQuestionOfType = (type: QuizQuestionType): QuizQuestion => {
+  const base = { id: newId(), prompt: "", explanation: "", points: 1 };
+  switch (type) {
+    case "mcq_single": {
+      const options = [
+        { id: newId(), text: "" },
+        { id: newId(), text: "" },
+      ];
+      return { ...base, type, options, correctOptionIds: [options[0].id] };
+    }
+    case "mcq_multi": {
+      const options = [
+        { id: newId(), text: "" },
+        { id: newId(), text: "" },
+      ];
+      return { ...base, type, options, correctOptionIds: [] };
+    }
+    case "true_false":
+      return { ...base, type, correctAnswer: true };
+    case "ordering":
+      return {
+        ...base,
+        type,
+        items: [
+          { id: newId(), text: "" },
+          { id: newId(), text: "" },
+        ],
+        correctOrder: [],
+      };
+    case "matching":
+      return {
+        ...base,
+        type,
+        left: [
+          { id: newId(), text: "" },
+          { id: newId(), text: "" },
+        ],
+        right: [
+          { id: newId(), text: "" },
+          { id: newId(), text: "" },
+        ],
+        correctPairs: [],
+      };
+    case "fill_blank":
+      return { ...base, type, template: "", blanks: [] };
+    case "open_ended":
+      return { ...base, type, rubric: { guidance: "", criteria: [], maxScore: 10 } };
+    case "likert_scale":
+      // Never graded, so no `points` — the default 5-point agreement scale
+      // with one blank statement to fill in.
+      return {
+        id: base.id,
+        prompt: base.prompt,
+        explanation: base.explanation,
+        type,
+        statements: [{ id: newId(), text: "" }],
+        scale: DEFAULT_LIKERT_SCALE_PRESET.scale.map(text => ({ id: newId(), text })),
+      };
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* Small parsing helpers                                                      */
+/* -------------------------------------------------------------------------- */
+
+const BLANK_TOKEN_REGEX = /\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g;
+
+/** Extract `{{b1}}`-style token ids from a fill-blank template, in order, deduped. */
+export const parseBlankTokens = (template: string): string[] => {
+  if (!template) return [];
+  const tokens: string[] = [];
+  for (const match of template.matchAll(BLANK_TOKEN_REGEX)) {
+    if (!tokens.includes(match[1])) tokens.push(match[1]);
+  }
+  return tokens;
+};
+
+/** Next unused `b{n}` token id for a fill-blank template. */
+export const nextBlankTokenId = (template: string): string => {
+  const tokens = parseBlankTokens(template);
+  let n = tokens.length + 1;
+  while (tokens.includes(`b${n}`)) n += 1;
+  return `b${n}`;
+};
+
+export interface ParsedVideoEmbed {
+  source: Exclude<VideoSource, "s3">;
+  url: string;
+  embedUrl: string;
+}
+
+/** Parse a pasted YouTube / Vimeo / Loom URL into provider + embeddable URL. */
+export const parseVideoEmbedUrl = (rawUrl: string): ParsedVideoEmbed | null => {
+  const url = (rawUrl || "").trim();
+  if (!url) return null;
+
+  const youtube = url.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/,
+  );
+  if (youtube) {
+    return {
+      source: "youtube",
+      url,
+      embedUrl: `https://www.youtube.com/embed/${youtube[1]}`,
+    };
+  }
+
+  const vimeo = url.match(/(?:player\.)?vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) {
+    return { source: "vimeo", url, embedUrl: `https://player.vimeo.com/video/${vimeo[1]}` };
+  }
+
+  const loom = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
+  if (loom) {
+    return { source: "loom", url, embedUrl: `https://www.loom.com/embed/${loom[1]}` };
+  }
+
+  return null;
+};
+
+/** Embeddable player URL for a stored (non-s3) video content value. */
+export const getEmbedPlayerUrl = (video: VideoContent): string | null => {
+  if (video.source === "s3") return null;
+  return parseVideoEmbedUrl(video.url)?.embedUrl ?? null;
+};
+
+/**
+ * Embeddable player URL for a question's media, or `null` when there is
+ * nothing to embed (an image, or an uploaded file that plays natively).
+ * Separate from `getEmbedPlayerUrl` only because `QuestionMedia` carries a
+ * `kind` alongside its source; the parsing is the same one the VIDEO
+ * component uses.
+ */
+export const getQuestionMediaEmbedUrl = (media: QuestionMedia): string | null => {
+  if (media.kind !== "video" || media.source === "s3") return null;
+  return parseVideoEmbedUrl(media.url)?.embedUrl ?? null;
+};
+
+/** Pull img src values out of article HTML (kept in `content.imageUrls`). */
+export const extractImageUrls = (html: string): string[] => {
+  if (!html) return [];
+  const urls: string[] = [];
+  for (const match of html.matchAll(/<img[^>]*\ssrc="([^"]+)"/g)) {
+    if (!urls.includes(match[1])) urls.push(match[1]);
+  }
+  return urls;
+};
+
+/**
+ * Question ids the article body anchors, in reading order. The question
+ * itself is stored in `content.questions`; this is the only thing the HTML
+ * knows about it, so it is what tells us where each question sits and which
+ * ones the author has actually placed.
+ */
+export const parseArticleQuestionMarkers = (html: string): string[] => {
+  if (!html) return [];
+  const ids: string[] = [];
+  for (const match of html.matchAll(
+    /<div\b[^>]*\bdata-ally-question\s*=\s*["']([^"']+)["'][^>]*>/gi,
+  )) {
+    if (!ids.includes(match[1])) ids.push(match[1]);
+  }
+  return ids;
+};
+
+/** Drop the placeholder for a question that no longer exists. */
+export const removeArticleQuestionMarker = (html: string, questionId: string): string =>
+  (html || "").replace(
+    new RegExp(
+      `<div\\b[^>]*\\bdata-ally-question\\s*=\\s*["']${questionId}["'][^>]*>\\s*</div>`,
+      "gi",
+    ),
+    "",
+  );
+
+const stripHtml = (html: string): string => (html || "").replace(/<[^>]*>/g, "").trim();
+
+const isBlank = (value?: string | null): boolean => !value || !value.trim();
+
+/* -------------------------------------------------------------------------- */
+/* Publish validation                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A question's optional media. The editor already refuses a bad file or an
+ * unparseable link at the point of adding it, so this catches the values that
+ * did not come from the editor — a component-library template authored against
+ * an older shape, or a course imported by API. Mirrors ally-be's
+ * `validateQuestionMedia` so the two cannot disagree about what is publishable.
+ */
+const validateQuestionMedia = (media: QuestionMedia, label: string): string[] => {
+  const errors: string[] = [];
+  if (isBlank(media.url)) {
+    errors.push(`${label}: media is missing its URL`);
+    return errors;
+  }
+  if (!media.url.trim().startsWith("https://")) {
+    errors.push(`${label}: media URL must be an https link`);
+  }
+  if (media.kind === "image" && media.source !== "s3") {
+    errors.push(`${label}: an image must be an uploaded file`);
+  }
+  /**
+   * Section 508 / ADA: an undescribed image is content a screen-reader user
+   * cannot reach at all, and that bites hardest on a question whose whole
+   * point is visual. Enforced here rather than on the server on purpose —
+   * the server stays lenient so an older payload or a saved template still
+   * loads, while the authoring path refuses to ship a new one undescribed.
+   * It is also the string the translator sees, so a blank here is a blank in
+   * every language.
+   */
+  if (media.kind === "image" && isBlank(media.alt)) {
+    errors.push(`${label}: describe the image for learners using a screen reader`);
+  }
+  if (media.kind === "video" && media.source !== "s3" && !parseVideoEmbedUrl(media.url)) {
+    errors.push(`${label}: media link must be a YouTube, Vimeo or Loom link`);
+  }
+  if ((media.alt?.length ?? 0) > MAX_QUESTION_MEDIA_ALT_LENGTH) {
+    errors.push(
+      `${label}: image description must be ${MAX_QUESTION_MEDIA_ALT_LENGTH} characters or fewer`,
+    );
+  }
+  return errors;
+};
+
+/**
+ * A rating-scale question is never graded (whatever `isGraded` says), so
+ * only it forces `requireKey` false regardless of the flag. Every other type
+ * follows the trainer's own Graded toggle — absent/true = graded.
+ */
+const isQuestionGraded = (question: QuizQuestion): boolean =>
+  question.type !== "likert_scale" && question.isGraded !== false;
+
+const validateQuestion = (question: QuizQuestion, label: string): string[] => {
+  const errors: string[] = [];
+  const needsPrompt = question.type !== "fill_blank";
+  if (needsPrompt && isBlank(question.prompt)) errors.push(`${label}: question text is required`);
+  if (question.media) errors.push(...validateQuestionMedia(question.media, label));
+
+  // Only a graded question must carry its answer key; an ungraded one may be
+  // a pure opinion/reflection prompt. A key that IS given is still checked,
+  // since it still decides the right/wrong the learner is shown.
+  const requireKey = isQuestionGraded(question);
+
+  switch (question.type) {
+    case "mcq_single":
+    case "mcq_multi": {
+      const q = question as McqSingleQuestion | McqMultiQuestion;
+      if (q.options.length < MIN_MCQ_OPTIONS || q.options.length > MAX_MCQ_OPTIONS) {
+        errors.push(`${label}: needs ${MIN_MCQ_OPTIONS}-${MAX_MCQ_OPTIONS} options`);
+      }
+      if (q.options.some(option => isBlank(option.text))) {
+        errors.push(`${label}: every option needs text`);
+      }
+      const hasKey = requireKey || (q.correctOptionIds?.length ?? 0) > 0;
+      if (hasKey) {
+        const optionIds = new Set(q.options.map(option => option.id));
+        const validCorrect = (q.correctOptionIds ?? []).filter(id => optionIds.has(id));
+        if (question.type === "mcq_single" && validCorrect.length !== 1) {
+          errors.push(`${label}: mark exactly one correct option`);
+        }
+        if (question.type === "mcq_multi" && validCorrect.length < 1) {
+          errors.push(`${label}: mark at least one correct option`);
+        }
+      }
+      break;
+    }
+    case "true_false": {
+      const q = question as TrueFalseQuestion;
+      if (requireKey && typeof q.correctAnswer !== "boolean") {
+        errors.push(`${label}: pick the correct answer`);
+      }
+      break;
+    }
+    case "ordering": {
+      const q = question as OrderingQuestion;
+      if (q.items.length < 2) errors.push(`${label}: needs at least 2 items to order`);
+      if (q.items.some(item => isBlank(item.text))) errors.push(`${label}: every item needs text`);
+      break;
+    }
+    case "matching": {
+      const q = question as MatchingQuestion;
+      if (q.left.length < 2) errors.push(`${label}: needs at least 2 pairs`);
+      if (q.left.some(entry => isBlank(entry.text)) || q.right.some(entry => isBlank(entry.text))) {
+        errors.push(`${label}: every entry needs text`);
+      }
+      if (requireKey) {
+        const rightIds = new Set(q.right.map(entry => entry.id));
+        const pairedLeftIds = new Set(
+          q.correctPairs.filter(pair => rightIds.has(pair.rightId)).map(pair => pair.leftId),
+        );
+        if (q.left.some(entry => !pairedLeftIds.has(entry.id))) {
+          errors.push(`${label}: every left entry needs a matching right answer`);
+        }
+      }
+      break;
+    }
+    case "fill_blank": {
+      const q = question as FillBlankQuestion;
+      const tokens = parseBlankTokens(q.template);
+      if (tokens.length === 0) {
+        errors.push(`${label}: template needs at least one {{blank}} token`);
+      }
+      if (requireKey) {
+        for (const token of tokens) {
+          const blank = q.blanks.find(entry => entry.id === token);
+          const answers = (blank?.acceptedAnswers ?? []).filter(answer => !isBlank(answer));
+          if (answers.length === 0) {
+            errors.push(`${label}: blank "${token}" needs at least one accepted answer`);
+          }
+        }
+      }
+      break;
+    }
+    case "open_ended": {
+      const q = question as OpenEndedQuestion;
+      // Ungraded never reaches the LLM grader, so its rubric is unused —
+      // nothing to validate.
+      if (requireKey) {
+        if (isBlank(q.rubric?.guidance)) errors.push(`${label}: grading guidance is required`);
+        if (!q.rubric || !(q.rubric.maxScore >= 1)) {
+          errors.push(`${label}: rubric max score must be at least 1`);
+        }
+      }
+      break;
+    }
+    case "likert_scale": {
+      const q = question as LikertScaleQuestion;
+      if (
+        (q.statements?.length ?? 0) < MIN_LIKERT_STATEMENTS ||
+        (q.statements?.length ?? 0) > MAX_LIKERT_STATEMENTS
+      ) {
+        errors.push(`${label}: needs ${MIN_LIKERT_STATEMENTS}-${MAX_LIKERT_STATEMENTS} statements`);
+      }
+      if (q.statements?.some(statement => isBlank(statement.text))) {
+        errors.push(`${label}: every statement needs text`);
+      }
+      if (
+        (q.scale?.length ?? 0) < MIN_LIKERT_SCALE_POINTS ||
+        (q.scale?.length ?? 0) > MAX_LIKERT_SCALE_POINTS
+      ) {
+        errors.push(
+          `${label}: scale needs ${MIN_LIKERT_SCALE_POINTS}-${MAX_LIKERT_SCALE_POINTS} points`,
+        );
+      }
+      if (q.scale?.some(point => isBlank(point.text))) {
+        errors.push(`${label}: every scale point needs text`);
+      }
+      break;
+    }
+  }
+  return errors;
+};
+
+const validateItem = (item: TrackItemFormValue): string[] => {
+  const errors: string[] = [];
+  const typeLabel = TRACK_ITEM_TYPE_LABELS[item.type];
+  if (isBlank(item.title)) errors.push(`${typeLabel}: title is required`);
+
+  switch (item.type) {
+    case TrackItemType.ROLEPLAY: {
+      if (item.scenarioId == null) errors.push("Roleplay: pick a simulation");
+      const minScore = item.completionCriteria?.minScore;
+      if (minScore != null && minScore < 0) {
+        errors.push("Roleplay: minimum score must be 0 or above");
+      }
+      break;
+    }
+    case TrackItemType.CASE:
+      if (item.caseId == null || isBlank(String(item.caseId))) errors.push("Case: pick a case");
+      break;
+    case TrackItemType.ARTICLE: {
+      const html = item.article?.html ?? "";
+      const questions = item.article?.questions ?? [];
+      if (isBlank(stripHtml(html)) && questions.length === 0) {
+        errors.push("Article: content is required");
+      }
+      if (questions.length > MAX_ARTICLE_QUESTIONS) {
+        errors.push(`Article: at most ${MAX_ARTICLE_QUESTIONS} questions`);
+      }
+      // The question list and the body have to agree both ways: an unplaced
+      // question never renders, and a stray placeholder renders an empty hole.
+      const placed = parseArticleQuestionMarkers(html);
+      const questionIds = new Set(questions.map(question => question.id));
+      questions.forEach((question, index) => {
+        const label = `Article question ${index + 1}`;
+        if (!placed.includes(question.id)) {
+          errors.push(`${label}: place it in the article, or delete it`);
+        }
+        errors.push(...validateQuestion(question, label));
+      });
+      for (const id of placed) {
+        if (!questionIds.has(id)) {
+          errors.push("Article: a question placeholder has no question behind it");
+          break;
+        }
+      }
+
+      const resources = item.article?.resources ?? [];
+      if (resources.length > MAX_ARTICLE_RESOURCES) {
+        errors.push(`Article: at most ${MAX_ARTICLE_RESOURCES} resources`);
+      }
+      resources.forEach((resource, index) => {
+        const label = `Article resource ${index + 1}`;
+        if (isBlank(resource.title)) {
+          errors.push(`${label}: title is required`);
+        }
+        if (!/^https?:\/\//i.test(resource.url ?? "")) {
+          errors.push(`${label}: enter a valid http(s) link`);
+        }
+      });
+      break;
+    }
+    case TrackItemType.VIDEO: {
+      if (isBlank(item.video?.url)) {
+        errors.push("Video: upload a video or paste an embed URL");
+      } else if (item.video?.source !== "s3" && !parseVideoEmbedUrl(item.video?.url ?? "")) {
+        errors.push("Video: embed URL must be a YouTube, Vimeo or Loom link");
+      }
+      const watchPct = item.completionCriteria?.watchPct;
+      if (watchPct != null && (watchPct < 1 || watchPct > 100)) {
+        errors.push("Video: watch percentage must be between 1 and 100");
+      }
+      const interjections = item.video?.source === "s3" ? (item.video?.interjections ?? []) : [];
+      const duration = item.video?.durationSeconds;
+      interjections.forEach((interjection, index) => {
+        const label = `Video interjection ${index + 1}`;
+        if (interjection.timestampSeconds == null || interjection.timestampSeconds < 0) {
+          errors.push(`${label}: timestamp must be 0 or later`);
+        } else if (duration != null && interjection.timestampSeconds > duration) {
+          errors.push(`${label}: timestamp must be within the video's duration`);
+        }
+        if (interjection.question.type === "open_ended") {
+          errors.push(`${label}: open-ended questions aren't supported for interjections`);
+        }
+        errors.push(...validateQuestion(interjection.question, label));
+      });
+      break;
+    }
+    case TrackItemType.JOURNAL: {
+      const prompts = item.journal?.prompts ?? [];
+      if (prompts.length < 1 || prompts.length > MAX_JOURNAL_PROMPTS) {
+        errors.push(`Journal: needs 1-${MAX_JOURNAL_PROMPTS} prompts`);
+      }
+      if (prompts.some(prompt => isBlank(prompt.prompt))) {
+        errors.push("Journal: every prompt needs text");
+      }
+      break;
+    }
+    case TrackItemType.QUIZ: {
+      const quiz = item.quiz;
+      const passScore = quiz?.settings?.passScore;
+      if (passScore == null || passScore < 0 || passScore > 100) {
+        errors.push("Quiz: pass score must be between 0 and 100");
+      }
+      const questions = quiz?.questions ?? [];
+      if (questions.length === 0) {
+        errors.push("Quiz: add at least one question");
+      }
+      questions.forEach((question, index) => {
+        errors.push(...validateQuestion(question, `Question ${index + 1}`));
+      });
+      break;
+    }
+    case TrackItemType.ANNOTATED_ARTIFACT: {
+      const annotation = item.annotation;
+      const units = annotation?.units ?? [];
+      if (units.length === 0) {
+        errors.push("Annotation: paste a transcript or note");
+      }
+      if (units.length > MAX_ANNOTATION_UNITS) {
+        errors.push(`Annotation: at most ${MAX_ANNOTATION_UNITS} lines`);
+      }
+      const namedLabels = (annotation?.labels ?? []).filter(label => !isBlank(label.text));
+      if (namedLabels.length === 0) {
+        errors.push("Annotation: name at least one label");
+      }
+      if (namedLabels.length > MAX_ANNOTATION_LABELS) {
+        errors.push(`Annotation: at most ${MAX_ANNOTATION_LABELS} labels`);
+      }
+      const labelIds = new Set(namedLabels.map(label => label.id));
+      const liveTargets = (annotation?.targets ?? []).filter(target =>
+        labelIds.has(target.labelId),
+      );
+      if (liveTargets.length === 0) {
+        errors.push("Annotation: mark at least one line as part of the answer");
+      }
+      const passScore = annotation?.settings?.passScore;
+      if (passScore == null || passScore < 0 || passScore > 100) {
+        errors.push("Annotation: pass score must be between 0 and 100");
+      }
+      const penalty = annotation?.settings?.falsePositivePenalty;
+      if (penalty == null || penalty < 0) {
+        errors.push("Annotation: the cost of a wrong mark cannot be negative");
+      }
+      const maxAttempts = annotation?.settings?.maxAttempts;
+      if (maxAttempts != null && (!Number.isInteger(maxAttempts) || maxAttempts < 1)) {
+        errors.push("Annotation: attempts must be a whole number of 1 or more");
+      }
+      break;
+    }
+    case TrackItemType.GAME: {
+      if (item.game?.gameKey === TrackGameKey.BREATHING_EXERCISE) {
+        const breathing = item.game.breathingExercise;
+        if (!breathing) {
+          errors.push("Breathing Exercise: configuration is missing");
+          break;
+        }
+        if (
+          typeof breathing.inhale !== "number" ||
+          !Number.isFinite(breathing.inhale) ||
+          breathing.inhale <= 0
+        ) {
+          errors.push("Breathing Exercise: inhale duration must be greater than 0");
+        }
+        if (
+          typeof breathing.holdIn !== "number" ||
+          !Number.isFinite(breathing.holdIn) ||
+          breathing.holdIn < 0
+        ) {
+          errors.push("Breathing Exercise: hold (in) duration cannot be negative");
+        }
+        if (
+          typeof breathing.exhale !== "number" ||
+          !Number.isFinite(breathing.exhale) ||
+          breathing.exhale <= 0
+        ) {
+          errors.push("Breathing Exercise: exhale duration must be greater than 0");
+        }
+        if (
+          typeof breathing.holdOut !== "number" ||
+          !Number.isFinite(breathing.holdOut) ||
+          breathing.holdOut < 0
+        ) {
+          errors.push("Breathing Exercise: hold (out) duration cannot be negative");
+        }
+        if (
+          typeof breathing.cycles !== "number" ||
+          !Number.isInteger(breathing.cycles) ||
+          breathing.cycles <= 0
+        ) {
+          errors.push("Breathing Exercise: cycles must be at least 1");
+        }
+
+        if (isBlank(breathing.inhaleText)) {
+          errors.push("Breathing Exercise: inhale text is required");
+        }
+        if (isBlank(breathing.holdInText)) {
+          errors.push("Breathing Exercise: hold (in) text is required");
+        }
+        if (isBlank(breathing.exhaleText)) {
+          errors.push("Breathing Exercise: exhale text is required");
+        }
+        if (isBlank(breathing.holdOutText)) {
+          errors.push("Breathing Exercise: hold (out) text is required");
+        }
+      }
+      break;
+    }
+    case TrackItemType.BRANCHING_SCENARIO: {
+      // Same graph rules the server enforces, worded for the editor's own list.
+      validateBranching(item.branching).forEach(problem => {
+        errors.push(`Branching scenario: ${problem.message}`);
+      });
+      break;
+    }
+    case TrackItemType.BUCKET_SORT: {
+      validateBucketSort(item.bucketSort).forEach(message => {
+        errors.push(`Bucket sort: ${message}`);
+      });
+      break;
+    }
+  }
+  return errors;
+};
+
+/**
+ * Pure publish validation, mirroring the server's structure checks. The server
+ * remains the authority — this only powers the disabled Publish button and the
+ * red badges on offending outline-rail nodes.
+ */
+export const validateTrackForPublish = (values: TrackFormValues): PublishError[] => {
+  const errors: PublishError[] = [];
+  const settings = (message: string) => errors.push({ nodeKey: TRACK_SETTINGS_NODE_KEY, message });
+
+  if (isBlank(values.title)) settings("Title is required");
+  if (isBlank(values.description)) settings("Description is required");
+  if (isBlank(values.coverImageUrl)) settings("Cover image is required");
+
+  if (!values.sections || values.sections.length === 0) {
+    settings("Add at least one section");
+  }
+
+  values.sections?.forEach((section, sectionIndex) => {
+    const key = sectionNodeKey(sectionIndex);
+    if (isBlank(section.title)) {
+      errors.push({
+        nodeKey: key,
+        message: `Section ${sectionIndex + 1}: title is required`,
+      });
+    }
+    if (!section.items || section.items.length === 0) {
+      errors.push({
+        nodeKey: key,
+        message: `Section ${sectionIndex + 1}: add at least one component`,
+      });
+    }
+    section.items?.forEach((item, itemIndex) => {
+      for (const message of validateItem(item)) {
+        errors.push({
+          nodeKey: itemNodeKey(sectionIndex, itemIndex),
+          message,
+        });
+      }
+    });
+  });
+
+  return errors;
+};
+
+/* -------------------------------------------------------------------------- */
+/* Serialization (form <-> API)                                               */
+/* -------------------------------------------------------------------------- */
+
+const compactCriteria = (criteria?: CompletionCriteria): CompletionCriteria | undefined => {
+  if (!criteria) return undefined;
+  const compact: CompletionCriteria = {};
+  if (criteria.minScore != null) compact.minScore = criteria.minScore;
+  if (criteria.minDurationSeconds != null) {
+    compact.minDurationSeconds = criteria.minDurationSeconds;
+  }
+  if (criteria.watchPct != null) compact.watchPct = criteria.watchPct;
+  if (criteria.minReadSeconds != null) compact.minReadSeconds = criteria.minReadSeconds;
+  // NOTE: passScore is intentionally never sent — the server mirrors it from
+  // the quiz settings.
+  return Object.keys(compact).length > 0 ? compact : undefined;
+};
+
+/**
+ * `sourceText` is editor-only — the units are the persisted source of truth, so
+ * it is dropped here rather than round-tripped through the server. Labels with
+ * no text never made it into the key, so they're dropped too.
+ */
+const serializeAnnotation = (annotation: AnnotationFormValue): AnnotationContent => {
+  const labels = annotation.labels.filter(label => label.text.trim());
+  const labelIds = new Set(labels.map(label => label.id));
+  return {
+    kind: annotation.kind,
+    ...(annotation.intro?.trim() ? { intro: annotation.intro.trim() } : {}),
+    units: annotation.units,
+    labels,
+    targets: annotation.targets
+      .filter(target => labelIds.has(target.labelId))
+      .map(target => ({
+        unitId: target.unitId,
+        labelId: target.labelId,
+        ...(target.points ? { points: target.points } : {}),
+        ...(target.note?.trim() ? { note: target.note.trim() } : {}),
+      })),
+    settings: { ...annotation.settings },
+  };
+};
+
+/**
+ * An ungraded question may keep a partial or stale answer key in form state
+ * (e.g. the option it once marked correct got deleted) — harmless in the
+ * editor since it's never read, but the server validates whatever key IS
+ * present even when it isn't required. So for an ungraded question, prune
+ * each key field down to references that still exist rather than shipping a
+ * partial/dangling one the server would otherwise reject.
+ */
+const sanitizeAnswerKeyForUngraded = (question: QuizQuestion): QuizQuestion => {
+  if (isQuestionGraded(question)) return question;
+  switch (question.type) {
+    case "mcq_single":
+    case "mcq_multi": {
+      const optionIds = new Set(question.options.map(option => option.id));
+      const correctOptionIds = (question.correctOptionIds ?? []).filter(id => optionIds.has(id));
+      return { ...question, correctOptionIds };
+    }
+    case "matching": {
+      const leftIds = new Set(question.left.map(entry => entry.id));
+      const rightIds = new Set(question.right.map(entry => entry.id));
+      const correctPairs = (question.correctPairs ?? []).filter(
+        pair => leftIds.has(pair.leftId) && rightIds.has(pair.rightId),
+      );
+      return { ...question, correctPairs };
+    }
+    case "fill_blank": {
+      const blanks = question.blanks.map(blank => ({
+        ...blank,
+        acceptedAnswers: (blank.acceptedAnswers ?? []).filter(answer => !isBlank(answer)),
+      }));
+      return { ...question, blanks };
+    }
+    default:
+      return question;
+  }
+};
+
+/**
+ * `isGraded`/`showCorrectAnswer` are only meaningful as an explicit `false` —
+ * absent means the (graded / shown) default, so we never write `true`
+ * needlessly and every course saved before these fields existed keeps an
+ * identical payload. `likert_scale` can never be graded (the server 400s on
+ * `isGraded: true`), so it never forwards the flag at all.
+ */
+const serializeQuestionFlags = (question: QuizQuestion): QuizQuestion => {
+  const { isGraded, showCorrectAnswer, ...rest } = question;
+  return {
+    ...rest,
+    ...(isGraded === false && question.type !== "likert_scale" ? { isGraded: false } : {}),
+    ...(showCorrectAnswer === false ? { showCorrectAnswer: false } : {}),
+  } as QuizQuestion;
+};
+
+const serializeQuiz = (quiz: QuizContent): QuizContent => ({
+  settings: { ...quiz.settings },
+  questions: quiz.questions.map(question => {
+    let next = question;
+    if (next.type === "ordering") {
+      // Authored row order IS the correct order.
+      next = { ...next, correctOrder: next.items.map(entry => entry.id) };
+    }
+    if (next.type === "fill_blank") {
+      // `const` (unlike the reassigned `next`) so the "fill_blank" narrowing
+      // survives inside the `.map` closure below.
+      const fillBlank = next;
+      // Only keep blanks whose token still exists in the template.
+      const tokens = parseBlankTokens(fillBlank.template);
+      next = {
+        ...fillBlank,
+        blanks: tokens.map(
+          token =>
+            fillBlank.blanks.find(blank => blank.id === token) ?? {
+              id: token,
+              acceptedAnswers: [],
+            },
+        ),
+      };
+    }
+    next = sanitizeAnswerKeyForUngraded(next);
+    next = serializeQuestionFlags(next);
+    return next;
+  }),
+});
+
+/**
+ * Exported so the Component Library page/dialogs can reuse the exact same
+ * per-type content shaping (article image extraction, quiz correctOrder/blanks
+ * derivation, annotation label/target pruning) that a normal course save uses,
+ * rather than re-implementing it. `order` is meaningless for a template — pass
+ * any value; callers building a template payload discard it along with `id`
+ * and `description`.
+ */
+export const serializeItem = (item: TrackItemFormValue, order: number): TrackStructureItemInput => {
+  const payload: TrackStructureItemInput = {
+    ...(item.serverId ? { id: item.serverId } : {}),
+    type: item.type,
+    order,
+    title: item.title,
+    description: item.description || undefined,
+  };
+
+  switch (item.type) {
+    case TrackItemType.ROLEPLAY:
+      payload.scenarioId = item.scenarioId ?? undefined;
+      break;
+    case TrackItemType.CASE:
+      payload.caseId = item.caseId ?? undefined;
+      break;
+    case TrackItemType.ARTICLE: {
+      const html = item.article?.html ?? "";
+      const imageUrls = extractImageUrls(html);
+      // Only questions the body actually anchors are sent — the server
+      // rejects a mismatch, and an author who deleted a placeholder meant to
+      // drop the question with it.
+      const placed = parseArticleQuestionMarkers(html);
+      const questions = (item.article?.questions ?? []).filter(question =>
+        placed.includes(question.id),
+      );
+      const resources = item.article?.resources ?? [];
+      payload.content = {
+        html,
+        ...(imageUrls.length > 0 ? { imageUrls } : {}),
+        ...(questions.length > 0 ? { questions } : {}),
+        ...(resources.length > 0 ? { resources } : {}),
+      };
+      break;
+    }
+    case TrackItemType.VIDEO:
+      payload.content = item.video ? { ...item.video } : undefined;
+      break;
+    case TrackItemType.JOURNAL:
+      payload.content = item.journal ? { prompts: item.journal.prompts } : undefined;
+      break;
+    case TrackItemType.QUIZ:
+      payload.content = item.quiz ? serializeQuiz(item.quiz) : undefined;
+      break;
+    case TrackItemType.ANNOTATED_ARTIFACT:
+      payload.content = item.annotation ? serializeAnnotation(item.annotation) : undefined;
+      break;
+    case TrackItemType.BRANCHING_SCENARIO:
+      payload.content = item.branching ? serializeBranching(item.branching) : undefined;
+      break;
+    case TrackItemType.BUCKET_SORT:
+      payload.content = item.bucketSort ? serializeBucketSort(item.bucketSort) : undefined;
+      break;
+    case TrackItemType.GAME:
+      payload.content = item.game
+        ? {
+            gameKey: item.game.gameKey,
+            ...(isBlank(item.game.intro) ? {} : { intro: item.game.intro }),
+            ...(item.game.gameKey === TrackGameKey.BREATHING_EXERCISE && item.game.breathingExercise
+              ? { breathingExercise: { ...item.game.breathingExercise } }
+              : {}),
+          }
+        : undefined;
+      break;
+  }
+
+  const criteria = compactCriteria(item.completionCriteria);
+  if (criteria) payload.completionCriteria = criteria;
+
+  // Always explicit so switching it off is persisted (omitting it would leave
+  // the stored value untouched server-side).
+  payload.hasDiscussion = item.hasDiscussion ?? false;
+
+  return payload;
+};
+
+/** Whole-tree structure payload for PUT /tracks/:id/structure. */
+export const serializeTrackForm = (values: TrackFormValues): TrackStructureInput => ({
+  sections: values.sections.map((section, sectionIndex) => ({
+    ...(section.serverId ? { id: section.serverId } : {}),
+    title: section.title,
+    description: section.description || undefined,
+    order: sectionIndex + 1,
+    items: section.items.map((item, itemIndex) => serializeItem(item, itemIndex + 1)),
+  })),
+});
+
+/* -------------------------------------------------------------------------- */
+/* Landing page                                                               */
+/* -------------------------------------------------------------------------- */
+
+type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
+/**
+ * The page the backend starts a course with: every block switched on, nothing written. Matches
+ * ally-be's defaults for a missing key (`enabled` true, strings null, arrays empty). A fresh
+ * object every call — the form edits it.
+ */
+export const emptyLandingPage = (): TrackLandingPage => ({
+  version: 1,
+  hero: { hook: null, question: null, courseLine: null, buttonLabel: null },
+  persona: { name: null, descriptor: null, imageUrl: null, characterId: null },
+  firstMove: { enabled: true, sceneLine: null, personaLine: null, prompt: null, replies: [] },
+  arc: { enabled: true, chapters: [], hardCallSectionId: null },
+  outcomes: { enabled: true, items: [] },
+  howItPlays: { enabled: true, sittingLength: null },
+  cast: { enabled: true, callerLine: null, guide: { name: null, role: null, line: null } },
+  xp: { enabled: true },
+  contentNotes: { extraNote: null },
+});
+
+const landingString = (value: unknown): string | null => (typeof value === "string" ? value : null);
+const landingFlag = (value: unknown): boolean => (typeof value === "boolean" ? value : true);
+
+/** Text counts as written once it has something other than whitespace. */
+export const isLandingTextFilled = (value: string | null | undefined): boolean =>
+  typeof value === "string" && value.trim() !== "";
+
+/**
+ * Completes a possibly partial landing page with the backend's defaults, copying as it goes: the
+ * input is often an RTK Query cache entry, which Immer has deep-frozen. Unknown beats and sitting
+ * lengths are read as unset rather than carried into a `<select>` that cannot show them.
+ */
+export const withLandingDefaults = (
+  page?: DeepPartial<TrackLandingPage> | null,
+): TrackLandingPage => {
+  const source: DeepPartial<TrackLandingPage> = page ?? {};
+  const beats: string[] = Object.values(StoryBeat);
+  const sittings: string[] = Object.values(LandingSittingLength);
+  return {
+    version: 1,
+    hero: {
+      hook: landingString(source.hero?.hook),
+      question: landingString(source.hero?.question),
+      courseLine: landingString(source.hero?.courseLine),
+      buttonLabel: landingString(source.hero?.buttonLabel),
+    },
+    persona: {
+      name: landingString(source.persona?.name),
+      descriptor: landingString(source.persona?.descriptor),
+      imageUrl: landingString(source.persona?.imageUrl),
+      characterId: landingString(source.persona?.characterId),
+    },
+    firstMove: {
+      enabled: landingFlag(source.firstMove?.enabled),
+      sceneLine: landingString(source.firstMove?.sceneLine),
+      personaLine: landingString(source.firstMove?.personaLine),
+      prompt: landingString(source.firstMove?.prompt),
+      replies: (source.firstMove?.replies ?? []).map(reply => ({
+        text: landingString(reply?.text) ?? "",
+        label: landingString(reply?.label) ?? "",
+        why: landingString(reply?.why),
+      })),
+    },
+    arc: {
+      enabled: landingFlag(source.arc?.enabled),
+      chapters: (source.arc?.chapters ?? []).flatMap(chapter =>
+        chapter?.sectionId
+          ? [
+              {
+                sectionId: chapter.sectionId,
+                beat: beats.includes(chapter.beat as string) ? (chapter.beat as StoryBeat) : null,
+                teaser: landingString(chapter.teaser),
+              },
+            ]
+          : [],
+      ),
+      hardCallSectionId: landingString(source.arc?.hardCallSectionId),
+    },
+    outcomes: {
+      enabled: landingFlag(source.outcomes?.enabled),
+      items: (source.outcomes?.items ?? []).filter(
+        (item): item is string => typeof item === "string",
+      ),
+    },
+    howItPlays: {
+      enabled: landingFlag(source.howItPlays?.enabled),
+      sittingLength: sittings.includes(source.howItPlays?.sittingLength as string)
+        ? (source.howItPlays?.sittingLength as LandingSittingLength)
+        : null,
+    },
+    cast: {
+      enabled: landingFlag(source.cast?.enabled),
+      callerLine: landingString(source.cast?.callerLine),
+      guide: {
+        name: landingString(source.cast?.guide?.name),
+        role: landingString(source.cast?.guide?.role),
+        line: landingString(source.cast?.guide?.line),
+      },
+    },
+    xp: { enabled: landingFlag(source.xp?.enabled) },
+    contentNotes: { extraNote: landingString(source.contentNotes?.extraNote) },
+  };
+};
+
+const isReplyBlank = (reply: LandingReply): boolean =>
+  !isLandingTextFilled(reply.text) &&
+  !isLandingTextFilled(reply.label) &&
+  !isLandingTextFilled(reply.why);
+
+/**
+ * Whether an author has done anything to the page: written any text, picked a beat, hard call or
+ * sitting length, or switched a block off. A page that is still the backend's default is "empty"
+ * and is saved as null, so a course nobody wrote a landing page for does not carry a full object
+ * of nulls. A switched-off block counts as something done, because the author chose it.
+ */
+export const hasLandingPageContent = (page?: DeepPartial<TrackLandingPage> | null): boolean => {
+  if (!page) return false;
+  const p = withLandingDefaults(page);
+  const texts = [
+    p.hero.hook,
+    p.hero.question,
+    p.hero.courseLine,
+    p.hero.buttonLabel,
+    p.persona.name,
+    p.persona.descriptor,
+    p.persona.imageUrl,
+    p.persona.characterId,
+    p.firstMove.sceneLine,
+    p.firstMove.personaLine,
+    p.firstMove.prompt,
+    p.arc.hardCallSectionId,
+    p.cast.callerLine,
+    p.cast.guide.name,
+    p.cast.guide.role,
+    p.cast.guide.line,
+    p.contentNotes.extraNote,
+  ];
+  return (
+    texts.some(isLandingTextFilled) ||
+    p.firstMove.replies.some(reply => !isReplyBlank(reply)) ||
+    p.arc.chapters.some(chapter => chapter.beat !== null || isLandingTextFilled(chapter.teaser)) ||
+    p.outcomes.items.some(isLandingTextFilled) ||
+    p.howItPlays.sittingLength !== null ||
+    !p.firstMove.enabled ||
+    !p.arc.enabled ||
+    !p.outcomes.enabled ||
+    !p.howItPlays.enabled ||
+    !p.cast.enabled ||
+    !p.xp.enabled
+  );
+};
+
+/**
+ * The landing page as PUT: null when there is nothing to save, else the page with the form's
+ * scaffolding stripped. Blank reply rows and blank outcome inputs are dropped, a chapter is kept
+ * only while its section is still in the course and has a beat or a teaser, and a hard call on a
+ * section that is gone is cleared. (The backend ignores stale section ids at read time anyway;
+ * this stops them piling up in the stored page.)
+ */
+export const serializeLandingPage = (
+  page: TrackLandingPage | null | undefined,
+  sections: TrackSectionFormValue[],
+): TrackLandingPage | null => {
+  if (!hasLandingPageContent(page)) return null;
+  const p = withLandingDefaults(page);
+  const sectionIds = new Set(
+    sections.map(section => section.serverId).filter((id): id is string => !!id),
+  );
+  return {
+    ...p,
+    firstMove: {
+      ...p.firstMove,
+      replies: p.firstMove.replies
+        .filter(reply => !isReplyBlank(reply))
+        .slice(0, LANDING_LIMITS.repliesMax),
+    },
+    arc: {
+      ...p.arc,
+      chapters: p.arc.chapters.filter(
+        chapter =>
+          sectionIds.has(chapter.sectionId) &&
+          (chapter.beat !== null || isLandingTextFilled(chapter.teaser)),
+      ),
+      hardCallSectionId:
+        p.arc.hardCallSectionId && sectionIds.has(p.arc.hardCallSectionId)
+          ? p.arc.hardCallSectionId
+          : null,
+    },
+    outcomes: {
+      ...p.outcomes,
+      items: p.outcomes.items.filter(isLandingTextFilled).slice(0, LANDING_LIMITS.outcomesMax),
+    },
+  };
+};
+
+export const extractTrackMetadata = (values: TrackFormValues): TrackMetadataInput => ({
+  title: values.title,
+  description: values.description,
+  coverImageUrl: values.coverImageUrl || undefined,
+  isGlobal: values.isGlobal,
+  isPublicView: values.isPublicView ?? false,
+  estimatedDurationMinutes: values.estimatedDurationMinutes ?? undefined,
+  // Always sent, so clearing the picker clears the tag (`[]` is stored as
+  // null). Ids the picker could not list ride along untouched — the backend
+  // never rejects an id the course already carries.
+  competencyIds: values.competencyIds ?? [],
+  // Always sent (null clears it) so emptying the page in the builder empties the stored one.
+  landingPage: serializeLandingPage(values.landingPage, values.sections ?? []),
+});
+
+/** GET /tracks/:id response -> builder form values (fresh client localIds). */
+export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
+  title: detail.title ?? "",
+  description: detail.description ?? "",
+  coverImageUrl: detail.coverImageUrl ?? "",
+  isGlobal: detail.isGlobal ?? false,
+  isPublicView: detail.isPublicView ?? false,
+  estimatedDurationMinutes: detail.estimatedDurationMinutes ?? null,
+  competencyIds: detail.competencyIds ?? [],
+  // Always a full page, so the Landing page editor never meets a null.
+  landingPage: detail.landingPage ? withLandingDefaults(detail.landingPage) : emptyLandingPage(),
+  sections: [...(detail.sections ?? [])]
+    .sort((a, b) => a.order - b.order)
+    .map(section => ({
+      localId: newId(),
+      serverId: section.id,
+      title: section.title ?? "",
+      description: section.description ?? "",
+      items: [...(section.items ?? [])]
+        .sort((a, b) => a.order - b.order)
+        .map(item => {
+          const formItem: TrackItemFormValue = {
+            localId: newId(),
+            serverId: item.id,
+            type: item.type,
+            title: item.title ?? "",
+            description: item.description ?? "",
+            completionCriteria: {
+              ...DEFAULT_COMPLETION_CRITERIA[item.type],
+              ...(item.completionCriteria ?? {}),
+            },
+            hasDiscussion: item.hasDiscussion ?? false,
+          };
+          switch (item.type) {
+            case TrackItemType.ROLEPLAY:
+              formItem.scenarioId = item.scenarioId ?? null;
+              break;
+            case TrackItemType.CASE:
+              formItem.caseId = item.caseId ?? null;
+              break;
+            case TrackItemType.ARTICLE: {
+              // Copied, never patched in place: `detail` is the RTK Query
+              // cache entry, which Immer has deep-frozen, so writing the
+              // `questions` default onto `item.content` throws.
+              const article = item.content as ArticleContent | undefined;
+              formItem.article = {
+                ...article,
+                html: article?.html ?? "",
+                questions: article?.questions ?? [],
+              };
+              break;
+            }
+            case TrackItemType.VIDEO:
+              formItem.video = (item.content as VideoContent) ?? { source: "s3", url: "" };
+              if (formItem.completionCriteria.watchPct == null) {
+                formItem.completionCriteria.watchPct = DEFAULT_VIDEO_WATCH_PCT;
+              }
+              break;
+            case TrackItemType.JOURNAL:
+              formItem.journal = (item.content as JournalContent) ?? { prompts: [] };
+              break;
+            case TrackItemType.QUIZ: {
+              const quiz = item.content as QuizContent | undefined;
+              formItem.quiz = quiz ?? { settings: { ...DEFAULT_QUIZ_SETTINGS }, questions: [] };
+              break;
+            }
+            case TrackItemType.GAME: {
+              const game = item.content as GameContent | undefined;
+              formItem.game = {
+                gameKey: game?.gameKey ?? DEFAULT_GAME_CONTENT.gameKey,
+                intro: game?.intro ?? "",
+                ...(game?.gameKey === TrackGameKey.BREATHING_EXERCISE
+                  ? {
+                      breathingExercise: game.breathingExercise ?? {
+                        ...DEFAULT_BREATHING_EXERCISE_CONTENT,
+                      },
+                    }
+                  : {}),
+              };
+              break;
+            }
+            case TrackItemType.BUCKET_SORT: {
+              const bucketSort = item.content as BucketSortContent | undefined;
+              formItem.bucketSort = bucketSort
+                ? { ...bucketSort, intro: bucketSort.intro ?? "" }
+                : createBucketSortTemplate();
+              break;
+            }
+            case TrackItemType.BRANCHING_SCENARIO: {
+              const branching = item.content as BranchingScenarioContent | undefined;
+              formItem.branching = branching
+                ? {
+                    ...branching,
+                    intro: branching.intro ?? "",
+                    settings: {
+                      passScore: branching.settings?.passScore ?? 0,
+                      maxAttempts: branching.settings?.maxAttempts ?? null,
+                    },
+                  }
+                : createBranchingTemplate();
+              break;
+            }
+            case TrackItemType.ANNOTATED_ARTIFACT: {
+              const annotation = item.content as AnnotationContent | undefined;
+              const units = annotation?.units ?? [];
+              formItem.annotation = {
+                kind: annotation?.kind ?? "TRANSCRIPT",
+                intro: annotation?.intro ?? "",
+                units,
+                labels: annotation?.labels ?? [],
+                targets: annotation?.targets ?? [],
+                settings: annotation?.settings ?? { ...DEFAULT_ANNOTATION_SETTINGS },
+                // Rebuilt from the stored units so the author edits the same
+                // text they pasted, and re-segmentation keeps the unit ids.
+                sourceText: unitsToSourceText(units, annotation?.kind ?? "TRANSCRIPT"),
+              };
+              break;
+            }
+          }
+          return formItem;
+        }),
+    })),
+});

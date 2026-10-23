@@ -1,0 +1,3113 @@
+{
+  "common": {
+    "appName": "Ally",
+    "or": "OR",
+    "loading": "Loading…",
+    "loadMore": "Load More",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "seconds_one": "{{count}} second",
+    "seconds_other": "{{count}} seconds",
+    "continue": "Continue",
+    "start": "Start",
+    "close": "Close",
+    "profile": "Profile",
+    "details": "Details",
+    "starting": "Starting...",
+    "next": "Next",
+    "viewSummary": "View summary",
+    "simulationIndex": "Simulation {{index}}",
+    "success": "Success",
+    "error": "Error",
+    "simulationEndedSuccess": "Simulation ended successfully",
+    "somethingWentWrong": "Something went wrong!",
+    "summary": "Summary",
+    "exportSummary": "Download Summary",
+    "startSimulation": "Start role play",
+    "simulation": "Role play",
+    "triggerWarnings": "Trigger warnings:",
+    "sessionId": "Session ID",
+    "duration": "Duration",
+    "boxBreathing": {
+      "inhale": "Inhale now",
+      "hold": "Hold breathe",
+      "exhale": "Exhale"
+    },
+    "tags": "Tags",
+    "cancel": "Cancel",
+    "save": "Save",
+    "add": "Add",
+    "share": "Share",
+    "viewMore": "View more",
+    "viewLess": "View less",
+    "scribe": "Scribe",
+    "scenario": "Scenario:",
+    "retry": "Retry",
+    "uploading": "Uploading...",
+    "maxActiveUsers": {
+      "title": "We're at capacity right now",
+      "description": "We're currently handling the maximum number of active users. Please wait a moment and try again access usually frees up shortly.",
+      "retry": "Retry",
+      "manualRetry": "You can retry in {{seconds}}s",
+      "autoRetry": "We'll automatically retry in {{seconds}}s"
+    },
+    "backToLearn": "Back to Learn",
+    "errors": {
+      "locked": "Upcoming simulation is locked"
+    },
+    "draggableArea": {
+      "text": "Drag & drop or <0>choose</0> a {{extensions}} file under {{size}}"
+    },
+    "practiceAgain": "Practise again",
+    "refresh": "Refresh",
+    "play": "Play",
+    "submit": "Submit"
+  },
+  "carousel": {
+    "slides": {
+      "noRecording": "We do not save audio recordings",
+      "noTrainingData": "We do not use your client’s data to train our models",
+      "personalInfoRemoved": "Personal information of clients is automatically removed",
+      "encrypted": "Data is encrypted"
+    }
+  },
+  "nav": {
+    "sidebar": {
+      "expand": "Expand sidebar",
+      "collapse": "Collapse sidebar",
+      "pin": "Keep sidebar open"
+    },
+    "language": {
+      "label": "App language",
+      "selectorAria": "Language selector"
+    },
+    "notifications": "Notifications",
+    "tabs": {
+      "learn": "Learn",
+      "review": "Review",
+      "badges": "Badges",
+      "community": "Community",
+      "sessions": "Sessions",
+      "scribeLogs": "Scribe Logs",
+      "roleplayLogs": "Roleplay Logs",
+      "statistics": "Statistics",
+      "search": "Search",
+      "allyAdmin": "Ally Admin",
+      "characterLibrary": "Character Library",
+      "progress": "Progress",
+      "helpline": "Helpline"
+    },
+    "logout": {
+      "title": {
+        "normal": "Safeguard your",
+        "italic": "account"
+      },
+      "content": "Are you sure you want to log out? You will need to enter secure OTP to login again.",
+      "button": "Logout & lock my Ally account"
+    }
+  },
+  "characterLibrary": {
+    "name": "Name",
+    "namePlaceholder": "Enter name",
+    "age": "Age",
+    "agePlaceholder": "0",
+    "gender": "Gender",
+    "genderPlaceholder": "Select gender",
+    "profession": "Profession",
+    "professionPlaceholder": "Enter profession",
+    "currentLocation": "Current location",
+    "currentLocationPlaceholder": "Enter current location",
+    "genderIdentity": "Gender identity",
+    "genderIdentityPlaceholder": "Select gender identity",
+    "sexualOrientation": "Sexual orientation",
+    "sexualOrientationPlaceholder": "Select sexual orientation",
+    "backstory": "Character Backstory",
+    "backstoryPlaceholder": "Enter character backstory",
+    "saving": "Saving..."
+  },
+  "customFields": {
+    "editTitle": "Edit custom field",
+    "addTitle": "Add custom field",
+    "selectFieldType": "Select field type",
+    "fieldName": "Field name",
+    "fieldNamePlaceholder": "Field name",
+    "options": "Options",
+    "optionPlaceholder": "Option",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "deleteOption": "Delete option",
+    "addOption": "Add option",
+    "section": "Section",
+    "selectSection": "Select section",
+    "whoCanEdit": "Who can edit",
+    "showAsTableColumn": "Show as table column",
+    "showAsTableColumnDesc": "Field will appear as a column in session logs",
+    "allowFiltering": "Allow filtering",
+    "allowFilteringDesc": "Field can be used to filter session logs",
+    "cancel": "Cancel",
+    "next": "Next",
+    "save": "Save",
+    "editPermissions": {
+      "adminOnly": "Admin only",
+      "counsellorOnly": "Counsellor only",
+      "both": "Admin and counsellor"
+    },
+    "types": {
+      "singleSelect": "Single Select",
+      "multiSelect": "Multi Select",
+      "date": "Date",
+      "text": "Text",
+      "number": "Number",
+      "boolean": "Yes / No"
+    },
+    "deleteTitle": "Delete custom field?",
+    "deleteDesc": "Deleting \"{{name}}\" will hide it from all call logs. Existing values will not be removed.",
+    "delete": "Delete",
+    "manageTitle": "Manage custom fields",
+    "noFields": "No custom fields yet.",
+    "hideFromTable": "Hide from table",
+    "showInTable": "Show in table",
+    "edit": "Edit",
+    "addField": "+ Add field",
+    "close": "Close"
+  },
+  "community": {
+    "title": "Community",
+    "you": "You",
+    "emptyLeaderboard": "No leaderboard data available",
+    "loadingMore": "Loading more...",
+    "filters": {
+      "last7days": "Last 7 days",
+      "last28days": "Last 28 days",
+      "last364days": "Last 364 days",
+      "allTime": "All time"
+    },
+    "duration": {
+      "hour": "hr",
+      "hours": "hrs",
+      "minute": "min",
+      "minutes": "mins"
+    },
+    "table": {
+      "rank": "Rank",
+      "user": "User",
+      "totalDuration": "Total duration",
+      "badges": "Badges",
+      "streak": "Streak",
+      "streakHint": "Current practice streak, all time",
+      "streakValue_one": "{{count}}d streak",
+      "streakValue_other": "{{count}}d streak",
+      "badgeValue_one": "{{count}} badge",
+      "badgeValue_other": "{{count}} badges"
+    }
+  },
+  "achievements": {
+    "title": "Achievements",
+    "badges": "Badges",
+    "viewAll": "View all",
+    "viewAllBadges": "View all badges",
+    "emptyHome": "You don't have any badges yet",
+    "badgesCount": "{{count}} Badges",
+    "badgesTooltip": "Badges are earned based on your activity across simulations and community participation. Some badges may be removed if qualifying actions are undone.",
+    "filters": {
+      "all": "All",
+      "unlocked": "Unlocked"
+    },
+    "empty": "No badges found",
+    "backAria": "Go back",
+    "errors": {
+      "title": "Unable to Load Achievements",
+      "description": "Something went wrong while loading achievements. Please try again."
+    },
+    "modal": {
+      "newBadge": "You earned a new badge"
+    },
+    "badgeTypes": {
+      "suffix": "Badges",
+      "journey": "App Journey",
+      "momentum": "Momentum",
+      "contribution": "Contribution",
+      "resonance": "Resonance",
+      "ascent": "Ascent",
+      "tooltip": {
+        "journey": "Earned by completing simulation minutes. Only completed simulation time is counted.",
+        "momentum": "Complete at least one role play per day to build a streak. Missing a day resets your streak.",
+        "contribution": "Number of comments and reactions you add to sessions by others. Activity on your own sessions is not included.",
+        "resonance": "Earned when other reviewers comment or react on your sessions. Your own actions on your sessions are excluded.",
+        "ascent": "Earned by reaching a new level on your progress ladder. Levels come from practice minutes, completed sessions and course items."
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "greetingLine1": "Hey,",
+      "greetingLine2": "Welcome to {{app}}",
+      "subtitle": "Enter your email address to continue",
+      "back": "Back",
+      "email": {
+        "label": "Email",
+        "placeholder": "Enter your email address",
+        "error": "Please enter a valid email address"
+      },
+      "rememberMe": "Remember me",
+      "generatingOtp": "Generating OTP...",
+      "divider": "OR",
+      "proceedAgree": "By proceeding, i agree to Ally's",
+      "terms": "Terms & Conditions",
+      "and": "and acknowledge",
+      "privacy": "Privacy Policy.",
+      "imageAlt": "Login",
+      "helloAlly": "helloally.ai",
+      "otp": {
+        "title": "Verify your email address",
+        "enterCode": "Enter the security code sent to",
+        "expires": "This code will expire in {{minutes}}. Need a new code?",
+        "resend": "Resend",
+        "resendWithCountdown": "Resend ({{seconds}})",
+        "verify": "Verify",
+        "signingIn": "Signing in..."
+      },
+      "google": {
+        "button": "Continue with Google",
+        "error": "Failed to sign in with Google"
+      },
+      "errors": {
+        "generateOtp": "Failed to generate OTP. Please try again.",
+        "verifyOtp": "Failed to verify OTP. Please try again.",
+        "agreeTerms": "Failed to agree to terms and conditions"
+      },
+      "sessionExpired": "You were signed out because your session expired. Sign in again to pick up where you left off."
+    }
+  },
+  "user": {
+    "creditUsage": "Credit usage",
+    "logout": "Logout",
+    "profileAlt": "Profile",
+    "dataPolicy": "Data policy",
+    "reportProblem": "Report a problem"
+  },
+  "bugReport": {
+    "success": "Thanks — we've got your report.",
+    "rateLimited": "You've submitted a few reports recently — please try again in a bit.",
+    "genericError": "Something went wrong sending that. Please try again.",
+    "prompt": "What were you trying to do?",
+    "placeholder": "Describe what you were doing when the problem happened",
+    "submit": "Send report",
+    "submitting": "Sending…",
+    "cancel": "Cancel"
+  },
+  "learn": {
+    "tabs": {
+      "simulations": "Simulations",
+      "tracks": "Learning Pathways",
+      "cases": "Cases",
+      "courses": "Courses"
+    },
+    "header": {
+      "prefix": "Use",
+      "emphasis1": "AI-voice based",
+      "middle": "real-world practice situation",
+      "emphasis2": "to build",
+      "suffix": "mental health skills."
+    },
+    "credits": {
+      "used": "Credits used:"
+    },
+    "scenario": {
+      "pageTitlePrefix": "Start",
+      "pageTitleEmphasis": "Role play",
+      "backAria": "Close scenario details",
+      "mediaUnavailable": "Media not available",
+      "share": "Share",
+      "shareAria": "Share scenario",
+      "shareTitle": "Share this scenario",
+      "shareCopied": "Scenario link copied to clipboard!",
+      "scenarioLabel": "Situation",
+      "startAria": "Start role play",
+      "mode": {
+        "label": "How would you like to practice?",
+        "voice": "Voice call",
+        "text": "Text chat",
+        "voiceHint": "Talk it through out loud, like a helpline call.",
+        "textHint": "Type back and forth, like a chat helpline."
+      },
+      "preStart": {
+        "titleNormal": "Before you get started",
+        "button": "Start Session",
+        "content": "At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!"
+      },
+      "existing": {
+        "titleNormal": "Active Simulation ",
+        "titleItalic": "Detected",
+        "content": "You have a running simulation. End the existing session to start a new one.",
+        "primary": "End session"
+      },
+      "noCredits": {
+        "title": "No Credits Left",
+        "desc": "Looks like you have run out of simulation credits"
+      },
+      "notEnough": {
+        "title": "Not Enough Credits",
+        "desc": "You don't have enough simulation credits to start this session"
+      },
+      "notFound": {
+        "title": "Scenario not found",
+        "desc": "The scenario you are looking for does not exist."
+      },
+      "completedChip_one": "Completed once",
+      "completedChip_other": "Completed {{count}} times"
+    },
+    "card": {
+      "imageAlt": "{{title}} {{type}} cover",
+      "imageUnavailable": "Image not available",
+      "comingSoon": "Coming Soon",
+      "completed_one": "Completed",
+      "completed_other": "Completed · {{count}}×",
+      "completedAria_one": "Completed once",
+      "completedAria_other": "Completed {{count}} times",
+      "simulationsCount_one": "{{count}} Simulation",
+      "simulationsCount_other": "{{count}} Simulations",
+      "ariaLabel": "Select {{title}} scenario",
+      "type": {
+        "pathway": "pathway",
+        "scenario": "scenario"
+      }
+    },
+    "empty": {
+      "scenarios": "No scenarios available at the moment",
+      "pathways": "No pathways available at the moment",
+      "cases": "No cases available at the moment",
+      "refresh": "Refresh Page",
+      "courses": "No courses available at the moment"
+    },
+    "aria": {
+      "availableCases": "Available cases",
+      "availablePathways": "Available pathways",
+      "availableScenarios": "Available scenarios"
+    },
+    "choose": {
+      "prefix": "Choose your",
+      "case": "Case",
+      "track": "Track",
+      "scenario": "situation",
+      "course": "course"
+    },
+    "details": {
+      "progress": "{{completed}} of {{total}} completed",
+      "loadingDetailsError": "Failed to load simulation details",
+      "track": {
+        "breadcrumb": "Learning Pathways",
+        "notFound": "Track not found"
+      },
+      "case": {
+        "breadcrumb": "Cases",
+        "notFound": "Case not found"
+      },
+      "modal": {
+        "headerTitle": "Role play",
+        "headerSubtitle": "Details"
+      }
+    },
+    "evaluationChecklist": "Evaluation Checklist"
+  },
+  "progress": {
+    "title": "Your progress",
+    "hero": {
+      "level": "Level {{level}}",
+      "toNextLevel_one": "{{count}} XP to level {{level}}",
+      "toNextLevel_other": "{{count}} XP to level {{level}}",
+      "maxLevel": "You've reached the top level",
+      "xpTotal_one": "{{count}} XP earned in total",
+      "xpTotal_other": "{{count}} XP earned in total",
+      "viewProgress": "See your progress"
+    },
+    "stats": {
+      "lifetimeMinutes": "Practice minutes",
+      "sessions": "Sessions completed",
+      "trackItems": "Course items done",
+      "currentStreak": "Day streak",
+      "weeklyConsistency": "Active days this week"
+    },
+    "rank": {
+      "line": "You're #{{rank}} in your organisation this week"
+    },
+    "badges": {
+      "link": "See all your badges"
+    },
+    "errors": {
+      "title": "Couldn't load your progress",
+      "description": "Something went wrong fetching your progress. Try again."
+    },
+    "a11y": {
+      "level": "Level {{level}}, {{xp}} XP earned in total",
+      "levelBar": "Progress through level {{level}}",
+      "navLevel": "Your progress, level {{level}}"
+    }
+  },
+  "practiceStreak": {
+    "title": "Practice streak",
+    "ariaLabel": "Practice minutes heatmap",
+    "minutesValue_one": "{{count}} min",
+    "minutesValue_other": "{{count}} min",
+    "error": "Couldn't load your practice streak.",
+    "retry": "Try again",
+    "groupBy": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "legend": {
+      "less": "Less",
+      "more": "More",
+      "threshold": "Any practice at all counts toward your streak."
+    },
+    "state": {
+      "secured": {
+        "headline_one": "{{count}}-day streak",
+        "headline_other": "{{count}}-day streak",
+        "sub": "Today is counted. Come back tomorrow to keep it going."
+      },
+      "atRisk": {
+        "headline_one": "{{count}}-day streak at risk",
+        "headline_other": "{{count}}-day streak at risk",
+        "sub_one": "Practise {{count}} minute today to keep it.",
+        "sub_other": "Practise {{count}} minutes today to keep it."
+      },
+      "justLost": {
+        "headline": "Start a new streak",
+        "sub_one": "Your best run was {{count}} day. Beat it.",
+        "sub_other": "Your best run was {{count}} days. Beat it."
+      },
+      "neverStarted": {
+        "headline": "Start your first streak",
+        "sub_one": "One role play of {{count}} minute or more starts it.",
+        "sub_other": "One role play of {{count}} minutes or more starts it."
+      }
+    },
+    "today": {
+      "secured": "Counted today",
+      "notSecured": "Not counted yet",
+      "goal": "{{done}} of {{goal}} min daily goal"
+    },
+    "milestone": {
+      "nextBadge_one": "{{count}} day to {{badge}}",
+      "nextBadge_other": "{{count}} days to {{badge}}",
+      "toPersonalBest_one": "{{count}} day to your personal best",
+      "toPersonalBest_other": "{{count}} days to your personal best",
+      "newPersonalBest": "New personal best"
+    },
+    "stats": {
+      "personalBest_one": "Best {{count}} day",
+      "personalBest_other": "Best {{count}} days",
+      "totalMinutes_one": "{{count}} min practised in total",
+      "totalMinutes_other": "{{count}} min practised in total"
+    },
+    "cta": {
+      "start": "Start a role play",
+      "keepItAlive": "Keep it alive",
+      "restart": "Start again"
+    },
+    "a11y": {
+      "ringLabel_one": "{{current}}-day streak, {{remaining}} day to {{target}}",
+      "ringLabel_other": "{{current}}-day streak, {{remaining}} days to {{target}}",
+      "ringLabelComplete": "{{current}}-day streak, your longest yet",
+      "previewLabel": "Recent practice: practised on {{active}} of the last {{total}} periods",
+      "expand": "Show full practice history",
+      "collapse": "Hide full practice history",
+      "readoutEmpty": "Hover or focus a period to see its practice minutes"
+    },
+    "nav": {
+      "value_one": "{{count}}-day practice streak",
+      "value_other": "{{count}}-day practice streak",
+      "atRisk_one": "{{count}}-day practice streak, not counted today",
+      "atRisk_other": "{{count}}-day practice streak, not counted today"
+    },
+    "postSession": {
+      "started": "Streak started",
+      "extended_one": "Streak extended to {{count}} day",
+      "extended_other": "Streak extended to {{count}} days",
+      "nextBadge_one": "{{count}} more day to {{badge}}",
+      "nextBadge_other": "{{count}} more days to {{badge}}"
+    }
+  },
+  "analytics": {
+    "title": "Session Metrics",
+    "dashboardTitle": "Metabase dashboard",
+    "types": {
+      "callLogs": "Real call logs",
+      "simulations": "Simulations",
+      "org": "Organization Metrics"
+    },
+    "empty": {
+      "description": "No dashboards are available yet. Please contact your administrator."
+    }
+  },
+  "organizationMetrics": {
+    "subtitle": "Organization-wide usage for the selected time period",
+    "ranges": {
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      "12m": "Last 12 months",
+      "all": "All time"
+    },
+    "kpis": {
+      "simulationsCompleted": "Simulations completed",
+      "simulationsCompletedCaption": "Total across the organization",
+      "activeUsers": "Active users",
+      "activeUsersCaption": "Completed at least one simulation",
+      "newLearnersOnboarded": "New learners onboarded",
+      "newLearnersOnboardedCaption": "New learner accounts created in the period",
+      "totalRegisteredLearners": "Total registered learners",
+      "totalRegisteredLearnersCaption": "Current headcount, all-time (not scoped to the selected period)",
+      "avgSessionsPerActiveLearner": "Avg sessions per active learner",
+      "avgSessionsPerActiveLearnerCaption": "Completed sessions ÷ active learners in the period",
+      "avgPracticeMinutesPerLearner": "Avg practice minutes per learner",
+      "avgPracticeMinutesPerLearnerCaption": "Practice time ÷ active learners in the period",
+      "avgDaysToFirstSession": "Avg days to first session",
+      "avgDaysToFirstSessionCaption_one": "From signup to first completed session, based on {{count}} learner onboarded in the period",
+      "avgDaysToFirstSessionCaption_other": "From signup to first completed session, based on {{count}} learners onboarded in the period"
+    },
+    "charts": {
+      "simulationsTrend": "Simulations completed over time",
+      "activeUsersTrend": "Active users over time",
+      "simulationsSeries": "Simulations completed",
+      "activeUsersSeries": "Active users",
+      "axis": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month",
+        "simulations": "Simulations",
+        "users": "Users",
+        "newLearners": "New learners"
+      },
+      "newLearnersTrend": "New learners onboarded over time",
+      "newLearnersSeries": "New learners onboarded"
+    },
+    "states": {
+      "errorTitle": "Couldn't load this chart",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "noAccess": "Organization metrics are available to organization admins only.",
+      "retry": "Retry",
+      "empty": "No data for this range",
+      "notEnoughData": "Not enough data yet",
+      "reorderFailed": "Couldn't save the new layout"
+    },
+    "dragHandleLabel": "Drag to reorder",
+    "mostUsedSimulations": {
+      "title": "Most practiced simulations",
+      "caption": "Top scenarios by completed sessions in the selected period",
+      "sessions_one": "{{count}} session",
+      "sessions_other": "{{count}} sessions"
+    },
+    "learnerUsage": {
+      "title": "Learner usage",
+      "caption": "One row per learner — who is (and isn't) using Ally, and how much of the effort is practice versus coursework",
+      "exportCsv": "Export CSV",
+      "errorTitle": "Couldn't load the learner usage table",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "emptyTitle": "No learners yet",
+      "emptyDescription": "Once learners are added to your organization, their usage will show up here.",
+      "status": {
+        "active": "Active",
+        "atRisk": "At risk",
+        "dormant": "Dormant",
+        "neverStarted": "Never started"
+      },
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "status": "Status",
+        "lastPracticeSession": "Last practice session",
+        "signupDate": "Signup date",
+        "roleplaySessionsStarted": "Roleplay sessions started",
+        "roleplaySessionsCompleted": "Roleplay sessions completed",
+        "totalPracticeMinutes": "Total practice minutes",
+        "coursesStartedAssigned": "Courses started / assigned",
+        "coursesAssigned": "Courses assigned",
+        "coursesStarted": "Courses started",
+        "coursesCompleted": "Courses completed",
+        "lastActive": "Last active",
+        "level": "Level",
+        "totalXp": "XP",
+        "roleplaySessions": "Roleplays done / started",
+        "avgScore": "Avg roleplay score",
+        "itemsCompletedPct": "Course items done",
+        "quizzes": "Quizzes passed / tried",
+        "readWatch": "Articles / videos",
+        "reflection": "Journals / games",
+        "pointsPerMinute": "Points / min"
+      },
+      "daysAgo": "{{count}}d ago",
+      "today": "Today",
+      "levelShort": "L{{level}}",
+      "tooltips": {
+        "status": "Based on when the learner was last active anywhere: Active within 14 days, At risk 15–30 days, Dormant over 30 days, Never started if they have never done anything. All-time, not affected by the period above.",
+        "lastActive": "The later of their last roleplay and their last course activity — so a learner doing only quizzes still counts as active. All-time.",
+        "level": "Position on the 1–10 level ladder, earned from practice minutes, completed sessions and course items. All-time. This is the same level the learner sees in the app.",
+        "totalXp": "Lifetime XP: 1 per practice minute, 10 per completed session, 25 per course item, 50 for a personal best, with a daily cap so no single activity can be farmed. All-time.",
+        "roleplaySessions": "Roleplays completed of roleplays started, in the selected period.",
+        "totalPracticeMinutes": "Minutes spent in completed roleplays, in the selected period.",
+        "pointsPerMinute": "Roleplay score earned per minute of practice, in the selected period — it separates a learner who scores steadily from one who only accumulates minutes. Can be negative, because roleplay scores can go below zero. Blank until the learner has at least 10 practice minutes, since below that the ratio is too noisy to be meaningful.",
+        "itemsCompletedPct": "Course items completed out of every item in the courses this learner is enrolled in, including items they have not unlocked yet. All-time. Counted per item, not per course, so progress through a long course still shows.",
+        "quizzes": "Quiz items passed, out of those they have attempted, and in brackets the average of their most recent graded attempt on each — so repeated failures show rather than being hidden by a later pass. All-time.",
+        "readWatch": "Article and video items completed. All-time.",
+        "reflection": "Journal, annotation and game items completed. All-time.",
+        "coursesCompleted": "Courses finished end to end, and in brackets that as a share of the courses they are enrolled in. All-time."
+      }
+    },
+    "scenarioAttempts": {
+      "action": "Scenario attempts",
+      "actionTooltip": "Shows scenario quizzes this learner has started but not passed, so you can reopen their attempts after they run out.",
+      "title": "Scenario attempts: {{name}}",
+      "empty": "No scenario quizzes in progress for this learner.",
+      "errorTitle": "Couldn't load scenario attempts",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "attemptsUsed": "{{used}} of {{max}} attempts used",
+      "attemptsUncapped": "{{used}} attempts",
+      "bestScore": "Best score {{score}}",
+      "pausedUntil": "Paused until {{when}}",
+      "inProgress": "In progress",
+      "reopen": "Reopen attempts",
+      "confirm": "Reopen attempts for {{name}}? They can try {{scenario}} again straight away.",
+      "confirmButton": "Reopen attempts",
+      "cancel": "Cancel",
+      "reopenSuccess": "Attempts reopened",
+      "reopenError": "Couldn't reopen attempts. Please try again."
+    },
+    "courseUsage": {
+      "title": "Course usage",
+      "caption": "One row per course — see which courses are being taken and where learners stall",
+      "exportCsv": "Export CSV",
+      "errorTitle": "Couldn't load the course usage table",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "emptyTitle": "No courses yet",
+      "emptyDescription": "Once courses are added to your organization's catalog, their usage will show up here.",
+      "inProgressCell": "{{active}} active / {{stalled}} stalled",
+      "status": {
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "columns": {
+        "title": "Course",
+        "status": "Status",
+        "totalItems": "Total items",
+        "assigned": "Assigned",
+        "started": "Started",
+        "atLeast50": "≥50% Complete",
+        "completed100": "100% Complete",
+        "completionTime": "Avg / median completion time",
+        "avgCompletionDays": "Avg completion time (days)",
+        "medianCompletionDays": "Median completion time (days)",
+        "avgScore": "Avg score",
+        "inProgress": "In progress / stalled",
+        "inProgressActive": "In progress (active)",
+        "inProgressStalled": "In progress (stalled)",
+        "lastEnrollmentAt": "Last enrollment"
+      }
+    }
+  },
+  "suspended": {
+    "title": "Account Suspended",
+    "description": {
+      "line1": "Your account has been suspended. Contact your",
+      "line2": "administrator for assistance"
+    },
+    "goToLogin": "Go to login"
+  },
+  "completeProfile": {
+    "title": "Complete your profile",
+    "subtitle": "Tell us a little about yourself to get started.",
+    "nameLabel": "Full name",
+    "namePlaceholder": "Enter your full name",
+    "submit": "Continue",
+    "error": "Couldn't save your profile. Please try again."
+  },
+  "terms": {
+    "title": "Terms and agreement",
+    "footerPrefix": "For complete details, please review our",
+    "footerLinkText": "Privacy Policy and User License Agreement",
+    "agreeLabel": "I have read and agreed to these Terms & Conditions, and consent.",
+    "agreeButton": "Agree",
+    "sections": [
+      {
+        "heading": "General Terms (All Users)",
+        "content": [
+          "You are 18+ and legally able to enter contracts",
+          "You are accessing Ally through a partner organization formally engaged with Ally or through direct invitation by Ally for demonstration, testing or research purposes.",
+          "You are using Ally’s platform in accordance with your affiliated organization’s rules, ethics and requirements.",
+          "You understand that Ally is NOT for real emergencies. Contact crisis services, if needed. More information: <a>https://findahelpline.com/</a>"
+        ]
+      },
+      {
+        "heading": "For Ally Skills Lab (Training Simulations)",
+        "content": [
+          "You understand that all the scenarios are fictional, and for training purposes only.",
+          "You understand that this doesn't replace human-supervised training, provide certification, or qualify you for independent practice.",
+          "You consent to audio and transcripts of role-play sessions being stored for quality improvement and being shared with your training organization/supervisor."
+        ]
+      },
+      {
+        "heading": "For Ally Assist (Session Notes)",
+        "content": [
+          "You will use this only for authorized sessions per your organization's rules",
+          "For this product, <b>audio recordings are NOT stored by Ally</b>. Transcripts of sessions are stored and deleted based on the user organization’s decision"
+        ]
+      }
+    ]
+  },
+  "postSim": {
+    "titlePrefix": "Role play",
+    "skills": {
+      "categories": {
+        "listeningEngagement": "Listening Engagement",
+        "emotionalAttunement": "Emotional Attunement",
+        "supportiveEngagement": "Supportive Engagement"
+      },
+      "empty": "No skills data available for this session",
+      "failed": "Failed to load skills data",
+      "coverage": "Skill Coverage",
+      "distressAlleviation": "Client Distress Alleviation",
+      "level": "Level (-5 to 5)",
+      "timeline": "Session Timeline",
+      "strengths": "Strengths & skills demonstrated",
+      "areasForGrowth": "Areas for growth",
+      "recommended": "RECOMMENDED",
+      "strengthsEmpty": "No strengths were identified for this session",
+      "areasForGrowthEmpty": "No areas for growth were identified for this session",
+      "feedbackUnavailable": "Feedback couldn't be generated for this session"
+    },
+    "tabs": {
+      "transcript": "Transcript",
+      "sessionReview": "Session Review",
+      "debrief": "Debrief"
+    },
+    "shortSession": {
+      "title": "Session ended too soon",
+      "description": "We need more interaction data to provide meaningful feedback."
+    },
+    "technicalInterruption": {
+      "title": "Session ended early",
+      "description": "It looks like we lost you for a bit — often a dropped connection. Your progress up to that point was saved, so feel free to start again."
+    },
+    "feedback": {
+      "noData": "No data found",
+      "dialog": {
+        "header": "Did this feel like useful practice for real sessions?",
+        "rating": {
+          "1": "Not at all",
+          "2": "Not really",
+          "3": "Maybe",
+          "4": "Yes",
+          "5": "5 — Absolutely",
+          "tags": {
+            "1": ["Poor", "Not helpful", "Very bad", "Disappointing", "Unhelpful"],
+            "2": ["Below average", "Lacking", "Unsatisfying", "Weak", "Needs improvement"],
+            "3": ["Neutral", "Okay", "Average", "Moderate", "Acceptable"],
+            "4": ["Good", "Helpful", "Satisfying", "Effective", "Worthwhile"],
+            "5": ["Excellent", "Amazing", "Highly useful", "Outstanding", "Very effective"]
+          }
+        }
+      }
+    },
+    "common": {
+      "tryAnother": "Try another simulation",
+      "details": "Details",
+      "scenario": "Scenario:",
+      "shareForReview": "Share for review"
+    },
+    "nextChallenge": {
+      "title": "Next challenge",
+      "start": "Start",
+      "difficulty": {
+        "EASY": "Easy",
+        "MEDIUM": "Medium",
+        "HARD": "Hard"
+      },
+      "reason": {
+        "levelUp": "Great work! You're ready to level up with a {{difficulty}} scenario.",
+        "keepPracticing": "Keep sharpening your skills with another {{difficulty}} scenario.",
+        "buildConfidence": "Rebuild confidence with a {{difficulty}} scenario, then climb back up."
+      }
+    },
+    "debrief": {
+      "header": "Your debrief",
+      "from": "from Ally",
+      "aiLabel": "AI-generated",
+      "aiTooltip": "Ally is an AI supervisor. This debrief was written by AI from your session transcript, not by a person.",
+      "generating": "Ally is writing your debrief…",
+      "generatingHint": "This usually takes a few moments.",
+      "failed": "Ally couldn't write your debrief for this session.",
+      "stillWorking": "Ally is taking longer than usual to finish this debrief. It may still be on its way.",
+      "checkAgain": "Check again",
+      "checkingAgain": "Checking…",
+      "notAvailable": "This session doesn't have a written debrief — it took place before Ally started writing them.",
+      "momentLabel": "See this moment",
+      "momentNotFound": "We couldn't jump to that moment — here's the full transcript instead.",
+      "section": {
+        "what_worked": "What worked",
+        "what_it_cost": "What it cost",
+        "try_next": "Try this next"
+      },
+      "replyPlaceholder": "Reply to Ally about this session…",
+      "transcriptReferences": "Transcript References",
+      "replyPrompt": "Have a question about any of this? Reply below.",
+      "feedback": {
+        "question": "Was this helpful?",
+        "thankYou": "Thank you for your feedback!",
+        "commentPlaceholder": "What did you like or dislike? (Optional)",
+        "saveFailed": "Sorry, we couldn't save your feedback."
+      }
+    }
+  },
+  "review": {
+    "title": "Review",
+    "tabs": {
+      "scribe": "Scribe",
+      "simulation": "Simulation"
+    },
+    "filter": {
+      "all": "All",
+      "latest": "Latest",
+      "mostReviewed": "Most reviewed",
+      "undiscovered": "Undiscovered",
+      "read": "Read",
+      "unread": "Unread"
+    },
+    "empty": {
+      "title": "No shared sessions yet",
+      "description": "Shared user transcripts will be available here for review.",
+      "refresh": "Refresh Page"
+    },
+    "error": {
+      "title": "Unable to Load Reviews",
+      "description": "Something went wrong while loading reviews. Please try again.",
+      "retry": "Retry"
+    },
+    "privacy": {
+      "private": "Keep it private",
+      "share": "Share for review"
+    },
+    "details": {
+      "comments": "Comments",
+      "comment_one": "{{count}} Comment",
+      "comment_other": "{{count}} Comments",
+      "noCommentsYet": "No comments yet",
+      "you": "You",
+      "by": "By {{name}}",
+      "dateAndTime": "Date & time",
+      "addNote": "Add note",
+      "editNote": "Edit note",
+      "noteLabel": "NOTE",
+      "editedLabel": "[Edited]",
+      "addNotePlaceholder": "Add a note...",
+      "shareModalHeader": "Share this for review",
+      "addComment": "Add Comment",
+      "addCommentPlaceholder": "Add a comment",
+      "commentAction": "Comment",
+      "replyAction": "Reply",
+      "replyPlaceholder": "Add reply",
+      "editCommentPlaceholder": "Edit comment",
+      "done": "Done",
+      "replyLabel": "Reply",
+      "repliesLabel": "Replies",
+      "commentLabel": "Comment",
+      "hideReply": "Hide Reply",
+      "hideReplies": "Hide Replies",
+      "hide": "Hide",
+      "unhide": "Unhide",
+      "edit": "Edit",
+      "delete": "Delete",
+      "insertEmoji": "Insert emoji",
+      "commentOptions": "Comment options",
+      "unknownUser": "Unknown",
+      "loadRepliesFailed": "Failed to load replies.",
+      "reactionUpdateFailed": "Reaction update failed",
+      "commentHiddenSuccessfully": "Comment hidden successfully",
+      "commentUnhiddenSuccessfully": "Comment unhidden successfully",
+      "replyHiddenSuccessfully": "Reply hidden successfully",
+      "replyUnhiddenSuccessfully": "Reply unhidden successfully",
+      "commentHideFailed": "Failed to hide comment",
+      "commentUnhideFailed": "Failed to unhide comment",
+      "replyHideFailed": "Failed to hide reply",
+      "replyUnhideFailed": "Failed to unhide reply",
+      "commentDeletedSuccessfully": "Comment deleted successfully",
+      "replyDeletedSuccessfully": "Reply deleted successfully",
+      "commentDeleteFailed": "Failed to delete comment",
+      "replyDeleteFailed": "Failed to delete reply",
+      "commentUpdatedSuccessfully": "Comment updated successfully",
+      "replyUpdatedSuccessfully": "Reply updated successfully",
+      "commentUpdateFailed": "Failed to update comment",
+      "replyUpdateFailed": "Failed to update reply",
+      "replyCreatedSuccessfully": "Reply created successfully",
+      "replyCreateFailed": "Failed to create reply"
+    },
+    "reactionsModal": {
+      "title": "Reactions",
+      "all": "All {{count}}",
+      "more": "More",
+      "noReactionsYet": "No reactions yet"
+    },
+    "feedCard": {
+      "dateTime": "Date & time",
+      "duration": "Duration",
+      "sec": "sec",
+      "min": "min",
+      "reviewTranscript": "Review Conversation",
+      "reactions": "reaction",
+      "reactions_plural": "reactions",
+      "comments": "comment",
+      "comments_plural": "comments",
+      "reply": "reply",
+      "replies": "replies",
+      "edited": "Edited",
+      "reviewed": "Reviewed",
+      "noComments": "No comments yet",
+      "relativeTime": {
+        "justNow": "Just now",
+        "year_one": "1 year",
+        "year_other": "{{count}} years",
+        "yearMonth": "1 year {{months}}",
+        "month_one": "{{count}} month",
+        "month_other": "{{count}} months",
+        "week_one": "{{count}} week",
+        "week_other": "{{count}} weeks",
+        "day_one": "{{count}} Day",
+        "day_other": "{{count}} Days",
+        "hour_one": "{{count}} hour",
+        "hour_other": "{{count}} hours",
+        "minute_one": "{{count}} minute",
+        "minute_other": "{{count}} minutes",
+        "second_one": "{{count}} second",
+        "second_other": "{{count}} seconds"
+      }
+    },
+    "sort": {
+      "label": "Sort by",
+      "latest": "Latest First",
+      "mostViewed": "Most Viewed First",
+      "mostCommented": "Most Commented First"
+    }
+  },
+  "callFeedback": {
+    "rateTitle": "Rate the AI-generated summary?",
+    "rateSubtitle": "Please rate the quality, let us know what worked well, and share areas for improvement.",
+    "moreSuggestions": "Any more suggestions?",
+    "suggestionPlaceholder": "Anything else that you'd like to share about the summary?",
+    "selectIssues": "Please select one or more issues",
+    "concernPlaceholder": "Describe your concern here.",
+    "submitting": "Submitting...",
+    "submit": "Submit",
+    "submitted": "Feedback submitted successfully",
+    "ratings": {
+      "1": "Poor quality - Needs significant improvement",
+      "2": "Below expectations - Could be much better",
+      "3": "Average quality - Meets basic expectations",
+      "4": "Good quality - Above expectations",
+      "5": "Excellent quality - Highly recommended"
+    },
+    "issues": {
+      "missingKeyInfo": "Missing key information",
+      "inaccurate": "Inaccurate",
+      "tooVague": "Too vague",
+      "difficultToUnderstand": "Difficult to understand",
+      "tooShort": "Too short",
+      "other": "Other"
+    }
+  },
+  "summaryLoading": {
+    "generated": "Summary is generated",
+    "generatedDesc": "You can review the session now.",
+    "failedTitle": "Failed to generate session summary",
+    "noAudioDetected": "No audio detected",
+    "transcriptionDeleted": "Transcription generated & audio deleted",
+    "processingDescSidebar": "An AI-generated summary will be available shortly on this screen. In the meantime, you can add notes below.",
+    "processingDescMain": "An AI-generated summary will be available shortly on this screen and in the session logs. In the meantime, you can add notes below.",
+    "estimatedTime": "Estimated time: ~ {{time}} min",
+    "settingUp": "Setting up your summary screen",
+    "checkLater": "I'll check later",
+    "seeIfReady": "See if its ready",
+    "backToSessionLogs": "Back to session logs",
+    "addNotes": "Add Notes (optional)",
+    "autosaving": "Autosaving",
+    "saved": "Saved",
+    "notesTooltip": "Your notes are saved automatically and will appear under “Additional Notes” after the summary is created.",
+    "notesPlaceholder": "write down your thoughts",
+    "processing": {
+      "generatingTranscription": "Generating transcription",
+      "deletingAudio": "Deleting audio",
+      "segregatingUtterances": "Segregating utterances",
+      "understandingConversation": "Understanding conversation",
+      "chartingFlow": "Charting flow",
+      "extractingKeyPoints": "Extracting key points",
+      "identifyingThemes": "Identifying themes",
+      "analysing": "Analysing",
+      "generatingSummary": "Generating summary",
+      "enrichingSummary": "Enriching summary",
+      "validatingSummary": "Validating summary"
+    }
+  },
+  "search": {
+    "placeholder": "Need guidance? Search here..",
+    "headerDescription": "Guidance, safety, and support — whenever you need it.",
+    "suggestionsTitle": "Try now:",
+    "noResults": "No results found for \"{{query}}\"",
+    "allLabel": "All",
+    "error": "Error fetching search results",
+    "logoAlt": "Ally Logo",
+    "viewMore": "View more",
+    "viewLess": "View less",
+    "categories": {
+      "Techniques": "Techniques",
+      "Assessment": "Assessment",
+      "Intervention": "Intervention",
+      "Resources": "Resources",
+      "Guidelines": "Guidelines",
+      "Support": "Support",
+      "Crisis": "Crisis",
+      "Training": "Training",
+      "Research": "Research",
+      "Policy": "Policy"
+    }
+  },
+  "transcription": {
+    "title": "Annotated Transcript",
+    "empty": "No transcript available",
+    "agentLabel": "AI Agent:",
+    "scribeAgentLabel": "Client:",
+    "youLabel": "You",
+    "clientLabel": "Client",
+    "counsellorLabel": "Counsellor",
+    "aiAgentName": "AI Agent",
+    "aiClientSuffix": "AI client",
+    "accuracyDisclaimer": "Transcription may not always be fully accurate."
+  },
+  "summary": {
+    "disclaimer": "This summary has been generated by AI. Ally AI can make mistakes. Check and edit key details before saving",
+    "generationFailedEditable": "Summary generation couldn't be completed. You can retry, or fill in the details manually below and save.",
+    "retrySummary": "Retry summary",
+    "retrySuccess": "Summary generated successfully",
+    "retryFailed": "Couldn't generate the summary. You can try again or fill it in manually.",
+    "notFoundTitle": "Summary Not Found",
+    "notFoundDesc": "The summary you are looking for does not exist.",
+    "goHome": "Go to Home",
+    "additionalNotes": "Additional Notes",
+    "overallScore": "Overall Score",
+    "save": "Save report",
+    "saving": "Saving...",
+    "enhance": "Enhance",
+    "enhanceFailed": "Couldn't enhance this text. Please try again.",
+    "tabs": {
+      "returnToSelf": "Return to Self",
+      "sessionSummary": "Session summary",
+      "transcript": "Transcript"
+    },
+    "sections": {
+      "featuresAndDemographics": "Features and Demographics",
+      "sessionSummary": "Session Summary",
+      "flow": "Flow",
+      "keyConcerns": "Key concerns",
+      "objectiveObservations": "Objective Observations",
+      "subjectiveObservations": "Subjective Observations",
+      "assessment": "Assessment",
+      "dominantFeelings": "Dominant Feelings",
+      "issuesWorkedOn": "Issues Worked On",
+      "keyTherapeuticTechniques": "Key Therapeutic Techniques",
+      "referralsProvided": "Referrals Provided",
+      "homeworkRecommended": "Homework Recommended",
+      "plansForNextCall": "Plans for Next Call",
+      "tags": "Tags",
+      "metrics": "Metrics",
+      "intake": "Intake",
+      "ongoingRisks": "Risk Assessment"
+    },
+    "placeholders": {
+      "sessionSummary": "Add a short summary of the session’s main points here.",
+      "flow": "Capture how the conversation unfolded and any shifts in the client’s mood.",
+      "keyConcerns": "List any main concerns or stressors raised by the client in this session.",
+      "objectiveObservations": "Document objective statements or observations shared by the clients.",
+      "subjectiveObservations": "Use this space for your impressions, intuitions, or emotional insights.",
+      "assessment": "Summarize your take or therapeutic impression from today's session",
+      "dominantFeelings": "Highlight any emotions that stood out strongly during the session.",
+      "issuesWorkedOn": "Mention what was explored or worked on during the session.",
+      "keyTherapeuticTechniques": "Note any tools, frameworks, or strategies applied in the session.",
+      "referralsProvided": "Note any internal or external referrals or resources shared with the client.",
+      "homework": "Add suggestions or tasks for the client to work on between sessions.",
+      "planForNextCall": "Mention goals or topics to revisit in the next session.",
+      "tags": "Add keywords to help organize or categorize this session.",
+      "select": "Select",
+      "addNote": "Add note"
+    },
+    "fields": {
+      "callId": "Call ID",
+      "callName": "Call Name",
+      "callDuration": "Call Duration",
+      "callDate": "Call Date",
+      "callTime": "Call time",
+      "newCallFollowUp": "New Call Follow Up",
+      "counsellor": "Counsellor",
+      "callQuality": "Call Quality",
+      "callerId": "Caller ID",
+      "counsellorName": "User Name",
+      "callerType": "Caller type",
+      "age": "Age",
+      "gender": "Gender",
+      "profession": "Profession",
+      "relationshipStatus": "Relationship status",
+      "languages": "Languages",
+      "location": "Location",
+      "concernCode": "Concern code",
+      "sessionSummary": "Session Summary",
+      "flow": "Flow",
+      "keyConcerns": "Key concerns",
+      "objectiveObservations": "Objective Observations",
+      "subjectiveObservations": "Subjective Observations",
+      "assessment": "Assessment",
+      "dominantFeelings": "Dominant Feelings",
+      "issuesWorkedOn": "Issues Worked On",
+      "keyTherapeuticTechniques": "Key Therapeutic Techniques",
+      "referralsProvided": "Referrals Provided",
+      "homeworkRecommended": "Homework Recommended",
+      "plansForNextCall": "Plans for Next Call",
+      "tags": "Tags",
+      "listeningRatio": "Listening Ratio",
+      "reflectiveQuestions": "No of Reflective Questions asked",
+      "emotionsLift": "Emotions Lift",
+      "openEndedQuestions": "No of Open Ended Questions asked",
+      "intakeNotes": "Intake Notes",
+      "riskSelfHarm": "Risk, Self Harm",
+      "riskSelfHarmNotes": "Risk, Self Harm Notes",
+      "riskSuicidalThoughts": "Risk, Suicidal Thoughts",
+      "riskSuicidalThoughtsNotes": "Risk, Suicidal Thoughts Notes",
+      "riskSuicidalPlan": "Risk, Suicidal Plan",
+      "riskSuicidalAction": "Risk, Suicidal Action",
+      "riskRunningAway": "Risk, Running Away",
+      "riskRunningAwayNotes": "Risk, Running Away Notes",
+      "traumaPhysicalAbuse": "Trauma, Physical Abuse",
+      "traumaSexualAbuse": "Trauma, Sexual Abuse",
+      "traumaVerbalAbuse": "Trauma, Verbal Abuse",
+      "traumaNeglect": "Trauma, Neglect",
+      "traumaSeparation": "Trauma, Separation from Caregiver/Parent",
+      "traumaDomesticViolence": "Trauma, Witnessed Domestic Violence",
+      "traumaNotes": "Trauma Notes",
+      "assessmentPsychDiagnosis": "Assessment, Psychological Diagnosis",
+      "assessmentPsychDiagnosisNotes": "Assessment, Psychological Diagnosis Notes",
+      "assessmentPsychotropicMeds": "Assessment, Use of Psychotropic Medications",
+      "assessmentPsychotropicMedsNotes": "Assessment, Use of Psychotropic Medications Notes",
+      "assessmentHallucinations": "Assessment, Hallucinations",
+      "assessmentHallucinationsNotes": "Assessment, Hallucinations Notes",
+      "assessmentAffect": "Assessment, Affect",
+      "assessmentSpeech": "Assessment, Speech",
+      "ongoingRiskSelfHarm": "Ongoing Risk, Self Harm",
+      "ongoingRiskSelfHarmNotes": "Ongoing Risk, Self Harm Notes",
+      "ongoingRiskSuicidalThoughts": "Ongoing Risk, Suicidal Thoughts",
+      "ongoingRiskSuicidalPlan": "Ongoing Risk, Suicidal Plan",
+      "ongoingRiskSuicidalAction": "Ongoing Risk, Suicidal Action",
+      "ongoingRiskSuicidalThoughtsNotes": "Ongoing Risk, Suicidal Thoughts Notes",
+      "mode": "Mode"
+    },
+    "options": {
+      "gender": {
+        "male": "Male",
+        "female": "Female",
+        "nonBinary": "Non-binary",
+        "preferNotToSay": "Client Prefers Not to Say"
+      },
+      "risk": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "affect": {
+        "congruent": "Congruent",
+        "incongruent": "Incongruent",
+        "flat": "Flat",
+        "blunted": "Blunted"
+      },
+      "speech": {
+        "clearCoherent": "Clear & Coherent",
+        "sluttering": "Stuttering",
+        "fast": "Fast",
+        "slow": "Slow",
+        "difficultToUnderstand": "Difficult to Understand"
+      }
+    }
+  },
+  "profile": {
+    "settings": {
+      "title": "Profile Settings",
+      "upload_image": "Upload Image",
+      "profile_image": "Profile image",
+      "name": "Name",
+      "email": "Email",
+      "cancel": "Cancel",
+      "done": "Done",
+      "error_image_size": "Image must be under 2MB and have the correct aspect ratio.",
+      "upload_hint": "PNG or JPG files only 1:1 ratio (max 2mb)",
+      "appearance": {
+        "title": "Appearance",
+        "current": "Current",
+        "current_desc": "The classic Ally look",
+        "claude": "Claude",
+        "claude_desc": "Warm, airy, and soft",
+        "carbon": "Carbon",
+        "carbon_desc": "Sharp, precise, and dense"
+      }
+    }
+  },
+  "calls": {
+    "title": "Session Logs",
+    "scribeTitle": "Scribe Logs",
+    "roleplayTitle": "Roleplay Logs",
+    "menu": {
+      "archives": "Archives"
+    },
+    "actions": {
+      "uploadAudio": "Upload audio",
+      "startSession": "Start Session",
+      "createNote": "Create Note"
+    },
+    "createNote": {
+      "title": "New note",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveError": "Couldn't save note",
+      "empty": "No note fields are configured for your organisation.",
+      "voice": {
+        "record": "Record a note",
+        "listening": "Listening…",
+        "paused": "Paused",
+        "pause": "Pause",
+        "resume": "Resume",
+        "stop": "Stop",
+        "ready": "Recording ready",
+        "generate": "Generate notes",
+        "generating": "Generating notes…",
+        "discard": "Discard",
+        "micDenied": "Microphone access was denied. Enable it in your browser settings to record.",
+        "unsupported": "Audio recording isn't supported in this browser.",
+        "noSpeech": "We couldn't hear any speech. Please try recording again.",
+        "generateError": "Couldn't generate notes from the recording. Please try again.",
+        "generated_one": "Filled in {{fields}} from your recording",
+        "generated_other": "Filled in {{count}} fields from your recording: {{fields}}",
+        "nothingExtracted": "We transcribed the audio but couldn't fill any fields from it.",
+        "cancel": "Cancel",
+        "timeout": "This is taking longer than expected, so we stopped waiting. Try again or go back to fill the form manually.",
+        "backToForm": "Back to form",
+        "tryAgain": "Try again",
+        "processing": {
+          "transcribing": "Transcribing your recording…",
+          "extracting": "Extracting note details…",
+          "populating": "Filling in the fields…"
+        },
+        "stillWorking": "Still working — this one is taking longer than usual. You can keep waiting, or cancel and fill the form in yourself.",
+        "extractionFailed": "We saved what you dictated, but couldn't fill the fields from it. Please fill them in below, or try recording again.",
+        "notEnabled": "Voice notes aren't switched on for your organisation. Ask an administrator to enable them.",
+        "closeBlocked": "Finish or discard your recording before closing."
+      }
+    },
+    "table": {
+      "counsellorName": "Counsellor",
+      "dateTime": "Date & Time",
+      "summaryStatus": "Status",
+      "source": "Channel",
+      "actions": "Actions",
+      "scenario": "Role Play",
+      "sessionScore": "Session points",
+      "mode": "Mode"
+    },
+    "duration": {
+      "lessThanOneMinute": "Less than 1 min",
+      "hour": "hr",
+      "hours": "hrs",
+      "minute": "min",
+      "minutes": "mins",
+      "second": "sec",
+      "seconds": "secs"
+    },
+    "userGroups": {
+      "my": "My Logs",
+      "org": "Org Logs"
+    },
+    "fallback": {
+      "callEmptyTitle": "No call logs found",
+      "callEmptyDesc": "Try adjusting filters or refresh the page.",
+      "simEmptyTitle": "No simulation logs found",
+      "simEmptyDesc": "Try adjusting filters or refresh the page.",
+      "callErrorTitle": "Unable to load call logs",
+      "callErrorDesc": "Something went wrong while loading call logs. Please try again.",
+      "simErrorTitle": "Unable to load simulation logs",
+      "simErrorDesc": "Something went wrong while loading simulation logs. Please try again."
+    },
+    "status": {
+      "processing": "Processing",
+      "generated": "Generated",
+      "error": "Error",
+      "noAudio": "No audio detected",
+      "unknown": "Unknown"
+    },
+    "source": {
+      "uploaded": "Uploaded",
+      "liveSession": "Live Session"
+    },
+    "mode": {
+      "scribe": "Scribe",
+      "dictation": "Dictation"
+    },
+    "dialog": {
+      "startSession": {
+        "embedTitle": "Listen Live",
+        "embedDesc": "Ally will hear audio alongside you",
+        "titleNormal": "Start",
+        "titleItalic": "Session",
+        "startScribeMode": "Start Scribe Mode",
+        "startDictationMode": "Start Dictation Mode",
+        "footer": "By starting, you confirm everyone being transcribed has given consent.",
+        "description1": "Ally’s mental health AI scribe safely listens, transcribes ",
+        "description2": "and writes session notes for you."
+      },
+      "delete": {
+        "titleNormal": "Delete",
+        "titleItalic": "session log?",
+        "content": "This action cannot be undone.",
+        "primary": "Delete",
+        "secondary": "Cancel"
+      },
+      "archive": {
+        "confirm": "Confirm",
+        "title": "Archive this",
+        "unarchiveItalic": "Unarchive?",
+        "sessionItalic": "Session?",
+        "unarchiveContent": "Are you sure you want to unarchive this session?",
+        "archiveContent": "Are you sure you want to archive this session? This will hide it from session logs, but you can restore it later.",
+        "unarchive": "Unarchive",
+        "archive": "Archive"
+      }
+    },
+    "archives": {
+      "backAria": "Go back",
+      "title": "Archives",
+      "errorTitle": "Unable to load archives",
+      "errorDesc": "Something went wrong while loading archives. Please try again.",
+      "emptyTitle": "No archived logs found",
+      "emptyDesc": "There are no archived items yet."
+    },
+    "audioUpload": {
+      "title": "Upload audio recording",
+      "uploading": "Uploading your audio file",
+      "loadingWaveform": "Loading waveform...",
+      "fields": {
+        "counsellor": {
+          "label": "Counsellor name",
+          "placeholder": "Select counsellor"
+        },
+        "sessionDate": "Session date",
+        "timeZone": {
+          "label": "Time zone",
+          "placeholder": "Select time zone"
+        },
+        "sessionTime": "Session time"
+      },
+      "actions": {
+        "upload": "Upload"
+      },
+      "errors": {
+        "uploadFailed": "Audio Upload failed!",
+        "genericError": "Failed to upload audio"
+      }
+    },
+    "uploadProgress": {
+      "cancelled": "Upload cancelled",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "clearAll": "Clear all",
+      "noUploads": "No uploads",
+      "inProgress_one": "1 upload in progress",
+      "inProgress_other": "{{count}} uploads in progress",
+      "summaryCancelled_one": "1 upload cancelled",
+      "summaryCancelled_other": "{{count}} uploads cancelled",
+      "completed_one": "1 upload completed",
+      "completed_other": "{{count}} uploads completed",
+      "cancelDialog": {
+        "title": "Cancel",
+        "titleItalic": "upload",
+        "content": "Your upload is not complete. Would you like to cancel the upload?",
+        "primaryButton": "Cancel Upload",
+        "secondaryButton": "Continue Upload"
+      }
+    }
+  },
+  "simulationPage": {
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "pause": "Pause",
+    "resume": "Resume",
+    "pauseControlError": "Couldn't reach the session — please try again",
+    "focus": "Focus",
+    "focused": "Focused",
+    "endSession": "End session",
+    "sessionDuration": "Session Duration:",
+    "dataSafe": "Your data is safe",
+    "waitingForAgent": "Waiting for the agent to join, this could take a few seconds…",
+    "connectingToSession": "Connecting to session...",
+    "simulationCountdownLabel": "Your simulation is about to begin…",
+    "allowMicrophone": "Allow microphone permission",
+    "microphonePromptBrowser": "To start the simulation, please allow microphone permission from your browser.",
+    "microphonePrompt": "To start the simulation, please allow us to use your microphone.",
+    "clickToAllow": "Click to allow microphone and join the session.",
+    "closePreview": "Close Preview",
+    "points": "Points",
+    "sessionTimer": "Session Timer",
+    "timeRemaining": "Time Remaining",
+    "sessionChecklist": "Session Checklist",
+    "progress": "Progress",
+    "completed": "completed",
+    "of": "of",
+    "min": "min",
+    "sec": "sec",
+    "remindersTab": "Reminders",
+    "descriptionTab": "Description",
+    "noRemindersYet": "No reminders for this scenario yet.",
+    "supervisorTab": "Supervisor",
+    "supervisorEmptyState": "Your supervisor is listening — notes appear here when there's something useful.",
+    "supervisorAiLabel": "AI-generated",
+    "supervisorAiTooltip": "Ally is an AI supervisor. It's listening live and sending these notes automatically — not a person.",
+    "connectionFailedTitle": "We couldn't connect you to this session",
+    "connectionFailedMessage": "Sorry — something went wrong setting up this roleplay. Check your internet connection and try again.",
+    "agentNotJoinedTitle": "Your practice partner didn't join",
+    "agentNotJoinedMessage": "Sorry — we reached the session but no one picked up on the other side. Trying again usually sorts it.",
+    "microphoneFailedTitle": "We couldn't use your microphone",
+    "microphoneBlockedMessage": "Your browser or computer is blocking the microphone for this site. Click the lock icon next to the web address and set Microphone to Allow. On Windows, also check Settings → Privacy → Microphone. Then try again.",
+    "microphoneNotFoundMessage": "We couldn't find a microphone on this device. Plug in a headset or microphone, check it is selected in your computer's sound settings, then try again.",
+    "microphoneInUseMessage": "Your microphone is busy, usually because another app such as Teams, Zoom or Meet is using it. Close those apps (or leave the call), then try again.",
+    "microphoneUnknownMessage": "Your browser wouldn't let us use your microphone. Check that a microphone is connected and allowed for this site, then try again.",
+    "retryConnection": "Try again",
+    "exitSimulation": "Leave this session",
+    "reconnecting": "Reconnecting…",
+    "missedSupervisorHints": "Some supervisor hints may not have reached you",
+    "textChat": {
+      "panelLabel": "Text chat",
+      "inChat": "In the chat",
+      "typing": "typing…",
+      "emptyState": "You're connected. Send a message to start the conversation.",
+      "inputLabel": "Your message",
+      "placeholder": "Type a message…",
+      "send": "Send",
+      "notSent": "Not sent",
+      "retry": "Retry",
+      "charactersLeft": "characters left",
+      "you": "You",
+      "connectingHint": "Your conversation will appear here as soon as it opens."
+    },
+    "turnIndicator": {
+      "speaking": "Speaking...",
+      "listening": "Listening...",
+      "yourTurnToSpeak": "Your turn to speak",
+      "yourTurnToListen": "Your turn to listen",
+      "thinking": "Thinking...",
+      "paused": "Paused"
+    },
+    "warningDialog": {
+      "titleNormal": "Session",
+      "titleItalic": "Ending Soon",
+      "content": "Your session will end in 30 seconds.",
+      "continueSession": "Continue Session",
+      "endSession": "End Session"
+    },
+    "endDialog": {
+      "titleNormal": "End ",
+      "titleItalic": "Session",
+      "content": "Are you sure you want to end the session?",
+      "endSession": "End Session",
+      "cancel": "Cancel"
+    }
+  },
+  "audioCall": {
+    "fallback": {
+      "ongoingCall": "There is an ongoing call",
+      "ongoingCallDesc": "You have an active call happening now",
+      "modeNotAvailable": "{{mode}} mode is not available",
+      "noPermission": "You don't have permission to access {{mode}} mode",
+      "noActiveCall": "No Active Call",
+      "noActiveCallDesc": "Your active call will be shown here.",
+      "modeDictation": "Dictation",
+      "modeMicrophone": "Microphone"
+    },
+    "endDialog": {
+      "titleNormal": "End ",
+      "titleItalic": "Session",
+      "content": "Are you sure you want to end this Session",
+      "endSession": "End Session"
+    },
+    "controls": {
+      "resumeTranscription": "Resume Transcription",
+      "pauseTranscription": "Pause Transcription",
+      "focused": "Focused",
+      "focus": "Focus",
+      "endSession": "End session",
+      "muteTooltip": "Need notes captured? AI can't hear you right now. Resume to let it listen.",
+      "dataSafe": "Your data is safe"
+    },
+    "privacy": {
+      "noRecording": "We do not save audio recordings",
+      "encrypted": "Data is encrypted",
+      "noTrainingData": "We do not use your client's data to train our models",
+      "personalInfoRemoved": "Personal information of clients is automatically removed"
+    },
+    "status": {
+      "connecting": "Connecting to your session...",
+      "starting": "Session is starting now..",
+      "takingNotes": "Taking notes"
+    },
+    "notes": {
+      "waitOrEnd": "You can wait for them to rejoin or end the call.",
+      "differentPlatform": "Note: This call was initiated from a different platform. You can listen but cannot control the call (mute/unmute).",
+      "activeInOtherTab": "Note: This call is already active in another tab/window. You can listen but cannot control the call (mute/unmute).",
+      "refreshWarning": "Note: Refreshing, closing the active tab, or network interruptions will end the call.",
+      "scribeStopWarning": "The scribe will stop taking notes once you end the call."
+    },
+    "sidebar": {
+      "isHelpful": "Is this helpful?",
+      "currentStage": "Current Stage:"
+    },
+    "error": {
+      "goBack": "Go back",
+      "tryAgain": "Try again",
+      "noNetwork": "No internet connection",
+      "noNetworkDesc": "Call ended due to network interruption, please check your connection and try again.",
+      "noNetworkSharedDesc": "Please check your connection and try again.",
+      "somethingWrong": "Something went wrong",
+      "somethingWrongDesc": "Call ended due to unknown reason, please try again..",
+      "micBlocked": "Microphone access is blocked",
+      "micBlockedDesc": "Ally needs your microphone to take notes. Allow microphone access for this site in your browser, then try again.",
+      "micUnavailable": "No microphone available",
+      "micUnavailableDesc": "Ally could not start your microphone. Check that one is connected and that no other app is using it, then try again."
+    }
+  },
+  "stressBuster": {
+    "messages": {
+      "gaveBest": "You gave your best in that session",
+      "gaveBestHighlight": "best",
+      "momentForYourself": "Now, take a moment for yourself",
+      "momentHighlight": "yourself"
+    },
+    "returnToSelf": "Return to self",
+    "viewCallSummary": "View Call Summary",
+    "breathing": {
+      "inhale": "Inhale",
+      "hold": "Hold",
+      "exhale": "Exhale"
+    }
+  },
+  "postCallSummary": {
+    "header": {
+      "session": "Session",
+      "summary": "Summary",
+      "shareForReview": "Share for review",
+      "comments": "Comments"
+    },
+    "somethingWentWrongRetry": "Something went wrong. Please try again."
+  },
+  "boxBreathing": {
+    "inhale": "Inhale now",
+    "hold": "Hold breathe",
+    "exhale": "Exhale"
+  },
+  "courseLanding": {
+    "documentTitle": "Course",
+    "eyebrow": "Course",
+    "summary_one": "{{count}} activity",
+    "summary_other": "{{count}} activities",
+    "summaryWithDuration_one": "{{count}} activity · about {{minutes}} min",
+    "summaryWithDuration_other": "{{count}} activities · about {{minutes}} min",
+    "sectionItems_one": "{{count}} activity",
+    "sectionItems_other": "{{count}} activities",
+    "outlineTitle": "What's in this course",
+    "start": "Start course",
+    "loginHint": "You'll log in to start.",
+    "logIn": "Log in",
+    "goToCourses": "Go to my courses",
+    "unavailable": {
+      "title": "This course isn't available",
+      "body": "The link may have been switched off, or the course is no longer published. Check with whoever shared it with you."
+    },
+    "denied": {
+      "toast": "This course isn't available for your account",
+      "title": "This course isn't available for your account",
+      "body": "It hasn't been made available to your organisation or group. If you think you should have it, ask your organisation's admin.",
+      "bodyWithEmail": "You're logged in as {{email}}. This course hasn't been made available to your organisation or group — if you think you should have it, ask your organisation's admin.",
+      "closedTitle": "This course is closed",
+      "closedBody": "It's no longer open to new learners."
+    },
+    "story": {
+      "start": "Take the case",
+      "eyebrow_one": "A case in {{count}} chapter",
+      "eyebrow_other": "A case in {{count}} chapters",
+      "durationMinutes_one": "About {{count}} min",
+      "durationMinutes_other": "About {{count}} min",
+      "durationHours_one": "About {{count}} hour",
+      "durationHours_other": "About {{count}} hours",
+      "roleplayCount_one": "{{count}} roleplay",
+      "roleplayCount_other": "{{count}} roleplays",
+      "sitting": {
+        "short": "5–10 min sittings",
+        "medium": "10–15 min sittings",
+        "long": "15–20 min sittings"
+      },
+      "firstMove": {
+        "eyebrow": "Your first move · a moment from chapter one",
+        "noScore": "No score",
+        "continue": "Continue",
+        "tryAnother": "Try another reply",
+        "loginHint": "Continue opens the login. Nothing you pick here is saved."
+      },
+      "arc": {
+        "eyebrow": "The story",
+        "title_one": "One chapter",
+        "title_other": "{{count}} chapters",
+        "curveLabel": "How the story builds, chapter by chapter, to the hard call",
+        "hardCall": "The hard call",
+        "chapterShort": "Ch. {{number}}",
+        "contentNote": "Content note"
+      },
+      "beats": {
+        "setup": "Setup",
+        "conflict": "Conflict",
+        "challenge": "Challenge",
+        "climax": "Climax",
+        "resolution": "Resolution"
+      },
+      "kinds": {
+        "game": "Game"
+      },
+      "outcomes": {
+        "title": "By the end, you'll be able to"
+      },
+      "howItPlays": {
+        "title": "How it plays",
+        "retry": "Retry any roleplay as often as you like.",
+        "debrief": "Every roleplay ends in a debrief on what you did.",
+        "keep": "Nothing you earn is ever taken away.",
+        "kinds": {
+          "roleplay": {
+            "title_one": "Roleplay",
+            "title_other": "Roleplays",
+            "hint": "Voice practice",
+            "withPersona": "Voice practice with {{name}}"
+          },
+          "case": {
+            "title_one": "Case study",
+            "title_other": "Case studies",
+            "hint": "Linked conversations"
+          },
+          "quiz": {
+            "title_one": "Quick check",
+            "title_other": "Quick checks",
+            "hint": "A few questions each"
+          },
+          "article": {
+            "title_one": "Reading",
+            "title_other": "Readings",
+            "hint": "Short and to the point"
+          },
+          "video": {
+            "title_one": "Video",
+            "title_other": "Videos",
+            "hint": "Watch and notice"
+          },
+          "journal": {
+            "title_one": "Reflection",
+            "title_other": "Reflections",
+            "hint": "In your own words"
+          },
+          "annotation": {
+            "title_one": "Transcript",
+            "title_other": "Transcripts",
+            "hint": "Mark what you notice"
+          },
+          "game": {
+            "title_one": "Game",
+            "title_other": "Games",
+            "hint": "Just for fun"
+          },
+          "scenario": {
+            "title_one": "Scenario",
+            "title_other": "Scenarios",
+            "hint": "Choose, then see what happens"
+          },
+          "bucketSort": {
+            "title_one": "Bucket sort",
+            "title_other": "Bucket sorts",
+            "hint": "Sort, then see why"
+          }
+        }
+      },
+      "cast": {
+        "title": "Who you'll meet",
+        "caller": "{{name}} · the caller"
+      },
+      "xp": {
+        "title": "What you'll earn",
+        "withPractice": "Up to {{xp}} XP for the activities, plus XP for every minute you practise.",
+        "activitiesOnly": "Up to {{xp}} XP for the activities.",
+        "keep": "XP counts towards your level and is never taken away."
+      },
+      "notes": {
+        "title": "Before you start",
+        "includes": "This course includes {{warnings}}.",
+        "warningWithChapters_one": "{{name}} (chapter {{chapters}})",
+        "warningWithChapters_other": "{{name}} (chapters {{chapters}})",
+        "pause": "You can pause or leave any roleplay, and you won't lose anything if you do.",
+        "listAnd": "{{rest}} and {{last}}"
+      },
+      "closing": {
+        "title": "Ready when you are",
+        "body": "Log in with your organisation account to start."
+      }
+    }
+  },
+  "tracks2": {
+    "breadcrumb": "Learn",
+    "language": {
+      "readingIn": "Reading in {{language}}",
+      "change": "Change",
+      "title": "Course language",
+      "subtitle": "Changes this course only — your app language stays as it is.",
+      "changeFailed": "Could not change the course language. Please try again.",
+      "fallback": {
+        "VIDEO_NOT_LOCALISED": "This video is in English",
+        "SCENARIO_NOT_TRANSLATED": "This role play runs in English",
+        "CASE_NOT_TRANSLATED": "This case is in English"
+      }
+    },
+    "coursesTitle": "Courses",
+    "progress": "{{completed}} of {{total}}",
+    "trackCompleted": "Track completed",
+    "lockedTooltip": "Complete the previous items to unlock this",
+    "notFound": "This track could not be found",
+    "backToLearn": "Back to Learn",
+    "viewProgress": "View progress",
+    "progressDashboard": {
+      "title": "Progress",
+      "tapHint": "Tap to see your progress and feedback",
+      "notFound": "This course's progress could not be found",
+      "feedbackHeading": "Consolidated feedback",
+      "feedbackSubheading_one": "Based on {{count}} evaluated practice session",
+      "feedbackSubheading_other": "Based on {{count}} evaluated practice sessions",
+      "feedbackEmpty": "Complete and finish a practice roleplay in this course to see consolidated feedback here.",
+      "scoreTrendAlt": "Score trend: {{first}} to {{latest}} over {{count}} sessions",
+      "latestScore": "Latest: {{score}}",
+      "latestFeedbackHeading": "Latest feedback",
+      "readFullFeedback": "Read full feedback",
+      "practiceNudge": "{{category}} could use more practice.",
+      "sessionsHeading": "Practice sessions",
+      "sessionScore": "Score {{score}}",
+      "sessionPending": "Pending evaluation",
+      "untitledSession": "Practice session",
+      "classification": {
+        "demonstrated": "Demonstrated",
+        "needs_practice": "Needs practice",
+        "insufficient_data": "Not enough practice yet"
+      }
+    },
+    "status": {
+      "completed": "Completed",
+      "inProgress": "In progress"
+    },
+    "meta": {
+      "quiz": "Quiz",
+      "questions": "{{count}} question",
+      "questions_other": "{{count}} questions",
+      "passScore": "pass {{score}}%",
+      "video": "Video",
+      "videoDuration": "{{minutes}} min video",
+      "article": "Article",
+      "journal": "Journal",
+      "prompts": "{{count}} prompt",
+      "prompts_other": "{{count}} prompts",
+      "roleplay": "Roleplay",
+      "minScore": "score {{score}}+",
+      "case": "Case study",
+      "annotationTranscript": "Transcript",
+      "annotationDocument": "Note",
+      "lines": "{{count}} line",
+      "lines_other": "{{count}} lines",
+      "labels": "{{count}} label",
+      "labels_other": "{{count}} labels",
+      "game": "Game · just for fun",
+      "branching": "Scenario quiz",
+      "bucketSort": "Bucket sort",
+      "sortItems": "{{count}} item",
+      "sortItems_other": "{{count}} items"
+    },
+    "continueLearning": {
+      "label": "Continue learning"
+    },
+    "player": {
+      "exit": "Exit",
+      "prev": "Previous",
+      "next": "Next",
+      "finish": "Finish",
+      "overallProgress": "{{pct}}% complete",
+      "loadFailed": "Could not load this item. Please try again.",
+      "trackLoadFailed": "Could not load this course",
+      "trackLoadFailedDescription": "Something went wrong while loading this course. Please try again.",
+      "retry": "Retry",
+      "reviewItem": "Review {{title}}"
+    },
+    "celebration": {
+      "sectionCompleteTitle": "Section complete!",
+      "sectionCompleteBody": "Great work — keep the momentum going.",
+      "trackCompleteTitle": "Course complete!",
+      "trackCompleteBody": "You've finished every item in this course.",
+      "continue": "Continue",
+      "backToLearn": "Back to Learn",
+      "itemsCompleted": "{{count}} items completed"
+    },
+    "article": {
+      "markRead": "Mark as read",
+      "read": "Read",
+      "keepReading": "Keep reading to continue",
+      "increaseFontSize": "Increase text size",
+      "decreaseFontSize": "Decrease text size",
+      "answerQuestionToContinue": "Answer the question to continue",
+      "answerQuestionsToContinue": "Answer the questions to continue",
+      "resourcesHeading": "Resources",
+      "openInNewTab": "Open in new tab",
+      "embedTimedOut": "This page couldn't load here — opened in a new tab instead.",
+      "question": {
+        "title": "Quick check",
+        "submit": "Check answer",
+        "correct": "Correct",
+        "incorrect": "Incorrect",
+        "correctAnswerIs": "The correct answer is marked below.",
+        "answeredHint": "You've answered this one — it can't be changed.",
+        "progress": "{{answered}} of {{total}} answered"
+      }
+    },
+    "video": {
+      "markWatched": "Mark as watched",
+      "watched": "Watched",
+      "loadFailed": "This video could not be loaded.",
+      "openExternally": "Open video externally",
+      "interjection": {
+        "title": "Quick check",
+        "submit": "Submit answer",
+        "continue": "Continue video",
+        "correct": "Correct",
+        "incorrect": "Incorrect",
+        "pending": "Grading your answer…"
+      }
+    },
+    "journal": {
+      "submit": "Submit",
+      "submitted": "Submitted",
+      "placeholder": "Write your thoughts...",
+      "required": "Required",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "saveFailed": "Save failed"
+    },
+    "roleplay": {
+      "intro": "Practice this scenario in a live roleplay.",
+      "start": "Start roleplay",
+      "openCase": "Open case",
+      "replay": "Replay",
+      "completed": "Completed",
+      "completedOn": "Completed {{date}}",
+      "language": "Language"
+    },
+    "quiz": {
+      "intro": {
+        "title": "Quiz",
+        "questionCount": "{{count}} question",
+        "questionCount_other": "{{count}} questions",
+        "passScore": "Pass score: {{score}}%",
+        "attemptsLeft": "{{count}} attempt left",
+        "attemptsLeft_other": "{{count}} attempts left",
+        "unlimitedAttempts": "Unlimited attempts",
+        "start": "Start quiz",
+        "noAttemptsLeft": "No attempts remaining",
+        "notScored": "Not scored — there are no right or wrong answers"
+      },
+      "question": {
+        "progress": "Question {{current}} of {{total}}",
+        "next": "Next",
+        "back": "Back",
+        "submit": "Submit quiz",
+        "selectPrompt": "Select an answer",
+        "selectMultiple": "Select all that apply",
+        "true": "True",
+        "false": "False",
+        "orderPrompt": "Put these in the correct order",
+        "matchPrompt": "Tap a left item, then its match on the right",
+        "dragHandle": "Drag to reorder",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "wordCount": "{{count}} / {{min}} words",
+        "aiGraded": "This answer is graded by AI",
+        "ratePrompt": "Rate each statement",
+        "notScored": "Not scored"
+      },
+      "results": {
+        "title": "Your results",
+        "passed": "Passed",
+        "failed": "Not passed",
+        "scoreLabel": "Score",
+        "yourAnswer": "Your answer",
+        "correct": "Correct",
+        "incorrect": "Incorrect",
+        "explanation": "Explanation",
+        "feedback": "Feedback",
+        "pendingGrading": "Some answers are still being graded.",
+        "finishGrading": "Finish grading",
+        "grading": "Grading...",
+        "retry": "Retry quiz",
+        "next": "Next",
+        "attemptsUsed": "Attempt {{used}} of {{max}}",
+        "notScored": "Not scored",
+        "correctAnswer": "Correct answer",
+        "yourResponses": "Your responses",
+        "noResponse": "No response",
+        "responsesSubmitted": "Responses submitted",
+        "responsesSubmittedBody": "Thanks — your answers have been recorded."
+      }
+    },
+    "question": {
+      "media": {
+        "imageFailed": "This image couldn't load. Check your connection and try again.",
+        "viewLarger": "View larger",
+        "close": "Close",
+        "openVideo": "Open the video",
+        "videoTitle": "Question video"
+      }
+    },
+    "annotation": {
+      "labels": "Labels",
+      "instructions": "Pick a label, then tap every line where you see it. Marking a line that isn't part of the answer costs you points, so mark only what you'd defend. You need {{passScore}}% to pass.",
+      "instructionsNoPenalty": "Pick a label, then tap every line where you see it. Wrong marks don't cost you anything here. You need {{passScore}}% to pass.",
+      "markedCount": "{{count}} marked",
+      "markedCount_other": "{{count}} marked",
+      "submit": "Submit",
+      "markSomethingFirst": "Mark at least one line to submit",
+      "tryAgain": "Try again",
+      "attemptsLeft": "{{count}} attempt left",
+      "attemptsLeft_other": "{{count}} attempts left",
+      "passed": "Passed · pass mark {{passScore}}%",
+      "notYet": "Not yet · pass mark {{passScore}}%",
+      "keyHidden": "The lines you missed stay hidden until you pass or use your last attempt.",
+      "tally": {
+        "found": "{{count}} found",
+        "found_other": "{{count}} found",
+        "missed": "{{count}} missed",
+        "missed_other": "{{count}} missed",
+        "notHere": "{{count}} marked in error",
+        "notHere_other": "{{count}} marked in error"
+      }
+    },
+    "bucketSort": {
+      "whereDoesItGo": "Where does this belong?",
+      "progress": "{{placed}} of {{total}} sorted",
+      "dragHint": "Drag the card onto a bucket, or tap a bucket.",
+      "bucketAria": "Put \"{{item}}\" in {{bucket}}",
+      "correct": "Right!",
+      "notQuite": "Not quite",
+      "belongsIn": "It belongs in {{bucket}}.",
+      "youChose": "You chose {{bucket}}.",
+      "next": "Next item",
+      "seeResults": "See results",
+      "resultsHeading": "All sorted",
+      "firstTry": "{{pct}}% right on the first try",
+      "best": "Best so far: {{pct}}%",
+      "reviewHeading": "Worth another look",
+      "allRight": "Every item went in the right bucket first time.",
+      "practiceAgain": "Sort again",
+      "continue": "Continue",
+      "yourItem": "Item to sort"
+    },
+    "branching": {
+      "sceneHeading": "Scene",
+      "choicesLabel": "Your choices",
+      "youChose": "You chose: {{choice}}",
+      "endingsSeen": "{{seen}} of {{total}} endings seen",
+      "takeaway": "Takeaway",
+      "scoreVsPass": "Your score: {{score}}% (pass mark {{pass}}%)",
+      "passed": "You passed.",
+      "notPassed": "Not quite there yet.",
+      "attemptsLeft": "{{count}} attempt left",
+      "attemptsLeft_other": "{{count}} attempts left",
+      "attemptsExhausted": "You've used all your attempts for now.",
+      "exhaustedHeading": "You've used all your attempts for now",
+      "newRoundIn": "A new round opens in about {{time}}. Your trainer can also open it sooner.",
+      "newRoundReady": "A new round is ready.",
+      "startNewRound": "Start a new round",
+      "startNewRoundFailed": "We couldn't open the new round. Please try again.",
+      "recapHeading": "What you reached",
+      "recapRunLabel": "Attempt {{number}}",
+      "recapScore": "Score: {{score}}%",
+      "backToCourse": "Back to course",
+      "waitHour": "{{count}} hour",
+      "waitHour_other": "{{count}} hours",
+      "waitMinute": "{{count}} minute",
+      "waitMinute_other": "{{count}} minutes",
+      "saving": "Saving your result…",
+      "continueCourse": "Continue course",
+      "tryAgain": "Try again",
+      "playAgain": "Play again",
+      "outcome": {
+        "POSITIVE": "Good outcome",
+        "MIXED": "Mixed outcome",
+        "NEGATIVE": "Difficult outcome"
+      }
+    },
+    "game": {
+      "frameTitle": "Game",
+      "controlsByGame": {
+        "TREX_RUNNER": "Press space or tap to jump. Nothing here is scored.",
+        "TIC_TAC_TOE": "Click or tap a square to play. Nothing here is scored.",
+        "MEMORY_MATCH": "Flip two cards to find a pair. The fewer moves it takes, the closer you get to a perfect eight-move round — which is all the score is, and it counts towards nothing.",
+        "CUB_N_PUP": "Drag the cub along the links to the star. Drag anywhere else to turn the whole grid. Boards you solve are counted, and the count goes nowhere.",
+        "SNAKE": "Swipe or use arrow keys to steer. Nothing here is scored.",
+        "SPROUT": "Press and drag the can over the soil, or use the arrow keys and hold space. Keep the level inside the green band — too much water is as bad as too little. Nothing here is scored towards the course."
+      },
+      "lastScoreByGame": {
+        "TREX_RUNNER": "This run: {{score}}",
+        "TIC_TAC_TOE": "Wins this sitting: {{score}}",
+        "MEMORY_MATCH": "This round: {{score}}% of a perfect round",
+        "CUB_N_PUP": "Solved this sitting: {{score}}",
+        "SNAKE": "This run: {{score}}",
+        "SPROUT": "This sitting: {{score}} growth"
+      },
+      "bestScoreByGame": {
+        "TREX_RUNNER": "Your best: {{score}}",
+        "TIC_TAC_TOE": "Your best: {{score}}",
+        "MEMORY_MATCH": "Your best: {{score}}%",
+        "CUB_N_PUP": "Your best: {{score}} boards",
+        "SNAKE": "Your best: {{score}}",
+        "SPROUT": "Most growth in one sitting: {{score}}"
+      },
+      "optional": "Play as long as you like, or skip straight on — either way you're good to continue.",
+      "loadFailed": "This game could not be loaded.",
+      "loadFailedDescription": "There was a problem loading this game. You're still free to continue — nothing here is scored or required.",
+      "frameStrings": {
+        "MEMORY_MATCH": {
+          "moves": "{{moves}} moves",
+          "restart": "Start over",
+          "wonTitle": "Board cleared",
+          "wonDetail": "{{moves}} moves — {{score}}% of a perfect round",
+          "playAgain": "Play again",
+          "cardLabel": "Card {{number}}"
+        },
+        "SNAKE": {
+          "score": "Score",
+          "best": "Best",
+          "restart": "Start over",
+          "gameOver": "Game over — {{score}}"
+        },
+        "CUB_N_PUP": {
+          "levels": "Levels",
+          "close": "Close",
+          "nextLevel": "Next level",
+          "solved": "{{solved}} of {{total}} solved",
+          "tutorial": "Tutorial",
+          "hintDragToStar": "Drag the cub to the star.",
+          "hintRotate": "Drag anywhere else to turn the grid. The cub and the star turn with it — grey links stay put.",
+          "hintFree": "Blue links turn with the grid. Turn it to join blue and grey links up in different ways.",
+          "hintPivot": "Green links swing round with the grid but keep pointing the same way.",
+          "hintRotateLink": "Red links stay where they are but spin with the grid."
+        },
+        "SPROUT": {
+          "pickerLabel": "Choose a plant",
+          "plantSUCCULENT": "Succulent",
+          "plantMARIGOLD": "Marigold",
+          "plantFERN": "Fern",
+          "plantTOMATO": "Tomato",
+          "visitorsLabel": "Visitors",
+          "hintStart": "Hold the can over the soil. Keep the water level inside the green band — too much is as bad as too little.",
+          "aimSoil": "Aiming at the soil.",
+          "aimLeaves": "Aiming at the leaves. Water on the leaves does not reach the roots.",
+          "aimAway": "Aiming past the pot.",
+          "stateDry": "Thirsty. The soil has dried out and growing has stopped.",
+          "stateGood": "Just right. It is growing.",
+          "stateWet": "Too wet. The saucer is flooding — ease off and let it drink.",
+          "stage0": "Seed",
+          "stage1": "Sprout",
+          "stage2": "Stem",
+          "stage3": "Leaves",
+          "stage4": "Bud",
+          "stage5": "Bloom",
+          "leafDropped": "A leaf yellowed and dropped from the wet soil.",
+          "leafScorched": "Water sat on a leaf in full sun and scorched it.",
+          "bloomed": "It bloomed. {{blooms}} so far this sitting.",
+          "plantAnother": "Plant another",
+          "visitorArrived": "A {{visitor}} came by.",
+          "visitorBEE": "bee",
+          "visitorBUTTERFLY": "butterfly",
+          "visitorLADYBIRD": "ladybird"
+        }
+      }
+    },
+    "discussion": {
+      "title": "Discussion",
+      "titleWithCount": "Discussion ({{count}})",
+      "emptyTitle": "No posts yet",
+      "emptyBody": "Be the first to share how you'd approach this — there are no wrong answers here.",
+      "placeholder": "Share your thoughts in your own words…",
+      "replyPlaceholder": "Write a reply…",
+      "editLabel": "Edit your post",
+      "post": "Post",
+      "reply": "Reply",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "charCount": "{{count}} / {{max}}",
+      "edited": "(edited)",
+      "editedByModerator": "(edited by moderator)",
+      "deletedByAuthor": "[deleted by author]",
+      "unknownAuthor": "Former member",
+      "you": "You",
+      "justNow": "Just now",
+      "timeAgo": "{{time}} ago",
+      "discussionLocked": "This discussion is locked",
+      "threadLocked": "This thread is locked",
+      "threadLockedBadge": "Locked",
+      "lockThread": "Lock thread",
+      "unlockThread": "Unlock thread",
+      "lockDiscussion": "Lock discussion",
+      "unlockDiscussion": "Unlock discussion",
+      "loadFailed": "Couldn't load the discussion.",
+      "retry": "Retry",
+      "actionFailed": "Something went wrong. Please try again.",
+      "deleteTitle": "Delete",
+      "deleteTitleItalic": "post?",
+      "deleteModeratorBody": "This removes the post and all of its replies for everyone. This can't be undone.",
+      "deleteWithRepliesBody": "Your post will be replaced with “[deleted by author]” so the replies keep their context. This can't be undone.",
+      "deleteBody": "Your post will be removed. This can't be undone."
+    }
+  },
+  "errorBoundary": {
+    "pageTitle": "Sorry — this page stopped working",
+    "pageMessage": "Something went wrong while showing this page. Try again, or reload if that doesn't help.",
+    "panelTitle": "Sorry — this section stopped working",
+    "panelMessage": "Something went wrong here. The rest of the app still works — try again, or come back to this later.",
+    "tryAgain": "Try again",
+    "reloadPage": "Reload the page",
+    "detailLabel": "Technical detail"
+  },
+  "helplineTalker": {
+    "loading": "Loading…",
+    "orgFallback": "this helpline",
+    "header": {
+      "quickExit": "Quick exit",
+      "quickExitHint": "Leave this page straight away. Your chat is cleared from this device.",
+      "moreOptions": "More options",
+      "endChat": "End chat",
+      "leaveQueue": "Leave the queue",
+      "deleteConversation": "Delete my conversation"
+    },
+    "resources": {
+      "title": "If you need help right now",
+      "fallback": "If you are in immediate danger, call {{emergency}}. Tele-MANAS offers free, 24×7 mental-health support: call {{teleManasShort}} or {{teleManasLong}}."
+    },
+    "consent": {
+      "title": "Talk to someone at {{org}}",
+      "intro": "A private text chat with a trained listener from {{org}}.",
+      "notEmergencyTitle": "This is not an emergency service",
+      "notEmergencyBody": "If you are in danger right now, please use these numbers instead:",
+      "aiTitle": "AI helps your listener",
+      "aiBody": "Your listener uses AI tools that read the conversation to help them reply and to notice if you may be at risk. Every message you receive is written by a person.",
+      "privacyTitle": "What stays private",
+      "privacyBody": "What you share stays within {{org}}'s helpline team, which may include a supervisor. If you or someone else may be in danger, the team may follow its safety procedure.",
+      "retentionTitle": "How long it is kept",
+      "retentionBody_one": "Your conversation is kept for {{count}} day, then deleted. You can delete it yourself at any time.",
+      "retentionBody_other": "Your conversation is kept for {{count}} days, then deleted. You can delete it yourself at any time.",
+      "retentionForever": "Your conversation is kept until you delete it. You can delete it yourself at any time.",
+      "deviceTitle": "On a shared device?",
+      "deviceBody": "Use Quick exit to leave this page at once. Closing the tab ends the chat on this device.",
+      "ageNoticeTitle": "Please note",
+      "nameLabel": "What should we call you? (optional)",
+      "namePlaceholder": "Anonymous",
+      "nameHint": "You don't need to use your real name.",
+      "languageLabel": "Language",
+      "start": "Start chat",
+      "starting": "Starting…",
+      "agreement": "Starting a chat means you've read the points above.",
+      "notice": {
+        "network": "We couldn't start your chat. Check your connection and try again.",
+        "consentOutdated": "This page was just updated. Please read it again, then start your chat.",
+        "blocked": "This helpline can't take a chat from this device right now.",
+        "sessionExpired": "Your earlier chat on this device has ended.",
+        "rateLimited": "Several chats were started from here recently. Please try again a little later.",
+        "generic": "Something went wrong. Please try again."
+      }
+    },
+    "waiting": {
+      "title": "You're in line",
+      "next": "You're next in line",
+      "position_ordinal_one": "You're {{count}}st in line",
+      "position_ordinal_two": "You're {{count}}nd in line",
+      "position_ordinal_few": "You're {{count}}rd in line",
+      "position_ordinal_many": "You're {{count}}th in line",
+      "position_ordinal_other": "You're {{count}}th in line",
+      "estimate_one": "Usually about {{count}} minute",
+      "estimate_other": "Usually about {{count}} minutes",
+      "estimateUnderMinute": "Usually less than a minute",
+      "body": "A listener will join as soon as one is free. You can keep this page open in the background.",
+      "composerHint": "You can start typing what's on your mind — your listener will see it when they join.",
+      "leave": "Leave the queue",
+      "leaveTitle": "Leave the queue?",
+      "leaveBody": "You'll lose your place in line. You can start a new chat at any time.",
+      "leaveConfirm": "Leave",
+      "stay": "Stay in line"
+    },
+    "closed": {
+      "title": "Nobody is available right now",
+      "body": "Our listeners aren't free at the moment. Please try again a little later.",
+      "outsideHoursBody": "The helpline is closed right now.",
+      "hoursTitle": "Opening hours",
+      "hoursTimezone": "Times are in {{tz}}.",
+      "closedDay": "Closed",
+      "busyTitle": "We're very busy right now",
+      "busyBody": "A lot of people are waiting to talk. Please try again in a little while.",
+      "tryAgain": "Try again",
+      "checking": "Checking…"
+    },
+    "notAvailable": {
+      "title": "This helpline isn't available",
+      "body": "The link may be wrong, or this helpline isn't taking chats."
+    },
+    "error": {
+      "title": "Something went wrong",
+      "body": "We couldn't load this page. Check your connection and try again.",
+      "retry": "Try again"
+    },
+    "chat": {
+      "withListener": "Chatting with {{name}}",
+      "listenerFallback": "your listener",
+      "conversation": "Conversation",
+      "you": "You",
+      "typing": "{{name}} is typing…",
+      "sending": "Sending…",
+      "sent": "Sent",
+      "notSent": "Not sent",
+      "retry": "Retry",
+      "composerLabel": "Message",
+      "composerPlaceholder": "Type a message",
+      "send": "Send",
+      "charactersLeft_one": "{{count}} character left",
+      "charactersLeft_other": "{{count}} characters left",
+      "reconnecting": "Reconnecting… Anything you type is kept here and you can send it when we're back.",
+      "endTitle": "End this chat?",
+      "endBody": "Your listener will see that you've left. You can start a new chat at any time.",
+      "endConfirm": "End chat",
+      "keepChatting": "Keep chatting",
+      "actionFailed": "That didn't work. Please try again.",
+      "sendError": {
+        "rate_limited": "You're sending messages quickly. Please wait a moment, then retry.",
+        "too_long": "That message is too long to send.",
+        "chat_ended": "This chat has ended.",
+        "generic": "Your message wasn't sent."
+      },
+      "system": {
+        "accepted": "{{name}} has joined the chat",
+        "transferring": "Your chat is being passed to another listener. Please stay here.",
+        "listenerReconnecting": "Your listener's connection dropped. They'll be back shortly.",
+        "listenerBack": "Your listener is back.",
+        "ended": "The chat has ended.",
+        "resourcesTitle": "Support you can reach right now"
+      }
+    },
+    "ended": {
+      "title": "This chat has ended",
+      "defaultClosing": "Thank you for reaching out. Take care of yourself, and come back whenever you need to talk.",
+      "leftQueueTitle": "You've left the queue",
+      "leftQueueBody": "You can start a new chat whenever you're ready.",
+      "waitExpiredTitle": "No listener was free in time",
+      "waitExpiredBody": "We're sorry you had to wait. Please try again, or use the numbers below if you need help now.",
+      "ratingQuestion": "How was this chat for you?",
+      "ratingOption": "{{count}} out of 5",
+      "ratingLow": "Not helpful",
+      "ratingHigh": "Very helpful",
+      "commentLabel": "Anything you'd like to tell us? (optional)",
+      "submit": "Send feedback",
+      "submitting": "Sending…",
+      "thanks": "Thank you. Your feedback helps us support people better.",
+      "feedbackError": "We couldn't send your feedback. Please try again.",
+      "startNew": "Start a new chat"
+    },
+    "delete": {
+      "title": "Delete your conversation?",
+      "body": "Everything you and your listener wrote will be erased now. This can't be undone. If the chat is still open, it will end.",
+      "confirm": "Delete",
+      "cancel": "Cancel",
+      "deleting": "Deleting…",
+      "failed": "We couldn't delete your conversation. Please try again.",
+      "doneTitle": "Your conversation has been deleted",
+      "doneBody": "Nothing you wrote is kept. You can close this page, or start a new chat."
+    }
+  },
+  "helplineWorkspace": {
+    "subnav": {
+      "label": "Helpline sections",
+      "lobby": "Lobby",
+      "history": "History",
+      "monitor": "Monitor",
+      "qa": "Quality",
+      "team": "Team",
+      "myFeedback": "My feedback"
+    },
+    "gate": {
+      "loading": "Loading the helpline…",
+      "disabledTitle": "The text helpline isn't turned on",
+      "disabledBody": "Your organisation's text helpline is switched off. Ask your Ally contact to turn it on.",
+      "loadFailed": "We couldn't load the helpline. Check your connection and try again.",
+      "retry": "Try again"
+    },
+    "connection": {
+      "connected": "Live",
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "hint": "Live updates pause while you're offline. Anything you send waits here until you're back."
+    },
+    "presence": {
+      "label": "Your status",
+      "available": "Available",
+      "away": "Away",
+      "tooltip": "Available listeners can claim chats. Away keeps your open chats but you won't be alerted to new talkers.",
+      "load_one": "{{active}} of {{count}} chat",
+      "load_other": "{{active}} of {{count}} chats",
+      "failed": "Couldn't change your status. Please try again.",
+      "notificationsBlocked": "Browser notifications are blocked, so you'll only hear a sound when someone joins the queue."
+    },
+    "lobby": {
+      "title": "Lobby",
+      "waitingTitle": "Waiting to talk",
+      "waitingCount_one": "{{count}} waiting",
+      "waitingCount_other": "{{count}} waiting",
+      "listenersAvailable_one": "{{count}} listener available",
+      "listenersAvailable_other": "{{count}} listeners available",
+      "emptyWaiting": "No one is waiting right now.",
+      "awayEmpty": "You're Away — set yourself Available to take new chats.",
+      "claim": "Claim",
+      "claiming": "Claiming…",
+      "claimDisabledAway": "Set yourself Available to claim chats.",
+      "claimDisabledCapacity": "You're at your limit of {{max}} chats. Finish one to take another.",
+      "claimDisabledPermission": "Your role can't claim chats.",
+      "claimDisabledTargeted": "This chat was passed to another listener.",
+      "passedToYou": "Passed to you",
+      "transfer": "Transfer",
+      "transferFrom": "From {{name}}",
+      "waitingFor": "Waiting {{time}}",
+      "noPreview": "No message yet",
+      "alreadyClaimed": "Someone else just picked this up.",
+      "atCapacity": "You're at your chat limit. Finish a chat before claiming another.",
+      "notAvailable": "Set yourself Available before claiming a chat.",
+      "claimFailed": "Couldn't claim this chat. Please try again.",
+      "myChatsTitle": "My chats",
+      "myChatsEmpty": "You have no open chats.",
+      "unread_one": "{{count}} unread",
+      "unread_other": "{{count}} unread",
+      "lastMessage": "Last message {{time}} ago",
+      "profileButton": "My helpline profile",
+      "notificationTitle": "Someone is waiting to talk",
+      "highRiskWaiting": "A talker who may be at high risk is waiting."
+    },
+    "risk": {
+      "HIGH": "High risk",
+      "ELEVATED": "Possible risk",
+      "NONE": "None"
+    },
+    "profile": {
+      "title": "My helpline profile",
+      "aliasLabel": "Name shown to talkers",
+      "aliasHint": "Talkers see only this name. A first name or an alias is fine.",
+      "aliasRequired": "Enter the name talkers will see.",
+      "maxLabel": "Chats at once",
+      "maxHint": "Up to {{max}}, your organisation's limit.",
+      "languagesLabel": "Languages I can chat in",
+      "notificationsLabel": "Alert me when someone joins the queue",
+      "notificationsHint": "A short sound, plus a browser notification when this tab isn't in view. It never shows what anyone wrote.",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "saved": "Profile saved",
+      "failed": "Couldn't save your profile."
+    },
+    "chat": {
+      "back": "Back to lobby",
+      "loading": "Loading chat…",
+      "loadFailed": "We couldn't load this chat.",
+      "notFound": "This chat doesn't exist, or you can't see it.",
+      "retry": "Try again",
+      "status": {
+        "WAITING": "Waiting",
+        "ACTIVE": "Active",
+        "ENDED": "Ended"
+      },
+      "transcriptLabel": "Transcript",
+      "talkerFallback": "Talker",
+      "you": "You",
+      "staffOnly": "Only staff see this",
+      "talkerSees": "The talker sees this",
+      "system": {
+        "ACCEPTED": "{{name}} joined the chat",
+        "RESOURCES": "Emergency resources were sent to the talker",
+        "CLOSING": "Closing message sent to the talker",
+        "TRANSFERRING": "The talker was told their chat is being passed on",
+        "LISTENER_RECONNECTING": "The talker was told their listener's connection dropped",
+        "LISTENER_BACK": "The talker was told their listener is back",
+        "ENDED": "Chat ended",
+        "TALKER_DISCONNECTED": "Talker disconnected",
+        "TALKER_RECONNECTED": "Talker reconnected",
+        "TAKEN_OVER": "A supervisor took over this chat",
+        "TRANSFERRED": "Chat transferred",
+        "ASSIGNED": "Chat assigned",
+        "generic": "Chat update",
+        "risk": "Risk flagged here: {{level}} · {{source}}",
+        "SUPERVISOR_REQUESTED": "{{name}} asked a supervisor for help",
+        "riskFolded": "Flagged again"
+      },
+      "typing": "{{name}} is typing…",
+      "composerLabel": "Reply",
+      "composerPlaceholder": "Write a reply…",
+      "send": "Send",
+      "readOnly": "You're viewing this chat. Only the listener of record can reply.",
+      "ended": "This chat has ended.",
+      "noPermission": "Your role can't send messages in a chat.",
+      "sending": "Sending…",
+      "notSent": "Not sent",
+      "retrySend": "Retry",
+      "sendError": {
+        "rate_limited": "Sending too fast. Wait a moment, then retry.",
+        "too_long": "That message is too long.",
+        "chat_ended": "This chat has ended.",
+        "not_allowed": "You can't reply in this chat.",
+        "generic": "Your message wasn't sent."
+      },
+      "charactersLeft_one": "{{count}} character left",
+      "charactersLeft_other": "{{count}} characters left",
+      "showCopilot": "Show copilot",
+      "hideCopilot": "Hide copilot",
+      "showInfo": "Show talker details",
+      "hideInfo": "Hide talker details",
+      "erased": "This chat's content has been erased.",
+      "otherStaff": "Another listener",
+      "systemNamed": {
+        "TRANSFERRED": "Transferred to {{name}}",
+        "ASSIGNED": "Assigned to {{name}}",
+        "TAKEN_OVER": "{{name}} took over this chat",
+        "SUPERVISOR_REQUESTED_NOTE": "{{name}} asked a supervisor for help: “{{note}}”"
+      }
+    },
+    "copilot": {
+      "title": "Copilot",
+      "about": "Suggestions are drafts written by AI from the conversation. They are never sent automatically: edit them into your own words before you send.",
+      "unavailable": "Copilot unavailable",
+      "unavailableHint": "Suggestions, nudges and summaries have paused. Risk keywords are still checked. Carry on as you normally would.",
+      "off": "Copilot is off for your organisation.",
+      "beforeFirst": "Suggestions appear after the talker writes.",
+      "suggestionsTitle": "Suggested replies",
+      "noSuggestions": "No suggestions for this turn.",
+      "use": "Use",
+      "useHint": "Puts this text in your reply box to edit. Nothing is sent.",
+      "useLabel": "Use this suggestion",
+      "helpful": "Helpful",
+      "notHelpful": "Not helpful",
+      "feedbackFailed": "Couldn't save your feedback.",
+      "nudgeTitle": "Coaching nudge",
+      "stageLabel": "Stage",
+      "stages": {
+        "Engage": "Engage",
+        "Understand": "Understand",
+        "Support": "Support",
+        "Close": "Close"
+      },
+      "summaryTitle": "Rolling summary",
+      "summaryEmpty": "A summary appears after a few turns.",
+      "finalSummaryTitle": "Final summary",
+      "finalSummaryEmpty": "No final summary was saved for this chat.",
+      "editSummary": "Edit summary",
+      "editedBy": "Edited by {{name}}",
+      "whispersTitle": "From your supervisor",
+      "whispersEmpty": "No messages from a supervisor.",
+      "unavailableNow": "Copilot is unavailable right now"
+    },
+    "riskBanner": {
+      "title": {
+        "HIGH": "High risk",
+        "ELEVATED": "Possible risk"
+      },
+      "source": {
+        "KEYWORD": "Keyword match",
+        "CLASSIFIER": "AI classifier"
+      },
+      "subjectOther": "About someone else",
+      "signal": "They wrote: ‘{{signal}}’",
+      "supervisorAlerted": "Your supervisor has been alerted.",
+      "resourcesSent": "Emergency resources were sent to the talker.",
+      "checklistTitle": "What to do now",
+      "acknowledge": "Acknowledge",
+      "falsePositive": "Mark false positive",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Anything a reviewer should know",
+      "saving": "Saving…",
+      "ackFailed": "Couldn't save. The flag stays open until it's acknowledged.",
+      "noted": "Risk noted",
+      "notedFalse": "Marked false positive",
+      "noSupervisorAlerted": "No supervisor could be alerted automatically — use Alert a supervisor or follow your organisation's emergency procedure.",
+      "folded_one": "Flagged {{count}} time",
+      "folded_other": "Flagged {{count}} times",
+      "foldedLatest_one": "Flagged {{count}} time · latest: ‘{{signal}}’",
+      "foldedLatest_other": "Flagged {{count}} times · latest: ‘{{signal}}’",
+      "raised": "Raised from possible to high risk.",
+      "hideSteps": "Hide steps",
+      "showSteps": "Show steps"
+    },
+    "info": {
+      "title": "Talker",
+      "name": "Name",
+      "language": "Language",
+      "waited": "Waited",
+      "channel": "Channel",
+      "channels": {
+        "TEXT_WEB": "Web chat",
+        "TEXT_WHATSAPP": "WhatsApp"
+      },
+      "consent": "Consent version",
+      "connection": "Connection",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "risk": "Risk",
+      "listener": "Listener",
+      "actions": "Actions",
+      "endChat": "End chat",
+      "endTitle": "End this chat?",
+      "endBody": "The talker will see that the chat has ended. You'll then review the summary.",
+      "endConfirm": "End chat",
+      "endAnyway": "End anyway",
+      "openRiskHigh": "This chat has an open high-risk flag. The talker may still be at risk — the checklist says not to end the chat while they are at risk.",
+      "openRiskElevated": "This chat has an open risk flag that hasn't been reviewed.",
+      "cancel": "Cancel",
+      "endFailed": "Couldn't end the chat. Please try again.",
+      "transfer": "Transfer",
+      "blocked": "Blocked"
+    },
+    "summary": {
+      "title": "Review the summary",
+      "intro": "Check the AI draft and correct anything that's wrong. It stays with this chat's record.",
+      "drafting": "Drafting summary…",
+      "draftTimeout": "The draft didn't arrive. You can write the summary yourself.",
+      "save": "Save and close",
+      "saving": "Saving…",
+      "skip": "Skip for now",
+      "saved": "Summary saved",
+      "failed": "Couldn't save the summary.",
+      "noFields": "No summary fields are set up for your organisation."
+    },
+    "wellbeing": {
+      "title": "Take a minute",
+      "body": "That was a hard conversation. Before your next chat, take a few minutes for yourself: step away from the screen, breathe, have some water.",
+      "support": "If you'd like to talk it through: {{contact}}",
+      "back": "Back to lobby"
+    },
+    "history": {
+      "title": "History",
+      "intro": "Chats you've finished.",
+      "empty": "You haven't finished any chats yet.",
+      "loadFailed": "Couldn't load your history.",
+      "columns": {
+        "talker": "Talker",
+        "date": "Date",
+        "duration": "Duration",
+        "risk": "Risk",
+        "reason": "How it ended",
+        "erased": "Content",
+        "feedback": "Feedback"
+      },
+      "erased": "Erased",
+      "kept": "Kept",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{page}} of {{pages}}"
+    },
+    "endedReason": {
+      "LISTENER_ENDED": "Listener ended",
+      "TALKER_ENDED": "Talker ended",
+      "TALKER_LEFT_QUEUE": "Talker left the queue",
+      "TALKER_DISCONNECTED": "Talker disconnected",
+      "WAIT_EXPIRED": "Wait expired",
+      "QUEUE_ABANDONED": "Left while waiting",
+      "SUPERVISOR_ENDED": "Supervisor ended",
+      "TALKER_ERASED": "Talker deleted the chat",
+      "TALKER_BLOCKED": "Talker blocked",
+      "unknown": "Ended"
+    },
+    "time": {
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min",
+      "hoursMinutes": "{{hours}} h {{minutes}} min"
+    },
+    "skills": {
+      "rapport": "Build rapport",
+      "confidentiality": "Explain confidentiality",
+      "feelings": "Explore feelings",
+      "empathy": "Show empathy",
+      "harm": "Ask about safety",
+      "functioning": "Daily life",
+      "explanation": "Their explanation",
+      "family": "Trusted people",
+      "goals": "Set goals together",
+      "hope": "Realistic hope",
+      "coping": "Coping",
+      "psychoeducation": "Explain simply",
+      "feedback": "Ask for feedback",
+      "verbal": "Clear wording"
+    },
+    "alertSupervisor": {
+      "button": "Alert a supervisor",
+      "noteLabel": "What do you need? (optional)",
+      "notePlaceholder": "For example: please join this chat",
+      "noteCount": "{{count}}/{{max}}",
+      "send": "Send alert",
+      "sending": "Sending…",
+      "sent": "Supervisor alerted",
+      "noneSetUp": "No supervisor is set up for your organisation — follow your organisation's emergency procedure.",
+      "supportContact": "Support: {{contact}}",
+      "failed": "Couldn't alert a supervisor. Try again, or follow your organisation's emergency procedure.",
+      "alertedJustNow": "Alerted just now",
+      "alertedAgo_one": "Alerted {{count}} min ago",
+      "alertedAgo_other": "Alerted {{count}} min ago",
+      "coolingDownHint": "You can send another alert 2 minutes after the last one."
+    },
+    "alerts": {
+      "open": "Open",
+      "notificationTitle": "Helpline alert",
+      "types": {
+        "RISK_HIGH": "A talker may be at high risk.",
+        "HIGH_RISK_WAITING": "A talker who may be at high risk is waiting.",
+        "LISTENER_DISCONNECTED": "A listener has been disconnected from a live chat.",
+        "TRANSFER_REQUESTED": "A chat is waiting to be transferred.",
+        "LISTENER_REQUESTED_HELP": "A listener is asking for a supervisor."
+      },
+      "forYou": {
+        "ASSIGNED": "A chat was assigned to you.",
+        "TRANSFER_REQUESTED": "A chat is being passed to you."
+      }
+    },
+    "whisper": {
+      "hint": "Whisper to {{name}} — only staff see this, never the talker.",
+      "label": "Whisper to {{name}}",
+      "placeholder": "Keep it short — {{name}} reads it mid-chat",
+      "send": "Send whisper",
+      "failed": "Couldn't send the whisper. Please try again.",
+      "inlineToMe": "Supervisor whisper — only you can see this",
+      "inlineFromMe": "Your whisper to {{name}} — the talker can't see this",
+      "inlineOther": "Supervisor whisper — the talker can't see this"
+    },
+    "transfer": {
+      "action": "Request transfer",
+      "title": "Pass this chat to another listener?",
+      "body": "The talker is told their chat is being passed on. Stay with them until another listener picks it up.",
+      "bodySupervisor": "The talker is told their chat is being passed on. Their listener stays with them until another listener picks it up.",
+      "targetLabel": "Pass to (optional)",
+      "anyone": "Anyone available",
+      "noneAvailable": "No one else is available right now. The chat waits in the lobby for the next available listener.",
+      "confirm": "Request transfer",
+      "requested": "Transfer requested",
+      "failed": "Couldn't request a transfer. Please try again.",
+      "pending": "Transfer requested — waiting for another listener",
+      "pendingListener": "Transfer requested — waiting for another listener. Stay with the talker until someone picks it up.",
+      "pendingShort": "Waiting for a listener",
+      "nowWith": "This chat is now with {{name}}.",
+      "previousBanner": "This chat is now with {{name}}. You can still read it, but only they can reply.",
+      "previousComposer": "This chat is now with {{name}}. Only they can reply."
+    },
+    "takeOver": {
+      "action": "Take over",
+      "title": "Take over this chat?",
+      "body": "You become the talker's listener now, and {{name}} can no longer reply. Often a whisper is enough — take over when the talker's safety needs it.",
+      "confirm": "Take over",
+      "failed": "Couldn't take over this chat. Please try again.",
+      "nowYours": "You're now this chat's listener."
+    },
+    "block": {
+      "action": "Block talker",
+      "title": "Block this talker?",
+      "body": "This ends the chat now and refuses new chats from this device or network for 24 hours. The talker sees a neutral message.",
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "Kept with this chat's record for your team",
+      "confirm": "Block and end chat",
+      "done": "Talker blocked. The chat has ended.",
+      "failed": "Couldn't block this talker. Please try again.",
+      "blockedShort": "Blocked for 24 hours"
+    },
+    "monitor": {
+      "title": "Monitor",
+      "intro": "Live chats, the queue and who is on. Open a chat to read along, whisper to its listener, or step in.",
+      "noAccess": "The Monitor is for supervisors.",
+      "viewsLabel": "Monitor views",
+      "views": {
+        "live": "Live",
+        "calibration": "Risk calibration"
+      },
+      "loadFailed": "Couldn't load the monitor.",
+      "browserAlertsOn": "Turn on browser alerts",
+      "browserAlertsBlocked": "Browser notifications are blocked, so alerts only show while this tab is open.",
+      "tiles": {
+        "waiting": "Waiting",
+        "active": "Active chats",
+        "listenersAvailable": "Listeners available",
+        "openHighFlags": "Open high-risk flags"
+      },
+      "activeTitle": "Active chats",
+      "activeEmpty": "No active chats right now.",
+      "waitingTitle": "Waiting to talk",
+      "listenersTitle": "Listeners",
+      "listenersEmpty": "No one is set up as a listener yet.",
+      "columns": {
+        "listener": "Listener",
+        "talker": "Talker",
+        "duration": "Duration",
+        "risk": "Risk",
+        "lastMessage": "Last message",
+        "listenerConnection": "Listener connection",
+        "talkerConnection": "Talker connection",
+        "transfer": "Transfer",
+        "openFlags": "Open flags",
+        "waited": "Waiting",
+        "language": "Language",
+        "kind": "Type",
+        "actions": "Actions",
+        "status": "Status",
+        "chats": "Chats",
+        "languages": "Languages"
+      },
+      "ago": "{{time}} ago",
+      "kindNew": "New",
+      "assignedTo": "for {{name}}",
+      "presence": {
+        "AVAILABLE": "Available",
+        "AWAY": "Away",
+        "OFFLINE": "Offline"
+      },
+      "load": "{{active}} of {{max}}",
+      "assign": {
+        "action": "Assign to…",
+        "title": "Assign {{name}}",
+        "body": "Choose an available listener. The chat is held for them and they're alerted.",
+        "listenerLabel": "Listener",
+        "choose": "Choose a listener",
+        "option": "{{name}} · {{active}} of {{max}} chats",
+        "noneAvailable": "No listener is available with room for another chat.",
+        "confirm": "Assign",
+        "done": "Assigned to {{name}}. They've been alerted.",
+        "gone": "Someone picked this chat up, or it ended.",
+        "failed": "Couldn't assign this chat. Please try again."
+      }
+    },
+    "calibration": {
+      "title": "Risk calibration",
+      "explainerLabel": "About risk calibration",
+      "explainer": "How this organisation's risk flags turned out, as marked by the listeners who reviewed them. Use it to tune your risk threshold: many false positives from the AI classifier suggest it is set too low. Your Ally contact can change it.",
+      "windowLabel": "Period",
+      "window_one": "Last {{count}} day",
+      "window_other": "Last {{count}} days",
+      "byOutcome": "By outcome",
+      "bySource": "By source",
+      "outcome": {
+        "UNREVIEWED": "Unreviewed",
+        "CONFIRMED": "Confirmed",
+        "FALSE_POSITIVE": "False positive"
+      },
+      "listTitle": "Flags",
+      "empty_one": "No risk flags in the last {{count}} day.",
+      "empty_other": "No risk flags in the last {{count}} days.",
+      "loadFailed": "Couldn't load risk flags.",
+      "columns": {
+        "date": "Raised",
+        "level": "Level",
+        "source": "Source",
+        "confidence": "Confidence",
+        "outcome": "Outcome",
+        "note": "Note",
+        "chat": "Chat",
+        "band": "Confidence",
+        "hits": "Hits"
+      },
+      "percent": "{{value}}%",
+      "openChat": "Open chat",
+      "sourceOutcomes": "{{confirmed}} confirmed · {{falsePositive}} false positive · {{unreviewed}} unreviewed",
+      "byConfidence": "AI classifier by confidence",
+      "byConfidenceHint": "How the classifier's flags turned out at each confidence. Flags at or above your threshold ({{threshold}}) are high risk; below it, possible risk.",
+      "band": "{{from}}–{{to}}",
+      "yourThreshold": "Your threshold"
+    },
+    "qa": {
+      "title": "Quality",
+      "mineTitle": "My feedback",
+      "introSupervisor": "Helping-skills feedback on finished chats, newest first. Each one is a snapshot of one conversation — use it to talk with the listener about how they're growing.",
+      "introMine": "Feedback on your finished chats, from the helping-skills rubric. It's here to help you grow, not to grade you.",
+      "listenerFilter": "Listener",
+      "allListeners": "All listeners",
+      "loadFailed": "Couldn't load feedback.",
+      "emptySupervisor": "No chats have feedback yet. It appears a little while after a chat ends, for chats with enough conversation to review.",
+      "emptyFiltered": "No chats with feedback for this listener yet.",
+      "emptyMine": "No feedback yet. It appears a little while after a chat ends, for chats with enough conversation to review.",
+      "columns": {
+        "listener": "Listener",
+        "date": "Date",
+        "overall": "Overall",
+        "notes": "Notes"
+      },
+      "overallHint": "The average of this chat's skill scores, on the rubric's 1–4 scale. One chat is a snapshot, not a verdict.",
+      "scoreOf": "score {{score}} of 4",
+      "unhelpfulMarker": "Unhelpful behaviour noted",
+      "viewFeedback": "View feedback",
+      "chatOn": "Chat on {{date}}",
+      "backAll": "Back to Quality",
+      "backMine": "Back to My feedback",
+      "notFound": "This feedback doesn't exist, or you can't see it.",
+      "detailTitleMine": "Your feedback",
+      "detailTitle": "Feedback for {{name}}",
+      "overallScore": "Overall score {{score}} of 4",
+      "detailIntroMine": "Read it alongside your own sense of the chat — what would you add? Talk it through with your supervisor if you'd like.",
+      "detailIntroSupervisor": "{{name}} sees exactly this. Start from what went well, then ask what they'd like to practise.",
+      "wentWell": "What went well",
+      "wentWellEmpty": "Strengths show here once a skill reaches score 3. Every chat builds them — pick one step below to start.",
+      "goingFurther": "Going further",
+      "toWorkOn": "To work on",
+      "toWorkOnIntro": "One or two at a time is plenty. Each comes with a way to practise.",
+      "toWorkOnEmpty": "Nothing stood out to work on in this chat.",
+      "unhelpfulLabel": "What got in the way:",
+      "missingLabel": "A step to add:",
+      "practiseUnhelpful": "Practise: in your next chat or roleplay, notice the moment before “{{behaviour}}” and pause before you reply.",
+      "practiseMissing": "Practise: make “{{behaviour}}” a deliberate step in your next chat or roleplay.",
+      "showMore_one": "Show {{count}} more skill",
+      "showMore_other": "Show {{count}} more skills",
+      "skillScore": "score {{score}} of 4",
+      "seeInChat": "See in chat",
+      "tiers": {
+        "Engage": "Engage",
+        "Understand": "Understand",
+        "Support": "Support"
+      },
+      "closing": "Thank you for being there for someone who reached out. Every conversation builds these skills."
+    },
+    "team": {
+      "title": "Team",
+      "rolesLabel": "Who can do what",
+      "listener": "Listener",
+      "supervisor": "Supervisor",
+      "listenerExplainer": "Takes chats with talkers: claims them from the lobby, replies, ends them, and sees their own feedback.",
+      "supervisorExplainer": "Everything a listener can do, plus: monitors live chats, whispers to listeners, transfers or takes over chats, and reviews feedback.",
+      "lagNote": "Changes apply at once. Someone already signed in may need to reload the page to see their new access.",
+      "searchLabel": "Search people",
+      "searchPlaceholder": "Name or email",
+      "loadFailed": "Couldn't load your team.",
+      "empty": "No one in your organisation yet.",
+      "noMatch": "No one matches “{{search}}”.",
+      "listenerViaSupervisor": "Supervisors can already take chats. Turn Supervisor off to change this.",
+      "listenerFor": "Listener: {{name}}",
+      "supervisorFor": "Supervisor: {{name}}",
+      "failed": "Couldn't update {{name}}. Their access hasn't changed.",
+      "noAccess": "Team is for your organisation's admins."
+    },
+    "restricted": {
+      "title": "Helpline is switched off for your organisation — you can finish your open chats",
+      "body": "New talkers can't reach the helpline and the queue is closed. Your open chats carry on until they end.",
+      "chatsTitle": "Your open chats",
+      "chatFallback": "Chat",
+      "elsewhere": "This part of the helpline is unavailable while it's switched off. Finish your open chats from the Lobby."
+    }
+  },
+  "homeV2": {
+    "nav": {
+      "label": "Main",
+      "home": "Ally home",
+      "blog": "Blog",
+      "changelog": "Changelog",
+      "about": "About",
+      "support": "Need support now?"
+    },
+    "greeting": {
+      "title": "Hi, I'm Ally.",
+      "intro": "I help people who support others — counsellors, volunteers, teachers, peers — practise hard conversations and get support on the job.",
+      "capabilities": "Try a practice moment right here, ask me anything about Ally, or type your email below to sign in.",
+      "welcomeBack": "Welcome back.",
+      "rememberedHint": "Or ask me anything about Ally.",
+      "signedInTitle": "Welcome back, {{name}}.",
+      "signedInBody": "You're already signed in."
+    },
+    "speakers": {
+      "ally": "Ally",
+      "you": "You",
+      "client": "Riya · virtual client"
+    },
+    "suggestions": {
+      "label": "Suggestions",
+      "practice": "Try a practice moment",
+      "again": "Try another response",
+      "what": "What is Ally?",
+      "access": "How do I get access?",
+      "org": "I train or manage helpers",
+      "privacy": "Is it private?",
+      "news": "What's new?",
+      "support": "I need support myself",
+      "signin": "Sign in",
+      "supportNow": "I need support now"
+    },
+    "answers": {
+      "practiceSetup": "Let's try one moment. I'll play Riya, 19, a first-year student whose exams start next week. Read what she says, then choose how you'd respond. There's no score here.",
+      "practiceAgain": "Let's rewind. Riya says it again:",
+      "practiceWrap": "That was one moment, in text. In Ally you'd keep going out loud, in your own language, and get a full debrief at the end.",
+      "whatIntro": "I'm the front door to Ally, a not-for-profit platform for people who help others. Inside there are two main tools:",
+      "whatMore": "Plus courses, cases and learning pathways, with XP and levels as you practise. Practice runs in eleven languages.",
+      "access1": "Ally comes to you through a partner organization: a helpline, NGO, school or employer.",
+      "access2": "If yours uses Ally, your trainer adds your email and you sign in right here. If not, point them our way, or get in touch yourself.",
+      "org": "Trainers write virtual clients from the cases their helpers actually meet, with no code, and review every session. Organizations use Ally to train more helpers in their own language.",
+      "privacy": "Plainly, it depends on what you're doing:",
+      "news": "Here's what's new:",
+      "languages1": "Practice runs in eleven languages: Hindi, English, Bengali, Tamil, Telugu, Marathi, Kannada, Malayalam, Gujarati, Punjabi and Odia.",
+      "languages2": "The app itself is in English, Hindi, Marathi, Tamil and Kannada. Switch any time from the language menu at the top.",
+      "cost": "Ally is built by a not-for-profit, and access comes through partner organizations. Ask yours, or get in touch to talk about your programme.",
+      "supportAck": "Thank you for telling me. I'm glad you said something.",
+      "support": "I'm a practice tool, not a counsellor, so I'm not the right support for this. Tele-MANAS is, any time, for free:",
+      "supportAfter": "If you'd like to keep talking about Ally, I'm still here.",
+      "signin": "Type your email below and I'll send you a 4-digit code.",
+      "fallback": "I don't have a good answer to that yet. I've passed your question to the team so we can add one.",
+      "fallbackMore": "Here's what I can help with right now, or write to the team directly.",
+      "codeSent_one": "If {{email}} has an Ally account, a 4-digit code is on its way. It's valid for {{count}} minute.",
+      "codeSent_other": "If {{email}} has an Ally account, a 4-digit code is on its way. It's valid for {{count}} minutes.",
+      "noCode": "No code? Ally accounts come through partner organizations, so ask your trainer to invite this address.",
+      "codeResent": "A new code is on its way to {{email}}. The old one no longer works.",
+      "codeWrong": "That code didn't match, or it has expired. Check the most recent email from Ally and try again.",
+      "verifyFailed": "I couldn't check that code just now. Please try again in a moment.",
+      "sendFailed": "I couldn't send the email just now. Please try again in a moment.",
+      "differentEmail": "No problem. Type the right email below.",
+      "notYou": "No problem. Type your email below.",
+      "alreadySignedIn": "You're already signed in. Open Ally whenever you're ready.",
+      "googleNoAccount": "There's no Ally account for that Google address yet. Ally accounts come through partner organizations, so ask your trainer to invite you.",
+      "googleFailed": "Google sign-in didn't work. Try again, or type your email instead."
+    },
+    "links": {
+      "partner": "Partner with us",
+      "writeTeam": "Write to the team",
+      "privacyPolicy": "Read the Privacy Policy",
+      "browseScenarios": "Browse practice scenarios"
+    },
+    "practice": {
+      "prompt": "How would you respond?",
+      "opening": "Everyone says it's just one exam. But if I fail, my parents… I can't even sleep.",
+      "choices": {
+        "a": "Don't worry, you'll do fine. Have you tried making a study timetable?",
+        "b": "It sounds like it isn't only the exam — it's what failing would mean at home.",
+        "c": "What exactly do your parents say to you?"
+      },
+      "reactions": {
+        "a": "…Yeah. Maybe I'll try that.",
+        "b": "Yes. Nobody gets that part. Even my friends just say 'chill'.",
+        "c": "They don't say anything. That's the worst part."
+      },
+      "feedback": {
+        "title": "Ally supervisor",
+        "tryNext": "Try next:",
+        "a": {
+          "tag": "Watch for: advice too early",
+          "what": "Reassurance and a tip came before Riya felt heard, so she closed the conversation politely. It's the most common first instinct, and exactly what practice helps you notice.",
+          "next": "Reflect what she's carrying before offering anything."
+        },
+        "b": {
+          "tag": "Skill: reflecting feelings",
+          "what": "You named the fear underneath her words. That's reflecting feelings, a core helping skill, and you just used it. Riya felt understood, so she opened up.",
+          "next": "Ask an open question, like what her nights have been like."
+        },
+        "c": {
+          "tag": "Watch for: facts before feelings",
+          "what": "A fair question, but it moved to facts before feelings. Riya still answered, and something important slipped out.",
+          "next": "Reflect what you just heard: the silence at home sounds heavy."
+        }
+      }
+    },
+    "cards": {
+      "skillsLab": {
+        "title": "Skills Lab",
+        "body": "Roleplay with virtual clients by voice or text, with an AI supervisor and a debrief after every session."
+      },
+      "assist": {
+        "title": "Ally Assist",
+        "body": "A scribe that transcribes real sessions and drafts notes in your organization's format."
+      },
+      "org": {
+        "creator": "Simulation creator: write a persona and a scenario, and Ally plays the client.",
+        "review": "Session review: transcripts, debriefs and roleplay logs for every learner.",
+        "courses": "Courses and pathways: sequence lessons, cases and roleplays."
+      },
+      "privacy": {
+        "assistTitle": "Real sessions, with Ally Assist",
+        "assistAudio": "Audio recordings are not stored.",
+        "assistPii": "Clients' personal details are removed automatically.",
+        "assistTraining": "Client data is never used to train models.",
+        "assistTranscripts": "Your organization decides how long transcripts are kept.",
+        "practiceTitle": "Practice, in Skills Lab",
+        "practiceStored": "Roleplay audio and transcripts are stored to improve the training, and shared with your training organization.",
+        "encrypted": "Data is encrypted."
+      },
+      "news": {
+        "blogLabel": "Building Ally",
+        "blogFallback": "Read the latest from the team",
+        "changelog": "Changelog: everything we've shipped",
+        "roadmap": "Roadmap: from the practice room to the field"
+      },
+      "support": {
+        "title": "Tele-MANAS · free, 24×7",
+        "call": "Call {{number}}",
+        "danger": "If you're in immediate danger, call {{number}}."
+      }
+    },
+    "remembered": {
+      "label": "Last signed in on this device",
+      "send": "Send my code",
+      "notYou": "Not you?"
+    },
+    "signedIn": {
+      "open": "Open Ally"
+    },
+    "composer": {
+      "label": "Ask Ally anything, or type your email to sign in",
+      "placeholder": "Ask anything, or your email",
+      "placeholderSignedIn": "Ask me anything about Ally",
+      "send": "Send",
+      "google": "Sign in with Google",
+      "agree": "Signing in means you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+      "codeLabel": "4-digit code sent to {{email}}",
+      "verify": "Verify",
+      "verifying": "Checking…",
+      "resend": "Send a new code",
+      "resendIn": "New code in {{seconds}}s",
+      "differentEmail": "Use a different email"
+    },
+    "index": {
+      "label": "Everything else",
+      "products": "Products",
+      "skillsLab": "Skills Lab: practice with virtual clients",
+      "assist": "Ally Assist: session notes",
+      "courses": "Courses and learning pathways",
+      "sjt": "Everyday conversations: a self-check for teachers",
+      "read": "Read",
+      "blog": "Building Ally, the blog",
+      "changelog": "Changelog",
+      "roadmap": "Roadmap",
+      "ally": "Ally",
+      "about": "About the Foundation",
+      "partner": "Partner with us",
+      "docs": "Developer docs",
+      "support": "Need support?",
+      "teleManas": "Tele-MANAS, free and 24×7: {{number}}",
+      "emergency": "Emergency: {{number}}",
+      "copyright": "© {{year}} Ally For Mental Health Foundation",
+      "privacy": "Privacy",
+      "terms": "Terms"
+    }
+  }
+}
