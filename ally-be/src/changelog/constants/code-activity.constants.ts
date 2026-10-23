@@ -48,3 +48,42 @@ export const CODE_ACTIVITY_MAX_PAGES_PER_MONTH = 100;
 /** Redis key for one repo's daily totals for one UTC month (`yyyy-mm`). */
 export const codeActivityCacheKey = (repo: string, month: string): string =>
   `changelog:code-activity:v1:${repo}:${month}`;
+
+/**
+ * The instant the last service history was imported into the monorepo
+ * (2026-10-23, `Merge 'ally-ai-learn/' …` at 05:21:16 UTC).
+ *
+ * Before it, each service's work is its own repo's history; those repos are
+ * archived and frozen. After it, the work is the monorepo's own commits. The
+ * monorepo also CONTAINS the imported history — every old commit, with its
+ * original date — so reading it before this instant would count everything
+ * twice. Each source is read on its side of the line, and nothing is counted
+ * on both.
+ */
+export const MONOREPO_CUTOVER = '2026-10-23T05:21:17Z';
+
+/**
+ * Repos whose work moved into the monorepo at the cutover: read only up to
+ * it. The five services are archived; the wiki repo is still live, but since
+ * the move it only receives publish commits mirroring the monorepo's
+ * `helloallytech.github.io/` folder, which would count the same lines twice.
+ */
+export const MOVED_TO_MONOREPO: readonly string[] = [
+  'ally-be',
+  'ally-web',
+  'ally-ai',
+  'ally-ai-learn',
+  'ally-mobile',
+  'helloallytech.github.io',
+];
+
+/**
+ * The bucket for monorepo work that belongs to no single repo above: root
+ * files (CI, scripts) and commits that touch several services at once. Named
+ * after the monorepo, because that is where it happened.
+ */
+export const MONOREPO_SHARED_BUCKET = 'ally-platform';
+
+/** Redis key for the monorepo's bucketed daily totals for one UTC month. */
+export const monorepoActivityCacheKey = (month: string): string =>
+  `changelog:code-activity:v1:monorepo:${month}`;
