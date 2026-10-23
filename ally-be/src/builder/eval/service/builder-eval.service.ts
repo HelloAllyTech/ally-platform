@@ -17,6 +17,7 @@ import {
   BUILDER_EVAL_CONCURRENCY,
   BUILDER_EVAL_JUDGE_TOLERANCE,
   BUILDER_EVAL_MAX_RUNNING_SUITES,
+  BUILDER_EVAL_SCORING_VERSION,
   BUILDER_EVAL_HEARTBEAT_MS,
   BUILDER_EVAL_MAX_RESUMES,
   BUILDER_EVAL_STALL_MS,
@@ -90,6 +91,7 @@ export function summariseSuite(
       Math.round(
         runs.reduce((sum, run) => sum + (run.metrics?.costUsd ?? 0), 0) * 100,
       ) / 100,
+    scoringVersion: BUILDER_EVAL_SCORING_VERSION,
   };
 }
 
@@ -563,8 +565,9 @@ export class BuilderEvalService {
       order: { completedAt: 'DESC' },
       take: 20,
     });
-    // Same loop as the candidate, and nothing else overridden: a baseline
-    // from the other loop would credit (or blame) the prompt for the loop.
+    // Same loop as the candidate, scored on the same terms, and nothing else
+    // overridden: a baseline from the other loop, or from before a gate
+    // existed, would credit (or blame) the prompt for what changed around it.
     const loop = loopOf(suite.overrides);
     const reusable = recent.find(
       (candidate) =>
@@ -573,6 +576,7 @@ export class BuilderEvalService {
         !candidate.overrides?.llmConfig &&
         loopOf(candidate.overrides) === loop &&
         !!candidate.summary &&
+        candidate.summary.scoringVersion === BUILDER_EVAL_SCORING_VERSION &&
         suite.fixtureIds.every((id) => candidate.fixtureIds.includes(id)),
     );
     if (reusable) return reusable;

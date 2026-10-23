@@ -1,3 +1,4 @@
+import { BUILDER_EVAL_SCORING_VERSION } from '../constants/builder-eval-prompts';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   BuilderEvalService,
@@ -370,7 +371,7 @@ describe('BuilderEvalService', () => {
       status: 'completed',
       completedAt: new Date(),
       overrides,
-      summary: { runs: 3 },
+      summary: { runs: 3, scoringVersion: BUILDER_EVAL_SCORING_VERSION },
       fixtureIds: ['debrief'],
       repetitions: 3,
     });
@@ -411,6 +412,23 @@ describe('BuilderEvalService', () => {
       );
       await expect((service as any).resolveBaseline(gate(false))).resolves.toBe(
         legacy,
+      );
+    });
+
+    // Suites A and B (ae81eb5b, 5d24dd95) ran before the falseReadyClaims gate
+    // and the persistent ready hold: a candidate on the new loop would be
+    // blamed for gate violations its baseline could not have counted.
+    it('never reuses a baseline scored on other terms', async () => {
+      const older = {
+        ...completed('suite-b', { validatedTurns: true }),
+        summary: { runs: 3 },
+      };
+      const { service, startSuite } = build([older]);
+
+      await (service as any).resolveBaseline(gate(true));
+
+      expect(startSuite).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'baseline' }),
       );
     });
 
