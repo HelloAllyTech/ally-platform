@@ -18,7 +18,6 @@ import {
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { BUILDER_EVAL_GATED_PROMPT_CODES } from '../../constants/builder-eval-gate.constants';

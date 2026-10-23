@@ -30,7 +30,6 @@ import { AppleSignInDto } from '../dto/apple-token.dto';
 import { MagicLinkVerifyDto } from '../dto/magic-link.dto';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
-import { AuthPermissions } from '../decorators/auth-permissions.decorator';
 import { ImpersonateDto } from '../dto/impersonate.dto';
 import { PostHog } from 'posthog-node';
 import {
