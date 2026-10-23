@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 
 import { ChangelogSourceService } from 'src/changelog/service/changelog-source.service';
 import { AppConfigService } from 'src/config/config.service';
+import {
+  repoFromGithubUrl,
+  repoName,
+} from 'src/github/constants/github-repos.constants';
 import { GithubActionsService } from 'src/github/service/github-actions.service';
 import { LoggerService } from 'src/logger/logger.service';
 
@@ -11,7 +15,7 @@ import {
 } from '../entity/product-update-source.entity';
 import { ProductUpdateSourceRepository } from '../repository/product-update-source.repository';
 import { JournalEntry, parseJournal } from '../util/journal-parser.util';
-import { deployablesFor } from '../util/liveness.util';
+import { deployablesFor, monorepoDeployablesFor } from '../util/liveness.util';
 import { gatesLiveness } from '../util/source-signals.util';
 
 /** A PR description or a push's commit bodies, capped: enough to understand a change, not a novel. */
@@ -144,11 +148,9 @@ export class ProductUpdateIngestService {
         degraded += 1;
       }
 
-      source.deployables = deployablesFor(
-        source.repo,
-        source.files,
-        source.apps,
-      );
+      source.deployables = this.mergedInMonorepo(source)
+        ? monorepoDeployablesFor(source.files, source.apps)
+        : deployablesFor(source.repo, source.files, source.apps);
       source.gatesLiveness = gatesLiveness({
         repo: source.repo,
         author: source.author,
@@ -167,17 +169,38 @@ export class ProductUpdateIngestService {
     return { enriched, degraded };
   }
 
+  /**
+   * The repo a source's pull request or compare lives in — the "owner/name"
+   * its stored URL names, which `GithubActionsService` passes through
+   * unchanged. The journal header's repo is a service name, and a service name
+   * is now routed to the monorepo: since PR numbers restarted at #1 there, the
+   * header plus a pre-move number would read a different pull request.
+   */
+  private static githubRepo(source: ProductUpdateSource): string {
+    return repoFromGithubUrl(source.prUrl) ?? source.repo;
+  }
+
+  /** Merged in the monorepo since the cutover, so its files carry a service folder in front. */
+  private mergedInMonorepo(source: ProductUpdateSource): boolean {
+    const monorepo = this.configService.githubMonorepo;
+    return (
+      Boolean(monorepo) &&
+      repoName(ProductUpdateIngestService.githubRepo(source)) === monorepo
+    );
+  }
+
   private async fetchDetails(
     source: ProductUpdateSource,
   ): Promise<Partial<ProductUpdateSource> | null> {
+    const repo = ProductUpdateIngestService.githubRepo(source);
     if (source.prNumber !== null) {
       const summary = await this.github.getPullRequestSummary(
-        source.repo,
+        repo,
         source.prNumber,
       );
       if (!summary) return null;
       const { files, truncated } = await this.github.listPullRequestFiles(
-        source.repo,
+        repo,
         source.prNumber,
       );
       return {
@@ -193,7 +216,7 @@ export class ProductUpdateIngestService {
 
     if (!source.baseSha || !source.headSha) return null;
     const comparison = await this.github.compareCommits(
-      source.repo,
+      repo,
       source.baseSha,
       source.headSha,
     );

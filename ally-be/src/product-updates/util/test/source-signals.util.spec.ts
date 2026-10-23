@@ -4,6 +4,7 @@ import {
   clusterKeys,
   gatesLiveness,
   isNoise,
+  isNonBehaviouralFile,
   linkedPullRequests,
   looksStaffOnly,
   normaliseBranch,
@@ -282,6 +283,54 @@ describe('looksStaffOnly — scopes, chart ids and customer surfaces', () => {
           ],
           files: [
             'apps/ally-helpline-dashboard/src/pages/statistics/OrgMetrics.tsx',
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+/** The same rules, for a change merged in the ally-platform monorepo. */
+describe('source signals in the ally-platform monorepo', () => {
+  it('reads ally-platform pull-request links', () => {
+    expect(
+      linkedPullRequests(
+        'Pairs with https://github.com/HelloAllyTech/ally-platform/pull/12 and ally-platform #13',
+      ).sort(),
+    ).toEqual(['pr:ally-platform#12', 'pr:ally-platform#13']);
+  });
+
+  it("treats an app folder's tooling as noise, as the app's own repo did", () => {
+    expect(isNonBehaviouralFile('ally-be/.husky/pre-commit')).toBe(true);
+    expect(isNonBehaviouralFile('ally-web/.claude/skills/x.md')).toBe(true);
+    expect(isNonBehaviouralFile('.github/workflows/test-ally-be.yml')).toBe(
+      true,
+    );
+    expect(isNonBehaviouralFile('ally-be/src/a.service.ts')).toBe(false);
+    expect(
+      gatesLiveness(
+        source({ repo: 'ally-platform', files: ['ally-be/.husky/pre-commit'] }),
+      ),
+    ).toBe(false);
+  });
+
+  it('never treats a change that reaches a customer app as staff-only', () => {
+    expect(
+      looksStaffOnly(
+        source({
+          repo: 'ally-platform',
+          subjects: ['fix(builder): tidy a label'],
+          files: ['ally-mobile/src/screens/Home.tsx'],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      looksStaffOnly(
+        source({
+          repo: 'ally-platform',
+          subjects: ['fix(helpline/analytics): make the reorder land'],
+          files: [
+            'ally-web/apps/ally-helpline-dashboard/src/pages/statistics/OrgMetrics.tsx',
           ],
         }),
       ),
