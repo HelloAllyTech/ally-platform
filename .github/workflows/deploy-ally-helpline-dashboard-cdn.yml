@@ -21,9 +21,9 @@ on:
   # push:
   #   branches:
   #     - master
-    paths:
-      - "ally-web/apps/ally-helpline-dashboard/**"
-      - "ally-web/libs/**"
+  #  paths:
+  #    - "ally-web/apps/ally-helpline-dashboard/**"
+  #    - "ally-web/libs/**"
 
 permissions:
   id-token: write
