@@ -888,59 +888,29 @@ export class BadgeService {
     }
   }
 
-  /**
-   * Fills in only the app-language translations a badge is missing, keeping every
-   * translation it already has (including ones a person corrected by hand).
-   *
-   * Badges seeded by a migration (e.g. the XP_LEVEL ladder) skip createBadge, so
-   * they start with no translations and show in English in every language.
-   */
   async makeTranslationsForBadges() {
     const badges = await this.badgeRepository.find({
-      select: ['id', 'name', 'description', 'translations'],
+      select: ['id', 'name', 'description'],
     });
 
     for (const badge of badges) {
-      const existing: Record<string, any> = badge.translations ?? {};
-      const missing = missingBadgeTranslationLanguages(badge, existing);
-      if (missing.length === 0) continue;
-
       const translations =
         await this.openaiTranslationsService.translateObjectToLanguages(
           {
             name: badge.name,
             description: badge.description,
           },
-          missing,
+          ELIGBLE_APP_LANGUAGES,
           'openai_translation_speech_reexpression_user',
         );
 
-      if (translations && Object.keys(translations).length > 0) {
+      if (translations) {
         await this.badgeRepository.update(badge.id, {
-          translations: { ...existing, ...translations },
+          translations,
         } as any);
       }
     }
 
     return true;
   }
-}
-
-/**
- * The app languages a badge has no usable translation for. A language counts as
- * missing when it has no entry, no name, no description while the badge has one,
- * or a name identical to the English one — translateObjectToLanguages stores the
- * English source as the "translation" when a call fails, so an English copy is a
- * past failure, not a translation.
- */
-export function missingBadgeTranslationLanguages(
-  badge: { name: string; description?: string | null },
-  existing: Record<string, any>,
-): string[] {
-  return ELIGBLE_APP_LANGUAGES.filter((code) => {
-    const entry = existing[code];
-    if (!entry?.name) return true;
-    if (badge.description && !entry.description) return true;
-    return entry.name.trim() === badge.name.trim();
-  });
 }
