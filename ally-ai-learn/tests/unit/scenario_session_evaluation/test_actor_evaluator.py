@@ -86,6 +86,20 @@ class TestEvaluateActorGoals:
         assert result["metrics"]["De-escalate acute risk"] == 10
 
     @pytest.mark.asyncio
+    async def test_llm_timeout_is_propagated(self):
+        import asyncio
+
+        with patch(
+            "app.core.scenario_session_evaluation.evaluator._build_evaluator_llm"
+        ) as build:
+            build.return_value.with_structured_output.return_value.ainvoke = AsyncMock(
+                side_effect=asyncio.TimeoutError("LLM call timed out")
+            )
+
+            with pytest.raises(asyncio.TimeoutError):
+                await evaluate_actor_goals(_transcript(), [_goal("a goal")])
+
+    @pytest.mark.asyncio
     async def test_drops_titles_matching_no_configured_goal(self):
         # The judge keys applicability by verbatim title; a paraphrase would
         # otherwise silently drop a goal from the composite. Unmatched titles

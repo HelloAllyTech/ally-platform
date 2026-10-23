@@ -37,7 +37,7 @@ logger = get_logger(__name__)
 #     report layer, so swapping the default conversational model in
 #     settings won't silently change report scoring behaviour.
 _EVALUATOR_MODEL = "gpt-4o-mini"
-_EVALUATOR_TIMEOUT_S = 120
+_EVALUATOR_TIMEOUT_S = 180
 _EVALUATOR_TEMPERATURE = 0
 
 
