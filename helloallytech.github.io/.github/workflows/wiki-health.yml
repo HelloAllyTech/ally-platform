@@ -1,0 +1,200 @@
+name: Wiki health sweep
+
+# Weekly reconciliation for the drift no PR triggers: pages nobody's diff touches, which
+# quietly go stale while the code moves. Runs the deterministic lint, keeps a single
+# rolling issue up to date, and opens a PR when generated files fall behind.
+#
+# It opens PRs and issues, never commits to main directly. The PR it opens carries only
+# generated files, so it auto-merges rather than queueing for a review nobody can
+# meaningfully give; the findings it reports still land in an issue for a human.
+#
+# Spec: https://tech.helloally.ai/#/wiki/contributing/docs-system.md
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "wiki/**"
+      - "scripts/wiki_lint.py"
+      - "scripts/docs-path-lint.mjs"
+      - ".docs-path-lint-ignore"
+      - "*.md"
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Counts come from the code, never from prose. Repos that fail to check out are
+      # reported as unavailable in the table rather than silently counted as zero.
+      - name: Check out the code repos for counting
+        if: github.event_name != 'pull_request'
+        run: mkdir -p checkouts
+
+      # Read-only for this job; the PR and issue steps below deliberately stay on the
+      # default GITHUB_TOKEN, which cannot reach outside this repo.
+      - name: Mint a read token for the code repos
+        id: app-token
+        if: github.event_name != 'pull_request'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DOCS_BOT_APP_ID }}
+          private-key: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
+          owner: HelloAllyTech
+          repositories: helloallytech.github.io,ally-be,ally-ai,ally-ai-learn,ally-web
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        with:
+          repository: helloallytech/ally-be
+          token: ${{ steps.app-token.outputs.token }}
+          path: checkouts/ally-be
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        with:
+          repository: helloallytech/ally-ai
+          token: ${{ steps.app-token.outputs.token }}
+          path: checkouts/ally-ai
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        with:
+          repository: helloallytech/ally-ai-learn
+          token: ${{ steps.app-token.outputs.token }}
+          path: checkouts/ally-ai-learn
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        with:
+          repository: helloallytech/ally-web
+          token: ${{ steps.app-token.outputs.token }}
+          path: checkouts/ally-web
+
+      - name: Regenerate platform stats
+        if: github.event_name != 'pull_request'
+        run: python3 scripts/gen-stats.py --repos checkouts
+
+      - name: Lint
+        id: lint
+        run: |
+          set -euo pipefail
+          python3 scripts/wiki_lint.py --stale-days 90 > report.md || true
+          {
+            echo 'report<<REPORT_EOF'
+            cat report.md
+            echo 'REPORT_EOF'
+          } >> "$GITHUB_OUTPUT"
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # On a PR the report is advisory — it appears in the job summary and stops there.
+      # Blocking a docs PR on pre-existing drift elsewhere in the wiki would just teach
+      # people to ignore the check.
+      # The App token, not GITHUB_TOKEN: org policy forbids GitHub Actions from creating
+      # pull requests, and we would rather keep that restriction than widen it org-wide.
+      # The issue step below stays on GITHUB_TOKEN — the App has no Issues permission.
+      - name: Open a PR if generated pages drifted
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/gen-routing.py
+          if git diff --quiet -- wiki/ROUTING.md wiki/manifest.json wiki/platform/stats.md; then
+            echo "Generated pages already current."
+            exit 0
+          fi
+          BRANCH="chore/regenerate-wiki-indexes-$(date -u +%Y%m%d)"
+          git config user.name  "ally-docs-bot[bot]"
+          git config user.email "314168265+ally-docs-bot[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add wiki/ROUTING.md wiki/manifest.json wiki/platform/stats.md
+          git commit -m "chore: regenerate wiki routing index and platform stats"
+          # The branch name is date-stamped, so a second run on the same day would other-
+          # wise be rejected as non-fast-forward. The content is generated; force is safe.
+          git push -u origin "$BRANCH" --force
+          # --state open matters: `gh pr view <branch>` also matches merged and closed
+          # PRs, so once a day's branch had been merged every later sweep skipped
+          # creating a PR and reported success while surfacing nothing.
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" ]; then
+            echo "A PR is already open for $BRANCH."
+            exit 0
+          fi
+          PR_URL="$(gh pr create \
+            --title "chore: regenerate wiki indexes and platform stats" \
+            --body "The generated pages had fallen behind the code and page frontmatter.
+
+          ---
+          _Generated by [Claude Code](https://claude.ai/code)_" \
+            --head "$BRANCH")"
+
+          gh pr merge --auto --squash --delete-branch "$PR_URL" 2>/dev/null \
+            || gh pr merge --squash --delete-branch "$PR_URL" 2>/dev/null \
+            || echo "::warning::Could not merge $PR_URL automatically — merge it by hand."
+
+      - name: Open or update the health issue
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT: ${{ steps.lint.outputs.report }}
+        run: |
+          set -euo pipefail
+          TITLE="Wiki health sweep"
+          BODY="$REPORT
+
+          _Refreshed automatically every Monday by \`wiki-health.yml\`. Fix items here or
+          adjust the rules in \`scripts/wiki_lint.py\`._
+
+          ---
+          _Generated by [Claude Code](https://claude.ai/code)_"
+
+          EXISTING="$(gh issue list --state open --search "$TITLE in:title" \
+            --json number,title -q "[.[] | select(.title==\"$TITLE\")][0].number")"
+
+          if [ -z "${EXISTING:-}" ] || [ "$EXISTING" = "null" ]; then
+            if grep -q '^✅' <<<"$REPORT"; then
+              echo "Clean, and no open issue — nothing to do."
+              exit 0
+            fi
+            gh issue create --title "$TITLE" --body "$BODY"
+          elif grep -q '^✅' <<<"$REPORT"; then
+            gh issue close "$EXISTING" --comment "Sweep is clean — closing until the next finding.
+
+          ---
+          _Generated by [Claude Code](https://claude.ai/code)_"
+          else
+            gh issue edit "$EXISTING" --body "$BODY"
+          fi
+
+  # Docs that name files which no longer exist. A separate job from the sweep: it needs
+  # no code checkouts and no write access, and a failure should read "a path is broken"
+  # rather than join the rolling health issue. The wiki names files in other repos
+  # constantly (`ally-be/src/...`); those are checked only where the sibling checkout
+  # exists, so CI skips them rather than guessing. Not a required check — fix the path, or
+  # mark a deliberate one `<!-- docs-path-lint: planned -->` (or `ignore`).
+  docs-paths:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Check documented file paths
+        run: node scripts/docs-path-lint.mjs

@@ -1,0 +1,15 @@
+# Paths that docs-path-lint should not check. One per line; `#` starts a comment.
+# See scripts/docs-path-lint.mjs for the full rules and the inline `planned` / `ignore` markers.
+
+# llmwiki/ is the upstream rendering engine and is never edited here, and the root README
+# mirrors it. These describe files in a *user's* project that llmwiki's setup creates,
+# not files in this repo.
+.agents/AGENTS.md
+.github/workflows/pages.yml
+
+# A placeholder in the docs-system rules table, not a file.
+path/to/doc.md
+
+# A gitignored secret in ally-mobile, named on its repo page; absent from a clean checkout
+# by design.
+android/app/google-services.json
