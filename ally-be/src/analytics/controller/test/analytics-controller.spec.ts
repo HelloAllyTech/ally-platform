@@ -47,6 +47,7 @@ import { QualityDistributionAnalyticsService } from '../../service/quality-distr
 import { CompetencyMapAnalyticsService } from '../../service/competency-map-analytics.service';
 import { TrackDropoffAnalyticsService } from '../../service/track-dropoff-analytics.service';
 import { CoachingLoopAnalyticsService } from '../../service/coaching-loop-analytics.service';
+import { LearnerFeedbackAnalyticsService } from '../../service/learner-feedback-analytics.service';
 import { OrgHealthAnalyticsService } from '../../service/org-health-analytics.service';
 import { OrgSessionDistributionAnalyticsService } from '../../service/org-session-distribution-analytics.service';
 import { LearnerKpisAnalyticsService } from '../../service/learner-kpis-analytics.service';
@@ -336,6 +337,10 @@ describe('AnalyticsController', () => {
         {
           provide: CoachingLoopAnalyticsService,
           useValue: { getCoachingLoop: jest.fn() },
+        },
+        {
+          provide: LearnerFeedbackAnalyticsService,
+          useValue: { getLearnerFeedback: jest.fn() },
         },
         {
           provide: OrgHealthAnalyticsService,

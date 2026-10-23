@@ -733,3 +733,45 @@ export interface ScenarioUsageResponse {
   scoping: AnalyticsScoping;
   computedAt: string;
 }
+
+/** One learner rating of a roleplay, with the comment they wrote if any. */
+export interface LearnerFeedbackItem {
+  feedbackId: string;
+  sessionId: string;
+  /** When the session ended (its start if it never ended), ISO. */
+  sessionAt: string;
+  ratedAt: string;
+  /** 1-5. */
+  rating: number;
+  comment: string | null;
+  /** Quick-pick tags, as stored (some are localised). */
+  tags: string[];
+  learnerId: number | null;
+  learnerName: string | null;
+  tenantId: string | null;
+  orgName: string | null;
+  scenarioId: number | null;
+  scenarioTitle: string | null;
+  language: string | null;
+}
+
+export interface LearnerFeedbackSummary {
+  ratings: number;
+  withComment: number;
+  avgRating: number | null;
+  /** Always all five stars, 1 to 5, zeros included. */
+  distribution: { rating: number; count: number; withComment: number }[];
+}
+
+export interface LearnerFeedbackResponse {
+  window: AnalyticsWindow;
+  /** The whole window, before the feed's own filters. */
+  summary: LearnerFeedbackSummary;
+  items: LearnerFeedbackItem[];
+  /** Rows matching the filters, across all pages. */
+  total: number;
+  limit: number;
+  offset: number;
+  scoping: AnalyticsScoping;
+  provenance: string;
+}
