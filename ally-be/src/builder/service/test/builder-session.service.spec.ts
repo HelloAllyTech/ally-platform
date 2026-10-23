@@ -480,8 +480,8 @@ describe('BuilderSessionService', () => {
   describe('listSessions', () => {
     it("lists everyone's non-archived sessions, each with its creator's name", async () => {
       sessionRepository.find.mockResolvedValue([
-        { id: 'session-1', createdBy: 7 },
-        { id: 'session-2', createdBy: 8 },
+        { id: 'session-1', createdBy: 7, model: 'gpt-4o' },
+        { id: 'session-2', createdBy: 8, model: null },
       ]);
       sessionRepository.findCreatorNames.mockResolvedValue(
         new Map([[7, 'Asha Rao']]),
@@ -494,8 +494,13 @@ describe('BuilderSessionService', () => {
         order: { updatedAt: 'DESC' },
       });
       expect(result).toEqual([
-        { id: 'session-1', createdBy: 7, createdByName: 'Asha Rao' },
-        { id: 'session-2', createdBy: 8, createdByName: null },
+        {
+          id: 'session-1',
+          createdBy: 7,
+          createdByName: 'Asha Rao',
+          model: 'gpt-4o',
+        },
+        { id: 'session-2', createdBy: 8, createdByName: null, model: null },
       ]);
     });
 
@@ -521,7 +526,7 @@ describe('BuilderSessionService', () => {
   describe('listArchivedSessions', () => {
     it('pages only archived rows, newest-archived first', async () => {
       sessionRepository.findAndCount.mockResolvedValue([
-        [{ id: 'session-1', createdBy: 7 }],
+        [{ id: 'session-1', createdBy: 7, model: 'claude-3-5-sonnet' }],
         1,
       ]);
       sessionRepository.findCreatorNames.mockResolvedValue(
@@ -541,7 +546,12 @@ describe('BuilderSessionService', () => {
       });
       expect(result).toEqual({
         sessions: [
-          { id: 'session-1', createdBy: 7, createdByName: 'Asha Rao' },
+          {
+            id: 'session-1',
+            createdBy: 7,
+            createdByName: 'Asha Rao',
+            model: 'claude-3-5-sonnet',
+          },
         ],
         totalCount: 1,
       });

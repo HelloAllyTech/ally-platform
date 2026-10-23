@@ -1,5 +1,6 @@
 import {
   Body,
+  ClassSerializerInterceptor,
   Controller,
   Get,
   NotFoundException,
@@ -9,14 +10,17 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
 import { Response } from 'express';
+import { plainToInstance } from 'class-transformer';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
@@ -50,6 +54,7 @@ import { BuilderBuildRunRepository } from '../repository/builder-build.repositor
 import {
   CreateBuilderMessageDto,
   CreateBuilderSessionDto,
+  BuilderSessionSummaryDto,
   ListBuilderSessionsQueryDto,
   PatchBuilderPrdDto,
   DismissBuilderReviewFindingDto,
@@ -130,23 +135,31 @@ export class BuilderController {
     summary:
       'List Builder sessions (shared across Builder users), newest first',
   })
-  listSessions(
+  @ApiOkResponse({ type: [BuilderSessionSummaryDto] })
+  @UseInterceptors(ClassSerializerInterceptor)
+  async listSessions(
     @Query() query: ListBuilderSessionsQueryDto,
     @CurrentUser() user: TokenUser,
   ) {
     const createdBy = query.mine ? user.id : undefined;
     if (query.archived) {
-      return this.sessionService.listArchivedSessions({
-        createdBy,
-        statuses: query.status,
-        limit: query.limit ?? 25,
-        offset: query.offset ?? 0,
-      });
+      const { sessions, totalCount } =
+        await this.sessionService.listArchivedSessions({
+          createdBy,
+          statuses: query.status,
+          limit: query.limit ?? 25,
+          offset: query.offset ?? 0,
+        });
+      return {
+        sessions: plainToInstance(BuilderSessionSummaryDto, sessions),
+        totalCount,
+      };
     }
-    return this.sessionService.listSessions({
+    const sessions = await this.sessionService.listSessions({
       statuses: query.status,
       createdBy,
     });
+    return plainToInstance(BuilderSessionSummaryDto, sessions);
   }
 
   @Get('sessions/:sessionId')
