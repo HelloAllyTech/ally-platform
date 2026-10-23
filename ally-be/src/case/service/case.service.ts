@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 import { CreateCaseDto, CreateCaseResponseDto } from '../dto/create-case.dto';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 import { DataSource, In } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import {
@@ -53,6 +57,7 @@ export class CaseService {
     private caseItemRepository: CaseItemRepository,
     private openaiTranslationsService: OpenAITranslationsService,
     private readonly sharedLanguageService: SharedLanguageService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
   async getCases(filters?: CaseFilterOptions): Promise<GetCaseResponseDto> {
     if (filters?.tenantId) {
@@ -61,7 +66,10 @@ export class CaseService {
         throw new NotFoundException('Tenant not found');
       }
     }
-    const result = await this.caseRepository.getAllCases(filters);
+    const result = await this.caseRepository.getAllCases({
+      ...filters,
+      createdByUserId: await this.contentAccessService.ownerFilterFor(),
+    });
 
     const cases = result.data.map((caseEntity: any) => {
       const { caseTenant, ...caseData } = caseEntity;
@@ -85,6 +93,16 @@ export class CaseService {
   }
 
   async getCaseById(id: string): Promise<GetCaseItemResponseDto> {
+    const caseEntity = await this.caseRepository.findOne({
+      where: { id },
+      select: ['id', 'createdBy'],
+    });
+    if (caseEntity) {
+      await this.contentAccessService.assertCanSee(
+        AuthoredContentType.CASE,
+        caseEntity.createdBy,
+      );
+    }
     return this.caseSharedService.getCaseWithScenarios(id);
   }
 
@@ -93,6 +111,8 @@ export class CaseService {
   ): Promise<CreateCaseResponseDto> {
     const { title, description, coverImageUrl, isGlobal, status, scenarios } =
       createCaseDto;
+    // Covers Course Copilot too: it creates cases here as the session's owner.
+    await this.contentAccessService.assertCanAuthor(AuthoredContentType.CASE);
     await this.validateCase(createCaseDto);
     this.logger.info(`Create Case validation passed for the title: ${title}`);
     const userIdStr = ExecutionManager.getUserId();
@@ -157,6 +177,10 @@ export class CaseService {
       this.logger.error(`Case not found for id: ${id}`);
       throw new NotFoundException('Case not found');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.CASE,
+      caseEntity.createdBy,
+    );
 
     const caseSession =
       await this.caseSessionService.getCaseSessionByCaseId(id);
@@ -291,6 +315,12 @@ export class CaseService {
     if (!caseEntity) {
       throw new NotFoundException('Case not found');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.CASE,
+      caseEntity.createdBy,
+    );
+    const copierIdStr = ExecutionManager.getUserId();
+    const copierId = copierIdStr ? Number(copierIdStr) : undefined;
 
     const caseItems = await this.caseItemRepository.find({
       where: { caseId: id },
@@ -303,6 +333,9 @@ export class CaseService {
       status: CaseStatus.DRAFT,
       isGlobal: caseEntity.isGlobal,
       totalScenarios: caseEntity.totalScenarios,
+      // A copy belongs to whoever made it — without this it had no creator,
+      // so an admin limited to their own content could not see their copy.
+      ...(copierId ? { createdBy: copierId, updatedBy: copierId } : {}),
     };
 
     return await this.dataSource.transaction(async (manager) => {
@@ -349,6 +382,10 @@ export class CaseService {
     if (!caseEntity) {
       throw new NotFoundException('case not found');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.CASE,
+      caseEntity.createdBy,
+    );
 
     const caseSession =
       await this.caseSessionService.getCaseSessionByCaseId(id);

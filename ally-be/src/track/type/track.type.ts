@@ -73,6 +73,8 @@ export interface TrackFilterOptions {
   assignmentStatus?: AssignmentStatus;
   sortBy?: TrackSortBy;
   order?: TrackSortOrder;
+  /** Only courses this user created (ContentAccessService.ownerFilterFor). */
+  createdByUserId?: number | null;
 }
 
 export interface TrackTranslations {

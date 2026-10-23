@@ -23,6 +23,7 @@ import { TenantFeatureService } from './service/tenant-feature.service';
 import { AdminTenant } from 'src/user/entity/admin-tenant.entity';
 import { Tenant } from 'src/tenant/entity/tenant.entity';
 import { TenantScopeService } from './service/tenant-scope.service';
+import { ContentAccessService } from './service/content-access.service';
 
 @Global()
 @Module({
@@ -61,6 +62,7 @@ import { TenantScopeService } from './service/tenant-scope.service';
     FeatureToggleService,
     TenantFeatureService,
     TenantScopeService,
+    ContentAccessService,
   ],
   exports: [
     PermissionsService,
@@ -74,6 +76,7 @@ import { TenantScopeService } from './service/tenant-scope.service';
     AdminFeatureToggleRepository,
     TenantFeatureService,
     TenantScopeService,
+    ContentAccessService,
   ],
 })
 export class AuthorizationModule {}

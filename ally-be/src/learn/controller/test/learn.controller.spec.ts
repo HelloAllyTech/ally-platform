@@ -683,11 +683,15 @@ describe('LearnController', () => {
       const scenarioId = 1;
       scenarioService.deleteAdminScenario.mockResolvedValue(true);
 
-      const result = await controller.deleteAdminScenario(scenarioId);
+      const result = await controller.deleteAdminScenario(
+        mockTokenUser,
+        scenarioId,
+      );
 
       expect(result).toBe(true);
       expect(scenarioService.deleteAdminScenario).toHaveBeenCalledWith(
         scenarioId,
+        mockTokenUser,
       );
     });
   });
@@ -1744,10 +1748,14 @@ describe('LearnController', () => {
         scenarioService.duplicateScenario.mockResolvedValue(
           mockDuplicatedScenario as any,
         );
-        const result = await controller.duplicateScenario(scenarioId);
+        const result = await controller.duplicateScenario(
+          mockTokenUser,
+          scenarioId,
+        );
         expect(result).toEqual(mockDuplicatedScenario);
         expect(scenarioService.duplicateScenario).toHaveBeenCalledWith(
           scenarioId,
+          mockTokenUser,
         );
         expect(scenarioService.duplicateScenario).toHaveBeenCalledTimes(1);
       });
@@ -1756,9 +1764,9 @@ describe('LearnController', () => {
         const scenarioId = 999;
         const error = new Error('Scenario not found');
         scenarioService.duplicateScenario.mockRejectedValue(error);
-        await expect(controller.duplicateScenario(scenarioId)).rejects.toThrow(
-          'Scenario not found',
-        );
+        await expect(
+          controller.duplicateScenario(mockTokenUser, scenarioId),
+        ).rejects.toThrow('Scenario not found');
       });
     });
   });

@@ -45,6 +45,12 @@ export class ScenarioPathRepository extends Repository<ScenarioPath> {
     this.applyStatusFilter(query, filters);
     this.applySearchFilter(query, filters);
 
+    if (filters?.createdByUserId) {
+      query.andWhere('scenarioPath.createdBy = :createdByUserId', {
+        createdByUserId: filters.createdByUserId,
+      });
+    }
+
     if (filters?.sortBy) {
       const sortColumn = this.getValidatedSortColumn(filters.sortBy);
       if (sortColumn) {

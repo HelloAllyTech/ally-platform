@@ -13,6 +13,7 @@ import { ScenarioCharacterService } from 'src/scenario-character/service/scenari
 import { ScenarioCoverImageLibrary } from 'src/scenario-cover-image-library/entity/scenario-cover-image-library.entity';
 import { TrackComponentTemplate } from 'src/track/entity/track-component-template.entity';
 import { TrackGameKey } from 'src/track/type/game.type';
+import { ContentAccessService } from 'src/authorization/service/content-access.service';
 
 /** One line per library hit — never full prompts, which are the size of a turn. */
 export interface LibraryHit {
@@ -63,6 +64,7 @@ export class CourseCopilotLibraryService {
     private readonly competencyService: CompetencyService,
     private readonly scenarioService: ScenarioService,
     private readonly characterService: ScenarioCharacterService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   /** Shared (non-custom) competencies — the only ones a course may be tagged with. */
@@ -188,21 +190,35 @@ export class CourseCopilotLibraryService {
     }
   }
 
+  /*
+   * Library reuse is held to the session owner's view, like every other
+   * read of library content (ContentAccessService): an admin limited to
+   * their own content gets a Copilot that reuses only their own roleplays
+   * and cases. Copilot runs as the session's owner, so the default caller
+   * is the right one.
+   */
   async getActiveScenarios(ids: number[]): Promise<Scenarios[]> {
     if (!ids.length) return [];
+    const ownerId = await this.contentAccessService.ownerFilterFor();
     return this.dataSource.getRepository(Scenarios).find({
       where: {
         id: In(ids),
         status: ScenarioStatus.ACTIVE,
         deletedAt: IsNull(),
+        ...(ownerId ? { createdBy: ownerId } : {}),
       },
     });
   }
 
   async getActiveCase(id: string): Promise<Case | null> {
-    return this.dataSource
-      .getRepository(Case)
-      .findOne({ where: { id, status: CaseStatus.ACTIVE } });
+    const ownerId = await this.contentAccessService.ownerFilterFor();
+    return this.dataSource.getRepository(Case).findOne({
+      where: {
+        id,
+        status: CaseStatus.ACTIVE,
+        ...(ownerId ? { createdBy: ownerId } : {}),
+      },
+    });
   }
 
   private async searchRoleplays(
@@ -215,6 +231,10 @@ export class CourseCopilotLibraryService {
       .createQueryBuilder('s')
       .where('s.status = :status', { status: ScenarioStatus.ACTIVE })
       .andWhere('s."deletedAt" IS NULL');
+    const ownerId = await this.contentAccessService.ownerFilterFor();
+    if (ownerId) {
+      qb.andWhere('s."createdBy" = :ownerId', { ownerId });
+    }
     const terms = (query ?? '')
       .split(/\s+/)
       .map((term) => term.trim())
@@ -278,10 +298,12 @@ export class CourseCopilotLibraryService {
     query: string,
     limit: number,
   ): Promise<LibraryHit[]> {
+    const ownerId = await this.contentAccessService.ownerFilterFor();
     const rows = await this.dataSource.getRepository(Case).find({
       where: {
         status: CaseStatus.ACTIVE,
         ...(query?.trim() ? { title: ILike(`%${query.trim()}%`) } : {}),
+        ...(ownerId ? { createdBy: ownerId } : {}),
       },
       order: { updatedAt: 'DESC' },
       take: limit,

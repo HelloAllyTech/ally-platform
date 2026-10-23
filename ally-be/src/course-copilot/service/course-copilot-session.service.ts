@@ -41,6 +41,10 @@ import {
 import { CourseCopilotCostService } from './course-copilot-cost.service';
 import { CourseCopilotEventService } from './course-copilot-event.service';
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 
 const CHANGE_LOG_MAX = 50;
 
@@ -75,6 +79,7 @@ export class CourseCopilotSessionService {
     private readonly costService: CourseCopilotCostService,
     private readonly eventService: CourseCopilotEventService,
     private readonly structureService: CourseCopilotStructureService,
+    private readonly contentAccessService: ContentAccessService,
     @Optional() private readonly analytics?: CourseCopilotAnalyticsService,
   ) {}
 
@@ -85,6 +90,11 @@ export class CourseCopilotSessionService {
     if (options.trackId) {
       return this.openForTrack(user, options.trackId);
     }
+    // Copilot makes courses, so it is closed to an admin who may not.
+    await this.contentAccessService.assertCanAuthor(
+      AuthoredContentType.COURSE,
+      user.id,
+    );
 
     const active = await this.sessionRepository.count({
       where: {
@@ -130,6 +140,12 @@ export class CourseCopilotSessionService {
   ): Promise<CourseCopilotSessionSummary> {
     const track = await this.trackSharedService.getTrackById(trackId);
     if (!track) throw new NotFoundException('Course not found');
+    // Editing a course by chat is editing the course.
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.COURSE,
+      track.createdBy,
+      user.id,
+    );
 
     const existing = await this.sessionRepository.findOne({
       where: {

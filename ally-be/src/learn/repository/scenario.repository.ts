@@ -196,6 +196,7 @@ export class ScenariosRepository extends Repository<Scenarios> {
       search,
       isMultiTenantAdmin,
       userId,
+      createdByUserId,
     } = scenarioFilters ?? {};
     const query = this.createQueryBuilder('scenario')
       .leftJoin(User, 'user', 'scenario."createdBy"=user.id')
@@ -234,6 +235,12 @@ export class ScenariosRepository extends Repository<Scenarios> {
         '(scenario.isPublic = true OR scenario.createdBy = :userId)',
         { userId },
       );
+    }
+
+    if (createdByUserId) {
+      query.andWhere('scenario.createdBy = :createdByUserId', {
+        createdByUserId,
+      });
     }
 
     if (status) {

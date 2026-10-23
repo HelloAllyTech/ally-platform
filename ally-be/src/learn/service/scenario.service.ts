@@ -200,6 +200,10 @@ import {
   parseTimeToSeconds,
 } from 'src/common/util/time.util';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { AuditLogService } from 'src/audit/service/audit-log.service';
 import {
@@ -245,6 +249,7 @@ export class ScenarioService {
     private readonly scenarioSessionRepository: ScenarioSessionRepository,
     private readonly cohortVisibilityService: CohortVisibilityService,
     private readonly tenantFeatureService: TenantFeatureService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   async getScenarios(): Promise<GetScenarioDto[]> {
@@ -394,6 +399,9 @@ export class ScenarioService {
     const isMultiTenantAdmin = currentUser
       ? await this.permissionsService.isMultiTenantAdmin(currentUser.id)
       : false;
+    const createdByUserId = currentUser
+      ? await this.contentAccessService.ownerFilterFor(currentUser.id)
+      : null;
 
     const scenarios = await this.scenariosRepository.getAdminScenarios(
       {
@@ -405,6 +413,7 @@ export class ScenarioService {
         search,
         isMultiTenantAdmin,
         userId: currentUser?.id,
+        createdByUserId,
       },
       options,
     );
@@ -618,9 +627,31 @@ export class ScenarioService {
           'You do not have permission to view this roleplay',
         );
       }
+      await this.contentAccessService.assertCanSee(
+        AuthoredContentType.ROLEPLAY,
+        result.createdBy,
+        currentUser.id,
+      );
     }
 
     return result;
+  }
+
+  /**
+   * Refuse a roleplay outside the caller's view (ContentAccessService) by id,
+   * for paths that load it without the admin read — e.g. a preview.
+   */
+  async assertRoleplayInView(scenarioId: number, userId: number) {
+    const scenario = await this.scenariosRepository.findOne({
+      where: { id: scenarioId },
+      select: ['id', 'createdBy'],
+    });
+    if (!scenario) return;
+    await this.contentAccessService.assertCanSee(
+      AuthoredContentType.ROLEPLAY,
+      scenario.createdBy,
+      userId,
+    );
   }
 
   async getPresignedUrlForScenarioCoverImage(
@@ -777,6 +808,12 @@ export class ScenarioService {
     createScenariosDto: CreateScenariosDto,
     userId: number,
   ): Promise<Scenarios[]> {
+    // Covers Course Copilot too: it builds roleplays through this method as
+    // the session's owner.
+    await this.contentAccessService.assertCanAuthor(
+      AuthoredContentType.ROLEPLAY,
+      userId,
+    );
     if (
       createScenariosDto.scenarios.some(
         (sc) =>
@@ -1533,6 +1570,11 @@ export class ScenarioService {
     if (isMultiTenantAdmin && scenario.createdBy !== userId) {
       throw new ForbiddenException('You can only edit your own roleplays');
     }
+    await this.contentAccessService.assertCanModify(
+      AuthoredContentType.ROLEPLAY,
+      scenario.createdBy,
+      userId,
+    );
 
     await this.checkForInProgressScenarioReports(scenario.id);
 
@@ -1757,6 +1799,11 @@ export class ScenarioService {
     id: number,
     currentUser?: TokenUser,
   ): Promise<Scenarios> {
+    await this.contentAccessService.assertCanAuthor(
+      AuthoredContentType.ROLEPLAY,
+      currentUser?.id,
+    );
+    // Checks the source is in the caller's view, as well as that it exists.
     const scenario = await this.getAdminScenario(id, currentUser);
 
     const scenarioEvents = await this.scenarioEventsRepository.find({
@@ -2054,7 +2101,11 @@ export class ScenarioService {
     id: number,
     currentUser?: TokenUser,
   ): Promise<boolean> {
-    // To check if the scenario exists
+    await this.contentAccessService.assertCanAuthor(
+      AuthoredContentType.ROLEPLAY,
+      currentUser?.id,
+    );
+    // To check if the scenario exists, and is in the caller's view
     await this.getAdminScenario(id, currentUser);
 
     const scenarioPathItem =

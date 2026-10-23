@@ -1,4 +1,5 @@
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { LlmModelService } from 'src/llm/service/llm-model.service';
 import { AuditLogService } from 'src/audit/service/audit-log.service';
@@ -345,6 +346,7 @@ describe('ScenarioService', () => {
       providers: [
         { provide: AuditLogService, useValue: { log: jest.fn() } },
         ScenarioService,
+        permissiveContentAccessProvider(),
         {
           provide: getRepositoryToken(Scenarios),
           useValue: mockRepository,
