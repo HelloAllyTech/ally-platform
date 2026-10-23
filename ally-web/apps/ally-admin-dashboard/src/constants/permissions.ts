@@ -48,6 +48,11 @@ export enum Permissions {
   // nothing to show without the chat), but both grants exist so the backend can tier them later.
   VIEW_COURSE_COPILOT = "view:admin:course-copilot",
   EDIT_COURSE_COPILOT = "edit:admin:course-copilot",
+  // Ally guide (Ally Console + org Ally tab). Transcripts need their own
+  // permission AND the per-person ally_guide_transcripts toggle.
+  VIEW_ALLY_GUIDE = "view:admin:ally-guide",
+  EDIT_ALLY_GUIDE = "edit:admin:ally-guide",
+  REVIEW_ALLY_GUIDE_TRANSCRIPTS = "review:admin:ally-guide-transcripts",
   // Per-user preferences (e.g. the saved admin sidebar order). Held by every
   // platform-tier group — PLATFORM_ADMIN inherited both from SUPER_DUPER_ADMIN
   // in the role-collapse migration — but NOT by a plain tenant ADMIN or a

@@ -60,6 +60,11 @@ export const FeatureToggleKey = {
   BUG_HUNTER: "bug_hunter",
   BUILDER: "builder",
   COURSE_COPILOT: "course_copilot",
+  // Ally guide: the Ally Console, the per-organisation Ally tab, and redacted
+  // learner transcripts (per-person grant). Mirrors ally-be FeatureToggleKey.
+  ALLY_GUIDE: "ally_guide",
+  ALLY_GUIDE_ORG: "ally_guide_org",
+  ALLY_GUIDE_TRANSCRIPTS: "ally_guide_transcripts",
   OPERATIONAL_ADMIN_ACTIONS: "operational_admin_actions",
   VIDEO_ACTOR: "video_actor",
   SIDEBAR_HOVER_EXPAND: "sidebar_hover_expand",
