@@ -27,6 +27,10 @@ describe('LLM model registry', () => {
     // Opus 4.7 rejects a temperature with a 400, so the picker disables the
     // control rather than offer a setting the call cannot send.
     expect(byId('claude-opus-4-7')?.supportsTemperature).toBe(false);
+    // The 5.5 generation rejects a custom (or any non-default) temperature.
+    expect(byId('claude-opus-5-5')?.supportsTemperature).toBe(false);
+    expect(byId('claude-sonnet-5-5')?.supportsTemperature).toBe(false);
+    expect(byId('claude-haiku-5-5')?.supportsTemperature).toBe(false);
   });
 
   describe('getLlmModels(runtime)', () => {

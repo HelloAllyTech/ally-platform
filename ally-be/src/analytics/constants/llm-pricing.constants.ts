@@ -33,6 +33,13 @@ export interface ModelPricing {
    * Not used for Anthropic, whose cache tokens go through the multipliers.
    */
   cachedInputPer1MUsd?: number;
+  /**
+   * Anthropic only: what a prompt-cache READ costs when it is not the default
+   * 0.1x the input rate. Claude Opus 5.5 reads at $0.20/1M against a $4 input
+   * rate (0.05x), so the multiplier alone would price its cached turns at
+   * double. Absent means CACHE_READ_MULTIPLIER × inputPer1MUsd.
+   */
+  cacheReadPer1MUsd?: number;
 }
 
 // Anthropic prompt-cache multipliers, applied to a model's base input rate.
@@ -49,6 +56,13 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // reports in its own modelUsage — Bug Hunter's cost-reporting step also
   // normalizes to the plain id via canonicalModel, but this entry is what
   // prices it if that ever falls back to the raw key.
+  // Exact key, not left to the prefix match: `claude-opus-5-5` starts with
+  // `claude-opus-5`, which would price it at that entry's $5/$25.
+  'claude-opus-5-5': {
+    inputPer1MUsd: 4,
+    outputPer1MUsd: 20,
+    cacheReadPer1MUsd: 0.2,
+  },
   'claude-opus-5': { inputPer1MUsd: 5, outputPer1MUsd: 25 },
   'claude-opus-4-8': { inputPer1MUsd: 5, outputPer1MUsd: 25 },
   'claude-opus-4-7': { inputPer1MUsd: 5, outputPer1MUsd: 25 },
@@ -63,6 +77,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-sonnet-5': { inputPer1MUsd: 3, outputPer1MUsd: 15 },
   'claude-sonnet-4-6': { inputPer1MUsd: 3, outputPer1MUsd: 15 },
   'claude-sonnet-4-5': { inputPer1MUsd: 3, outputPer1MUsd: 15 },
+  // Rates for prompts up to 100K tokens; longer prompts bill at $0.50/$2.50,
+  // which this per-model table does not model (same approximation as the
+  // tiered Gemini 2.5 Pro entry below).
+  'claude-haiku-5-5': { inputPer1MUsd: 0.1, outputPer1MUsd: 0.5 },
   'claude-haiku-4-5': { inputPer1MUsd: 1, outputPer1MUsd: 5 },
 
   // --- OpenAI (verified 2026-06) ---
@@ -169,8 +187,8 @@ export function computeCostUsd(
     (promptTokens / 1_000_000) * pricing.inputPer1MUsd +
     (completionTokens / 1_000_000) * pricing.outputPer1MUsd +
     ((cacheTokens?.cacheReadTokens ?? 0) / 1_000_000) *
-      pricing.inputPer1MUsd *
-      CACHE_READ_MULTIPLIER +
+      (pricing.cacheReadPer1MUsd ??
+        pricing.inputPer1MUsd * CACHE_READ_MULTIPLIER) +
     ((cacheTokens?.cacheCreationTokens ?? 0) / 1_000_000) *
       pricing.inputPer1MUsd *
       CACHE_WRITE_MULTIPLIER;
