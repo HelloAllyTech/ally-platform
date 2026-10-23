@@ -87,8 +87,12 @@ jobs:
           # revert don't, even though some of those (e.g. `perf`) can matter; keeping this to the
           # two types users actually feel keeps the check simple and matches what the release
           # notes step already highlights as the interesting part of a release.
+          #
+          # `-- .`: this runs in ally-mobile/ of the monorepo (since the 2026-10-23 cutover), and
+          # only the app's own commits count. Without it a backend `feat:` releases the app.
+          # --no-merges: the cutover's import merges and PR merges are not work of their own.
           has_meaningful_commit() {
-            git log "$1" --pretty='%s' | grep -v '^Merge pull request' | grep -qiE '^(feat|fix)(\(|:)'
+            git log --no-merges "$1" --pretty='%s' -- . | grep -v '^Merge pull request' | grep -qiE '^(feat|fix)(\(|:)'
           }
 
           LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
@@ -102,13 +106,14 @@ jobs:
             fi
           else
             LAST_SHA=$(git rev-list -n 1 "$LAST_TAG")
-            HEAD_SHA=$(git rev-parse HEAD)
+            # The app's commits since the tag, not master's: master moves with every service.
+            APP_NEW=$(git log --no-merges --format=%H "$LAST_TAG..HEAD" -- . | head -1)
             LAST_TS=$(git log -1 --format=%ct "$LAST_TAG")
             NOW_TS=$(date +%s)
             ELAPSED_H=$(( (NOW_TS - LAST_TS) / 3600 ))
             echo "Last auto-release: $LAST_TAG ($LAST_SHA), ${ELAPSED_H}h ago"
-            if [ "$LAST_SHA" = "$HEAD_SHA" ]; then
-              echo "No new commits on master since $LAST_TAG. Skipping."
+            if [ -z "$APP_NEW" ]; then
+              echo "No new ally-mobile commits on master since $LAST_TAG. Skipping."
               echo "proceed=false" >> "$GITHUB_OUTPUT"
             elif [ "$ELAPSED_H" -lt 48 ]; then
               echo "Only ${ELAPSED_H}h since $LAST_TAG (need 48h). Skipping."
@@ -126,10 +131,13 @@ jobs:
         if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true'
         run: |
           set -e
-          HEAD_SHA=$(git rev-parse HEAD)
-          CONCLUSION=$(gh run list --repo "${{ github.repository }}" --workflow test.yml --branch master --limit 20 --json headSha,conclusion \
-            --jq "[.[] | select(.headSha == \"$HEAD_SHA\")] | .[0].conclusion // \"\"")
-          echo "Tests conclusion for $HEAD_SHA: '$CONCLUSION'"
+          # The app's tests run only on master pushes that touch ally-mobile/, so master's
+          # head (often another service's commit) has no run at all. What ships is the app as
+          # of its newest commit, and that commit's run is the one that has to be green.
+          APP_HEAD=$(git log -1 --format=%H -- .)
+          CONCLUSION=$(gh run list --repo "${{ github.repository }}" --workflow test-ally-mobile.yml --branch master --limit 20 --json headSha,conclusion \
+            --jq "[.[] | select(.headSha == \"$APP_HEAD\")] | .[0].conclusion // \"\"")
+          echo "Tests conclusion for $APP_HEAD: '$CONCLUSION'"
           if [ "$CONCLUSION" != "success" ]; then
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           else
@@ -179,9 +187,9 @@ jobs:
           set -e
           LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
           if [ -z "$LAST_TAG" ]; then
-            LOG=$(git log -20 --pretty='%s' | grep -v '^Merge pull request' || true)
+            LOG=$(git log --no-merges -20 --pretty='%s' -- . | grep -v '^Merge pull request' || true)
           else
-            LOG=$(git log "$LAST_TAG"..HEAD --pretty='%s' | grep -v '^Merge pull request' || true)
+            LOG=$(git log --no-merges "$LAST_TAG"..HEAD --pretty='%s' -- . | grep -v '^Merge pull request' || true)
           fi
           # `cut -c1-480` truncates each *line* to 480 chars, not the combined output — with
           # several commit lines the total can still blow past Play Store's 500-char whatsnew

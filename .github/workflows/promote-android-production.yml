@@ -1,3 +1,7 @@
+# Touched on 2026-10-23 so GitHub registers this workflow in ally-platform: the files
+# imported with the monorepo were never pushed on their own, and a workflow_dispatch-only
+# workflow is not listed (nor dispatchable) until one is. ally-be's mobile release page
+# dispatches it, or scheduled-mobile-release.yml does.
 name: Promote Android release to production
 defaults:
   run:
