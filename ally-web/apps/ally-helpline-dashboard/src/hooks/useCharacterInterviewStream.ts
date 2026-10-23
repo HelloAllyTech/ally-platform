@@ -19,6 +19,7 @@ import {
   CharacterInterviewStructuredAnswer,
   RefreshResponse,
 } from "@types";
+import { parseSseFrames } from "@utils/sseStream";
 
 /**
  * Ported from ally-admin-dashboard's `src/hooks/useCharacterInterviewStream.ts`.
@@ -46,20 +47,13 @@ export const parseSseBuffer = (
   buffer: string,
 ): { events: CharacterInterviewStreamEvent[]; rest: string } => {
   const events: CharacterInterviewStreamEvent[] = [];
-  const frames = buffer.split(/\r?\n\r?\n/);
-  const rest = frames.pop() ?? "";
+  const { frames, rest } = parseSseFrames(buffer);
 
   for (const frame of frames) {
-    let eventName = "";
-    const dataLines: string[] = [];
-    for (const line of frame.split(/\r?\n/)) {
-      if (line.startsWith("event:")) eventName = line.slice(6).trim();
-      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
-      // Comments (":") and other fields (id:, retry:) are ignored.
-    }
-    if (!eventName || dataLines.length === 0) continue;
+    const eventName = frame.event;
+    if (!eventName) continue;
     try {
-      const data = JSON.parse(dataLines.join("\n"));
+      const data = JSON.parse(frame.data);
       events.push({ type: eventName, data } as CharacterInterviewStreamEvent);
     } catch {
       logger.warn(`[Character Interview] Dropping malformed SSE frame for event "${eventName}"`);
