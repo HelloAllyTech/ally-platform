@@ -4578,6 +4578,10 @@ export const en = {
           label: "False update claims",
           hint: "Turns whose reply says the PRD changed while no edit succeeded.",
         },
+        falseReadyClaims: {
+          label: "False ready claims",
+          hint: 'Replies that told the admin the PRD was ready, or to start the build, while readiness said it was not. A reply Builder had to add "Not ready to build yet" under is not counted.',
+        },
         consistent: {
           label: "PRD consistent",
           hint: "The final PRD's test plan, requirement homes and mobile twins agree with each other.",
@@ -4858,7 +4862,10 @@ export const en = {
           cost: "~Cost",
         },
         readyYes: (score: number) => `Yes (readiness ${score})`,
-        readyNo: (score: number) => `No (readiness ${score})`,
+        readyNo: (score: number, blockers: string[] = []) =>
+          blockers.length
+            ? `No — held back by ${blockers.join(", ")} (readiness ${score})`
+            : `No (readiness ${score})`,
         toolCalls: (calls: number, failures: number) =>
           failures > 0 ? `${calls} (${failures} failed)` : String(calls),
         correctedItems: (items: string) => `The simulated admin corrected Builder on: ${items}.`,
