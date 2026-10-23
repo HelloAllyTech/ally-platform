@@ -44,6 +44,11 @@ env:
 
 jobs:
   prepare-env:
+    # No checkout in this job, so the workflow's service-folder default
+    # does not exist on the runner; run from the workspace root instead.
+    defaults:
+      run:
+        working-directory: .
     name: Prepare Env
     runs-on: ubuntu-22.04
     outputs:
