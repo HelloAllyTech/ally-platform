@@ -9,7 +9,10 @@
  * serves it over GET /v1/builder/pipeline/repo-commands.
  */
 export interface BuilderRepoDefinition {
-  /** Repository name under the GitHub org. */
+  /**
+   * The service — since the 2026-10-23 cutover a folder of the monorepo, not a
+   * repository of its own. Its commands below run from that folder.
+   */
   repo: string;
   /** One line the agent reads to decide whether a change belongs here. */
   description: string;
@@ -109,8 +112,11 @@ export const BUILDER_REPOS: BuilderRepoDefinition[] = [
     // files and finished in under 20s. Working tree vs origin/master, so
     // uncommitted edits count. Deletions are dropped because related can't
     // resolve a missing path. With no source changed there is nothing to relate.
+    // `--relative`: in the monorepo this runs from `ally-web/`, where a bare
+    // `git diff --name-only` prints root paths (`ally-web/apps/…`) that vitest
+    // cannot resolve, and lists every other service's changes too.
     affectedTest:
-      "files=$(git diff --name-only --diff-filter=d origin/master -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mts' '*.mjs'); " +
+      "files=$(git diff --name-only --relative --diff-filter=d origin/master -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mts' '*.mjs'); " +
       'if [ -z "$files" ]; then echo "No changed source files; no related specs to run."; ' +
       'else npx vitest related --run --passWithNoTests $files; fi',
     lint: 'npx nx run-many -t lint --skip-nx-cache',

@@ -1,7 +1,10 @@
-# Builder's code review, run where the code is: in the target repo's own
-# Actions, with the pull request checked out and its dependencies installed.
+# Builder's code review, run where the code is: in the monorepo's Actions,
+# with the pull request checked out and its service's dependencies installed.
 #
-# Called from a small `builder-review.yml` stub in each repo Builder builds in.
+# Called from `builder-review.yml`. Since the 2026-10-23 cutover every service
+# is a folder of this monorepo; `service` (or, when empty, the folder holding
+# most of the pull request's files) picks the runtime, the install and the
+# folder the reviewers run commands from.
 # Four focused passes run in parallel — spec, compatibility, safety, tests —
 # each an opencode agent that may run anything (probe scripts, focused tests
 # against the real code, type checks) to prove what it reports. A final pass
@@ -16,7 +19,7 @@
 # and `builder_pr_id` set, the verdict is filed to Builder; without them the
 # run is a dry run whose result is the job summary and the `review` artifact.
 #
-# Prompts live in ally-be at scripts/builder/review/, read from master.
+# Prompts live at ally-be/scripts/builder/review/, read from the default branch.
 #
 # Secrets: GEMINI_API_KEY, ALLY_BE_API_KEY (org). Variables: ALLY_BE_API_URL,
 # BUILDER_REVIEW_MODEL (default google/gemini-3.1-pro-preview).
@@ -40,19 +43,8 @@ on:
         description: Builder's id for this pull request. Needed to file findings.
         type: string
         default: ''
-      runtime:
-        type: string
-        default: node
-      node-version:
-        type: string
-        default: '24'
-      python-version:
-        type: string
-        default: '3.12'
-      install-command:
-        type: string
-        default: ''
-      node-options:
+      service:
+        description: The service the pull request is for. Empty = the folder holding most of its files.
         type: string
         default: ''
     secrets:
@@ -87,8 +79,6 @@ jobs:
       max-parallel: 2
       matrix:
         pass: [spec, compat, safety, tests]
-    env:
-      NODE_OPTIONS: ${{ inputs.node-options }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,38 +89,63 @@ jobs:
       # reviewed.
       - uses: actions/checkout@v4
         with:
-          repository: HelloAllyTech/ally-be
-          ref: master
+          ref: ${{ github.event.repository.default_branch }}
           path: .builder-review-prompts
           sparse-checkout: |
-            scripts/builder/review
-            scripts/builder/opencode-usage.py
+            ally-be/scripts/builder/review
+            ally-be/scripts/builder/opencode-usage.py
+          sparse-checkout-cone-mode: false
       - name: Set the prompts aside
         run: |
-          mv .builder-review-prompts/scripts/builder/review "${RUNNER_TEMP}/prompts"
-          mv .builder-review-prompts/scripts/builder/opencode-usage.py "${RUNNER_TEMP}/opencode-usage.py"
+          mv .builder-review-prompts/ally-be/scripts/builder/review "${RUNNER_TEMP}/prompts"
+          mv .builder-review-prompts/ally-be/scripts/builder/opencode-usage.py "${RUNNER_TEMP}/opencode-usage.py"
           rm -rf .builder-review-prompts
+
+      - name: Which service
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVICE_INPUT: ${{ inputs.service }}
+          PR: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          service="$SERVICE_INPUT"
+          if [ -z "$service" ]; then
+            for folder in $(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json files \
+                --jq '[.files[].path | split("/")[0]] | group_by(.) | sort_by(length) | reverse | .[][0]'); do
+              case "$folder" in ally-be|ally-web|ally-ai|ally-ai-learn|ally-mobile) service="$folder"; break ;; esac
+            done
+          fi
+          case "$service" in
+            ally-be|ally-web|ally-ai|ally-ai-learn|ally-mobile) ;;
+            *) echo "::error::Could not tell which service pull request #${PR} is for."; exit 1 ;;
+          esac
+          {
+            echo "SERVICE=${service}"
+            case "$service" in
+              ally-be|ally-web) echo "NODE_OPTIONS=--max-old-space-size=6144" ;;
+            esac
+          } >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ (env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile') && '22' || '24' }}
       - uses: actions/setup-python@v5
-        if: inputs.runtime == 'python'
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: '3.12'
       - name: Install Poetry
-        if: inputs.runtime == 'python'
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
       - name: Install dependencies
-        env:
-          INSTALL: ${{ inputs.install-command || (inputs.runtime == 'python' && 'poetry install --no-interaction --with dev' || 'npm ci') }}
-        run: eval "$INSTALL"
+        working-directory: ${{ env.SERVICE }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
       - name: Put the virtualenv on PATH
-        if: inputs.runtime == 'python'
-        run: echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
+        run: echo "${GITHUB_WORKSPACE}/${SERVICE}/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Install opencode
         run: npm install -g opencode-ai@1.18.32
@@ -170,6 +185,11 @@ jobs:
               "OUT": sys.argv[1],
           }.items():
               body = body.replace("{{" + k + "}}", v)
+          service = os.environ["SERVICE"]
+          body += (
+              f"\n\nThis repository is a monorepo. The pull request is for the {service} service,"
+              f" in the `{service}/` folder: run its tests, lint and type checks from there (`cd {service}`)."
+          )
           print(body)
           PY
           # --auto: the runner is disposable and holds no credential that can
@@ -221,8 +241,6 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      NODE_OPTIONS: ${{ inputs.node-options }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -230,38 +248,63 @@ jobs:
           fetch-depth: 0
       - uses: actions/checkout@v4
         with:
-          repository: HelloAllyTech/ally-be
-          ref: master
+          ref: ${{ github.event.repository.default_branch }}
           path: .builder-review-prompts
           sparse-checkout: |
-            scripts/builder/review
-            scripts/builder/opencode-usage.py
+            ally-be/scripts/builder/review
+            ally-be/scripts/builder/opencode-usage.py
+          sparse-checkout-cone-mode: false
       - name: Set the prompts aside
         run: |
-          mv .builder-review-prompts/scripts/builder/review "${RUNNER_TEMP}/prompts"
-          mv .builder-review-prompts/scripts/builder/opencode-usage.py "${RUNNER_TEMP}/opencode-usage.py"
+          mv .builder-review-prompts/ally-be/scripts/builder/review "${RUNNER_TEMP}/prompts"
+          mv .builder-review-prompts/ally-be/scripts/builder/opencode-usage.py "${RUNNER_TEMP}/opencode-usage.py"
           rm -rf .builder-review-prompts
+
+      - name: Which service
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVICE_INPUT: ${{ inputs.service }}
+          PR: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          service="$SERVICE_INPUT"
+          if [ -z "$service" ]; then
+            for folder in $(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json files \
+                --jq '[.files[].path | split("/")[0]] | group_by(.) | sort_by(length) | reverse | .[][0]'); do
+              case "$folder" in ally-be|ally-web|ally-ai|ally-ai-learn|ally-mobile) service="$folder"; break ;; esac
+            done
+          fi
+          case "$service" in
+            ally-be|ally-web|ally-ai|ally-ai-learn|ally-mobile) ;;
+            *) echo "::error::Could not tell which service pull request #${PR} is for."; exit 1 ;;
+          esac
+          {
+            echo "SERVICE=${service}"
+            case "$service" in
+              ally-be|ally-web) echo "NODE_OPTIONS=--max-old-space-size=6144" ;;
+            esac
+          } >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ (env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile') && '22' || '24' }}
       - uses: actions/setup-python@v5
-        if: inputs.runtime == 'python'
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: '3.12'
       - name: Install Poetry
-        if: inputs.runtime == 'python'
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
       - name: Install dependencies
-        env:
-          INSTALL: ${{ inputs.install-command || (inputs.runtime == 'python' && 'poetry install --no-interaction --with dev' || 'npm ci') }}
-        run: eval "$INSTALL"
+        working-directory: ${{ env.SERVICE }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
       - name: Put the virtualenv on PATH
-        if: inputs.runtime == 'python'
-        run: echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
+        run: echo "${GITHUB_WORKSPACE}/${SERVICE}/.venv/bin" >> "$GITHUB_PATH"
       - name: Install opencode
         run: npm install -g opencode-ai@1.18.32
 
@@ -327,6 +370,11 @@ jobs:
               "SCRATCH": f"{t}/scratch", "CANDIDATES": f"{t}/candidates.json", "OUT": sys.argv[1],
           }.items():
               body = body.replace("{{" + k + "}}", v)
+          service = os.environ["SERVICE"]
+          body += (
+              f"\n\nThis repository is a monorepo. The pull request is for the {service} service,"
+              f" in the `{service}/` folder: run its tests, lint and type checks from there (`cd {service}`)."
+          )
           print(body)
           PY
           timeout 24m opencode run --auto --print-logs --log-level WARN --model "$MODEL" --variant high "$(cat "${RUNNER_TEMP}/prompt.md")" \

@@ -7,7 +7,34 @@ import {
   BUILDER_GITHUB_SEARCH_MAX_RESULTS,
   BUILDER_GITHUB_TREE_MAX_ENTRIES,
 } from '../constants/builder.constants';
-import { isBuilderReadableRepo } from '../constants/builder-repos.constants';
+import {
+  BUILDER_WIKI_REPO,
+  isBuilderReadableRepo,
+} from '../constants/builder-repos.constants';
+import {
+  isMonorepoService,
+  pathWithinService,
+  serviceForPath,
+} from 'src/github/constants/github-repos.constants';
+
+/**
+ * Where a repo's code is read from. Since the 2026-10-23 cutover the five
+ * services live as folders of one monorepo and their own repos are archived:
+ * frozen, still readable, and wrong for anything current. A service is read
+ * from its folder in the monorepo; anything else (the wiki) from its own repo.
+ * Paths stay service-relative either way — the agent asks for
+ * `ally-be` + `src/main.ts` exactly as before.
+ */
+interface ReadLocation {
+  /** owner/name to address. */
+  fullName: string;
+  /** The service's folder in the monorepo, or null when the repo is its own. */
+  folder: string | null;
+}
+
+/** A GitHub 404: the path, or a `ref:folder` tree, does not exist there. */
+const isNotFound = (error: unknown): boolean =>
+  (error as { response?: { status?: number } })?.response?.status === 404;
 
 /**
  * Read-only GitHub REST access for the interview agent: search code, read a
@@ -47,6 +74,49 @@ export class BuilderGithubReadService {
     return this.configService.githubOrg;
   }
 
+  private locate(repo: string): ReadLocation {
+    const monorepo = this.configService.githubMonorepo;
+    return monorepo && isMonorepoService(repo)
+      ? { fullName: `${this.org}/${monorepo}`, folder: repo }
+      : { fullName: `${this.org}/${repo}`, folder: null };
+  }
+
+  /**
+   * A service's tree at `ref`, with paths relative to the service.
+   *
+   * `ref:folder` asks GitHub for the folder's own tree. A ref from before the
+   * cutover — the eval's pinned commits — is a commit of the old service repo,
+   * which the monorepo kept in its history: there the service IS the root and
+   * `ref:folder` is a 404, so the root tree is the answer. Only an explicit
+   * ref can be that old; master never is.
+   */
+  private async serviceTree(
+    location: ReadLocation,
+    ref: string,
+    explicitRef: boolean,
+  ): Promise<{ tree: any[]; truncated: boolean }> {
+    const get = (treeRef: string) =>
+      axios.get(
+        `https://api.github.com/repos/${location.fullName}/git/trees/${treeRef}`,
+        {
+          headers: this.headers,
+          params: { recursive: '1' },
+          timeout: 30_000,
+        },
+      );
+    let response;
+    try {
+      response = await get(location.folder ? `${ref}:${location.folder}` : ref);
+    } catch (error) {
+      if (!location.folder || !explicitRef || !isNotFound(error)) throw error;
+      response = await get(ref);
+    }
+    return {
+      tree: response.data?.tree ?? [],
+      truncated: Boolean(response.data?.truncated),
+    };
+  }
+
   /**
    * Code search across the org (or one repo). Returns paths and repo names
    * only — GitHub's fragments are noisy and the agent should follow up with
@@ -59,7 +129,10 @@ export class BuilderGithubReadService {
     if (repo && !isBuilderReadableRepo(repo)) {
       return { ok: false, error: 'unknown_repo', repo };
     }
-    const scope = repo ? `repo:${this.org}/${repo}` : `org:${this.org}`;
+    const location = repo ? this.locate(repo) : null;
+    const scope = location
+      ? `repo:${location.fullName}${location.folder ? ` path:${location.folder}/` : ''}`
+      : `org:${this.org}`;
     try {
       const response = await axios.get('https://api.github.com/search/code', {
         headers: this.headers,
@@ -70,13 +143,22 @@ export class BuilderGithubReadService {
         timeout: 20_000,
       });
       const items: any[] = response.data?.items ?? [];
+      const seen = new Set<string>();
+      const results = items
+        .map((item) =>
+          this.asReadable(String(item?.repository?.name ?? ''), item?.path),
+        )
+        .filter((hit): hit is { repo: string; path: string } => {
+          if (!hit) return false;
+          const key = `${hit.repo}:${hit.path}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
       return {
         ok: true,
         totalCount: response.data?.total_count ?? items.length,
-        results: items.map((item) => ({
-          repo: item?.repository?.name,
-          path: item?.path,
-        })),
+        results,
       };
     } catch (error) {
       return this.failure('search_failed', error);
@@ -100,14 +182,27 @@ export class BuilderGithubReadService {
       return { ok: false, error: 'unknown_repo', repo };
     }
     try {
-      const response = await axios.get(
-        `https://api.github.com/repos/${this.org}/${repo}/contents/${path}`,
-        {
-          headers: this.headers,
-          params: ref ? { ref } : undefined,
-          timeout: 20_000,
-        },
-      );
+      const location = this.locate(repo);
+      const get = (contentPath: string) =>
+        axios.get(
+          `https://api.github.com/repos/${location.fullName}/contents/${contentPath}`,
+          {
+            headers: this.headers,
+            params: ref ? { ref } : undefined,
+            timeout: 20_000,
+          },
+        );
+      let response;
+      try {
+        response = await get(
+          location.folder ? `${location.folder}/${path}` : path,
+        );
+      } catch (error) {
+        // A pinned ref from before the cutover is a commit of the old service
+        // repo, where the service is the root (see serviceTree).
+        if (!location.folder || !ref || !isNotFound(error)) throw error;
+        response = await get(path);
+      }
       const data = response.data;
       if (Array.isArray(data)) {
         return {
@@ -148,8 +243,10 @@ export class BuilderGithubReadService {
   async repoTree(
     repo: string,
     path?: string,
-    ref = 'master',
+    requestedRef?: string,
   ): Promise<Record<string, any>> {
+    const explicitRef = Boolean(requestedRef);
+    const ref = requestedRef || 'master';
     if (!this.isConfigured) {
       return this.notConfigured();
     }
@@ -157,16 +254,12 @@ export class BuilderGithubReadService {
       return { ok: false, error: 'unknown_repo', repo };
     }
     try {
-      const response = await axios.get(
-        `https://api.github.com/repos/${this.org}/${repo}/git/trees/${ref}`,
-        {
-          headers: this.headers,
-          params: { recursive: '1' },
-          timeout: 30_000,
-        },
+      const { tree: all, truncated: githubTruncated } = await this.serviceTree(
+        this.locate(repo),
+        ref,
+        explicitRef,
       );
       const prefix = path?.replace(/^\/+|\/+$/g, '');
-      const all: any[] = response.data?.tree ?? [];
       const filtered = all
         .filter((entry) => entry?.type === 'blob')
         .map((entry) => entry.path as string)
@@ -182,7 +275,7 @@ export class BuilderGithubReadService {
         // GitHub's own truncation flag matters too: a huge repo's tree comes
         // back partial, and a confident "this file does not exist" drawn from
         // a partial tree is worse than no answer.
-        githubTruncated: Boolean(response.data?.truncated),
+        githubTruncated,
         files: filtered.slice(0, BUILDER_GITHUB_TREE_MAX_ENTRIES),
       };
     } catch (error) {
@@ -208,15 +301,11 @@ export class BuilderGithubReadService {
       return { ok: false, error: 'unknown_repo', repo };
     }
     try {
-      const response = await axios.get(
-        `https://api.github.com/repos/${this.org}/${repo}/git/trees/${ref}`,
-        {
-          headers: this.headers,
-          params: { recursive: '1' },
-          timeout: 30_000,
-        },
+      const { tree: all, truncated: githubTruncated } = await this.serviceTree(
+        this.locate(repo),
+        ref,
+        ref !== 'master',
       );
-      const all: any[] = response.data?.tree ?? [];
       const docs = all
         .filter((entry) => entry?.type === 'blob')
         .map((entry) => entry.path as string)
@@ -232,12 +321,44 @@ export class BuilderGithubReadService {
         ref,
         totalCount: docs.length,
         truncated: docs.length > BUILDER_GITHUB_TREE_MAX_ENTRIES,
-        githubTruncated: Boolean(response.data?.truncated),
+        githubTruncated,
         files: docs.slice(0, BUILDER_GITHUB_TREE_MAX_ENTRIES),
       };
     } catch (error) {
       return this.failure('docs_failed', error);
     }
+  }
+
+  /**
+   * A code-search hit as the agent addresses it: a service plus a
+   * service-relative path, the way every other tool here takes them.
+   *
+   * A monorepo hit becomes the service whose folder holds it (and the wiki's
+   * folder becomes the wiki repo, which mirrors it). A hit in an archived
+   * service repo is dropped: GitHub still indexes those repos, and their copy
+   * of a file is the one frozen at the cutover — the current one is in the
+   * monorepo. Root files of the monorepo belong to no readable repo and are
+   * dropped too, since nothing could read them back.
+   */
+  private asReadable(
+    repoName: string,
+    path: unknown,
+  ): { repo: string; path: string } | null {
+    if (typeof path !== 'string' || !repoName) return null;
+    const monorepo = this.configService.githubMonorepo;
+    if (monorepo && repoName === monorepo) {
+      const service = serviceForPath(path);
+      if (service) return { repo: service, path: pathWithinService(path) };
+      if (path.startsWith(`${BUILDER_WIKI_REPO}/`)) {
+        return {
+          repo: BUILDER_WIKI_REPO,
+          path: path.slice(BUILDER_WIKI_REPO.length + 1),
+        };
+      }
+      return null;
+    }
+    if (monorepo && isMonorepoService(repoName)) return null;
+    return { repo: repoName, path };
   }
 
   private notConfigured(): Record<string, any> {

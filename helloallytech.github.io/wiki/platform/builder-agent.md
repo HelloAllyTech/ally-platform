@@ -232,6 +232,16 @@ Each repo definition carries the commands the agent must use — its test, lint 
 typecheck invocations — so the machine gate runs what CI runs rather than what the agent
 guesses.
 
+Since 2026-10-23 those five are folders of one monorepo rather than repos of their own,
+and their old repos are archived. One `builder.yml` and one `builder-review.yml` serve all
+five: the service comes from a marker in the issue Builder raises (or, for a `/oc` comment,
+from the folder holding most of the pull request's files), and decides the runtime, the
+install and the folder the agent works in. Each run carries its issue, pull request or run
+id in its title, which is how Builder tells its own run from another session's. Anything
+Builder stored — a pull request, an issue, a workflow run — is read from the repo its URL
+names, because numbers restarted at #1 in the monorepo; a pull request still open on an
+archived repo can never merge, so it goes to a person instead of being retried.
+
 It runs on more than one coding engine, chosen per session or by a default in settings.
 Only two files know anything engine-specific: one installs the engine, one invokes it and
 normalises its output. Everything downstream — the event schema, the pipeline endpoints,

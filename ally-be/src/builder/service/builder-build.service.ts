@@ -64,7 +64,15 @@ import {
   prdTechnicalPlanLength,
   BUILDER_REPO_REVIEW_WORKFLOW,
   BUILDER_REPO_REVIEW_TIMEOUT_MS,
+  builderIssueRunTitle,
+  builderRunTitle,
+  builderServiceMarker,
 } from '../constants/builder.constants';
+import {
+  issueRepoOf,
+  prRepoOf,
+  workflowRunRepoOf,
+} from '../util/builder-github-location.util';
 
 /** A size decision plus the features it was derived from. */
 export interface BuilderSizing {
@@ -1195,7 +1203,11 @@ export class BuilderBuildService {
 
     try {
       await this.github.dispatchWorkflow({
-        repo: pullRequest.repo,
+        // Where the pull request lives. A PR opened before the 2026-10-23
+        // cutover is on an archived repo, which refuses the dispatch — the
+        // right outcome; sending its number to the monorepo would review a
+        // different pull request.
+        repo: prRepoOf(pullRequest),
         workflow: BUILDER_REPO_REVIEW_WORKFLOW,
         ref: 'master',
         inputs: {
@@ -1203,6 +1215,9 @@ export class BuilderBuildService {
           spec_run_id: specRunId,
           review_run_id: run.id,
           builder_pr_id: pullRequest.id,
+          // One review workflow serves every service now; this picks the
+          // runtime, the dependencies and the folder.
+          service: pullRequest.repo,
         },
       });
     } catch (error) {
@@ -1313,6 +1328,7 @@ export class BuilderBuildService {
       repo,
       workflow: BUILDER_REPO_REVIEW_WORKFLOW,
       since: run.dispatchedAt,
+      titleIncludes: builderRunTitle(run.id),
     });
     if (remote && !run.githubRunUrl) {
       await this.runRepository.update(
@@ -1423,6 +1439,7 @@ export class BuilderBuildService {
     // the run id it needs to do that (in a marker the workflow parses).
     const body = [
       `<!-- builder-run: ${run.id} -->`,
+      builderServiceMarker(repo),
       `Builder build for \`${repo}\` (session \`${session.id.slice(0, 8)}\`, run ${run.sequence}).`,
       '',
       'The specification is private: the Builder workflow fetches it from Builder ' +
@@ -1721,6 +1738,7 @@ export class BuilderBuildService {
               repo,
               workflow: BUILDER_REPO_REVIEW_WORKFLOW,
               since: run.dispatchedAt,
+              titleIncludes: builderRunTitle(run.id),
             })
             .catch(() => null)
         : null;
@@ -1738,13 +1756,17 @@ export class BuilderBuildService {
         repo: BUILDER_WORKFLOW_REPO,
         workflow: BUILDER_WORKFLOW_FILE,
         since: run.dispatchedAt,
+        titleIncludes: builderRunTitle(run.id),
       });
       githubRunId = found?.id ?? null;
     }
     if (!githubRunId) return;
 
     try {
-      await this.github.cancelRun(BUILDER_WORKFLOW_REPO, String(githubRunId));
+      await this.github.cancelRun(
+        workflowRunRepoOf(run, BUILDER_WORKFLOW_REPO),
+        String(githubRunId),
+      );
     } catch (error) {
       this.logger.warn(
         `GitHub cancel failed for Builder run ${run.id} (harmless if it had already finished): ${
@@ -1765,7 +1787,11 @@ export class BuilderBuildService {
    * Best-effort throughout; the run is already CANCELLED.
    */
   private async stopIssueBuild(run: BuilderBuildRun): Promise<void> {
-    const repo = run.repos?.[0];
+    // Where the issue lives — the archived service repo for a build raised
+    // before the cutover, the monorepo after — and THIS issue's run: one
+    // builder.yml now serves every Builder issue, so the oldest run since
+    // dispatch could be another session's, and it would be cancelled.
+    const repo = issueRepoOf(run);
     if (!repo || !run.issueNumber || !this.github.isConfigured) return;
     try {
       const working = await this.github.findRunSince({
@@ -1773,6 +1799,7 @@ export class BuilderBuildService {
         workflow: 'builder.yml',
         since: run.dispatchedAt,
         event: 'issues',
+        titleIncludes: builderIssueRunTitle(run.issueNumber, 'issues'),
       });
       if (working && working.status !== 'completed') {
         await this.github.cancelRun(repo, working.id);
@@ -1929,6 +1956,7 @@ export class BuilderBuildService {
         repo: BUILDER_WORKFLOW_REPO,
         workflow: BUILDER_WORKFLOW_FILE,
         since: run.dispatchedAt,
+        titleIncludes: builderRunTitle(run.id),
       });
       if (found) {
         await this.runRepository.update(
@@ -1947,7 +1975,7 @@ export class BuilderBuildService {
     }
 
     const remote = await this.github.getRun(
-      BUILDER_WORKFLOW_REPO,
+      workflowRunRepoOf(run, BUILDER_WORKFLOW_REPO),
       String(run.githubRunId),
     );
 

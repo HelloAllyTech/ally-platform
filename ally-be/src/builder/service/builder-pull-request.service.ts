@@ -48,8 +48,15 @@ import {
   BUILDER_HEALTH_RETRY_MS,
   BUILDER_UNHEALTHY_HOLD_MS,
   BUILDER_TRACK_RECORD_WINDOW,
+  builderIssueRunTitle,
 } from '../constants/builder.constants';
-import { resolveReleaseTargets } from 'src/release/constants/release-targets.constants';
+import {
+  ReleaseTargetSet,
+  resolveMonorepoReleaseTargets,
+  resolveReleaseTargets,
+} from 'src/release/constants/release-targets.constants';
+import { repoName } from 'src/github/constants/github-repos.constants';
+import { issueRepoOf, prRepoOf } from '../util/builder-github-location.util';
 import { ProductionReleaseService } from 'src/release/service/production-release.service';
 
 /**
@@ -68,6 +75,12 @@ const ISSUE_BUILD_TIMEOUT_MS = 60 * 60_000;
 const ISSUE_FIX_REQUESTS = 2;
 /** How long a `/oc` request on feedback may go unanswered before it is retried. */
 const OC_FIX_TIMEOUT_MS = 60 * 60_000;
+
+/** Why a pull request on an archived service repo goes to a person. */
+const ARCHIVED_REPO_REASON = (prUrl: string): string =>
+  `${prUrl} is on a repository that was archived when the code moved to the ` +
+  'monorepo, so it can never merge. Re-open the change on the monorepo if it ' +
+  'is still wanted, or close this one.';
 /** A branch opencode made (`opencode github run`), so its fixes go by `/oc`. */
 const isOpencodeBranch = (branch?: string | null): boolean =>
   Boolean(branch?.startsWith('opencode/'));
@@ -144,7 +157,10 @@ export class BuilderPullRequestService {
       );
     }
 
-    const remote = await this.github.getPullRequest(row.repo, row.prNumber);
+    const remote = await this.github.getPullRequest(
+      prRepoOf(row),
+      row.prNumber,
+    );
     if (!remote) {
       throw new BadRequestException(
         `Could not read ${row.prUrl} from GitHub. Try again, or merge it there.`,
@@ -164,12 +180,15 @@ export class BuilderPullRequestService {
         `${row.prUrl} is closed without being merged.`,
       );
     }
+    if (remote.baseRepoArchived) {
+      throw new ForbiddenException(ARCHIVED_REPO_REASON(row.prUrl));
+    }
 
     // A null rollup means GitHub could not be read, which is NOT the same as
     // green. `none` and `pending` are refused for the same reason: a merge is
     // the one action here that cannot be undone from this tab.
     const rollup = remote.headSha
-      ? await this.github.getCheckRollup(row.repo, remote.headSha)
+      ? await this.github.getCheckRollup(prRepoOf(row), remote.headSha)
       : null;
     if (!rollup) {
       throw new BadRequestException(
@@ -197,7 +216,7 @@ export class BuilderPullRequestService {
     }
 
     const result = await this.github.mergePullRequest(
-      row.repo,
+      prRepoOf(row),
       row.prNumber,
       row.title ?? undefined,
     );
@@ -372,19 +391,26 @@ export class BuilderPullRequestService {
   }
 
   private async reconcileIssueRun(run: BuilderBuildRun): Promise<void> {
+    // `repo` is the service the build is for — what the PR row records.
+    // `githubRepo` is where its issue, and so its PR and runs, actually live:
+    // the archived service repo for a build raised before the 2026-10-23
+    // cutover, the monorepo after it.
     const repo = run.repos?.[0];
-    if (!repo || !run.issueNumber) return;
+    const githubRepo = issueRepoOf(run);
+    if (!repo || !githubRepo || !run.issueNumber) return;
     const prefix = `opencode/issue${run.issueNumber}-`;
-    const pr = ((await this.github.listPullRequests(repo)) ?? []).find(
+    const pr = ((await this.github.listPullRequests(githubRepo)) ?? []).find(
       (candidate) => candidate.headRef?.startsWith(prefix),
     );
 
     if (!pr?.number) {
       const workflowRun = await this.github.findRunSince({
-        repo,
+        repo: githubRepo,
         workflow: ISSUE_BUILD_WORKFLOW,
         since: run.dispatchedAt,
         event: 'issues',
+        // One builder.yml serves every Builder issue in the monorepo.
+        titleIncludes: builderIssueRunTitle(run.issueNumber, 'issues'),
       });
       if (workflowRun && workflowRun.status !== 'completed') {
         await this.buildService.recordIssueMilestone(
@@ -431,7 +457,7 @@ export class BuilderPullRequestService {
     );
     if (!pr.headSha) return;
     const sha = pr.headSha.slice(0, 7);
-    const rollup = await this.github.getCheckRollup(repo, pr.headSha);
+    const rollup = await this.github.getCheckRollup(githubRepo, pr.headSha);
     const ci = (state: 'success' | 'failure' | 'pending') => ({
       ci: {
         repo,
@@ -484,7 +510,7 @@ export class BuilderPullRequestService {
       return;
     }
     await this.github.createIssueComment(
-      repo,
+      githubRepo,
       pr.number,
       `/oc CI failed on this pull request: ${rollup.failed.join(', ') || 'see the checks'}. ` +
         'Read the failing checks, fix the cause on this branch, and keep every check passing. ' +
@@ -522,14 +548,14 @@ export class BuilderPullRequestService {
 
   private async reconcileOne(pullRequest: BuilderPullRequest): Promise<void> {
     const remote = await this.github.getPullRequest(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
     );
     if (!remote) return;
 
     const closedWithoutMerging = remote.state === 'closed' && !remote.merged;
     const rollup = remote.headSha
-      ? await this.github.getCheckRollup(pullRequest.repo, remote.headSha)
+      ? await this.github.getCheckRollup(prRepoOf(pullRequest), remote.headSha)
       : null;
 
     await this.repository.update(
@@ -551,6 +577,15 @@ export class BuilderPullRequestService {
     // A PR that is gone has nothing left to act on. Marked rather than
     // deleted: "we saw this and it stopped mattering" is the useful record,
     // and the flywheel reads closed-unmerged as its strongest signal.
+    // Opened before the 2026-10-23 cutover on a service repo that is now
+    // archived: it can never merge, and every write Builder would make to it
+    // is refused. Neither merged nor rejected — so not marked closed, which
+    // the flywheel would read as a rejection. A person decides, once.
+    if (remote.baseRepoArchived && !remote.merged && !closedWithoutMerging) {
+      await this.escalate(pullRequest, ARCHIVED_REPO_REASON(pullRequest.prUrl));
+      return;
+    }
+
     if (remote.merged || closedWithoutMerging) {
       await this.staleFeedback(pullRequest.id);
       if (pullRequest.needsHumanAt && !pullRequest.escalationResolution) {
@@ -912,10 +947,10 @@ export class BuilderPullRequestService {
     if (await this.releaseIsUnhealthy()) return;
 
     const { files, truncated } = await this.github.listPullRequestFiles(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
     );
-    const resolved = resolveReleaseTargets(pullRequest.repo, files);
+    const resolved = this.releaseTargetsOf(pullRequest, files);
 
     // A truncated listing is "we do not know what changed", not "nothing did".
     const blocked = truncated || resolved.ambiguous;
@@ -1031,15 +1066,15 @@ export class BuilderPullRequestService {
         if (!pullRequest.mergedAt) continue;
 
         const files = await this.github.listPullRequestFiles(
-          pullRequest.repo,
+          prRepoOf(pullRequest),
           pullRequest.prNumber,
         );
         // A truncated file list cannot attribute the work to one deployable,
         // and guessing which app shipped is exactly the wrong place to guess.
         if (files.truncated) continue;
 
-        const { targets, ambiguous } = resolveReleaseTargets(
-          pullRequest.repo,
+        const { targets, ambiguous } = this.releaseTargetsOf(
+          pullRequest,
           files.files,
         );
         if (ambiguous || targets.length !== 1) continue;
@@ -1126,10 +1161,10 @@ export class BuilderPullRequestService {
     for (const pullRequest of releasing) {
       try {
         const files = await this.github.listPullRequestFiles(
-          pullRequest.repo,
+          prRepoOf(pullRequest),
           pullRequest.prNumber,
         );
-        const target = resolveReleaseTargets(pullRequest.repo, files.files)
+        const target = this.releaseTargetsOf(pullRequest, files.files)
           .targets[0];
         if (!target) continue;
 
@@ -1392,14 +1427,14 @@ export class BuilderPullRequestService {
     if (!settings.enabled) return;
 
     const author = await this.github.getCommitAuthor(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       remote.headSha,
     );
     if (!author) return;
     if (!this.isOwnActor(author.login ?? author.name ?? '')) return;
 
     const { updated, message } = await this.github.updatePullRequestBranch(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
       remote.headSha,
     );
@@ -1462,7 +1497,7 @@ export class BuilderPullRequestService {
     }
     if (!remote.headSha) return true;
     const author = await this.github.getCommitAuthor(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       remote.headSha,
     );
     // Could not tell, or somebody else is mid-work on the branch.
@@ -1476,7 +1511,7 @@ export class BuilderPullRequestService {
     }
 
     const commentUrl = await this.github.createIssueComment(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
       '/oc This pull request conflicts with master, so CI cannot run on it. ' +
         'Merge the latest master into this branch, resolve every conflict ' +
@@ -1702,7 +1737,10 @@ export class BuilderPullRequestService {
     pullRequest: BuilderPullRequest,
     headSha: string,
   ): Promise<boolean> {
-    const head = await this.github.getCommitAuthor(pullRequest.repo, headSha);
+    const head = await this.github.getCommitAuthor(
+      prRepoOf(pullRequest),
+      headSha,
+    );
     // Two parents is what makes it a merge; anything else is real work. A
     // missing `parents` is treated as "cannot tell", which refuses — the same
     // judgement the branch-update guard makes about an unreadable author.
@@ -1759,7 +1797,7 @@ export class BuilderPullRequestService {
     const remote =
       known?.remote ??
       (await this.github.getPullRequest(
-        pullRequest.repo,
+        prRepoOf(pullRequest),
         pullRequest.prNumber,
       ));
     if (!remote || remote.state !== 'open' || remote.merged) return;
@@ -1773,7 +1811,7 @@ export class BuilderPullRequestService {
 
     const rollup =
       known?.rollup ??
-      (await this.github.getCheckRollup(pullRequest.repo, remote.headSha));
+      (await this.github.getCheckRollup(prRepoOf(pullRequest), remote.headSha));
     if (rollup?.state !== 'success') {
       this.logger.info(
         `Not approving ${pullRequest.repo}#${pullRequest.prNumber}: checks are ${rollup?.state ?? 'unknown'}.`,
@@ -1785,7 +1823,7 @@ export class BuilderPullRequestService {
     // should be able to tell at a glance that a machine approved it, and on
     // what basis, rather than finding an unattributed "LGTM".
     const { approved, message } = await this.github.approvePullRequest(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
       [
         "Approved by Builder's review agent.",
@@ -1858,7 +1896,7 @@ export class BuilderPullRequestService {
   ): Promise<void> {
     if (rollup?.state === 'failure' && headSha) {
       const headAuthor = await this.github.getCommitAuthor(
-        pullRequest.repo,
+        prRepoOf(pullRequest),
         headSha,
       );
       if (!headAuthor) {
@@ -1936,7 +1974,7 @@ export class BuilderPullRequestService {
     }
 
     const feedback = await this.github.listPullRequestFeedback(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
     );
     for (const item of feedback) {
@@ -2062,7 +2100,7 @@ export class BuilderPullRequestService {
     if (!items.length) return;
 
     const commentUrl = await this.github.createIssueComment(
-      pullRequest.repo,
+      prRepoOf(pullRequest),
       pullRequest.prNumber,
       `/oc Address Builder's review feedback on this pull request ` +
         `(${items.length} item${items.length === 1 ? '' : 's'}). ` +
@@ -2119,10 +2157,15 @@ export class BuilderPullRequestService {
       status = BuilderPrFeedbackStatus.ADDRESSED;
     } else {
       const answer = await this.github.findRunSince({
-        repo: pullRequest.repo,
+        repo: prRepoOf(pullRequest),
         workflow: ISSUE_BUILD_WORKFLOW,
         since: requestedAt,
         event: 'issue_comment',
+        // Every /oc comment in the monorepo runs the same builder.yml.
+        titleIncludes: builderIssueRunTitle(
+          pullRequest.prNumber,
+          'issue_comment',
+        ),
       });
       if (answer?.status === 'completed') {
         status = BuilderPrFeedbackStatus.PENDING;
@@ -2305,9 +2348,18 @@ export class BuilderPullRequestService {
     outputTokens?: number;
   }): Promise<{ ok: boolean; sessionId: string | null }> {
     const cost = Math.max(0, Number(report.costUsd) || 0);
+    // `report.repo` is the GitHub repo the workflow ran in — `ally-platform`
+    // since the 2026-10-23 cutover — not the service a row records, so the
+    // pull request is found by the URL it lives at. Matching the service
+    // instead never found a monorepo PR (its spend went uncounted and the
+    // per-PR budget never tripped), and PR numbers restarted at #1 there, so
+    // service + number could also land on a pre-move row.
     const pullRequest = report.prNumber
       ? await this.repository.findOne({
-          where: { repo: report.repo, prNumber: report.prNumber },
+          where: {
+            prNumber: report.prNumber,
+            prUrl: Like(`%/${repoName(report.repo)}/pull/${report.prNumber}`),
+          },
           order: { createdAt: 'DESC' },
         })
       : null;
@@ -2403,6 +2455,22 @@ export class BuilderPullRequestService {
    * Stacks, "Escalate Agent Errors to Human Operators Transparently": the
    * stop is said, with its reason, rather than left as a loop that went quiet.
    */
+  /**
+   * What a merged pull request releases. A service repo's pull request ships
+   * as that service; a monorepo one is attributed by its files' folders, so a
+   * change that touches the backend and a frontend releases both, and one
+   * that also touches root files is ambiguous rather than half-released.
+   */
+  private releaseTargetsOf(
+    pullRequest: BuilderPullRequest,
+    files: readonly string[],
+  ): ReleaseTargetSet {
+    const monorepo = this.configService.githubMonorepo;
+    return monorepo && repoName(prRepoOf(pullRequest)) === monorepo
+      ? resolveMonorepoReleaseTargets(files)
+      : resolveReleaseTargets(pullRequest.repo, files);
+  }
+
   private async escalate(
     pullRequest: BuilderPullRequest,
     reason: string,
