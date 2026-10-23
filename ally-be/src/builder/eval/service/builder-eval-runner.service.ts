@@ -39,7 +39,9 @@ import {
 } from '../type/builder-eval.type';
 import {
   computeEvalGates,
+  expectedOutcomeOf,
   gateViolations,
+  interviewOutcome,
 } from '../util/builder-eval-scoring.util';
 import {
   BuilderBriefLine,
@@ -313,6 +315,9 @@ export class BuilderEvalRunnerService {
     let briefLines: number | null = null;
     let briefBeforeFirstQuestion = false;
     let briefCorrections = 0;
+    // Whether the latest turn ended on a reply that asked nothing — the only
+    // way an interview can conclude there is nothing to build.
+    let endedWithoutAsking = false;
     // What each turn's readiness settled on, by its reply: "it's ready" is
     // only false against the readiness of the turn that said it.
     const readyAfter = new Map<string, boolean>();
@@ -345,6 +350,14 @@ export class BuilderEvalRunnerService {
         ? reply!.metadata!.questions.length
         : 0;
       if (reply && turnReady !== null) readyAfter.set(reply.id, turnReady);
+      // The reply must be this turn's: a turn that failed before replying
+      // leaves the previous reply last, and that one was already answered.
+      endedWithoutAsking =
+        messages[messages.length - 1] === reply &&
+        Boolean(String(reply?.content ?? '').trim()) &&
+        !reply?.metadata?.errorMessage &&
+        !question &&
+        !brief;
       transcript.push(
         this.turnRecord(
           turns,
@@ -401,6 +414,14 @@ export class BuilderEvalRunnerService {
     const toolResults = messages
       .flatMap((row) => row.toolResults ?? [])
       .filter((result) => !BUILDER_TERMINAL_TOOLS.has(String(result?.name)));
+    const readyReached =
+      sandbox.session.status === BuilderSessionStatus.PRD_READY;
+    const expectedOutcome = expectedOutcomeOf(payload);
+    const outcome = interviewOutcome({
+      readyReached,
+      draft,
+      endedWithoutAsking,
+    });
     const metrics: BuilderEvalMetrics = {
       loop: sandbox.validatedTurns ? 'validated' : 'legacy',
       protocol: sandbox.validatedTurns && sandbox.situationBrief,
@@ -421,7 +442,9 @@ export class BuilderEvalRunnerService {
       ),
       corrections,
       correctedItems: [...correctedItems],
-      readyReached: sandbox.session.status === BuilderSessionStatus.PRD_READY,
+      readyReached,
+      outcome,
+      expectedOutcome,
       readinessScore: readiness.score,
       // Beside the score, because the score alone reads 100 on a PRD that
       // review findings or the admin's unapplied words still hold back — 9
@@ -437,10 +460,13 @@ export class BuilderEvalRunnerService {
       durationMs: Date.now() - started,
     };
     const judgedClean = judge.total === 0 || judge.met === judge.total;
+    // A fixture that expects nothing to build passes on Builder concluding
+    // that, never on a ready PRD: reaching ready means it planned to rebuild
+    // what exists. Every other condition is the same for both.
     const passed =
       gateViolations(gates) === 0 &&
       corrections === 0 &&
-      metrics.readyReached &&
+      outcome === expectedOutcome &&
       judgedClean;
 
     return {

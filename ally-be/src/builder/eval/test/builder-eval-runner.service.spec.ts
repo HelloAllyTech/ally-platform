@@ -402,6 +402,169 @@ describe('BuilderEvalRunnerService', () => {
       expect(result.status).toBe('failed');
     });
 
+    describe('a fixture that expects nothing to build', () => {
+      /**
+       * A stand-in interview that ends the way Suite 5d24dd95's "simulation
+       * edit versions" run did: turn one shows a brief, the admin confirms,
+       * turn two empties the requirements, says what exists and asks nothing.
+       * `variant` changes only how it ends.
+       */
+      const replay = async (
+        expectedOutcome: string | undefined,
+        variant: 'concludes' | 'builds' | 'keeps asking' = 'concludes',
+      ) => {
+        const stores = new SandboxStores();
+        const session = {
+          id: 'session-1',
+          status: BuilderSessionStatus.INTERVIEWING,
+        };
+        const grounded = {
+          score: 82,
+          ready: false,
+          blockers: ['No requirements captured yet.'],
+          sections: [
+            { key: 'existingGrounded', label: 'Read', ok: true },
+            { key: 'requirements', label: 'Requirements', ok: false },
+          ],
+        };
+        let turn = 0;
+        const orchestrator = {
+          streamTurn: async function* (_id: string, dto: any) {
+            turn += 1;
+            await stores.messageRepository.appendMessage('session-1', {
+              role: BuilderMessageRole.USER,
+              content: dto.message,
+            });
+            const asks = turn === 1 || variant === 'keeps asking';
+            await stores.messageRepository.appendMessage('session-1', {
+              role: BuilderMessageRole.ASSISTANT,
+              content: asks
+                ? 'Is anything different from the daily auto-version job?'
+                : 'The daily job already does this, so no build is needed.',
+              metadata: asks
+                ? { questions: [{ id: `q${turn}`, prompt: 'Different?' }] }
+                : {},
+            });
+            await stores.docRepository.save({
+              id: 'doc-1',
+              sessionId: 'session-1',
+              versionNumber: turn,
+              draft: {
+                existingBehaviour:
+                  'A daily job saves an automatic version of each edited draft.',
+                requirements:
+                  variant === 'builds'
+                    ? [
+                        {
+                          id: 'R1',
+                          title: 'Version history',
+                          description: '',
+                          acceptanceCriteria: ['Lists versions'],
+                        },
+                      ]
+                    : [],
+              },
+            } as any);
+            if (variant === 'builds' && turn === 2) {
+              session.status = BuilderSessionStatus.PRD_READY;
+            }
+            yield { event: 'readiness', data: grounded };
+            yield { event: 'done', data: {} };
+          },
+        };
+        const complete = jest.fn(async (request: any) =>
+          request.taskId === 'builder-eval-admin'
+            ? {
+                text: JSON.stringify(
+                  turn === 1
+                    ? { message: 'No, that is it.' }
+                    : { message: 'Thanks.', done: true },
+                ),
+              }
+            : {
+                text: JSON.stringify({
+                  items: [{ id: 'C1', met: true, evidence: 'daily job' }],
+                }),
+                model: 'gpt-5-mini',
+              },
+        );
+        const runner = new BuilderEvalRunnerService({
+          create: jest.fn(() => ({
+            session,
+            stores,
+            orchestrator,
+            prdService: {},
+            readiness: { assess: jest.fn().mockResolvedValue(grounded) },
+            llmCompletion: { complete },
+            passes: [],
+            costUsd: () => 0.3,
+          })),
+        } as any);
+        return runner.run(
+          {
+            id: 'f1',
+            name: 'versions',
+            kind: 'interview',
+            payload: {
+              openingMessage: 'Version simulations every 24 hours.',
+              adminScript: ['No, that is it.'],
+              checklist: [
+                {
+                  id: 'C1',
+                  text: 'Says the daily auto-version job exists',
+                  kind: 'must',
+                },
+              ],
+              maxTurns: 3,
+              ...(expectedOutcome ? { expectedOutcome } : {}),
+            },
+          } as any,
+          { evalRunId: 'run-1', userId: 7 },
+        );
+      };
+
+      it('passes without a ready PRD when Builder concludes the work exists', async () => {
+        const result = await replay('nothing_to_build');
+
+        expect(result.metrics).toEqual(
+          expect.objectContaining({
+            readyReached: false,
+            outcome: 'nothing_to_build',
+            expectedOutcome: 'nothing_to_build',
+            corrections: 0,
+          }),
+        );
+        expect(result.status).toBe('passed');
+      });
+
+      it('fails the same ending on a fixture that expects a PRD, as before', async () => {
+        const result = await replay(undefined);
+
+        expect(result.metrics).toEqual(
+          expect.objectContaining({
+            outcome: 'nothing_to_build',
+            expectedOutcome: 'prd_ready',
+          }),
+        );
+        expect(result.status).toBe('failed');
+      });
+
+      it('fails when Builder plans a build of what exists, even one that reaches ready', async () => {
+        const result = await replay('nothing_to_build', 'builds');
+
+        expect(result.metrics?.readyReached).toBe(true);
+        expect(result.metrics?.outcome).toBe('prd_ready');
+        expect(result.status).toBe('failed');
+      });
+
+      it('fails when the replay runs out of turns still asking', async () => {
+        const result = await replay('nothing_to_build', 'keeps asking');
+
+        expect(result.metrics?.outcome).toBe('neither');
+        expect(result.status).toBe('failed');
+      });
+    });
+
     it('reports an errored run rather than throwing', async () => {
       const runner = new BuilderEvalRunnerService({
         create: () => {

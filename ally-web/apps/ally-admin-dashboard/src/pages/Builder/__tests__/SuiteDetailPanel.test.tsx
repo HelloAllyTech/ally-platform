@@ -206,6 +206,63 @@ describe("SuiteDetailPanel", () => {
       );
     });
 
+    it("reads a run against a fixture that expects nothing to build", () => {
+      suiteResult.data = evalSuiteDetail({
+        runs: [
+          evalRun({
+            status: "passed",
+            gates: gatesWith(),
+            metrics: {
+              ...evalRun().metrics!,
+              corrections: 0,
+              readyReached: false,
+              readinessScore: 82,
+              outcome: "nothing_to_build",
+              expectedOutcome: "nothing_to_build",
+            },
+          }),
+        ],
+      });
+      renderPanel();
+
+      // On the fixture's heading and the run's header, without opening the run.
+      expect(screen.getByText(strings.suiteDetail.expectsNothingToBuild)).toBeInTheDocument();
+      expect(screen.getByText(strings.runCard.outcomeNote.nothingAsExpected)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: strings.runCard.showDetails }));
+      expect(screen.getByText(strings.runCard.metric.outcome)).toBeInTheDocument();
+      expect(screen.getByText(strings.runCard.outcome.nothing_to_build)).toBeInTheDocument();
+    });
+
+    it("flags a run that planned to build what a nothing-to-build fixture says exists", () => {
+      suiteResult.data = evalSuiteDetail({
+        runs: [
+          evalRun({
+            metrics: {
+              ...evalRun().metrics!,
+              readyReached: true,
+              outcome: "prd_ready",
+              expectedOutcome: "nothing_to_build",
+            },
+          }),
+        ],
+      });
+      renderPanel();
+
+      expect(screen.getByText(strings.runCard.outcomeNote.plannedBuild)).toHaveClass(
+        "text-destructive-600",
+      );
+    });
+
+    it("adds no outcome line to a PRD fixture's run that reached ready, or an older run", () => {
+      renderPanel();
+
+      for (const text of Object.values(strings.runCard.outcomeNote)) {
+        expect(screen.queryByText(text)).not.toBeInTheDocument();
+      }
+      expect(screen.queryByText(strings.suiteDetail.expectsNothingToBuild)).not.toBeInTheDocument();
+    });
+
     it("shows the critic's outcome for a PRD-review run", () => {
       suiteResult.data = evalSuiteDetail({
         runs: [

@@ -16,6 +16,7 @@ import {
   checklistsEqual,
   cleanChecklist,
   expectationOf,
+  expectsNothingToBuild,
   fixtureRows,
   formatEvalCost,
   formatJudgeScore,
@@ -29,6 +30,7 @@ import {
   MAX_CHECKLIST_ITEMS,
   MAX_CHECKLIST_TEXT,
   nextChecklistId,
+  outcomeNote,
   parsePastedExport,
   shortNote,
   suiteRows,
@@ -246,6 +248,7 @@ describe("fixtureRows", () => {
         name: "Asked before reading",
         kind: "interview",
         checklistSize: 2,
+        expectsNothingToBuild: false,
         active: true,
         note: "Session 2bc3a5cf asked six questions it never read.",
       },
@@ -254,6 +257,7 @@ describe("fixtureRows", () => {
         name: "Clean control",
         kind: "prd_review",
         checklistSize: null,
+        expectsNothingToBuild: false,
         active: false,
         note: "",
       },
@@ -262,10 +266,34 @@ describe("fixtureRows", () => {
         name: "No checklist yet",
         kind: "interview",
         checklistSize: 0,
+        expectsNothingToBuild: false,
         active: true,
         note: "",
       },
     ]);
+  });
+
+  it("marks an interview fixture that expects nothing to build, and only that", () => {
+    const shipped = interviewFixture({
+      payload: {
+        openingMessage: "Version simulations every 24 hours",
+        adminScript: [],
+        checklist: [],
+        expectedOutcome: "nothing_to_build",
+      },
+    });
+
+    expect(fixtureRows([shipped])[0].expectsNothingToBuild).toBe(true);
+    expect(expectsNothingToBuild(interviewFixture())).toBe(false);
+    // Only an interview has an outcome to expect; a stray field on a review changes nothing.
+    expect(
+      expectsNothingToBuild(
+        interviewFixture({
+          kind: "prd_review",
+          payload: { expectedOutcome: "nothing_to_build" } as never,
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("is empty for a list that has not arrived or arrived wrong", () => {
@@ -588,8 +616,97 @@ describe("groupRunsByFixture", () => {
     expect(deleted[1].name).toBeNull();
   });
 
+  it("says a fixture expected nothing to build as its runs recorded it, else as it is now", () => {
+    const shipped = interviewFixture({
+      id: "f2",
+      payload: {
+        openingMessage: "x",
+        adminScript: [],
+        checklist: [],
+        expectedOutcome: "nothing_to_build",
+      },
+    });
+    const metrics = (expectedOutcome?: "prd_ready" | "nothing_to_build") =>
+      ({
+        turns: 2,
+        questions: 0,
+        corrections: 0,
+        correctedItems: [],
+        readyReached: false,
+        readinessScore: 82,
+        toolCalls: 4,
+        toolFailures: 0,
+        costUsd: 0.3,
+        durationMs: 1,
+        ...(expectedOutcome ? { expectedOutcome } : {}),
+      }) as BuilderEvalRun["metrics"];
+
+    // Runs from before the expectation was recorded: the live fixture answers.
+    expect(groupRunsByFixture(detail(), [shipped])[1].expectsNothingToBuild).toBe(true);
+    // Runs that recorded it win over a fixture that has changed since.
+    const scoredAsPrd = detail({
+      runs: [run({ id: "r3", fixtureId: "f2", metrics: metrics("prd_ready") })],
+    });
+    expect(groupRunsByFixture(scoredAsPrd, [shipped])[0].expectsNothingToBuild).toBe(false);
+    const scoredAsNothing = detail({
+      runs: [run({ id: "r1", metrics: metrics("nothing_to_build") })],
+    });
+    expect(groupRunsByFixture(scoredAsNothing, [])[0].expectsNothingToBuild).toBe(true);
+  });
+
   it("is empty with no suite, or runs that are not a list", () => {
     expect(groupRunsByFixture(undefined, [])).toEqual([]);
     expect(groupRunsByFixture(detail({ runs: null as never }), [])).toEqual([]);
+  });
+});
+
+describe("outcomeNote", () => {
+  const metrics = (
+    outcome: "prd_ready" | "nothing_to_build" | "neither" | undefined,
+    expectedOutcome: "prd_ready" | "nothing_to_build" | undefined,
+  ) =>
+    ({
+      turns: 2,
+      questions: 0,
+      corrections: 0,
+      correctedItems: [],
+      readyReached: outcome === "prd_ready",
+      readinessScore: 82,
+      toolCalls: 4,
+      toolFailures: 0,
+      costUsd: 0.3,
+      durationMs: 1,
+      ...(outcome ? { outcome } : {}),
+      ...(expectedOutcome ? { expectedOutcome } : {}),
+    }) as BuilderEvalRun["metrics"];
+
+  it("reads a nothing-to-build fixture's run against that expectation", () => {
+    expect(outcomeNote(metrics("nothing_to_build", "nothing_to_build"))).toEqual({
+      key: "nothingAsExpected",
+      failing: false,
+    });
+    expect(outcomeNote(metrics("prd_ready", "nothing_to_build"))).toEqual({
+      key: "plannedBuild",
+      failing: true,
+    });
+    expect(outcomeNote(metrics("neither", "nothing_to_build"))).toEqual({
+      key: "didNotConclude",
+      failing: true,
+    });
+  });
+
+  // Suite 5d24dd95 scored three such runs as plain "not ready" failures.
+  it("on a PRD fixture, says only when Builder concluded there was nothing to build", () => {
+    expect(outcomeNote(metrics("nothing_to_build", "prd_ready"))).toEqual({
+      key: "nothingButPrdExpected",
+      failing: true,
+    });
+    expect(outcomeNote(metrics("prd_ready", "prd_ready"))).toBeNull();
+    expect(outcomeNote(metrics("neither", "prd_ready"))).toBeNull();
+  });
+
+  it("says nothing for a run from before the outcome was recorded", () => {
+    expect(outcomeNote(metrics(undefined, undefined))).toBeNull();
+    expect(outcomeNote(null)).toBeNull();
   });
 });

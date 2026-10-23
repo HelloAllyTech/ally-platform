@@ -66,9 +66,16 @@ export const FixturesTable: React.FC<FixturesTableProps> = ({
                 </button>
               </TableCell>
               <TableCell>
-                <Tag type={row.kind === "interview" ? "blue" : "purple"} size="sm">
-                  {en.builder.eval.kind[row.kind] ?? row.kind}
-                </Tag>
+                <div className="flex flex-wrap items-center gap-1">
+                  <Tag type={row.kind === "interview" ? "blue" : "purple"} size="sm">
+                    {en.builder.eval.kind[row.kind] ?? row.kind}
+                  </Tag>
+                  {row.expectsNothingToBuild && (
+                    <Tag type="cool-gray" size="sm">
+                      {strings.expectsNothingToBuild}
+                    </Tag>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 {row.checklistSize === null ? (

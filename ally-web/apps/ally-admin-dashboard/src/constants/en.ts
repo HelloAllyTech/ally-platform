@@ -4633,6 +4633,7 @@ export const en = {
         columnNote: "Note",
         checklistNotApplicable: "—",
         checklistEmpty: "None yet",
+        expectsNothingToBuild: "Nothing to build",
         activeLabel: (name: string) => `Include "${name}" in suites`,
         noNote: "No note",
         edit: "Edit",
@@ -4668,6 +4669,12 @@ export const en = {
         expectClean: "Not block on this PRD. It is a clean control.",
         expectReadOnly:
           "A PRD-review fixture has no checklist; its expectation is set when it is created.",
+        outcomeHeading: "How a correct interview ends",
+        outcomePrd: "With a PRD that reaches ready.",
+        outcomeNothingToBuild:
+          "With nothing to build: Builder says what already exists, plans no requirement and asks nothing more. A run passes without a ready PRD, and fails if it plans to build what exists.",
+        outcomeReadOnly:
+          'Set by "expectedOutcome" in an imported fixture. To change it, re-cut the fixture under a new name, so earlier suites still read against what they were scored on.',
         save: "Save changes",
         saving: "Saving…",
         saved: "Fixture saved.",
@@ -4835,7 +4842,8 @@ export const en = {
         verdictNone: "This suite settled without a verdict.",
         gatesLegend: "What the gates count",
         passRule:
-          "A run passes when every gate is clean, the simulated admin never corrected Builder, the PRD reached ready, and every checklist item is met.",
+          'A run passes when every gate is clean, the simulated admin never corrected Builder, the interview ended the way the fixture expects, and every checklist item is met. Most fixtures expect a PRD that reaches ready; one marked "Nothing to build" expects Builder to conclude the request is already met and plan no requirement.',
+        expectsNothingToBuild: "Expects nothing to build",
         noRuns: "No runs yet.",
         deletedFixture: "Deleted fixture",
         fixturePassed: (passed: number, total: number) => `${passed} of ${total} passed`,
@@ -4870,6 +4878,7 @@ export const en = {
           questions: "Questions asked",
           corrections: "Corrections",
           ready: "PRD ready",
+          outcome: "Ended with",
           toolCalls: "Tool calls",
           cost: "~Cost",
         },
@@ -4880,6 +4889,17 @@ export const en = {
             : `No (readiness ${score})`,
         toolCalls: (calls: number, failures: number) =>
           failures > 0 ? `${calls} (${failures} failed)` : String(calls),
+        outcome: {
+          prd_ready: "A ready PRD",
+          nothing_to_build: "Nothing to build",
+          neither: "Neither: no ready PRD, and no conclusion",
+        } as Record<string, string>,
+        outcomeNote: {
+          nothingAsExpected: "Nothing to build, as expected",
+          plannedBuild: "Planned to build what already exists",
+          didNotConclude: "Didn't conclude there was nothing to build",
+          nothingButPrdExpected: "Concluded nothing to build; this fixture expects a PRD",
+        },
         correctedItems: (items: string) => `The simulated admin corrected Builder on: ${items}.`,
         judgeHeading: (met: number, total: number, score: string) =>
           `Judge: ${met} of ${total} met (${score})`,

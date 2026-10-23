@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -81,6 +81,25 @@ describe("FixtureSidePanel", () => {
     expect(screen.getByLabelText(strings.checklist.textLabel("C1"))).toHaveValue(
       "Reuses the existing digest job",
     );
+  });
+
+  it("says how a correct interview ends, read-only", () => {
+    renderPanel();
+    expect(screen.getByText(panel.outcomePrd)).toBeInTheDocument();
+    cleanup();
+
+    renderPanel(
+      interviewFixture({
+        payload: {
+          openingMessage: "Version simulations every 24 hours",
+          adminScript: [],
+          checklist: [],
+          expectedOutcome: "nothing_to_build",
+        },
+      }),
+    );
+    expect(screen.getByText(panel.outcomeNothingToBuild)).toBeInTheDocument();
+    expect(screen.getByText(panel.outcomeReadOnly)).toBeInTheDocument();
   });
 
   it("links back to the session the fixture was cut from", () => {

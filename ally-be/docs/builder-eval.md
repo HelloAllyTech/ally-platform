@@ -30,6 +30,25 @@ database and never in a file here.** Ways to make one:
 `pins` (repo to commit) pins file reads in the replay to the commits the session ran against.
 Code search can't be pinned: GitHub only indexes the default branch.
 
+### Nothing to build
+
+`expectedOutcome` on an interview fixture says how a correct interview ends. Absent (or
+`"prd_ready"`) means a PRD that reaches ready, which is what every fixture meant before the field
+existed. `"nothing_to_build"` is for a request the platform already meets: the right end is
+Builder saying so and planning nothing. Use it for a replay of a session whose work has since
+shipped. The replay's research tools read today's code, and pins can't change that, so such a
+fixture otherwise measures how well Builder rebuilds shipped work. Use it too for a real
+re-request of shipped work.
+
+The checklist still applies. Write it for the conclusion: what Builder must name as existing
+(`must`), and the rebuild it must not plan (`must_not`).
+
+Import and export carry the field inside `payload`. An export from before it existed imports
+unchanged, and a value other than the two above is refused rather than read as a PRD. Only
+`"nothing_to_build"` is stored, so the payloads of existing fixtures don't change. The admin page
+shows it read-only. To change it, re-cut the fixture under a new name rather than edit it in
+place, so earlier suites stay readable against what they were scored on.
+
 ## What a run does
 
 **Interview fixtures.** The fixture plays through `BuilderInterviewOrchestratorService` in a
@@ -72,8 +91,23 @@ checks only ever block. `readyAtEnd` and `blockersAtEnd` (row key and label) say
 run back. Each transcript turn records `ready`, the readiness that turn settled on, and
 `readyClaimCorrected` when the server had to say what was left under a reply.
 
-A run **passes** when every gate is clean, the simulated admin never corrected Builder, the
-PRD reached ready, and every checklist item is met.
+Each interview run records `outcome`, how the replay ended, and `expectedOutcome`, what the
+fixture asked for when the run was scored:
+
+- `prd_ready`: the PRD reached ready.
+- `nothing_to_build`: Builder concluded the request is already met. The final PRD says what
+  already exists, it plans no requirement, and the last reply reached the admin and asked
+  nothing (no question, no brief), so the interview ended on that conclusion and not
+  mid-question. This is read from what Builder left, not from its prose. A reply that says "no
+  work is needed" over a PRD that still lists requirements is not this outcome: a build started
+  from that PRD would build them.
+- `neither`: neither of those.
+
+A run **passes** when every gate is clean, the simulated admin never corrected Builder, `outcome`
+equals `expectedOutcome`, and every checklist item is met. For a fixture without
+`expectedOutcome` that means the PRD reached ready, as before. A nothing-to-build fixture passes
+without ready, and its `evidenceCited` gate is what holds "what already exists" to files the
+replay read. Reaching ready fails it, because that means Builder planned to rebuild what exists.
 
 A model **judge** scores the checklist. It only scores; it never decides a gate on its own.
 

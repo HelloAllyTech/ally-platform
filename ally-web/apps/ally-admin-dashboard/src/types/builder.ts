@@ -946,7 +946,15 @@ export interface BuilderEvalInterviewPayload {
   recordedPrd?: BuilderPrdDocument | null;
   pins?: Record<string, string>;
   maxTurns?: number;
+  /** How a correct interview ends. Absent means a ready PRD. */
+  expectedOutcome?: BuilderEvalExpectedOutcome;
 }
+
+/** `nothing_to_build`: the request is already met, and the right end is Builder saying so. */
+export type BuilderEvalExpectedOutcome = "prd_ready" | "nothing_to_build";
+
+/** How an interview replay ended; `neither` stopped short of both. */
+export type BuilderEvalInterviewOutcome = BuilderEvalExpectedOutcome | "neither";
 
 export interface BuilderEvalPrdReviewPayload {
   prd: BuilderPrdDocument;
@@ -999,6 +1007,10 @@ export interface BuilderEvalMetrics {
   corrections: number;
   correctedItems: string[];
   readyReached: boolean;
+  /** How the replay ended. Absent on runs from before it was recorded. */
+  outcome?: BuilderEvalInterviewOutcome;
+  /** What the fixture expected when the run was scored. Absent on runs from before it was recorded. */
+  expectedOutcome?: BuilderEvalExpectedOutcome;
   /** Share of the PRD's "is this written" rows that pass — 100 can still be not ready. */
   readinessScore: number;
   /** Absent on runs from before it was recorded. */
