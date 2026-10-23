@@ -77,3 +77,16 @@ String formatReviewDuration(String? secondsValue) {
   if (minutes > 0) return '$minutes:${seconds.toString().padLeft(2, '0')} min';
   return '$seconds sec';
 }
+
+/// RN's `htmlToPlainText` — strips tags/scripts/styles and collapses
+/// whitespace, close enough for a one-paragraph scenario description
+/// (not a full HTML entity-decoding pass, which this app's scenario
+/// descriptions don't need in practice).
+String htmlToPlainText(String? value) {
+  if (value == null || value.isEmpty) return '';
+  final stripped = value
+      .replaceAll(RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), ' ')
+      .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
+      .replaceAll(RegExp('<[^>]*>'), ' ');
+  return stripped.replaceAll(RegExp(r'\s+'), ' ').trim();
+}

@@ -19,11 +19,11 @@ void main() {
   });
 
   group('getScribeReviews', () {
-    test('hits /scribe-session-reviews with the default sort/pagination query', () async {
+    test('hits /scribe-session-reviews with the default LATEST sort/pagination query', () async {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/scribe-session-reviews',
-          queryParameters: {'sortBy': 'createdAt', 'order': 'DESC', 'limit': 25, 'offset': 0},
+          queryParameters: {'sortBy': 'LATEST', 'limit': 25, 'offset': 0},
         ),
       ).thenAnswer(
         (_) async => _response({
@@ -46,31 +46,29 @@ void main() {
       expect(reviews.first.createdBy.name, 'Alex');
     });
 
-    test('forwards the readFilter query parameter when provided', () async {
+    test('forwards the readFilter query parameter and a non-default sortBy when provided', () async {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/scribe-session-reviews',
           queryParameters: {
-            'sortBy': 'createdAt',
-            'order': 'DESC',
+            'sortBy': 'MOST_VIEWED',
             'limit': 25,
             'offset': 0,
-            'readFilter': 'unread',
+            'readFilter': 'UNREAD',
           },
         ),
       ).thenAnswer((_) async => _response({'data': <dynamic>[]}));
 
-      await repository.getScribeReviews(readFilter: 'unread');
+      await repository.getScribeReviews(readFilter: 'UNREAD', sortBy: 'MOST_VIEWED');
 
       verify(
         () => dio.get<Map<String, dynamic>>(
           '/scribe-session-reviews',
           queryParameters: {
-            'sortBy': 'createdAt',
-            'order': 'DESC',
+            'sortBy': 'MOST_VIEWED',
             'limit': 25,
             'offset': 0,
-            'readFilter': 'unread',
+            'readFilter': 'UNREAD',
           },
         ),
       ).called(1);

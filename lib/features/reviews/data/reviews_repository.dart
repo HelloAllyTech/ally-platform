@@ -13,12 +13,16 @@ class ReviewsRepository {
 
   final Dio _dio;
 
-  Future<List<ReviewItem>> getReviews({String? readFilter}) async {
+  /// `sortBy` mirrors RN's `SortBy` enum values exactly ('LATEST' /
+  /// 'MOST_VIEWED' / 'MOST_COMMENTED') — confirmed from `useReviews.ts`'s
+  /// real query, which sends `sortBy`/`readFilter`/`limit`/`offset` only
+  /// (no `order` param; this previously sent `sortBy: 'createdAt', order:
+  /// 'DESC'`, a shape the real backend doesn't use at all).
+  Future<List<ReviewItem>> getReviews({String? readFilter, String sortBy = 'LATEST'}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/scenario-session-reviews',
       queryParameters: {
-        'sortBy': 'createdAt',
-        'order': 'DESC',
+        'sortBy': sortBy,
         'limit': 25,
         'offset': 0,
         'readFilter': ?readFilter,
@@ -171,8 +175,13 @@ final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {
   return ReviewsRepository(ref.watch(apiClientProvider));
 });
 
-final reviewsListProvider = FutureProvider<List<ReviewItem>>((ref) {
-  return ref.watch(reviewsRepositoryProvider).getReviews();
+final reviewsListProvider = FutureProvider.family<List<ReviewItem>, ReviewListQuery>((
+  ref,
+  query,
+) {
+  return ref
+      .watch(reviewsRepositoryProvider)
+      .getReviews(readFilter: query.readFilter.apiValue, sortBy: query.sortBy.apiValue);
 });
 
 /// Simulation-review half of RN's `hasUnreadReviews` (`simUnread.count +

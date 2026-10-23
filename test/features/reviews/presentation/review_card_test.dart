@@ -133,6 +133,68 @@ void main() {
     expect(find.byKey(const ValueKey('simulation-audio-player-toggle')), findsOneWidget);
   });
 
+  testWidgets('tapping "View more" expands the description, and toggles back on "View less"', (
+    tester,
+  ) async {
+    await pump(tester, _simulationReview(), ReviewType.simulation);
+
+    expect(find.text('View more'), findsOneWidget);
+    expect(find.text('View less'), findsNothing);
+
+    await tester.tap(find.text('View more'));
+    await tester.pump();
+
+    expect(find.text('View less'), findsOneWidget);
+    expect(find.text('View more'), findsNothing);
+
+    await tester.tap(find.text('View less'));
+    await tester.pump();
+
+    expect(find.text('View more'), findsOneWidget);
+  });
+
+  testWidgets('a simulation review with a scenario cover image renders it', (tester) async {
+    await pump(
+      tester,
+      ReviewItem(
+        id: 'rev-4',
+        createdAt: DateTime.now().toUtc().toIso8601String(),
+        note: 'n',
+        createdBy: ReviewAuthor(id: 4, name: 'A', profileImage: ''),
+        commentsCount: 0,
+        summaryName: null,
+        scenario: ReviewScenario(title: 'T', coverImageUrl: 'https://cdn.example.com/cover.jpg'),
+      ),
+      ReviewType.simulation,
+    );
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('a scribe review renders the scribe illustration, not a network Image', (tester) async {
+    await pump(tester, _scribeReview(), ReviewType.scribe);
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('the simulation Date & time / Duration rows render plain, outside the bordered details card', (
+    tester,
+  ) async {
+    await pump(tester, _simulationReview(), ReviewType.simulation);
+    expect(find.textContaining('Date & time'), findsOneWidget);
+    expect(find.textContaining('Duration'), findsOneWidget);
+  });
+
+  testWidgets(
+    'the scribe Date & time / Duration rows render inside the details card instead of a description',
+    (tester) async {
+      await pump(tester, _scribeReview(), ReviewType.scribe);
+      expect(find.textContaining('Date & time'), findsOneWidget);
+      expect(find.textContaining('Duration'), findsOneWidget);
+      // The scribe card has no scenario, so no "View more" toggle — the
+      // date/duration rows take that slot instead, without truncation.
+      expect(find.text('View more'), findsNothing);
+    },
+  );
+
   testWidgets('reactions and comment counts use singular/plural wording correctly', (tester) async {
     await pump(
       tester,

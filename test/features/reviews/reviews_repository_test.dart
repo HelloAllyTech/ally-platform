@@ -31,16 +31,18 @@ void main() {
       };
 
   group('getReviews', () {
-    test('sends the default sort/pagination query and omits readFilter entirely', () async {
+    test('sends the default LATEST sort/pagination query and omits readFilter entirely', () async {
       // `'readFilter': ?readFilter` is a null-aware map entry: when
       // readFilter is null the key is left out of the map altogether,
       // not sent with a null value — verified against a map literal with
-      // no 'readFilter' key at all.
+      // no 'readFilter' key at all. No 'order' param either — the real
+      // backend (per useReviews.ts) never sends one; this repository used
+      // to send 'sortBy': 'createdAt'/'order': 'DESC', a shape the real
+      // app never actually uses.
       when(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
-              'sortBy': 'createdAt',
-              'order': 'DESC',
+              'sortBy': 'LATEST',
               'limit': 25,
               'offset': 0,
             },
@@ -57,37 +59,34 @@ void main() {
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
-              'sortBy': 'createdAt',
-              'order': 'DESC',
+              'sortBy': 'LATEST',
               'limit': 25,
               'offset': 0,
             },
           )).called(1);
     });
 
-    test('forwards the readFilter query parameter when provided', () async {
+    test('forwards the readFilter query parameter and a non-default sortBy when provided', () async {
       when(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
-              'sortBy': 'createdAt',
-              'order': 'DESC',
+              'sortBy': 'MOST_COMMENTED',
               'limit': 25,
               'offset': 0,
-              'readFilter': 'unread',
+              'readFilter': 'UNREAD',
             },
           )).thenAnswer((_) async => _response({'data': <dynamic>[]}));
 
-      final result = await repository.getReviews(readFilter: 'unread');
+      final result = await repository.getReviews(readFilter: 'UNREAD', sortBy: 'MOST_COMMENTED');
 
       expect(result, isEmpty);
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
-              'sortBy': 'createdAt',
-              'order': 'DESC',
+              'sortBy': 'MOST_COMMENTED',
               'limit': 25,
               'offset': 0,
-              'readFilter': 'unread',
+              'readFilter': 'UNREAD',
             },
           )).called(1);
     });

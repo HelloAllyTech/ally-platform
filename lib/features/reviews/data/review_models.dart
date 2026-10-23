@@ -1,3 +1,44 @@
+/// Mirrors RN's `ReadFilter` enum (`src/constants/reviews.ts`) — the
+/// All/Read/Unread row above the review list.
+enum ReviewReadFilter {
+  all(null, 'review.filter.all'),
+  read('READ', 'review.filter.read'),
+  unread('UNREAD', 'review.filter.unread');
+
+  const ReviewReadFilter(this.apiValue, this.labelKey);
+
+  /// `null` for [all] — RN's own `getReviews` call passes `readFilter: 'ALL'`
+  /// through unconditionally, but this app's repository methods already
+  /// treat "no readFilter param at all" as the all-reviews case (see their
+  /// own tests), so [all] maps to omitting the param entirely instead of
+  /// introducing a third "ALL" value the backend has never been sent.
+  final String? apiValue;
+  final String labelKey;
+}
+
+/// Mirrors RN's `SortBy` enum.
+enum ReviewSortBy {
+  latest('LATEST', 'review.sort.latest'),
+  mostViewed('MOST_VIEWED', 'review.sort.mostViewed'),
+  mostCommented('MOST_COMMENTED', 'review.sort.mostCommented');
+
+  const ReviewSortBy(this.apiValue, this.labelKey);
+
+  final String apiValue;
+  final String labelKey;
+}
+
+/// The read-filter + sort combination the review list screen keeps as
+/// local state and re-fetches on — mirrors RN's `useReviews` hook's
+/// `selectedReadFilter`/`selectedSort`, which the same `ReviewList` uses
+/// for both simulation and scribe reviews.
+typedef ReviewListQuery = ({ReviewReadFilter readFilter, ReviewSortBy sortBy});
+
+const defaultReviewListQuery = (
+  readFilter: ReviewReadFilter.all,
+  sortBy: ReviewSortBy.latest,
+);
+
 /// Mirrors ally-mobile (React Native)'s `src/types/reviews.ts`. Only the
 /// fields the ported list/detail screens use — the RN type carries
 /// scenario/scenarioSession/scribeSession variants and per-reaction-code
@@ -58,19 +99,21 @@ class ReviewScribeSession {
 }
 
 /// Mirrors RN's `ReviewScenario` — the scenario a simulation review's
-/// session was played from. `coverImageUrl`/`coverVideoUrl` aren't modeled
-/// here: this scoped port's `ReviewCard` shows title/description text only,
-/// not RN's `SimulationDetailsCard` cover art.
+/// session was played from. `coverVideoUrl` isn't modeled: this scoped
+/// port's `ReviewCard` shows the still cover image only, not RN's
+/// `VideoPreview` for scenarios that ship a cover video instead.
 class ReviewScenario {
-  ReviewScenario({required this.title, this.description});
+  ReviewScenario({required this.title, this.description, this.coverImageUrl});
 
   factory ReviewScenario.fromJson(Map<String, dynamic> json) => ReviewScenario(
     title: json['title'] as String? ?? '',
     description: json['description'] as String?,
+    coverImageUrl: json['coverImageUrl'] as String?,
   );
 
   final String title;
   final String? description;
+  final String? coverImageUrl;
 }
 
 class ReviewItem {

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show FutureProviderFamily;
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/widgets/app_dropdown.dart';
 import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
@@ -14,18 +18,15 @@ import '../data/scribe_reviews_repository.dart';
 import 'review_card.dart';
 
 /// Port of ally-mobile (React Native)'s `ReviewScreen` — one screen, not
-/// two tabs/routes. An `AppTabView` switches between simulation reviews and
-/// scribe reviews only when the signed-in user holds *both*
-/// `VIEW_SIMULATION_REVIEWS` and `VIEW_SCRIBE_REVIEWS`; with only one, that
-/// permission's list renders directly with no switcher — same
-/// `showTypeTabs`/`reviewTypeTabs` logic as the real screen (which uses
-/// `react-native-tab-view`'s swipeable TabBar; this uses the same pill
-/// `AppTabView` CallLogScreen uses, for visual consistency across the app
-/// rather than introducing a second distinct tab-switcher look with no
-/// specific styling evidence for this screen).
-///
-/// Not ported: the read-filter (All/Read/Unread) row and sort dropdown
-/// `ReviewList.tsx` renders above its list.
+/// two tabs/routes. The Scribe/Simulation switcher only renders when the
+/// signed-in user holds *both* `VIEW_SIMULATION_REVIEWS` and
+/// `VIEW_SCRIBE_REVIEWS`; with only one, that permission's list renders
+/// directly with no switcher — same `showTypeTabs`/`reviewTypeTabs` logic
+/// as the real screen. Confirmed from source this switcher is a genuinely
+/// different widget from the generic pill `AppTabView` used elsewhere
+/// (CallLogScreen, the read-filter row below): `react-native-tab-view`'s
+/// `TabBar`, an underline indicator over plain text, not a pill — see
+/// [_UnderlineTabRow].
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key});
 
@@ -79,40 +80,40 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final showTabs = hasScribe && hasSimulation;
 
     return Scaffold(
+      backgroundColor: AppColors.surfaceContainerLow,
       body: SafeArea(
         child: Column(
           children: [
-            TabScreenHeader(
-              title: ref.t('review.title'),
-              subtitle: ref.t('nav.tabs.review'),
-            ),
-            if (showTabs)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                child: AppTabView<_ReviewTab>(
-                  tabs: [
-                    AppTabViewItem(
-                      key: _ReviewTab.scribe,
-                      label: ref.t('review.tabs.scribe'),
+            Container(
+              color: Colors.white,
+              child: Column(
+                children: [
+                  TabScreenHeader(title: ref.t('review.title')),
+                  if (showTabs)
+                    _UnderlineTabRow<_ReviewTab>(
+                      tabs: [
+                        AppTabViewItem(
+                          key: _ReviewTab.scribe,
+                          label: ref.t('review.tabs.scribe'),
+                        ),
+                        AppTabViewItem(
+                          key: _ReviewTab.simulation,
+                          label: ref.t('review.tabs.simulation'),
+                        ),
+                      ],
+                      activeTab: _activeTab!,
+                      onTabChange: (tab) => setState(() => _activeTab = tab),
                     ),
-                    AppTabViewItem(
-                      key: _ReviewTab.simulation,
-                      label: ref.t('review.tabs.simulation'),
-                    ),
-                  ],
-                  activeTab: _activeTab!,
-                  onTabChange: (tab) => setState(() => _activeTab = tab),
-                ),
+                ],
               ),
+            ),
             Expanded(
               child: _activeTab == null
                   ? Center(child: Text(ref.t('review.empty.title')))
                   : _activeTab == _ReviewTab.simulation
                   ? _ReviewList(
-                      provider: reviewsListProvider,
+                      key: const ValueKey('simulation'),
+                      familyProvider: reviewsListProvider,
                       reviewType: ReviewType.simulation,
                       canViewDetails: canViewSimulationDetail,
                       onReviewTapped: (review) async {
@@ -123,7 +124,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                       },
                     )
                   : _ReviewList(
-                      provider: scribeReviewsListProvider,
+                      key: const ValueKey('scribe'),
+                      familyProvider: scribeReviewsListProvider,
                       reviewType: ReviewType.scribe,
                       canViewDetails: canViewScribeDetail,
                       onReviewTapped: (review) async {
@@ -146,46 +148,146 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   }
 }
 
-class _ReviewList extends ConsumerWidget {
+/// Port of ally-mobile (React Native)'s `react-native-tab-view` `TabBar` as
+/// configured on `ReviewScreen` — plain text (medium weight + primary color
+/// when active, regular + low-emphasis otherwise) over a 2px bottom
+/// indicator, equal-width tabs. Distinct from the pill-style [AppTabView].
+class _UnderlineTabRow<T> extends StatelessWidget {
+  const _UnderlineTabRow({required this.tabs, required this.activeTab, required this.onTabChange});
+
+  final List<AppTabViewItem<T>> tabs;
+  final T activeTab;
+  final ValueChanged<T> onTabChange;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            for (final tab in tabs)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onTabChange(tab.key),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      tab.label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifMedium,
+                        color: tab.key == activeTab ? AppColors.primary : AppColors.lowEmphasis,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        Row(
+          children: [
+            for (final tab in tabs)
+              Expanded(
+                child: Container(
+                  height: 2,
+                  color: tab.key == activeTab ? AppColors.primary : Colors.transparent,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewList extends ConsumerStatefulWidget {
   const _ReviewList({
-    required this.provider,
+    super.key,
+    required this.familyProvider,
     required this.reviewType,
     required this.canViewDetails,
     required this.onReviewTapped,
   });
 
-  final FutureProvider<List<ReviewItem>> provider;
+  final FutureProviderFamily<List<ReviewItem>, ReviewListQuery> familyProvider;
   final ReviewType reviewType;
   final bool canViewDetails;
   final Future<void> Function(ReviewItem review) onReviewTapped;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reviewsAsync = ref.watch(provider);
+  ConsumerState<_ReviewList> createState() => _ReviewListState();
+}
 
-    return reviewsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) =>
-          Center(child: Text('${ref.t('review.error.title')}: $error')),
-      data: (reviews) {
-        if (reviews.isEmpty) {
-          return Center(child: Text(ref.t('review.empty.title')));
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: reviews.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            final review = reviews[index];
-            return ReviewCard(
-              review: review,
-              reviewType: reviewType,
-              canViewDetails: canViewDetails,
-              onOpenReview: () => onReviewTapped(review),
-            );
-          },
-        );
-      },
+class _ReviewListState extends ConsumerState<_ReviewList> {
+  ReviewListQuery _query = defaultReviewListQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    final reviewsAsync = ref.watch(widget.familyProvider(_query));
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // Not `IntrinsicWidth` around `AppTabView`: its internal
+              // `Row` uses `Expanded` tabs, and `Expanded`/`Flexible`
+              // children have no well-defined intrinsic width in Flutter —
+              // wrapping it that way overflowed instead of sizing to
+              // content. `Expanded` here instead (fill the space the
+              // dropdown doesn't need) is the closest content-preserving
+              // fix without a bespoke content-width tab widget.
+              Expanded(
+                child: AppTabView<ReviewReadFilter>(
+                  tabs: [
+                    for (final filter in ReviewReadFilter.values)
+                      AppTabViewItem(key: filter, label: ref.t(filter.labelKey)),
+                  ],
+                  activeTab: _query.readFilter,
+                  onTabChange: (filter) => setState(() => _query = (readFilter: filter, sortBy: _query.sortBy)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              AppDropdown(
+                value: ref.t(_query.sortBy.labelKey),
+                options: [for (final sort in ReviewSortBy.values) ref.t(sort.labelKey)],
+                onSelect: (label) {
+                  final sort = ReviewSortBy.values.firstWhere((s) => ref.t(s.labelKey) == label);
+                  setState(() => _query = (readFilter: _query.readFilter, sortBy: sort));
+                },
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: reviewsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) =>
+                Center(child: Text('${ref.t('review.error.title')}: $error')),
+            data: (reviews) {
+              if (reviews.isEmpty) {
+                return Center(child: Text(ref.t('review.empty.title')));
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: reviews.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 16),
+                itemBuilder: (context, index) {
+                  final review = reviews[index];
+                  return ReviewCard(
+                    review: review,
+                    reviewType: widget.reviewType,
+                    canViewDetails: widget.canViewDetails,
+                    onOpenReview: () => widget.onReviewTapped(review),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
