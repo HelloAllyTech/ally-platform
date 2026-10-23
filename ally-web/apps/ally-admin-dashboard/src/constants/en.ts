@@ -5448,6 +5448,626 @@ export const en = {
       suggestedActionsLabel: "Suggested next steps",
     },
   },
+  // The Ally Console (ally guide admin) and the organisation's Ally tab. Written for the Ally team:
+  // plain words for what a control does, and the exact blast radius of anything that changes what
+  // learners see.
+  allyConsole: {
+    navLabel: "Ally",
+    title: "Ally Console",
+    intro:
+      "The control room for Ally, the AI course companion: how it is doing, what it said, which release is live, and the switches that turn it off.",
+    viewOnly:
+      "View only. Changing anything here needs the edit permission for the Ally guide, and yours is read-only.",
+    tabs: {
+      overview: "Overview",
+      conversations: "Conversations",
+      releases: "Releases",
+      settings: "Settings",
+      crisisCopy: "Crisis copy",
+    },
+    languages: {
+      en: "English",
+      hi: "Hindi",
+      mr: "Marathi",
+      ta: "Tamil",
+      kn: "Kannada",
+    } as Record<string, string>,
+    channels: {
+      text: "Text",
+      voice: "Voice",
+      event: "Events",
+    } as Record<string, string>,
+    modes: {
+      NORMAL: "Normal",
+      CARE: "Care",
+      CRISIS: "Crisis",
+      CRISIS_FOLLOWUP: "Crisis follow-up",
+    } as Record<string, string>,
+    modeHelp:
+      "Safety mode. Care and Crisis mean the safety monitor found distress about the learner; Crisis follow-up is the quiet week after a crisis.",
+    threadStatuses: {
+      active: "Active",
+      merged: "Merged",
+      completed: "Completed",
+      archived: "Archived",
+    } as Record<string, string>,
+    states: {
+      loading: "Loading…",
+      retry: "Try again",
+      forbiddenTitle: "You don't have access to this",
+      forbiddenMessage:
+        "Your account is missing the Ally guide permission or its toggle. Ask a platform admin to turn it on for you.",
+      failedTitle: (what: string) => `Could not load ${what}`,
+      failedMessage: "Check your connection and try again. Nothing was changed.",
+      noAccessToOrg:
+        "You don't have access to this organisation's Ally profile. If you should, ask a platform admin to add it to your allowlist.",
+    },
+    overview: {
+      windowLabel: "Time window",
+      last7: "Last 7 days",
+      last30: "Last 30 days",
+      windowSummary: (days: number) => `The last ${days} days, up to now.`,
+      emptyTitle: "No Ally conversations in this window yet",
+      emptyMessage:
+        "Once learners start talking to Ally, turns, timings, safety counts and cost appear here.",
+      tiles: {
+        turns: "Turns",
+        turnsDetail: (threads: number) =>
+          threads === 1 ? "in 1 conversation" : `in ${threads} conversations`,
+        turnsHelp:
+          "Every time Ally was asked to respond: a message, a card event or a returning learner.",
+        success: "Success rate",
+        successDetail: (failed: number, interrupted: number) =>
+          `${failed} failed · ${interrupted} interrupted`,
+        successHelp:
+          "Turns that finished with a reply, as a share of all turns. A turn cut off by a restart counts as interrupted.",
+        cache: "Cache hit ratio",
+        cacheDetail: (read: string, uncached: string) =>
+          `${read} read · ${uncached} uncached tokens`,
+        cacheHelp:
+          "Share of input tokens answered from the prompt cache instead of being re-read. Higher is cheaper and faster. It drops on purpose after an emergency rollback.",
+        cost: "Cost",
+        costDetail: (perThread: string) => `${perThread} per conversation`,
+        costHelp: "Model spend for the turns in this window, as each turn recorded it.",
+        release: "Live release",
+        releaseDetail: (when: string) => `Live since ${when}`,
+        releaseNone: "No live release",
+        releaseNoneDetail: "Ally has no GA release, so it cannot answer.",
+        releaseHelp:
+          "The release (prompts, models, policy) that new conversations start on. GA means generally available.",
+        openReleases: "Open releases",
+      },
+      ttft: {
+        title: "Time to first token",
+        help: "How long a learner waits before Ally starts to answer. Median (p50) is the typical wait; p95 is the wait the slowest one in twenty turns sees.",
+        channel: "Channel",
+        turns: "Turns",
+        median: "Median (p50)",
+        p95: "Slowest 5% (p95)",
+        empty: "No timed turns in this window.",
+      },
+      safety: {
+        title: "Safety",
+        help: "Counts only. The Overview never shows what a learner said.",
+        crises: "Crisis signals",
+        crisesHelp: "Messages the safety monitor recognised as acute risk about the learner.",
+        crisisReplies: "Crisis replies sent",
+        crisisRepliesHelp: "Turns answered with the fixed crisis copy instead of model text.",
+        careEntries: "Entered care mode",
+        careEntriesHelp:
+          "Turns where a conversation moved into care mode, which pauses coaching and hushes the experience.",
+        refusals: "Refusals",
+        refusalsHelp:
+          "Turns where Ally declined to engage, for example a request outside its scope.",
+        restarts: "Restarts",
+        restartsHelp:
+          "Turns held back and written again because the safety monitor changed the conversation's mode partway through.",
+      },
+    },
+    conversations: {
+      searchPlaceholder: "Search by course or conversation id…",
+      filter: "Filter",
+      refresh: "Refresh",
+      organisation: "Organisation",
+      mode: "Mode",
+      clearFilters: "Clear filters",
+      noOrganisation: "No organisation",
+      columns: {
+        course: "Course",
+        organisation: "Organisation",
+        mode: "Mode",
+        status: "Status",
+        turns: "Turns",
+        cost: "Cost",
+        crises: "Crisis signals",
+        updated: "Last activity",
+      },
+      open: (title: string) => `Open conversation: ${title}`,
+      untitledCourse: "Untitled course",
+      emptyTitle: "No conversations yet",
+      emptyMessage: "Conversations start when a learner opens a course with Ally.",
+      emptyFilteredTitle: "No conversations match",
+      emptyFilteredMessage:
+        "Nothing matches these filters. Clear them, or load more if the list is not finished.",
+      footer: (shown: number) =>
+        shown === 1 ? "Showing 1 conversation" : `Showing ${shown} conversations`,
+      loadMore: "Load more",
+      loadingMore: "Loading…",
+      noMore: "That is every conversation.",
+      filterHint:
+        "With more than one organisation or mode selected, the list is filtered here, so a page may hold fewer rows.",
+    },
+    inspector: {
+      title: "Turn Inspector",
+      close: "Close",
+      conversationFacts: (turns: number, cost: string) =>
+        `${turns === 1 ? "1 turn" : `${turns} turns`} · ${cost}`,
+      epoch: (epoch: number) => `Epoch ${epoch}`,
+      turnsHeading: "Turns",
+      latestOnly: (count: number) =>
+        `Showing the latest ${count} turns. Older turns are not listed.`,
+      noTurns: "No turns have been recorded for this conversation yet.",
+      noTurnsTitle: "Nothing to inspect yet",
+      turnLabel: (time: string) => `Turn at ${time}`,
+      outcomes: { completed: "Completed", failed: "Failed" } as Record<string, string>,
+      replyKinds: {
+        crisis: "Crisis reply",
+        refusal: "Refusal",
+        chat: "Reply",
+        fixed: "Fixed reply",
+      } as Record<string, string>,
+      triggers: {
+        learner_message: "Learner message",
+        card_event: "Card event",
+        platform_event: "Platform event",
+        resume: "Returning learner",
+        intent: "Dock button",
+      } as Record<string, string>,
+      stagesHeading: "Stages",
+      stagesHelp:
+        "Where the time went. Each bar starts when its stage started and is as wide as it took, on one shared scale. The marker is when the first word reached the learner.",
+      firstToken: "First token",
+      stageOutcomes: {
+        ok: "ok",
+        stopped: "stopped the turn",
+        error: "failed",
+        skipped: "skipped",
+      } as Record<string, string>,
+      noStages: "No stage timings were recorded.",
+      factsHeading: "How it ran",
+      facts: {
+        trigger: "Started by",
+        channel: "Channel",
+        release: "Release",
+        model: "Model",
+        tier: "Budget tier",
+        steer: "Steer",
+        mode: "Mode",
+        epoch: "Epoch",
+        passes: "Model passes",
+        restarted: "Restarted",
+      },
+      factHelp: {
+        tier: "How much budget the conversation had left. Lower tiers use a lighter model.",
+        steer:
+          "How hard Ally was allowed to steer back to the course on this turn. Level 0 is silent, 1 shows only the Continue button, 2 allows one short verbal bridge, 3 lets Ally present the next item.",
+        epoch:
+          "A run of turns that share one release and one context. A new epoch starts after a quiet spell; the release can change then.",
+        restarted:
+          "The safety monitor changed the conversation's mode while the reply was being written, so the reply was discarded and written again with a safety overlay.",
+      },
+      steerLevels: {
+        0: "silent",
+        1: "Continue button only",
+        2: "one verbal bridge",
+        3: "may present the next item",
+      } as Record<string, string>,
+      steerNone: "No steer recorded",
+      modeUnchanged: (mode: string) => `${mode}, unchanged`,
+      modeChanged: (from: string, to: string) => `${from} to ${to}`,
+      epochNew: (number: number, reason: string | null, messages: number) =>
+        `${number}, new${reason ? ` (${reason})` : ""} · ${messages} earlier messages in context`,
+      epochContinued: (number: number, messages: number) =>
+        `${number}, continued · ${messages} earlier messages in context`,
+      yes: "Yes",
+      no: "No",
+      sentinelHeading: "Safety monitor verdict",
+      sentinelHelp:
+        "What the Sentinel decided about the learner's message. Risk and about say who is at risk; overlay is the extra instruction added to the turn.",
+      sentinel: {
+        risk: "Risk",
+        about: "About",
+        overlay: "Overlay",
+        confidence: "Confidence",
+        source: "Decided by",
+        latency: "Took",
+      },
+      sentinelNone: "The safety monitor did not run on this turn.",
+      toolsHeading: "Tools",
+      toolsNone: "No tools were called.",
+      toolFailed: "failed",
+      cardsHeading: "Cards shown",
+      cardsNone: "No cards were shown.",
+      usageHeading: "Tokens and cost",
+      usage: {
+        input: "Input",
+        output: "Output",
+        cacheRead: "Cache read",
+        cacheWrite: "Cache write",
+        cost: "Cost",
+      },
+      failureHeading: "What went wrong",
+      failure: (stage: string, code: string) => `${code} in the ${stage} stage`,
+      turnRecord: "Turn record",
+      turnRecordStatus: "Status",
+      turnRecordError: "Error code",
+      turnDetailFailed: "The turn record could not be loaded. The summary above is unaffected.",
+      payload: {
+        show: "Show payload",
+        hide: "Hide payload",
+        loading: "Loading the payload…",
+        help: "The situation report Ally was given, the safety monitor's evidence, tool input and output, and the reply. It holds the learner's words.",
+        notStored:
+          "No payload was stored for this turn. Payloads are only kept when trace storage is configured, and they expire.",
+        failed: "The payload could not be loaded. Try again.",
+        situationReport: "Situation report",
+        sentinelEvidence: "Safety monitor evidence",
+        toolCalls: "Tool calls",
+        toolCallsNone: "No tool calls.",
+        reply: "Reply",
+        replyNone: "No reply text.",
+        empty: "Nothing recorded.",
+      },
+      transcript: {
+        title: "Transcript",
+        redactionNote:
+          "Redacted by the server: contact details and long numbers are masked, and a message the safety monitor flagged as identifying a real person is hidden whole.",
+        loading: "Loading the transcript…",
+        empty: "No messages in this conversation yet.",
+        capped: (count: number) => `Showing the first ${count} messages.`,
+        failed: "The transcript could not be loaded.",
+        learner: "Learner",
+        ally: "Ally",
+        flags: {
+          crisis: "Crisis",
+          care: "Care",
+          realCase: "Real case",
+          pii: "Personal details",
+        } as Record<string, string>,
+        kinds: {
+          crisis_fixed: "Fixed crisis reply",
+          fixed: "Fixed reply",
+          recap: "Recap",
+          nudge: "Nudge",
+        } as Record<string, string>,
+        jumpToTurn: "Show this turn's details",
+      },
+      transcriptsLocked: {
+        title: "Transcripts are not open to you",
+        message:
+          "Transcripts and trace payloads hold learners' words, so they need the per-person transcripts permission. Everything else in the inspector is available.",
+      },
+    },
+    releases: {
+      liveSummary: (version: string, since: string | null) =>
+        since ? `Live: ${version}, since ${since}` : `Live: ${version}`,
+      noneLive: "No release is live.",
+      rollback: "Roll back…",
+      rollbackNeedsTwo: "There is no earlier release to roll back to.",
+      columns: {
+        version: "Version",
+        status: "Status",
+        author: "Author",
+        notes: "Notes",
+        promoted: "Went live",
+        created: "Created",
+      },
+      statuses: {
+        draft: "Draft",
+        evaluating: "Evaluating",
+        candidate: "Candidate",
+        shadow: "Shadow",
+        canary: "Canary",
+        ga: "Live (GA)",
+        retired: "Retired",
+      } as Record<string, string>,
+      statusHelp:
+        "Draft, evaluating, candidate, shadow and canary are the stages before a release goes live. Exactly one release is Live (GA) at a time; the one it replaced is Retired but can come back.",
+      authors: {
+        seed: "Seeded from code",
+        human: "A person",
+        curator: "The curator",
+      } as Record<string, string>,
+      noNotes: "No notes",
+      notPromoted: "Never live",
+      emptyTitle: "No releases yet",
+      emptyMessage: "Ally seeds its first release when the service starts.",
+      open: (version: string) => `Open release ${version}`,
+      detail: {
+        close: "Close",
+        title: (version: string) => `Release ${version}`,
+        loadFailed: "This release could not be loaded.",
+        meta: {
+          author: "Author",
+          hash: "Content hash",
+          created: "Created",
+          promoted: "Went live",
+          retired: "Retired",
+          notes: "Notes",
+        },
+        hashHelp:
+          "A fingerprint of everything in the release. Two releases with the same hash behave identically.",
+        promptsHeading: "Prompts",
+        promptsHelp:
+          "Read-only. Prompts travel inside the release as text, so a rollback restores every word exactly. To change one, create a new release.",
+        promptsNone: "This release carries no prompts.",
+        promptHeading: (role: string, code: string, version: number) =>
+          `${role} · ${code} v${version}`,
+        policyHeading: "Policy",
+        policyHelp:
+          "Every threshold, limit and cadence Ally runs on, flattened to one value per row. Changing any of them is a new release.",
+        policyNone: "This release carries no policy values.",
+        routingHeading: "Model routing",
+        routingHelp: "Which model serves each role, by channel and budget tier.",
+        capabilitiesHeading: "Capabilities",
+        capabilitiesHelp:
+          "Tools and specialists in this release. Off here means unavailable to Ally.",
+        key: "Setting",
+        value: "Value",
+        on: "On",
+        off: "Off",
+        promote: "Promote…",
+        promoteGa: "This release is already live.",
+      },
+      promoteDialog: {
+        title: (version: string) => `Promote ${version} to live?`,
+        body: (version: string, current: string | null) =>
+          current
+            ? `${version} becomes the live release and ${current} is retired. Conversations already under way finish on their current release and move at their next epoch; new ones start on ${version}.`
+            : `${version} becomes the live release. Conversations already under way move at their next epoch; new ones start on ${version}.`,
+        undo: "You can roll back afterwards.",
+        cancel: "Cancel",
+        confirm: (version: string) => `Promote ${version}`,
+        working: "Promoting…",
+        success: (version: string) => `${version} is now live.`,
+        failed: "Could not promote this release.",
+      },
+      rollbackDialog: {
+        title: "Roll back the live release",
+        body: (current: string | null) =>
+          current
+            ? `Goes back to the release that was live before ${current}. ${current} is retired.`
+            : "Goes back to the release that was live before the current one.",
+        reasonLabel: "Reason (optional)",
+        reasonHint:
+          "Kept in the release audit trail. Say what you saw, so the next person understands.",
+        reasonPlaceholder: "For example: replies in Hindi started repeating themselves",
+        emergencyLabel: "Emergency (moves every conversation at its next turn)",
+        emergencyHelp:
+          "Without this, conversations under way keep their release until their next epoch. Use it for a safety reason only.",
+        emergencyWarningTitle: "Every conversation switches on its next turn",
+        emergencyWarning:
+          "Each one loses its prompt cache once, so the next replies are slower and cost more. That is the price of acting at once.",
+        cancel: "Cancel",
+        confirm: "Roll back",
+        confirmEmergency: "Roll back now",
+        working: "Rolling back…",
+        success: (version: string) => `Rolled back. ${version} is live.`,
+        failed: "Could not roll back.",
+      },
+    },
+    settings: {
+      intro:
+        "The kill switches. They sit outside releases so they act at once: every change reaches learners within about 30 seconds. If these settings ever cannot be read, Ally switches itself off and learners see the classic course.",
+      saving: "Saving…",
+      saved: "Saved. Learners see this within about 30 seconds.",
+      saveFailed: "Could not save. The switch is unchanged.",
+      switchesHeading: "Switches",
+      enabled: {
+        label: "Ally is on",
+        help: "The master switch. Off sends every learner to the classic course page, at the item they were on.",
+      },
+      anonymousChat: {
+        label: "Anonymous chat",
+        help: "Whether visitors who have not signed in can talk to Ally when they open a course link.",
+      },
+      voice: {
+        label: "Voice",
+        help: "Whether learners can talk to Ally by voice. Text keeps working when this is off.",
+      },
+      on: "On",
+      off: "Off",
+      turnOffDialog: {
+        title: "Turn Ally off for everyone?",
+        body: "Within about 30 seconds every learner is moved to the classic course page, at the item they were on. Nothing is deleted, and turning Ally back on restores everything.",
+        cancel: "Keep Ally on",
+        confirm: "Turn Ally off",
+      },
+      lists: {
+        heading: "Switched off for",
+        courses: {
+          label: "Courses",
+          help: "Course ids (the id in the course's address) where Ally is off. Learners get the classic course.",
+          empty: "No courses are switched off.",
+          placeholder: "Course id",
+          add: "Add course",
+        },
+        tenants: {
+          label: "Organisations",
+          help: "Organisations whose learners never see Ally.",
+          empty: "No organisations are switched off.",
+          selectPlaceholder: "Choose an organisation",
+          placeholder: "Organisation id",
+          add: "Add organisation",
+        },
+        capabilities: {
+          label: "Capabilities",
+          help: "A tool or specialist switched off for every conversation, for example consult_tutor, while the rest of Ally keeps working.",
+          empty: "No capabilities are switched off.",
+          placeholder: "Capability id",
+          add: "Add capability",
+        },
+        remove: (id: string) => `Remove ${id}`,
+        duplicate: "That one is already on the list.",
+        blank: "Enter an id first.",
+      },
+    },
+    crisisCopy: {
+      intro:
+        "The fixed message Ally sends when a learner may be in crisis. No model writes it. Each save is a new version, the previous one is kept, and a language with no copy falls back to English, then to the built-in default.",
+      orgIntro:
+        "This organisation's own crisis message, which replaces the platform's for its learners. Each save is a new version. A language with no copy here uses the platform's, then English.",
+      version: (version: number) => `Version ${version}`,
+      // The language switcher on an organisation's tab: the language, and its version when it has copy.
+      switchLabel: (language: string, version: number | null) =>
+        version === null ? language : `${language} · v${version}`,
+      approval: (approver: string, when: string | null) =>
+        when ? `Approved by ${approver} · ${when}` : `Approved by ${approver}`,
+      approverYou: "you",
+      approverUser: (id: number) => `user ${id}`,
+      approverUnknown: "someone unrecorded",
+      noCopy: "No copy saved for this language yet.",
+      noCopyFallback: "Learners see English, then the built-in default, until you save one.",
+      bodyLabel: (language: string) => `${language} crisis message`,
+      counter: (length: number, min: number, max: number) => `${length} / ${max} (at least ${min})`,
+      tooShort: (min: number) => `At least ${min} characters.`,
+      tooLong: (max: number) => `At most ${max} characters.`,
+      unchanged: "No changes to save.",
+      save: "Save new version…",
+      withdraw: "Withdraw…",
+      reset: "Discard changes",
+      previewShow: "Preview the card",
+      previewHide: "Hide preview",
+      saveDialog: {
+        title: (language: string) => `Save the ${language} crisis message?`,
+        body: "This text is what a learner in crisis reads. It becomes live for new messages straight away, and it is recorded as approved by you.",
+        approvalLabel: "A clinician has approved this exact text",
+        approvalHelp:
+          "Don't save it until they have. The wording of this message is a safety decision.",
+        cancel: "Cancel",
+        confirm: "Save version",
+        working: "Saving…",
+      },
+      withdrawDialog: {
+        title: (language: string) => `Withdraw the ${language} crisis message?`,
+        body: "Learners in this language fall back to English, then to the built-in default, until you save a new one. The withdrawn version is kept in the record.",
+        cancel: "Keep it",
+        confirm: "Withdraw",
+        working: "Withdrawing…",
+      },
+      saved: (language: string, version: number) =>
+        `${language} crisis message saved as version ${version}.`,
+      saveFailed: "Could not save the crisis message.",
+      withdrawn: (language: string) => `${language} crisis message withdrawn.`,
+      withdrawFailed: "Could not withdraw the crisis message.",
+      emptyTitle: "No crisis copy has been saved",
+      emptyMessage: "Write the first message for any language below.",
+    },
+    crisisPreview: {
+      label: "What the learner sees",
+      note: "A preview. The wording of the card's buttons is English for now; the message and the support lines are the ones above.",
+      messageMissing:
+        "No message for this language: learners see English, then the built-in default.",
+      title: "Support is available now",
+      safeNow: "I'm safe right now",
+      needHelpNow: "I need help now",
+      privacy: "This stays private. Nothing is shared with your organisation.",
+      linesFromOrg: "The support lines are this organisation's.",
+      linesFromEnglish: "No lines for this language, so the English ones show.",
+      linesDefault: "No lines for this organisation, so the platform defaults show.",
+      buttonsInert: "Not clickable in the preview.",
+    },
+    org: {
+      tabLabel: "Ally",
+      intro:
+        "How Ally behaves for this organisation: who learners are pointed to for support, what Ally says about their supervisor, and the organisation's own crisis message. Changes apply from each learner's next turn.",
+      viewOnly:
+        "View only. Editing the organisation's Ally profile needs the edit permission for the Ally guide.",
+      loadFailedWhat: "this organisation's Ally profile",
+      versionLine: (version: number, who: string | null, when: string | null) =>
+        version === 0
+          ? "Never saved. Ally uses the platform defaults for this organisation."
+          : `Version ${version}${who ? ` · saved by ${who}` : ""}${when ? ` · ${when}` : ""}`,
+      supportLines: {
+        heading: "Support lines",
+        help: "Shown to a learner in crisis or when they could use support. A language with no lines uses the English ones, then the platform defaults (Tele-MANAS and emergency services).",
+        languageSwitch: "Language",
+        none: "No support lines for this language.",
+        add: "Add support line",
+        capReached: (max: number) => `${max} lines is the most for one language.`,
+        remove: (n: number) => `Remove support line ${n}`,
+        name: "Name",
+        namePlaceholder: "Counselling helpline",
+        phone: "Phone",
+        phonePlaceholder: "+91 98765 43210",
+        hours: "Hours",
+        hoursPlaceholder: "Mon to Fri, 9 to 6",
+        url: "Link",
+        urlPlaceholder: "https://",
+        isCrisis: "Crisis line",
+        isCrisisHelp:
+          "A line a learner can call right now. Crisis lines are listed first on the crisis card.",
+        errors: {
+          nameRequired: "Every line needs a name.",
+          phoneRequired: "Every line needs a phone number.",
+          phoneInvalid:
+            "Start with a digit or +, then use only digits, spaces, brackets, dots and dashes.",
+          urlInvalid: "A link must start with http:// or https://.",
+        },
+        lineLabel: (n: number) => `Support line ${n}`,
+      },
+      supervisor: {
+        heading: "Supervisor",
+        contact: "Supervisor contact",
+        contactHelp:
+          "A name, role or phone number Ally can give when a learner needs their supervisor.",
+        contactPlaceholder: "Dr Rao, clinical lead · 98765 43210",
+        wording: "How Ally refers to the supervisor",
+        wordingHelp:
+          "A sentence or two in the voice you want, for when a learner mentions something their supervisor should handle.",
+        wordingPlaceholder:
+          "Please talk to your clinical supervisor about this before the next session.",
+      },
+      guidance: {
+        heading: "Protocols and tone",
+        protocols: "Protocols",
+        protocolsHelp:
+          "The organisation's own procedures Ally should point to, for example what to do when a client discloses harm. Ally refers to them and never improvises clinical advice.",
+        protocolsPlaceholder: "If a client discloses…",
+        tone: "Tone notes",
+        toneHelp:
+          "How this organisation likes learners to be spoken to. Applied on top of Ally's own voice.",
+        tonePlaceholder: "Warm, plain English, no jargon.",
+        avoid: "Topics to avoid",
+        avoidHelp: "Ally steers away from these with this organisation's learners.",
+        avoidPlaceholder: "Add a topic and press Add",
+        avoidAdd: "Add",
+        avoidRemove: (topic: string) => `Remove ${topic}`,
+        avoidDuplicate: "That topic is already listed.",
+        avoidCap: (max: number) => `${max} topics is the most.`,
+      },
+      outreach: {
+        heading: "Outreach",
+        outreach: "Ally may reach out",
+        outreachHelp: "Whether Ally may contact this organisation's learners who have gone quiet.",
+        email: "Reach out by email",
+        emailHelp: "Whether that outreach may use email as well as in-app messages.",
+      },
+      crisis: {
+        heading: "Crisis message and card",
+        note: "Crisis messages are saved one language at a time, separately from the rest of this profile.",
+        loadFailed: "this organisation's crisis messages",
+      },
+      save: "Save profile",
+      saving: "Saving…",
+      discard: "Discard changes",
+      dirty: "You have unsaved changes.",
+      clean: "Everything is saved.",
+      invalid: "Fix the highlighted fields to save.",
+      saved: "Ally profile saved.",
+      saveFailed: "Could not save the Ally profile.",
+    },
+  },
   evaluate: {
     title: "Ally Evaluation",
     loginHeading: "Evaluator Sign In",

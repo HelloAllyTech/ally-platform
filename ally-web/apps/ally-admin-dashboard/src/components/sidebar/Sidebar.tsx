@@ -15,6 +15,7 @@ import {
   Bullhorn,
   Catalog,
   Chat,
+  ChatBot,
   Chemistry,
   MachineLearningModel,
   Roadmap,
@@ -298,6 +299,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // not Builder's Tools, since the two agents sit side by side in the nav.
       case SIDEBAR_ITEMS.COURSE_COPILOT:
         return <WandStars className="w-5 h-5" />;
+      // A chat bot, not the plain Chat bubble the WhatsApp Bot uses: this is the console for Ally the
+      // companion, and the two would be indistinguishable once the sidebar collapses to icons.
+      case SIDEBAR_ITEMS.ALLY_GUIDE:
+        return <ChatBot size={20} />;
       case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:
@@ -394,6 +399,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // Matches the session and /new routes too, so the tab stays lit inside a session.
       case ROUTES.COURSE_COPILOT:
         return location.pathname.includes(ROUTES.COURSE_COPILOT);
+      case ROUTES.ALLY_CONSOLE:
+        return (
+          location.pathname === ROUTES.ALLY_CONSOLE ||
+          location.pathname.startsWith(`${ROUTES.ALLY_CONSOLE}/`)
+        );
       case ROUTES.PRODUCT_ROADMAP:
         return location.pathname.includes(ROUTES.PRODUCT_ROADMAP);
       case ROUTES.SETTINGS:

@@ -165,6 +165,11 @@ const buildNavigationItems = (): NavigationItem[] => [
     path: ROUTES.COURSE_COPILOT,
   },
   {
+    id: SIDEBAR_ITEMS.ALLY_GUIDE,
+    label: en.allyConsole.navLabel,
+    path: ROUTES.ALLY_CONSOLE,
+  },
+  {
     id: SIDEBAR_ITEMS.WHATSAPP_BOT,
     label: en.whatsappBot.navLabel,
     path: ROUTES.WHATSAPP_BOT,
@@ -276,6 +281,14 @@ export const deriveNavigationItems = ({
               permissions!.includes(Permissions.EDIT_COURSE_COPILOT) &&
               hasFeature(features, FeatureToggleKey.COURSE_COPILOT) &&
               hasFeature(features, FeatureToggleKey.CREATE_COURSES)
+            );
+          // The Ally Console: the ally_guide toggle AND the view grant, like Course Copilot, so
+          // deliberately NOT in buildSidebarItemFeatureKeyMap (which would make it toggle-only and
+          // drop the permission). The permission alone shows it to every platform admin.
+          case SIDEBAR_ITEMS.ALLY_GUIDE:
+            return (
+              permissions!.includes(Permissions.VIEW_ALLY_GUIDE) &&
+              hasFeature(features, FeatureToggleKey.ALLY_GUIDE)
             );
           // The tabs below each have a per-admin toggle (ON by default) AND keep
           // their permission, so they stay out of buildSidebarItemFeatureKeyMap,

@@ -21,6 +21,7 @@ import {
   ScenarioVoices,
   SttConfigs,
   AiTasks,
+  AllyConsole,
   LlmModelCatalog,
   ScenarioLanguages,
   LanguageGlossary,
@@ -576,6 +577,19 @@ export const RouteLayout: React.FC = () => {
               alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
             >
               <CourseCopilotSession />
+            </PrivateLayout>
+          }
+        />
+        {/* The toggle AND the view grant, as ally-be checks them; every edit control inside the page
+            narrows further on EDIT_ALLY_GUIDE. */}
+        <Route
+          path={ROUTES.ALLY_CONSOLE}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.ALLY_GUIDE}
+              requiredPermissions={[Permissions.VIEW_ALLY_GUIDE]}
+            >
+              <AllyConsole />
             </PrivateLayout>
           }
         />
