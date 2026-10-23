@@ -12,6 +12,9 @@
 # - The workflow will create the tag, build, deploy to S3/CloudFront, and create a release draft
 # - Note: This is a monorepo, so each service has its own tag prefix (admin-, helpline-, web-)
 
+# Touched on 2026-10-23 so GitHub registers this workflow in ally-platform: the files
+# imported with the monorepo were never pushed on their own, and a workflow_dispatch-only
+# workflow is not listed (nor dispatchable) until one is.
 name: Production Release - Admin Dashboard
 defaults:
   run:
