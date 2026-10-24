@@ -45,6 +45,7 @@ SELECT 'keep dashboard text' AS action,
     ON live."promptId" = p.id AND live.version = p."currentVersion"
  WHERE p."useDashboardOverride" = true
    AND p."defaultPrompt" IS NOT NULL
+   AND btrim(live.prompt) <> ''
    AND btrim(live.prompt) <> btrim(p."defaultPrompt")
  ORDER BY file_is_newer DESC, p."promptCode";
 

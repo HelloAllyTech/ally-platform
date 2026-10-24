@@ -71,38 +71,39 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
     // An overridden row whose live version is missing or blank was serving
     // `defaultPrompt` as well, and sync is about to replace that column with
     // the new Git default, so it is published too.
+    // The version each row gets is the one inserted here: put it live in the
+    // same statement, so a row whose pointer dangled (a currentVersion beyond
+    // its last version) is repaired too, and a re-run touches nothing.
     await queryRunner.query(`
-      INSERT INTO "prompts_versions"
-        ("promptId", "version", "prompt", "createdBy", "updatedBy",
-         "provider", "model", "temperature", "source", "note", "publishedAt")
-      SELECT p.id,
-             COALESCE((SELECT MAX(v."version") FROM "prompts_versions" v WHERE v."promptId" = p.id), 0) + 1,
-             p."defaultPrompt", 0, 0,
-             p."provider", p."model", p."temperature",
-             'migration',
-             'Published the file text that was serving before the Skills Store became the source of truth.',
-             NOW()
-        FROM "prompts" p
-        LEFT JOIN "prompts_versions" live
-          ON live."promptId" = p.id AND live."version" = p."currentVersion"
-       WHERE p."defaultPrompt" IS NOT NULL
-         AND btrim(p."defaultPrompt") <> ''
-         AND (
-           (p."useDashboardOverride" = false
-             AND (live.id IS NULL OR btrim(live."prompt") <> btrim(p."defaultPrompt")))
-           OR
-           (p."useDashboardOverride" = true
-             AND (live.id IS NULL OR btrim(COALESCE(live."prompt", '')) = ''))
-         )
-    `);
-    await queryRunner.query(`
+      WITH published AS (
+        INSERT INTO "prompts_versions"
+          ("promptId", "version", "prompt", "createdBy", "updatedBy",
+           "provider", "model", "temperature", "source", "note", "publishedAt")
+        SELECT p.id,
+               COALESCE((SELECT MAX(v."version") FROM "prompts_versions" v WHERE v."promptId" = p.id), 0) + 1,
+               p."defaultPrompt", 0, 0,
+               p."provider", p."model", p."temperature",
+               'migration',
+               'Published the file text that was serving before the Skills Store became the source of truth.',
+               NOW()
+          FROM "prompts" p
+          LEFT JOIN "prompts_versions" live
+            ON live."promptId" = p.id AND live."version" = p."currentVersion"
+         WHERE p."defaultPrompt" IS NOT NULL
+           AND btrim(p."defaultPrompt") <> ''
+           AND (
+             (p."useDashboardOverride" = false
+               AND (live.id IS NULL OR btrim(live."prompt") <> btrim(p."defaultPrompt")))
+             OR
+             (p."useDashboardOverride" = true
+               AND (live.id IS NULL OR btrim(COALESCE(live."prompt", '')) = ''))
+           )
+        RETURNING "promptId", "version"
+      )
       UPDATE "prompts" p
-         SET "currentVersion" = v.max_version
-        FROM (SELECT "promptId", MAX("version") AS max_version
-                FROM "prompts_versions" WHERE "source" = 'migration'
-               GROUP BY "promptId") v
-       WHERE p.id = v."promptId"
-         AND (p."currentVersion" IS NULL OR p."currentVersion" < v.max_version)
+         SET "currentVersion" = published."version"
+        FROM published
+       WHERE p.id = published."promptId"
     `);
     await queryRunner.query(
       `UPDATE "prompts" SET "useDashboardOverride" = true WHERE "useDashboardOverride" = false`,
