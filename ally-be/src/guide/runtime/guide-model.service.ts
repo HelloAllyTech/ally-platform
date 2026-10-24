@@ -27,6 +27,13 @@ export interface GuideCallAttribution {
   visitorId?: string | null;
   tenantId?: string | null;
   releaseId?: string | null;
+  /**
+   * The ledger's `agentKey` for this call; default the guide's own. The
+   * learning loop (evaluator, red team, eval replays) passes
+   * `ally_guide_learning` so its spend never counts toward a learner's
+   * budget tier or the guide's cost alerts.
+   */
+  costAgentKey?: string;
 }
 
 export interface GuideModelCall {
@@ -174,12 +181,15 @@ export class GuideModelService {
         guideThreadId: call.attribution.threadId ?? null,
         guideTurnId: call.attribution.turnId ?? null,
         releaseId: call.attribution.releaseId ?? null,
+        ...(call.attribution.costAgentKey
+          ? { costAgentKey: call.attribution.costAgentKey }
+          : {}),
         latencyMs,
         stopReason: result.stopReason,
       },
     });
     return this.ledger.record({
-      agentKey: ALLY_GUIDE_AGENT_KEY,
+      agentKey: call.attribution.costAgentKey ?? ALLY_GUIDE_AGENT_KEY,
       role: call.role,
       provider: route.provider,
       model: route.model,

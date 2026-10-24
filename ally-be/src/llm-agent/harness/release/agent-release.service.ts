@@ -407,6 +407,59 @@ export class AgentReleaseService {
     return promoted;
   }
 
+  /**
+   * Record an eval gate on a release (plan §7.4 lifecycle, §7.13): starting
+   * one moves a DRAFT to EVALUATING; its result moves EVALUATING on to
+   * CANDIDATE or back to DRAFT, and links the run as the release's evidence
+   * (`evalRunId`). A release past CANDIDATE keeps its status — re-running
+   * the gate on a canary or GA release only adds evidence. Always audited.
+   */
+  async recordEvalRun(input: {
+    releaseId: string;
+    runId: string;
+    phase: 'started' | 'passed' | 'failed';
+    userId: number | null;
+    detail?: Record<string, unknown>;
+  }): Promise<AgentRelease> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const release = await repo.findOne({ where: { id: input.releaseId } });
+      if (!release) throw new NotFoundException('Release not found');
+      const next =
+        input.phase === 'started'
+          ? release.status === AgentReleaseStatus.DRAFT
+            ? AgentReleaseStatus.EVALUATING
+            : release.status
+          : release.status === AgentReleaseStatus.EVALUATING
+            ? input.phase === 'passed'
+              ? AgentReleaseStatus.CANDIDATE
+              : AgentReleaseStatus.DRAFT
+            : release.status;
+      await repo.update(release.id, {
+        status: next,
+        ...(input.phase === 'started' ? {} : { evalRunId: input.runId }),
+      });
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey: release.agentKey,
+        releaseId: release.id,
+        action:
+          next !== release.status
+            ? AgentReleaseAuditAction.STATUS_CHANGED
+            : AgentReleaseAuditAction.NOTE,
+        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorUserId: input.userId,
+        detail: {
+          evalRunId: input.runId,
+          evalPhase: input.phase,
+          from: release.status,
+          to: next,
+          ...(input.detail ?? {}),
+        },
+      });
+      return { ...release, status: next } as AgentRelease;
+    });
+  }
+
   /** The release in canary, if any (plan §7.4: at most one per agent). */
   async getCanary(agentKey: string): Promise<AgentRelease | null> {
     const cached = this.canaryCache.get(agentKey);

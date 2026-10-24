@@ -148,5 +148,14 @@ import { GuideConfigResolverService } from './config/guide-config-resolver.servi
     GuideLearnerDataService,
     GuideVoiceService,
   ],
+  // For the learning loop (src/guide-learning), which imports this module:
+  // replays run through the Playground's dry-run turn, judges call models
+  // through the guide's one model path, and the canary guard reads the arms.
+  exports: [
+    GuidePlaygroundService,
+    GuideModelService,
+    GuideAdminService,
+    GuideCrisisService,
+  ],
 })
 export class GuideModule {}

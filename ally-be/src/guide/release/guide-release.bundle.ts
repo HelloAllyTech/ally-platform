@@ -57,7 +57,13 @@ export type GuideRole =
   | 'assessor'
   | 'memory_curator'
   | 'summariser'
-  | 'outreach_writer';
+  | 'outreach_writer'
+  // The learning loop (src/guide-learning, plan §7.13). Offline only: never
+  // on a learner's turn. The verifier must route to a different model family
+  // from the critic — that is the point of having one.
+  | 'evaluator_critic'
+  | 'evaluator_verifier'
+  | 'red_team';
 
 export type GuideChannelRoute = 'text' | 'voice';
 export type GuideBudgetTier = 'premium' | 'degraded' | 'lite';
@@ -130,6 +136,30 @@ export interface GuidePolicy {
    * readable; read it through `peerPolicy()`.
    */
   peer?: GuidePeerPolicy;
+  /**
+   * The learning loop (Appendix A "Learning loop", `evaluator.dailyBudgetUsd`).
+   * Releases seeded before M4 have no such key; read it through
+   * `evaluatorPolicy()`, which falls back to these defaults.
+   */
+  evaluator: GuideEvaluatorPolicy;
+}
+
+export interface GuideEvaluatorPolicy {
+  /** Spend ceiling for the nightly evaluator and the weekly red team, per UTC day. */
+  dailyBudgetUsd: number;
+  /** Every flagged window is judged, up to this many a night. */
+  flaggedMax: number;
+  /** Share of the remaining windows sampled at random, up to `randomMax`. */
+  randomShare: number;
+  randomMax: number;
+  /** Share of judged windows sent to people as a calibration sample. */
+  calibrationShare: number;
+  /** κ (critic vs person) a criterion needs before automated decisions use it. */
+  kappaThreshold: number;
+  /** Paired labels a criterion needs before its κ is trusted at all. */
+  kappaMinPairs: number;
+  /** Repetitions of every case in a gate run. */
+  gateRepetitions: number;
 }
 
 export interface GuidePeerPolicy {
@@ -235,7 +265,24 @@ export const GUIDE_DEFAULT_POLICY: GuidePolicy = {
     turnHardTimeoutMs: 45_000,
   },
   peer: GUIDE_DEFAULT_PEER_POLICY,
+  evaluator: {
+    dailyBudgetUsd: 25,
+    flaggedMax: 200,
+    randomShare: 0.05,
+    randomMax: 300,
+    calibrationShare: 0.02,
+    kappaThreshold: 0.6,
+    kappaMinPairs: 20,
+    gateRepetitions: 3,
+  },
 };
+
+/** A release's learning-loop policy, with defaults for releases that predate it. */
+export function evaluatorPolicy(
+  policy: Partial<GuidePolicy> | null | undefined,
+): GuideEvaluatorPolicy {
+  return { ...GUIDE_DEFAULT_POLICY.evaluator, ...(policy?.evaluator ?? {}) };
+}
 
 const OPUS: GuideModelRoute = {
   provider: 'anthropic',
@@ -249,6 +296,8 @@ const HAIKU: GuideModelRoute = {
   provider: 'anthropic',
   model: 'claude-haiku-5-5',
 };
+/** The verifier's family must differ from the critic's (plan §7.13). */
+const GPT5: GuideModelRoute = { provider: 'openai', model: 'gpt-5' };
 
 /**
  * The code's current defaults. Prompts and capabilities are added as step 1.1
@@ -309,6 +358,9 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
     memory_curator: { text: { premium: { ...OPUS, effort: 'low' } } },
     summariser: { text: { premium: HAIKU } },
     outreach_writer: { text: { premium: { ...OPUS, effort: 'low' } } },
+    evaluator_critic: { text: { premium: { ...OPUS, effort: 'low' } } },
+    evaluator_verifier: { text: { premium: { ...GPT5, effort: 'low' } } },
+    red_team: { text: { premium: { ...OPUS, effort: 'medium' } } },
   },
   capabilities: {
     present_course_item: true,

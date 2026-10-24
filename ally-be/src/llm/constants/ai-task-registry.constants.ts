@@ -2295,7 +2295,7 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_ORCHESTRATOR,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'A learner sends Ally a message, or presses Continue, Start or Not now; a platform event (a completion, a grade, signing in) while they are on the page; an anonymous visitor writes on a public course link; or an admin runs a turn in the Ally Console Playground (no learner, nothing stored)',
+      'A learner sends Ally a message, or presses Continue, Start or Not now; a platform event (a completion, a grade, signing in) while they are on the page; an anonymous visitor writes on a public course link; an admin runs a turn in the Ally Console Playground (no learner, nothing stored); or an eval run replays a case against a release (dry run, write tools stubbed, charged to the learning loop)',
     detail:
       "Ally's reply: a streamed tool loop (at most six tool passes, then a closing pass " +
       'with tool_choice none) whose text is held until the Sentinel clears the message. ' +
@@ -2321,7 +2321,7 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_SENTINEL,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'A learner or visitor sends Ally a message, or an admin runs a Playground turn',
+      'A learner or visitor sends Ally a message, an admin runs a Playground turn, or an eval run replays a case',
     detail:
       'The safety classifier: one call per learner message, run concurrently with the ' +
       'reply and held to a deadline (release policy safety.sentinelDeadlineMs, 1.2 s), so it ' +
@@ -2340,7 +2340,7 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_TUTOR,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Ally needs a grounded answer to a learner question about the course (also in Playground turns)',
+      'Ally needs a grounded answer to a learner question about the course (also in Playground turns and eval replays)',
     detail:
       "The Tutor specialist, called by Ally's consult_tutor tool: one structured call per " +
       'question over the learner-safe text of the items the learner can already open ' +
@@ -2447,6 +2447,60 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     provider: 'multiple',
     defaultModel: 'per-language',
     configuredBy: 'Guide worker voice config per language',
+  },
+  {
+    id: 'guide-evaluator-critic',
+    task: LlmTask.GUIDE_EVALUATOR_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "Nightly (00:05 UTC), for a sample of the previous day's Ally replies; and when an admin re-runs a night from the Ally Console",
+    detail:
+      "The nightly evaluator's critic (src/guide-learning): one structured call per sampled " +
+      'window — the reply and up to six messages before it, contact details masked — graded ' +
+      'pass / fail / not applicable on thirteen rubric criteria with a one-line reason each. ' +
+      'Sample: every flagged window (safety verdicts, CARE or crisis, thumbs down, a failed ' +
+      'deterministic check; at most 200) plus 5% of the rest (at most 300), split evenly ' +
+      'between GA and canary while a canary runs. Shares a $25 a day budget (release policy ' +
+      'evaluator.dailyBudgetUsd) with the verifier and the red team; past it, windows get the ' +
+      'deterministic checks only. Charged to agentKey ally_guide_learning, never to a learner.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.evaluator_critic',
+  },
+  {
+    id: 'guide-evaluator-verifier',
+    task: LlmTask.GUIDE_EVALUATOR_VERIFIER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'Right after the critic, for every window the critic judged',
+    detail:
+      'An independent second grading of the same window on the same rubric, by a model from ' +
+      'a different family so the two do not share blind spots. It never sees the critic’s ' +
+      'verdicts. Any criterion the two judge differently sends the window to the human ' +
+      'review queue. Same budget and ledger key as the critic. Effort low.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5',
+    configuredBy: 'ally_guide release modelRouting.evaluator_verifier',
+  },
+  {
+    id: 'guide-red-team',
+    task: LlmTask.GUIDE_RED_TEAM,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Weekly (Mondays 02:00 UTC), and when an admin asks for a fresh red-team set in the Ally Console',
+    detail:
+      'Writes adversarial learner messages for Ally’s eval suite, one structured call per ' +
+      'category (prompt injection, quiz-answer extraction, crisis said directly, indirectly ' +
+      'and in mixed English and Hindi, professional discussion of suicide that must NOT be ' +
+      'treated as a crisis, real-client details, drift, sycophancy bait, neediness bait, ' +
+      'requests to write graded work), including noisy and misspelt ones. Each becomes a ' +
+      'PROPOSED case that runs in a gate only once a person accepts it. Shares the ' +
+      'evaluator’s daily budget and ledger key.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.red_team',
   },
 ];
 

@@ -11,4 +11,8 @@ export const GUIDE_AI_TASKS = {
   OUTREACH: 'guide-outreach',
   ASSESSOR: 'guide-assessor',
   COACH: 'guide-coach',
+  // The learning loop (src/guide-learning).
+  EVALUATOR_CRITIC: 'guide-evaluator-critic',
+  EVALUATOR_VERIFIER: 'guide-evaluator-verifier',
+  RED_TEAM: 'guide-red-team',
 } as const;

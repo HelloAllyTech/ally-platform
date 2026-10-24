@@ -327,6 +327,11 @@ export enum LlmTask {
   // The guide's voice worker (ally-ai-learn app/guide_worker.py).
   GUIDE_VOICE_STT = 'guide_voice_stt',
   GUIDE_VOICE_TTS = 'guide_voice_tts',
+  // The guide's learning loop (src/guide-learning): offline, never on a
+  // learner's turn. Charged to agent_cost_ledger under 'ally_guide_learning'.
+  GUIDE_EVALUATOR_CRITIC = 'guide_evaluator_critic',
+  GUIDE_EVALUATOR_VERIFIER = 'guide_evaluator_verifier',
+  GUIDE_RED_TEAM = 'guide_red_team',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

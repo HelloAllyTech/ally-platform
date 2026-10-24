@@ -273,7 +273,7 @@ export class GuideCanaryStartDto {
   reason?: string;
 }
 
-class GuidePlaygroundTurnDto {
+export class GuidePlaygroundTurnDto {
   @IsIn(['learner', 'ally'])
   role!: 'learner' | 'ally';
 

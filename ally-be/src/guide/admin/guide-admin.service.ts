@@ -149,6 +149,11 @@ export class GuideAdminService {
    * time to first token, cost per thread, safety and thumbs. Only turns of
    * the canary in flight count as canary; earlier canaries are history.
    */
+  /** The same per-arm read, for the learning loop's guard (src/guide-learning). */
+  armMetrics(windowDays: number, canaryId: string | null) {
+    return this.arms(windowDays, canaryId);
+  }
+
   private async arms(window: number, canaryId: string | null) {
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `SELECT CASE WHEN t."arm" = 'canary' AND t."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",

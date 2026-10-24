@@ -62,6 +62,16 @@ export interface PlaygroundInput {
   history?: Array<{ role: 'learner' | 'ally'; text: string }>;
   message: string;
   intent?: GuideIntent | null;
+  /**
+   * Replay conditions an eval case can pin (src/guide-learning): a release
+   * window just opened, a quiz open on screen, or turns already spent off
+   * the course. All default to off.
+   */
+  releaseWindowOpen?: boolean;
+  quizOpen?: boolean;
+  offSpineTurns?: number;
+  /** The ledger key to charge; eval replays pass the learning loop's. */
+  costAgentKey?: string;
 }
 
 export interface PlaygroundToolCall {
@@ -125,10 +135,18 @@ export class GuidePlaygroundService {
     const guidance = input.guidance ?? 'walk';
     const channel = input.channel ?? 'text';
     const spine = course.spine;
+    const learnerTurns =
+      history.filter((turn) => turn.role === 'learner').length + 1;
+    const releaseWindowOpen = Boolean(input.releaseWindowOpen);
     const pacing = {
-      learnerTurns:
-        history.filter((turn) => turn.role === 'learner').length + 1,
-      offSpineTurns: 0,
+      learnerTurns,
+      offSpineTurns: Math.max(0, Math.floor(input.offSpineTurns ?? 0)),
+      releaseWindow: releaseWindowOpen
+        ? {
+            itemId: spine.current?.id ?? 'replay',
+            openedAtTurn: learnerTurns - 1,
+          }
+        : null,
     };
     const steer = decideSteer({
       mode,
@@ -141,14 +159,15 @@ export class GuidePlaygroundService {
     const situation = renderSituationReport({
       turn: pacing.learnerTurns,
       mode,
-      atmosphere: atmosphereOf({ mode, releaseWindowOpen: false, spine }),
+      atmosphere: atmosphereOf({ mode, releaseWindowOpen, spine }),
       channel,
       guidance,
       budget: proseBudget(guidance, channel, policy.fade.start.lay, policy),
       steer,
       spine,
       firstWin: planFirstWin(spine, pacing),
-      releaseWindowOpen: false,
+      releaseWindowOpen,
+      quizOpen: Boolean(input.quizOpen),
       overlay: 'none',
       events: [],
       continuePressed: input.intent === 'start' || input.intent === 'continue',
@@ -166,6 +185,7 @@ export class GuidePlaygroundService {
       userId: null,
       tenantId: null,
       releaseId: release.id,
+      ...(input.costAgentKey ? { costAgentKey: input.costAgentKey } : {}),
     };
     let costUsd = 0;
     const onCost = (usd: number) => {
