@@ -170,7 +170,7 @@ export class GuideViewService {
     if (!thread) return view;
     const mode = thread.mode ?? GuideMode.NORMAL;
     const [messages, cards, crisis] = await Promise.all([
-      this.recentMessages(thread.id),
+      this.recentMessages(thread.id, thread.userId ?? null),
       this.presentedCards(thread.id),
       mode === GuideMode.CRISIS ? this.crisisOnScreen(thread.id) : null,
     ]);
@@ -262,7 +262,7 @@ export class GuideViewService {
 
     const mode = thread.mode ?? GuideMode.NORMAL;
     const [messages, { cards, scenes }, crisis] = await Promise.all([
-      this.recentMessages(thread.id),
+      this.recentMessages(thread.id, thread.userId ?? null),
       this.feed(thread.id),
       mode === GuideMode.CRISIS ? this.crisisOnScreen(thread.id) : null,
     ]);
@@ -333,7 +333,10 @@ export class GuideViewService {
     return { ...DEFAULT_GUIDE_PREFS, ...pickPrefs(prefs) };
   }
 
-  private async recentMessages(threadId: string): Promise<GuideMessageView[]> {
+  private async recentMessages(
+    threadId: string,
+    userId: number | null,
+  ): Promise<GuideMessageView[]> {
     const rows = await this.messages.find({
       where: {
         threadId,
@@ -342,7 +345,30 @@ export class GuideViewService {
       order: { seq: 'DESC' },
       take: BOOTSTRAP_MESSAGE_PAGE,
     });
-    return rows.reverse().map(messageView);
+    const ratings = await this.ratingsOf(rows, userId);
+    return rows.reverse().map((row) => messageView(row, ratings.get(row.id)));
+  }
+
+  /** The learner's own thumbs on Ally's messages, so they survive a reload. */
+  async ratingsOf(
+    rows: Array<Pick<GuideMessage, 'id' | 'role'>>,
+    userId: number | null,
+  ): Promise<Map<string, 1 | -1>> {
+    const ids = rows
+      .filter((row) => row.role === GuideMessageRole.ALLY)
+      .map((row) => row.id);
+    if (!userId || !ids.length) return new Map();
+    const found: Array<{ messageId: string; rating: number }> =
+      await this.messages.manager.query(
+        `SELECT "messageId", "rating" FROM "guide_turn_feedback"
+          WHERE "userId" = $1 AND "messageId" = ANY($2::uuid[])`,
+        [userId, ids],
+      );
+    return new Map(
+      found
+        .filter((row) => row.rating === 1 || row.rating === -1)
+        .map((row) => [row.messageId, row.rating as 1 | -1]),
+    );
   }
 
   async presentedCards(threadId: string): Promise<GuidePresentedCard[]> {
@@ -441,7 +467,7 @@ export function nextStepFor(
   };
 }
 
-function messageView(row: GuideMessage): GuideMessageView {
+function messageView(row: GuideMessage, myRating?: 1 | -1): GuideMessageView {
   return {
     id: row.id,
     seq: row.seq,
@@ -453,6 +479,7 @@ function messageView(row: GuideMessage): GuideMessageView {
       : new Date(0).toISOString(),
     turnId: row.turnId ?? (row.metadata?.turnId as string | undefined) ?? null,
     ...(row.metadata?.interrupted ? { interrupted: true } : {}),
+    ...(myRating ? { myRating } : {}),
   };
 }
 

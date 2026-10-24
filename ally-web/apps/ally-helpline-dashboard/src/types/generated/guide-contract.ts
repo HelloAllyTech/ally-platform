@@ -522,6 +522,8 @@ export interface GuideMessageView {
   createdAt: string;
   turnId?: string | null;
   interrupted?: boolean;
+  /** The learner's own thumbs on this Ally message (1 up, -1 down); absent when unrated. */
+  myRating?: 1 | -1;
 }
 
 /** The learner's own settings for Ally (plan §8.1 guide_learner_prefs). */

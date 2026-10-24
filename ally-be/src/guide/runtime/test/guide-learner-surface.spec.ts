@@ -149,21 +149,23 @@ describe('GuideViewService.bootstrap', () => {
       save: jest.fn(async (row: any) => row),
       manager: {
         query: jest.fn(async (sql: string) =>
-          sql.includes("'crisis.response'")
-            ? [
-                {
-                  payload: {
-                    type: 'crisis.response',
-                    data: {
-                      messageId: 'm9',
-                      text: 'You matter.',
-                      language: 'en',
-                      lines: [],
+          sql.includes('guide_turn_feedback')
+            ? [{ messageId: 'm2', rating: -1 }]
+            : sql.includes("'crisis.response'")
+              ? [
+                  {
+                    payload: {
+                      type: 'crisis.response',
+                      data: {
+                        messageId: 'm9',
+                        text: 'You matter.',
+                        language: 'en',
+                        lines: [],
+                      },
                     },
                   },
-                },
-              ]
-            : [],
+                ]
+              : [],
         ),
       },
     });
@@ -300,6 +302,7 @@ describe('GuideViewService.bootstrap', () => {
         pacing: {},
         lastEventSeq: 9,
         languageCode: 'en',
+        userId: 7,
       },
     }).bootstrap('tr1', user);
     expect(result.course).toMatchObject({
@@ -312,6 +315,8 @@ describe('GuideViewService.bootstrap', () => {
       atmosphere: 'hushed',
     });
     expect(result.messages.map((m) => m.text)).toEqual(['Hi', 'Hello.']);
+    // The learner's own thumbs come back on Ally's messages only.
+    expect(result.messages.map((m) => m.myRating)).toEqual([undefined, -1]);
     expect(result.cards).toEqual([
       {
         seq: 4,

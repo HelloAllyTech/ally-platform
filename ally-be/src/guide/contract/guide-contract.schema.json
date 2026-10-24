@@ -1535,6 +1535,11 @@
         },
         "interrupted": {
           "type": "boolean"
+        },
+        "myRating": {
+          "description": "The learner's own thumbs on this Ally message (1 up, -1 down); absent when unrated.",
+          "type": "integer",
+          "enum": [1, -1]
         }
       }
     },

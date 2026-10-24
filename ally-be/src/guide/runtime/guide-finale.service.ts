@@ -84,7 +84,7 @@ export function buildFinalePayload(input: {
   noticings: string[];
   watchFor: string | null;
   now: Date;
-  /** Advice lines are a separate workstream; the door stays shut until then. */
+  /** Whether the mentor door can take an advice line (finishers only). */
   adviceLinesAvailable?: boolean;
 }): GuideFinalePayload {
   const watchFor = input.watchFor?.trim().replace(/\s+/g, ' ') ?? '';
@@ -237,6 +237,9 @@ export class GuideFinaleService {
       noticings,
       watchFor,
       now,
+      // The finale only reaches signed-in finishers: exactly who may write
+      // an advice line (POST /v1/guide/tracks/:trackId/advice).
+      adviceLinesAvailable: true,
     });
     const title = FINALE_COPY.title(courseTitle).slice(0, 255);
     const saved = await this.cards.save(

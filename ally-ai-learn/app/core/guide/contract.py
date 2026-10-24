@@ -551,6 +551,7 @@ class GuideMessageView(_GuideModel):
     created_at: str = Field(alias="createdAt")
     turn_id: Optional[str] = Field(default=None, alias="turnId")
     interrupted: Optional[bool] = None
+    my_rating: Optional[Literal[1, -1]] = Field(default=None, alias="myRating")
 
 
 class GuidePrefs(_GuideModel):

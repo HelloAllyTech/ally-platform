@@ -522,6 +522,7 @@ export class GuideLearnerController {
       threadId,
       Number(beforeSeq) || undefined,
     );
+    const ratings = await this.view.ratingsOf(messages, user.id);
     // Only what the learner may see: never the model-facing blocks.
     return messages.map((m) => ({
       id: m.id,
@@ -532,6 +533,7 @@ export class GuideLearnerController {
       text: m.content,
       turnId: m.turnId,
       createdAt: m.createdAt,
+      ...(ratings.has(m.id) ? { myRating: ratings.get(m.id) } : {}),
     }));
   }
 
