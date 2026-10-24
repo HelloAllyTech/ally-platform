@@ -332,6 +332,44 @@
         }
       }
     },
+    "GuideSceneView": {
+      "description": "A chapter scene as bootstrap returns it: what scene.opened and scene.closed said, with the seqs they were sent at.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sceneId",
+        "sectionId",
+        "title",
+        "stakes",
+        "openedSeq",
+        "closedSeq"
+      ],
+      "properties": {
+        "sceneId": {
+          "type": "string"
+        },
+        "sectionId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "stakes": {
+          "type": ["string", "null"]
+        },
+        "openedSeq": {
+          "type": "integer"
+        },
+        "closedSeq": {
+          "description": "Null while the scene is open.",
+          "type": ["integer", "null"]
+        },
+        "receipt": {
+          "description": "Present once the scene has closed.",
+          "$ref": "#/$defs/GuideSceneReceipt"
+        }
+      }
+    },
     "GuideAnchor": {
       "description": "Context attached to a turn by 'Ask about this' (plan §5.8).",
       "type": "object",
@@ -1842,6 +1880,13 @@
         },
         "allowance": {
           "$ref": "#/$defs/GuideAllowance"
+        },
+        "scenes": {
+          "description": "Every chapter scene of the thread, oldest first (plan §5.5), so a reload can group the feed: an entry belongs to a scene when its seq is at or after `openedSeq` and before `closedSeq` (or the scene is still open). The scenes' own title cards are not repeated in `cards`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GuideSceneView"
+          }
         }
       }
     }

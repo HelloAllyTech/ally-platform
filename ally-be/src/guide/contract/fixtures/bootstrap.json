@@ -128,7 +128,30 @@
         "itemId": "i2",
         "title": "Meera calls",
         "minutes": 12
-      }
+      },
+      "scenes": [
+        {
+          "sceneId": "sc-1",
+          "sectionId": "s1",
+          "title": "First steps",
+          "stakes": "It builds to a practice: Meera calls.",
+          "openedSeq": 3,
+          "closedSeq": 8,
+          "receipt": {
+            "behaviourLabels": ["You let the silence sit"],
+            "sideQuests": 1,
+            "noticing": "You let the silence sit (roleplay)"
+          }
+        },
+        {
+          "sceneId": "sc-2",
+          "sectionId": "s2",
+          "title": "Going deeper",
+          "stakes": null,
+          "openedSeq": 9,
+          "closedSeq": null
+        }
+      ]
     },
     {
       "availability": {

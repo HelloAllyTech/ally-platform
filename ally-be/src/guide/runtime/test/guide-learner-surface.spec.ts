@@ -220,6 +220,25 @@ describe('GuideViewService.bootstrap', () => {
           title: 'never shown',
           presentedSeq: null,
         },
+        {
+          id: 'sc1',
+          kind: 'chapter_title',
+          presentation: 'inline',
+          state: 'done',
+          title: 'First steps',
+          presentedSeq: 3,
+          payload: {
+            sectionId: 's1',
+            sectionIndex: 0,
+            stakes: 'It builds to a practice: Meera calls.',
+            closedSeq: 8,
+            receipt: {
+              behaviourLabels: ['You let the silence sit'],
+              sideQuests: 1,
+              noticing: 'You let the silence sit (roleplay)',
+            },
+          },
+        },
       ]) as never,
       repo({ prefs: { guidance: 'drive' } }) as never,
       repo({ coverImageUrl: null }) as never,
@@ -300,6 +319,22 @@ describe('GuideViewService.bootstrap', () => {
       },
     ]);
     expect(result.nextStep).toMatchObject({ itemId: 'i2', hidden: false });
+    // The scene goes out as a scene with its seq range, never as a card.
+    expect(result.scenes).toEqual([
+      {
+        sceneId: 'sc1',
+        sectionId: 's1',
+        title: 'First steps',
+        stakes: 'It builds to a practice: Meera calls.',
+        openedSeq: 3,
+        closedSeq: 8,
+        receipt: {
+          behaviourLabels: ['You let the silence sit'],
+          sideQuests: 1,
+          noticing: 'You let the silence sit (roleplay)',
+        },
+      },
+    ]);
   });
 });
 
@@ -439,6 +474,9 @@ describe('GuideProgressListener', () => {
       ]),
       update: jest.fn(),
     };
+    const scenes = {
+      closeChapter: jest.fn(async () => null),
+    };
     const listener = new GuideProgressListener(
       dataSource as never,
       threadService as never,
@@ -447,9 +485,16 @@ describe('GuideProgressListener', () => {
       cards as never,
       turns as never,
       threads as never,
+      scenes as never,
     );
-    return { listener, bus, threadService, turns, queries, params };
+    return { listener, bus, threadService, turns, queries, params, scenes };
   }
+
+  it('closes the chapter’s scene when the chapter is complete', async () => {
+    const t = setup();
+    await t.listener.onSectionCompleted(event);
+    expect(t.scenes.closeChapter).toHaveBeenCalledWith('th1', 's1');
+  });
 
   it('marks the card done, moves the Spine, opens the release window and celebrates the practice', async () => {
     const t = setup();

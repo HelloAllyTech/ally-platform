@@ -34,6 +34,7 @@ import {
 import { GUIDE_DEFAULT_POLICY } from '../release/guide-release.bundle';
 import { GuideCardService } from './guide-card.service';
 import { GuideEventBusService } from './guide-event-bus.service';
+import { GuideSceneService } from './guide-scene.service';
 import { GuideThreadService } from './guide-thread.service';
 import { GuideTurnService } from './guide-turn.service';
 
@@ -88,6 +89,7 @@ export class GuideProgressListener {
     private readonly turns: GuideTurnService,
     @InjectRepository(GuideThread)
     private readonly threads: Repository<GuideThread>,
+    private readonly scenes: GuideSceneService,
   ) {}
 
   @OnEvent(TRACK_EVENTS.ITEM_COMPLETED, { async: true })
@@ -316,6 +318,10 @@ export class GuideProgressListener {
           ? `course_completed:${event.trackEnrollmentId}`
           : `section_completed:${event.trackEnrollmentId}:${event.trackSectionId}`;
       if (!(await this.claim(thread, kind, dedupeKey, description))) continue;
+      // A finished chapter closes its scene with a receipt (plan §5.5).
+      if (kind === 'section_complete' && event.trackSectionId) {
+        await this.scenes.closeChapter(thread.id, event.trackSectionId);
+      }
       const mode = thread.mode ?? GuideMode.NORMAL;
       const atmosphere = atmosphereOf({
         mode,

@@ -37,6 +37,7 @@ import {
   SideQuestSlot,
 } from '../conductor/side-quests';
 import { GuideSideQuestService } from '../runtime/guide-side-quest.service';
+import { GuideSceneService } from '../runtime/guide-scene.service';
 import { GuideCard as GuideCardEvent } from '../contract/generated/guide-contract';
 import { itemTypeLabel } from '../context/guide-context';
 import { GuideCard } from '../entity/guide-card.entity';
@@ -276,6 +277,7 @@ export class GuideToolExecutorService {
     private readonly practice: GuidePracticeHistoryService,
     private readonly peer: GuidePeerService,
     private readonly library: GuideLibraryService,
+    private readonly scenes: GuideSceneService,
   ) {}
 
   async execute(
@@ -384,6 +386,18 @@ export class GuideToolExecutorService {
               : 'This card is already on screen above. Do not present it again; point them to it in a few words.',
         });
       }
+    }
+
+    // The first item of a chapter opens its scene: the title card goes out
+    // before the item's card (plan §5.5).
+    if (!reopening) {
+      await this.scenes.enterChapterOf({
+        threadId: ctx.threadId,
+        tenantId: ctx.tenantId || null,
+        spine: ctx.spine,
+        item,
+        emit: (type, data) => ctx.emitDurable(type, data),
+      });
     }
 
     const saved = await this.cards.save(

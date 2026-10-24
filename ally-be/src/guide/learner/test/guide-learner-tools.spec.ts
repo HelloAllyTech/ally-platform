@@ -430,6 +430,12 @@ describe('learner tools', () => {
       update: jest.fn(),
       query: jest.fn(async (): Promise<unknown[]> => []),
     };
+    const scenes = {
+      enterChapterOf: jest.fn(async (input: any) => {
+        await input.emit('scene.opened', {});
+        return 'sc1';
+      }),
+    };
     const executor = new GuideToolExecutorService(
       cards as never,
       {} as never,
@@ -441,6 +447,7 @@ describe('learner tools', () => {
       {} as never,
       {} as never,
       {} as never,
+      scenes as never,
     );
     const emitted: string[] = [];
     const ctx: any = {
@@ -465,7 +472,7 @@ describe('learner tools', () => {
       }),
       ...overrides,
     };
-    return { executor, ctx, learnerData, emitted, cards };
+    return { executor, ctx, learnerData, emitted, cards, scenes };
   }
 
   it('remembers only when memory is on and the moment is ordinary', async () => {
@@ -659,7 +666,14 @@ describe('learner tools', () => {
         .content,
     );
     expect(presented.presented).toBe(true);
-    expect(first.emitted).toEqual(['card.presented']);
+    // The chapter's title card goes out first, through the turn's emitter.
+    expect(first.emitted).toEqual(['scene.opened', 'card.presented']);
+    expect(first.scenes.enterChapterOf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threadId: 'th1',
+        item: expect.objectContaining({ id: 'i1', sectionId: 's1' }),
+      }),
+    );
 
     const again = setup({
       spine,

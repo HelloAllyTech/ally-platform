@@ -24,13 +24,16 @@ import {
   GuideNextStep,
   GuidePrefs,
   GuidePresentedCard,
+  GuideSceneView,
   GuideSpine,
 } from '../contract/generated/guide-contract';
 import { GuideCard } from '../entity/guide-card.entity';
 import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
 import { GuideMessage } from '../entity/guide-message.entity';
 import { GuideThread } from '../entity/guide-thread.entity';
+import { sceneViews } from './guide-scene.service';
 import {
+  GuideCardKind,
   GuideMessageRole,
   GuideMode,
   GuideThreadStatus,
@@ -258,13 +261,14 @@ export class GuideViewService {
     if (!thread) return view;
 
     const mode = thread.mode ?? GuideMode.NORMAL;
-    const [messages, cards, crisis] = await Promise.all([
+    const [messages, { cards, scenes }, crisis] = await Promise.all([
       this.recentMessages(thread.id),
-      this.presentedCards(thread.id),
+      this.feed(thread.id),
       mode === GuideMode.CRISIS ? this.crisisOnScreen(thread.id) : null,
     ]);
     return {
       ...view,
+      scenes,
       thread: {
         id: thread.id,
         trackId,
@@ -342,13 +346,30 @@ export class GuideViewService {
   }
 
   async presentedCards(threadId: string): Promise<GuidePresentedCard[]> {
+    return (await this.feed(threadId)).cards;
+  }
+
+  /**
+   * The thread's cards and its chapter scenes (plan §5.5). A scene is kept
+   * as a `chapter_title` card row; it goes out as a scene, never as a card.
+   */
+  async feed(
+    threadId: string,
+  ): Promise<{ cards: GuidePresentedCard[]; scenes: GuideSceneView[] }> {
     const rows = await this.cards.find({
       where: { threadId },
       order: { presentedSeq: 'ASC', createdAt: 'ASC' },
     });
-    return rows
-      .filter((row) => row.presentedSeq != null)
-      .map((row) => ({ seq: row.presentedSeq!, card: cardView(row) }));
+    return {
+      cards: rows
+        .filter(
+          (row) =>
+            row.presentedSeq != null &&
+            row.kind !== GuideCardKind.CHAPTER_TITLE,
+        )
+        .map((row) => ({ seq: row.presentedSeq!, card: cardView(row) })),
+      scenes: sceneViews(rows),
+    };
   }
 }
 

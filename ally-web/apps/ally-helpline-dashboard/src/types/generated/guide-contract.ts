@@ -118,6 +118,19 @@ export interface GuideSceneReceipt {
   noticing?: string | null;
 }
 
+/** A chapter scene as bootstrap returns it: what scene.opened and scene.closed said, with the seqs they were sent at. */
+export interface GuideSceneView {
+  sceneId: string;
+  sectionId: string;
+  title: string;
+  stakes: string | null;
+  openedSeq: number;
+  /** Null while the scene is open. */
+  closedSeq: number | null;
+  /** Present once the scene has closed. */
+  receipt?: GuideSceneReceipt;
+}
+
 /** Context attached to a turn by 'Ask about this' (plan §5.8). */
 export interface GuideAnchor {
   itemId: string;
@@ -626,4 +639,6 @@ export interface GuideBootstrap {
   nextStep?: GuideNextStep;
   crisis?: GuideCrisisState;
   allowance?: GuideAllowance;
+  /** Every chapter scene of the thread, oldest first (plan §5.5), so a reload can group the feed: an entry belongs to a scene when its seq is at or after `openedSeq` and before `closedSeq` (or the scene is still open). The scenes' own title cards are not repeated in `cards`. */
+  scenes?: Array<GuideSceneView>;
 }

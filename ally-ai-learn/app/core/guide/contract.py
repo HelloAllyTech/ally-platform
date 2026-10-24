@@ -119,6 +119,18 @@ class GuideSceneReceipt(_GuideModel):
     noticing: Optional[str] = None
 
 
+class GuideSceneView(_GuideModel):
+    """A chapter scene as bootstrap returns it: what scene.opened and scene.closed said, with the seqs they were sent at."""
+
+    scene_id: str = Field(alias="sceneId")
+    section_id: str = Field(alias="sectionId")
+    title: str
+    stakes: Optional[str]
+    opened_seq: int = Field(alias="openedSeq")
+    closed_seq: Optional[int] = Field(alias="closedSeq")
+    receipt: Optional[GuideSceneReceipt] = None
+
+
 class GuideAnchor(_GuideModel):
     """Context attached to a turn by 'Ask about this' (plan §5.8)."""
 
@@ -653,3 +665,4 @@ class GuideBootstrap(_GuideModel):
     next_step: Optional[GuideNextStep] = Field(default=None, alias="nextStep")
     crisis: Optional[GuideCrisisState] = None
     allowance: Optional[GuideAllowance] = None
+    scenes: Optional[list[GuideSceneView]] = None
