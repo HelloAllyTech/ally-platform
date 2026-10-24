@@ -14,6 +14,7 @@ import { AskKind } from "./cards/AskLayer";
 import { ItemPlayerHost } from "./cards/ItemPlayerHost";
 import { itemCardFor } from "./cards/registry";
 import { CrisisCard } from "./cards/special/CrisisCard";
+import { FinaleReveal, finalePayloadOf } from "./cards/special/FinaleReveal";
 import {
   AccessDeniedCard,
   ResourceCard,
@@ -210,10 +211,47 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
 
   // ----------------------------------------------------------------- crisis
   const inCrisis = feed.mode === "CRISIS" || atmosphere === "still";
+
+  // ----------------------------------------------------------------- finale
+  // The reveal opens by itself when the finale arrives during the session;
+  // after a reload its card in the conversation opens it again.
+  const [finaleId, setFinaleId] = useState<string | null>(null);
+  const knownFinales = useRef<Set<string> | null>(null);
+  const finaleIds = useMemo(
+    () =>
+      Object.values(feed.cards)
+        .filter(card => card.kind === "finale" && finalePayloadOf(card))
+        .map(card => card.cardId),
+    [feed.cards],
+  );
+  useEffect(() => {
+    if (session.boot !== "ready") return;
+    if (!knownFinales.current) {
+      knownFinales.current = new Set(finaleIds);
+      return;
+    }
+    const fresh = finaleIds.find(id => !knownFinales.current?.has(id));
+    finaleIds.forEach(id => knownFinales.current?.add(id));
+    if (fresh && !inCrisis) setFinaleId(fresh);
+  }, [finaleIds, session.boot, inCrisis]);
+  const finaleCard = finaleId ? feed.cards[finaleId] : null;
+  const finalePayload = finaleCard ? finalePayloadOf(finaleCard) : null;
+  useEffect(() => {
+    if (finalePayload) {
+      track(ANALYTICS_EVENTS.GUIDED_FINALE_OPENED, {
+        [ANALYTICS_PROPS.COURSE_ID]: trackId,
+        [ANALYTICS_PROPS.GUIDED_HUSHED]: finalePayload.hushed,
+      });
+    }
+    // Once per opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finaleId]);
+
   useEffect(() => {
     if (inCrisis) {
       setSheet(null);
       setUtility(null);
+      setFinaleId(null);
     }
   }, [inCrisis]);
 
@@ -523,6 +561,7 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
               onSignIn={() => requestSignIn("card")}
               onMyCourses={goMyCourses}
               onFocusComposer={() => setComposerFocus(n => n + 1)}
+              onOpenFinale={setFinaleId}
               muteAnnouncements={voice.active}
             />
           )}
@@ -694,6 +733,27 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
           }}
         />
       </Sheet>
+
+      {finaleCard && finalePayload && !inCrisis && (
+        <FinaleReveal
+          open
+          card={finaleCard}
+          payload={finalePayload}
+          spine={spine}
+          trackId={trackId}
+          onClose={() => setFinaleId(null)}
+          onReply={text => actions.submitTurn({ text, source: "finale" })}
+          onScheduleRecall={actions.scheduleRecall}
+          onDoor={door =>
+            door === "spaced_recall"
+              ? undefined
+              : track(ANALYTICS_EVENTS.GUIDED_FINALE_DOOR, {
+                  [ANALYTICS_PROPS.COURSE_ID]: trackId,
+                  [ANALYTICS_PROPS.GUIDED_DOOR]: door,
+                })
+          }
+        />
+      )}
 
       <LoginDialog
         isOpen={loginOpen}

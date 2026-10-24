@@ -11,7 +11,7 @@
  * word. Phrases in a message trigger the designed states:
  *   crisis-demo · care-demo · fail-demo · slow-demo · provider-demo ·
  *   other-tab-demo · closing-demo · practice-demo · quickcheck-demo ·
- *   reflection-demo · offline (use devtools)
+ *   reflection-demo · finale-demo (add "hushed" or "nomentor") · offline (use devtools)
  *
  * `?fixture=visitor` plays a signed-out visitor: the landing, an allowance of
  * four messages (the counter shows at two), the sign-in card when it runs
@@ -33,8 +33,11 @@ import type {
   GuideCrisisState,
   GuideEvent,
   GuideMode,
+  GuideAdviceLines,
+  GuideMemoryView,
   GuideMicroActivityRequest,
   GuideMicroActivityResult,
+  GuideSceneView,
   GuidePrefs,
   GuideTurnRequest,
 } from "../contract/wire";
@@ -108,22 +111,42 @@ export class GuideFixtureServer {
       createdAt: "2026-10-21T10:00:00.000Z",
     },
   ];
-  private memories = [
+  private memories: GuideMemoryView[] = [
     {
       id: "fx-mem-1",
       kind: "goal",
       body: "Wants to feel steadier on night shifts.",
+      revision: 2,
       lastConfirmedAt: "2026-10-21T10:00:00.000Z",
       expiresAt: "2027-04-19T10:00:00.000Z",
+      sources: [
+        {
+          messageId: "fx-src-1",
+          threadId: "fx-thread",
+          excerpt: "Night shifts are when I feel least sure of myself.",
+          at: "2026-10-20T21:40:00.000Z",
+        },
+      ],
     },
     {
       id: "fx-mem-2",
       kind: "preference",
       body: "Likes short examples before the theory.",
+      revision: 1,
       lastConfirmedAt: null,
       expiresAt: null,
+      sources: [],
     },
   ];
+  /** The mentor door: the learner's own line and the org's approved lines. */
+  private advice: GuideAdviceLines = {
+    lines: [
+      "Let the silence sit longer than feels comfortable.",
+      "Say your name first. It helps more than you think.",
+    ],
+    maxChars: 200,
+  };
+  readonly ratings = new Map<string, { rating: number; comment?: string }>();
   /** Side quests the fixture can mark: card id → the course's answers. */
   private practiceKeys = new Map<string, Record<string, string>>();
   readonly requests: Array<{ method: string; path: string; body: unknown }> = [];
@@ -352,6 +375,65 @@ export class GuideFixtureServer {
           noticing: "Today you stayed with a long silence instead of filling it.",
           watchFor: "when a caller says “fine”",
           teaser: "Meera calls back, and this time she says why.",
+        },
+      };
+      const event = this.durable("card.presented", { card });
+      this.cards.set(card.cardId, { ...card, seq: event.seq });
+      this.ephemeral("turn.completed", { turnId });
+      return;
+    }
+    if (lower.includes("finale-demo")) {
+      const hushed = lower.includes("hushed");
+      await this.streamReply(
+        turnId,
+        "That's the whole course. Before you go, have a look at how far you've come.",
+      );
+      const card: GuideCard = {
+        cardId: `fx-finale-${turnId}`,
+        kind: "finale",
+        presentation: "theatre",
+        state: "ready",
+        tone: hushed ? "quiet" : "festive",
+        title: "Looking back on Answering the first call",
+        cta: { label: "Open", action: "open" },
+        payload: {
+          hushed,
+          firstMove: {
+            text: "I'd ask for their name and what's wrong.",
+            question: "Meera goes quiet. What do you say first?",
+            invitation: "This is how you answered at the very start. How would you answer it now?",
+          },
+          possibleSelf: {
+            text: "Someone callers trust in the first minute.",
+            invitation: "You said this is the helper you want to become. Does it still fit?",
+          },
+          noticings: [
+            "You waited before you spoke.",
+            "You reflected her words back before offering anything.",
+          ],
+          doors: [
+            {
+              kind: "field_assignment",
+              title: "Try it on your next shift",
+              body: "On your next shift, watch for this: when a caller says “fine”. Afterwards, come back and tell me what happened.",
+              available: true,
+            },
+            {
+              kind: "spaced_recall",
+              title: "A short look back in a week",
+              body: "Three quick questions, seven days from now, to help what you learned stick.",
+              suggestedAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+              available: true,
+            },
+            {
+              kind: "mentor",
+              title: "Leave a line for the next learner",
+              body: "What would you tell someone just starting this course?",
+              maxChars: 200,
+              // The fixture plays the server once advice lines are wired into the finale.
+              available: !lower.includes("nomentor"),
+            },
+          ],
         },
       };
       const event = this.durable("card.presented", { card });
@@ -677,8 +759,38 @@ export class GuideFixtureServer {
       cards: [...this.cards.values()].map(({ seq, ...card }) => ({ seq, card })),
       prefs: { ...this.prefs },
       nextStep: this.nextStepData(),
+      scenes: this.sceneViews(),
       ...(this.mode === "CRISIS" && this.crisis ? { crisis: this.crisis } : {}),
     };
+  }
+
+  /** Chapter scenes as bootstrap returns them (`GuideBootstrap.scenes`), from the event log. */
+  private sceneViews(): GuideSceneView[] {
+    const views = new Map<string, GuideSceneView>();
+    for (const event of this.log) {
+      if (event.type === "scene.opened") {
+        const data = event.data as {
+          sceneId: string;
+          sectionId: string;
+          title: string;
+          stakes?: string | null;
+        };
+        views.set(data.sceneId, {
+          sceneId: data.sceneId,
+          sectionId: data.sectionId,
+          title: data.title,
+          stakes: data.stakes ?? null,
+          openedSeq: event.seq,
+          closedSeq: null,
+        });
+      }
+      if (event.type === "scene.closed") {
+        const data = event.data as { sceneId: string; receipt?: GuideSceneView["receipt"] };
+        const view = views.get(data.sceneId);
+        if (view) views.set(data.sceneId, { ...view, closedSeq: event.seq, receipt: data.receipt });
+      }
+    }
+    return [...views.values()];
   }
 
   /** `GET /v1/guide/public/tracks/:trackId/bootstrap`: the preview, the visit so far and the allowance. */
@@ -922,6 +1034,37 @@ export class GuideFixtureServer {
       return json({ removed: 1 });
     }
     if (m(/^\/v1\/guide\/notebook$/)) return json(this.notebook);
+    if ((match = m(/^\/v1\/guide\/messages\/([^/]+)\/feedback$/)) && method === "POST") {
+      const rating = (body as { rating?: number; comment?: string }) ?? {};
+      this.ratings.set(decodeURIComponent(match[1]), {
+        rating: rating.rating ?? 0,
+        comment: rating.comment,
+      });
+      return json({ messageId: decodeURIComponent(match[1]), rating: rating.rating }, 201);
+    }
+    if (m(/^\/v1\/guide\/tracks\/[^/]+\/advice$/)) {
+      if (method === "POST") {
+        const text = String((body as { text?: string })?.text ?? "").trim();
+        if (this.advice.mine && this.advice.mine.status !== "pending") {
+          return json(
+            { statusCode: 409, message: "You have already left your advice for this course." },
+            409,
+          );
+        }
+        if (text.length > this.advice.maxChars) {
+          return json(
+            { statusCode: 400, message: `Keep it under ${this.advice.maxChars} characters.` },
+            400,
+          );
+        }
+        this.advice = {
+          ...this.advice,
+          mine: { id: "fx-advice", text, status: "pending", createdAt: new Date().toISOString() },
+        };
+        return json(this.advice.mine, 201);
+      }
+      return json(this.advice);
+    }
     if ((match = m(/^\/v1\/guide\/memory\/([^/]+)$/)) && method === "DELETE") {
       this.memories = this.memories.filter(n => n.id !== decodeURIComponent(match![1]));
       return json({ forgotten: 1 });

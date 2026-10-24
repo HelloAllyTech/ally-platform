@@ -19,6 +19,8 @@ import {
   UtilityPage,
 } from "./shelfParts";
 
+import type { GuideMemorySource } from "../contract/wire";
+
 const KNOWN_KINDS = [
   "preference",
   "goal",
@@ -29,6 +31,39 @@ const KNOWN_KINDS = [
   "commitment",
   "unique_outcome",
 ];
+
+/**
+ * Why Ally remembers this (memory provenance, plan §6): the learner's own
+ * words it was drawn from, quoted as they wrote them, with when. A source
+ * they have since deleted is simply absent.
+ */
+const MemorySources: FC<{ sources: GuideMemorySource[]; language: string }> = ({
+  sources,
+  language,
+}) => {
+  const { t } = useTranslation();
+  if (!sources.length) return null;
+  return (
+    <details className="mt-1" data-testid="memory-sources">
+      <summary className="min-h-11 cursor-pointer py-2 font-primary text-sm text-[var(--g-ink-soft)] underline underline-offset-2">
+        {t("guide.memory.why")}
+      </summary>
+      <ul className="flex flex-col gap-2 pb-1">
+        {sources.map(source => {
+          const when = shortDate(source.at, language);
+          return (
+            <li key={source.messageId} className="border-l-2 border-[var(--g-line)] pl-3">
+              <q className="font-secondary text-base text-[var(--g-ink)]">{source.excerpt}</q>
+              {when && (
+                <span className="g-caption block">{t("guide.memory.youSaid", { date: when })}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+};
 
 /**
  * What Ally remembers (plan §6, memory: view, forget one, forget all, turn
@@ -98,6 +133,7 @@ export const MemoryPanel: FC<{ onForgotten?: (scope: "one" | "all") => void }> =
                 >
                   <p className="g-label text-[var(--g-ink-faint)]">{kind}</p>
                   <p className="g-prose mt-1 text-[var(--g-ink)]">{memory.body}</p>
+                  <MemorySources sources={memory.sources ?? []} language={i18n.language} />
                   <div className="mt-1 flex flex-wrap items-center gap-x-3">
                     {until && (
                       <span className="g-caption">{t("guide.memory.until", { date: until })}</span>

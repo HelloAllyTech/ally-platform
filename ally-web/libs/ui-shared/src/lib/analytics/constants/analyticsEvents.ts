@@ -156,6 +156,9 @@ export const ANALYTICS_EVENTS = {
   GUIDED_SHELF_OPENED: "guided_shelf_opened",
   GUIDED_NOTEBOOK_EXPORTED: "guided_notebook_exported",
   GUIDED_MEMORY_FORGOTTEN: "guided_memory_forgotten",
+  GUIDED_MESSAGE_RATED: "guided_message_rated",
+  GUIDED_FINALE_OPENED: "guided_finale_opened",
+  GUIDED_FINALE_DOOR: "guided_finale_door",
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
@@ -362,6 +365,9 @@ export const ANALYTICS_PROPS = {
   GUIDED_PRACTICE_KIND: "practice_kind",
   GUIDED_SHELF: "shelf",
   GUIDED_SCOPE: "scope",
+  GUIDED_RATING: "rating",
+  GUIDED_DOOR: "door",
+  GUIDED_HUSHED: "hushed",
 
   // Sidebar context
   ACTION: "action",

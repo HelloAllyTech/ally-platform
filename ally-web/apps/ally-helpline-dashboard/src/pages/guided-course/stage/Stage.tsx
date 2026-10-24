@@ -2,11 +2,18 @@ import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from
 
 import { useTranslation } from "react-i18next";
 
-import { AllyProse, LearnerBubble, SystemCaption, ThinkingLine } from "./Messages";
+import {
+  AllyProse,
+  LearnerBubble,
+  MessageFeedbackProps,
+  SystemCaption,
+  ThinkingLine,
+} from "./Messages";
 import { SceneReceipt, SceneTitleCard } from "./SceneCards";
 import { ItemCard } from "../cards/ItemCard";
 import { CARD_KIND_RENDERER } from "../cards/registry";
 import { ClosingRitualCard } from "../cards/special/ClosingRitualCard";
+import { FinaleCard as FinaleRevealCard, finalePayloadOf } from "../cards/special/FinaleReveal";
 import { activityOf, SideQuestCard } from "../cards/special/SideQuestCard";
 import {
   AccessDeniedCard,
@@ -34,6 +41,8 @@ export interface StageProps {
   onSignIn: () => void;
   onMyCourses: () => void;
   onFocusComposer: () => void;
+  /** Opens the finale reveal for this card. */
+  onOpenFinale?: (cardId: string) => void;
   /** Voice is on: Ally is heard, so the screen reader shouldn't say it again (plan §5.13). */
   muteAnnouncements?: boolean;
   /** Rendered after the last entry (the thinking line lives here). */
@@ -50,6 +59,7 @@ export const Stage: FC<StageProps> = ({
   onSignIn,
   onMyCourses,
   onFocusComposer,
+  onOpenFinale,
   footer,
   muteAnnouncements = false,
 }) => {
@@ -101,6 +111,28 @@ export const Stage: FC<StageProps> = ({
   const careMode = feed.mode === "CARE" || feed.mode === "CRISIS_FOLLOWUP";
   // "Ask about this" waits while Ally is replying; a visitor can't open items anyway.
   const askEnabled = journey.session.turn === "idle" && journey.identity !== "visitor";
+
+  // Thumbs: a signed-in learner, on Ally's own (model) words, in a normal
+  // moment. Never on fixed copy, and never in CARE or a crisis.
+  const lastAllyId = useMemo(() => {
+    for (let i = feed.entries.length - 1; i >= 0; i -= 1) {
+      const entry = feed.entries[i];
+      if (entry.kind === "message" && entry.role === "ally") return entry.id;
+    }
+    return null;
+  }, [feed.entries]);
+  const feedbackFor = (entry: MessageEntry): MessageFeedbackProps | null => {
+    if (journey.identity !== "learner" || feed.mode !== "NORMAL") return null;
+    if (entry.fixed || entry.status !== "final" || entry.seq === null) return null;
+    const saved = journey.ratings[entry.id];
+    return {
+      rating: saved?.rating ?? null,
+      commented: Boolean(saved?.comment),
+      failed: saved?.status === "error",
+      prominent: entry.id === lastAllyId,
+      onRate: (rating, comment) => void actions.rateMessage(entry.id, rating, comment),
+    };
+  };
 
   const renderCard = (card: GuideCard): ReactNode => {
     const renderer = CARD_KIND_RENDERER[card.kind]?.renderer;
@@ -176,7 +208,11 @@ export const Stage: FC<StageProps> = ({
           />
         );
       case "finale":
-        return <FinaleCard card={card} />;
+        return finalePayloadOf(card) ? (
+          <FinaleRevealCard card={card} onOpen={() => onOpenFinale?.(card.cardId)} />
+        ) : (
+          <FinaleCard card={card} />
+        );
       case "chapter_title":
         return (
           <header className="mt-4 border-t border-[var(--g-line)] pt-5">
@@ -203,7 +239,7 @@ export const Stage: FC<StageProps> = ({
           return <LearnerBubble entry={entry} onRetry={actions.retryEcho} />;
         }
         if (entry.role === "system") return <SystemCaption>{entry.text}</SystemCaption>;
-        return <AllyProse entry={entry} />;
+        return <AllyProse entry={entry} feedback={feedbackFor(entry)} />;
       case "card": {
         const card = feed.cards[entry.id];
         return card ? renderCard(card) : null;

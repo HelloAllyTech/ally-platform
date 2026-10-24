@@ -3182,7 +3182,14 @@
       "queued": "Will send when you're back online.",
       "notSent": "Not sent.",
       "remembered": "Remembered: {{from}}",
-      "aboutMoment": "About {{time}} in the video"
+      "aboutMoment": "About {{time}} in the video",
+      "helpful": "Helpful",
+      "notHelpful": "Not helpful",
+      "feedbackThanks": "Thanks.",
+      "feedbackFailed": "That didn't send.",
+      "whyLabel": "What missed?",
+      "whyPlaceholder": "What missed? (optional)",
+      "whySend": "Send"
     },
     "stage": {
       "label": "Conversation with Ally"
@@ -3366,7 +3373,28 @@
     "finale": {
       "title": "Where you started, where you are",
       "before": "Before",
-      "now": "Now"
+      "now": "Now",
+      "label": "You finished the course",
+      "framing": "Where you started, what Ally noticed, and three ways to keep going.",
+      "open": "Open",
+      "map": "The course map, complete",
+      "mapLine_one": "{{count}} step, all done",
+      "mapLine_other": "{{count}} steps, all done",
+      "possibleSelf": "Who you said you want to become",
+      "stillFits": "It still fits",
+      "changed": "It's changed",
+      "noticed": "What Ally noticed",
+      "doors": "Three ways to keep going",
+      "atTheStart": "At the very start",
+      "allyAsked": "Ally asked: {{question}}",
+      "nowPlaceholder": "How would you answer now?",
+      "sendNow": "Send to Ally",
+      "sent": "Sent to Ally.",
+      "fieldTake": "I'll try it",
+      "fieldReply": "I'll try it on my next shift.",
+      "fieldTaken": "Noted. Come back and tell Ally how it went.",
+      "remindOn": "Remind me {{when}}",
+      "anotherDay": "Another day"
     },
     "spine": {
       "label": "Course map",
@@ -3471,7 +3499,9 @@
         "commitment": "Commitment",
         "unique_outcome": "A moment that stood out",
         "other": "Note"
-      }
+      },
+      "why": "Why Ally remembers this",
+      "youSaid": "You said this on {{date}}"
     },
     "prefs": {
       "sideQuests": "Optional practice",
@@ -3492,6 +3522,18 @@
       "articleTurn": "Can you help me with this part?",
       "videoTurn": "Can you help me with this moment?",
       "quizTurn": "Where is this covered in the course?"
+    },
+    "advice": {
+      "placeholder": "One line for someone just starting…",
+      "send": "Leave it",
+      "update": "Update it",
+      "count": "{{count}}/{{max}}",
+      "review": "Each line is reviewed before it's shared, without your name.",
+      "pending": "Waiting for review. You can still change it.",
+      "approved": "Shared with people who start this course after you.",
+      "rejected": "This one wasn't shared.",
+      "failed": "That didn't save. Try again.",
+      "fromOthers": "From people who finished before you"
     }
   }
 }

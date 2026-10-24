@@ -175,6 +175,10 @@ export const ApiEndpoints = {
     NOTEBOOK_ENTRY: (entryId: string) => `/v1/guide/notebook/${entryId}`,
     MEMORY: "/v1/guide/memory",
     MEMORY_ITEM: (memoryId: string) => `/v1/guide/memory/${memoryId}`,
+    /** The mentor door: finishers' advice lines for one course, and the learner's own. */
+    ADVICE: (trackId: string) => `/v1/guide/tracks/${trackId}/advice`,
+    /** Thumbs on one of Ally's messages. */
+    MESSAGE_FEEDBACK: (messageId: string) => `/v1/guide/messages/${messageId}/feedback`,
     // Anonymous visitors (M2): the visitor token goes in x-guide-visitor.
     PUBLIC_VISITORS: "/v1/guide/public/visitors",
     PUBLIC_BOOTSTRAP: (trackId: string) => `/v1/guide/public/tracks/${trackId}/bootstrap`,

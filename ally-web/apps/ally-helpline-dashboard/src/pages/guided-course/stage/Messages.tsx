@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 
@@ -19,14 +19,16 @@ const paragraphs = (text: string): string[] =>
  * the margin. The glyph pulses only while this message streams. Text streams
  * by appending words, never a typewriter (presence spec §4 rule 6).
  */
-export const AllyProse: FC<{ entry: MessageEntry; showLabel?: boolean }> = ({
-  entry,
-  showLabel,
-}) => {
+export const AllyProse: FC<{
+  entry: MessageEntry;
+  showLabel?: boolean;
+  /** Thumbs under the message (signed-in, NORMAL mode, model text only). */
+  feedback?: MessageFeedbackProps | null;
+}> = ({ entry, showLabel, feedback }) => {
   const { t } = useTranslation();
   const streaming = entry.status === "streaming";
   return (
-    <div className="g-rise flex gap-3" data-testid={`ally-${entry.id}`}>
+    <div className="g-rise group flex gap-3" data-testid={`ally-${entry.id}`}>
       <div className="pt-[7px]">
         <AllyPresence state={streaming ? "speaking" : "still"} size={14} />
       </div>
@@ -47,7 +49,128 @@ export const AllyProse: FC<{ entry: MessageEntry; showLabel?: boolean }> = ({
         {entry.memoryRefs && entry.memoryRefs.length > 0 && (
           <MemoryProvenance refs={entry.memoryRefs} />
         )}
+        {feedback && !streaming && <MessageFeedback {...feedback} />}
       </div>
+    </div>
+  );
+};
+
+export interface MessageFeedbackProps {
+  rating: 1 | -1 | null;
+  /** The comment after a thumbs-down was sent. */
+  commented: boolean;
+  failed: boolean;
+  /** Always shown on Ally's latest message; on hover or focus for the rest. */
+  prominent: boolean;
+  onRate: (rating: 1 | -1, comment?: string) => void;
+}
+
+const Thumb: FC<{ down?: boolean }> = ({ down }) => (
+  <svg
+    viewBox="0 0 16 16"
+    width="16"
+    height="16"
+    aria-hidden="true"
+    style={down ? { transform: "rotate(180deg)" } : undefined}
+  >
+    <path
+      d="M5 7v6.5H2.5V7H5zm0 0l2.6-4.6c.3-.5 1-.6 1.4-.2.3.3.4.7.3 1.1L8.7 6H12c.8 0 1.4.8 1.2 1.6l-1 4.6c-.1.7-.7 1.3-1.4 1.3H5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/**
+ * Was this helpful? Thumbs on Ally's messages, an explicit signal the team
+ * reviews (Stacks: "Collect User Feedback to Evaluate Agent Performance").
+ * Quiet: shown on the latest message, on hover or focus for the others. A
+ * thumbs-down offers one optional line on what missed.
+ */
+export const MessageFeedback: FC<MessageFeedbackProps> = ({
+  rating,
+  commented,
+  failed,
+  prominent,
+  onRate,
+}) => {
+  const { t } = useTranslation();
+  const [comment, setComment] = useState("");
+  const [askingWhy, setAskingWhy] = useState(false);
+  const thumb = (value: 1 | -1, label: string) => (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={rating === value}
+      onClick={() => {
+        onRate(value);
+        setAskingWhy(value === -1);
+      }}
+      className={`flex h-9 w-9 items-center justify-center rounded-[10px] max-md:h-11 max-md:w-11 ${
+        rating === value
+          ? "bg-[var(--g-learner-bubble)] text-[var(--g-ink)]"
+          : "text-[var(--g-ink-faint)] hover:text-[var(--g-ink-soft)]"
+      }`}
+    >
+      <Thumb down={value === -1} />
+    </button>
+  );
+  return (
+    <div
+      className={`mt-1 flex flex-col gap-1 ${
+        prominent || rating !== null
+          ? ""
+          : "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+      }`}
+      data-testid="message-feedback"
+    >
+      <div className="flex items-center gap-1">
+        {thumb(1, t("guide.message.helpful"))}
+        {thumb(-1, t("guide.message.notHelpful"))}
+        {failed && <span className="g-caption ml-1">{t("guide.message.feedbackFailed")}</span>}
+        {rating !== null && !failed && !askingWhy && (
+          <span className="g-caption ml-1">{t("guide.message.feedbackThanks")}</span>
+        )}
+      </div>
+      {askingWhy && rating === -1 && !commented && (
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={event => {
+            event.preventDefault();
+            if (!comment.trim()) return;
+            onRate(-1, comment);
+            setAskingWhy(false);
+          }}
+        >
+          <label className="sr-only" htmlFor="guide-feedback-why">
+            {t("guide.message.whyLabel")}
+          </label>
+          <input
+            id="guide-feedback-why"
+            value={comment}
+            maxLength={1000}
+            onChange={event => setComment(event.target.value)}
+            placeholder={t("guide.message.whyPlaceholder")}
+            className="min-h-11 min-w-0 flex-1 rounded-[10px] border border-[var(--g-line)] bg-[var(--g-card)] px-3 font-secondary text-base text-[var(--g-ink)] outline-none placeholder:text-[var(--g-ink-faint)] focus:border-[var(--g-ink-faint)]"
+          />
+          <button
+            type="submit"
+            disabled={!comment.trim()}
+            className="min-h-11 rounded-[10px] border border-[var(--g-line)] px-3 font-primary text-sm text-[var(--g-ink)] disabled:opacity-50"
+          >
+            {t("guide.message.whySend")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAskingWhy(false)}
+            className="min-h-11 px-2 font-primary text-sm text-[var(--g-ink-soft)] underline underline-offset-2"
+          >
+            {t("guide.common.dismiss")}
+          </button>
+        </form>
+      )}
     </div>
   );
 };

@@ -269,6 +269,58 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
   const cards: Record<string, GuideCard> = {};
   type Placed = { seq: number; order: number; entry: FeedEntry };
   const placed: Placed[] = [];
+
+  // Chapter scenes (bootstrap `scenes`): an entry belongs to the scene opened
+  // at or before it and not yet closed (plan §5.5). Each scene's title card
+  // sits at its opening seq and its receipt at its closing seq.
+  const scenes: Record<string, SceneState> = {};
+  let currentSceneId: string | null = null;
+  const sceneViews = bootstrap.scenes ?? [];
+  sceneViews.forEach((scene, order) => {
+    scenes[scene.sceneId] = {
+      sceneId: scene.sceneId,
+      sectionId: scene.sectionId,
+      title: scene.title,
+      stakes: scene.stakes ?? null,
+      closed: scene.closedSeq !== null && scene.closedSeq !== undefined,
+      receipt: scene.receipt ?? null,
+    };
+    // Before anything else at the same seq.
+    placed.push({
+      seq: scene.openedSeq,
+      order: -1_000_000 + order,
+      entry: {
+        kind: "scene",
+        id: `scene:${scene.sceneId}`,
+        seq: scene.openedSeq,
+        sceneId: scene.sceneId,
+      },
+    });
+    if (typeof scene.closedSeq === "number") {
+      placed.push({
+        seq: scene.closedSeq,
+        order: Number.MAX_SAFE_INTEGER - 1_000 + order,
+        entry: {
+          kind: "receipt",
+          id: `receipt:${scene.sceneId}`,
+          seq: scene.closedSeq,
+          sceneId: scene.sceneId,
+        },
+      });
+    } else {
+      currentSceneId = scene.sceneId;
+    }
+  });
+  const sceneAt = (seq: number | null | undefined): string | null => {
+    if (seq === null || seq === undefined) return null;
+    let found: string | null = null;
+    for (const scene of sceneViews) {
+      const closed = typeof scene.closedSeq === "number" ? scene.closedSeq : Infinity;
+      if (scene.openedSeq <= seq && seq < closed) found = scene.sceneId;
+    }
+    return found;
+  };
+
   bootstrap.messages.forEach((message, order) => {
     placed.push({
       seq: message.seq,
@@ -282,7 +334,7 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
         turnId: message.turnId,
         clientTurnId: null,
         seq: message.seq,
-        sceneId: null,
+        sceneId: sceneAt(message.seq),
         interrupted: message.interrupted ?? false,
         fixed: message.kind === "fixed" || message.kind === "crisis_fixed",
       },
@@ -295,7 +347,7 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
       // Cards without a position go after everything the server ordered.
       seq: seq ?? Number.MAX_SAFE_INTEGER,
       order: bootstrap.messages.length + order,
-      entry: { kind: "card", id: card.cardId, seq: seq ?? null, sceneId: null },
+      entry: { kind: "card", id: card.cardId, seq: seq ?? null, sceneId: sceneAt(seq) },
     });
   });
   placed.sort((a, b) => a.seq - b.seq || a.order - b.order);
@@ -305,6 +357,8 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
     lastSeq: thread?.lastEventSeq ?? 0,
     entries: placed.map(p => p.entry),
     cards,
+    scenes,
+    currentSceneId,
   };
 };
 

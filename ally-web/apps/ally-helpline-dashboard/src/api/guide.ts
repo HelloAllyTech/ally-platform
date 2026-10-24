@@ -13,11 +13,15 @@ import { GUIDE_VISITOR_HEADER } from "../pages/guided-course/visitor/visitorToke
 
 import type { JourneyThread } from "../pages/guided-course/contract/bootstrap";
 import type {
+  GuideAdviceLineRequest,
+  GuideAdviceLines,
+  GuideAdviceLineView,
   GuideAvailability,
   GuideBootstrap,
   GuideCardEventRequest,
   GuideCardState,
   GuideMicroActivityRequest,
+  GuideMemoryView,
   GuideMicroActivityResult,
   GuideNextStep,
   GuidePrefs,
@@ -69,6 +73,14 @@ export interface GuideAppointmentRequest {
   at: string;
   /** IANA zone, so the reminder fires at local wall-clock time (plan §11 E-8). */
   timezone: string;
+  /** `session` (the closing ritual, the default) or `spaced_recall` (the finale's look back). */
+  purpose?: "session" | "spaced_recall";
+}
+
+/** Thumbs on one of Ally's messages: one per learner per message, sending again replaces it. */
+export interface GuideMessageFeedbackRequest {
+  rating: 1 | -1;
+  comment?: string;
 }
 
 /** One entry in the learner's notebook (`GET /v1/guide/notebook`). */
@@ -81,15 +93,8 @@ export interface GuideNotebookEntry {
   createdAt: string | null;
 }
 
-/** One thing Ally remembers (`GET /v1/guide/memory`). */
-export interface GuideMemoryItem {
-  id: string;
-  /** preference, goal, possible_self, strength, struggle, context, commitment, unique_outcome. */
-  kind: string;
-  body: string;
-  lastConfirmedAt: string | null;
-  expiresAt: string | null;
-}
+/** One thing Ally remembers (`GET /v1/guide/memory`), with the learner's words it came from. */
+export type GuideMemoryItem = GuideMemoryView;
 
 /**
  * The prefs as the server returns them. `challenge` is read only when the
@@ -98,7 +103,7 @@ export interface GuideMemoryItem {
  */
 export type GuidePrefsView = GuidePrefs & { challenge?: "normal" | "more" };
 
-const GUIDE_TAGS = ["GuideNotebook", "GuideMemory", "GuidePrefs"] as const;
+const GUIDE_TAGS = ["GuideNotebook", "GuideMemory", "GuidePrefs", "GuideAdvice"] as const;
 
 const guideAPI = baseAPI.enhanceEndpoints({ addTagTypes: GUIDE_TAGS }).injectEndpoints({
   endpoints: builder => ({
@@ -284,6 +289,36 @@ const guideAPI = baseAPI.enhanceEndpoints({ addTagTypes: GUIDE_TAGS }).injectEnd
       query: () => ({ url: ApiEndpoints.GUIDE.MEMORY, method: HttpMethod.DELETE }),
       invalidatesTags: ["GuideMemory"],
     }),
+
+    /** Finishers' approved lines (empty until enough have finished) and the learner's own. */
+    getGuideAdvice: builder.query<GuideAdviceLines, { trackId: string }>({
+      query: ({ trackId }) => ({ url: ApiEndpoints.GUIDE.ADVICE(trackId), method: HttpMethod.GET }),
+      providesTags: ["GuideAdvice"],
+    }),
+
+    /** The learner's one line for this course; rewritable while it waits for review. */
+    submitGuideAdvice: builder.mutation<
+      GuideAdviceLineView,
+      { trackId: string; body: GuideAdviceLineRequest }
+    >({
+      query: ({ trackId, body }) => ({
+        url: ApiEndpoints.GUIDE.ADVICE(trackId),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: ["GuideAdvice"],
+    }),
+
+    rateGuideMessage: builder.mutation<
+      { messageId: string; rating: 1 | -1 },
+      { messageId: string; body: GuideMessageFeedbackRequest }
+    >({
+      query: ({ messageId, body }) => ({
+        url: ApiEndpoints.GUIDE.MESSAGE_FEEDBACK(messageId),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
   }),
 });
 
@@ -307,4 +342,7 @@ export const {
   useGetGuideMemoryQuery,
   useForgetGuideMemoryMutation,
   useForgetAllGuideMemoryMutation,
+  useGetGuideAdviceQuery,
+  useSubmitGuideAdviceMutation,
+  useRateGuideMessageMutation,
 } = guideAPI;

@@ -18,6 +18,7 @@ import {
   usePostGuideCardEventMutation,
   usePutGuideAppointmentMutation,
   useAnswerGuideMicroActivityMutation,
+  useRateGuideMessageMutation,
   usePutGuidePrefsMutation,
   useSendGuideTurnMutation,
   useSendVisitorTurnMutation,
@@ -102,7 +103,8 @@ export type TurnSource =
   | "care"
   | "crisis"
   | "landing"
-  | "ask";
+  | "ask"
+  | "finale";
 
 export interface SubmitTurnInput {
   text: string;
@@ -122,6 +124,13 @@ export interface PracticeState {
   result?: GuideMicroActivityResult;
   /** The server's line for a refusal (e.g. "Choose an answer first."). */
   message?: string;
+}
+
+/** The learner's thumb on one of Ally's messages, on this page (the server keeps one per message). */
+export interface MessageRating {
+  rating: 1 | -1;
+  comment?: string;
+  status: "sending" | "saved" | "error";
 }
 
 export type SignInSource = "card" | "allowance" | "paused" | "item" | "voice" | "header";
@@ -166,6 +175,7 @@ export const useGuideJourney = (
   const [helpRequested, setHelpRequested] = useState(false);
   const [enrolled, setEnrolled] = useState(true);
   const [practice, setPractice] = useState<Record<string, PracticeState>>({});
+  const [ratings, setRatings] = useState<Record<string, MessageRating>>({});
   const [now, setNow] = useState(() => Date.now());
   // A signed-out visitor (M2) talks through the public routes with their own token.
   const [identity, setIdentity] = useState<JourneyIdentity>("learner");
@@ -201,6 +211,7 @@ export const useGuideJourney = (
   const [postGuideCardEvent] = usePostGuideCardEventMutation();
   const [putGuidePrefs] = usePutGuidePrefsMutation();
   const [answerGuideMicroActivity] = useAnswerGuideMicroActivityMutation();
+  const [rateGuideMessage] = useRateGuideMessageMutation();
   const [putGuideAppointment] = usePutGuideAppointmentMutation();
   const [enrollGuideThread] = useEnrollGuideThreadMutation();
   const [enrollTrack] = useEnrollTrackMutation();
@@ -690,6 +701,34 @@ export const useGuideJourney = (
   );
 
   /**
+   * Thumbs on one of Ally's messages; a comment can follow a thumbs-down.
+   * Sending again replaces the last (one per message). Analytics gets the
+   * direction only, never the comment.
+   */
+  const rateMessage = useCallback(
+    async (messageId: string, rating: 1 | -1, comment?: string) => {
+      if (identityRef.current === "visitor") return;
+      setRatings(prev => ({ ...prev, [messageId]: { rating, comment, status: "sending" } }));
+      try {
+        await rateGuideMessage({
+          messageId,
+          body: { rating, ...(comment?.trim() ? { comment: comment.trim() } : {}) },
+        }).unwrap();
+        setRatings(prev => ({ ...prev, [messageId]: { rating, comment, status: "saved" } }));
+        if (!comment) {
+          track(ANALYTICS_EVENTS.GUIDED_MESSAGE_RATED, {
+            ...courseProps,
+            [ANALYTICS_PROPS.GUIDED_RATING]: rating === 1 ? "up" : "down",
+          });
+        }
+      } catch {
+        setRatings(prev => ({ ...prev, [messageId]: { rating, comment, status: "error" } }));
+      }
+    },
+    [rateGuideMessage, track, courseProps],
+  );
+
+  /**
    * "Ask about this" (plan §5.8): a turn in the learner's words with the item
    * and the quote or moment attached. Ally answers in the conversation.
    */
@@ -815,6 +854,22 @@ export const useGuideJourney = (
     [setTrackLanguage, trackId, track, courseProps, retryBoot],
   );
 
+  /** The finale's look back in a week (`purpose: spaced_recall`), at the time suggested or chosen. */
+  const scheduleRecall = useCallback(
+    async (at: Date, timezone: string) => {
+      if (!threadId) throw new Error("no thread");
+      await putGuideAppointment({
+        threadId,
+        body: { at: at.toISOString(), timezone, purpose: "spaced_recall" },
+      }).unwrap();
+      track(ANALYTICS_EVENTS.GUIDED_FINALE_DOOR, {
+        ...courseProps,
+        [ANALYTICS_PROPS.GUIDED_DOOR]: "spaced_recall",
+      });
+    },
+    [threadId, putGuideAppointment, track, courseProps],
+  );
+
   // ---------------------------------------------------------------- crisis
   const chooseSafe = useCallback(() => {
     dispatch({ type: "crisis/safe" });
@@ -883,6 +938,7 @@ export const useGuideJourney = (
     cues,
     enrolled,
     practice,
+    ratings,
     minimisedCardId,
     helpRequested,
     identity,
@@ -907,6 +963,8 @@ export const useGuideJourney = (
       dismissCard,
       answerPractice,
       askAbout,
+      rateMessage,
+      scheduleRecall,
       setGuidance,
       scheduleAppointment,
       chooseSafe,

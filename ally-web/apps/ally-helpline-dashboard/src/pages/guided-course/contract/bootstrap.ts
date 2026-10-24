@@ -23,6 +23,7 @@ import type {
   GuideCrisisState,
   GuideItemType,
   GuideMode,
+  GuideSceneView,
 } from "./wire";
 
 /** The wire shape, generated from ally-be's schema. */
@@ -129,6 +130,8 @@ export interface JourneyBootstrap {
   crisis: GuideCrisisState | null;
   /** A visitor's remaining messages before sign-in (absent for learners). */
   allowance: { remaining: number; limit: number } | null;
+  /** Chapter scenes, oldest first, so a reload regroups the feed (empty from an older server). */
+  scenes: GuideSceneView[];
   /**
    * Whether `messages` and `cards` already describe the thread up to
    * `thread.lastEventSeq`. False for the composed fallback, which has no
@@ -230,6 +233,7 @@ export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): Jo
       : null,
     crisis: wire.crisis ?? null,
     allowance: wire.allowance ?? null,
+    scenes: Array.isArray(wire.scenes) ? wire.scenes : [],
     complete: true,
   };
 };
@@ -316,6 +320,7 @@ export const composeBootstrap = ({
     progress: null,
     crisis: null,
     allowance: null,
+    scenes: [],
     messages: [],
     cards: [],
     prefs: { guidance: asGuidance(guidance) },
