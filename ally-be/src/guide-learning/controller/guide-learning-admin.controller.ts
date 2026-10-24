@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -30,7 +31,10 @@ import {
   CreateEvalCaseDto,
   DismissReviewDto,
   GenerateRedTeamDto,
+  LessonDecisionDto,
+  ListLessonsQueryDto,
   RunEvaluatorDto,
+  SetDelegationStageDto,
   SaveEvalCaseDto,
   StartEvalRunDto,
   SubmitReviewDto,
@@ -43,6 +47,12 @@ import { GuideRedTeamService } from '../evals/guide-red-team.service';
 import { GuideEvaluatorService } from '../evaluator/guide-evaluator.service';
 import { RUBRIC_CRITERIA } from '../evaluator/rubric';
 import { GuideReviewService } from '../review/guide-review.service';
+import { GuideCuratorService } from '../curator/guide-curator.service';
+import { GuideLearningAuditService } from '../curator/guide-learning-audit.service';
+import { GuideDelegationService } from '../pipeline/guide-delegation.service';
+import { GuidePipelineService } from '../pipeline/guide-pipeline.service';
+import { GuideShadowService } from '../shadow/guide-shadow.service';
+import { GuideSyntheticService } from '../synthetic/guide-synthetic.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_ALLY_GUIDE] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_ALLY_GUIDE] };
@@ -74,6 +84,12 @@ export class GuideLearningAdminController {
     private readonly cases: GuideEvalCaseService,
     private readonly runs: GuideEvalRunService,
     private readonly redTeam: GuideRedTeamService,
+    private readonly curator: GuideCuratorService,
+    private readonly learningAudit: GuideLearningAuditService,
+    private readonly delegation: GuideDelegationService,
+    private readonly pipeline: GuidePipelineService,
+    private readonly shadows: GuideShadowService,
+    private readonly synthetic: GuideSyntheticService,
   ) {}
 
   // ─── Evaluator ────────────────────────────────────────────────────────────
@@ -377,5 +393,229 @@ export class GuideLearningAdminController {
   })
   runOutputs(@Param('runId', ParseUUIDPipe) runId: string) {
     return this.runs.listResults(runId, true);
+  }
+
+  // ─── Curator and playbook (plan §7.13 loop 2) ─────────────────────────────
+
+  @Post('curator/run')
+  @HttpCode(202)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Run the curator now (it also runs daily): trusted evidence → at most 5 lessons or tweaks → guardrails → a curator draft release. Skipped while a curator release is still in the pipeline',
+  })
+  runCurator(@CurrentUser() user: TokenUser) {
+    setImmediate(() => {
+      this.curator
+        .run({ userId: user.id })
+        .catch((error) =>
+          this.logger.error('Curator run failed', error as Error),
+        );
+    });
+    return { started: true };
+  }
+
+  @Get('playbook')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      "The GA release's playbook: every lesson by scope with its id, and each scope's cap",
+  })
+  playbook() {
+    return this.curator.playbook();
+  }
+
+  @Get('lessons')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      "Every change the curator proposed — blocked and quarantined ones with the reason. Curator-written text and counts only; never a learner's words",
+  })
+  listLessons(@Query() query: ListLessonsQueryDto) {
+    return this.curator.list(query);
+  }
+
+  @Post('lessons/:lessonId/approve')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Clear a quarantined change: the next curator run carries it, through every other guardrail again',
+  })
+  approveLesson(
+    @Param('lessonId', ParseUUIDPipe) lessonId: string,
+    @Body() dto: LessonDecisionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.curator.decide(lessonId, 'approve', user.id, dto.notes);
+  }
+
+  @Post('lessons/:lessonId/reject')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary: 'Reject a quarantined, approved or proposed change',
+  })
+  rejectLesson(
+    @Param('lessonId', ParseUUIDPipe) lessonId: string,
+    @Body() dto: LessonDecisionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.curator.decide(lessonId, 'reject', user.id, dto.notes);
+  }
+
+  @Post('lessons/:lessonId/retire')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Take an active lesson out of the playbook; the next curator release drops it',
+  })
+  retireLesson(
+    @Param('lessonId', ParseUUIDPipe) lessonId: string,
+    @Body() dto: LessonDecisionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.curator.retire(lessonId, user.id, dto.notes);
+  }
+
+  @Get('learning/audit')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      "The learning loop's audit: curator runs, lesson decisions, stage changes and the pipeline's own steps, newest first",
+  })
+  learningAuditList(
+    @Query('releaseId') releaseId?: string,
+    @Query('lessonId') lessonId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.learningAudit.list({
+      releaseId,
+      lessonId,
+      limit: Number(limit) || 100,
+    });
+  }
+
+  @Get('releases/:releaseId/trail')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      "A release's complete trail, oldest first: created → gate → shadow → canary → decision → GA or revert, with the curator's change set",
+  })
+  trail(@Param('releaseId', ParseUUIDPipe) releaseId: string) {
+    return this.pipeline.trail(releaseId);
+  }
+
+  // ─── Shadow ───────────────────────────────────────────────────────────────
+
+  @Post('releases/:releaseId/shadow')
+  @HttpCode(202)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Shadow a release: replay recent real GA turns on it in dry run and compare with what GA said (check ids and counts only)',
+  })
+  startShadow(
+    @Param('releaseId', ParseUUIDPipe) releaseId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.shadows.start(releaseId, user.id);
+  }
+
+  @Get('shadow-reports')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'Shadow reports, newest first' })
+  listShadows(@Query('releaseId') releaseId?: string) {
+    return this.shadows.list(releaseId);
+  }
+
+  @Get('shadow-reports/:reportId')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'One shadow report and its per-turn verdicts' })
+  getShadow(@Param('reportId', ParseUUIDPipe) reportId: string) {
+    return this.shadows.get(reportId);
+  }
+
+  // ─── Canary decision, pipeline, delegation ───────────────────────────────
+
+  @Get('canary/decision')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      "The running canary's automatic decision (wait, promote or revert) with its thresholds, κ-trusted criteria per arm and the learning guard",
+  })
+  canaryDecision() {
+    return this.pipeline.canaryStatus();
+  }
+
+  @Post('learning/pipeline/advance')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Run one pass of the pipeline now (it also runs hourly): decide the canary, and at stage 2+ move the curator release on',
+  })
+  advance() {
+    return this.pipeline.advance();
+  }
+
+  @Get('delegation')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      'The progressive-delegation stage, which stages are unlocked, and every precondition counted (auto-revert is always on)',
+  })
+  getDelegation() {
+    return this.delegation.effectiveStage();
+  }
+
+  @Put('delegation')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Set the stage: lower it any time; raise it one step, only when that stage is unlocked',
+  })
+  setDelegation(
+    @Body() dto: SetDelegationStageDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.delegation.setStage(dto.stage, user.id, dto.reason);
+  }
+
+  // ─── Synthetic monitoring ─────────────────────────────────────────────────
+
+  @Get('synthetic-runs')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      'Nightly synthetic journeys on GA: pass rate, safety failures and drift per night',
+  })
+  listSynthetic(@Query('limit') limit?: string) {
+    return this.synthetic.list(Number(limit) || 30);
+  }
+
+  @Get('synthetic-runs/:runId')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'One synthetic night, per journey and step' })
+  getSynthetic(@Param('runId', ParseUUIDPipe) runId: string) {
+    return this.synthetic.get(runId);
+  }
+
+  @Post('synthetic-runs')
+  @HttpCode(202)
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary: 'Run the synthetic journeys on GA now (they also run nightly)',
+  })
+  runSynthetic() {
+    setImmediate(() => {
+      this.synthetic
+        .runNight()
+        .catch((error) =>
+          this.logger.error('Synthetic run failed', error as Error),
+        );
+    });
+    return { started: true };
   }
 }

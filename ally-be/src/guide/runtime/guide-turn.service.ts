@@ -911,7 +911,16 @@ export class GuideTurnService {
 
     const orgSpan = buildOrgSpan(ctx.orgProfile);
     const courseSpan = buildCourseSpan(course);
-    const pinnedSpans = buildSystemSpans(candidateBundle, orgSpan, courseSpan);
+    const lessonScope = {
+      tenantId: ctx.visitorId ? null : (ctx.tenantId ?? null),
+      trackId: thread.trackId,
+    };
+    const pinnedSpans = buildSystemSpans(
+      candidateBundle,
+      orgSpan,
+      courseSpan,
+      lessonScope,
+    );
     // The epoch's history so far: replayed if it continues, measured either
     // way, and summarised once it has grown past the policy's threshold.
     const epochRows =
@@ -953,7 +962,7 @@ export class GuideTurnService {
       release = toCanary ? canary! : ga;
       ctx.arm = toCanary ? 'canary' : 'ga';
       const bundle = release.bundle as unknown as GuideReleaseBundle;
-      spans = buildSystemSpans(bundle, orgSpan, courseSpan);
+      spans = buildSystemSpans(bundle, orgSpan, courseSpan, lessonScope);
       const route = this.models.route(
         bundle,
         'orchestrator',

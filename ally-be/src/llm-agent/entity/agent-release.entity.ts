@@ -56,6 +56,14 @@ export class AgentRelease extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid', nullable: true })
   shadowReportId?: string | null;
 
+  /**
+   * What changed against the parent and why, for a curator release: the
+   * agent_lessons ids it carries and each tweak (plan §7.13). Kept beside the
+   * bundle, not in it, so it never changes the content hash.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  changeSet?: Record<string, any> | null;
+
   @Column({ type: 'timestamp', nullable: true })
   promotedAt?: Date | null;
 

@@ -334,6 +334,7 @@ export enum LlmTask {
   GUIDE_EVALUATOR_CRITIC = 'guide_evaluator_critic',
   GUIDE_EVALUATOR_VERIFIER = 'guide_evaluator_verifier',
   GUIDE_RED_TEAM = 'guide_red_team',
+  GUIDE_CURATOR = 'guide_curator',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

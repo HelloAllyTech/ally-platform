@@ -73,7 +73,9 @@ export type GuideRole =
   // from the critic — that is the point of having one.
   | 'evaluator_critic'
   | 'evaluator_verifier'
-  | 'red_team';
+  | 'red_team'
+  // Proposes lessons and tweaks for the next release from trusted evidence.
+  | 'curator';
 
 export type GuideChannelRoute = 'text' | 'voice';
 export type GuideBudgetTier = 'premium' | 'degraded' | 'lite';
@@ -152,6 +154,89 @@ export interface GuidePolicy {
    * `evaluatorPolicy()`, which falls back to these defaults.
    */
   evaluator: GuideEvaluatorPolicy;
+  /**
+   * The curator, shadow, canary decision, progressive delegation and
+   * synthetic monitoring (Appendix A "Learning loop"). Optional so a release
+   * frozen before it existed stays readable; read it through `loopPolicy()`.
+   */
+  loop?: GuideLoopPolicy;
+}
+
+/** Appendix A "Learning loop", second half (plan §7.13). Pinned: the loop cannot loosen its own rules. */
+export interface GuideLoopPolicy {
+  /** Most lessons in the playbook: platform-wide, per organisation, per course. */
+  lessonCapPlatform: number;
+  lessonCapOrg: number;
+  lessonCapCourse: number;
+  /** Most changes (lessons and tweaks) one curator release carries. */
+  maxChangesPerRelease: number;
+  /** Evidence for a platform lesson: this many learners across this many organisations. */
+  evidencePlatformLearners: number;
+  evidencePlatformTenants: number;
+  /** Evidence for an organisation or course lesson: this many learners. */
+  evidenceScopedLearners: number;
+  /** Words in a row shared with a learner's message that block a lesson as copied. */
+  copyNgram: number;
+  /** Share of new epochs an automatic canary takes. */
+  canaryPercent: number;
+  /** Earliest canary decision: days, and the canary arm's threads, judged windows and rated turns. */
+  canaryMinDays: number;
+  canaryMinThreads: number;
+  canaryMinJudgedWindows: number;
+  canaryMinRatedTurns: number;
+  /** A canary still undecided after this many days is reverted. */
+  canaryInconclusiveDays: number;
+  /** Fewest days between two promotions. */
+  promotionGapDays: number;
+  /** How much higher a trusted criterion's fail rate may be on a candidate. */
+  qualityMargin: number;
+  /** Recent real turns a shadow replays, and the fewest that make a verdict. */
+  shadowSampleTurns: number;
+  shadowMinTurns: number;
+  /** Progressive delegation preconditions (Appendix A "Autonomy preconditions"). */
+  delegationMinCases: number;
+  delegationMinSafetyCases: number;
+  delegationMinMinedCases: number;
+  delegationMinPerHardCategory: number;
+  delegationEvaluatorDays: number;
+  delegationCleanCanaries: number;
+  /** A synthetic night whose pass rate falls this far below the recent median is drift. */
+  syntheticDriftDrop: number;
+}
+
+export const GUIDE_DEFAULT_LOOP_POLICY: GuideLoopPolicy = {
+  lessonCapPlatform: 60,
+  lessonCapOrg: 15,
+  lessonCapCourse: 10,
+  maxChangesPerRelease: 5,
+  evidencePlatformLearners: 2,
+  evidencePlatformTenants: 2,
+  evidenceScopedLearners: 5,
+  copyNgram: 8,
+  canaryPercent: 20,
+  canaryMinDays: 4,
+  canaryMinThreads: 120,
+  canaryMinJudgedWindows: 80,
+  canaryMinRatedTurns: 100,
+  canaryInconclusiveDays: 14,
+  promotionGapDays: 3,
+  qualityMargin: 0.05,
+  shadowSampleTurns: 50,
+  shadowMinTurns: 10,
+  delegationMinCases: 150,
+  delegationMinSafetyCases: 60,
+  delegationMinMinedCases: 40,
+  delegationMinPerHardCategory: 8,
+  delegationEvaluatorDays: 28,
+  delegationCleanCanaries: 3,
+  syntheticDriftDrop: 0.1,
+};
+
+/** A release's learning-loop rules, with defaults for releases that predate them. */
+export function loopPolicy(
+  policy: Partial<GuidePolicy> | null | undefined,
+): GuideLoopPolicy {
+  return { ...GUIDE_DEFAULT_LOOP_POLICY, ...(policy?.loop ?? {}) };
 }
 
 export interface GuideEvaluatorPolicy {
@@ -225,8 +310,48 @@ export interface GuideReleaseBundle {
    */
   skillDefs?: Record<string, GuideSkillDef>;
   policy: GuidePolicy;
-  /** Frozen lesson text (the playbook). Empty until the learning loop exists. */
+  /**
+   * The platform-wide playbook as frozen text: what S1 (the persona span)
+   * shows every conversation. Written by the curator (src/guide-learning),
+   * never edited in place: a new playbook is a new release.
+   */
   lessonSnapshot: string[];
+  /**
+   * The whole playbook with each lesson's id and scope. Organisation and
+   * course lessons are shown only in their own span (S2, S3), so one
+   * organisation's lesson never reaches another's conversations. Optional:
+   * releases from before the curator have none.
+   */
+  playbook?: GuidePlaybookLesson[];
+}
+
+export interface GuidePlaybookLesson {
+  /** agent_lessons.id */
+  id: string;
+  scope: 'platform' | 'org' | 'course';
+  tenantId?: string | null;
+  trackId?: string | null;
+  text: string;
+}
+
+/** The organisation and course lessons a conversation may see. */
+export function scopedLessons(
+  bundle: Pick<GuideReleaseBundle, 'playbook'>,
+  where: { tenantId?: string | null; trackId?: string | null },
+): { org: string[]; course: string[] } {
+  const lessons = bundle.playbook ?? [];
+  return {
+    org: where.tenantId
+      ? lessons
+          .filter((l) => l.scope === 'org' && l.tenantId === where.tenantId)
+          .map((l) => l.text)
+      : [],
+    course: where.trackId
+      ? lessons
+          .filter((l) => l.scope === 'course' && l.trackId === where.trackId)
+          .map((l) => l.text)
+      : [],
+  };
 }
 
 export const GUIDE_DEFAULT_POLICY: GuidePolicy = {
@@ -285,6 +410,7 @@ export const GUIDE_DEFAULT_POLICY: GuidePolicy = {
     kappaMinPairs: 20,
     gateRepetitions: 3,
   },
+  loop: GUIDE_DEFAULT_LOOP_POLICY,
 };
 
 /** A release's learning-loop policy, with defaults for releases that predate it. */
@@ -381,6 +507,7 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
     evaluator_critic: { text: { premium: { ...OPUS, effort: 'low' } } },
     evaluator_verifier: { text: { premium: { ...GPT5, effort: 'low' } } },
     red_team: { text: { premium: { ...OPUS, effort: 'medium' } } },
+    curator: { text: { premium: { ...OPUS, effort: 'medium' } } },
   },
   capabilities: {
     present_course_item: true,

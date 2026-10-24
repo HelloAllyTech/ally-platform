@@ -71,6 +71,14 @@ import {
   HelplineSummaryKind,
 } from '../../helpline/constants/helpline.constants';
 import {
+  AgentLessonAuditAction,
+  AgentLessonScope,
+  AgentLessonStatus,
+  AgentShadowStatus,
+  AgentSyntheticRunStatus,
+  AGENT_LESSON_KINDS,
+} from '../../llm-agent/harness/enum/learning.enum';
+import {
   AgentChannel,
   AgentConfigLayer,
   AgentReleaseAuditAction,
@@ -340,6 +348,17 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_agent_evaluations_status', Object.values(AgentEvaluationStatus)],
     ['CHK_agent_reviews_reason', Object.values(AgentReviewReason)],
     ['CHK_agent_reviews_status', Object.values(AgentReviewStatus)],
+    ['CHK_agent_lessons_scope', Object.values(AgentLessonScope)],
+    ['CHK_agent_lessons_status', Object.values(AgentLessonStatus)],
+    ['CHK_agent_lessons_kind', [...AGENT_LESSON_KINDS]],
+    ['CHK_agent_lessons_author_kind', Object.values(AgentReleaseAuthorKind)],
+    ['CHK_agent_lesson_audit_action', Object.values(AgentLessonAuditAction)],
+    [
+      'CHK_agent_lesson_audit_actor_kind',
+      Object.values(AgentReleaseAuthorKind),
+    ],
+    ['CHK_agent_shadow_reports_status', Object.values(AgentShadowStatus)],
+    ['CHK_agent_synthetic_runs_status', Object.values(AgentSyntheticRunStatus)],
     ['CHK_guide_threads_status', Object.values(GuideThreadStatus)],
     ['CHK_guide_threads_mode', Object.values(GuideMode)],
     ['CHK_guide_messages_role', Object.values(GuideMessageRole)],

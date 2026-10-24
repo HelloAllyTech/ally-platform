@@ -2,6 +2,7 @@ import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
 import { AgentReleaseAudit } from 'src/llm-agent/entity/agent-release-audit.entity';
 import {
   AgentReleaseAuditAction,
+  AgentReleaseAuthorKind,
   AgentReleaseStatus,
 } from '../../enum/harness.enum';
 import { AgentReleaseService, inCanary } from '../agent-release.service';
@@ -273,6 +274,101 @@ describe('AgentReleaseService', () => {
       expect(hits / 2000).toBeGreaterThan(0.16);
       expect(hits / 2000).toBeLessThan(0.24);
       expect(inCanary('th-1', 'rel-c', 0)).toBe(false);
+    });
+  });
+
+  describe('the learning loop (M4)', () => {
+    it('creates a curator draft with its change set beside the bundle', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      const ga = await service.ensureSeed('ally_guide', { policy: { a: 1 } });
+      const draft = await service.createCuratorDraft(
+        'ally_guide',
+        { policy: { a: 2 } },
+        { changes: [{ lessonId: 'l1' }] },
+        'curator',
+      );
+      expect(draft.status).toBe(AgentReleaseStatus.DRAFT);
+      expect(draft.authorKind).toBe(AgentReleaseAuthorKind.CURATOR);
+      expect(draft.createdBy).toBeNull();
+      expect(draft.parentReleaseId).toBe(ga!.id);
+      expect(draft.changeSet).toEqual({ changes: [{ lessonId: 'l1' }] });
+      expect(fake.audit[fake.audit.length - 1]).toMatchObject({
+        action: AgentReleaseAuditAction.CREATED,
+        actorKind: AgentReleaseAuthorKind.CURATOR,
+        detail: expect.objectContaining({ changes: 1 }),
+      });
+    });
+
+    it('moves a candidate into shadow, and a failed shadow back to draft', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      await service.ensureSeed('ally_guide', { policy: { a: 1 } });
+      const draft = await service.createCuratorDraft(
+        'ally_guide',
+        { policy: { a: 2 } },
+        {},
+        'x',
+      );
+      fake.releases.find((r) => r.id === draft.id)!.status =
+        AgentReleaseStatus.CANDIDATE;
+      await service.recordShadow({
+        releaseId: draft.id,
+        reportId: 'rep-1',
+        phase: 'started',
+        userId: null,
+      });
+      const row = fake.releases.find((r) => r.id === draft.id)!;
+      expect(row.status).toBe(AgentReleaseStatus.SHADOW);
+      expect(row.shadowReportId).toBe('rep-1');
+      await service.recordShadow({
+        releaseId: draft.id,
+        reportId: 'rep-1',
+        phase: 'failed',
+        userId: null,
+      });
+      expect(row.status).toBe(AgentReleaseStatus.DRAFT);
+      expect(
+        fake.audit
+          .filter((a) => a.releaseId === draft.id)
+          .map((a) => [a.action, a.actorKind]),
+      ).toEqual([
+        [AgentReleaseAuditAction.CREATED, AgentReleaseAuthorKind.CURATOR],
+        [AgentReleaseAuditAction.SHADOW_STARTED, AgentReleaseAuthorKind.SYSTEM],
+        [
+          AgentReleaseAuditAction.SHADOW_COMPLETED,
+          AgentReleaseAuthorKind.SYSTEM,
+        ],
+      ]);
+    });
+
+    it('records automatic canary steps and promotions as the system, not a person', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      await service.ensureSeed('ally_guide', { policy: { a: 1 } });
+      const draft = await service.createCuratorDraft(
+        'ally_guide',
+        { policy: { a: 2 } },
+        {},
+        'x',
+      );
+      await service.startCanary(
+        draft.id,
+        20,
+        null,
+        'auto',
+        AgentReleaseAuthorKind.SYSTEM,
+      );
+      expect(await service.canaryStartedAt(draft.id)).toBeInstanceOf(Date);
+      await service.stopCanary('ally_guide', null, false, 'quality fell', {
+        actorKind: AgentReleaseAuthorKind.SYSTEM,
+        action: AgentReleaseAuditAction.CANARY_REVERTED,
+      });
+      const last = fake.audit[fake.audit.length - 1]!;
+      expect(last.action).toBe(AgentReleaseAuditAction.CANARY_REVERTED);
+      expect(last.actorKind).toBe(AgentReleaseAuthorKind.SYSTEM);
+      expect(last.actorUserId).toBeNull();
+      expect(await service.lastPromotionAt('ally_guide')).toBeNull();
     });
   });
 });

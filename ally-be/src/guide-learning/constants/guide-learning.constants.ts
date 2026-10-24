@@ -15,6 +15,7 @@ export const BUDGETED_ROLES = [
   'evaluator_critic',
   'evaluator_verifier',
   'red_team',
+  'curator',
 ] as const;
 
 /** Stable suite keys: code finds a suite by these, whatever its id. */
@@ -45,3 +46,11 @@ export const RED_TEAM_CASES_PER_CATEGORY = 4;
 export const SMOKE_MAX_CASES = 25;
 /** Replays in flight at once in an eval run. */
 export const REPLAY_CONCURRENCY = 4;
+
+/** How far back the curator reads evidence (days). */
+export const CURATOR_LOOKBACK_DAYS = 14;
+/** Evidence clusters offered to the curator per run, at most. */
+export const CURATOR_MAX_CLUSTERS = 16;
+/** Learner messages the copied-text check indexes per run, at most. */
+export const CURATOR_TRANSCRIPT_LIMIT = 20_000;
+export const CURATOR_MAX_TOKENS = 8_000;

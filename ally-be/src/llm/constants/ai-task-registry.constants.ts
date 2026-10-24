@@ -2538,6 +2538,28 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     defaultModel: 'claude-opus-5-5',
     configuredBy: 'ally_guide release modelRouting.red_team',
   },
+  {
+    id: 'guide-curator',
+    task: LlmTask.GUIDE_CURATOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Daily (with the nightly scheduler) when no curator release is already in the pipeline, ' +
+      'and when an admin presses "Run the curator" in the Ally Console',
+    detail:
+      'One structured call that reads clusters of trusted failures from Ally’s recent ' +
+      'conversations (critic verdicts on criteria whose agreement with people is high enough, ' +
+      'people’s review labels, automatic check failures; counts and judge reasons only, never ' +
+      'learner text), the current playbook, the tunable policy keys and the editable prompts, ' +
+      'and proposes up to five lessons, policy tweaks or prompt tweaks for the next release. ' +
+      'Code guardrails then block or quarantine them (evidence thresholds, pinned keys and the ' +
+      'safety core, an 8-word copied-text check against transcripts, safety vocabulary, lesson ' +
+      'caps); survivors become a curator DRAFT release that goes through the eval gate, shadow ' +
+      'and canary. Charged to the learning loop’s ledger key and daily budget.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.curator',
+  },
 ];
 
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [

@@ -357,12 +357,13 @@ export class AgentReleaseService {
    */
   async makeGa(
     releaseId: string,
-    userId: number,
+    userId: number | null,
     action:
       | AgentReleaseAuditAction.PROMOTED
       | AgentReleaseAuditAction.ROLLED_BACK
       | AgentReleaseAuditAction.EMERGENCY_ROLLBACK = AgentReleaseAuditAction.PROMOTED,
     reason?: string,
+    actorKind: AgentReleaseAuthorKind = AgentReleaseAuthorKind.HUMAN,
   ): Promise<AgentRelease> {
     const promoted = await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(AgentRelease);
@@ -387,7 +388,7 @@ export class AgentReleaseService {
         agentKey: target.agentKey,
         releaseId: target.id,
         action,
-        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorKind,
         actorUserId: userId,
         detail: {
           fromReleaseId: current?.id ?? null,
@@ -402,7 +403,7 @@ export class AgentReleaseService {
     this.canaryCache.delete(promoted.agentKey);
     this.emergencyCache.delete(promoted.agentKey);
     this.logger.info(
-      `${promoted.agentKey} release v${promoted.version} is now GA (${action}) by user ${userId}`,
+      `${promoted.agentKey} release v${promoted.version} is now GA (${action}) by ${actorKind === AgentReleaseAuthorKind.HUMAN ? `user ${userId}` : actorKind}`,
     );
     return promoted;
   }
@@ -420,6 +421,7 @@ export class AgentReleaseService {
     phase: 'started' | 'passed' | 'failed';
     userId: number | null;
     detail?: Record<string, unknown>;
+    actorKind?: AgentReleaseAuthorKind;
   }): Promise<AgentRelease> {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(AgentRelease);
@@ -446,7 +448,11 @@ export class AgentReleaseService {
           next !== release.status
             ? AgentReleaseAuditAction.STATUS_CHANGED
             : AgentReleaseAuditAction.NOTE,
-        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorKind:
+          input.actorKind ??
+          (input.userId === null
+            ? AgentReleaseAuthorKind.SYSTEM
+            : AgentReleaseAuthorKind.HUMAN),
         actorUserId: input.userId,
         detail: {
           evalRunId: input.runId,
@@ -481,8 +487,9 @@ export class AgentReleaseService {
   async startCanary(
     releaseId: string,
     percent: number,
-    userId: number,
+    userId: number | null,
     reason?: string,
+    actorKind: AgentReleaseAuthorKind = AgentReleaseAuthorKind.HUMAN,
   ): Promise<AgentRelease> {
     const share = Math.floor(percent);
     if (!Number.isFinite(share) || share < 1 || share > CANARY_MAX_PERCENT) {
@@ -522,7 +529,7 @@ export class AgentReleaseService {
         agentKey: target.agentKey,
         releaseId: target.id,
         action: AgentReleaseAuditAction.CANARY_STARTED,
-        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorKind,
         actorUserId: userId,
         detail: {
           version: target.version,
@@ -539,7 +546,7 @@ export class AgentReleaseService {
     });
     this.canaryCache.delete(started.agentKey);
     this.logger.info(
-      `${started.agentKey} release v${started.version} in canary at ${share}% by user ${userId}`,
+      `${started.agentKey} release v${started.version} in canary at ${share}% by ${actorKind === AgentReleaseAuthorKind.HUMAN ? `user ${userId}` : actorKind}`,
     );
     return started;
   }
@@ -552,10 +559,19 @@ export class AgentReleaseService {
    */
   async stopCanary(
     agentKey: string,
-    userId: number,
+    userId: number | null,
     emergency: boolean,
     reason?: string,
+    options: {
+      actorKind?: AgentReleaseAuthorKind;
+      /** CANARY_REVERTED when the canary monitor reverts it on its own. */
+      action?:
+        | AgentReleaseAuditAction.CANARY_STOPPED
+        | AgentReleaseAuditAction.CANARY_REVERTED;
+      detail?: Record<string, unknown>;
+    } = {},
   ): Promise<AgentRelease> {
+    const actorKind = options.actorKind ?? AgentReleaseAuthorKind.HUMAN;
     const stopped = await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(AgentRelease);
       const canary = await repo.findOne({
@@ -570,13 +586,14 @@ export class AgentReleaseService {
       await audit.save({
         agentKey,
         releaseId: canary.id,
-        action: AgentReleaseAuditAction.CANARY_STOPPED,
-        actorKind: AgentReleaseAuthorKind.HUMAN,
+        action: options.action ?? AgentReleaseAuditAction.CANARY_STOPPED,
+        actorKind,
         actorUserId: userId,
         detail: {
           version: canary.version,
           emergency,
           reason: reason ?? null,
+          ...(options.detail ?? {}),
         },
       });
       if (emergency) {
@@ -586,7 +603,7 @@ export class AgentReleaseService {
           agentKey,
           releaseId: canary.id,
           action: AgentReleaseAuditAction.EMERGENCY_ROLLBACK,
-          actorKind: AgentReleaseAuthorKind.HUMAN,
+          actorKind,
           actorUserId: userId,
           detail: { canaryStopped: true, reason: reason ?? null },
         });
@@ -599,9 +616,201 @@ export class AgentReleaseService {
     this.canaryCache.delete(agentKey);
     this.emergencyCache.delete(agentKey);
     this.logger.info(
-      `${agentKey} canary v${stopped.version} stopped${emergency ? ' (emergency)' : ''} by user ${userId}`,
+      `${agentKey} canary v${stopped.version} stopped${emergency ? ' (emergency)' : ''} by ${actorKind === AgentReleaseAuthorKind.HUMAN ? `user ${userId}` : actorKind}`,
     );
     return stopped;
+  }
+
+  /**
+   * A DRAFT written by the curator (plan §7.13): authored by no person, with
+   * what it changed and why beside the bundle. It goes through the same
+   * pipeline as a person's draft.
+   */
+  async createCuratorDraft(
+    agentKey: string,
+    bundle: Record<string, unknown>,
+    changeSet: Record<string, unknown>,
+    notes: string,
+  ): Promise<AgentRelease> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const latest = await repo.findOne({
+        where: { agentKey },
+        order: { version: 'DESC' },
+      });
+      const ga = await repo.findOne({
+        where: { agentKey, status: AgentReleaseStatus.GA },
+      });
+      const release = await repo.save(
+        repo.create({
+          agentKey,
+          version: (latest?.version ?? 0) + 1,
+          status: AgentReleaseStatus.DRAFT,
+          bundle,
+          contentHash: canonicalHash(bundle),
+          parentReleaseId: ga?.id ?? latest?.id ?? null,
+          authorKind: AgentReleaseAuthorKind.CURATOR,
+          createdBy: null,
+          notes,
+          changeSet,
+        }),
+      );
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey,
+        releaseId: release.id,
+        action: AgentReleaseAuditAction.CREATED,
+        actorKind: AgentReleaseAuthorKind.CURATOR,
+        actorUserId: null,
+        detail: {
+          version: release.version,
+          contentHash: release.contentHash,
+          changes: (changeSet.changes as unknown[] | undefined)?.length ?? 0,
+        },
+      });
+      return release;
+    });
+  }
+
+  /**
+   * Record a shadow replay (plan §7.4 lifecycle): starting one moves a
+   * CANDIDATE to SHADOW; a passed or inconclusive shadow leaves it there
+   * (inconclusive means a person decides), a failed one sends it back to
+   * DRAFT. The report becomes the release's evidence (`shadowReportId`).
+   */
+  async recordShadow(input: {
+    releaseId: string;
+    reportId: string;
+    phase: 'started' | 'passed' | 'failed' | 'inconclusive';
+    userId: number | null;
+    detail?: Record<string, unknown>;
+  }): Promise<AgentRelease> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const release = await repo.findOne({ where: { id: input.releaseId } });
+      if (!release) throw new NotFoundException('Release not found');
+      const next =
+        input.phase === 'started'
+          ? release.status === AgentReleaseStatus.CANDIDATE
+            ? AgentReleaseStatus.SHADOW
+            : release.status
+          : input.phase === 'failed' &&
+              release.status === AgentReleaseStatus.SHADOW
+            ? AgentReleaseStatus.DRAFT
+            : release.status;
+      await repo.update(release.id, {
+        status: next,
+        shadowReportId: input.reportId,
+      });
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey: release.agentKey,
+        releaseId: release.id,
+        action:
+          input.phase === 'started'
+            ? AgentReleaseAuditAction.SHADOW_STARTED
+            : AgentReleaseAuditAction.SHADOW_COMPLETED,
+        actorKind:
+          input.userId === null
+            ? AgentReleaseAuthorKind.SYSTEM
+            : AgentReleaseAuthorKind.HUMAN,
+        actorUserId: input.userId,
+        detail: {
+          shadowReportId: input.reportId,
+          phase: input.phase,
+          from: release.status,
+          to: next,
+          ...(input.detail ?? {}),
+        },
+      });
+      return { ...release, status: next } as AgentRelease;
+    });
+  }
+
+  /**
+   * Retire a release that never reached GA or canary — a curator draft that
+   * failed its gate or its shadow. Retired releases stay readable as
+   * evidence; nothing serves them.
+   */
+  async retireUnreleased(
+    releaseId: string,
+    reason: string,
+    actorKind: AgentReleaseAuthorKind,
+    userId: number | null = null,
+  ): Promise<AgentRelease> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const release = await repo.findOne({ where: { id: releaseId } });
+      if (!release) throw new NotFoundException('Release not found');
+      if (
+        [
+          AgentReleaseStatus.GA,
+          AgentReleaseStatus.CANARY,
+          AgentReleaseStatus.RETIRED,
+        ].includes(release.status)
+      ) {
+        throw new BadRequestException(
+          `A ${release.status} release is not retired this way.`,
+        );
+      }
+      await repo.update(release.id, {
+        status: AgentReleaseStatus.RETIRED,
+        retiredAt: new Date(),
+      });
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey: release.agentKey,
+        releaseId: release.id,
+        action: AgentReleaseAuditAction.STATUS_CHANGED,
+        actorKind,
+        actorUserId: userId,
+        detail: {
+          from: release.status,
+          to: AgentReleaseStatus.RETIRED,
+          reason,
+        },
+      });
+      return { ...release, status: AgentReleaseStatus.RETIRED } as AgentRelease;
+    });
+  }
+
+  /** The canary monitor's decision, kept with its evidence (plan §7.13). */
+  async recordCanaryDecision(
+    releaseId: string,
+    detail: Record<string, unknown>,
+  ): Promise<void> {
+    const release = await this.getById(releaseId);
+    await this.audit.save({
+      agentKey: release.agentKey,
+      releaseId,
+      action: AgentReleaseAuditAction.CANARY_DECIDED,
+      actorKind: AgentReleaseAuthorKind.SYSTEM,
+      actorUserId: null,
+      detail,
+    });
+  }
+
+  /** A release's audit rows, oldest first. */
+  auditFor(releaseId: string): Promise<AgentReleaseAudit[]> {
+    return this.audit.find({
+      where: { releaseId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /** When the running canary started: its latest CANARY_STARTED row. */
+  async canaryStartedAt(releaseId: string): Promise<Date | null> {
+    const row = await this.audit.findOne({
+      where: { releaseId, action: AgentReleaseAuditAction.CANARY_STARTED },
+      order: { createdAt: 'DESC' },
+    });
+    return row?.createdAt ?? null;
+  }
+
+  /** The latest promotion of any release of the agent (plan Appendix A: ≥ 3 days apart). */
+  async lastPromotionAt(agentKey: string): Promise<Date | null> {
+    const row = await this.audit.findOne({
+      where: { agentKey, action: AgentReleaseAuditAction.PROMOTED },
+      order: { createdAt: 'DESC' },
+    });
+    return row?.createdAt ?? null;
   }
 
   /** The GA release before the current one: where a rollback lands now. */
