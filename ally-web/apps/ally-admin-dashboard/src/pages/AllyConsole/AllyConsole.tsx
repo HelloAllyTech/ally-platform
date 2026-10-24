@@ -4,10 +4,14 @@ import { useSearchParams } from "react-router-dom";
 
 import { Tabs } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
+import { useAllyGuideAccess } from "@hooks";
 
+import { AlertsTab } from "./AlertsTab";
+import { BaselineTab } from "./BaselineTab";
 import { ConversationsTab } from "./ConversationsTab";
 import { CrisisCopyTab } from "./CrisisCopyTab";
 import { OverviewTab } from "./OverviewTab";
+import { PlaygroundTab } from "./PlaygroundTab";
 import { ReleasesTab } from "./ReleasesTab";
 import { SettingsTab } from "./SettingsTab";
 
@@ -15,42 +19,64 @@ export enum AllyConsoleTab {
   OVERVIEW = "overview",
   CONVERSATIONS = "conversations",
   RELEASES = "releases",
+  PLAYGROUND = "playground",
+  ALERTS = "alerts",
+  BASELINE = "baseline",
   SETTINGS = "settings",
   CRISIS_COPY = "crisis-copy",
 }
 
-const TAB_ITEMS = [
+const ALL_TAB_ITEMS = [
   { id: AllyConsoleTab.OVERVIEW, label: en.allyConsole.tabs.overview },
   { id: AllyConsoleTab.CONVERSATIONS, label: en.allyConsole.tabs.conversations },
   { id: AllyConsoleTab.RELEASES, label: en.allyConsole.tabs.releases },
+  { id: AllyConsoleTab.PLAYGROUND, label: en.allyConsole.tabs.playground },
+  { id: AllyConsoleTab.ALERTS, label: en.allyConsole.tabs.alerts },
+  { id: AllyConsoleTab.BASELINE, label: en.allyConsole.tabs.baseline },
   { id: AllyConsoleTab.SETTINGS, label: en.allyConsole.tabs.settings },
   { id: AllyConsoleTab.CRISIS_COPY, label: en.allyConsole.tabs.crisisCopy },
 ];
 
-const VALID_TABS = new Set<string>(TAB_ITEMS.map(tab => tab.id));
+const VALID_TABS = new Set<string>(ALL_TAB_ITEMS.map(tab => tab.id));
 
 /**
  * The Ally Console: the Ally team's control room for the AI course companion.
  *
  * The route is gated on the `ally_guide` toggle AND the view permission (see RouteLayout); every
  * edit control inside narrows further on the edit permission, and transcripts and payloads on their
- * own per-person grant. The active tab lives in the address (`?tab=`), so a link to "Releases" or to
- * one conversation (`?tab=conversations&thread=…`) opens exactly there.
+ * own per-person grant. The Playground calls the models and the server requires the edit grant for
+ * it, so the tab is hidden without it (a link to it still explains why). The active tab lives in
+ * the address (`?tab=`), so a link to "Releases" or to one conversation
+ * (`?tab=conversations&thread=…`) opens exactly there.
  */
 export const AllyConsole: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { canEdit } = useAllyGuideAccess();
+
+  const tabItems = useMemo(
+    () => ALL_TAB_ITEMS.filter(tab => canEdit || tab.id !== AllyConsoleTab.PLAYGROUND),
+    [canEdit],
+  );
 
   const activeTab = useMemo(() => {
     const requested = searchParams.get("tab");
     return requested && VALID_TABS.has(requested) ? requested : AllyConsoleTab.OVERVIEW;
   }, [searchParams]);
 
+  const go = (tab: AllyConsoleTab) => setSearchParams({ tab });
+
   const renderTab = () => {
     switch (activeTab) {
       case AllyConsoleTab.CONVERSATIONS:
         return <ConversationsTab />;
       case AllyConsoleTab.RELEASES:
-        return <ReleasesTab />;
+        return <ReleasesTab onOpenOverview={() => go(AllyConsoleTab.OVERVIEW)} />;
+      case AllyConsoleTab.PLAYGROUND:
+        return <PlaygroundTab />;
+      case AllyConsoleTab.ALERTS:
+        return <AlertsTab />;
+      case AllyConsoleTab.BASELINE:
+        return <BaselineTab />;
       case AllyConsoleTab.SETTINGS:
         return <SettingsTab />;
       case AllyConsoleTab.CRISIS_COPY:
@@ -58,7 +84,10 @@ export const AllyConsole: React.FC = () => {
       case AllyConsoleTab.OVERVIEW:
       default:
         return (
-          <OverviewTab onOpenReleases={() => setSearchParams({ tab: AllyConsoleTab.RELEASES })} />
+          <OverviewTab
+            onOpenReleases={() => go(AllyConsoleTab.RELEASES)}
+            onOpenAlerts={() => go(AllyConsoleTab.ALERTS)}
+          />
         );
     }
   };
@@ -70,7 +99,7 @@ export const AllyConsole: React.FC = () => {
         {en.allyConsole.intro}
       </p>
       <Tabs
-        items={TAB_ITEMS}
+        items={tabItems}
         activeId={activeTab}
         onChange={id => setSearchParams({ tab: id })}
         showCount={false}

@@ -13,7 +13,7 @@ import {
   TableRow,
   Tile,
 } from "@ally-ui-mono/ui-shared";
-import { useGetAllyGuideOverviewQuery } from "@api";
+import { useGetAllyGuideAlertCountsQuery, useGetAllyGuideOverviewQuery } from "@api";
 import {
   formatCount,
   formatMs,
@@ -27,7 +27,11 @@ import { en } from "@constants";
 import { AllyGuideOverview } from "@types";
 import { formatDate } from "@utils";
 
+import { CanaryMonitor } from "./CanaryMonitor";
+
 const WINDOWS = [7, 30] as const;
+
+const TILE_GRID = "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6";
 
 interface StatTileProps {
   label: string;
@@ -50,28 +54,60 @@ const StatTile: React.FC<StatTileProps> = ({ label, help, value, detail, testId,
   </Tile>
 );
 
+/**
+ * Open alerts, from the counts endpoint (open and total, whatever their age). It has its own request:
+ * a failed read says so in the tile and leaves the rest of the Overview alone.
+ */
+const AlertsTile: React.FC<{ onOpenAlerts: () => void }> = ({ onOpenAlerts }) => {
+  const strings = en.allyConsole.overview.alertsTile;
+  const { data, isLoading, isError } = useGetAllyGuideAlertCountsQuery();
+
+  return (
+    <StatTile
+      testId="tile-alerts"
+      label={strings.label}
+      help={strings.help}
+      value={isLoading ? "…" : isError || !data ? "—" : formatCount(data.open)}
+      detail={
+        isError
+          ? strings.failed
+          : isLoading || !data
+            ? undefined
+            : data.open === 0
+              ? strings.none
+              : strings.ofTotal(data.total)
+      }
+    >
+      <Button kind="ghost" size="sm" className="mt-1 self-start !px-0" onClick={onOpenAlerts}>
+        {strings.review}
+      </Button>
+    </StatTile>
+  );
+};
+
 const OverviewSkeleton: React.FC = () => (
   <div role="status" aria-live="polite" data-testid="ally-overview-loading">
     <span className="sr-only">{en.allyConsole.states.loading}</span>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {[0, 1, 2, 3, 4].map(index => (
+    <div className={TILE_GRID}>
+      {[0, 1, 2, 3, 4, 5].map(index => (
         <SkeletonPlaceholder key={index} style={{ width: "100%", height: "120px" }} />
       ))}
     </div>
   </div>
 );
 
-const OverviewBody: React.FC<{ data: AllyGuideOverview; onOpenReleases: () => void }> = ({
-  data,
-  onOpenReleases,
-}) => {
+const OverviewBody: React.FC<{
+  data: AllyGuideOverview;
+  onOpenReleases: () => void;
+  onOpenAlerts: () => void;
+}> = ({ data, onOpenReleases, onOpenAlerts }) => {
   const strings = en.allyConsole.overview;
-  const { turns, cache, cost, release, safety } = data;
+  const { turns, cache, cost, release, safety, canary } = data;
   const noTraffic = turns.total === 0;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className={TILE_GRID}>
         <StatTile
           testId="tile-turns"
           label={strings.tiles.turns}
@@ -120,11 +156,19 @@ const OverviewBody: React.FC<{ data: AllyGuideOverview; onOpenReleases: () => vo
               : strings.tiles.releaseNoneDetail
           }
         >
+          {canary && (
+            <div className="text-sm text-typography-800" data-testid="tile-release-canary">
+              {strings.tiles.canaryDetail(releaseVersionLabel(canary.version), canary.percent)}
+            </div>
+          )}
           <Button kind="ghost" size="sm" className="mt-1 self-start !px-0" onClick={onOpenReleases}>
             {strings.tiles.openReleases}
           </Button>
         </StatTile>
+        <AlertsTile onOpenAlerts={onOpenAlerts} />
       </div>
+
+      <CanaryMonitor canary={canary} live={release} arms={data.arms} />
 
       {noTraffic ? (
         <EmptyPanel title={strings.emptyTitle} message={strings.emptyMessage} />
@@ -229,14 +273,17 @@ const OverviewBody: React.FC<{ data: AllyGuideOverview; onOpenReleases: () => vo
 interface OverviewTabProps {
   /** Jumps to the Releases tab, from the live-release tile. */
   onOpenReleases: () => void;
+  /** Jumps to the Alerts tab, from the open-alerts tile. */
+  onOpenAlerts: () => void;
 }
 
 /**
  * Live health for Ally over the last 7 or 30 days: turns and success, time to first token by
- * channel, cache hit ratio, cost, the safety counts and which release is live. Counts only, never
- * what a learner said (that is the Conversations tab, behind its own permission).
+ * channel, cache hit ratio, cost, the safety counts, which release is live, how many alerts are
+ * open, and the canary beside the live release when one is running. Counts only, never what a
+ * learner said (that is the Conversations tab, behind its own permission).
  */
-export const OverviewTab: React.FC<OverviewTabProps> = ({ onOpenReleases }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ onOpenReleases, onOpenAlerts }) => {
   const strings = en.allyConsole.overview;
   const [days, setDays] = useState<number>(7);
   // `currentData`, not `data`: `data` keeps the PREVIOUS window's numbers while the new one loads,
@@ -260,7 +307,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onOpenReleases }) => {
       </div>
 
       {data ? (
-        <OverviewBody data={data} onOpenReleases={onOpenReleases} />
+        <OverviewBody data={data} onOpenReleases={onOpenReleases} onOpenAlerts={onOpenAlerts} />
       ) : isError ? (
         <ErrorPanel what="the overview" error={error} onRetry={() => void refetch()} />
       ) : (

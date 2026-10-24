@@ -15,8 +15,16 @@ const TONES: Record<AllyGuideReleaseStatus, PillTone> = {
   retired: "neutral",
 };
 
-export const ReleaseStatusPill: React.FC<{ status: AllyGuideReleaseStatus }> = ({ status }) => (
+interface ReleaseStatusPillProps {
+  status: AllyGuideReleaseStatus;
+  /** A canary's share of new conversations, so the pill reads "Canary · 20%". */
+  rolloutPercent?: number | null;
+}
+
+export const ReleaseStatusPill: React.FC<ReleaseStatusPillProps> = ({ status, rolloutPercent }) => (
   <Pill tone={TONES[status] ?? "neutral"}>
-    {en.allyConsole.releases.statuses[status] ?? status}
+    {status === "canary"
+      ? en.allyConsole.releases.canaryPill(rolloutPercent ?? null)
+      : (en.allyConsole.releases.statuses[status] ?? status)}
   </Pill>
 );

@@ -23,6 +23,7 @@ import { en } from "@constants";
 import { AllyGuidePromptRef, AllyGuideRelease } from "@types";
 import { formatDateTime } from "@utils";
 
+import { canStartCanary } from "./canaryShare";
 import { ReleaseStatusPill } from "./ReleaseStatusPill";
 
 const PRE_CLASSES =
@@ -75,6 +76,9 @@ interface ReleaseDrawerProps {
   summary?: AllyGuideRelease;
   canEdit: boolean;
   onPromote: (release: AllyGuideRelease) => void;
+  /** Start a canary of this release, or change the share of one already running. */
+  onStartCanary: (release: AllyGuideRelease) => void;
+  onStopCanary: (release: AllyGuideRelease) => void;
   onClose: () => void;
 }
 
@@ -82,7 +86,9 @@ const DrawerBody: React.FC<{
   releaseId: string;
   canEdit: boolean;
   onPromote: (release: AllyGuideRelease) => void;
-}> = ({ releaseId, canEdit, onPromote }) => {
+  onStartCanary: (release: AllyGuideRelease) => void;
+  onStopCanary: (release: AllyGuideRelease) => void;
+}> = ({ releaseId, canEdit, onPromote, onStartCanary, onStopCanary }) => {
   const strings = en.allyConsole.releases.detail;
   const { data, isLoading, isError, error, refetch } = useGetAllyGuideReleaseQuery(releaseId);
 
@@ -112,6 +118,17 @@ const DrawerBody: React.FC<{
       </span>,
       strings.hashHelp,
     ],
+    ...(data.status === "canary"
+      ? ([
+          [
+            strings.shareMeta,
+            data.rolloutPercent === null || data.rolloutPercent === undefined
+              ? "—"
+              : `${data.rolloutPercent}%`,
+            strings.canaryHelp,
+          ],
+        ] as [string, React.ReactNode, string?][])
+      : []),
     [strings.meta.created, formatDateTime(data.createdAt)],
     [
       strings.meta.promoted,
@@ -137,11 +154,26 @@ const DrawerBody: React.FC<{
         ))}
       </dl>
 
+      {data.status === "canary" && (
+        <p className="text-sm text-typography-800" data-testid="release-canary-note">
+          {strings.canaryRunning(data.rolloutPercent ?? null)}
+        </p>
+      )}
       {canEdit && data.status !== "ga" && (
-        <div>
+        <div className="flex flex-wrap gap-3">
           <Button kind="primary" size="md" onClick={() => onPromote(data)}>
             {strings.promote}
           </Button>
+          {canStartCanary(data.status) && (
+            <Button kind="tertiary" size="md" onClick={() => onStartCanary(data)}>
+              {data.status === "canary" ? strings.changeCanary : strings.startCanary}
+            </Button>
+          )}
+          {data.status === "canary" && (
+            <Button kind="danger--tertiary" size="md" onClick={() => onStopCanary(data)}>
+              {strings.stopCanary}
+            </Button>
+          )}
         </div>
       )}
       {data.status === "ga" && <p className="text-sm text-typography-700">{strings.promoteGa}</p>}
@@ -203,6 +235,8 @@ export const ReleaseDrawer: React.FC<ReleaseDrawerProps> = ({
   summary,
   canEdit,
   onPromote,
+  onStartCanary,
+  onStopCanary,
   onClose,
 }) => {
   const strings = en.allyConsole.releases.detail;
@@ -215,7 +249,9 @@ export const ReleaseDrawer: React.FC<ReleaseDrawerProps> = ({
             ? shortId(releaseId)
             : ""}
       </h2>
-      {summary && <ReleaseStatusPill status={summary.status} />}
+      {summary && (
+        <ReleaseStatusPill status={summary.status} rolloutPercent={summary.rolloutPercent} />
+      )}
     </div>
   );
   return (
@@ -227,7 +263,14 @@ export const ReleaseDrawer: React.FC<ReleaseDrawerProps> = ({
       className="w-[min(860px,100vw)]"
     >
       {releaseId && (
-        <DrawerBody key={releaseId} releaseId={releaseId} canEdit={canEdit} onPromote={onPromote} />
+        <DrawerBody
+          key={releaseId}
+          releaseId={releaseId}
+          canEdit={canEdit}
+          onPromote={onPromote}
+          onStartCanary={onStartCanary}
+          onStopCanary={onStopCanary}
+        />
       )}
     </SidePanel>
   );

@@ -5,16 +5,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // another import that pulls it in arrives too late.
 import "@constants";
 
-const h = vi.hoisted(() => ({ overview: vi.fn() }));
+const h = vi.hoisted(() => ({
+  overview: vi.fn(),
+  counts: vi.fn(),
+  access: { current: { canEdit: true } as Record<string, boolean> },
+}));
 
 vi.mock(
   "@ally-ui-mono/ui-shared",
   async () =>
     (await import("../../../components/ally-guide/__tests__/uiSharedFakes")).uiSharedFakes,
 );
+vi.mock("@hooks", () => ({ useAllyGuideAccess: () => h.access.current }));
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGetAllyGuideOverviewQuery: (args: { days: number }) => h.overview(args),
+  useGetAllyGuideAlertCountsQuery: () => h.counts(),
+  usePromoteAllyGuideReleaseMutation: () => [vi.fn(), { isLoading: false }],
+  useStopAllyGuideCanaryMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -32,6 +40,8 @@ const overview = (overrides: Record<string, unknown> = {}) => ({
   cache: { readTokens: 9_000_000, uncachedInputTokens: 3_000_000, ratio: 0.75 },
   cost: { totalUsd: 12.3456, perThreadUsd: 0.0398 },
   release: { id: "rel-3", version: 3, promotedAt: "2026-10-20T09:00:00.000Z" },
+  canary: null,
+  arms: [],
   ...overrides,
 });
 
@@ -46,10 +56,49 @@ describe("OverviewTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.overview.mockReturnValue(loaded(overview()));
+    h.counts.mockReturnValue({ data: { open: 2, total: 9 }, isLoading: false, isError: false });
+    h.access.current = { canEdit: true };
+  });
+
+  describe("the open-alerts tile", () => {
+    it("shows how many alerts are open out of all raised, and opens the Alerts tab", () => {
+      const onOpenAlerts = vi.fn();
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={onOpenAlerts} />);
+
+      const tile = screen.getByTestId("tile-alerts");
+      expect(tile).toHaveTextContent("2");
+      expect(tile).toHaveTextContent("of 9 raised in all");
+      fireEvent.click(within(tile).getByRole("button", { name: "Review alerts" }));
+      expect(onOpenAlerts).toHaveBeenCalledTimes(1);
+    });
+
+    it("says nothing needs attention at zero open", () => {
+      h.counts.mockReturnValue({ data: { open: 0, total: 4 }, isLoading: false, isError: false });
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
+
+      expect(screen.getByTestId("tile-alerts")).toHaveTextContent("Nothing needs attention");
+    });
+
+    it("says it could not load, without taking the rest of the Overview down", () => {
+      h.counts.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
+
+      expect(screen.getByTestId("tile-alerts")).toHaveTextContent("Could not load the alerts");
+      expect(screen.getByTestId("tile-turns")).toHaveTextContent("1.2k");
+    });
+  });
+
+  it("mentions the canary on the release tile when one is running", () => {
+    h.overview.mockReturnValue(
+      loaded(overview({ canary: { id: "rel-4", version: 4, percent: 20 } })),
+    );
+    render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
+
+    expect(screen.getByTestId("tile-release-canary")).toHaveTextContent("Canary: v4 at 20%");
   });
 
   it("shows the health tiles with the figures in words and units", () => {
-    render(<OverviewTab onOpenReleases={vi.fn()} />);
+    render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
     expect(screen.getByTestId("tile-turns")).toHaveTextContent("1.2k");
     expect(screen.getByTestId("tile-turns")).toHaveTextContent("in 310 conversations");
@@ -62,7 +111,7 @@ describe("OverviewTab", () => {
 
   it("shows the live release and takes you to the Releases tab from it", () => {
     const onOpenReleases = vi.fn();
-    render(<OverviewTab onOpenReleases={onOpenReleases} />);
+    render(<OverviewTab onOpenReleases={onOpenReleases} onOpenAlerts={vi.fn()} />);
 
     expect(screen.getByTestId("tile-release")).toHaveTextContent("v3");
     expect(screen.getByTestId("tile-release")).toHaveTextContent("Live since");
@@ -73,14 +122,14 @@ describe("OverviewTab", () => {
 
   it("says plainly when there is no live release, because Ally cannot answer without one", () => {
     h.overview.mockReturnValue(loaded(overview({ release: null })));
-    render(<OverviewTab onOpenReleases={vi.fn()} />);
+    render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
     expect(screen.getByTestId("tile-release")).toHaveTextContent("No live release");
     expect(screen.getByTestId("tile-release")).toHaveTextContent("cannot answer");
   });
 
   it("tabulates time to first token by channel, in milliseconds then seconds", () => {
-    render(<OverviewTab onOpenReleases={vi.fn()} />);
+    render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
     const text = screen.getByTestId("ttft-row-text");
     expect(text).toHaveTextContent("Text");
@@ -94,14 +143,14 @@ describe("OverviewTab", () => {
 
   it("says there were no timed turns rather than drawing an empty table", () => {
     h.overview.mockReturnValue(loaded(overview({ timeToFirstTokenMs: [] })));
-    render(<OverviewTab onOpenReleases={vi.fn()} />);
+    render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
     expect(screen.getByTestId("ally-ttft-empty")).toBeInTheDocument();
     expect(screen.queryByTestId("ally-ttft-table")).not.toBeInTheDocument();
   });
 
   it("shows the five safety counts, and nothing a learner said", () => {
-    render(<OverviewTab onOpenReleases={vi.fn()} />);
+    render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
     const safety = screen.getByTestId("ally-safety");
     expect(within(safety).getByTestId("safety-crises")).toHaveTextContent("3");
@@ -116,7 +165,7 @@ describe("OverviewTab", () => {
 
   describe("the 7 / 30 day window", () => {
     it("asks for the last 7 days first", () => {
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
       expect(h.overview).toHaveBeenLastCalledWith({ days: 7 });
       expect(screen.getByRole("button", { name: "Last 7 days" })).toHaveAttribute(
@@ -126,7 +175,7 @@ describe("OverviewTab", () => {
     });
 
     it("switches to 30 days and asks for them", () => {
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Last 30 days" }));
 
@@ -140,7 +189,7 @@ describe("OverviewTab", () => {
           ? loaded(overview())
           : { currentData: undefined, isError: false, error: undefined, refetch: vi.fn() },
       );
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
       expect(screen.getByTestId("tile-turns")).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: "Last 30 days" }));
@@ -153,7 +202,7 @@ describe("OverviewTab", () => {
   describe("states", () => {
     it("shows a skeleton while the first load is in flight", () => {
       h.overview.mockReturnValue(loaded(undefined));
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
       expect(screen.getByTestId("ally-overview-loading")).toBeInTheDocument();
     });
@@ -166,7 +215,7 @@ describe("OverviewTab", () => {
         error: { status: 500 },
         refetch,
       });
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
       expect(screen.getByTestId("ally-load-failed")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -180,7 +229,7 @@ describe("OverviewTab", () => {
         error: { status: 403 },
         refetch: vi.fn(),
       });
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
       expect(screen.getByTestId("ally-forbidden")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
@@ -198,7 +247,7 @@ describe("OverviewTab", () => {
           }),
         ),
       );
-      render(<OverviewTab onOpenReleases={vi.fn()} />);
+      render(<OverviewTab onOpenReleases={vi.fn()} onOpenAlerts={vi.fn()} />);
 
       expect(screen.getByText("No Ally conversations in this window yet")).toBeInTheDocument();
       // Nothing to measure is a dash, not 0% and not NaN.
