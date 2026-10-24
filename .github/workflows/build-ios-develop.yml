@@ -17,6 +17,8 @@ jobs:
 
     steps:
       - name: Verify Xcode version
+        # Runs before checkout, so the ally-mobile default folder does not exist yet.
+        working-directory: .
         run: sudo xcode-select --switch /Applications/Xcode_26.2.app
 
       - name: Checkout repository
