@@ -199,6 +199,78 @@
         }
       }
     },
+    "GuideMemorySource": {
+      "description": "One of the learner's own messages a memory note was drawn from: the answer to \"why does Ally remember this?\". A message the learner has since deleted is absent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["messageId", "threadId", "excerpt", "at"],
+      "properties": {
+        "messageId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "excerpt": {
+          "description": "The learner's words, at most 200 characters.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "at": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "GuideMemoryView": {
+      "description": "GET /v1/guide/memory returns an array of these: what Ally remembers about the learner in this organisation (plan §8.1), each with its provenance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "body",
+        "revision",
+        "lastConfirmedAt",
+        "expiresAt",
+        "sources"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "preference",
+            "goal",
+            "possible_self",
+            "strength",
+            "struggle",
+            "context",
+            "commitment",
+            "unique_outcome"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "lastConfirmedAt": {
+          "type": ["string", "null"]
+        },
+        "expiresAt": {
+          "type": ["string", "null"]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GuideMemorySource"
+          }
+        }
+      }
+    },
     "GuideCrisisState": {
       "description": "The fixed crisis response on screen (plan §6.3): sent as crisis.response, and in bootstrap while the thread is in CRISIS so a reload keeps the card.",
       "type": "object",

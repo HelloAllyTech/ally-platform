@@ -110,13 +110,29 @@ describe('verifyTutorAnswer', () => {
 });
 
 describe('GuideLearnerDataService', () => {
-  function setup(existing: any = null) {
+  function setup(existing: any = null, affected = 1) {
+    const writes: Array<{ set: any; where: string; params: any }> = [];
+    const builder: any = {
+      update: jest.fn(() => builder),
+      set: jest.fn((set: any) => {
+        writes.push({ set, where: '', params: null });
+        return builder;
+      }),
+      where: jest.fn((where: string, params: any) => {
+        writes[writes.length - 1].where = where;
+        writes[writes.length - 1].params = params;
+        return builder;
+      }),
+      execute: jest.fn(async () => ({ affected })),
+    };
     const memories = {
-      findOne: jest.fn(async () => existing),
-      find: jest.fn(async () => []),
-      update: jest.fn(async () => undefined),
+      findOne: jest.fn<Promise<any>, any[]>(async () => existing),
+      find: jest.fn<Promise<any[]>, any[]>(async () => []),
+      update: jest.fn<Promise<void>, any[]>(async () => undefined),
       create: jest.fn((row) => row),
       save: jest.fn(async (row) => ({ id: 'm1', ...row })),
+      createQueryBuilder: jest.fn(() => builder),
+      writes,
     };
     const appointments = {
       update: jest.fn(async () => undefined),
@@ -124,12 +140,16 @@ describe('GuideLearnerDataService', () => {
       save: jest.fn(async (row) => ({ id: 'a1', ...row })),
       findOne: jest.fn(),
     };
+    const messages = {
+      find: jest.fn<Promise<any[]>, any[]>(async () => []),
+    };
     const service = new GuideLearnerDataService(
       memories as never,
       {} as never,
       appointments as never,
+      messages as never,
     );
-    return { service, memories, appointments };
+    return { service, memories, appointments, messages };
   }
   const owner = { id: 3, tenantId: 'org' };
   const input = (body: string) => ({
@@ -183,6 +203,151 @@ describe('GuideLearnerDataService', () => {
       status: GuideMemoryStatus.DELETED,
       body: '',
       expiresAt: null,
+    });
+  });
+
+  it('keeps the message a note came from, and adds to it when confirmed', async () => {
+    const t = setup();
+    await t.service.remember({
+      ...input('Wants calmer openings.'),
+      sourceMessageIds: ['msg-1'],
+    });
+    expect(t.memories.save.mock.calls[0][0]).toMatchObject({
+      sourceMessageIds: ['msg-1'],
+    });
+
+    const again = setup({
+      id: 'm9',
+      status: GuideMemoryStatus.ACTIVE,
+      revision: 2,
+      sourceMessageIds: ['msg-1'],
+    });
+    await again.service.remember({
+      ...input('Wants calmer openings.'),
+      sourceMessageIds: ['msg-1', 'msg-7'],
+    });
+    expect(again.memories.update.mock.calls[0][1]).toMatchObject({
+      sourceMessageIds: ['msg-1', 'msg-7'],
+      revision: 3,
+    });
+  });
+
+  it('writes a retired note again when it becomes true again', async () => {
+    const t = setup({
+      id: 'm9',
+      status: GuideMemoryStatus.RETIRED,
+      revision: 4,
+      body: '',
+    });
+    expect(await t.service.remember(input('Wants calmer openings.'))).toEqual({
+      stored: true,
+      id: 'm9',
+      updated: true,
+    });
+    expect(t.memories.update.mock.calls[0][1]).toMatchObject({
+      status: GuideMemoryStatus.ACTIVE,
+      body: 'Wants calmer openings.',
+    });
+  });
+
+  const owned = (extra: any = {}) => ({
+    id: 'm9',
+    userId: 3,
+    tenantId: 'org',
+    status: GuideMemoryStatus.ACTIVE,
+    revision: 2,
+    bodyHash: 'old',
+    sourceMessageIds: ['msg-1'],
+    ...extra,
+  });
+  const edit = (extra: any = {}) => ({
+    owner,
+    id: 'm9',
+    expectedRevision: 2,
+    body: 'Wants slower, calmer openings.',
+    expiryDays: 180,
+    maxChars: 280,
+    sourceMessageIds: ['msg-4'],
+    ...extra,
+  });
+
+  it('edits a note only at the revision the curator read', async () => {
+    const t = setup(owned());
+    t.memories.findOne
+      .mockResolvedValueOnce(owned())
+      .mockResolvedValueOnce(null);
+    expect(await t.service.editMemory(edit())).toBe('applied');
+    const write = t.memories.writes[0];
+    expect(write.where).toContain('revision = :revision');
+    expect(write.params).toMatchObject({ revision: 2, id: 'm9' });
+    expect(write.set).toMatchObject({
+      body: 'Wants slower, calmer openings.',
+      sourceMessageIds: ['msg-1', 'msg-4'],
+    });
+
+    const moved = setup(owned({ revision: 3 }));
+    expect(await moved.service.editMemory(edit())).toBe('stale');
+    expect(moved.memories.writes).toHaveLength(0);
+
+    const raced = setup(owned(), 0);
+    raced.memories.findOne
+      .mockResolvedValueOnce(owned())
+      .mockResolvedValueOnce(null);
+    expect(await raced.service.editMemory(edit())).toBe('stale');
+  });
+
+  it('never rewrites a note into one the learner forgot', async () => {
+    const t = setup();
+    t.memories.findOne.mockResolvedValueOnce(owned()).mockResolvedValueOnce({
+      id: 'm2',
+      status: GuideMemoryStatus.DELETED,
+    });
+    expect(await t.service.editMemory(edit())).toBe('forgotten_before');
+    expect(t.memories.writes).toHaveLength(0);
+  });
+
+  it('retires a note: text gone, no tombstone, revision-checked', async () => {
+    const t = setup();
+    expect(
+      await t.service.retireMemory({ owner, id: 'm9', expectedRevision: 2 }),
+    ).toBe('applied');
+    expect(t.memories.writes[0].set).toMatchObject({
+      status: GuideMemoryStatus.RETIRED,
+      body: '',
+    });
+    expect(t.memories.writes[0].params).toMatchObject({ revision: 2 });
+  });
+
+  it('lists each note with the learner’s own words it came from', async () => {
+    const t = setup();
+    t.memories.find.mockResolvedValueOnce([
+      owned({
+        kind: 'goal',
+        body: 'Wants calmer openings.',
+        sourceMessageIds: ['msg-1', 'msg-gone'],
+      }),
+    ]);
+    t.messages.find.mockResolvedValueOnce([
+      {
+        id: 'msg-1',
+        threadId: 'th1',
+        content: 'I want my openings to feel calmer',
+        createdAt: new Date('2026-10-20T10:00:00Z'),
+      },
+    ]);
+    const [note] = await t.service.listMemories(owner);
+    expect(note.sources).toEqual([
+      {
+        messageId: 'msg-1',
+        threadId: 'th1',
+        excerpt: 'I want my openings to feel calmer',
+        at: '2026-10-20T10:00:00.000Z',
+      },
+    ]);
+    // Only the learner's own messages, only in this org.
+    expect(t.messages.find.mock.calls[0][0].where).toMatchObject({
+      tenantId: 'org',
+      role: 'learner',
     });
   });
 

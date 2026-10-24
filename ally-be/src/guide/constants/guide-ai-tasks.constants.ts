@@ -15,4 +15,5 @@ export const GUIDE_AI_TASKS = {
   EVALUATOR_CRITIC: 'guide-evaluator-critic',
   EVALUATOR_VERIFIER: 'guide-evaluator-verifier',
   RED_TEAM: 'guide-red-team',
+  MEMORY_CURATOR: 'guide-memory-curator',
 } as const;

@@ -6,7 +6,9 @@ import { GuideMemoryKind, GuideMemoryStatus } from '../enum/guide.enum';
  * Something Ally remembers about a learner, per (user, org) (plan §2.2 D4).
  * The learner can view, edit and delete each note. A deleted note becomes a
  * tombstone (`status = deleted`, `bodyHash` kept) so the curator never writes
- * the same thing back. Never holds third-party identifying details.
+ * the same thing back. A note the curator retired as out of date
+ * (`status = retired`) loses its text too, but may be written again. Never
+ * holds third-party identifying details.
  */
 @Entity('guide_learner_memories')
 @Index('idx_guide_learner_memories_owner', ['userId', 'tenantId', 'status'])
@@ -31,6 +33,13 @@ export class GuideLearnerMemory extends BaseWithoutTenantEntity {
 
   @Column({ type: 'uuid', nullable: true })
   sourceThreadId?: string | null;
+
+  /**
+   * The learner messages the note was drawn from (memory provenance): the
+   * learner sees them as "why Ally remembers this". Null on older notes.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  sourceMessageIds?: string[] | null;
 
   @Column({ type: 'real', nullable: true })
   confidence?: number | null;

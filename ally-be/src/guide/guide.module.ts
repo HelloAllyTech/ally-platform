@@ -11,6 +11,7 @@ import { GuideToolExecutorService } from './capabilities/guide-tool-executor.ser
 import { GuideTutorService } from './capabilities/specialists/guide-tutor.service';
 import { GuideCourseContentService } from './content/guide-course-content.service';
 import { GuideLearnerDataService } from './learner/guide-learner-data.service';
+import { GuideMemoryCuratorService } from './learner/guide-memory-curator.service';
 import { GuideConductorService } from './conductor/guide-conductor.service';
 import { GuideAdminService } from './admin/guide-admin.service';
 import { GuideAdminController } from './controller/guide-admin.controller';
@@ -146,6 +147,7 @@ import { GuideConfigResolverService } from './config/guide-config-resolver.servi
     GuideTutorService,
     GuideCourseContentService,
     GuideLearnerDataService,
+    GuideMemoryCuratorService,
     GuideVoiceService,
   ],
   // For the learning loop (src/guide-learning), which imports this module:

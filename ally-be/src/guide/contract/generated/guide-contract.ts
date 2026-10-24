@@ -77,6 +77,26 @@ export interface GuideMemoryRef {
   label: string;
 }
 
+/** One of the learner's own messages a memory note was drawn from: the answer to "why does Ally remember this?". A message the learner has since deleted is absent. */
+export interface GuideMemorySource {
+  messageId: string;
+  threadId: string;
+  /** The learner's words, at most 200 characters. */
+  excerpt: string;
+  at: string | null;
+}
+
+/** GET /v1/guide/memory returns an array of these: what Ally remembers about the learner in this organisation (plan §8.1), each with its provenance. */
+export interface GuideMemoryView {
+  id: string;
+  kind: 'preference' | 'goal' | 'possible_self' | 'strength' | 'struggle' | 'context' | 'commitment' | 'unique_outcome';
+  body: string;
+  revision: number;
+  lastConfirmedAt: string | null;
+  expiresAt: string | null;
+  sources: Array<GuideMemorySource>;
+}
+
 /** The fixed crisis response on screen (plan §6.3): sent as crisis.response, and in bootstrap while the thread is in CRISIS so a reload keeps the card. */
 export interface GuideCrisisState {
   messageId: string;

@@ -747,6 +747,8 @@ export class GuideToolExecutorService {
       threadId: ctx.threadId,
       expiryDays: policy.expiryDays,
       maxChars: policy.noteMaxChars,
+      // Provenance: the message the learner said it in (this turn's).
+      sourceMessageIds: ctx.learnerMessageId ? [ctx.learnerMessageId] : [],
     });
     if (!result.stored) {
       return fail(

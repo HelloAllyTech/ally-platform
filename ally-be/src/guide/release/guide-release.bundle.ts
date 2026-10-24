@@ -9,6 +9,11 @@ import {
   COACH_SYSTEM_PROMPT,
 } from '../prompts/coach.prompt';
 import {
+  MEMORY_CURATOR_PROMPT_CODE,
+  MEMORY_CURATOR_PROMPT_VERSION,
+  MEMORY_CURATOR_SYSTEM_PROMPT,
+} from '../prompts/memory-curator.prompt';
+import {
   OUTREACH_PROMPT_CODE,
   OUTREACH_PROMPT_VERSION,
   OUTREACH_SYSTEM_PROMPT,
@@ -336,6 +341,11 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
       code: COACH_PROMPT_CODE,
       version: COACH_PROMPT_VERSION,
       text: COACH_SYSTEM_PROMPT,
+    },
+    memory_curator: {
+      code: MEMORY_CURATOR_PROMPT_CODE,
+      version: MEMORY_CURATOR_PROMPT_VERSION,
+      text: MEMORY_CURATOR_SYSTEM_PROMPT,
     },
   },
   modelRouting: {

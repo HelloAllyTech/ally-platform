@@ -260,6 +260,7 @@ function setup(
     repo(null) as never,
     repo(null) as never,
   );
+  const curator = { schedule: jest.fn() };
   const service = new GuideTurnService(
     threads as never,
     bus as never,
@@ -281,6 +282,7 @@ function setup(
     learnerData as never,
     visitors as never,
     configResolver as never,
+    curator as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(
@@ -312,6 +314,7 @@ function setup(
     conductor,
     learnerData,
     releases,
+    curator,
   };
 }
 
@@ -862,6 +865,59 @@ describe('GuideTurnService', () => {
       'streaming',
       expect.objectContaining({ releaseId: 'rel-c', arm: 'canary' }),
     );
+  });
+
+  it('hands the previous epoch to the Memory Curator when a new one starts', async () => {
+    const t = setup({
+      thread: {
+        epoch: 1,
+        // Away long enough that this message starts a new session.
+        lastLearnerActivityAt: new Date(Date.now() - 3 * 60 * 60_000),
+        epochSnapshot: {
+          releaseId: 'rel-1',
+          tier: 'premium',
+          startedAt: new Date(Date.now() - 4 * 60 * 60_000).toISOString(),
+          startSeq: 1,
+          layerHashes: {},
+        },
+      },
+    });
+    const ctx = await t.run();
+    expect(ctx.epoch?.isNew).toBe(true);
+    // Up to, not including, the message that opened the new epoch.
+    expect(t.curator.schedule).toHaveBeenCalledWith('th1', ctx.learnerSeq! - 1);
+  });
+
+  it('does not curate on a thread’s first conversation', async () => {
+    const t = setup();
+    await t.run();
+    expect(t.curator.schedule).not.toHaveBeenCalled();
+  });
+
+  it('curates once the closing ritual is shown', async () => {
+    const closePass: Script = [
+      {
+        type: 'final',
+        message: {
+          content: [
+            { type: 'thinking', thinking: '', signature: 'sig' },
+            { type: 'tool_use', id: 'tu1', name: 'close_session', input: {} },
+          ],
+          stopReason: 'tool_use',
+          usage: { inputTokens: 100, outputTokens: 20 },
+        },
+      } as AgentStreamEvent,
+    ];
+    const t = setup({ scripts: [closePass, textPass('Until next time.')] });
+    t.tools.execute.mockImplementation(async (...args: any[]) => {
+      args[2].presented.push({
+        kind: 'closing_ritual',
+        title: 'Until next time',
+      });
+      return { content: '{"shown":true}', isError: false };
+    });
+    await t.run();
+    expect(t.curator.schedule).toHaveBeenCalledWith('th1');
   });
 
   const visitorTurn = (

@@ -88,6 +88,7 @@ import { recentConversation, replayHistory } from '../context/guide-history';
 import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
 import { GuideTrigger } from '../entity/guide-trigger.entity';
 import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
+import { GuideMemoryCuratorService } from '../learner/guide-memory-curator.service';
 import {
   GuideOrgProfile,
   GuideOrgProfileValue,
@@ -99,6 +100,7 @@ import {
   GuideThreadPacing,
 } from '../entity/guide-thread.entity';
 import {
+  GuideCardKind,
   GuideMessageKind,
   GuideMessageRole,
   GuideMode,
@@ -373,6 +375,7 @@ export class GuideTurnService {
     private readonly learnerData: GuideLearnerDataService,
     private readonly visitors: GuideVisitorService,
     private readonly configResolver: GuideConfigResolverService,
+    private readonly curator: GuideMemoryCuratorService,
   ) {}
 
   /**
@@ -968,6 +971,11 @@ export class GuideTurnService {
           config,
         },
       };
+      // The previous epoch was a session window: the Memory Curator reads
+      // it in the background, up to (not including) this message (§7.7).
+      if (snapshot?.startedAt && !visitor) {
+        this.curator.schedule(ctx.threadId, ctx.learnerSeq! - 1);
+      }
       const recent = await this.threads.recentRows(
         ctx.threadId,
         ctx.learnerSeq!,
@@ -1925,6 +1933,15 @@ export class GuideTurnService {
             ctx.lastSeq,
           )
           .catch(() => undefined));
+    // The closing ritual ends a session window: the Memory Curator reads it
+    // now, with this turn's reply in place (plan §7.7).
+    if (
+      !failed &&
+      !ctx.visitorId &&
+      ctx.presented.some((card) => card.kind === GuideCardKind.CLOSING_RITUAL)
+    ) {
+      this.curator.schedule(ctx.threadId);
+    }
     // The visitor's counter (plan §5.14: shown once two or fewer are left).
     if (ctx.visitorAllowance && ctx.announced) {
       await this.bus

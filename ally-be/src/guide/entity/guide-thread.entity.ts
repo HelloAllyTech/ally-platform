@@ -139,6 +139,13 @@ export class GuideThread extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', nullable: true })
   lastLearnerActivityAt?: Date | null;
 
+  /**
+   * The Memory Curator's watermark: messages with `seq` at or below it have
+   * been read for memory (plan §7.7). Advanced by a conditional update.
+   */
+  @Column({ type: 'int', default: 0 })
+  memoryCuratedSeq!: number;
+
   @Column({ type: 'uuid', nullable: true })
   mergedIntoThreadId?: string | null;
 

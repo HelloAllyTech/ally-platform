@@ -5,15 +5,18 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
-import { IsNull, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Repository } from 'typeorm';
+import { GuideMemoryView } from '../contract/generated/guide-contract';
 import { GuideAppointment } from '../entity/guide-appointment.entity';
 import { GuideLearnerMemory } from '../entity/guide-learner-memory.entity';
+import { GuideMessage } from '../entity/guide-message.entity';
 import { GuideNotebookEntry } from '../entity/guide-notebook-entry.entity';
 import { GuideThread } from '../entity/guide-thread.entity';
 import {
   GuideAppointmentStatus,
   GuideMemoryKind,
   GuideMemoryStatus,
+  GuideMessageRole,
   GuideNotebookKind,
 } from '../enum/guide.enum';
 
@@ -21,10 +24,12 @@ type Owner = { id: number; tenantId: string };
 
 /** Active notes kept per learner; the oldest beyond it are let go. */
 export const MEMORY_CAP = 100;
+/** Source messages kept per note: the latest few are enough to explain it. */
+export const MEMORY_SOURCES_CAP = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Lower-case, collapsed, punctuation-free: the identity of a note. */
-const memoryKey = (text: string) =>
+export const memoryKey = (text: string) =>
   createHash('sha256')
     .update(
       text
@@ -39,6 +44,44 @@ export type RememberResult =
   | { stored: true; id: string; updated: boolean }
   | { stored: false; reason: 'forgotten_before' | 'empty' };
 
+/** What happened to one curator edit or retirement. */
+export type CurationOutcome =
+  | 'applied'
+  /** The note changed (or went) since the curator read it: skipped, never forced. */
+  | 'stale'
+  /** The rewrite matches a note the learner forgot. */
+  | 'forgotten_before'
+  /** The rewrite matches another note the learner already has. */
+  | 'duplicate'
+  | 'empty';
+
+const cleanBody = (text: string, maxChars: number) =>
+  text.trim().replace(/\s+/g, ' ').slice(0, maxChars);
+
+/** Older sources first, newest last, without repeats, capped. */
+export function mergeSources(
+  existing: string[] | null | undefined,
+  added: string[] | null | undefined,
+): string[] | null {
+  const merged = [...(existing ?? [])];
+  for (const id of added ?? []) {
+    if (id && !merged.includes(id)) merged.push(id);
+  }
+  return merged.length ? merged.slice(-MEMORY_SOURCES_CAP) : null;
+}
+
+const clipExcerpt = (text: string) => {
+  const flat = text.trim().replace(/\s+/g, ' ');
+  return flat.length > 200 ? `${flat.slice(0, 199)}…` : flat;
+};
+
+const isoOrNull = (value: Date | string | undefined | null) =>
+  value ? new Date(value).toISOString() : null;
+
+/** A curator write lands only on the revision it read (optimistic). */
+const CURRENT_REVISION_SQL =
+  'id = :id AND "userId" = :userId AND "tenant_id" = :tenantId AND status = :active AND revision = :revision';
+
 /**
  * The learner's own data around Ally (plans/ally-guide/plan.md §8.1, §8.2):
  * memory (visible, editable, forgettable), the notebook (the learner's
@@ -46,7 +89,8 @@ export type RememberResult =
  *
  * Memory is per (learner, organisation) and never crosses orgs (plan D4).
  * Forgetting keeps only a hash, so the same note cannot quietly return, and
- * drops the text immediately.
+ * drops the text immediately. Every note remembers which of the learner's
+ * messages it came from, so the learner can see why.
  */
 @Injectable()
 export class GuideLearnerDataService {
@@ -57,6 +101,8 @@ export class GuideLearnerDataService {
     private readonly notebook: Repository<GuideNotebookEntry>,
     @InjectRepository(GuideAppointment)
     private readonly appointments: Repository<GuideAppointment>,
+    @InjectRepository(GuideMessage)
+    private readonly messages: Repository<GuideMessage>,
   ) {}
 
   // ── Memory ─────────────────────────────────────────────────────────────
@@ -90,11 +136,10 @@ export class GuideLearnerDataService {
     threadId: string | null;
     expiryDays: number;
     maxChars: number;
+    /** The learner messages the note comes from (memory provenance). */
+    sourceMessageIds?: string[];
   }): Promise<RememberResult> {
-    const body = input.body
-      .trim()
-      .replace(/\s+/g, ' ')
-      .slice(0, input.maxChars);
+    const body = cleanBody(input.body, input.maxChars);
     if (!body) return { stored: false, reason: 'empty' };
     const bodyHash = memoryKey(body);
     const existing = await this.memories.findOne({
@@ -109,11 +154,25 @@ export class GuideLearnerDataService {
     if (existing?.status === GuideMemoryStatus.DELETED) {
       return { stored: false, reason: 'forgotten_before' };
     }
+    const sourceMessageIds = mergeSources(
+      existing?.sourceMessageIds,
+      input.sourceMessageIds,
+    );
     if (existing) {
+      // Confirmed again — or, if the curator had retired it, true again.
       await this.memories.update(existing.id, {
+        ...(existing.status === GuideMemoryStatus.RETIRED
+          ? {
+              status: GuideMemoryStatus.ACTIVE,
+              body,
+              kind: input.kind,
+              sourceThreadId: input.threadId,
+            }
+          : {}),
         lastConfirmedAt: now,
         expiresAt,
         revision: existing.revision + 1,
+        sourceMessageIds,
       });
       return { stored: true, id: existing.id, updated: true };
     }
@@ -126,6 +185,7 @@ export class GuideLearnerDataService {
         bodyHash,
         status: GuideMemoryStatus.ACTIVE,
         sourceThreadId: input.threadId,
+        sourceMessageIds,
         revision: 1,
         lastConfirmedAt: now,
         expiresAt,
@@ -133,6 +193,109 @@ export class GuideLearnerDataService {
     );
     await this.trimMemories(input.owner);
     return { stored: true, id: saved.id, updated: false };
+  }
+
+  /**
+   * Rewrite a note the curator read at `expectedRevision` (plan §7.7). The
+   * write lands only if nobody — the learner, another run — changed the
+   * note since; otherwise it is skipped, never forced. A rewrite may not
+   * take the shape of something the learner forgot.
+   */
+  async editMemory(input: {
+    owner: Owner;
+    id: string;
+    expectedRevision: number;
+    body: string;
+    kind?: GuideMemoryKind;
+    expiryDays: number;
+    maxChars: number;
+    sourceMessageIds?: string[];
+  }): Promise<CurationOutcome> {
+    const body = cleanBody(input.body, input.maxChars);
+    if (!body) return 'empty';
+    const bodyHash = memoryKey(body);
+    const row = await this.memories.findOne({
+      where: {
+        id: input.id,
+        userId: input.owner.id,
+        tenantId: input.owner.tenantId,
+      },
+    });
+    if (
+      !row ||
+      row.status !== GuideMemoryStatus.ACTIVE ||
+      row.revision !== input.expectedRevision
+    ) {
+      return 'stale';
+    }
+    if (bodyHash !== row.bodyHash) {
+      const clash = await this.memories.findOne({
+        where: {
+          userId: input.owner.id,
+          tenantId: input.owner.tenantId,
+          bodyHash,
+        },
+      });
+      if (clash?.status === GuideMemoryStatus.DELETED) {
+        return 'forgotten_before';
+      }
+      if (clash && clash.id !== row.id) return 'duplicate';
+    }
+    const now = new Date();
+    const result = await this.memories
+      .createQueryBuilder()
+      .update()
+      .set({
+        body,
+        bodyHash,
+        ...(input.kind ? { kind: input.kind } : {}),
+        revision: () => '"revision" + 1',
+        lastConfirmedAt: now,
+        expiresAt: new Date(now.getTime() + input.expiryDays * DAY_MS),
+        sourceMessageIds: mergeSources(
+          row.sourceMessageIds,
+          input.sourceMessageIds,
+        ) as never,
+      })
+      .where(CURRENT_REVISION_SQL, {
+        id: row.id,
+        userId: input.owner.id,
+        tenantId: input.owner.tenantId,
+        active: GuideMemoryStatus.ACTIVE,
+        revision: input.expectedRevision,
+      })
+      .execute();
+    return result.affected ? 'applied' : 'stale';
+  }
+
+  /**
+   * Retire a note the curator read at `expectedRevision` as no longer true.
+   * Its text goes at once; unlike a learner's forget it is not a tombstone,
+   * so it may be written again if it becomes true again.
+   */
+  async retireMemory(input: {
+    owner: Owner;
+    id: string;
+    expectedRevision: number;
+  }): Promise<CurationOutcome> {
+    const result = await this.memories
+      .createQueryBuilder()
+      .update()
+      .set({
+        status: GuideMemoryStatus.RETIRED,
+        body: '',
+        expiresAt: null,
+        revision: () => '"revision" + 1',
+      })
+      .where(CURRENT_REVISION_SQL, {
+        id: input.id,
+        userId: input.owner.id,
+        tenantId: input.owner.tenantId,
+        active: GuideMemoryStatus.ACTIVE,
+        revision: input.expectedRevision,
+      })
+      .execute();
+    return result.affected ? 'applied' : 'stale';
   }
 
   private async trimMemories(owner: Owner): Promise<void> {
@@ -150,14 +313,43 @@ export class GuideLearnerDataService {
     }
   }
 
-  async listMemories(owner: Owner) {
+  /**
+   * The learner's notes with their provenance: each note names the messages
+   * it was drawn from, in the learner's own words, so the memory screen can
+   * show why Ally remembers it. A source the learner has since deleted is
+   * simply absent.
+   */
+  async listMemories(owner: Owner): Promise<GuideMemoryView[]> {
     const rows = await this.activeMemories(owner, MEMORY_CAP);
+    const ids = [...new Set(rows.flatMap((row) => row.sourceMessageIds ?? []))];
+    const messages = ids.length
+      ? await this.messages.find({
+          where: {
+            id: In(ids),
+            tenantId: owner.tenantId,
+            role: GuideMessageRole.LEARNER,
+          },
+        })
+      : [];
+    const byId = new Map(messages.map((message) => [message.id, message]));
     return rows.map((row) => ({
       id: row.id,
       kind: row.kind,
       body: row.body,
-      lastConfirmedAt: row.lastConfirmedAt ?? null,
-      expiresAt: row.expiresAt ?? null,
+      revision: row.revision,
+      lastConfirmedAt: isoOrNull(row.lastConfirmedAt),
+      expiresAt: isoOrNull(row.expiresAt),
+      sources: (row.sourceMessageIds ?? [])
+        .map((id) => byId.get(id))
+        .filter((message): message is GuideMessage =>
+          Boolean(message?.content?.trim()),
+        )
+        .map((message) => ({
+          messageId: message.id,
+          threadId: message.threadId,
+          excerpt: clipExcerpt(message.content!),
+          at: isoOrNull((message as { createdAt?: Date }).createdAt),
+        })),
     }));
   }
 

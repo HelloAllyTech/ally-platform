@@ -76,6 +76,27 @@ class GuideMemoryRef(_GuideModel):
     label: str
 
 
+class GuideMemorySource(_GuideModel):
+    """One of the learner's own messages a memory note was drawn from: the answer to "why does Ally remember this?". A message the learner has since deleted is absent."""
+
+    message_id: str = Field(alias="messageId")
+    thread_id: str = Field(alias="threadId")
+    excerpt: str
+    at: Optional[str]
+
+
+class GuideMemoryView(_GuideModel):
+    """GET /v1/guide/memory returns an array of these: what Ally remembers about the learner in this organisation (plan §8.1), each with its provenance."""
+
+    id_: str = Field(alias="id")
+    kind: Literal["preference", "goal", "possible_self", "strength", "struggle", "context", "commitment", "unique_outcome"]
+    body: str
+    revision: int
+    last_confirmed_at: Optional[str] = Field(alias="lastConfirmedAt")
+    expires_at: Optional[str] = Field(alias="expiresAt")
+    sources: list[GuideMemorySource]
+
+
 class GuideCrisisLine(_GuideModel):
     name: str
     phone: str

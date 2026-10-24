@@ -113,6 +113,8 @@ export class GuideLearnerController {
   @AuthPermissions([PERMISSIONS.VIEW_TRACK])
   @ApiOperation({
     summary: 'What Ally remembers about the learner (theirs to see and delete)',
+    description:
+      "GuideMemoryView[]: each note with `sources`, the learner's own messages it was drawn from (why Ally remembers it).",
   })
   memory(@CurrentUser() user: TokenUser) {
     return this.learnerData.listMemories(user);

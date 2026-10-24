@@ -2418,6 +2418,24 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     configuredBy: 'ally_guide release modelRouting.coach',
   },
   {
+    id: 'guide-memory-curator',
+    task: LlmTask.GUIDE_MEMORY_CURATOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "A learner's Ally session window closes: a new epoch starts, the closing ritual is shown, or 30 minutes pass with no message (5-minute sweep)",
+    detail:
+      'The Memory Curator (src/guide/learner/guide-memory-curator.service.ts): one ' +
+      "structured call per window reads the learner's unflagged lines since the last run " +
+      'and the notes Ally holds, and proposes ADD / EDIT / REMOVE. Code keeps each only if ' +
+      "it cites the learner's lines, is grounded in their words, carries no contact details " +
+      'and names the revision it read; never over a forgotten note. Background, not on the ' +
+      'learning path; at most one call per thread per window.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.memory_curator',
+  },
+  {
     id: 'guide-voice-stt',
     task: LlmTask.GUIDE_VOICE_STT,
     runtime: LlmRuntime.AI_LEARN,

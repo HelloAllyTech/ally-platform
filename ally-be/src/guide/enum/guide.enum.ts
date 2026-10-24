@@ -91,7 +91,10 @@ export enum GuideMemoryKind {
 
 export enum GuideMemoryStatus {
   ACTIVE = 'active',
+  /** The learner forgot it: a tombstone, never written again. */
   DELETED = 'deleted',
+  /** The Memory Curator retired it as out of date: may come back. */
+  RETIRED = 'retired',
 }
 
 /** Same values as the contract's notebook.added kind. */
