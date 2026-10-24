@@ -14,6 +14,11 @@ import {
   MEMORY_CURATOR_SYSTEM_PROMPT,
 } from '../prompts/memory-curator.prompt';
 import {
+  SUMMARISER_PROMPT_CODE,
+  SUMMARISER_PROMPT_VERSION,
+  SUMMARISER_SYSTEM_PROMPT,
+} from '../prompts/summariser.prompt';
+import {
   OUTREACH_PROMPT_CODE,
   OUTREACH_PROMPT_VERSION,
   OUTREACH_SYSTEM_PROMPT,
@@ -346,6 +351,11 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
       code: MEMORY_CURATOR_PROMPT_CODE,
       version: MEMORY_CURATOR_PROMPT_VERSION,
       text: MEMORY_CURATOR_SYSTEM_PROMPT,
+    },
+    summariser: {
+      code: SUMMARISER_PROMPT_CODE,
+      version: SUMMARISER_PROMPT_VERSION,
+      text: SUMMARISER_SYSTEM_PROMPT,
     },
   },
   modelRouting: {

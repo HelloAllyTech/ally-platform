@@ -212,6 +212,8 @@ export function buildEpochOpener(input: {
   reason: string;
   /** What Ally remembers about the learner (they can see and delete it). */
   memories?: Array<{ kind: string; body: string }>;
+  /** The Summariser's summary of earlier epochs, if any (plan §7.6). */
+  summary?: string | null;
 }): string {
   const lines = ['<epoch_context>'];
   if (input.firstName) {
@@ -226,6 +228,14 @@ export function buildEpochOpener(input: {
         (memory) => `- (${memory.kind}) ${asData(memory.body)}`,
       ),
       '</memory>',
+    );
+  }
+  if (input.summary) {
+    lines.push(
+      'Earlier in this conversation (a summary written for you; the learner cannot see it — do not quote it):',
+      '<summary>',
+      asData(input.summary),
+      '</summary>',
     );
   }
   if (input.recent.length) {

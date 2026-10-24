@@ -137,7 +137,8 @@ import {
   GuideVisitorService,
   VisitorRefusal,
 } from '../visitor/guide-visitor.service';
-import { budgetTier, decideEpoch } from './guide-epoch';
+import { budgetTier, decideEpoch, estimateTokens } from './guide-epoch';
+import { GuideSummariserService } from '../context/guide-summariser.service';
 import { GuideEventBusService } from './guide-event-bus.service';
 import { GuideModelService } from './guide-model.service';
 import { ReleaseGate, runOrchestrator } from './guide-orchestrator.runner';
@@ -376,6 +377,7 @@ export class GuideTurnService {
     private readonly visitors: GuideVisitorService,
     private readonly configResolver: GuideConfigResolverService,
     private readonly curator: GuideMemoryCuratorService,
+    private readonly summariser: GuideSummariserService,
   ) {}
 
   /**
@@ -908,6 +910,17 @@ export class GuideTurnService {
     const orgSpan = buildOrgSpan(ctx.orgProfile);
     const courseSpan = buildCourseSpan(course);
     const pinnedSpans = buildSystemSpans(candidateBundle, orgSpan, courseSpan);
+    // The epoch's history so far: replayed if it continues, measured either
+    // way, and summarised once it has grown past the policy's threshold.
+    const epochRows =
+      snapshot?.startedAt && snapshot.releaseId
+        ? await this.threads.historyRows(
+            ctx.threadId,
+            snapshot.startSeq ?? 0,
+            ctx.learnerSeq!,
+          )
+        : [];
+    const replayed = replayHistory(epochRows);
     const decision = decideEpoch({
       snapshot,
       now,
@@ -916,6 +929,8 @@ export class GuideTurnService {
       emergencyRollbackId: emergencyId,
       tier,
       spanHashes: pinnedSpans.hashes,
+      historyTokens: estimateTokens(replayed),
+      summariseAboveTokens: candidateBundle.policy.historySummariseAboveTokens,
     });
 
     let release: AgentRelease;
@@ -924,12 +939,7 @@ export class GuideTurnService {
     if (decision.continue) {
       release = candidate;
       spans = pinnedSpans;
-      const rows = await this.threads.historyRows(
-        ctx.threadId,
-        snapshot!.startSeq ?? 0,
-        ctx.learnerSeq!,
-      );
-      ctx.history = replayHistory(rows);
+      ctx.history = replayed;
       ctx.epoch = { number: thread.epoch, snapshot: snapshot!, isNew: false };
     } else {
       // A new epoch: GA, or the canary for its share of threads (plan §7.4).
@@ -976,6 +986,28 @@ export class GuideTurnService {
       if (snapshot?.startedAt && !visitor) {
         this.curator.schedule(ctx.threadId, ctx.learnerSeq! - 1);
       }
+      // A history grown too long is summarised into the opener, folding in
+      // any earlier summary; otherwise an earlier summary carries forward.
+      let summary = snapshot?.summary ?? null;
+      if (decision.reason === 'conversation summarised') {
+        summary = await this.summariser.summarise({
+          rows: epochRows,
+          previousSummary: summary,
+          courseTitle: course.title,
+          bundle,
+          attribution: attributionOf(ctx),
+          onCost: (usd) => {
+            ctx.usd += usd;
+          },
+        });
+      }
+      if (summary) {
+        ctx.epoch.snapshot.summary = summary;
+        ctx.epoch.snapshot.summarisedThroughSeq =
+          decision.reason === 'conversation summarised'
+            ? ctx.learnerSeq! - 1
+            : (snapshot?.summarisedThroughSeq ?? null);
+      }
       const recent = await this.threads.recentRows(
         ctx.threadId,
         ctx.learnerSeq!,
@@ -996,6 +1028,7 @@ export class GuideTurnService {
           kind: memory.kind,
           body: memory.body,
         })),
+        summary,
       });
       if (
         decision.reason === 'first conversation' ||

@@ -261,6 +261,11 @@ function setup(
     repo(null) as never,
   );
   const curator = { schedule: jest.fn() };
+  const summariser = {
+    summarise: jest.fn(
+      async (): Promise<string | null> => 'Their goals:\n- Calmer openings',
+    ),
+  };
   const service = new GuideTurnService(
     threads as never,
     bus as never,
@@ -283,6 +288,7 @@ function setup(
     visitors as never,
     configResolver as never,
     curator as never,
+    summariser as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(
@@ -315,6 +321,7 @@ function setup(
     learnerData,
     releases,
     curator,
+    summariser,
   };
 }
 
@@ -886,6 +893,88 @@ describe('GuideTurnService', () => {
     expect(ctx.epoch?.isNew).toBe(true);
     // Up to, not including, the message that opened the new epoch.
     expect(t.curator.schedule).toHaveBeenCalledWith('th1', ctx.learnerSeq! - 1);
+  });
+
+  it('summarises an epoch grown past the threshold into the next opener', async () => {
+    const snapshotHashes = {};
+    const long = 'word '.repeat(40_000);
+    const t = setup({
+      thread: {
+        epoch: 1,
+        lastLearnerActivityAt: new Date(),
+        epochSnapshot: {
+          releaseId: 'rel-1',
+          tier: 'premium',
+          startedAt: new Date().toISOString(),
+          startSeq: 1,
+          layerHashes: snapshotHashes,
+          summary: 'Earlier: they work nights.',
+        },
+      },
+      historyRows: [
+        {
+          seq: 1,
+          role: 'learner',
+          turnId: 'old',
+          content: 'tell me everything',
+          renderedContent: [{ role: 'user', content: long }],
+        },
+        {
+          seq: 2,
+          role: 'ally',
+          turnId: 'old',
+          content: 'Here goes.',
+          providerBlocks: [{ role: 'assistant', content: long }],
+        },
+      ],
+    });
+    const probe = await setup().run();
+    Object.assign(snapshotHashes, probe.system!.hashes);
+
+    const ctx = await t.run();
+    expect(ctx.epoch).toMatchObject({
+      isNew: true,
+      number: 2,
+      snapshot: {
+        reason: 'conversation summarised',
+        summary: 'Their goals:\n- Calmer openings',
+        summarisedThroughSeq: ctx.learnerSeq! - 1,
+      },
+    });
+    expect(t.summariser.summarise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousSummary: 'Earlier: they work nights.',
+      }),
+    );
+    // Nothing of the long history is replayed: the opener carries the summary.
+    const request = t.requests[0].request;
+    expect(JSON.stringify(request.messages)).not.toContain('word word word');
+    expect(JSON.stringify(request.messages)).toContain('Calmer openings');
+  });
+
+  it('carries an earlier summary forward into a new session', async () => {
+    const t = setup({
+      thread: {
+        epoch: 2,
+        lastLearnerActivityAt: new Date(Date.now() - 3 * 60 * 60_000),
+        epochSnapshot: {
+          releaseId: 'rel-1',
+          tier: 'premium',
+          startedAt: new Date(Date.now() - 4 * 60 * 60_000).toISOString(),
+          startSeq: 1,
+          layerHashes: {},
+          summary: 'Earlier: they work nights.',
+          summarisedThroughSeq: 40,
+        },
+      },
+    });
+    const ctx = await t.run();
+    expect(t.summariser.summarise).not.toHaveBeenCalled();
+    expect(ctx.epoch?.snapshot).toMatchObject({
+      reason: 'return after a break',
+      summary: 'Earlier: they work nights.',
+      summarisedThroughSeq: 40,
+    });
   });
 
   it('does not curate on a thread’s first conversation', async () => {

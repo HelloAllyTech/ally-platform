@@ -16,4 +16,5 @@ export const GUIDE_AI_TASKS = {
   EVALUATOR_VERIFIER: 'guide-evaluator-verifier',
   RED_TEAM: 'guide-red-team',
   MEMORY_CURATOR: 'guide-memory-curator',
+  SUMMARISER: 'guide-summariser',
 } as const;

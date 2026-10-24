@@ -26,7 +26,20 @@ export type EpochReason =
   | 'return after a break'
   | 'safety rollback'
   | 'budget tier changed'
-  | 'course or organisation changed';
+  | 'course or organisation changed'
+  /** The epoch's history passed `historySummariseAboveTokens` (plan §7.6). */
+  | 'conversation summarised';
+
+/**
+ * A provider-neutral estimate of what a replayed history costs in input
+ * tokens: about four characters a token over the serialised messages. It
+ * only has to say when an epoch has grown long, not price it — the ledger
+ * prices every call from the provider's own counts.
+ */
+export function estimateTokens(messages: unknown[]): number {
+  if (!messages.length) return 0;
+  return Math.ceil(JSON.stringify(messages).length / 4);
+}
 
 export type EpochDecision =
   | { continue: true }
@@ -39,7 +52,10 @@ export type EpochDecision =
  * valid; anything that would change them starts a new one instead.
  *
  * A normal GA promotion does not end an epoch — the thread moves at its next
- * one. A safety (emergency) rollback does, at the next turn.
+ * one. A safety (emergency) rollback does, at the next turn. So does a
+ * history past the policy's summarisation threshold: the next epoch opens
+ * with a summary in place of the replayed exchanges, which never edits the
+ * transcript — only what the model is given.
  */
 export function decideEpoch(input: {
   snapshot: GuideEpochSnapshot | null | undefined;
@@ -51,6 +67,10 @@ export function decideEpoch(input: {
   tier: GuideBudgetTier;
   /** The spans as they would be built now, with the pinned release. */
   spanHashes: { persona: string; org: string; course: string };
+  /** The epoch's replayed history so far, estimated (`estimateTokens`). */
+  historyTokens?: number;
+  /** Policy `historySummariseAboveTokens`: past it, summarise and start afresh. */
+  summariseAboveTokens?: number;
 }): EpochDecision {
   const snapshot = input.snapshot;
   if (!snapshot?.startedAt || !snapshot.releaseId) {
@@ -79,6 +99,13 @@ export function decideEpoch(input: {
     hashes.course !== input.spanHashes.course
   ) {
     return { continue: false, reason: 'course or organisation changed' };
+  }
+  if (
+    input.historyTokens != null &&
+    input.summariseAboveTokens != null &&
+    input.historyTokens > input.summariseAboveTokens
+  ) {
+    return { continue: false, reason: 'conversation summarised' };
   }
   return { continue: true };
 }

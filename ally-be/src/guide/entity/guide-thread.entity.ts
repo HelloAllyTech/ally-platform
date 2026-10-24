@@ -66,6 +66,14 @@ export interface GuideEpochSnapshot {
    * epochs that began before the config plane existed (= release defaults).
    */
   config?: GuideEpochConfig | null;
+  /**
+   * What the epoch opener carried about earlier epochs: the Summariser's
+   * structured summary (plan §7.6). Carried forward, and folded into the
+   * next summary, so a long course conversation is never simply forgotten.
+   */
+  summary?: string | null;
+  /** The last message seq the summary covers. */
+  summarisedThroughSeq?: number | null;
 }
 
 /** The org and course overrides as they stood when an epoch began. */

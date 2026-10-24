@@ -2436,6 +2436,24 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     configuredBy: 'ally_guide release modelRouting.memory_curator',
   },
   {
+    id: 'guide-summariser',
+    task: LlmTask.GUIDE_SUMMARISER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "A learner's next message arrives after an Ally epoch's replayed history passed history.summariseAboveTokens (40k by default)",
+    detail:
+      'The Summariser (src/guide/context/guide-summariser.service.ts): one structured call ' +
+      "condenses the epoch's visible transcript (real cases and hard moments replaced by " +
+      'markers) and any earlier summary into goals / where things stand / agreed / still ' +
+      "open. The next epoch's opener carries it in place of the replayed history; the " +
+      'transcript itself is never edited. Runs inside that turn before the reply, with a ' +
+      '20 s deadline; on failure the epoch opens with the last few messages only.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-haiku-5-5',
+    configuredBy: 'ally_guide release modelRouting.summariser',
+  },
+  {
     id: 'guide-voice-stt',
     task: LlmTask.GUIDE_VOICE_STT,
     runtime: LlmRuntime.AI_LEARN,

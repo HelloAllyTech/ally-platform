@@ -8,10 +8,15 @@ import {
   GUIDE_DEFAULT_BUNDLE,
   GUIDE_DEFAULT_POLICY,
 } from '../../release/guide-release.bundle';
-import { budgetTier, decideEpoch } from '../../runtime/guide-epoch';
+import {
+  budgetTier,
+  decideEpoch,
+  estimateTokens,
+} from '../../runtime/guide-epoch';
 import { checkPresentable } from '../../capabilities/guide-tools';
 import {
   buildCourseSpan,
+  buildEpochOpener,
   buildLearnerMessage,
   buildOrgSpan,
   buildSystemSpans,
@@ -239,6 +244,57 @@ describe('decideEpoch', () => {
     ],
   ])('starts a new epoch for %o', (over, reason) => {
     expect(decide(over as never)).toEqual({ continue: false, reason });
+  });
+
+  it('summarises once the history passes the policy threshold, not before', () => {
+    expect(
+      decide({ historyTokens: 40_000, summariseAboveTokens: 40_000 }),
+    ).toEqual({ continue: true });
+    expect(
+      decide({ historyTokens: 40_001, summariseAboveTokens: 40_000 }),
+    ).toEqual({ continue: false, reason: 'conversation summarised' });
+  });
+
+  it('lets any other reason win over summarising', () => {
+    expect(
+      decide({
+        tier: 'degraded',
+        historyTokens: 90_000,
+        summariseAboveTokens: 40_000,
+      }),
+    ).toEqual({ continue: false, reason: 'budget tier changed' });
+  });
+
+  it('estimates a history at about four characters a token', () => {
+    expect(estimateTokens([])).toBe(0);
+    const history = [{ role: 'user', content: 'x'.repeat(3_986) }];
+    expect(estimateTokens(history)).toBe(1_004);
+  });
+});
+
+describe('the epoch opener', () => {
+  it('carries the summary of earlier epochs as data the learner cannot see', () => {
+    const opener = buildEpochOpener({
+      firstName: null,
+      guidance: 'walk',
+      recent: [{ role: 'learner', text: 'Where were we?' }],
+      reason: 'conversation summarised',
+      summary: 'Their goals:\n- Feel calmer on <first> calls',
+    });
+    expect(opener).toContain('<summary>');
+    expect(opener).toContain('- Feel calmer on ‹first› calls');
+    expect(opener).toContain('the learner cannot see it');
+  });
+
+  it('says nothing about a summary when there is none', () => {
+    expect(
+      buildEpochOpener({
+        firstName: null,
+        guidance: 'walk',
+        recent: [],
+        reason: 'first conversation',
+      }),
+    ).not.toContain('<summary>');
   });
 });
 
