@@ -422,7 +422,7 @@ Built on branch `feat/skills-store` (one PR, ally-be + ally-web + ally-ai + ally
 
 Verified locally: migration on the local DB (29 file-served prompts published, all 152 served from the store); CLI pull/status/diff/push, stale-base refusal and three-way merge; publishing from the Skills Store; translation gate (pending → 409, ready → live); key generation; release check (pass and a deliberate failure); a v2v voice session with every prompt served from the store and the session recording each prompt's version and hash.
 
-**Base versions in Git.** The defaults were cut to minimal bases as the last step: ally-be 207k → 70k characters (64 defaults, plus 10 new defaults with contracts for the migration-seeded prompts), ally-ai 58k → 21k, ally-ai-learn 44k → 17k. Every placeholder, output format and parser-checked marker is kept. 88 prompts have their answer parsed as JSON: 13 parse free text (`output: json`, and the structured check passes on all of them), 75 rely on provider-enforced JSON (`output: structured`).
+**Base versions in Git.** The defaults were cut to minimal bases as the last step: ally-be 207k → 70k characters (64 defaults, plus 8 new defaults with contracts for the migration-seeded prompts that code runs), ally-ai 58k → 21k, ally-ai-learn 44k → 17k. Every placeholder, output format and parser-checked marker is kept. 88 prompts have their answer parsed as JSON: 13 parse free text (`output: json`, and the structured check passes on all of them), 75 rely on provider-enforced JSON (`output: structured`).
 
 **Deploy order (required).** Deploy **ally-be first**. Its migration publishes today's text of every file-served prompt from the database copy before any service syncs the new minimal defaults. The ally-ai and ally-ai-learn release workflows enforce this: a `require-skills-store` job blocks their deploy until production ally-be serves the Skills Store. Before deploying, run `scripts/prompts/migration-preview.sql` read-only against production to see which prompts get their file text published, and which dashboard-edited prompts have file edits that never shipped.
 
@@ -432,11 +432,10 @@ Verified locally: migration on the local DB (29 file-served prompts published, a
 
 All earlier questions are decided (see Decisions). Left for the review:
 
-- [ ] 23 database-only prompts have no references in code (for example the old Builder guidance prompts, the V2V tester's `trainee_*`/`judge_*`/`director_*` rows, `roleplay_copilot_*`): delete them, or keep them?
 - [x] Output markers confirmed against every call site: 88 prompts are parsed as JSON (13 `json`, 75 `structured`); 3 marked prompts with no caller were unmarked.
 - [x] WhatsApp replies now record the Skills Store version and content hash of each knowledge prompt sent to ally-ai (`wa_messages.retrieval_meta.prompt_versions`/`prompt_hashes`).
 - [x] Contracts tightened from the call sites: 93 variables are now `required` (ally-be 60, ally-ai 22, ally-ai-learn 11) where every caller always supplies a non-empty value the prompt depends on; 8 in the ally-ai-learn main-agent prompts that were required but not always supplied (`competency`, the seven working-memory sections) are optional again; `role_instructions` stays required, since main-agent text without it drops the scenario's role. Everything else stays optional; contracts stay open.
-- [ ] 3 marked-then-unmarked prompts have no caller at all (`roadmap_opportunity_interview`, ally-ai's two `simulation_analysis` prompts): delete them with the 23 above?
+- [x] Unused prompts removed: migration `1980750000000-RemoveUnusedPrompts` deletes 26 rows nothing runs (V2V tester and harness prototypes, Builder guidance rows, `roleplay_copilot_*`, `roadmap_opportunity_interview`, `roadmap_release_notes`, ally-ai's two `simulation_analysis` prompts), checked read-only against production on 2026-10-24; the four with Git defaults lose them too. It skips any row a scenario selects or an experiment points at. `ally_ai_learn_system_main_agent_prompt_working_memory` stays: a scenario selects it as its main prompt.
 - [x] Fixed in the build: a never-published version now lists as a draft wherever it sits, not as "Earlier".
 
 ## Sources

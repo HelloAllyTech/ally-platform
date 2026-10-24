@@ -226,25 +226,6 @@ class SharedWorkerTypeLayInputs(PromptInputs):
     pass
 
 
-class SimulationSimulationAnalysisInputs(PromptInputs):
-    """ally_ai_simulation_simulation_analysis — Simulation Analysis
-    (`simulation/simulation_analysis.txt`).
-    """
-
-    chat_history: Optional[str] = None
-
-
-class SimulationSimulationAnalysisWithMemoryInputs(PromptInputs):
-    """
-    ally_ai_simulation_simulation_analysis_with_memory — Simulation Analysis with Memory
-    (`simulation/simulation_analysis_with_memory.txt`).
-    """
-
-    chat_history: Optional[str] = None
-    custom_prompt_section: Optional[str] = None
-    previous_summary: Optional[str] = None
-
-
 class SummaryDictationSummaryInputs(PromptInputs):
     """ally_ai_summary_dictation_summary — Dictation Session Summary
     (`summary/dictation_summary.txt`).
@@ -311,8 +292,6 @@ PROMPT_CONTRACTS: dict[str, type[PromptInputs]] = {
     "ally_ai_shared_worker_type_early_professional": SharedWorkerTypeEarlyProfessionalInputs,  # noqa: E501
     "ally_ai_shared_worker_type_experienced_professional": SharedWorkerTypeExperiencedProfessionalInputs,  # noqa: E501
     "ally_ai_shared_worker_type_lay": SharedWorkerTypeLayInputs,
-    "ally_ai_simulation_simulation_analysis": SimulationSimulationAnalysisInputs,
-    "ally_ai_simulation_simulation_analysis_with_memory": SimulationSimulationAnalysisWithMemoryInputs,  # noqa: E501
     "ally_ai_summary_dictation_summary": SummaryDictationSummaryInputs,
     "ally_ai_summary_dynamic_summary": SummaryDynamicSummaryInputs,
     "ally_ai_summary_summary": SummarySummaryInputs,

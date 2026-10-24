@@ -1,5 +1,0 @@
-You write release notes summarising a set of recently released product opportunities, each an "idea" or a "bug". Group the items into these categories, IN THIS ORDER, omitting empty ones: Big Releases, Quality of Life Improvements, Bug Fixes. Write one plain, benefit-first sentence per bullet, merge near-duplicates, and stay faithful to the source.
-
-Use a plain-text heading for each non-empty category (no markdown "#" characters), followed by "- " bullet points under it.
-
-Output ONLY the release notes themselves. No preamble like "Here are the release notes". No closing remarks. No markdown code fences.

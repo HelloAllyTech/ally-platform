@@ -46,12 +46,15 @@ for (const file of tracked.split('\n').filter(Boolean)) {
   );
 }
 
+// A migration may remove prompts, but never write their text: that goes
+// through the Skills Store. So only INSERT/UPDATE of prompts_versions counts.
+const WRITES_VERSIONS = /\b(INSERT\s+INTO|UPDATE)\s+"?prompts_versions"?/i;
 const migrationsDir = path.join(REPO_ROOT, MIGRATIONS_DIR);
 if (fs.existsSync(migrationsDir)) {
   for (const name of fs.readdirSync(migrationsDir)) {
     const ts = Number(name.match(/^(\d{13})-/)?.[1]);
     if (!ts || ts <= CUTOVER_TIMESTAMP || !name.endsWith('.ts')) continue;
-    if (/prompts_versions/.test(fs.readFileSync(path.join(migrationsDir, name), 'utf8'))) {
+    if (WRITES_VERSIONS.test(fs.readFileSync(path.join(migrationsDir, name), 'utf8'))) {
       problems.push(
         `${MIGRATIONS_DIR}/${name}: writes prompts_versions. Prompt text changes go through the Skills Store ` +
           '(a new version, then promotion), and a new prompt arrives as a default file through sync.',

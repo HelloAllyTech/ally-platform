@@ -770,15 +770,6 @@ export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
   { output: 'structured' },
 );
 
-/** src/prompts/roadmap/opportunity_interview.txt */
-export const ROADMAP_OPPORTUNITY_INTERVIEW = definePrompt(
-  'roadmap_opportunity_interview',
-  {},
-);
-
-/** src/prompts/roadmap/release_notes.txt */
-export const ROADMAP_RELEASE_NOTES = definePrompt('roadmap_release_notes', {});
-
 export const PROMPT_CONTRACTS = Object.fromEntries(
   [
     AGENT_BUILDER_ALLOWED_FILLER_WORDS,
@@ -854,7 +845,5 @@ export const PROMPT_CONTRACTS = Object.fromEntries(
     GLOSSARY_LEXEME_PAIRING,
     LANGUAGE_QUALITY_JUDGE_RUBRIC,
     OPENAI_TRANSLATION_TOOLTIP_TRANSLATION,
-    ROADMAP_OPPORTUNITY_INTERVIEW,
-    ROADMAP_RELEASE_NOTES,
   ].map((d) => [d.code, d]),
 ) as Readonly<Record<string, ReturnType<typeof definePrompt>>>;

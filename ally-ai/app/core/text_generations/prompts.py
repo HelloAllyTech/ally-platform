@@ -54,13 +54,3 @@ SCENARIO_EVALUATION_WITH_MEMORY_PROMPT = PromptTemplate(
         "{SKILL_COVERAGE_DESCRIPTIONS}", load_template("shared/skill_coverage")
     ),
 )
-
-SIMULATION_ANALYSIS_PROMPT = PromptTemplate(
-    template=load_template("simulation/simulation_analysis"),
-    input_variables=["chat_history"],
-)
-
-SIMULATION_ANALYSIS_WITH_MEMORY_PROMPT = PromptTemplate(
-    template=load_template("simulation/simulation_analysis_with_memory"),
-    input_variables=["chat_history", "previous_summary", "custom_prompt_section"],
-)
