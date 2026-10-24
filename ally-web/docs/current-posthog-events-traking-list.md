@@ -331,3 +331,4 @@ no paywall or upgrade surface today. `useAnalytics()` exposes `trackUpgradePromp
 re-deriving the property names.
 
 `sidebar_interaction` sends `action` as `pinned` or `unpinned`.
+
