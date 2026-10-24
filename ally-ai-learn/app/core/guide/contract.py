@@ -563,6 +563,29 @@ class GuideMicroActivityResult(_GuideModel):
     note: Optional[str] = None
 
 
+class GuideAdviceLineRequest(_GuideModel):
+    """POST /v1/guide/tracks/:trackId/advice: the mentor door. A finisher of the course leaves one line for those who come after; it can be rewritten until it is reviewed."""
+
+    text: str
+
+
+class GuideAdviceLineView(_GuideModel):
+    """The learner's own advice line, and where it is in review."""
+
+    id_: str = Field(alias="id")
+    text: str
+    status: Literal["pending", "approved", "rejected"]
+    created_at: str = Field(alias="createdAt")
+
+
+class GuideAdviceLines(_GuideModel):
+    """GET /v1/guide/tracks/:trackId/advice: approved, anonymous advice from finishers in the learner's organisation (empty until enough have finished; render each line as a quotation, as plain text), and the learner's own line (absent when they have not written one)."""
+
+    lines: list[str]
+    mine: Optional[GuideAdviceLineView] = None
+    max_chars: int = Field(alias="maxChars")
+
+
 class GuideThreadView(_GuideModel):
     id_: str = Field(alias="id")
     track_id: str = Field(alias="trackId")

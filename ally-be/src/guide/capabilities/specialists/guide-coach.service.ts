@@ -3,11 +3,16 @@ import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LoggerService } from 'src/logger/logger.service';
 import { GUIDE_AI_TASKS } from '../../constants/guide-ai-tasks.constants';
 import {
+  COACH_AFTER_ACTION_SCHEMA,
   COACH_NOTE_SCHEMA,
+  COACH_PREBRIEF_SCHEMA,
   COACH_PROMPT_SCHEMA,
   COACH_SYSTEM_PROMPT,
+  CoachHistoryAttempt,
   CoachKind,
+  buildCoachAfterActionMessage,
   buildCoachNoteMessage,
+  buildCoachPrebriefMessage,
   buildCoachPromptMessage,
 } from '../../prompts/coach.prompt';
 import {
@@ -26,6 +31,43 @@ export interface CoachActivity {
   placeholder: string;
   focus: { itemId: string; title: string; text: string } | null;
 }
+
+export interface CoachPrebrief {
+  focus: string;
+  brief: string;
+  rehearsal: string;
+}
+
+export interface CoachAfterAction {
+  whatHappened: string;
+  why: string;
+  tryNext: string;
+}
+
+interface CoachActivityRef {
+  title: string;
+  type: string;
+  description: string;
+}
+
+/**
+ * A line that reports a score or a mark: "72%", "8/10", "scored 60",
+ * "a grade of B". The Coach is told never to; this is the check that it
+ * didn't (plan §7.7, "never scores").
+ */
+export function mentionsScore(text: string): boolean {
+  return (
+    /\b\d{1,3}\s*(%|percent\b|\/\s*\d{1,3}\b|points?\b|marks?\b)/i.test(text) ||
+    /\b(scored?|scoring|grade[ds]?|rated)\b[^.]{0,20}\d/i.test(text)
+  );
+}
+
+/** Trimmed and clipped; empty when it reports a score. */
+const coachLine = (value: unknown, max: number): string => {
+  const text = String(value ?? '').trim();
+  if (!text || mentionsScore(text)) return '';
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+};
 
 interface CoachCall {
   bundle: GuideReleaseBundle;
@@ -105,6 +147,62 @@ export class GuideCoachService {
     );
     const note = String(parsed?.note ?? '').trim();
     return note ? note.slice(0, 600) : null;
+  }
+
+  /**
+   * A pre-brief before a roleplay or case (plan §4.4): one focus from the
+   * learner's own practice history, a short brief, and a rehearsal offer.
+   * Null when the model gave nothing usable.
+   */
+  async prebrief(
+    input: CoachCall & {
+      languageCode: string;
+      activity: CoachActivityRef;
+      history: CoachHistoryAttempt[];
+      learnerGoals: string[];
+    },
+  ): Promise<CoachPrebrief | null> {
+    const parsed = await this.call<Record<string, unknown>>(
+      input,
+      buildCoachPrebriefMessage(input),
+      COACH_PREBRIEF_SCHEMA,
+      2_000,
+    );
+    const focus = coachLine(parsed?.focus, 200);
+    const brief = coachLine(parsed?.brief, 500);
+    if (!focus && !brief) return null;
+    return {
+      focus,
+      brief,
+      rehearsal: coachLine(parsed?.rehearsal, 160),
+    };
+  }
+
+  /**
+   * An after-action review (plan §4.4): what happened, why, what to try
+   * next. Consequences, never a score; a line that reports one is dropped.
+   */
+  async afterAction(
+    input: CoachCall & {
+      languageCode: string;
+      activity: CoachActivityRef;
+      attempt: CoachHistoryAttempt | null;
+      history: CoachHistoryAttempt[];
+      learnerNoticed: string | null;
+    },
+  ): Promise<CoachAfterAction | null> {
+    const parsed = await this.call<Record<string, unknown>>(
+      input,
+      buildCoachAfterActionMessage(input),
+      COACH_AFTER_ACTION_SCHEMA,
+      2_500,
+    );
+    const review = {
+      whatHappened: coachLine(parsed?.what_happened, 400),
+      why: coachLine(parsed?.why, 400),
+      tryNext: coachLine(parsed?.try_next, 300),
+    };
+    return review.whatHappened || review.tryNext ? review : null;
   }
 
   private async call<T>(

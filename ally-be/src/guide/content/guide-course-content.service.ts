@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TrackItem } from 'src/track/entity/track-item.entity';
 import { TrackLocalizationService } from 'src/track/service/track-localization.service';
 import { TrackSharedService } from 'src/track/service/track-shared.service';
+import { QuizContent } from 'src/track/type/quiz.type';
 import { TrackItemType } from 'src/track/type/track.type';
 import { CourseSpine } from '../conductor/course-spine';
 import { itemTypeLabel, plainText } from '../context/guide-context';
@@ -174,6 +175,30 @@ export class GuideCourseContentService {
       }
     }
     return prompts;
+  }
+
+  /**
+   * One quiz's full content, key included, in the learner's language — for
+   * the Assessor's firewall alone (plan §6.4), which decides what of it the
+   * learner has earned. Never passed to the orchestrator or a prompt as is.
+   */
+  async quizWithKey(
+    trackId: string,
+    itemId: string,
+    languageCode: string,
+  ): Promise<{ title: string; quiz: QuizContent } | null> {
+    const [structure, translation] = await Promise.all([
+      this.shared.getTrackWithStructure(trackId),
+      this.localization.resolvePublished(trackId, languageCode),
+    ]);
+    const raw = structure.sections
+      .flatMap((section) => section.items)
+      .find((item) => item.id === itemId);
+    if (!raw || raw.type !== TrackItemType.QUIZ) return null;
+    const item = this.localization.localizeItem(raw, translation);
+    const quiz = item.content as QuizContent | undefined;
+    if (!quiz || !Array.isArray(quiz.questions)) return null;
+    return { title: item.title ?? '', quiz };
   }
 
   /** One reached item's learner-safe text, for the Coach's focus. */

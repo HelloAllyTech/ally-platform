@@ -540,6 +540,26 @@ export interface GuideMicroActivityResult {
   note?: string | null;
 }
 
+/** POST /v1/guide/tracks/:trackId/advice: the mentor door. A finisher of the course leaves one line for those who come after; it can be rewritten until it is reviewed. */
+export interface GuideAdviceLineRequest {
+  text: string;
+}
+
+/** The learner's own advice line, and where it is in review. */
+export interface GuideAdviceLineView {
+  id: string;
+  text: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+/** GET /v1/guide/tracks/:trackId/advice: approved, anonymous advice from finishers in the learner's organisation (empty until enough have finished; render each line as a quotation, as plain text), and the learner's own line (absent when they have not written one). */
+export interface GuideAdviceLines {
+  lines: Array<string>;
+  mine?: GuideAdviceLineView;
+  maxChars: number;
+}
+
 export interface GuideThreadView {
   id: string;
   trackId: string;

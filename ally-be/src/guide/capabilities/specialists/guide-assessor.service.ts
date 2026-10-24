@@ -1,16 +1,27 @@
 import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LoggerService } from 'src/logger/logger.service';
 import { CourseSpine } from '../../conductor/course-spine';
 import { GUIDE_AI_TASKS } from '../../constants/guide-ai-tasks.constants';
 import { GuideCourseContentService } from '../../content/guide-course-content.service';
 import {
+  ASSESSOR_EXPLAIN_SCHEMA,
   ASSESSOR_OUTPUT_SCHEMA,
   ASSESSOR_SYSTEM_PROMPT,
   AssessorKind,
   SideQuestDifficulty,
+  buildAssessorExplainMessage,
   buildAssessorUserMessage,
 } from '../../prompts/assessor.prompt';
+import {
+  QuizAttemptView,
+  decideQuizExplanation,
+  findKeyMaterial,
+  keyMaterial,
+  learnerAllowedView,
+  materialBefore,
+} from '../quiz-firewall';
 import {
   GuideBudgetTier,
   GuideReleaseBundle,
@@ -19,6 +30,30 @@ import {
   GuideCallAttribution,
   GuideModelService,
 } from '../../runtime/guide-model.service';
+
+export type QuizPointReason =
+  | 'never'
+  | 'quiz_open'
+  | 'no_attempt'
+  | 'withheld'
+  | 'unavailable';
+
+/** What the orchestrator may receive about a quiz: never the key. */
+export type QuizExplainOutcome =
+  | {
+      kind: 'point';
+      quizTitle: string;
+      reason: QuizPointReason;
+      /** Titles of the items that cover it. */
+      material: string[];
+    }
+  | {
+      kind: 'explain';
+      quizTitle: string;
+      attemptNumber: number;
+      explanation: string;
+      questions: number[];
+    };
 
 /** A practice question with its key — server-side only. */
 export interface AssessorQuestion {
@@ -147,7 +182,157 @@ export class GuideAssessorService {
   constructor(
     private readonly models: GuideModelService,
     private readonly content: GuideCourseContentService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Explain a submitted quiz under the firewall (plan §6.4). Returns either
+   * an explanation written ONLY from what the quiz player already showed the
+   * learner — checked for unearned key material before it is returned — or
+   * where the material is, when the quiz does not explain (`never`, at every
+   * attempt and retake), is open, or has no submitted attempt.
+   */
+  async explainQuiz(input: {
+    trackId: string;
+    quizItemId: string;
+    userId: number;
+    spine: CourseSpine;
+    quizOpen: boolean;
+    learnerQuestion: string;
+    languageCode: string;
+    bundle: GuideReleaseBundle;
+    tier?: GuideBudgetTier;
+    attribution: GuideCallAttribution;
+    onCost?: (usd: number) => void;
+  }): Promise<QuizExplainOutcome | null> {
+    const loaded = await this.content.quizWithKey(
+      input.trackId,
+      input.quizItemId,
+      input.languageCode,
+    );
+    if (!loaded) return null;
+    const { title, quiz } = loaded;
+    const point = (reason: QuizPointReason): QuizExplainOutcome => ({
+      kind: 'point',
+      quizTitle: title,
+      reason,
+      material: materialBefore(input.spine, input.quizItemId),
+    });
+
+    // The setting first: `never` is decided before any attempt is read.
+    const settingOnly = decideQuizExplanation({
+      showExplanations: quiz.settings?.showExplanations,
+      quizOpen: input.quizOpen,
+      attempt: null,
+    });
+    if (!settingOnly.allowed && settingOnly.reason !== 'no_attempt') {
+      return point(settingOnly.reason);
+    }
+    const attempt = await this.latestAttempt(input.userId, input.quizItemId);
+    const decision = decideQuizExplanation({
+      showExplanations: quiz.settings?.showExplanations,
+      quizOpen: input.quizOpen,
+      attempt,
+    });
+    if (!decision.allowed) return point(decision.reason);
+    const shown = learnerAllowedView(quiz, attempt!);
+    if (!shown.length) return point('no_attempt');
+
+    const { result } = await this.models.complete({
+      role: 'assessor',
+      bundle: input.bundle,
+      tier: input.tier,
+      task: LlmTask.GUIDE_ASSESSOR,
+      aiTaskId: GUIDE_AI_TASKS.ASSESSOR,
+      attribution: input.attribution,
+      onCost: input.onCost,
+      request: {
+        system: [
+          {
+            text: input.bundle.prompts.assessor?.text ?? ASSESSOR_SYSTEM_PROMPT,
+            cache: true,
+          },
+        ],
+        messages: [
+          {
+            role: 'user',
+            content: buildAssessorExplainMessage({
+              languageCode: input.languageCode,
+              quizTitle: title,
+              learnerQuestion: input.learnerQuestion,
+              shown,
+            }),
+          },
+        ],
+        maxTokens: 2_000,
+        outputSchema: ASSESSOR_EXPLAIN_SCHEMA as unknown as Record<
+          string,
+          unknown
+        >,
+        timeoutMs: 30_000,
+      },
+    });
+    if (result.stopReason !== 'end_turn') {
+      this.logger.warn(`Assessor explain stopped with ${result.stopReason}`);
+      return point('unavailable');
+    }
+    const parsed = JSON.parse(
+      result.content
+        .filter((block) => block.type === 'text')
+        .map((block) => (block as { text: string }).text)
+        .join(''),
+    ) as { explanation?: string; questions?: number[] };
+    const explanation = String(parsed?.explanation ?? '')
+      .trim()
+      .slice(0, 700);
+    if (!explanation) return point('unavailable');
+    const leak = findKeyMaterial(explanation, keyMaterial(quiz, shown));
+    if (leak) {
+      // The model reached past what the learner was shown. Nothing of it
+      // goes on; the learner is pointed to the material instead.
+      this.logger.warn(
+        `Assessor explanation withheld for quiz ${input.quizItemId}: unearned key material`,
+      );
+      return point('withheld');
+    }
+    const numbers = new Set(shown.map((q) => q.number));
+    return {
+      kind: 'explain',
+      quizTitle: title,
+      attemptNumber: attempt!.attemptNumber,
+      explanation,
+      questions: (Array.isArray(parsed?.questions) ? parsed.questions : [])
+        .map(Number)
+        .filter((n) => numbers.has(n)),
+    };
+  }
+
+  /** The learner's latest submitted attempt at a quiz, or null. */
+  private async latestAttempt(
+    userId: number,
+    trackItemId: string,
+  ): Promise<QuizAttemptView | null> {
+    const rows: Array<{
+      attemptNumber: number;
+      answers: QuizAttemptView['answers'];
+      grading: QuizAttemptView['grading'] | null;
+    }> = await this.dataSource.query(
+      `SELECT "attemptNumber", "answers", "grading"
+         FROM "track_quiz_attempts"
+        WHERE "userId" = $1 AND "trackItemId" = $2 AND "deletedAt" IS NULL
+          AND "status" IN ('GRADED', 'PENDING_GRADING')
+        ORDER BY "attemptNumber" DESC
+        LIMIT 1`,
+      [userId, trackItemId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      attemptNumber: Number(row.attemptNumber),
+      answers: Array.isArray(row.answers) ? row.answers : [],
+      grading: Array.isArray(row.grading) ? row.grading : [],
+    };
+  }
 
   async generate(input: {
     kind: AssessorKind;

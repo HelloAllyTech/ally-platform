@@ -169,6 +169,7 @@ describe('GuidePlaygroundService', () => {
     expect(
       t.requests[0].request.tools.map((tool: any) => tool.name).sort(),
     ).toEqual([
+      'search_library',
       'show_course_info',
       'show_wellbeing_resources',
       'suggest_sign_in',

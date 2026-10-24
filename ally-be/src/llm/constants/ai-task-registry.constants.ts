@@ -2282,8 +2282,11 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'situation report as a mid-conversation system message. A Sentinel verdict that ' +
       'changes the mode restarts the reply once. Model by budget tier: Opus 5.5 (effort ' +
       'medium) → Sonnet 5.5 past $3 a thread or $1.50 a learner-day → Haiku 5.5 past $6, ' +
-      'switching only at an epoch boundary. An anonymous visitor gets the same call with ' +
-      'platform defaults, the public outline and three tools, charged to the visitor and ' +
+      'switching only at an epoch boundary. With more than 15 tools, the occasional ones ' +
+      '(set_guidance, show_course_info, get_peer_signals, consult_assessor, record_noticing, ' +
+      "search_library) are deferred behind the provider's tool search, and load_skill " +
+      'appends a skill as a tool result. An anonymous visitor gets the same call with ' +
+      'platform defaults, the public outline and four tools (the library global-only), charged to the visitor and ' +
       'capped at 12 messages or $0.25 per course per 24 h, under a $25 daily anonymous ceiling.',
     kind: AiTaskKind.COMPLETION,
     provider: 'anthropic',
@@ -2351,14 +2354,20 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_ASSESSOR,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Ally offers a side quest with answers (quick check, story dilemma, spaced recall, predict the beat)',
+      'Ally offers a side quest with answers (quick check, story dilemma, spaced recall, predict the beat), ' +
+      'or the learner asks Ally about a quiz they submitted (consult_assessor)',
     detail:
       'The Assessor specialist: one structured call writes 1–3 three-option questions from ' +
       'the learner-safe text of items the learner has reached, at a hidden difficulty ' +
       '(gentle / standard / stretch from their side-quest record, or stretch when they ask ' +
       'for more challenge). It is shown the course quiz prompts only to avoid them; any ' +
       'question sharing 60% of a graded prompt’s words is dropped. The key stays on the ' +
-      'server and answers are marked without a model. Ungraded: no XP, never gates.',
+      'server and answers are marked without a model. Ungraded: no XP, never gates. ' +
+      'Quiz explanations (job "explain") run only when the quiz’s showExplanations is ' +
+      'after_each or after_submit, the quiz is not open, and an attempt was submitted — ' +
+      '`never` and the rest point to the material with no model call. The call sees only ' +
+      'what the quiz player already showed for the latest attempt, and its reply is ' +
+      'checked for unearned key material before the orchestrator gets it.',
     kind: AiTaskKind.COMPLETION,
     provider: 'anthropic',
     defaultModel: 'claude-opus-5-5',
@@ -2369,13 +2378,17 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_COACH,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Ally offers an open side quest (rehearse a line, teach back, reflection), and again when the learner answers it',
+      'Ally offers an open side quest (rehearse a line, teach back, reflection), and again when the learner answers it; ' +
+      'Ally pre-briefs a roleplay or case, or runs an after-action review after one (consult_coach)',
     detail:
       'The Coach specialist: one structured call writes the practice prompt around the item ' +
       'it is about (the practice conversation ahead, or what was just done); a second gives ' +
       'one specific note on what the learner wrote — what it does, what it would lead to, ' +
-      'one thing to try. Never a score, never about a real client. Same budget tiers as the ' +
-      'orchestrator.',
+      'one thing to try. consult_coach makes one more call per use: a pre-brief (one focus, ' +
+      'a short brief, a rehearsal offer) or an after-action review (what happened, why, one ' +
+      "thing to try), from the learner's own ended scenario_sessions on this course and each " +
+      "debrief's learner-facing summary, read-only. Never a score (a line reporting one is " +
+      'dropped), never about a real client. Same budget tiers as the orchestrator.',
     kind: AiTaskKind.COMPLETION,
     provider: 'anthropic',
     defaultModel: 'claude-opus-5-5',

@@ -35,6 +35,9 @@ import { GuideThreadEvent } from './entity/guide-thread-event.entity';
 import { GuideThread } from './entity/guide-thread.entity';
 import { GuideTrigger } from './entity/guide-trigger.entity';
 import { GuideTurnFeedback } from './entity/guide-turn-feedback.entity';
+import { GuideAdviceLine } from './entity/guide-advice-line.entity';
+import { GuidePracticeHistoryService } from './learner/guide-practice-history.service';
+import { GuidePeerService } from './peer/guide-peer.service';
 import { GuideVisitor } from './entity/guide-visitor.entity';
 import { GuideBootstrapService } from './runtime/guide-bootstrap.service';
 import { GuideCardService } from './runtime/guide-card.service';
@@ -87,6 +90,7 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
       GuideCrisisResponse,
       GuideSignal,
       GuideTurnFeedback,
+      GuideAdviceLine,
       User,
       Track,
     ]),
@@ -110,6 +114,8 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
   ],
   providers: [
     GuideLibraryService,
+    GuidePracticeHistoryService,
+    GuidePeerService,
     GuideAssessorService,
     GuideCoachService,
     GuideSideQuestService,

@@ -3,6 +3,7 @@ import { CourseSpine, SpineItem } from '../conductor/course-spine';
 import { SteerDecision } from '../conductor/pacing';
 import { GuideCardPresentation } from '../enum/guide.enum';
 import { GuideMode } from '../enum/guide.enum';
+import { GUIDE_SKILL_IDS } from '../skills/guide-skills';
 
 /**
  * Ally's v1 tools (plans/ally-guide/plan.md §7.7). Each is strict — the
@@ -35,6 +36,11 @@ export const GUIDE_TOOL_NAMES = {
   CLOSE_SESSION: 'close_session',
   SUGGEST_SIGN_IN: 'suggest_sign_in',
   PRESENT_MICRO_ACTIVITY: 'present_micro_activity',
+  CONSULT_COACH: 'consult_coach',
+  CONSULT_ASSESSOR: 'consult_assessor',
+  GET_PEER_SIGNALS: 'get_peer_signals',
+  SEARCH_LIBRARY: 'search_library',
+  LOAD_SKILL: 'load_skill',
 } as const;
 
 export const GUIDE_TOOLS: AgentToolDefinition[] = [
@@ -254,7 +260,147 @@ export const GUIDE_TOOLS: AgentToolDefinition[] = [
     },
     strict: true,
   },
+  {
+    name: GUIDE_TOOL_NAMES.CONSULT_COACH,
+    description:
+      'Ask the Coach, who reads the learner\'s own practice history on this course, for help around a roleplay or case. purpose "prebrief": before they start one: the one thing worth watching for, a short brief and a rehearsal offer. purpose "after_action": after an attempt or its debrief: what happened, why, and one thing to try next. Never a score. Ask the learner what they noticed before an after-action review, and pass it on. ' +
+      'Example: {"purpose":"after_action","item_id":"3f2c…","learner_noticed":"I rushed to reassure her."}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        purpose: { type: 'string', enum: ['prebrief', 'after_action'] },
+        item_id: {
+          type: ['string', 'null'],
+          description:
+            'The roleplay or case from the course outline, or null for the current step.',
+        },
+        learner_noticed: {
+          type: ['string', 'null'],
+          description:
+            'For after_action: what the learner said they noticed, in their words; null if they have not said.',
+        },
+      },
+      required: ['purpose', 'item_id', 'learner_noticed'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.CONSULT_ASSESSOR,
+    description:
+      'Ask about a quiz the learner has taken, when they want to understand a question they missed or were unsure of. It answers only with what the quiz itself lets them see; when the quiz does not explain answers, or is still open, it returns where in the course the material is. Use its words only; never add an answer of your own. ' +
+      'Example: {"item_id":"9a1b…","question":"Why was question 2 not the open question?"}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        item_id: {
+          type: 'string',
+          description: 'The quiz item id from the course outline.',
+        },
+        question: {
+          type: 'string',
+          description: 'What the learner asked, in their words.',
+        },
+      },
+      required: ['item_id', 'question'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.GET_PEER_SIGNALS,
+    description:
+      'See how other learners in their organisation have found an activity ("learners often pause here") and any advice past finishers left. Group patterns only, never a person. Use when the learner feels stuck or slow, or asks how others find it. ' +
+      'Example: {"item_id":null}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        item_id: {
+          type: ['string', 'null'],
+          description:
+            'An item from the course outline, or null for the current step.',
+        },
+      },
+      required: ['item_id'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.SEARCH_LIBRARY,
+    description:
+      "Search Ally's library: material about becoming and being someone who supports others, beyond this course, including the learner's own organisation's documents. Use for wider professional questions the course does not cover (consult_tutor first for anything about the course). Cite what you use by title. " +
+      'Example: {"query":"looking after yourself after a hard shift"}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'A short topic to search for, not a full sentence.',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.LOAD_SKILL,
+    description:
+      'Load the instructions for one of the skills listed under "Skills", when the moment matches it. At most once per skill per conversation. ' +
+      'Example: {"skill_id":"debrief-heavy-roleplay"}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        skill_id: { type: 'string', enum: GUIDE_SKILL_IDS },
+      },
+      required: ['skill_id'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
+
+/**
+ * Tool search switches on above this many tools (plan §7.6). Below it every
+ * definition is loaded; above it the occasional tools are deferred and the
+ * model finds them by searching.
+ */
+export const GUIDE_TOOL_SEARCH_THRESHOLD = 15;
+
+/**
+ * The tools a typical turn does not need, deferred once tool search is on.
+ * Nothing on the safety path (wellbeing resources), nothing the situation
+ * report asks for by name (presenting, side quests), and nothing whose
+ * absence would make Ally guess about the course (the Tutor). Each of these
+ * fails safe if the model never finds it: a quiz question unanswered is
+ * pointed to the material, which is the firewall's own default.
+ */
+export const GUIDE_DEFERRABLE_TOOLS: ReadonlySet<string> = new Set([
+  GUIDE_TOOL_NAMES.SET_GUIDANCE,
+  GUIDE_TOOL_NAMES.SHOW_COURSE_INFO,
+  GUIDE_TOOL_NAMES.GET_PEER_SIGNALS,
+  GUIDE_TOOL_NAMES.CONSULT_ASSESSOR,
+  GUIDE_TOOL_NAMES.RECORD_NOTICING,
+  GUIDE_TOOL_NAMES.SEARCH_LIBRARY,
+]);
+
+/** The list as sent: the deferrable tools deferred once there are enough tools. */
+export function withToolSearch(
+  tools: AgentToolDefinition[],
+  threshold = GUIDE_TOOL_SEARCH_THRESHOLD,
+): AgentToolDefinition[] {
+  if (tools.length <= threshold) return tools;
+  return tools.map((tool) =>
+    GUIDE_DEFERRABLE_TOOLS.has(tool.name)
+      ? { ...tool, deferLoading: true }
+      : tool,
+  );
+}
+
+/** Ally's tools as a signed-in learner's turn sends them. */
+export const GUIDE_LEARNER_TOOLS: AgentToolDefinition[] =
+  withToolSearch(GUIDE_TOOLS);
 
 /** Where each item type opens (plan §2.1 decision 13): fixed per type. */
 export const PRESENTATION_BY_TYPE: Record<string, GuideCardPresentation> = {
@@ -375,6 +521,8 @@ export const GUIDE_VISITOR_TOOL_NAMES: ReadonlySet<string> = new Set([
   GUIDE_TOOL_NAMES.SHOW_COURSE_INFO,
   GUIDE_TOOL_NAMES.SHOW_WELLBEING_RESOURCES,
   GUIDE_TOOL_NAMES.SUGGEST_SIGN_IN,
+  // The global library only: the executor searches with no organisation.
+  GUIDE_TOOL_NAMES.SEARCH_LIBRARY,
 ]);
 
 export const GUIDE_VISITOR_TOOLS: AgentToolDefinition[] = [

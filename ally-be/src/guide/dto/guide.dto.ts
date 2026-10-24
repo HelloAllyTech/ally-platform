@@ -377,3 +377,24 @@ export class GuideMessageFeedbackDto {
   @MaxLength(1000)
   comment?: string;
 }
+
+/** POST /v1/guide/tracks/:trackId/advice (contract GuideAdviceLineRequest). */
+export class GuideAdviceLineDto {
+  @ApiProperty({ maxLength: 200 })
+  @IsString()
+  @MaxLength(200)
+  text!: string;
+}
+
+/** POST /v1/guide/admin/advice/:adviceId/moderate (Ally Console). */
+export class GuideAdviceModerationDto {
+  @ApiProperty({ enum: ['approve', 'reject'] })
+  @IsIn(['approve', 'reject'])
+  decision!: 'approve' | 'reject';
+
+  @ApiPropertyOptional({ maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}

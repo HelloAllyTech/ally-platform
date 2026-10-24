@@ -28,6 +28,7 @@ import { TokenUser } from 'src/auth/type/auth.types';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { atmosphereFor } from '../constants/guide.constants';
 import {
+  GuideAdviceLineDto,
   GuideVoiceSessionDto,
   GuideAppointmentDto,
   GuideCardEventDto,
@@ -40,7 +41,12 @@ import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
 import { GuideCardService } from '../runtime/guide-card.service';
 import { GuideViewService } from '../runtime/guide-view.service';
 import { GuideVoiceService } from '../voice/guide-voice.service';
-import { GuideThreadOpened } from '../contract/generated/guide-contract';
+import {
+  GuideAdviceLineView,
+  GuideAdviceLines,
+  GuideThreadOpened,
+} from '../contract/generated/guide-contract';
+import { GuidePeerService } from '../peer/guide-peer.service';
 import { GuideThread } from '../entity/guide-thread.entity';
 import { TrackEntrySource } from '../enum/guide.enum';
 import { GuideSideQuestService } from '../runtime/guide-side-quest.service';
@@ -48,6 +54,7 @@ import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release
 import {
   ALLY_GUIDE_AGENT_KEY,
   GuideReleaseBundle,
+  peerPolicy,
 } from '../release/guide-release.bundle';
 import { guideDisabled } from '../guide-errors';
 import {
@@ -84,6 +91,7 @@ export class GuideLearnerController {
     private readonly visitors: GuideVisitorService,
     private readonly sideQuests: GuideSideQuestService,
     private readonly releases: AgentReleaseService,
+    private readonly peer: GuidePeerService,
   ) {}
 
   @Post('threads/:threadId/voice-session')
@@ -208,6 +216,75 @@ export class GuideLearnerController {
     const thread = await this.threads.getOwned(threadId, user);
     await this.learnerData.cancelAppointment(thread);
     return { cancelled: true };
+  }
+
+  @Get('tracks/:trackId/advice')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({
+    summary:
+      "Advice from finishers in the learner's organisation (anonymous, moderated; none until enough have finished), and the learner's own line",
+  })
+  async advice(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @CurrentUser() user: TokenUser,
+  ): Promise<GuideAdviceLines> {
+    await this.requireEnrollment(trackId, user);
+    const policy = peerPolicy(await this.gaBundle());
+    const [lines, mine] = await Promise.all([
+      this.peer.visibleAdvice({
+        trackId,
+        tenantId: user.tenantId,
+        policy,
+        excludeUserId: user.id,
+      }),
+      this.peer.mine(user.id, trackId),
+    ]);
+    return {
+      lines,
+      ...(mine ? { mine } : {}),
+      maxChars: policy.adviceMaxChars,
+    };
+  }
+
+  @Post('tracks/:trackId/advice')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({
+    summary:
+      'The mentor door: a finisher leaves one line of advice for those who come after (one per course, rewritable until reviewed)',
+  })
+  async submitAdvice(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Body() dto: GuideAdviceLineDto,
+    @CurrentUser() user: TokenUser,
+  ): Promise<GuideAdviceLineView> {
+    const policy = peerPolicy(await this.gaBundle());
+    return this.peer.submit({
+      userId: user.id,
+      tenantId: user.tenantId,
+      trackId,
+      text: dto.text,
+      policy,
+    });
+  }
+
+  private async gaBundle(): Promise<GuideReleaseBundle> {
+    const ga = await this.releases.getGa(ALLY_GUIDE_AGENT_KEY);
+    if (!ga) throw guideDisabled();
+    return ga.bundle as unknown as GuideReleaseBundle;
+  }
+
+  private async requireEnrollment(
+    trackId: string,
+    user: TokenUser,
+  ): Promise<void> {
+    const rows: unknown[] = await this.dataSource.query(
+      `SELECT 1 FROM "track_enrollments"
+        WHERE "userId" = $1 AND "trackId" = $2 AND "tenantId" = $3
+          AND "deletedAt" IS NULL
+        LIMIT 1`,
+      [user.id, trackId, user.tenantId],
+    );
+    if (!rows.length) throw new NotFoundException('Course not found');
   }
 
   @Get('tracks/:trackId/bootstrap')

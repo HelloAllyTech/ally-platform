@@ -1588,6 +1588,59 @@
         }
       }
     },
+    "GuideAdviceLineRequest": {
+      "description": "POST /v1/guide/tracks/:trackId/advice: the mentor door. A finisher of the course leaves one line for those who come after; it can be rewritten until it is reviewed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "GuideAdviceLineView": {
+      "description": "The learner's own advice line, and where it is in review.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "status", "createdAt"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"]
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      }
+    },
+    "GuideAdviceLines": {
+      "description": "GET /v1/guide/tracks/:trackId/advice: approved, anonymous advice from finishers in the learner's organisation (empty until enough have finished; render each line as a quotation, as plain text), and the learner's own line (absent when they have not written one).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines", "maxChars"],
+      "properties": {
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mine": {
+          "$ref": "#/$defs/GuideAdviceLineView"
+        },
+        "maxChars": {
+          "type": "integer"
+        }
+      }
+    },
     "GuideThreadView": {
       "type": "object",
       "additionalProperties": false,

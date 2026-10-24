@@ -31,7 +31,10 @@ import { GuidePlaygroundService } from '../admin/guide-playground.service';
 import { GuideAlertService } from '../measure/guide-alert.service';
 import { GuideOutreachService } from '../outreach/guide-outreach.service';
 import { GuideMode } from '../enum/guide.enum';
+import { GuidePeerService } from '../peer/guide-peer.service';
+import { GuideAdviceStatus } from '../entity/guide-advice-line.entity';
 import {
+  GuideAdviceModerationDto,
   GuideBaselineCaptureDto,
   GuideCanaryStartDto,
   GuidePlaygroundRunDto,
@@ -67,6 +70,7 @@ export class GuideAdminController {
     private readonly playgroundService: GuidePlaygroundService,
     private readonly alerts: GuideAlertService,
     private readonly outreach: GuideOutreachService,
+    private readonly peer: GuidePeerService,
   ) {}
 
   @Get('overview')
@@ -325,6 +329,46 @@ export class GuideAdminController {
   })
   checkAlerts() {
     return this.alerts.check();
+  }
+
+  @Get('advice')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      'Advice moderation queue: lines finishers left at the mentor door (pending by default, oldest first). Authors are never shown.',
+  })
+  listAdvice(
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+  ) {
+    const wanted = ['pending', 'approved', 'rejected'].includes(status ?? '')
+      ? (status as GuideAdviceStatus)
+      : 'pending';
+    return this.peer.listForModeration({
+      status: wanted,
+      limit: Number(limit) || 50,
+      before: before && !Number.isNaN(Date.parse(before)) ? before : null,
+    });
+  }
+
+  @Post('advice/:adviceId/moderate')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Approve or reject an advice line. Approved lines show, anonymously, to the same organisation once enough have finished the course.',
+  })
+  moderateAdvice(
+    @Param('adviceId', ParseUUIDPipe) adviceId: string,
+    @Body() dto: GuideAdviceModerationDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.peer.moderate({
+      id: adviceId,
+      decision: dto.decision,
+      reason: dto.reason ?? null,
+      moderatorId: user.id,
+    });
   }
 
   @Post('alerts/:alertId/ack')

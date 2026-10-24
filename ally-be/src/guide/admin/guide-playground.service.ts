@@ -6,7 +6,7 @@ import { AgentMessage } from 'src/llm-agent/type/agent-llm.type';
 import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release.service';
 import {
   GUIDE_TOOL_NAMES,
-  GUIDE_TOOLS,
+  GUIDE_LEARNER_TOOLS,
   GUIDE_VISITOR_TOOLS,
   GUIDE_VISITOR_TOOL_NAMES,
   checkPresentable,
@@ -218,7 +218,7 @@ export class GuidePlaygroundService {
     const gate = new ReleaseGate(async () => undefined);
     await gate.release();
     const toolCalls: PlaygroundToolCall[] = [];
-    const tools = visitor ? GUIDE_VISITOR_TOOLS : GUIDE_TOOLS;
+    const tools = visitor ? GUIDE_VISITOR_TOOLS : GUIDE_LEARNER_TOOLS;
     let presented = 0;
     const output = await runOrchestrator({
       system: spans.blocks,

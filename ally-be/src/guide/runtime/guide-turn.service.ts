@@ -30,7 +30,10 @@ import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-sto
 import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
 import { AgentMessage } from 'src/llm-agent/type/agent-llm.type';
 import { TraceCarrier } from 'src/observability/tracing';
-import { GUIDE_TOOLS, GUIDE_VISITOR_TOOLS } from '../capabilities/guide-tools';
+import {
+  GUIDE_LEARNER_TOOLS,
+  GUIDE_VISITOR_TOOLS,
+} from '../capabilities/guide-tools';
 import {
   GuideToolContext,
   GuideToolExecutorService,
@@ -1347,7 +1350,7 @@ export class GuideTurnService {
             ctx.learnerMessage!,
             { role: 'system', content: ctx.situation! },
           ],
-          tools: ctx.visitorId ? GUIDE_VISITOR_TOOLS : GUIDE_TOOLS,
+          tools: ctx.visitorId ? GUIDE_VISITOR_TOOLS : GUIDE_LEARNER_TOOLS,
           maxTokens: GUIDE_ORCHESTRATOR_MAX_TOKENS,
           maxPasses: GUIDE_MAX_TOOL_PASSES,
           signal: controller.signal,
@@ -1619,6 +1622,7 @@ export class GuideTurnService {
       epochStartedAt: ctx.epoch?.snapshot?.startedAt ?? null,
       platformTurn: Boolean(ctx.platformEvent) && !ctx.text.trim(),
       learnerMessageId: ctx.learnerMessageId,
+      openItemId: ctx.openItem?.id ?? null,
       emitDurable: async (type, data) => {
         if (type === 'card.presented' && ctx.voice) {
           ctx.voice.onCardHint(cardHint((data as any).card));
