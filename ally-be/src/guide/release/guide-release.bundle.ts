@@ -73,7 +73,9 @@ export type GuideRole =
   // from the critic — that is the point of having one.
   | 'evaluator_critic'
   | 'evaluator_verifier'
-  | 'red_team';
+  | 'red_team'
+  // Proposes lessons and tweaks for the next release from trusted evidence.
+  | 'curator';
 
 export type GuideChannelRoute = 'text' | 'voice';
 export type GuideBudgetTier = 'premium' | 'degraded' | 'lite';
@@ -505,6 +507,7 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
     evaluator_critic: { text: { premium: { ...OPUS, effort: 'low' } } },
     evaluator_verifier: { text: { premium: { ...GPT5, effort: 'low' } } },
     red_team: { text: { premium: { ...OPUS, effort: 'medium' } } },
+    curator: { text: { premium: { ...OPUS, effort: 'medium' } } },
   },
   capabilities: {
     present_course_item: true,

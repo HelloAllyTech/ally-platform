@@ -288,3 +288,71 @@ export class GenerateRedTeamDto {
   @Max(10)
   perCategory?: number;
 }
+
+// ─── Curator, delegation (plan §7.13 loop 2) ────────────────────────────────
+
+export class LessonDecisionDto {
+  @ApiPropertyOptional({ description: 'Why, for the audit' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  notes?: string;
+}
+
+export class ListLessonsQueryDto {
+  @ApiPropertyOptional({
+    enum: [
+      'proposed',
+      'quarantined',
+      'approved',
+      'active',
+      'blocked',
+      'rejected',
+      'retired',
+    ],
+  })
+  @IsOptional()
+  @IsIn([
+    'proposed',
+    'quarantined',
+    'approved',
+    'active',
+    'blocked',
+    'rejected',
+    'retired',
+  ])
+  status?: string;
+
+  @ApiPropertyOptional({ enum: ['platform', 'org', 'course'] })
+  @IsOptional()
+  @IsIn(['platform', 'org', 'course'])
+  scope?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number;
+}
+
+export class SetDelegationStageDto {
+  @ApiProperty({
+    description:
+      '1 propose only · 2 automatic gate, shadow and canary, a person promotes · 3 automatic promotion. Up one unlocked step at a time; down any time.',
+    minimum: 1,
+    maximum: 3,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  stage!: number;
+
+  @ApiPropertyOptional({ description: 'Why, for the audit' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  reason?: string;
+}

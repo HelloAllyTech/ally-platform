@@ -725,6 +725,52 @@ export class AgentReleaseService {
     });
   }
 
+  /**
+   * Retire a release that never reached GA or canary — a curator draft that
+   * failed its gate or its shadow. Retired releases stay readable as
+   * evidence; nothing serves them.
+   */
+  async retireUnreleased(
+    releaseId: string,
+    reason: string,
+    actorKind: AgentReleaseAuthorKind,
+    userId: number | null = null,
+  ): Promise<AgentRelease> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const release = await repo.findOne({ where: { id: releaseId } });
+      if (!release) throw new NotFoundException('Release not found');
+      if (
+        [
+          AgentReleaseStatus.GA,
+          AgentReleaseStatus.CANARY,
+          AgentReleaseStatus.RETIRED,
+        ].includes(release.status)
+      ) {
+        throw new BadRequestException(
+          `A ${release.status} release is not retired this way.`,
+        );
+      }
+      await repo.update(release.id, {
+        status: AgentReleaseStatus.RETIRED,
+        retiredAt: new Date(),
+      });
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey: release.agentKey,
+        releaseId: release.id,
+        action: AgentReleaseAuditAction.STATUS_CHANGED,
+        actorKind,
+        actorUserId: userId,
+        detail: {
+          from: release.status,
+          to: AgentReleaseStatus.RETIRED,
+          reason,
+        },
+      });
+      return { ...release, status: AgentReleaseStatus.RETIRED } as AgentRelease;
+    });
+  }
+
   /** The canary monitor's decision, kept with its evidence (plan §7.13). */
   async recordCanaryDecision(
     releaseId: string,

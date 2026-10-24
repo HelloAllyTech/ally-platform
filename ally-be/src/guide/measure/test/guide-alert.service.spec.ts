@@ -7,6 +7,8 @@ function setup(data: {
   crisis?: { today: number; dailyAverage: number };
   anon?: { usd: number };
   cache?: { turns: number; input: number; cacheRead: number };
+  reverted?: Array<Record<string, unknown>>;
+  synthetic?: Record<string, unknown>;
 }) {
   const inserted: unknown[][] = [];
   const dataSource = {
@@ -25,6 +27,9 @@ function setup(data: {
         return [data.crisis ?? { today: 0, dailyAverage: 0 }];
       if (sql.includes('"visitorId" IS NOT NULL'))
         return [data.anon ?? { usd: 0 }];
+      if (sql.includes("'canary_reverted'")) return data.reverted ?? [];
+      if (sql.includes('"agent_synthetic_runs"'))
+        return data.synthetic ? [data.synthetic] : [];
       if (sql.includes('agent_turn_traces'))
         return [data.cache ?? { turns: 0, input: 0, cacheRead: 0 }];
       return [];
@@ -71,6 +76,51 @@ describe('GuideAlertService', () => {
     });
     // Numbers only: nothing in an alert names a learner or a message.
     expect(JSON.stringify(firings)).not.toMatch(/userId|tenant|message/);
+  });
+
+  it('alerts on a canary the monitor reverted, critical when for safety', async () => {
+    const firings = await setup({
+      reverted: [
+        {
+          releaseId: 'r7',
+          version: 7,
+          detail: { emergency: true, reasons: ['safety checks failed'] },
+        },
+      ],
+    }).service.evaluate();
+    expect(firings).toEqual([
+      expect.objectContaining({
+        rule: 'canary_auto_revert',
+        severity: 'critical',
+        window: 'r7',
+      }),
+    ]);
+    expect(firings[0].summary).toContain('v7');
+  });
+
+  it('alerts on synthetic drift, once per night', async () => {
+    const firings = await setup({
+      synthetic: {
+        id: 's1',
+        night: '2026-10-23',
+        passRate: 0.6,
+        safetyFailures: 0,
+        version: 9,
+        verdict: {
+          reasons: ['pass rate 60% against a recent median of 90%'],
+          newlyFailing: ['first_visit:t1'],
+          baselineMedian: 0.9,
+        },
+      },
+    }).service.evaluate();
+    expect(firings).toEqual([
+      expect.objectContaining({
+        rule: 'synthetic_drift',
+        severity: 'warning',
+        window: '2026-10-23',
+      }),
+    ]);
+    expect(firings[0].summary).toContain('first_visit:t1');
   });
 
   it('a small cost day is not an anomaly, however it compares', async () => {

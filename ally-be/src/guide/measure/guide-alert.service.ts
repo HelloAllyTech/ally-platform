@@ -236,6 +236,77 @@ export class GuideAlertService implements OnModuleInit {
         });
       }
     }
+    firings.push(...(await this.learningLoopFirings()));
+    return firings;
+  }
+
+  /**
+   * The learning loop's rules (plan §7.12): a canary the monitor reverted on
+   * its own in the last day, and a synthetic-monitoring night that drifted.
+   * Numbers and versions only.
+   */
+  async learningLoopFirings(): Promise<AlertFiring[]> {
+    const firings: AlertFiring[] = [];
+    const reverted: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT a."releaseId", a."detail", r."version"
+         FROM "agent_release_audit" a
+         JOIN "agent_releases" r ON r."id" = a."releaseId"
+        WHERE a."agentKey" = $1 AND a."action" = 'canary_reverted'
+          AND a."createdAt" >= now() - interval '24 hours'`,
+      [ALLY_GUIDE_AGENT_KEY],
+    );
+    for (const row of reverted) {
+      const reasons: string[] = Array.isArray(row.detail?.reasons)
+        ? row.detail.reasons
+        : [];
+      firings.push({
+        rule: 'canary_auto_revert',
+        severity: row.detail?.emergency ? 'critical' : 'warning',
+        window: String(row.releaseId),
+        summary: `Canary v${row.version} was reverted automatically: ${reasons.join('; ') || 'see the release audit'}. Runbook: bad release.`,
+        value: {
+          releaseId: row.releaseId,
+          version: row.version,
+          emergency: Boolean(row.detail?.emergency),
+        },
+      });
+    }
+    const [drift]: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT s."id", s."night"::text AS night, s."passRate", s."safetyFailures",
+              s."summary"->'verdict' AS verdict, r."version"
+         FROM "agent_synthetic_runs" s
+         JOIN "agent_releases" r ON r."id" = s."releaseId"
+        WHERE s."agentKey" = $1 AND s."status" = 'completed' AND s."drift" IS TRUE
+          AND s."completedAt" >= now() - interval '36 hours'
+        ORDER BY s."completedAt" DESC
+        LIMIT 1`,
+      [ALLY_GUIDE_AGENT_KEY],
+    );
+    if (drift) {
+      const reasons: string[] = Array.isArray(drift.verdict?.reasons)
+        ? drift.verdict.reasons
+        : [];
+      const newly: string[] = Array.isArray(drift.verdict?.newlyFailing)
+        ? drift.verdict.newlyFailing
+        : [];
+      firings.push({
+        rule: 'synthetic_drift',
+        severity: Number(drift.safetyFailures) > 0 ? 'critical' : 'warning',
+        window: String(drift.night),
+        summary:
+          `Synthetic journeys on GA v${drift.version} drifted on ${drift.night}: ${reasons.join('; ')}` +
+          (newly.length
+            ? `. Newly failing: ${newly.slice(0, 5).join(', ')}`
+            : '') +
+          '. Runbook: provider drift / course edit.',
+        value: {
+          runId: drift.id,
+          passRate: drift.passRate,
+          safetyFailures: Number(drift.safetyFailures),
+          baselineMedian: drift.verdict?.baselineMedian ?? null,
+        },
+      });
+    }
     return firings;
   }
 
