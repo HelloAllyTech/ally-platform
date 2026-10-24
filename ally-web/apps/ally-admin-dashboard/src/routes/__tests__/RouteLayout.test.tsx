@@ -3,13 +3,29 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import { ROUTES } from "@constants";
+import { FeatureToggleKey, Permissions, ROUTES } from "@constants";
 
 import { RouteLayout } from "../RouteLayout";
 
-// Pass-through wrappers for layouts
+// Pass-through wrappers for layouts. PrivateLayout also records the gate each route asked for, so a
+// route's access rule can be asserted without standing up the entitlement queries behind it.
+const privateLayoutCalls = vi.hoisted(() => ({
+  props: [] as {
+    requiredFeature?: string | string[];
+    requiredPermissions?: string[];
+    alsoRequiredFeatures?: string[];
+  }[],
+}));
 vi.mock("../PrivateLayout", () => ({
-  PrivateLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PrivateLayout: (props: {
+    children: React.ReactNode;
+    requiredFeature?: string | string[];
+    requiredPermissions?: string[];
+    alsoRequiredFeatures?: string[];
+  }) => {
+    privateLayoutCalls.props.push(props);
+    return <>{props.children}</>;
+  },
 }));
 vi.mock("../PublicRoute", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -44,6 +60,7 @@ vi.mock("@pages", () => ({
   LlmConfigs: () => <div>LlmConfigsPage</div>,
   LlmModelCatalog: () => <div>LlmModelCatalogPage</div>,
   AiTasks: () => <div>AiTasksPage</div>,
+  AllyConsole: () => <div>AllyConsolePage</div>,
   ScenarioLanguages: () => <div>ScenarioLanguagesPage</div>,
   SystemSkillsPage: () => <div>SystemSkillsPage</div>,
   UserBadges: () => <div>UserBadgesPage</div>,
@@ -166,6 +183,36 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
     render(<RouteLayout />);
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
+  });
+
+  describe("Ally Console route", () => {
+    it("renders at /ally", () => {
+      window.history.pushState({}, "", ROUTES.ALLY_CONSOLE);
+      render(<RouteLayout />);
+      expect(screen.getByText("AllyConsolePage")).toBeInTheDocument();
+    });
+
+    // The pair ally-be checks on the console's routes. The permission alone reaches every
+    // platform admin since the role collapse, so the toggle is the gate that matters here.
+    it("is gated on the ally_guide toggle AND the view permission", () => {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", ROUTES.ALLY_CONSOLE);
+      render(<RouteLayout />);
+
+      const gate = privateLayoutCalls.props.at(-1);
+      expect(gate?.requiredFeature).toBe(FeatureToggleKey.ALLY_GUIDE);
+      expect(gate?.requiredPermissions).toEqual([Permissions.VIEW_ALLY_GUIDE]);
+    });
+
+    it("is not gated on the edit permission, which narrows controls inside the page instead", () => {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", ROUTES.ALLY_CONSOLE);
+      render(<RouteLayout />);
+
+      expect(privateLayoutCalls.props.at(-1)?.requiredPermissions).not.toContain(
+        Permissions.EDIT_ALLY_GUIDE,
+      );
+    });
   });
 
   it("renders Component Library route", () => {

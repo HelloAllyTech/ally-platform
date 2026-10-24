@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-10-24] update | `repos/ally-be.md`: Ally, the AI course companion.
+- Added `guide/`, `guide-learning/` and `llm-agent/harness/` under a new "Ally, the AI course companion" heading in Architecture & Key Modules: the turn pipeline, the SSE event stream, the one-schema wire contract and its codegen, the switches that keep it off by default, and the learning loop's evaluator, review queue, curator, canary and delegation stage. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
+
 ## [2026-10-23] update | `platform/builder-agent.md`: Builder in the monorepo.
 - "Where it can work" now says the five services are folders of one monorepo, that one `builder.yml` and `builder-review.yml` serve all of them (service from the issue marker or the pull request's files), that runs are told apart by the id in their title, and that stored pull requests, issues and runs are read from the repo their URL names, with a pull request left open on an archived repo going to a person. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
 

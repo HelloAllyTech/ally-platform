@@ -1,0 +1,773 @@
+import { NotFoundException } from '@nestjs/common';
+import { SessionItemStatus } from 'src/common/type/common.type';
+import { TrackItemType } from 'src/track/type/track.type';
+import { buildCourseSpine } from '../../conductor/course-spine';
+import {
+  GuideCardKind,
+  GuideCardState,
+  GuideMode,
+} from '../../enum/guide.enum';
+import {
+  GUIDE_DEFAULT_BUNDLE,
+  GUIDE_DEFAULT_POLICY,
+} from '../../release/guide-release.bundle';
+import { GuideCardService } from '../guide-card.service';
+import { GuideProgressListener } from '../guide-progress.listener';
+import {
+  DEFAULT_GUIDE_PREFS,
+  GuideViewService,
+  cardView,
+  nextStepFor,
+  spineView,
+} from '../guide-view.service';
+
+const spine = buildCourseSpine(
+  {
+    id: 'tr1',
+    title: 'Course',
+    enrolled: true,
+    sections: [
+      {
+        id: 's1',
+        title: 'Starting well',
+        order: 1,
+        items: [
+          {
+            id: 'i1',
+            type: TrackItemType.ARTICLE,
+            order: 1,
+            title: 'Listening',
+            status: SessionItemStatus.COMPLETED,
+          },
+          {
+            id: 'i2',
+            type: TrackItemType.ROLEPLAY,
+            order: 2,
+            title: 'Meera calls',
+            status: SessionItemStatus.UNLOCKED,
+          },
+        ],
+      },
+    ],
+  },
+  { triggerWarningsByItem: new Map([['i2', ['Suicide']]]) },
+);
+
+describe('spineView and nextStepFor', () => {
+  it('draws the Spine with states, minutes and warnings', () => {
+    const view = spineView(spine);
+    expect(view).toMatchObject({
+      completed: 1,
+      total: 2,
+      currentItemId: 'i2',
+      finished: false,
+    });
+    expect(
+      view.sections[0].items.map((i) => [i.id, i.state, i.boss, i.hasWarnings]),
+    ).toEqual([
+      ['i1', 'completed', false, false],
+      ['i2', 'available', true, true],
+    ]);
+  });
+
+  it('shows the dock normally and hides it in CARE', () => {
+    expect(nextStepFor(spine, null, GUIDE_DEFAULT_POLICY)).toEqual({
+      hidden: false,
+      itemId: 'i2',
+      title: 'Meera calls',
+      minutes: 12,
+    });
+    expect(
+      nextStepFor(
+        spine,
+        { mode: GuideMode.CARE, pacing: {} },
+        GUIDE_DEFAULT_POLICY,
+      ).hidden,
+    ).toBe(true);
+  });
+});
+
+describe('cardView', () => {
+  it('restores the card as presented, with its current state', () => {
+    const presented = {
+      cardId: 'c1',
+      kind: 'course_item',
+      presentation: 'theatre',
+      state: 'ready',
+      title: 'Meera calls',
+      framing: 'Your first call.',
+    };
+    expect(
+      cardView({
+        id: 'c1',
+        kind: 'course_item',
+        presentation: 'theatre',
+        state: 'done',
+        title: 'x',
+        payload: { card: presented },
+      } as never),
+    ).toEqual({ ...presented, state: 'done' });
+  });
+
+  const practice = (state: string) =>
+    cardView({
+      id: 'q1',
+      kind: 'micro_activity',
+      presentation: 'inline',
+      state,
+      title: 'Silence',
+      payload: {
+        spec: { source: 'assessor', activity: { title: 'Silence' } },
+        card: {
+          cardId: 'q1',
+          kind: 'micro_activity',
+          presentation: 'inline',
+          state: 'ready',
+          title: 'Silence',
+          payload: { activity: { kind: 'quick_check' } },
+        },
+        response: [{ questionId: 'a', optionId: 'x' }],
+        result: {
+          cardId: 'q1',
+          kind: 'quick_check',
+          results: [
+            {
+              questionId: 'a',
+              correct: false,
+              correctOptionId: 'y',
+              feedback: 'f',
+            },
+          ],
+        },
+      },
+    } as never);
+
+  it("brings a done side quest back with the learner's answer and its marks", () => {
+    expect(practice('done').payload).toEqual({
+      activity: { kind: 'quick_check' },
+      response: { answers: [{ questionId: 'a', optionId: 'x' }] },
+      result: expect.objectContaining({
+        results: [expect.objectContaining({ correctOptionId: 'y' })],
+      }),
+    });
+  });
+
+  it('never sends the key or the spec on a side quest not yet done', () => {
+    const card = practice('ready');
+    expect(card.payload).toEqual({ activity: { kind: 'quick_check' } });
+    expect(JSON.stringify(card)).not.toMatch(/correctOptionId|spec/);
+  });
+});
+
+describe('GuideViewService prefs', () => {
+  it('saves and returns the challenge setting, defaulting to normal', async () => {
+    const saved: any[] = [];
+    let row: any = null;
+    const prefs = {
+      findOne: jest.fn(async () => row),
+      save: jest.fn(async (value: any) => {
+        saved.push(value);
+        row = value;
+      }),
+    };
+    const none = {} as never;
+    const view = new GuideViewService(
+      none,
+      none,
+      none,
+      none,
+      none,
+      none,
+      none,
+      none,
+      prefs as never,
+      none,
+    );
+    const user = { id: 3, tenantId: 'org' };
+    expect((await view.prefsFor(user)).challenge).toBe('normal');
+    const after = await view.updatePrefs(user, { challenge: 'more' });
+    expect(after.challenge).toBe('more');
+    expect(saved[0].prefs).toEqual({ challenge: 'more' });
+    expect((await view.prefsFor(user)).challenge).toBe('more');
+  });
+});
+
+describe('GuideViewService.bootstrap', () => {
+  function service(
+    options: { reason?: string | null; hasAccess?: boolean; thread?: any } = {},
+  ) {
+    const settings = {
+      unavailableReason: jest.fn(async () => options.reason ?? null),
+      switches: jest.fn(async () => ({ anonymousChat: false, voice: true })),
+    };
+    const enrollment = {
+      getTrackAccess: jest.fn(async () => ({
+        hasAccess: options.hasAccess ?? true,
+        enrolled: true,
+        reason: options.hasAccess === false ? 'NOT_IN_GROUP' : null,
+      })),
+    };
+    const localization = {
+      listLearnerLanguages: jest.fn(async () => [
+        { languageCode: 'en' },
+        { languageCode: 'hi' },
+      ]),
+    };
+    const conductor = {
+      loadCourse: jest.fn(async () => ({
+        title: 'Course',
+        description: null,
+        languageCode: 'en',
+        trainerNotes: null,
+        spine,
+      })),
+    };
+    const releases = {
+      getGa: jest.fn(async () => ({ bundle: GUIDE_DEFAULT_BUNDLE })),
+    };
+    const repo = (findOne: any, find: any = []) => ({
+      findOne: jest.fn(async () => findOne),
+      find: jest.fn(async () => find),
+      save: jest.fn(async (row: any) => row),
+      manager: {
+        query: jest.fn(async (sql: string) =>
+          sql.includes('guide_turn_feedback')
+            ? [{ messageId: 'm2', rating: -1 }]
+            : sql.includes("'crisis.response'")
+              ? [
+                  {
+                    payload: {
+                      type: 'crisis.response',
+                      data: {
+                        messageId: 'm9',
+                        text: 'You matter.',
+                        language: 'en',
+                        lines: [],
+                      },
+                    },
+                  },
+                ]
+              : [],
+        ),
+      },
+    });
+    return new GuideViewService(
+      settings as never,
+      enrollment as never,
+      localization as never,
+      conductor as never,
+      releases as never,
+      repo(options.thread ?? null) as never,
+      repo(null, [
+        {
+          id: 'm2',
+          seq: 2,
+          role: 'ally',
+          kind: 'chat',
+          content: 'Hello.',
+          createdAt: new Date('2026-10-23T10:00:00Z'),
+          turnId: 't1',
+        },
+        {
+          id: 'm1',
+          seq: 1,
+          role: 'learner',
+          kind: 'chat',
+          content: 'Hi',
+          createdAt: new Date('2026-10-23T09:59:00Z'),
+          turnId: 't1',
+        },
+      ]) as never,
+      repo(null, [
+        {
+          id: 'c1',
+          kind: 'course_item',
+          presentation: 'theatre',
+          state: 'ready',
+          title: 'Meera calls',
+          presentedSeq: 4,
+          payload: {
+            card: {
+              cardId: 'c1',
+              kind: 'course_item',
+              presentation: 'theatre',
+              state: 'ready',
+              title: 'Meera calls',
+            },
+          },
+        },
+        {
+          id: 'c0',
+          kind: 'resource',
+          presentation: 'inline',
+          state: 'ready',
+          title: 'never shown',
+          presentedSeq: null,
+        },
+        {
+          id: 'sc1',
+          kind: 'chapter_title',
+          presentation: 'inline',
+          state: 'done',
+          title: 'First steps',
+          presentedSeq: 3,
+          payload: {
+            sectionId: 's1',
+            sectionIndex: 0,
+            stakes: 'It builds to a practice: Meera calls.',
+            closedSeq: 8,
+            receipt: {
+              behaviourLabels: ['You let the silence sit'],
+              sideQuests: 1,
+              noticing: 'You let the silence sit (roleplay)',
+            },
+          },
+        },
+      ]) as never,
+      repo({ prefs: { guidance: 'drive' } }) as never,
+      repo({ coverImageUrl: null }) as never,
+    );
+  }
+  const user = { id: 3, tenantId: 'org', username: 'x' };
+
+  it('says why when the guide is off, and stops there', async () => {
+    const result = await service({ reason: 'switched_off' }).bootstrap(
+      'tr1',
+      user,
+    );
+    expect(result.availability).toMatchObject({
+      guided: false,
+      reason: 'switched_off',
+      languages: ['en', 'hi'],
+    });
+    expect(result.access).toBeUndefined();
+    expect(result.prefs).toEqual({ ...DEFAULT_GUIDE_PREFS, guidance: 'drive' });
+  });
+
+  it('returns the access answer without course data when access is refused', async () => {
+    const result = await service({ hasAccess: false }).bootstrap('tr1', user);
+    expect(result.access).toEqual({
+      hasAccess: false,
+      enrolled: true,
+      reason: 'NOT_IN_GROUP',
+    });
+    expect(result.spine).toBeUndefined();
+  });
+
+  it('brings the crisis card back on a reload while the thread is in CRISIS', async () => {
+    const thread = {
+      id: 'th1',
+      pacing: {},
+      lastEventSeq: 9,
+      languageCode: 'en',
+    };
+    const inCrisis = await service({
+      thread: { ...thread, mode: 'CRISIS' },
+    }).bootstrap('tr1', user);
+    expect(inCrisis.crisis).toEqual({
+      messageId: 'm9',
+      text: 'You matter.',
+      language: 'en',
+      lines: [],
+    });
+    const calm = await service({
+      thread: { ...thread, mode: 'CARE' },
+    }).bootstrap('tr1', user);
+    expect(calm.crisis).toBeUndefined();
+  });
+
+  it('draws everything for a learner with a thread', async () => {
+    const result = await service({
+      thread: {
+        id: 'th1',
+        mode: 'NORMAL',
+        pacing: {},
+        lastEventSeq: 9,
+        languageCode: 'en',
+        userId: 7,
+      },
+    }).bootstrap('tr1', user);
+    expect(result.course).toMatchObject({
+      title: 'Course',
+      estimatedMinutes: 18,
+    });
+    expect(result.thread).toMatchObject({
+      id: 'th1',
+      lastEventSeq: 9,
+      atmosphere: 'hushed',
+    });
+    expect(result.messages.map((m) => m.text)).toEqual(['Hi', 'Hello.']);
+    // The learner's own thumbs come back on Ally's messages only.
+    expect(result.messages.map((m) => m.myRating)).toEqual([undefined, -1]);
+    expect(result.cards).toEqual([
+      {
+        seq: 4,
+        card: expect.objectContaining({ cardId: 'c1', state: 'ready' }),
+      },
+    ]);
+    expect(result.nextStep).toMatchObject({ itemId: 'i2', hidden: false });
+    // The scene goes out as a scene with its seq range, never as a card.
+    expect(result.scenes).toEqual([
+      {
+        sceneId: 'sc1',
+        sectionId: 's1',
+        title: 'First steps',
+        stakes: 'It builds to a practice: Meera calls.',
+        openedSeq: 3,
+        closedSeq: 8,
+        receipt: {
+          behaviourLabels: ['You let the silence sit'],
+          sideQuests: 1,
+          noticing: 'You let the silence sit (roleplay)',
+        },
+      },
+    ]);
+  });
+});
+
+describe('GuideCardService', () => {
+  function setup(card: any, completed = false) {
+    const cards = {
+      findOne: jest.fn(async () => card),
+      update: jest.fn(async () => undefined),
+    };
+    const threads = { saveState: jest.fn(async () => undefined) };
+    const bus = { appendDurable: jest.fn(async () => ({ seq: 1 })) };
+    const dataSource = {
+      query: jest.fn(async () => [
+        { status: completed ? 'COMPLETED' : 'UNLOCKED' },
+      ]),
+    };
+    const service = new GuideCardService(
+      dataSource as never,
+      threads as never,
+      bus as never,
+      { set: jest.fn(), get: jest.fn(), del: jest.fn() } as never,
+      cards as never,
+    );
+    return { service, cards, threads, bus };
+  }
+  const thread = {
+    id: 'th1',
+    trackId: 'tr1',
+    userId: 3,
+    pacing: { offSpineTurns: 5 },
+  } as never;
+  const itemCard = {
+    id: 'c1',
+    kind: GuideCardKind.COURSE_ITEM,
+    state: GuideCardState.READY,
+    trackItemId: 'i2',
+  };
+
+  it('opening an item makes the card active and resets the off-course count', async () => {
+    const t = setup(itemCard);
+    expect(await t.service.handle(thread, 'c1', { type: 'opened' })).toEqual({
+      cardId: 'c1',
+      state: GuideCardState.ACTIVE,
+    });
+    expect(t.threads.saveState).toHaveBeenCalledWith('th1', {
+      pacing: expect.objectContaining({ offSpineTurns: 0 }),
+    });
+    expect(t.bus.appendDurable).toHaveBeenCalledWith('th1', 'card.updated', {
+      cardId: 'c1',
+      state: GuideCardState.ACTIVE,
+    });
+  });
+
+  it('accepts a completion claim only when classic progress agrees', async () => {
+    const refused = setup(itemCard, false);
+    expect(
+      await refused.service.handle(thread, 'c1', { type: 'completed_claim' }),
+    ).toEqual({
+      cardId: 'c1',
+      state: GuideCardState.READY,
+      verified: false,
+    });
+    expect(refused.cards.update).not.toHaveBeenCalled();
+
+    const accepted = setup(itemCard, true);
+    expect(
+      await accepted.service.handle(thread, 'c1', { type: 'completed_claim' }),
+    ).toMatchObject({
+      state: GuideCardState.DONE,
+      verified: true,
+    });
+  });
+
+  it('answers 404 for a card from another thread', async () => {
+    await expect(
+      setup(null).service.handle(thread, 'c9', { type: 'opened' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('GuideProgressListener', () => {
+  const event = {
+    userId: 3,
+    tenantId: 'org',
+    trackId: 'tr1',
+    trackEnrollmentId: 'enr1',
+    trackItemId: 'i2',
+    trackSectionId: 's1',
+    itemType: 'ROLEPLAY',
+  };
+
+  function setup(options: { duplicate?: boolean; present?: boolean } = {}) {
+    const queries: string[] = [];
+    const params: unknown[][] = [];
+    const dataSource = {
+      query: jest.fn(async (sql: string, args: unknown[] = []) => {
+        queries.push(sql);
+        params.push(args);
+        if (sql.includes('INSERT INTO "guide_triggers"')) {
+          return options.duplicate ? [[], 0] : [[{ id: 'trg-1' }], 1];
+        }
+        if (sql.includes('UPDATE "guide_cards"')) return [[{ id: 'c1' }], 1];
+        if (sql.includes('FROM "track_enrollments"')) {
+          return [{ trackId: 'tr1', tenantId: 'org', userId: 3 }];
+        }
+        if (sql.includes('FROM "scenario_sessions"')) {
+          return [{ trackItemProgressId: 'tip1' }];
+        }
+        if (sql.includes('FROM "track_item_progress"')) {
+          return [{ trackEnrollmentId: 'enr1', trackItemId: 'i2' }];
+        }
+        return [];
+      }),
+    };
+    const threadService = { saveState: jest.fn(async () => undefined) };
+    const bus = {
+      appendDurable: jest.fn<Promise<{ seq: number }>, [string, string, any]>(
+        async () => ({ seq: 1 }),
+      ),
+    };
+    const conductor = {
+      loadCourse: jest.fn(async () => ({ spine })),
+    };
+    const cards = { isPresent: jest.fn(async () => options.present ?? false) };
+    const turns = {
+      acceptTrigger: jest.fn(async () => ({ turnId: 't', created: true })),
+    };
+    const threads = {
+      find: jest.fn(async () => [
+        {
+          id: 'th1',
+          userId: 3,
+          tenantId: 'org',
+          mode: GuideMode.NORMAL,
+          pacing: { learnerTurns: 4 },
+        },
+      ]),
+      update: jest.fn(),
+    };
+    const scenes = {
+      closeChapter: jest.fn(async () => null),
+    };
+    const finale = {
+      present: jest.fn(async () => ({
+        presented: true,
+        card: { cardId: 'f1' },
+        payload: {},
+      })),
+    };
+    const listener = new GuideProgressListener(
+      dataSource as never,
+      threadService as never,
+      bus as never,
+      conductor as never,
+      cards as never,
+      turns as never,
+      threads as never,
+      scenes as never,
+      finale as never,
+    );
+    return {
+      listener,
+      bus,
+      threadService,
+      turns,
+      queries,
+      params,
+      scenes,
+      finale,
+      threads,
+    };
+  }
+
+  it('presents the finale on course completion, keeps the thread open, and lets Ally host it', async () => {
+    const t = setup({ present: true });
+    await t.listener.onTrackCompleted(event);
+    expect(t.threads.update).toHaveBeenCalledWith('th1', {
+      completedAt: expect.any(Date),
+    });
+    expect(t.finale.present).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      expect.anything(),
+      'Course',
+    );
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      { id: 3, tenantId: 'org' },
+      {
+        dedupeKey: 'th1:course_completed:enr1',
+        description: 'The learner has finished the whole course.',
+      },
+    );
+  });
+
+  it('ends a heavy course quietly', async () => {
+    const t = setup();
+    await t.listener.onTrackCompleted(event);
+    const milestone = t.bus.appendDurable.mock.calls.find(
+      (call: any[]) => call[1] === 'milestone',
+    );
+    // The test course's practice carries content warnings.
+    expect(milestone?.[2]).toMatchObject({
+      kind: 'course_complete',
+      tone: 'quiet',
+    });
+  });
+
+  it('closes the chapter’s scene when the chapter is complete', async () => {
+    const t = setup();
+    await t.listener.onSectionCompleted(event);
+    expect(t.scenes.closeChapter).toHaveBeenCalledWith('th1', 's1');
+  });
+
+  it('marks the card done, moves the Spine, opens the release window and celebrates the practice', async () => {
+    const t = setup();
+    await t.listener.onItemCompleted(event);
+    const types = t.bus.appendDurable.mock.calls.map((call: any[]) => call[1]);
+    expect(types).toEqual(['card.updated', 'spine.updated', 'milestone']);
+    // A hard item with content warnings: hushed, so the celebration is quiet.
+    expect(t.bus.appendDurable.mock.calls[2][2]).toMatchObject({
+      kind: 'boss_complete',
+      tone: 'quiet',
+    });
+    expect(t.threadService.saveState).toHaveBeenCalledWith('th1', {
+      pacing: expect.objectContaining({
+        releaseWindow: { itemId: 'i2', openedAtTurn: 4 },
+      }),
+    });
+    expect(t.turns.acceptTrigger).not.toHaveBeenCalled();
+  });
+
+  it('starts a turn when the learner is watching', async () => {
+    const t = setup({ present: true });
+    await t.listener.onItemCompleted(event);
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      { id: 3, tenantId: 'org' },
+      {
+        dedupeKey: 'th1:item_completed:enr1:i2',
+        description: 'The learner completed "Meera calls" (roleplay).',
+      },
+    );
+  });
+
+  it('folds a failed quiz into the next turn and speaks now if the learner is watching', async () => {
+    const t = setup({ present: true });
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att1',
+      status: 'FAILED',
+      passed: false,
+      scorePct: 40,
+      attemptsUsed: 1,
+      maxAttempts: 3,
+    });
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      { id: 3, tenantId: 'org' },
+      expect.objectContaining({
+        dedupeKey: 'th1:quiz_graded:att1:FAILED',
+        description: expect.stringContaining('2 attempts left'),
+      }),
+    );
+  });
+
+  it('scopes the dedupe key to the thread, so a replacement thread still hears the event', async () => {
+    const t = setup();
+    await t.listener.onItemCompleted(event);
+    const insert = t.queries.findIndex((sql) =>
+      sql.includes('INSERT INTO "guide_triggers"'),
+    );
+    expect(t.params[insert]).toContain('th1:item_completed:enr1:i2');
+  });
+
+  it('reads the enrollment by its real column names', async () => {
+    const t = setup();
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att3',
+      status: 'FAILED',
+      passed: false,
+      scorePct: 40,
+      attemptsUsed: 1,
+      maxAttempts: 3,
+    });
+    const sql = t.queries.find((q) => q.includes('FROM "track_enrollments"'));
+    expect(sql).toContain('"tenantId"');
+    expect(sql).not.toContain('tenant_id');
+  });
+
+  it('lets a quiz with no pass mark speak through its completion too', async () => {
+    const t = setup({ present: true });
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att4',
+      status: 'GRADED',
+      passed: null,
+      scorePct: 98,
+      attemptsUsed: 1,
+      maxAttempts: null,
+    });
+    expect(t.turns.acceptTrigger).not.toHaveBeenCalled();
+  });
+
+  it('lets a passed quiz speak through its completion instead', async () => {
+    const t = setup({ present: true });
+    await t.listener.onQuizGraded({
+      userId: 3,
+      trackEnrollmentId: 'enr1',
+      trackItemId: 'i2',
+      attemptId: 'att2',
+      status: 'PASSED',
+      passed: true,
+      scorePct: 90,
+      attemptsUsed: 1,
+      maxAttempts: 3,
+    });
+    expect(t.turns.acceptTrigger).not.toHaveBeenCalled();
+  });
+
+  it('offers an after-action review when the debrief is ready', async () => {
+    const t = setup({ present: true });
+    await t.listener.onDebriefReady({
+      scenarioSessionId: 'ss1',
+      tenantId: 'org',
+    });
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        dedupeKey: 'th1:debrief_ready:ss1',
+        description: expect.stringContaining('after-action review'),
+      }),
+    );
+  });
+
+  it('does nothing for an event it has already handled', async () => {
+    const t = setup({ duplicate: true });
+    await t.listener.onItemCompleted(event);
+    expect(t.bus.appendDurable).not.toHaveBeenCalled();
+    expect(t.threadService.saveState).not.toHaveBeenCalled();
+  });
+});

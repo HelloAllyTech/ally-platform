@@ -81,6 +81,8 @@ import { TrackDropoffAnalyticsRepository } from './repository/track-dropoff-anal
 import { CoachingLoopAnalyticsService } from './service/coaching-loop-analytics.service';
 import { CoachingLoopAnalyticsRepository } from './repository/coaching-loop-analytics.repository';
 import { LearnerFeedbackAnalyticsService } from './service/learner-feedback-analytics.service';
+import { AllyGuideAnalyticsService } from './service/ally-guide-analytics.service';
+import { AllyGuideAnalyticsRepository } from './repository/ally-guide-analytics.repository';
 import { LearnerFeedbackAnalyticsRepository } from './repository/learner-feedback-analytics.repository';
 import { OrgHealthAnalyticsService } from './service/org-health-analytics.service';
 import { OrgHealthAnalyticsRepository } from './repository/org-health-analytics.repository';
@@ -280,6 +282,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     CoachingLoopAnalyticsRepository,
     LearnerFeedbackAnalyticsService,
     LearnerFeedbackAnalyticsRepository,
+    AllyGuideAnalyticsService,
+    AllyGuideAnalyticsRepository,
     OrgHealthAnalyticsService,
     OrgHealthAnalyticsRepository,
     OrgSessionDistributionAnalyticsService,

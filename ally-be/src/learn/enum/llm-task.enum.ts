@@ -312,6 +312,29 @@ export enum LlmTask {
   // The one Course Copilot call made outside a session: an admin's click on the
   // builder's Landing page tab. Tagged with metadata.trackId, not a session id.
   COURSE_COPILOT_LANDING_PAGE = 'course_copilot_landing_page',
+  // Also outside a session: the builder's Ally notes "Draft with Copilot".
+  COURSE_COPILOT_ALLY_NOTES = 'course_copilot_ally_notes',
+
+  // The Ally guide (src/guide): the learner-facing course companion. One label
+  // per role; every row carries metadata.guideThreadId and guideTurnId, and
+  // the model comes from the thread's release (modelRouting), not from env.
+  GUIDE_ORCHESTRATOR = 'guide_orchestrator',
+  GUIDE_SENTINEL = 'guide_sentinel',
+  GUIDE_TUTOR = 'guide_tutor',
+  GUIDE_OUTREACH = 'guide_outreach',
+  GUIDE_ASSESSOR = 'guide_assessor',
+  GUIDE_COACH = 'guide_coach',
+  GUIDE_MEMORY_CURATOR = 'guide_memory_curator',
+  GUIDE_SUMMARISER = 'guide_summariser',
+  // The guide's voice worker (ally-ai-learn app/guide_worker.py).
+  GUIDE_VOICE_STT = 'guide_voice_stt',
+  GUIDE_VOICE_TTS = 'guide_voice_tts',
+  // The guide's learning loop (src/guide-learning): offline, never on a
+  // learner's turn. Charged to agent_cost_ledger under 'ally_guide_learning'.
+  GUIDE_EVALUATOR_CRITIC = 'guide_evaluator_critic',
+  GUIDE_EVALUATOR_VERIFIER = 'guide_evaluator_verifier',
+  GUIDE_RED_TEAM = 'guide_red_team',
+  GUIDE_CURATOR = 'guide_curator',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

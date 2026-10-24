@@ -16,6 +16,7 @@ class VectorDBCollectionNames:
     AGENT_MEMORIES = "AgentMemory"
     KNOWLEDGE_CHUNKS = "KnowledgeChunk"
     CHARACTER_CHUNKS = "CharacterChunk"
+    GUIDE_LIBRARY_CHUNKS = "GuideLibraryChunk"
 
 
 class MigrationHistoryProperties:
@@ -232,7 +233,8 @@ class AgentMemoryProperties:
 class KnowledgeChunkProperties:
     """
     Properties for a passage-level retrieval collection — the WhatsApp Q&A bot's
-    KnowledgeChunk, and the character library's CharacterChunk.
+    KnowledgeChunk, the character library's CharacterChunk, and the Ally guide's
+    library, GuideLibraryChunk.
 
     Distinct from ReferenceDocument, which is left untouched: that collection stores one
     object per document with a SINGLE embedding of the whole body, which is why it can
@@ -296,12 +298,19 @@ class KnowledgeChunkProperties:
     of a filtered traversal is accepted here, and is the reason it is not also used for
     corpora.
 
-    A NON-WHATSAPP CORPUS INHERITS THESE TWO PROPERTIES AND LEAVES THEM AT THEIR CLOSED
+    THE CHARACTER CORPUS INHERITS THESE TWO PROPERTIES AND LEAVES THEM AT THEIR CLOSED
     DEFAULTS (`is_global = false`, no tenant ids), because nothing writes an audience
-    for it. Retrieval for such a corpus must therefore pass
+    for it. Retrieval for that corpus must therefore pass
     `ChunkAudience.unrestricted()` — which is correct for material that is Ally-global
     rather than a customer's, and is why that constructor exists as more than admin
     tooling.
+
+    THE ALLY GUIDE LIBRARY IS THE OPPOSITE CASE, and the reason the audience pair
+    matters most there. It holds platform documents (`is_global = true`) beside one
+    organisation's own protocols and handbooks (`tenant_ids = [that organisation]`),
+    and every search for a learner names who is asking: their organisation plus the
+    global documents, or the global documents alone for an anonymous visitor. It is
+    never searched unrestricted on a learner's behalf.
 
     Audience is also the ONE piece of chunk metadata deliberately MUTABLE in place.
     Chunk text is immutable for a given (document_id, chunk_version, chunk_index) so a

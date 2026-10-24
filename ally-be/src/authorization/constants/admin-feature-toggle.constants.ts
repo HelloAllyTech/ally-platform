@@ -134,6 +134,15 @@ export enum FeatureToggleKey {
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
   COURSE_COPILOT = 'course_copilot',
 
+  // Ally guide (plans/ally-guide/plan.md §10.5). ALLY_GUIDE is the Ally
+  // Console (settings, releases, traces) and reaches every organisation;
+  // ALLY_GUIDE_ORG is the per-organisation Ally tab (crisis lines, supervisor
+  // wording, protocols); ALLY_GUIDE_TRANSCRIPTS opens individual learner
+  // conversations (redacted) and is granted person by person, never backfilled.
+  ALLY_GUIDE = 'ally_guide',
+  ALLY_GUIDE_ORG = 'ally_guide_org',
+  ALLY_GUIDE_TRANSCRIPTS = 'ally_guide_transcripts',
+
   // Operational, all-scenarios/all-sessions bulk actions (translate-passive,
   // checklist-item translation, V2V test sessions) — historically gated to
   // SUPER_ADMIN-tier specifically so MULTI_TENANT_ADMIN, who holds the
@@ -483,6 +492,33 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     // Backfilled ON for platform-tier admins by 1977710000000-AddCourseCopilotAccess;
     // like every key added after the role-collapse cutover, this is inert.
     legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.ALLY_GUIDE,
+    label: 'Ally Console',
+    description:
+      'Run the Ally guide: kill switches, releases and rollback, configuration, health, and the trace of any turn. Does not open learner conversations — that is Ally transcripts.',
+    // Backfilled ON for platform-tier admins by 1980640000000-AddAllyGuideAccess;
+    // inert like every key added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.ALLY_GUIDE_ORG,
+    label: 'Ally — organisation settings',
+    description:
+      "Edit an organisation's Ally settings: crisis and wellbeing lines per language, supervisor wording, protocols, tone and topics to avoid.",
+    legacyGrants: SUPER_ADMIN_TIER,
+    orgScopedRoutesOnly: true,
+  },
+  {
+    key: FeatureToggleKey.ALLY_GUIDE_TRANSCRIPTS,
+    label: 'Ally transcripts (redacted)',
+    description:
+      "Read individual learners' conversations with Ally, redacted, for quality review. Grant person by person: learners are told the Ally team may review their conversations, and every opening is audited.",
+    // Deliberately NOT backfilled: this is a per-person grant.
+    legacyGrants: SDA_ONLY,
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.OPERATIONAL_ADMIN_ACTIONS,

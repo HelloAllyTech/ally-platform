@@ -29,6 +29,7 @@ import { BugAgentPerformance } from "./BugAgentPerformance";
 import { CodingAgentCost } from "./CodingAgentCost";
 import { FixSessionEngineCost } from "./FixSessionEngineCost";
 import { TabControlsSlotProvider } from "./tabControlsSlot";
+import { AllyGuideTab } from "./tabs/AllyGuideTab";
 import { AnalyticsAgentTab } from "./tabs/AnalyticsAgentTab";
 import { GlossaryAdherenceTab } from "./tabs/GlossaryAdherenceTab";
 import { HighlightsTab } from "./tabs/HighlightsTab";
@@ -138,6 +139,19 @@ const TABS: TabDef[] = [
     uses: { language: false, range: true },
     orgScoped: true,
     render: f => <RatingsCommentsTab {...f} />,
+  },
+  {
+    // How learners use Ally and, beside it, whether they are learning (AAQ-240 to AAQ-251). Leads
+    // with the paired engagement-vs-learning chart, the guard the plan's rollout rule rests on.
+    //
+    // Takes the range picker, not the language picker: Ally's conversations are in whatever
+    // language the learner chose. Open to an admin restricted to some organisations, narrowed to the
+    // page's organisation (its routes are org-scoped), like Ratings & comments beside it.
+    id: "ally",
+    label: "Ally",
+    uses: { language: false, range: true },
+    orgScoped: true,
+    render: f => <AllyGuideTab {...f} />,
   },
   {
     id: "latency",

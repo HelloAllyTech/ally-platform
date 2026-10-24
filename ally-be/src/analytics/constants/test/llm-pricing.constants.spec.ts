@@ -86,6 +86,49 @@ describe('computeCostUsd — prompt-cache pricing', () => {
   });
 });
 
+describe('Claude 5.5 generation pricing', () => {
+  it('prices Opus 5.5 at its own rate, not the claude-opus-5 prefix match', () => {
+    const { costUsd, priced } = computeCostUsd(
+      'claude-opus-5-5',
+      1_000_000,
+      1_000_000,
+    );
+    expect(priced).toBe(true);
+    expect(costUsd).toBeCloseTo(24, 5); // $4 in + $20 out
+  });
+
+  it('prices Opus 5.5 cache reads at its $0.20 rate, not 0.1x input', () => {
+    const { costUsd } = computeCostUsd('claude-opus-5-5', 0, 0, {
+      cacheReadTokens: 1_000_000,
+    });
+    expect(costUsd).toBeCloseTo(0.2, 5);
+  });
+
+  it('still prices Opus 5.5 cache writes at 1.25x input', () => {
+    const { costUsd } = computeCostUsd('claude-opus-5-5', 0, 0, {
+      cacheCreationTokens: 1_000_000,
+    });
+    expect(costUsd).toBeCloseTo(5, 5);
+  });
+
+  it('prices Haiku 5.5 at its own rate', () => {
+    const { costUsd, priced } = computeCostUsd(
+      'claude-haiku-5-5',
+      1_000_000,
+      1_000_000,
+    );
+    expect(priced).toBe(true);
+    expect(costUsd).toBeCloseTo(0.6, 5);
+  });
+
+  it('leaves Opus 5 itself on its own entry', () => {
+    expect(computeCostUsd('claude-opus-5', 1_000_000, 0).costUsd).toBeCloseTo(
+      5,
+      5,
+    );
+  });
+});
+
 describe('pricing ids the providers actually report', () => {
   it('prices a `models/`-prefixed Gemini id like the bare id', () => {
     // The Gemini SDK reports some calls by resource name; those rows were

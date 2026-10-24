@@ -3,6 +3,7 @@ export type TrackSelection =
   | "settings"
   | "landing"
   | "translations"
+  | "allyNotes"
   | { sectionIndex: number; itemIndex: number };
 
 export const isSettingsSelection = (selection: TrackSelection): selection is "settings" =>
@@ -13,6 +14,9 @@ export const isLandingSelection = (selection: TrackSelection): selection is "lan
 
 export const isTranslationsSelection = (selection: TrackSelection): selection is "translations" =>
   selection === "translations";
+
+export const isAllyNotesSelection = (selection: TrackSelection): selection is "allyNotes" =>
+  selection === "allyNotes";
 
 export const isSameItemSelection = (
   selection: TrackSelection,

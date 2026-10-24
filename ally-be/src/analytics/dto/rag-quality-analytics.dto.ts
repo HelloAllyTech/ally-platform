@@ -13,6 +13,7 @@ export const RAG_CONSUMERS = [
   'whatsapp_bot',
   'reference_search',
   'roadmap_matcher',
+  'ally_guide',
 ] as const;
 export type RagConsumerParam = (typeof RAG_CONSUMERS)[number];
 
@@ -28,6 +29,7 @@ export type RagConsumerParam = (typeof RAG_CONSUMERS)[number];
 export const RAG_CORPORA = [
   'whatsapp_qa',
   'character_library',
+  'ally_guide_library',
   'reference_documents',
   'roadmap_opportunities',
 ] as const;

@@ -46,6 +46,16 @@ CORPUS_PURPOSE = {
         "protocols. A passage is relevant when it helps ANSWER the question "
         "that was asked."
     ),
+    "ally_guide_library": (
+        "The ALLY GUIDE LIBRARY corpus. Its reader is Ally, a guide walking a "
+        "learner through a course on mental-health helping skills; the query is "
+        "Ally's own search, usually prompted by something the learner asked. It "
+        "holds material on becoming and being a helper — helping skills, "
+        "self-care, supervision, the work itself — plus an organisation's own "
+        "protocols and handbooks. A passage is relevant when Ally could use it "
+        "to answer or ground what the learner asked; a passage on the same "
+        "topic that does not bear on the question is tangential."
+    ),
 }
 
 DEFAULT_JUDGE_RUBRIC = """\

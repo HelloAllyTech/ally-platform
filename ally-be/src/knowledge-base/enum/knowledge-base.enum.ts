@@ -22,6 +22,28 @@ export enum KbCorpus {
    * than inventing a plausible-sounding person from nothing.
    */
   CHARACTER_LIBRARY = 'character_library',
+  /**
+   * Grounds the Ally guide (plans/ally-guide/plan.md §7.6) — material about becoming and
+   * being a helper. The first corpus that is not Ally-global throughout: a document is
+   * either the PLATFORM's, available to every learner, or one ORGANISATION's own
+   * protocols and handbooks, available only to that organisation's learners. So it is
+   * searched only through `KnowledgeBaseService.searchForAudience`, and its documents'
+   * audience follows their owner (`kb_documents.owner_tenant_id`) rather than being
+   * targeted by hand — see KB_OWNED_CORPORA.
+   */
+  ALLY_GUIDE_LIBRARY = 'ally_guide_library',
+}
+
+/**
+ * Where a retrieved document sits relative to the person asking. Derived from
+ * `kb_documents.is_global` at query time rather than stored, so it can never disagree with
+ * the audience that let the passage through.
+ */
+export enum KbDocumentScope {
+  /** Available to every organisation, and to anonymous visitors. */
+  GLOBAL = 'global',
+  /** Targeted at organisations — on an audience search, the asker's own. */
+  ORGANISATION = 'organisation',
 }
 
 /**
@@ -182,6 +204,11 @@ export enum KbRetrievalConsumer {
   REFERENCE_SEARCH = 'reference_search',
   /** Roadmap duplicate detection. Staff-authored product text, nothing sensitive. */
   ROADMAP_MATCHER = 'roadmap_matcher',
+  /**
+   * The Ally guide's library search, on a learner's behalf. Marked sensitive: Ally composes
+   * the query, but from what the learner just said, so it can carry their words.
+   */
+  ALLY_GUIDE = 'ally_guide',
 }
 
 /**

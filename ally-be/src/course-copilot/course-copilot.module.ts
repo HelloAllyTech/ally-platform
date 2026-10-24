@@ -32,6 +32,8 @@ import { CourseCopilotEditToolsService } from './service/course-copilot-edit-too
 import { CourseCopilotEventService } from './service/course-copilot-event.service';
 import { CourseCopilotJobExecutorService } from './service/course-copilot-job-executor.service';
 import { CourseCopilotLandingPageService } from './service/course-copilot-landing-page.service';
+import { CourseCopilotAllyNotesService } from './service/course-copilot-ally-notes.service';
+import { AllyNotesSpecialist } from './service/specialists/ally-notes.specialist';
 import { CourseCopilotLibraryService } from './service/course-copilot-library.service';
 import { CourseCopilotMediaService } from './service/course-copilot-media.service';
 import { CourseCopilotOrchestratorService } from './service/course-copilot-orchestrator.service';
@@ -102,6 +104,7 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     CourseCopilotOrchestratorService,
     CourseCopilotSchedulerRegistrationService,
     CourseCopilotLandingPageService,
+    CourseCopilotAllyNotesService,
     SpecialistLlmService,
     BlueprintPlannerSpecialist,
     ArticleSpecialist,
@@ -113,6 +116,7 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     ImagePromptSpecialist,
     RoleplayBriefSpecialist,
     LandingPageSpecialist,
+    AllyNotesSpecialist,
   ],
 })
 export class CourseCopilotModule {}

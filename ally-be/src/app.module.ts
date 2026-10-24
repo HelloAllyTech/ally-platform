@@ -24,6 +24,8 @@ import { AnalyticsSuggestionsModule } from './analytics-suggestions/analytics-su
 import { BugHunterModule } from './bug-hunter/bug-hunter.module';
 import { BuilderModule } from './builder/builder.module';
 import { CourseCopilotModule } from './course-copilot/course-copilot.module';
+import { GuideModule } from './guide/guide.module';
+import { GuideLearningModule } from './guide-learning/guide-learning.module';
 import { ExecutionContextMiddleware } from './common/execution/execution-context.middleware';
 import { TenantModule } from './tenant/tenant.module';
 import { CommonModule } from './common/common.module';
@@ -108,6 +110,9 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     BugHunterModule,
     BuilderModule,
     CourseCopilotModule,
+    // The Ally guide (plans/ally-guide/plan.md) — off until its kill switch is on.
+    GuideModule,
+    GuideLearningModule,
     TenantModule,
     CommonModule,
     SettingsModule,

@@ -19,7 +19,35 @@ export const TRACK_EVENTS = {
   ITEM_COMPLETED: 'track.item.completed',
   SECTION_COMPLETED: 'track.section.completed',
   TRACK_COMPLETED: 'track.completed',
+  /** A quiz attempt has a result (or is waiting for model grading). */
+  QUIZ_GRADED: 'track.quiz.graded',
+  /** A roleplay attempt ended, whether or not it completed the item. */
+  ROLEPLAY_ATTEMPT_ENDED: 'track.roleplay.attempt.ended',
 } as const;
+
+/** Payload of TRACK_EVENTS.QUIZ_GRADED. */
+export interface TrackQuizGradedEvent {
+  userId: number;
+  trackEnrollmentId: string;
+  trackItemId: string;
+  attemptId: string;
+  status: string;
+  passed: boolean | null;
+  scorePct: number | null;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+}
+
+/** Payload of TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED. */
+export interface TrackRoleplayAttemptEndedEvent {
+  userId: number;
+  trackEnrollmentId: string;
+  trackItemId: string;
+  trackItemProgressId: string;
+  outcome: 'completed' | 'too_short' | 'below_score';
+  score: number | null;
+  callDurationMs: number;
+}
 
 export const CASE_SESSION_COMPLETED_EVENT = 'case.session.completed';
 
@@ -226,10 +254,22 @@ export class TrackProgressService {
       this.configService.simulationPath
         ?.simulationPathItemMinDurationForCompletion ??
       0;
+    const attemptEnded = (outcome: TrackRoleplayAttemptEndedEvent['outcome']) =>
+      this.emitSafely(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, {
+        userId: progress.userId,
+        trackEnrollmentId: progress.trackEnrollmentId,
+        trackItemId: progress.trackItemId,
+        trackItemProgressId,
+        outcome,
+        score: score ?? null,
+        callDurationMs: callDuration ?? 0,
+      } satisfies TrackRoleplayAttemptEndedEvent);
+
     if (callDurationInSeconds < minDurationSeconds) {
       this.logger.info(
         `Track roleplay too short (${callDurationInSeconds}s < ${minDurationSeconds}s) for progress ${trackItemProgressId}`,
       );
+      attemptEnded('too_short');
       return NOOP_RESULT;
     }
 
@@ -238,10 +278,26 @@ export class TrackProgressService {
       this.logger.info(
         `Track roleplay score ${score} below minScore ${minScore} for progress ${trackItemProgressId}`,
       );
+      attemptEnded('below_score');
       return NOOP_RESULT;
     }
 
-    return this.completeItem(trackItemProgressId, { score });
+    const result = await this.completeItem(trackItemProgressId, { score });
+    attemptEnded('completed');
+    return result;
+  }
+
+  /** A quiz attempt's result, for listeners (the Ally guide). */
+  emitQuizGraded(event: TrackQuizGradedEvent): void {
+    this.emitSafely(TRACK_EVENTS.QUIZ_GRADED, event);
+  }
+
+  private emitSafely(name: string, payload: unknown): void {
+    try {
+      this.eventEmitter.emit(name, payload);
+    } catch (error) {
+      this.logger.error(`Failed to emit ${name}: ${error}`);
+    }
   }
 
   /**
@@ -285,132 +341,145 @@ export class TrackProgressService {
     trackItemProgressId: string,
     { score, meta }: { score?: number; meta?: Partial<TrackItemProgressMeta> },
   ): Promise<CompleteItemResult> {
-    return this.dataSource.transaction(async (manager: EntityManager) => {
-      const progressRepo = manager.getRepository(TrackItemProgress);
-      const enrollmentRepo = manager.getRepository(TrackEnrollment);
-      const itemRepo = manager.getRepository(TrackItem);
-      const sectionRepo = manager.getRepository(TrackSection);
+    // Progress events go out only after the transaction commits: a listener
+    // that reads progress back (the Ally guide's spine, badges) must see the
+    // completion, and must not hear about one that was rolled back.
+    let committedEvents:
+      | Parameters<TrackProgressService['emitProgressEvents']>[0]
+      | null = null;
+    const result = await this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        const progressRepo = manager.getRepository(TrackItemProgress);
+        const enrollmentRepo = manager.getRepository(TrackEnrollment);
+        const itemRepo = manager.getRepository(TrackItem);
+        const sectionRepo = manager.getRepository(TrackSection);
 
-      const progress = await progressRepo.findOne({
-        where: { id: trackItemProgressId },
-      });
-      if (!progress) {
-        this.logger.error(
-          `Track item progress not found: ${trackItemProgressId}`,
-        );
-        return NOOP_RESULT;
-      }
-      if (progress.status === SessionItemStatus.COMPLETED) {
-        return { ...NOOP_RESULT, completed: true };
-      }
-
-      const enrollment = await enrollmentRepo.findOne({
-        where: { id: progress.trackEnrollmentId },
-      });
-      if (!enrollment) {
-        this.logger.error(
-          `Track enrollment not found: ${progress.trackEnrollmentId}`,
-        );
-        return NOOP_RESULT;
-      }
-
-      const item = await itemRepo.findOne({
-        where: { id: progress.trackItemId },
-      });
-      if (!item) {
-        this.logger.error(`Track item not found: ${progress.trackItemId}`);
-        return NOOP_RESULT;
-      }
-
-      const now = new Date();
-      await progressRepo.update(progress.id, {
-        status: SessionItemStatus.COMPLETED,
-        completedAt: now,
-        ...(score !== undefined ? { score } : {}),
-        ...(meta ? { meta: { ...(progress.meta ?? {}), ...meta } } : {}),
-      });
-
-      // Ordered walk of the whole track to find what comes next.
-      const [sections, items, progressRows] = await Promise.all([
-        sectionRepo.find({
-          where: { trackId: item.trackId },
-          order: { order: 'ASC' },
-        }),
-        itemRepo.find({ where: { trackId: item.trackId } }),
-        progressRepo.find({
-          where: { trackEnrollmentId: enrollment.id },
-        }),
-      ]);
-      const orderedItems = sections.flatMap((section) =>
-        items
-          .filter((i) => i.trackSectionId === section.id)
-          .sort((a, b) => a.order - b.order),
-      );
-      const progressByItemId = new Map(
-        progressRows.map((row) => [row.trackItemId, row]),
-      );
-
-      const currentIndex = orderedItems.findIndex((i) => i.id === item.id);
-      const nextItem =
-        currentIndex >= 0 ? orderedItems[currentIndex + 1] : undefined;
-
-      const unlockedItemIds: string[] = [];
-      if (nextItem) {
-        const nextProgress = progressByItemId.get(nextItem.id);
-        if (nextProgress && nextProgress.status === SessionItemStatus.LOCKED) {
-          await progressRepo.update(nextProgress.id, {
-            status: SessionItemStatus.UNLOCKED,
-          });
-          unlockedItemIds.push(nextItem.id);
-        } else if (!nextProgress) {
-          // Defensive backfill — enrollment normally creates all rows upfront.
-          const created = await progressRepo.save(
-            progressRepo.create({
-              trackEnrollmentId: enrollment.id,
-              trackItemId: nextItem.id,
-              userId: enrollment.userId,
-              status: SessionItemStatus.UNLOCKED,
-            }),
+        const progress = await progressRepo.findOne({
+          where: { id: trackItemProgressId },
+        });
+        if (!progress) {
+          this.logger.error(
+            `Track item progress not found: ${trackItemProgressId}`,
           );
-          progressByItemId.set(nextItem.id, created);
-          unlockedItemIds.push(nextItem.id);
+          return NOOP_RESULT;
         }
-      }
+        if (progress.status === SessionItemStatus.COMPLETED) {
+          return { ...NOOP_RESULT, completed: true };
+        }
 
-      // Section completed = every item in the current section is COMPLETED
-      // (counting the row we just flipped).
-      const sectionItems = items.filter(
-        (i) => i.trackSectionId === item.trackSectionId,
-      );
-      const sectionCompleted = sectionItems.every((sectionItem) => {
-        if (sectionItem.id === item.id) return true;
-        return (
-          progressByItemId.get(sectionItem.id)?.status ===
-          SessionItemStatus.COMPLETED
+        const enrollment = await enrollmentRepo.findOne({
+          where: { id: progress.trackEnrollmentId },
+        });
+        if (!enrollment) {
+          this.logger.error(
+            `Track enrollment not found: ${progress.trackEnrollmentId}`,
+          );
+          return NOOP_RESULT;
+        }
+
+        const item = await itemRepo.findOne({
+          where: { id: progress.trackItemId },
+        });
+        if (!item) {
+          this.logger.error(`Track item not found: ${progress.trackItemId}`);
+          return NOOP_RESULT;
+        }
+
+        const now = new Date();
+        await progressRepo.update(progress.id, {
+          status: SessionItemStatus.COMPLETED,
+          completedAt: now,
+          ...(score !== undefined ? { score } : {}),
+          ...(meta ? { meta: { ...(progress.meta ?? {}), ...meta } } : {}),
+        });
+
+        // Ordered walk of the whole track to find what comes next.
+        const [sections, items, progressRows] = await Promise.all([
+          sectionRepo.find({
+            where: { trackId: item.trackId },
+            order: { order: 'ASC' },
+          }),
+          itemRepo.find({ where: { trackId: item.trackId } }),
+          progressRepo.find({
+            where: { trackEnrollmentId: enrollment.id },
+          }),
+        ]);
+        const orderedItems = sections.flatMap((section) =>
+          items
+            .filter((i) => i.trackSectionId === section.id)
+            .sort((a, b) => a.order - b.order),
         );
-      });
+        const progressByItemId = new Map(
+          progressRows.map((row) => [row.trackItemId, row]),
+        );
 
-      const trackCompleted = !nextItem;
-      await enrollmentRepo.update(enrollment.id, {
-        completedItems: (enrollment.completedItems ?? 0) + 1,
-        lastActivityAt: now,
-        ...(trackCompleted ? { completedAt: now } : {}),
-      });
+        const currentIndex = orderedItems.findIndex((i) => i.id === item.id);
+        const nextItem =
+          currentIndex >= 0 ? orderedItems[currentIndex + 1] : undefined;
 
-      this.emitProgressEvents({
-        enrollment,
-        item,
-        sectionCompleted,
-        trackCompleted,
-      });
+        const unlockedItemIds: string[] = [];
+        if (nextItem) {
+          const nextProgress = progressByItemId.get(nextItem.id);
+          if (
+            nextProgress &&
+            nextProgress.status === SessionItemStatus.LOCKED
+          ) {
+            await progressRepo.update(nextProgress.id, {
+              status: SessionItemStatus.UNLOCKED,
+            });
+            unlockedItemIds.push(nextItem.id);
+          } else if (!nextProgress) {
+            // Defensive backfill — enrollment normally creates all rows upfront.
+            const created = await progressRepo.save(
+              progressRepo.create({
+                trackEnrollmentId: enrollment.id,
+                trackItemId: nextItem.id,
+                userId: enrollment.userId,
+                status: SessionItemStatus.UNLOCKED,
+              }),
+            );
+            progressByItemId.set(nextItem.id, created);
+            unlockedItemIds.push(nextItem.id);
+          }
+        }
 
-      return {
-        completed: true,
-        unlockedItemIds,
-        sectionCompleted,
-        trackCompleted,
-      };
-    });
+        // Section completed = every item in the current section is COMPLETED
+        // (counting the row we just flipped).
+        const sectionItems = items.filter(
+          (i) => i.trackSectionId === item.trackSectionId,
+        );
+        const sectionCompleted = sectionItems.every((sectionItem) => {
+          if (sectionItem.id === item.id) return true;
+          return (
+            progressByItemId.get(sectionItem.id)?.status ===
+            SessionItemStatus.COMPLETED
+          );
+        });
+
+        const trackCompleted = !nextItem;
+        await enrollmentRepo.update(enrollment.id, {
+          completedItems: (enrollment.completedItems ?? 0) + 1,
+          lastActivityAt: now,
+          ...(trackCompleted ? { completedAt: now } : {}),
+        });
+
+        committedEvents = {
+          enrollment,
+          item,
+          sectionCompleted,
+          trackCompleted,
+        };
+
+        return {
+          completed: true,
+          unlockedItemIds,
+          sectionCompleted,
+          trackCompleted,
+        };
+      },
+    );
+    if (committedEvents) this.emitProgressEvents(committedEvents);
+    return result;
   }
 
   /** Best-effort in-process events — the future badge/analytics seam. */

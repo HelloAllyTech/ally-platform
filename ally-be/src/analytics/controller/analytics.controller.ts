@@ -18,6 +18,14 @@ import { AnalyticsService } from '../service/analytics.service';
 import { ActivationAnalyticsService } from '../service/activation-analytics.service';
 import { CoachingLoopAnalyticsService } from '../service/coaching-loop-analytics.service';
 import { LearnerFeedbackAnalyticsService } from '../service/learner-feedback-analytics.service';
+import { AllyGuideAnalyticsService } from '../service/ally-guide-analytics.service';
+import {
+  AllyGuideAnalyticsQueryDto,
+  AllyGuideCoursesDto,
+  AllyGuideEngagementLearningDto,
+  AllyGuideSummaryDto,
+  AllyGuideWeeklyDto,
+} from '../dto/ally-guide-analytics.dto';
 import { CohortAnalyticsService } from '../service/cohort-analytics.service';
 import { CompetencyMapAnalyticsService } from '../service/competency-map-analytics.service';
 import { XpGrowthAnalyticsService } from '../service/xp-growth-analytics.service';
@@ -440,6 +448,7 @@ export class AnalyticsController {
     private readonly trackDropoffAnalyticsService: TrackDropoffAnalyticsService,
     private readonly coachingLoopAnalyticsService: CoachingLoopAnalyticsService,
     private readonly learnerFeedbackAnalyticsService: LearnerFeedbackAnalyticsService,
+    private readonly allyGuideAnalyticsService: AllyGuideAnalyticsService,
     private readonly orgHealthAnalyticsService: OrgHealthAnalyticsService,
     private readonly orgSessionDistributionAnalyticsService: OrgSessionDistributionAnalyticsService,
     private readonly learnerKpisAnalyticsService: LearnerKpisAnalyticsService,
@@ -1776,6 +1785,70 @@ export class AnalyticsController {
     @Query() query: LearnerFeedbackQueryDto,
   ): Promise<LearnerFeedbackResponseDto> {
     return this.learnerFeedbackAnalyticsService.getLearnerFeedback(query);
+  }
+
+  // ─── Ally guide (AAQ-240..251, plans/ally-guide/plan.md §4.13) ───────────
+
+  @Get('ally-guide/summary')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Ally guide at a glance (AAQ-240)',
+    description:
+      'Learners, conversations and messages with Ally in the window, the share of rated replies rated up, and cost per learner. Rates over fewer than 5 learners are withheld. Test organisations are excluded.',
+  })
+  @ApiResponse({ status: 200, type: AllyGuideSummaryDto })
+  getAllyGuideSummary(
+    @Query() query: AllyGuideAnalyticsQueryDto,
+  ): Promise<AllyGuideSummaryDto> {
+    return this.allyGuideAnalyticsService.summary(query);
+  }
+
+  @Get('ally-guide/weekly')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Ally guide by week: engagement, learning and health (AAQ-241..247, 249, 250)',
+    description:
+      'Per ISO week: first-session wins, items per learning day, 7-day return, appointments set and kept, voice adoption, quiz first-attempt pass and roleplay score (with learners on the same courses without Ally as a reference line, not a control), CARE and CRISIS entries per 100 learners, off-course and refusal rates. Rates over fewer than 5 learners are withheld; counts are kept.',
+  })
+  @ApiResponse({ status: 200, type: AllyGuideWeeklyDto })
+  getAllyGuideWeekly(
+    @Query() query: AllyGuideAnalyticsQueryDto,
+  ): Promise<AllyGuideWeeklyDto> {
+    return this.allyGuideAnalyticsService.weekly(query);
+  }
+
+  @Get('ally-guide/engagement-vs-learning')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Ally engagement beside learning, with the guard per week (AAQ-248)',
+    description:
+      'Engagement (items per learning day, thumbs-up share) and learning (quiz first-attempt pass) on one timeline. Each week is flagged when engagement rose while learning stayed flat or fell against the previous week, with the thresholds the canary guard uses.',
+  })
+  @ApiResponse({ status: 200, type: AllyGuideEngagementLearningDto })
+  getAllyGuideEngagementVsLearning(
+    @Query() query: AllyGuideAnalyticsQueryDto,
+  ): Promise<AllyGuideEngagementLearningDto> {
+    return this.allyGuideAnalyticsService.engagementVsLearning(query);
+  }
+
+  @Get('ally-guide/courses')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Ally cost per learner per course (AAQ-251)',
+    description:
+      'Learners, turns and model cost per course in the window. Courses with fewer than 5 learners fold into one unnamed "Other courses" row.',
+  })
+  @ApiResponse({ status: 200, type: AllyGuideCoursesDto })
+  getAllyGuideCourses(
+    @Query() query: AllyGuideAnalyticsQueryDto,
+  ): Promise<AllyGuideCoursesDto> {
+    return this.allyGuideAnalyticsService.courses(query);
   }
 
   @Get('org-health')

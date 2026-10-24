@@ -1,4 +1,5 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
+import { TrackEntrySource } from 'src/guide/enum/guide.enum';
 import {
   Column,
   DeleteDateColumn,
@@ -31,6 +32,15 @@ export class TrackEnrollment extends BaseWithoutTenantEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   lastActivityAt?: Date;
+
+  /**
+   * How the learner reached the course — public link, in-app, the Ally guide,
+   * or an outreach reminder — so cohorts can be compared without a holdout
+   * (plans/ally-guide/plan.md §2.1 decision 19). Null for enrollments made
+   * before the column existed.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  entrySource?: TrackEntrySource | null;
 
   /**
    * The learner's chosen language for THIS course (a `languages.translationCode`

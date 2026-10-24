@@ -95,6 +95,10 @@ extend-exclude = '''
   | pretrained_models
 )/
 '''
+# Generated from ally-be's guide contract schema: `codegen.mjs --check` in
+# ally-be compares it byte for byte, so it is never reformatted here — not even
+# when a file list names it (force-exclude, unlike extend-exclude, covers that).
+force-exclude = '/app/core/guide/contract\.py'
 
 # isort configuration
 [tool.isort]

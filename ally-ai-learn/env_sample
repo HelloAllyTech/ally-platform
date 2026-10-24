@@ -15,6 +15,12 @@ LIVEKIT_API_KEY=<YOUR_LIVEKIT_API_KEY>
 LIVEKIT_API_SECRET=<YOUR_LIVEKIT_API_SECRET>
 LIVEKIT_URL=<YOUR_LIVEKIT_URL>
 
+# Ally guide voice worker (python -m app.guide_worker; docs/guide-voice-worker.md).
+# Its LiveKit agent name defaults to ${AGENT_NAME}Guide and must match ally-be's
+# LIVEKIT_GUIDE_AGENT_NAME. Ally's voice per language: GUIDE_TTS_CONFIG (JSON).
+# LIVEKIT_GUIDE_AGENT_NAME=AgentGuide
+# GUIDE_TTS_CONFIG={"hi": {"provider": "google", "config": {"voice_name": "hi-IN-Chirp3-HD-Kore"}}}
+
 # Optional — omit to fall back to Ollama automatically (see the Ollama section
 # below). Required only if you want OpenAI as the LLM provider, or want
 # semantic-similarity/paraphrase-detection events (they use OpenAI embeddings).

@@ -355,6 +355,60 @@ describe("deriveNavigationItems", () => {
     });
   });
 
+  // The ally_guide toggle AND the view grant, as ally-be checks them. Deliberately not in
+  // buildSidebarItemFeatureKeyMap, which would make the tab toggle-only and drop the permission.
+  describe("Ally Console (toggle AND view grant)", () => {
+    it("shows the Ally tab, pointing at the console, to a holder of both", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.VIEW_ALLY_GUIDE],
+        features: [FeatureToggleKey.ALLY_GUIDE],
+        savedOrder: undefined,
+      });
+      expect(result.find(i => i.id === SIDEBAR_ITEMS.ALLY_GUIDE)).toMatchObject({
+        label: "Ally",
+        path: ROUTES.ALLY_CONSOLE,
+      });
+    });
+
+    it("hides it from an admin who holds the permission but not the toggle", () => {
+      // Every platform admin carries the permission since the role collapse, so this is the case
+      // that separates the Ally team from everyone else.
+      const result = deriveNavigationItems({
+        permissions: [Permissions.VIEW_ALLY_GUIDE, Permissions.EDIT_ALLY_GUIDE],
+        features: [],
+        savedOrder: undefined,
+      });
+      expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.ALLY_GUIDE);
+    });
+
+    it("hides it from an admin who holds the toggle but not the view permission", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.EDIT_SCENARIO],
+        features: [FeatureToggleKey.ALLY_GUIDE],
+        savedOrder: undefined,
+      });
+      expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.ALLY_GUIDE);
+    });
+
+    it("does not let the org-tab or transcripts toggles stand in for the console's", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.VIEW_ALLY_GUIDE, Permissions.REVIEW_ALLY_GUIDE_TRANSCRIPTS],
+        features: [FeatureToggleKey.ALLY_GUIDE_ORG, FeatureToggleKey.ALLY_GUIDE_TRANSCRIPTS],
+        savedOrder: undefined,
+      });
+      expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.ALLY_GUIDE);
+    });
+
+    it("follows the admin's saved order like any other tab", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.VIEW_ALLY_GUIDE],
+        features: [FeatureToggleKey.ALLY_GUIDE],
+        savedOrder: [SIDEBAR_ITEMS.ALLY_GUIDE],
+      });
+      expect(result[0].id).toBe(SIDEBAR_ITEMS.ALLY_GUIDE);
+    });
+  });
+
   it("hides WhatsApp Bot from a user holding every permission but not the toggle", () => {
     // The corpus is what the bot tells mental healthcare workers, and the conversation log
     // holds their clinical questions beside their phone numbers — so a permission grant must

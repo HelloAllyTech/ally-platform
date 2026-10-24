@@ -20,6 +20,8 @@ export * from "./legalContent";
 export * from "./notifications";
 export * from "./discussionApi";
 export * from "./tracks";
+export * from "./guide";
+export * from "./guideVisitor";
 export * from "./blog";
 export * from "./changelog";
 export * from "./bugReport";

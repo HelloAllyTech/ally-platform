@@ -1,0 +1,17 @@
+{
+  "def": "GuideVoiceFrame",
+  "valid": [
+    { "type": "delta", "text": "Let's look at that together." },
+    { "type": "card_hint", "text": "I've put the article on your right." },
+    { "type": "done", "turnId": "u1", "messageId": "m2" },
+    {
+      "type": "error",
+      "code": "provider_unavailable",
+      "message": "One moment…"
+    }
+  ],
+  "invalid": [
+    { "type": "delta" },
+    { "type": "error", "code": "teapot", "message": "x" }
+  ]
+}

@@ -146,7 +146,11 @@ export class TrackLearnerController {
     @Body() dto?: EnrollTrackDto,
   ) {
     // The app language seeds the course's language when it is published in it.
-    return this.trackEnrollmentService.enroll(trackId, dto?.languageCode);
+    return this.trackEnrollmentService.enroll(
+      trackId,
+      dto?.languageCode,
+      dto?.entrySource,
+    );
   }
 
   @ApiOperation({

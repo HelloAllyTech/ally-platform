@@ -1,0 +1,61 @@
+{
+  "def": "GuideFinalePayload",
+  "valid": [
+    {
+      "hushed": false,
+      "firstMove": {
+        "text": "I would tell her it gets better",
+        "question": "Meera says she can't cope. What do you say first?",
+        "invitation": "This is how you answered at the very start. How would you answer it now?"
+      },
+      "possibleSelf": {
+        "text": "Someone people feel safe with",
+        "invitation": "You said this is the helper you want to become. Does it still fit?"
+      },
+      "noticings": ["You let the silence sit (roleplay)"],
+      "doors": [
+        {
+          "kind": "field_assignment",
+          "title": "Try it on your next shift",
+          "body": "On your next shift, watch for this: the moment a caller goes quiet. Afterwards, come back and tell me what happened.",
+          "available": true
+        },
+        {
+          "kind": "spaced_recall",
+          "title": "A short look back in a week",
+          "body": "Three quick questions, seven days from now, to help what you learned stick.",
+          "suggestedAt": "2026-10-31T10:00:00.000Z",
+          "available": true
+        },
+        {
+          "kind": "mentor",
+          "title": "Leave a line for the next learner",
+          "body": "What would you tell someone just starting this course?",
+          "maxChars": 200,
+          "available": false
+        }
+      ]
+    },
+    {
+      "hushed": true,
+      "firstMove": null,
+      "possibleSelf": null,
+      "noticings": [],
+      "doors": []
+    }
+  ],
+  "invalid": [
+    {
+      "hushed": false,
+      "firstMove": null,
+      "possibleSelf": null,
+      "noticings": [],
+      "doors": [{ "kind": "badge", "title": "x", "body": "y" }]
+    },
+    {
+      "hushed": false,
+      "noticings": [],
+      "doors": []
+    }
+  ]
+}

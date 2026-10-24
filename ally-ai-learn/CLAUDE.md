@@ -49,6 +49,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Prompts | [`docs/12-prompts-system.md`](docs/12-prompts-system.md) |
 | Queues and cross-service messaging | [`docs/11-queue-messaging.md`](docs/11-queue-messaging.md) |
 | Running it locally | [`docs/LOCAL_DEV.md`](docs/LOCAL_DEV.md) — and read the first gotcha below |
+| The Ally guide's voice worker (`guide-` rooms) | [`docs/guide-voice-worker.md`](docs/guide-voice-worker.md) — speech only; every reply comes from ally-be |
 | Your change outdates a doc | [`docs/docs-guard.md`](docs/docs-guard.md) — `.docs-map.yml`, the CI gate and its line budget, escape hatches, wiki PRs |
 | Anything else | [`WIKI-ROUTING.md`](WIKI-ROUTING.md) — one line per wiki page, tells you which to fetch |
 

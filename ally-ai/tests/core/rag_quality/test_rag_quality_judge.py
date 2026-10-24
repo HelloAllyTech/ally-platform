@@ -56,6 +56,14 @@ class TestPromptBuilder:
         prompt = build_judge_prompt("q", "character_library", [_passage()], 0.35)
         assert CORPUS_PURPOSE["character_library"] in prompt
 
+    def test_every_corpus_says_what_it_is_for(self):
+        # A corpus without a purpose is judged as "an unrecognised corpus", which
+        # makes its relevance labels guesses about what the reader wanted.
+        from app.core.knowledge_base.corpus import KbCorpus
+
+        for corpus in KbCorpus:
+            assert corpus.value in CORPUS_PURPOSE, corpus.value
+
     def test_names_an_unrecognised_corpus_rather_than_guessing(self):
         prompt = build_judge_prompt("q", "not_a_corpus", [_passage()], 0.35)
         assert "unrecognised corpus (not_a_corpus)" in prompt

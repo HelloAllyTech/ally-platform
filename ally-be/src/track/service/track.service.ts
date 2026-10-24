@@ -65,6 +65,7 @@ import {
   normaliseTrackLandingPage,
   remapLandingPageSections,
 } from '../util/track-landing-page.util';
+import { remapGuideNotesItems } from '../util/track-guide-notes.util';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
 import { TrackTranslationService } from './track-translation.service';
 import {
@@ -593,6 +594,8 @@ export class TrackService {
       // Old section id -> the copy's, so the landing page's chapters and hard
       // call can be re-pointed once every section exists.
       const sectionIdMap = new Map<string, string>();
+      // Old item id -> the copy's, for the Ally notes' per-item tension.
+      const itemIdMap = new Map<string, string>();
 
       for (const section of source.sections) {
         const newSection = await sectionRepo.save({
@@ -604,7 +607,7 @@ export class TrackService {
         });
         sectionIdMap.set(section.id, newSection.id);
         if (section.items.length > 0) {
-          await itemRepo.save(
+          const savedItems = await itemRepo.save(
             section.items.map((item) => ({
               trackId: newTrack.id,
               trackSectionId: newSection.id,
@@ -620,19 +623,35 @@ export class TrackService {
               hasDiscussion: item.hasDiscussion,
             })),
           );
+          if (Array.isArray(savedItems)) {
+            section.items.forEach((item, index) => {
+              const copy = savedItems[index];
+              if (item.id && copy?.id) itemIdMap.set(item.id, copy.id);
+            });
+          }
         }
       }
 
       // The copy keeps the story, pointed at its own sections. It stays private
       // (isPublicView above), so the story is invisible until its author
       // publishes the link.
+      // Ally's notes come along too, their per-item tension re-pointed at the
+      // copy's items. One update for both, still inside the transaction.
+      const copyPatch: Partial<Track> = {};
       if (source.landingPage) {
-        await trackRepo.update(newTrack.id, {
-          landingPage: remapLandingPageSections(
-            source.landingPage,
-            sectionIdMap,
-          ),
-        });
+        copyPatch.landingPage = remapLandingPageSections(
+          source.landingPage,
+          sectionIdMap,
+        );
+      }
+      if (source.guideNotes) {
+        copyPatch.guideNotes = remapGuideNotesItems(
+          source.guideNotes,
+          itemIdMap,
+        );
+      }
+      if (Object.keys(copyPatch).length > 0) {
+        await trackRepo.update(newTrack.id, copyPatch);
       }
 
       if (newTrack.isGlobal) {

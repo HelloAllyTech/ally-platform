@@ -1,3 +1,4 @@
+import { useAllyGuideAccess } from "./useAllyGuideAccess";
 import { AllySocketStatus, useAllySocket } from "./useAllySocket";
 import { useBuilderSocket } from "./useBuilderSocket";
 import { useBuilderStream } from "./useBuilderStream";
@@ -30,6 +31,7 @@ import { useUser } from "./useUser";
 import { useVoicePreview } from "./useVoicePreview";
 
 export {
+  useAllyGuideAccess,
   useAllySocket,
   AllySocketStatus,
   useUser,

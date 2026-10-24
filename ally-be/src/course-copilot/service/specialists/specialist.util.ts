@@ -29,6 +29,7 @@ export const SPECIALIST_MAX_TOKENS = {
   REVIEW: 12_000,
   IMAGE_PROMPT: 2_000,
   LANDING_PAGE: 10_000,
+  ALLY_NOTES: 6_000,
 } as const;
 
 /** Item types a learner "does" — the practice a journal reflects on. */

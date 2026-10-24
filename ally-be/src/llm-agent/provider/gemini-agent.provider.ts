@@ -211,6 +211,13 @@ export class GeminiAgentProvider implements IAgentLlmProvider {
     for (const message of messages) {
       const role = message.role === 'assistant' ? 'model' : 'user';
 
+      // Gemini has no mid-conversation system channel: an operator note
+      // becomes a labelled user part so it is not mistaken for the learner.
+      if (message.role === 'system') {
+        push('user', [{ text: `[System note] ${message.content}` }]);
+        continue;
+      }
+
       if (typeof message.content === 'string') {
         push(role, message.content ? [{ text: message.content }] : []);
         continue;

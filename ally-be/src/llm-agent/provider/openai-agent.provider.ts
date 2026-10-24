@@ -54,21 +54,42 @@ export class OpenAiAgentProvider implements IAgentLlmProvider {
         ...(request.tools?.length
           ? { tools: this.toOpenAiTools(request.tools) }
           : {}),
+        ...(request.tools?.length && request.toolChoice
+          ? { tool_choice: request.toolChoice }
+          : {}),
         ...(request.temperature !== undefined &&
         modelSupportsTemperature(request.model)
           ? { temperature: request.temperature }
           : {}),
         // A real API-enforced JSON mode; nothing to fall back on in the prompt.
-        ...(request.jsonMode
-          ? { response_format: { type: 'json_object' as const } }
-          : {}),
+        ...(request.outputSchema
+          ? {
+              response_format: {
+                type: 'json_schema' as const,
+                json_schema: {
+                  name: 'output',
+                  schema: request.outputSchema,
+                  strict: true,
+                },
+              },
+            }
+          : request.jsonMode
+            ? { response_format: { type: 'json_object' as const } }
+            : {}),
         stream: true,
         // Without this the usage block never arrives on a streamed call and
         // every interview turn would record zero tokens.
         stream_options: { include_usage: true },
       },
-      ...(request.timeoutMs !== undefined
-        ? [{ timeout: request.timeoutMs }]
+      ...(request.timeoutMs !== undefined || request.signal
+        ? [
+            {
+              ...(request.timeoutMs !== undefined
+                ? { timeout: request.timeoutMs }
+                : {}),
+              ...(request.signal ? { signal: request.signal } : {}),
+            },
+          ]
         : []),
     );
 
@@ -156,6 +177,7 @@ export class OpenAiAgentProvider implements IAgentLlmProvider {
         name: tool.name,
         description: tool.description,
         parameters: tool.input_schema,
+        ...(tool.strict ? { strict: true } : {}),
       },
     }));
   }

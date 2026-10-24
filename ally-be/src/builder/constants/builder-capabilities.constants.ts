@@ -317,6 +317,34 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['course copilot', 'author course', 'generate course'],
   },
   {
+    id: 'ally-guide',
+    name: 'Ally guide (guided course experience) and the agent harness',
+    whatItIs:
+      'Ally, an AI companion that walks a learner through a course as a conversation, presenting ' +
+      'each course item as a card; experimental, behind kill switches, on the public course link. ' +
+      'It runs on the reusable agent harness in src/llm-agent/harness: a staged turn pipeline, ' +
+      'versioned releases with one-call rollback, idempotent turn records and per-turn traces.',
+    reuseWhen:
+      'A request wants a learner-facing AI guide, coach or tutor inside a course, a conversational ' +
+      'course experience, or a new long-running agent that needs releases, rollback, turn traces ' +
+      'or an event stream with replay. Build the agent on the harness rather than a new loop.',
+    extendVia:
+      'A new agent: an agentKey, its stages and a release bundle on the harness. Ally itself: ' +
+      'release bundle policy keys and capabilities.',
+    modules: ['ally-be:src/guide', 'ally-be:src/llm-agent/harness'],
+    keywords: [
+      'ally',
+      'guide',
+      'guided course',
+      'companion',
+      'coach',
+      'journey',
+      'agent harness',
+      'release',
+      'rollback',
+    ],
+  },
+  {
     id: 'course-discussions',
     name: 'Course discussions',
     whatItIs: 'Per-lesson discussion threads inside a course.',

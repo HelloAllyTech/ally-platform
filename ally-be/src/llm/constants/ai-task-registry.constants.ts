@@ -967,10 +967,13 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Anything is embedded for semantic search',
+    trigger:
+      'Anything is embedded for semantic search — including every document added to ' +
+      "Ally's library and every library search Ally makes for a learner",
     detail:
-      'Both knowledge corpora (WhatsApp Q&A and the character library, one Weaviate ' +
-      'collection each) plus roadmap opportunities — every corpus embeds with THIS model, ' +
+      'All three knowledge corpora (WhatsApp Q&A, the character library and the Ally ' +
+      "guide's library, one Weaviate collection each) plus roadmap opportunities — " +
+      'embedded once per chunk at ingest and once per query at search. Every corpus embeds with THIS model, ' +
       'because a query vector from another model lands in a different space and makes every ' +
       'similarity number meaningless rather than merely worse. 1536 dimensions; Weaviate ' +
       'never vectorises for itself, so this model and those schemas are coupled.',
@@ -2193,6 +2196,29 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_landing_page_writer',
   },
   {
+    id: 'course-copilot-ally-notes',
+    task: LlmTask.COURSE_COPILOT_ALLY_NOTES,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      "An admin clicks Draft with Copilot in the course builder's Ally notes (the Ally guide's course layer)",
+    detail:
+      'One call per click, outside any Copilot session. It drafts the notes the Ally guide ' +
+      'reads about this course (who the learners are, where it is emotionally heavy and how ' +
+      'to pace it, the ideas it returns to) and per-item tension overrides, from the saved ' +
+      'outline: titles, types, default tension, trigger warnings and short article and ' +
+      'roleplay-scenario excerpts — never quiz answer keys. JSON mode. A second call only ' +
+      "when the output can't be parsed or quotes one of the course's correct answers " +
+      '(checked in code, the same check that blocks saving notes). Nothing is saved ' +
+      'server-side; the trainer saves through the guide-notes PUT. Tagged with ' +
+      'metadata.trackId, so it never counts against a build budget.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_ally_notes_writer',
+  },
+  {
     id: 'course-copilot-summary',
     task: LlmTask.COURSE_COPILOT_SUMMARY,
     runtime: LlmRuntime.ALLY_BE,
@@ -2254,6 +2280,288 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
   },
 ];
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The Ally guide (src/guide) — the learner-facing course companion on the
+ * agent harness. Models are NOT configured by env or prompt rows: each role's
+ * model comes from the thread's release (`modelRouting`: role → channel →
+ * budget tier), so `defaultModel` is the seeded release's premium route and a
+ * change ships as a new release. Every row's usage carries
+ * metadata.guideThreadId / guideTurnId / releaseId, and the same calls are
+ * priced into `agent_cost_ledger`, which the guide reads for its budget tiers.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const GUIDE_TASKS: AiTaskEntry[] = [
+  {
+    id: 'guide-orchestrator',
+    task: LlmTask.GUIDE_ORCHESTRATOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner sends Ally a message, or presses Continue, Start or Not now; a platform event (a completion, a grade, signing in) while they are on the page; an anonymous visitor writes on a public course link; an admin runs a turn in the Ally Console Playground (no learner, nothing stored); or an eval run replays a case against a release (dry run, write tools stubbed, charged to the learning loop)',
+    detail:
+      "Ally's reply: a streamed tool loop (at most six tool passes, then a closing pass " +
+      'with tool_choice none) whose text is held until the Sentinel clears the message. ' +
+      'Context is a frozen per-epoch prefix — persona + safety core (cached 1h), the ' +
+      'organisation layer (1h), the course outline (5m) — then the epoch history replayed ' +
+      'byte for byte with its thinking blocks, the learner message, and a per-turn ' +
+      'situation report as a mid-conversation system message. A Sentinel verdict that ' +
+      'changes the mode restarts the reply once. Model by budget tier: Opus 5.5 (effort ' +
+      'medium) → Sonnet 5.5 past $3 a thread or $1.50 a learner-day → Haiku 5.5 past $6, ' +
+      'switching only at an epoch boundary. With more than 15 tools, the occasional ones ' +
+      '(set_guidance, show_course_info, get_peer_signals, consult_assessor, record_noticing, ' +
+      "search_library) are deferred behind the provider's tool search, and load_skill " +
+      'appends a skill as a tool result. An anonymous visitor gets the same call with ' +
+      'platform defaults, the public outline and four tools (the library global-only), charged to the visitor and ' +
+      'capped at 12 messages or $0.25 per course per 24 h, under a $25 daily anonymous ceiling.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.orchestrator',
+  },
+  {
+    id: 'guide-sentinel',
+    task: LlmTask.GUIDE_SENTINEL,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner or visitor sends Ally a message, an admin runs a Playground turn, or an eval run replays a case',
+    detail:
+      'The safety classifier: one call per learner message, run concurrently with the ' +
+      'reply and held to a deadline (release policy safety.sentinelDeadlineMs, 1.2 s), so it ' +
+      'adds latency only when it is slower than the reply. Sees the message, the last six ' +
+      'turns and the current item, and returns a closed structured verdict (risk, whose ' +
+      'state it is about, real-case and identifying-detail overlays). Skipped when the ' +
+      'first-person keyword layer has already matched. Effort low; Haiku because latency ' +
+      'gates safety here.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-haiku-5-5',
+    configuredBy: 'ally_guide release modelRouting.sentinel',
+  },
+  {
+    id: 'guide-tutor',
+    task: LlmTask.GUIDE_TUTOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Ally needs a grounded answer to a learner question about the course (also in Playground turns and eval replays)',
+    detail:
+      "The Tutor specialist, called by Ally's consult_tutor tool: one structured call per " +
+      'question over the learner-safe text of the items the learner can already open ' +
+      '(article bodies, journal prompts, intros, titles and descriptions — never quiz ' +
+      'questions, interjections or branches, which carry answers), at most 30,000 ' +
+      'characters. Citations whose quote is not really in the passage are dropped, and an ' +
+      'answer left with none is reported as not covered. Same budget tiers as the ' +
+      'orchestrator.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.tutor',
+  },
+  {
+    id: 'guide-outreach',
+    task: LlmTask.GUIDE_OUTREACH,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "At the time a learner chose in Ally's closing ritual, or once per idle stretch (4–21 days away, at most weekly)",
+    detail:
+      "Writes Ally's one reminder (title ≤50 characters, body ≤220) from course facts only — " +
+      'progress, the last item finished, the next step and its minutes — never the ' +
+      'conversation or anything the learner shared, since it may be emailed. Low effort. ' +
+      'The text is linted for loss, guilt, urgency and neediness words; on a failed lint or ' +
+      'call a fixed template is sent instead. Skipped after a crisis (30 days) or CARE (14), ' +
+      'for visitors, finished courses, opted-out learners and organisations with outreach off.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.outreach_writer',
+  },
+  {
+    id: 'guide-assessor',
+    task: LlmTask.GUIDE_ASSESSOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Ally offers a side quest with answers (quick check, story dilemma, spaced recall, predict the beat), ' +
+      'or the learner asks Ally about a quiz they submitted (consult_assessor)',
+    detail:
+      'The Assessor specialist: one structured call writes 1–3 three-option questions from ' +
+      'the learner-safe text of items the learner has reached, at a hidden difficulty ' +
+      '(gentle / standard / stretch from their side-quest record, or stretch when they ask ' +
+      'for more challenge). It is shown the course quiz prompts only to avoid them; any ' +
+      'question sharing 60% of a graded prompt’s words is dropped. The key stays on the ' +
+      'server and answers are marked without a model. Ungraded: no XP, never gates. ' +
+      'Quiz explanations (job "explain") run only when the quiz’s showExplanations is ' +
+      'after_each or after_submit, the quiz is not open, and an attempt was submitted — ' +
+      '`never` and the rest point to the material with no model call. The call sees only ' +
+      'what the quiz player already showed for the latest attempt, and its reply is ' +
+      'checked for unearned key material before the orchestrator gets it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.assessor',
+  },
+  {
+    id: 'guide-coach',
+    task: LlmTask.GUIDE_COACH,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Ally offers an open side quest (rehearse a line, teach back, reflection), and again when the learner answers it; ' +
+      'Ally pre-briefs a roleplay or case, or runs an after-action review after one (consult_coach)',
+    detail:
+      'The Coach specialist: one structured call writes the practice prompt around the item ' +
+      'it is about (the practice conversation ahead, or what was just done); a second gives ' +
+      'one specific note on what the learner wrote — what it does, what it would lead to, ' +
+      'one thing to try. consult_coach makes one more call per use: a pre-brief (one focus, ' +
+      'a short brief, a rehearsal offer) or an after-action review (what happened, why, one ' +
+      "thing to try), from the learner's own ended scenario_sessions on this course and each " +
+      "debrief's learner-facing summary, read-only. Never a score (a line reporting one is " +
+      'dropped), never about a real client. Same budget tiers as the orchestrator.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.coach',
+  },
+  {
+    id: 'guide-memory-curator',
+    task: LlmTask.GUIDE_MEMORY_CURATOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "A learner's Ally session window closes: a new epoch starts, the closing ritual is shown, or 30 minutes pass with no message (5-minute sweep)",
+    detail:
+      'The Memory Curator (src/guide/learner/guide-memory-curator.service.ts): one ' +
+      "structured call per window reads the learner's unflagged lines since the last run " +
+      'and the notes Ally holds, and proposes ADD / EDIT / REMOVE. Code keeps each only if ' +
+      "it cites the learner's lines, is grounded in their words, carries no contact details " +
+      'and names the revision it read; never over a forgotten note. Background, not on the ' +
+      'learning path; at most one call per thread per window.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.memory_curator',
+  },
+  {
+    id: 'guide-summariser',
+    task: LlmTask.GUIDE_SUMMARISER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "A learner's next message arrives after an Ally epoch's replayed history passed history.summariseAboveTokens (40k by default)",
+    detail:
+      'The Summariser (src/guide/context/guide-summariser.service.ts): one structured call ' +
+      "condenses the epoch's visible transcript (real cases and hard moments replaced by " +
+      'markers) and any earlier summary into goals / where things stand / agreed / still ' +
+      "open. The next epoch's opener carries it in place of the replayed history; the " +
+      'transcript itself is never edited. Runs inside that turn before the reply, with a ' +
+      '20 s deadline; on failure the epoch opens with the last few messages only.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-haiku-5-5',
+    configuredBy: 'ally_guide release modelRouting.summariser',
+  },
+  {
+    id: 'guide-voice-stt',
+    task: LlmTask.GUIDE_VOICE_STT,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'A learner talks to Ally by voice',
+    detail:
+      "Speech recognition in the guide's own voice worker (app/guide_worker.py), a separate " +
+      'deployment from the roleplay agent. Same provider resolution as the roleplay agent for ' +
+      "the session's language; semantic turn detection for en and hi, VAD with a longer " +
+      'endpointing delay otherwise. The final transcript becomes a guide turn through ' +
+      'POST /v1/guide/voice/turns.',
+    hotPath: true,
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'google',
+    defaultModel: 'chirp_2',
+    configuredBy: 'DEFAULT_STT_CONFIG, then the language’s stt config',
+  },
+  {
+    id: 'guide-voice-tts',
+    task: LlmTask.GUIDE_VOICE_TTS,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'Ally speaks a reply in a voice session',
+    detail:
+      "Speech synthesis of Ally's streamed reply (and card hints, and the fixed crisis " +
+      'message) in the guide voice worker. One voice for Ally per language.',
+    hotPath: true,
+    kind: AiTaskKind.SPEECH,
+    provider: 'multiple',
+    defaultModel: 'per-language',
+    configuredBy: 'Guide worker voice config per language',
+  },
+  {
+    id: 'guide-evaluator-critic',
+    task: LlmTask.GUIDE_EVALUATOR_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "Nightly (00:05 UTC), for a sample of the previous day's Ally replies; and when an admin re-runs a night from the Ally Console",
+    detail:
+      "The nightly evaluator's critic (src/guide-learning): one structured call per sampled " +
+      'window — the reply and up to six messages before it, contact details masked — graded ' +
+      'pass / fail / not applicable on thirteen rubric criteria with a one-line reason each. ' +
+      'Sample: every flagged window (safety verdicts, CARE or crisis, thumbs down, a failed ' +
+      'deterministic check; at most 200) plus 5% of the rest (at most 300), split evenly ' +
+      'between GA and canary while a canary runs. Shares a $25 a day budget (release policy ' +
+      'evaluator.dailyBudgetUsd) with the verifier and the red team; past it, windows get the ' +
+      'deterministic checks only. Charged to agentKey ally_guide_learning, never to a learner.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.evaluator_critic',
+  },
+  {
+    id: 'guide-evaluator-verifier',
+    task: LlmTask.GUIDE_EVALUATOR_VERIFIER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'Right after the critic, for every window the critic judged',
+    detail:
+      'An independent second grading of the same window on the same rubric, by a model from ' +
+      'a different family so the two do not share blind spots. It never sees the critic’s ' +
+      'verdicts. Any criterion the two judge differently sends the window to the human ' +
+      'review queue. Same budget and ledger key as the critic. Effort low.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5',
+    configuredBy: 'ally_guide release modelRouting.evaluator_verifier',
+  },
+  {
+    id: 'guide-red-team',
+    task: LlmTask.GUIDE_RED_TEAM,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Weekly (Mondays 02:00 UTC), and when an admin asks for a fresh red-team set in the Ally Console',
+    detail:
+      'Writes adversarial learner messages for Ally’s eval suite, one structured call per ' +
+      'category (prompt injection, quiz-answer extraction, crisis said directly, indirectly ' +
+      'and in mixed English and Hindi, professional discussion of suicide that must NOT be ' +
+      'treated as a crisis, real-client details, drift, sycophancy bait, neediness bait, ' +
+      'requests to write graded work), including noisy and misspelt ones. Each becomes a ' +
+      'PROPOSED case that runs in a gate only once a person accepts it. Shares the ' +
+      'evaluator’s daily budget and ledger key.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.red_team',
+  },
+  {
+    id: 'guide-curator',
+    task: LlmTask.GUIDE_CURATOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Daily (with the nightly scheduler) when no curator release is already in the pipeline, ' +
+      'and when an admin presses "Run the curator" in the Ally Console',
+    detail:
+      'One structured call that reads clusters of trusted failures from Ally’s recent ' +
+      'conversations (critic verdicts on criteria whose agreement with people is high enough, ' +
+      'people’s review labels, automatic check failures; counts and judge reasons only, never ' +
+      'learner text), the current playbook, the tunable policy keys and the editable prompts, ' +
+      'and proposes up to five lessons, policy tweaks or prompt tweaks for the next release. ' +
+      'Code guardrails then block or quarantine them (evidence thresholds, pinned keys and the ' +
+      'safety core, an 8-word copied-text check against transcripts, safety vocabulary, lesson ' +
+      'caps); survivors become a curator DRAFT release that goes through the eval gate, shadow ' +
+      'and canary. Charged to the learning loop’s ledger key and daily budget.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.curator',
+  },
+];
+
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...AI_LEARN_TASKS,
   ...ALLY_AI_TASKS,
@@ -2261,6 +2569,7 @@ export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...BUILDER_TASKS,
   ...BUG_HUNTER_TASKS,
   ...COURSE_COPILOT_TASKS,
+  ...GUIDE_TASKS,
 ];
 
 /**

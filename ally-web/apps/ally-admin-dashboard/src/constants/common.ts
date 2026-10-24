@@ -179,6 +179,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    // The trainer's notes for Ally and per-item tension.
+    GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
     TENANT_VISIBILITY: (tenantId: string) => `/v1/learn/admin/tracks/tenant/${tenantId}`,
     MEDIA_UPLOAD_URL: "/v1/learn/admin/tracks/media/upload-url",
@@ -537,6 +539,11 @@ export const ApiEndpoints = {
     COACHING_LOOP: "/v1/analytics/coaching-loop",
     // Ratings & comments tab (AAQ-238/239): learners' own post-session words.
     LEARNER_FEEDBACK: "/v1/analytics/learner-feedback",
+    // The Ally tab (AAQ-240 to AAQ-251).
+    ALLY_GUIDE_SUMMARY: "/v1/analytics/ally-guide/summary",
+    ALLY_GUIDE_WEEKLY: "/v1/analytics/ally-guide/weekly",
+    ALLY_GUIDE_ENGAGEMENT_VS_LEARNING: "/v1/analytics/ally-guide/engagement-vs-learning",
+    ALLY_GUIDE_COURSES: "/v1/analytics/ally-guide/courses",
     ORG_HEALTH: "/v1/analytics/org-health",
     // Helping skills → "Is the measure sound?" (AAQ-220..223), Quality &
     // sentiment confidence (AAQ-230/231) and the Orgs scorecard (AAQ-232).
@@ -696,6 +703,9 @@ export const ApiEndpoints = {
     // Drafts the story fields of a SAVED course's landing page. Returns the draft; saves nothing.
     TRACK_LANDING_PAGE_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/landing-page-draft`,
+    // Drafts a saved course's notes for Ally. Returns the draft; saves nothing.
+    TRACK_ALLY_NOTES_DRAFT: (trackId: string) =>
+      `/v1/course-copilot/tracks/${trackId}/ally-notes-draft`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -783,6 +793,90 @@ export const ApiEndpoints = {
     ITEM: (id: string) => `/v1/public-roadmap/items/${id}`,
     ORDER: "/v1/public-roadmap/items/order",
   },
+  // The Ally Console (ally-be src/guide, `GuideAdminController`). Every route is under one prefix.
+  ALLY_GUIDE: {
+    SETTINGS: "/v1/guide/admin/settings",
+    OVERVIEW: "/v1/guide/admin/overview",
+    THREADS: "/v1/guide/admin/threads",
+    THREAD_BY_ID: (threadId: string) => `/v1/guide/admin/threads/${threadId}`,
+    THREAD_TRACES: (threadId: string) => `/v1/guide/admin/threads/${threadId}/traces`,
+    THREAD_TRANSCRIPT: (threadId: string) => `/v1/guide/admin/threads/${threadId}/transcript`,
+    TURN_TRACE: (turnId: string) => `/v1/guide/admin/turns/${turnId}/trace`,
+    TURN_PAYLOAD: (turnId: string) => `/v1/guide/admin/turns/${turnId}/payload`,
+    RELEASES: "/v1/guide/admin/releases",
+    RELEASE_BY_ID: (id: string) => `/v1/guide/admin/releases/${id}`,
+    RELEASE_PROMOTE: (id: string) => `/v1/guide/admin/releases/${id}/promote`,
+    RELEASE_ROLLBACK: "/v1/guide/admin/releases/rollback",
+    RELEASE_ROLLBACK_TARGET: "/v1/guide/admin/releases/rollback-target",
+    RELEASE_AUDIT: "/v1/guide/admin/releases/audit",
+    RELEASE_CANARY: (id: string) => `/v1/guide/admin/releases/${id}/canary`,
+    RELEASE_CANARY_STOP: "/v1/guide/admin/releases/canary/stop",
+    PLAYGROUND: "/v1/guide/admin/playground",
+    ALERTS: "/v1/guide/admin/alerts",
+    ALERTS_CHECK: "/v1/guide/admin/alerts/check",
+    ALERTS_COUNTS: "/v1/guide/admin/alerts/counts",
+    ALERT_ACK: (id: string) => `/v1/guide/admin/alerts/${id}/ack`,
+    BASELINE: "/v1/guide/admin/baseline",
+    CRISIS_RESPONSES: "/v1/guide/admin/crisis-responses",
+    CRISIS_RESPONSE_BY_ID: (id: string) => `/v1/guide/admin/crisis-responses/${id}`,
+    ORG_PROFILE: "/v1/guide/admin/org-profile",
+    ORG_CRISIS_RESPONSES: "/v1/guide/admin/org-crisis-responses",
+    ORG_CRISIS_RESPONSE_BY_ID: (id: string) => `/v1/guide/admin/org-crisis-responses/${id}`,
+    // Configuration plane (plan §7.5).
+    CONFIG_SCHEMA: "/v1/guide/admin/config/schema",
+    CONFIG_OVERRIDES: "/v1/guide/admin/config/overrides",
+    CONFIG_AUDIT: "/v1/guide/admin/config/audit",
+    CONFIG_COURSE: (trackId: string) => `/v1/guide/admin/config/course/${trackId}`,
+    CONFIG_ORG: "/v1/guide/admin/config/org",
+    THREAD_CONFIG: (threadId: string) => `/v1/guide/admin/threads/${threadId}/config`,
+    // Advice moderation.
+    ADVICE: "/v1/guide/admin/advice",
+    ADVICE_MODERATE: (id: string) => `/v1/guide/admin/advice/${id}/moderate`,
+    // Library: the platform's, and one organisation's own.
+    LIBRARY_DOCUMENTS: "/v1/guide/admin/library/documents",
+    LIBRARY_UPLOAD_URL: "/v1/guide/admin/library/documents/upload-url",
+    LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/library/documents/${id}`,
+    ORG_LIBRARY_DOCUMENTS: "/v1/guide/admin/org-library/documents",
+    ORG_LIBRARY_UPLOAD_URL: "/v1/guide/admin/org-library/documents/upload-url",
+    ORG_LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/org-library/documents/${id}`,
+    // Learning loop (plan §7.13, §10.5 "Evals").
+    EVALUATOR_RUBRIC: "/v1/guide/admin/evaluator/rubric",
+    EVALUATOR_SUMMARY: "/v1/guide/admin/evaluator/summary",
+    EVALUATOR_KAPPA: "/v1/guide/admin/evaluator/kappa",
+    EVALUATOR_RUN: "/v1/guide/admin/evaluator/run",
+    REVIEWS: "/v1/guide/admin/reviews",
+    REVIEW: (id: string) => `/v1/guide/admin/reviews/${id}`,
+    REVIEW_CLAIM: (id: string) => `/v1/guide/admin/reviews/${id}/claim`,
+    REVIEW_SUBMIT: (id: string) => `/v1/guide/admin/reviews/${id}/submit`,
+    REVIEW_DISMISS: (id: string) => `/v1/guide/admin/reviews/${id}/dismiss`,
+    EVAL_SUITES: "/v1/guide/admin/eval-suites",
+    EVAL_CASES: "/v1/guide/admin/eval-cases",
+    EVAL_CASE_ACCEPT: (id: string) => `/v1/guide/admin/eval-cases/${id}/accept`,
+    EVAL_CASE_RETIRE: (id: string) => `/v1/guide/admin/eval-cases/${id}/retire`,
+    EVAL_CASE_VARIANTS: (id: string) => `/v1/guide/admin/eval-cases/${id}/variants`,
+    RED_TEAM_GENERATE: "/v1/guide/admin/red-team/generate",
+    TURN_EVAL_CASE: (turnId: string) => `/v1/guide/admin/turns/${turnId}/eval-case`,
+    EVAL_RUNS: "/v1/guide/admin/eval-runs",
+    EVAL_RUN: (id: string) => `/v1/guide/admin/eval-runs/${id}`,
+    EVAL_RUN_OUTPUTS: (id: string) => `/v1/guide/admin/eval-runs/${id}/outputs`,
+    RELEASE_EVAL_RUNS: (id: string) => `/v1/guide/admin/releases/${id}/eval-runs`,
+    // Learning loop, second half: delegation, the curator, shadow, the canary's decision, synthetic.
+    DELEGATION: "/v1/guide/admin/delegation",
+    CURATOR_RUN: "/v1/guide/admin/curator/run",
+    PLAYBOOK: "/v1/guide/admin/playbook",
+    LESSONS: "/v1/guide/admin/lessons",
+    LESSON_APPROVE: (id: string) => `/v1/guide/admin/lessons/${id}/approve`,
+    LESSON_REJECT: (id: string) => `/v1/guide/admin/lessons/${id}/reject`,
+    LESSON_RETIRE: (id: string) => `/v1/guide/admin/lessons/${id}/retire`,
+    LEARNING_AUDIT: "/v1/guide/admin/learning/audit",
+    RELEASE_TRAIL: (id: string) => `/v1/guide/admin/releases/${id}/trail`,
+    RELEASE_SHADOW: (id: string) => `/v1/guide/admin/releases/${id}/shadow`,
+    SHADOW_REPORTS: "/v1/guide/admin/shadow-reports",
+    SHADOW_REPORT: (id: string) => `/v1/guide/admin/shadow-reports/${id}`,
+    CANARY_DECISION: "/v1/guide/admin/canary/decision",
+    SYNTHETIC_RUNS: "/v1/guide/admin/synthetic-runs",
+    SYNTHETIC_RUN: (id: string) => `/v1/guide/admin/synthetic-runs/${id}`,
+  },
   // Text helpline org settings (platform admin only; EDIT_GLOBAL_SETTINGS).
   HELPLINE_ADMIN: {
     SETTINGS: "/v1/helpline/admin/settings",
@@ -851,6 +945,8 @@ export const ROUTES = {
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
   COURSE_COPILOT_NEW: "/course-copilot/new",
   COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
+  // The Ally Console (ally guide admin). `?tab=` picks the tab; `?thread=` opens the Turn Inspector.
+  ALLY_CONSOLE: "/ally",
   // Evaluator micro-app (public routes; evaluator email+password auth)
   EVALUATE: "/evaluate",
   EVALUATE_RECORDS: "/evaluate/records",
@@ -1047,6 +1143,23 @@ export const TAG_TYPES = {
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",
+  // Ally Console. Also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
+  ALLY_GUIDE_SETTINGS: "allyGuideSettings",
+  ALLY_GUIDE_RELEASES: "allyGuideReleases",
+  ALLY_GUIDE_CRISIS_RESPONSES: "allyGuideCrisisResponses",
+  ALLY_GUIDE_ORG_PROFILE: "allyGuideOrgProfile",
+  ALLY_GUIDE_ALERTS: "allyGuideAlerts",
+  ALLY_GUIDE_BASELINE: "allyGuideBaseline",
+  ALLY_GUIDE_CONFIG: "allyGuideConfig",
+  ALLY_GUIDE_ADVICE: "allyGuideAdvice",
+  ALLY_GUIDE_LIBRARY: "allyGuideLibrary",
+  ALLY_GUIDE_REVIEWS: "allyGuideReviews",
+  ALLY_GUIDE_EVALS: "allyGuideEvals",
+  ALLY_GUIDE_NOTES: "allyGuideNotes",
+  ALLY_GUIDE_DELEGATION: "allyGuideDelegation",
+  ALLY_GUIDE_LESSONS: "allyGuideLessons",
+  ALLY_GUIDE_SHADOW: "allyGuideShadow",
+  ALLY_GUIDE_SYNTHETIC: "allyGuideSynthetic",
   AI_LAB_SKILLS: "aiLabSkills",
   AI_LAB_VARIABLES: "aiLabVariables",
   AI_LAB_VALUES: "aiLabValues",

@@ -271,6 +271,37 @@ describe('TrackService — story landing page (tracks.landingPage)', () => {
       expect(copyTrackRepo.update).toHaveBeenCalledTimes(1);
     });
 
+    it("copies Ally's notes with their tension re-pointed at the copy's items", async () => {
+      copyItemRepo.save.mockImplementationOnce(async (items: unknown[]) =>
+        items.map((item, index) => ({
+          ...(item as object),
+          id: `copy-item-${index + 1}`,
+        })),
+      );
+      const withNotes = {
+        ...source(null),
+        guideNotes: {
+          notes: 'Go gently.',
+          tension: { 'old-item': 'high', 'not-in-course': 'low' },
+        },
+      };
+      withNotes.sections[0].items[0] = {
+        ...withNotes.sections[0].items[0],
+        id: 'old-item',
+      } as (typeof withNotes.sections)[0]['items'][0];
+      trackSharedService.getTrackWithStructure.mockResolvedValue(withNotes);
+
+      await service.duplicateTrack('source');
+
+      expect(copyTrackRepo.update).toHaveBeenCalledTimes(1);
+      const [, patch] = copyTrackRepo.update.mock.calls[0];
+      expect(patch.guideNotes).toEqual({
+        notes: 'Go gently.',
+        tension: { 'copy-item-1': 'high' },
+      });
+      expect(patch.landingPage).toBeUndefined();
+    });
+
     it('does nothing about a landing page when the original has none', async () => {
       trackSharedService.getTrackWithStructure.mockResolvedValue(source(null));
 

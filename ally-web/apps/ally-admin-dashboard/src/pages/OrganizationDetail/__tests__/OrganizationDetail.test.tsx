@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { en } from "@src/constants";
 
@@ -8,8 +8,10 @@ import OrganizationDetail from "../OrganizationDetail";
 
 // Stable references on purpose: the page re-runs effects when `data` or the lazy trigger change
 // identity, so a mock that builds fresh ones each render would loop forever.
-const { mockFeatures, mockTenantQuery } = vi.hoisted(() => ({
+const { mockFeatures, mockAllyOrgAccess, mockTenantQuery } = vi.hoisted(() => ({
   mockFeatures: { current: [] as string[] },
+  // Whether this viewer holds the ally_guide_org toggle AND the view permission (see useAllyGuideAccess).
+  mockAllyOrgAccess: { current: false },
   mockTenantQuery: [
     () => undefined,
     { data: { id: "tenant-uuid", name: "Acme", code: "acme", userCount: 3 }, isLoading: false },
@@ -62,6 +64,10 @@ vi.mock("@api", () => {
   };
 });
 
+vi.mock("@hooks", () => ({
+  useAllyGuideAccess: () => ({ canViewOrg: mockAllyOrgAccess.current }),
+}));
+
 vi.mock("@assets", () => ({ ArrowDown: () => <svg />, Dot: () => <svg /> }));
 vi.mock("@utils", () => ({
   hasFeature: (features: string[] = [], key: string) => features.includes(key),
@@ -79,6 +85,9 @@ vi.mock("@components", () => {
     CoursesTab: stub("courses"),
     GroupsTab: stub("groups"),
     BadgesTab: stub("badges"),
+    AllyOrgTab: ({ tenantId }: { tenantId: string }) => (
+      <div data-testid="ally-org-tab">{tenantId}</div>
+    ),
     TextHelplineSettings: ({ tenantId }: { tenantId: string }) => (
       <div data-testid="text-helpline-settings">{tenantId}</div>
     ),
@@ -122,5 +131,74 @@ describe("OrganizationDetail — Text helpline tab", () => {
 
     expect(screen.getByTestId("text-helpline-settings")).toHaveTextContent("acme");
     expect(screen.getByTestId("tab-textHelpline")).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("OrganizationDetail — Ally tab", () => {
+  beforeEach(() => {
+    mockFeatures.current = [];
+    mockAllyOrgAccess.current = false;
+  });
+
+  it("is labelled from the admin copy", () => {
+    expect(en.allyConsole.org.tabLabel).toBe("Ally");
+  });
+
+  it("is not offered to an admin without the ally_guide_org toggle and the view permission", () => {
+    renderAt();
+
+    expect(screen.queryByTestId("tab-ally")).not.toBeInTheDocument();
+  });
+
+  it("is offered once the toggle and permission are both held", () => {
+    mockAllyOrgAccess.current = true;
+    renderAt();
+
+    expect(screen.getByTestId("tab-ally")).toHaveTextContent("Ally");
+  });
+
+  it("is its own gate: neither the content-tabs toggle nor the other tabs bring it in", () => {
+    mockFeatures.current = ["org_detail_content_tabs"];
+    renderAt();
+
+    // The content tabs are there for this viewer; the Ally tab is not.
+    expect(screen.getByTestId("tab-path")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-ally")).not.toBeInTheDocument();
+  });
+
+  it("does not need the content-tabs toggle to be offered", () => {
+    mockAllyOrgAccess.current = true;
+    mockFeatures.current = [];
+    renderAt();
+
+    expect(screen.getByTestId("tab-ally")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-path")).not.toBeInTheDocument();
+  });
+
+  it("opens from ?tab=ally with the organisation id from the route", () => {
+    mockAllyOrgAccess.current = true;
+    renderAt("?tab=ally");
+
+    expect(screen.getByTestId("ally-org-tab")).toHaveTextContent("acme");
+    expect(screen.getByTestId("tab-ally")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("opens when the tab is clicked", () => {
+    mockAllyOrgAccess.current = true;
+    renderAt();
+    expect(screen.queryByTestId("ally-org-tab")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-ally"));
+
+    expect(screen.getByTestId("ally-org-tab")).toHaveTextContent("acme");
+  });
+
+  it("does not render the tab's content for a link to it when access is missing", () => {
+    mockAllyOrgAccess.current = false;
+    renderAt("?tab=ally");
+
+    // The link falls back to the first tab the viewer has, never to someone else's Ally profile.
+    expect(screen.queryByTestId("ally-org-tab")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tab-simulations")).toHaveAttribute("aria-pressed", "true");
   });
 });

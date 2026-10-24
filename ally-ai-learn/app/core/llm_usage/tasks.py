@@ -78,3 +78,9 @@ class LLMTask(str, Enum):
     V2V_TESTER_REPLY = "v2v_tester_reply"
     # End-of-run judge counting tester turns that broke the counsellor role.
     V2V_ROLE_FIDELITY_JUDGE = "v2v_role_fidelity_judge"
+
+    # ---- Ally guide voice worker (app/guide_worker.py): speech only — every
+    # reply is written by ally-be, so these are its only AI calls. Recorded
+    # against the guide- room with metadata.guideThreadId.
+    GUIDE_VOICE_STT = "guide_voice_stt"
+    GUIDE_VOICE_TTS = "guide_voice_tts"
