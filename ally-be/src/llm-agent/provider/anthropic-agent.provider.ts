@@ -9,6 +9,7 @@ import {
   AgentStreamEvent,
   AgentStreamRequest,
   AgentSystemBlock,
+  AgentToolDefinition,
 } from '../type/agent-llm.type';
 import { systemBlocks } from '../util/agent-system.util';
 import { IAgentLlmProvider } from './agent-llm-provider.interface';
@@ -47,6 +48,37 @@ const cacheControl = (cache: AgentSystemBlock['cache']) =>
         },
       }
     : {};
+
+/**
+ * The provider's server-side tool search (BM25 over names and descriptions).
+ * Added to any request that defers a tool: without it a deferred tool could
+ * never be loaded. Natural-language queries suit tool descriptions written
+ * as sentences better than the regex variant does.
+ */
+export const TOOL_SEARCH_TOOL = {
+  type: 'tool_search_tool_bm25_20251119',
+  name: 'tool_search_tool_bm25',
+} as const;
+
+/**
+ * The neutral tool list in Anthropic's shape: `deferLoading` becomes
+ * `defer_loading`, and the search tool is appended when anything is
+ * deferred. At least one tool always stays loaded — the API rejects a list
+ * where every tool is deferred — so an all-deferred list is sent undeferred.
+ */
+export function anthropicTools(
+  tools: AgentToolDefinition[],
+  eagerToolInput?: boolean,
+): any[] {
+  const anyLoaded = tools.some((tool) => !tool.deferLoading);
+  const deferring = anyLoaded && tools.some((tool) => tool.deferLoading);
+  const mapped = tools.map(({ deferLoading, ...tool }) => ({
+    ...tool,
+    ...(eagerToolInput ? { eager_input_streaming: true } : {}),
+    ...(deferring && deferLoading ? { defer_loading: true } : {}),
+  }));
+  return deferring ? [...mapped, { ...TOOL_SEARCH_TOOL }] : mapped;
+}
 
 /**
  * Anthropic adapter — the identity mapping, since the neutral block vocabulary
@@ -99,14 +131,7 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
           ? { tool_choice: { type: request.toolChoice } }
           : {}),
         ...(request.tools?.length
-          ? {
-              tools: request.tools.map((tool) => ({
-                ...tool,
-                ...(request.eagerToolInput
-                  ? { eager_input_streaming: true }
-                  : {}),
-              })) as any,
-            }
+          ? { tools: anthropicTools(request.tools, request.eagerToolInput) }
           : {}),
         ...(request.effort || request.outputSchema
           ? {

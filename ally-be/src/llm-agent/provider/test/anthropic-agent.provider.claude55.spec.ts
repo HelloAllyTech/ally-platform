@@ -202,4 +202,85 @@ describe('AnthropicAgentProvider — Claude 5.5 request surface', () => {
     expect(sent.tool_choice).toEqual({ type: 'none' });
     expect(sent.tools).toEqual([tool]);
   });
+
+  describe('deferred tool loading', () => {
+    const tool = (name: string, deferLoading?: boolean) => ({
+      name,
+      description: `The ${name} tool`,
+      input_schema: { type: 'object', additionalProperties: false },
+      strict: true,
+      ...(deferLoading !== undefined ? { deferLoading } : {}),
+    });
+
+    it('marks deferred tools and appends the search tool', async () => {
+      const { sent } = await run({
+        tools: [tool('get_progress'), tool('get_peer_signals', true)],
+      });
+      expect(sent.tools).toEqual([
+        {
+          name: 'get_progress',
+          description: 'The get_progress tool',
+          input_schema: { type: 'object', additionalProperties: false },
+          strict: true,
+        },
+        {
+          name: 'get_peer_signals',
+          description: 'The get_peer_signals tool',
+          input_schema: { type: 'object', additionalProperties: false },
+          strict: true,
+          defer_loading: true,
+        },
+        {
+          type: 'tool_search_tool_bm25_20251119',
+          name: 'tool_search_tool_bm25',
+        },
+      ]);
+      expect(JSON.stringify(sent.tools)).not.toContain('deferLoading');
+    });
+
+    it('sends no search tool when nothing is deferred', async () => {
+      const { sent } = await run({ tools: [tool('a'), tool('b', false)] });
+      expect(sent.tools.map((t: any) => t.name)).toEqual(['a', 'b']);
+      expect(JSON.stringify(sent.tools)).not.toContain('defer');
+    });
+
+    it('never defers every tool (the API rejects that)', async () => {
+      const { sent } = await run({ tools: [tool('a', true), tool('b', true)] });
+      expect(sent.tools.map((t: any) => t.name)).toEqual(['a', 'b']);
+      expect(JSON.stringify(sent.tools)).not.toContain('defer');
+    });
+
+    it('returns the server tool traffic for replay, untouched', async () => {
+      const content = [
+        {
+          type: 'server_tool_use',
+          id: 'srv_1',
+          name: 'tool_search_tool_bm25',
+          input: { query: 'peer' },
+        },
+        {
+          type: 'tool_search_tool_result',
+          tool_use_id: 'srv_1',
+          content: {
+            type: 'tool_search_tool_search_result',
+            tool_references: [
+              { type: 'tool_reference', tool_name: 'get_peer_signals' },
+            ],
+          },
+        },
+        { type: 'text', text: 'ok' },
+      ];
+      const { result } = await run(
+        { tools: [tool('a'), tool('get_peer_signals', true)] },
+        {
+          final: {
+            content,
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          },
+        },
+      );
+      expect(result.content).toEqual(content);
+    });
+  });
 });

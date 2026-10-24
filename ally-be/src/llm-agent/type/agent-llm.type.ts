@@ -29,7 +29,14 @@ export type AgentContentBlock =
    * for other providers drop it.
    */
   | { type: 'thinking'; thinking: string; signature: string }
-  | { type: 'redacted_thinking'; data: string };
+  | { type: 'redacted_thinking'; data: string }
+  /**
+   * Anthropic's server-side tool traffic (the tool search that loads a
+   * deferred tool). Opaque: replayed byte for byte, never executed by the
+   * caller. Adapters for other providers drop it.
+   */
+  | { type: 'server_tool_use'; id: string; name: string; input: unknown }
+  | { type: 'tool_search_tool_result'; tool_use_id: string; content: unknown };
 
 export type AgentMessage =
   | {
@@ -61,6 +68,15 @@ export interface AgentToolDefinition {
    * `tool_choice` is rejected, this is what keeps the schema guarantee.
    */
   strict?: boolean;
+  /**
+   * Leave the definition out of the model's context until it searches for
+   * it. Anthropic only: a request with any deferred tool also carries the
+   * provider's tool-search tool, and the model loads a deferred tool by
+   * searching its name and description. Deferred definitions sit outside the
+   * cached prefix, so a long tool list stops costing input on every turn.
+   * Other adapters ignore it and send every tool.
+   */
+  deferLoading?: boolean;
 }
 
 /** How much the model thinks, where the provider exposes a dial for it. */
