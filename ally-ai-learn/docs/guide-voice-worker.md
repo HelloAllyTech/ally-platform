@@ -132,6 +132,6 @@ credentials as the roleplay worker. Gotcha: with `ENV=LOCAL` the **roleplay** wo
 with an empty agent name, which makes LiveKit auto-dispatch it into every room — `guide-` rooms
 included. Use `ENV=DEV` for the roleplay worker while testing voice locally.
 
-Deployed: same image as learn-core, command `./start-guide.sh` (uvicorn for `/api/health` plus
+Deployed: same image as learn-core, command `start-guide.sh` (uvicorn for `/api/health` plus
 the guide worker). Give the service its own `GUIDE_ECS_METRICS_SERVICE` dimension (default
 `ally-prd-svc-learn-guide`) so guide sessions never drive the roleplay fleet's autoscaling.
