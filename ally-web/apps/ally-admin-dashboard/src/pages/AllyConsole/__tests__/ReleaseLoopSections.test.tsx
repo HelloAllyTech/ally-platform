@@ -55,6 +55,7 @@ const trailRow = (overrides: Record<string, unknown> = {}) => ({
   action: "gate_passed",
   actorKind: "system",
   actorUserId: null,
+  actorName: null,
   detail: null,
   ...overrides,
 });
@@ -78,7 +79,13 @@ const TRAIL = {
       actorUserId: 7,
       detail: { notes: "fine" },
     }),
-    trailRow({ source: "learning", action: "stage_changed", actorKind: "human", actorUserId: 12 }),
+    trailRow({
+      source: "learning",
+      action: "stage_changed",
+      actorKind: "human",
+      actorUserId: 12,
+      actorName: "Ravi Kumar",
+    }),
     trailRow({ action: "curator_proposed", actorKind: "curator" }),
   ],
 };
@@ -122,13 +129,13 @@ describe("ReleaseTrailSection", () => {
     expect(rows[3]).toHaveTextContent("Curator proposed");
   });
 
-  it("says who: the system, you, another user's id", () => {
+  it("says who: the system, you, another person by name", () => {
     render(<ReleaseTrailSection releaseId="rel-4" />);
 
     const rows = screen.getAllByTestId("trail-row");
     expect(rows[0]).toHaveTextContent("The system");
     expect(rows[1]).toHaveTextContent("you");
-    expect(rows[2]).toHaveTextContent("user 12");
+    expect(rows[2]).toHaveTextContent("Ravi Kumar");
     expect(rows[3]).toHaveTextContent("The curator");
   });
 

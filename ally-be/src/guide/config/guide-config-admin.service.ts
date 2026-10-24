@@ -49,6 +49,10 @@ export interface GuideConfigLayerView {
 }
 
 export interface GuideConfigAuditRow {
+  layer: AgentConfigLayer;
+  scopeId: string;
+  /** The organisation's name or the course's title; null once it is gone. */
+  scopeName: string | null;
   key: string;
   oldValue: { value: unknown } | null;
   newValue: { value: unknown } | null;
@@ -118,7 +122,7 @@ export class GuideConfigAdminService {
           ...field(key, spec, releaseValues),
           override: key in values ? { value: values[key] } : null,
         })),
-      audit: audit.map((entry) => auditRow(entry, names)),
+      audit: audit.map((entry) => auditRow(entry, names, scopeName)),
     };
   }
 
@@ -196,11 +200,31 @@ export class GuideConfigAdminService {
     limit?: number;
   }): Promise<GuideConfigAuditRow[]> {
     const rows = await this.overrides.audit(ALLY_GUIDE_AGENT_KEY, filter);
-    const names = await userNames(
-      this.dataSource,
-      rows.map((row) => row.actorUserId),
+    const [tenants, tracks, names] = await Promise.all([
+      this.namesFor(
+        'tenants',
+        'name',
+        rows.filter((row) => row.layer === AgentConfigLayer.ORG),
+      ),
+      this.namesFor(
+        'tracks',
+        'title',
+        rows.filter((row) => row.layer === AgentConfigLayer.COURSE),
+      ),
+      userNames(
+        this.dataSource,
+        rows.map((row) => row.actorUserId),
+      ),
+    ]);
+    return rows.map((row) =>
+      auditRow(
+        row,
+        names,
+        (row.layer === AgentConfigLayer.ORG ? tenants : tracks).get(
+          row.scopeId,
+        ) ?? null,
+      ),
     );
-    return rows.map((row) => auditRow(row, names));
   }
 
   private async releaseValues(): Promise<Record<string, unknown>> {
@@ -231,7 +255,7 @@ export class GuideConfigAdminService {
   private async namesFor(
     table: 'tenants' | 'tracks',
     column: 'name' | 'title',
-    rows: AgentConfigOverride[],
+    rows: Array<Pick<AgentConfigOverride, 'scopeId'>>,
   ): Promise<Map<string, string>> {
     const ids = [...new Set(rows.map((row) => row.scopeId))];
     if (!ids.length) return new Map();
@@ -266,8 +290,12 @@ function field(
 function auditRow(
   row: AgentConfigOverrideAudit,
   names: Map<number, string>,
+  scopeName: string | null,
 ): GuideConfigAuditRow {
   return {
+    layer: row.layer,
+    scopeId: row.scopeId,
+    scopeName,
     key: row.key,
     oldValue: row.oldValue ?? null,
     newValue: row.newValue ?? null,

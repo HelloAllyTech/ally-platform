@@ -103,7 +103,13 @@ export class GuidePlaygroundService {
     private readonly orgProfiles: Repository<GuideOrgProfile>,
   ) {}
 
-  async run(input: PlaygroundInput) {
+  /**
+   * `signal` aborts the run when the Console stops waiting (the request
+   * closed): the model stream is cancelled and no further model call or
+   * Tutor consult starts. What ran up to then is still charged.
+   */
+  async run(input: PlaygroundInput, signal?: AbortSignal) {
+    const abort = signal ?? new AbortController().signal;
     const text = (input.message ?? '').trim();
     if (!text && !input.intent) {
       throw new BadRequestException('A message or an intent is required');
@@ -198,18 +204,19 @@ export class GuidePlaygroundService {
 
     // The Sentinel, for real: the Playground is where safety behaviour is
     // checked before a release reaches anyone.
-    const sentinel = text
-      ? await this.sentinel.assess({
-          text,
-          recentTurns: history.map((turn) => ({
-            role: turn.role,
-            text: turn.text,
-          })),
-          item: null,
-          bundle,
-          attribution,
-        })
-      : null;
+    const sentinel =
+      text && !abort.aborted
+        ? await this.sentinel.assess({
+            text,
+            recentTurns: history.map((turn) => ({
+              role: turn.role,
+              text: turn.text,
+            })),
+            item: null,
+            bundle,
+            attribution,
+          })
+        : null;
     if (sentinel && isLearnerCrisis(sentinel)) {
       return {
         release: {
@@ -239,6 +246,24 @@ export class GuidePlaygroundService {
       buildLearnerMessage({ text, intent: input.intent ?? null }),
       { role: 'system', content: situation },
     ];
+    if (abort.aborted) {
+      return {
+        release: {
+          id: release.id,
+          version: release.version,
+          status: release.status,
+        },
+        reply: '',
+        replyKind: 'aborted' as const,
+        sentinel,
+        situation,
+        toolCalls: [] as PlaygroundToolCall[],
+        model: null,
+        usage: [],
+        costUsd: Number(costUsd.toFixed(6)),
+        latencyMs: Date.now() - startedAt,
+      };
+    }
     const gate = new ReleaseGate(async () => undefined);
     await gate.release();
     const toolCalls: PlaygroundToolCall[] = [];
@@ -250,7 +275,7 @@ export class GuidePlaygroundService {
       tools,
       maxTokens: GUIDE_ORCHESTRATOR_MAX_TOKENS,
       maxPasses: GUIDE_MAX_TOOL_PASSES,
-      signal: new AbortController().signal,
+      signal: abort,
       gate,
       stream: (request) =>
         this.models.stream({
@@ -265,6 +290,7 @@ export class GuidePlaygroundService {
           onCost,
         }),
       executeTool: async (name, toolInput) => {
+        if (abort.aborted) return { content: 'Stopped.', isError: true };
         const call = await this.dryRun(name, toolInput, {
           visitor,
           course,
@@ -290,7 +316,11 @@ export class GuidePlaygroundService {
         status: release.status,
       },
       reply: output.text,
-      replyKind: output.refusal ? ('refusal' as const) : ('model' as const),
+      replyKind: output.aborted
+        ? ('aborted' as const)
+        : output.refusal
+          ? ('refusal' as const)
+          : ('model' as const),
       sentinel,
       situation,
       toolCalls,

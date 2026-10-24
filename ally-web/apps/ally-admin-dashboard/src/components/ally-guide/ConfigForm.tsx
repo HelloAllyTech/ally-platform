@@ -383,8 +383,9 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ view, canEdit, onSave, o
 /** Override changes, newest first: which key, from what to what, and who. */
 export const ConfigAuditTable: React.FC<{
   rows: AllyGuideConfigLayerView["audit"];
-  /** Show a "Key" column even when every row is the same layer. */
-}> = ({ rows }) => {
+  /** Rows from many organisations and courses: say which each one changed. */
+  showScope?: boolean;
+}> = ({ rows, showScope = false }) => {
   const strings = en.allyConsole.config;
   const show = (entry: { value: unknown } | null) =>
     entry === null ? strings.unset : describe(entry.value);
@@ -394,6 +395,11 @@ export const ConfigAuditTable: React.FC<{
         <TableHead>
           <TableRow className="border-b border-border-light text-sm text-typography-700">
             <TableHeader className="py-2 pr-4 font-medium">{strings.auditColumns.when}</TableHeader>
+            {showScope && (
+              <TableHeader className="py-2 pr-4 font-medium">
+                {strings.auditColumns.appliesTo}
+              </TableHeader>
+            )}
             <TableHeader className="py-2 pr-4 font-medium">
               {strings.auditColumns.scope}
             </TableHeader>
@@ -412,6 +418,16 @@ export const ConfigAuditTable: React.FC<{
               <TableCell className="whitespace-nowrap py-2 pr-4">
                 {formatDateTime(row.createdAt)}
               </TableCell>
+              {showScope && (
+                <TableCell className="py-2 pr-4" data-testid="config-audit-scope">
+                  {row.scopeName ?? (
+                    <span className="text-typography-700">{strings.scopeGone}</span>
+                  )}
+                  <span className="block text-xs text-typography-700">
+                    {strings.layers[row.layer] ?? row.layer}
+                  </span>
+                </TableCell>
+              )}
               <TableCell className="py-2 pr-4 font-mono text-xs">{row.key}</TableCell>
               <TableCell className="py-2 pr-4">{show(row.oldValue)}</TableCell>
               <TableCell className="py-2 pr-4">{show(row.newValue)}</TableCell>

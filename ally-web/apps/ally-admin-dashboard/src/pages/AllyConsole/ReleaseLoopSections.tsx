@@ -64,12 +64,12 @@ export const ReleaseTrailSection: React.FC<{ releaseId: string }> = ({ releaseId
   const currentUserId = useSelector((state: RootState) => state.user?.user?.id);
   const { data, isLoading, isError, error, refetch } = useGetAllyGuideReleaseTrailQuery(releaseId);
 
-  const who = (id: number | null, kind: string) =>
+  const who = (id: number | null, kind: string, name: string | null) =>
     id === null || id === undefined
       ? (en.allyConsole.curator.actors[kind] ?? kind)
       : currentUserId !== undefined && currentUserId !== null && Number(currentUserId) === id
         ? en.allyConsole.delegation.you
-        : en.allyConsole.delegation.user(id);
+        : (name ?? en.allyConsole.delegation.user(id));
 
   const changeSet = data?.release.changeSet;
   const changeRows = changeSet ? flattenToRows(changeSet) : [];
@@ -140,7 +140,7 @@ export const ReleaseTrailSection: React.FC<{ releaseId: string }> = ({ releaseId
                         </span>
                       </TableCell>
                       <TableCell className="py-2 pr-4">
-                        {who(row.actorUserId, row.actorKind)}
+                        {who(row.actorUserId, row.actorKind, row.actorName)}
                       </TableCell>
                       <TableCell className="max-w-xs break-words py-2 pr-4 text-xs text-typography-700">
                         {summariseDetail(row.detail)}

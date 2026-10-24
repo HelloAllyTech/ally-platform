@@ -145,6 +145,25 @@ describe('GuidePlaygroundService', () => {
     expect(t.conductor.loadPreviewCourse).toHaveBeenCalledWith('tr1', 0);
   });
 
+  it('passes the request signal to the model, and stops once it aborts', async () => {
+    const t = setup([]);
+    const stop = new AbortController();
+    await t.service.run(
+      { releaseId: 'rel-d', trackId: 'tr1', message: 'Hello' },
+      stop.signal,
+    );
+    expect(t.requests[0].request.signal).toBe(stop.signal);
+
+    stop.abort();
+    const after = setup([]);
+    const result = await after.service.run(
+      { releaseId: 'rel-d', trackId: 'tr1', message: 'Hello' },
+      stop.signal,
+    );
+    expect(result.replyKind).toBe('aborted');
+    expect(after.requests).toHaveLength(0);
+  });
+
   it('gives the fixed crisis response without calling the orchestrator', async () => {
     const t = setup([]);
     const result = await t.service.run({

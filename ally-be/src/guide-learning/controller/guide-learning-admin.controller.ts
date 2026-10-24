@@ -17,6 +17,7 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import { DataSource } from 'typeorm';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
@@ -40,6 +41,7 @@ import {
   SubmitReviewDto,
   UpdateEvalCaseDto,
 } from '../dto/guide-learning.dto';
+import { userNames } from 'src/guide/admin/user-names';
 import { RED_TEAM_CATEGORIES } from '../evals/categories';
 import { GuideEvalCaseService } from '../evals/guide-eval-case.service';
 import { GuideEvalRunService } from '../evals/guide-eval-run.service';
@@ -53,6 +55,7 @@ import { GuideDelegationService } from '../pipeline/guide-delegation.service';
 import { GuidePipelineService } from '../pipeline/guide-pipeline.service';
 import { GuideShadowService } from '../shadow/guide-shadow.service';
 import { GuideSyntheticService } from '../synthetic/guide-synthetic.service';
+import { DelegationStatus } from '../pipeline/guide-delegation.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_ALLY_GUIDE] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_ALLY_GUIDE] };
@@ -90,7 +93,31 @@ export class GuideLearningAdminController {
     private readonly pipeline: GuidePipelineService,
     private readonly shadows: GuideShadowService,
     private readonly synthetic: GuideSyntheticService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  /** Each row with its person's display name beside the id (null for the system or a nameless user). */
+  private async withNames<T, K extends string>(
+    rows: T[],
+    idOf: (row: T) => number | null | undefined,
+    nameKey: K,
+  ): Promise<Array<T & Record<K, string | null>>> {
+    const names = await userNames(this.dataSource, rows.map(idOf));
+    return rows.map((row) => {
+      const id = idOf(row);
+      const name = id ? (names.get(id) ?? null) : null;
+      return { ...row, [nameKey]: name } as T & Record<K, string | null>;
+    });
+  }
+
+  private async delegationView(status: DelegationStatus) {
+    const [named] = await this.withNames(
+      [status],
+      (row) => row.changedBy,
+      'changedByName',
+    );
+    return named;
+  }
 
   // ─── Evaluator ────────────────────────────────────────────────────────────
 
@@ -431,8 +458,12 @@ export class GuideLearningAdminController {
     summary:
       "Every change the curator proposed — blocked and quarantined ones with the reason. Curator-written text and counts only; never a learner's words",
   })
-  listLessons(@Query() query: ListLessonsQueryDto) {
-    return this.curator.list(query);
+  async listLessons(@Query() query: ListLessonsQueryDto) {
+    return this.withNames(
+      await this.curator.list(query),
+      (lesson) => lesson.decidedBy,
+      'decidedByName',
+    );
   }
 
   @Post('lessons/:lessonId/approve')
@@ -485,16 +516,20 @@ export class GuideLearningAdminController {
     summary:
       "The learning loop's audit: curator runs, lesson decisions, stage changes and the pipeline's own steps, newest first",
   })
-  learningAuditList(
+  async learningAuditList(
     @Query('releaseId') releaseId?: string,
     @Query('lessonId') lessonId?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.learningAudit.list({
-      releaseId,
-      lessonId,
-      limit: Number(limit) || 100,
-    });
+    return this.withNames(
+      await this.learningAudit.list({
+        releaseId,
+        lessonId,
+        limit: Number(limit) || 100,
+      }),
+      (row) => row.actorUserId,
+      'actorName',
+    );
   }
 
   @Get('releases/:releaseId/trail')
@@ -503,8 +538,12 @@ export class GuideLearningAdminController {
     summary:
       "A release's complete trail, oldest first: created → gate → shadow → canary → decision → GA or revert, with the curator's change set",
   })
-  trail(@Param('releaseId', ParseUUIDPipe) releaseId: string) {
-    return this.pipeline.trail(releaseId);
+  async trail(@Param('releaseId', ParseUUIDPipe) releaseId: string) {
+    const { release, trail } = await this.pipeline.trail(releaseId);
+    return {
+      release,
+      trail: await this.withNames(trail, (row) => row.actorUserId, 'actorName'),
+    };
   }
 
   // ─── Shadow ───────────────────────────────────────────────────────────────
@@ -566,8 +605,8 @@ export class GuideLearningAdminController {
     summary:
       'The progressive-delegation stage, which stages are unlocked, and every precondition counted (auto-revert is always on)',
   })
-  getDelegation() {
-    return this.delegation.effectiveStage();
+  async getDelegation() {
+    return this.delegationView(await this.delegation.effectiveStage());
   }
 
   @Put('delegation')
@@ -576,11 +615,13 @@ export class GuideLearningAdminController {
     summary:
       'Set the stage: lower it any time; raise it one step, only when that stage is unlocked',
   })
-  setDelegation(
+  async setDelegation(
     @Body() dto: SetDelegationStageDto,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.delegation.setStage(dto.stage, user.id, dto.reason);
+    return this.delegationView(
+      await this.delegation.setStage(dto.stage, user.id, dto.reason),
+    );
   }
 
   // ─── Synthetic monitoring ─────────────────────────────────────────────────

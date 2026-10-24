@@ -40,6 +40,10 @@ export interface AllyGuideConfigLayerField extends AllyGuideConfigField {
 }
 
 export interface AllyGuideConfigAuditRow {
+  layer: AllyGuideConfigEditLayer;
+  scopeId: string;
+  /** The organisation's name or the course's title; null once it is gone. */
+  scopeName: string | null;
   key: string;
   oldValue: { value: unknown } | null;
   newValue: { value: unknown } | null;

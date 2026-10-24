@@ -68,6 +68,9 @@ const view = (overrides: Record<string, unknown> = {}) => ({
   ],
   audit: [
     {
+      layer: "course",
+      scopeId: "tr-1",
+      scopeName: "First calls",
       key: "nudgeAfterDays",
       oldValue: null,
       newValue: { value: 5 },

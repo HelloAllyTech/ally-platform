@@ -124,6 +124,9 @@ describe("ConfigurationTab", () => {
     h.audit.mockReturnValue(
       ok([
         {
+          layer: "course",
+          scopeId: "tr-1",
+          scopeName: "First calls",
           key: "sideQuests",
           oldValue: null,
           newValue: { value: false },
@@ -194,6 +197,30 @@ describe("ConfigurationTab", () => {
 
       expect(screen.getByTestId("config-audit-row")).toHaveTextContent("sideQuests");
       expect(screen.getByTestId("config-audit-row")).toHaveTextContent("Priya Nair");
+      expect(screen.getByTestId("config-audit-scope")).toHaveTextContent("First calls");
+      expect(screen.getByTestId("config-audit-scope")).toHaveTextContent("Course");
+    });
+
+    it("says when the organisation or course a change applied to no longer exists", () => {
+      h.audit.mockReturnValue(
+        ok([
+          {
+            layer: "org",
+            scopeId: "org-gone",
+            scopeName: null,
+            key: "sideQuests",
+            oldValue: null,
+            newValue: { value: true },
+            version: 1,
+            actor: null,
+            actorUserId: null,
+            createdAt: "2026-10-19T09:00:00.000Z",
+          },
+        ]),
+      );
+      render(<ConfigurationTab />);
+      expect(screen.getByTestId("config-audit-scope")).toHaveTextContent("No longer exists");
+      expect(screen.getByTestId("config-audit-scope")).toHaveTextContent("Organisation");
     });
 
     it("says no override has been changed yet", () => {

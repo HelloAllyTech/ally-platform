@@ -79,7 +79,7 @@ export const DelegationPanel: React.FC = () => {
           currentUserId !== null &&
           Number(currentUserId) === data.changedBy
         ? strings.you
-        : strings.user(data.changedBy);
+        : (data.changedByName ?? strings.user(data.changedBy));
   const changedAt = data.changedAt ? formatDateTime(data.changedAt) : "";
   const next = (data.stage + 1) as AllyGuideDelegationStage;
   const canRaise = data.stage < 3 && next <= data.unlocked;

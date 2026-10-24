@@ -10,7 +10,9 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -308,11 +310,20 @@ export class GuideAdminController {
     summary:
       'One dry-run turn of any release against a course and a scripted conversation (nothing stored)',
   })
-  playground(@Body() dto: GuidePlaygroundRunDto) {
-    return this.playgroundService.run({
-      ...dto,
-      mode: dto.mode as GuideMode | undefined,
+  playground(
+    @Body() dto: GuidePlaygroundRunDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // The Console's Stop closes the request: stop the dry run with it, so a
+    // cancelled turn doesn't keep calling (and charging) the models.
+    const stop = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) stop.abort();
     });
+    return this.playgroundService.run(
+      { ...dto, mode: dto.mode as GuideMode | undefined },
+      stop.signal,
+    );
   }
 
   @Get('alerts')

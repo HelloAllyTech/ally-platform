@@ -139,12 +139,12 @@ export const CuratorPanel: React.FC = () => {
     }
   };
 
-  const who = (id: number | null, kind: string): string =>
+  const who = (id: number | null, kind: string, name: string | null): string =>
     id === null || id === undefined
       ? (strings.actors[kind] ?? kind)
       : currentUserId !== undefined && currentUserId !== null && Number(currentUserId) === id
         ? en.allyConsole.delegation.you
-        : en.allyConsole.delegation.user(id);
+        : (name ?? en.allyConsole.delegation.user(id));
 
   const decisionCopy = deciding
     ? deciding.decision === "approve"
@@ -327,7 +327,7 @@ export const CuratorPanel: React.FC = () => {
                       {lesson.decidedAt && (
                         <span className="mt-1 block text-xs text-typography-700">
                           {strings.decided(
-                            who(lesson.decidedBy, "human"),
+                            who(lesson.decidedBy, "human", lesson.decidedByName),
                             formatDateTime(lesson.decidedAt),
                           )}
                         </span>
@@ -506,7 +506,7 @@ export const CuratorPanel: React.FC = () => {
                       {strings.auditActions[row.action] ?? row.action}
                     </TableCell>
                     <TableCell className="py-2 pr-4">
-                      {who(row.actorUserId, row.actorKind)}
+                      {who(row.actorUserId, row.actorKind, row.actorName)}
                     </TableCell>
                     <TableCell className="max-w-md break-words py-2 pr-4 text-xs text-typography-700">
                       {summariseDetail(row.detail)}

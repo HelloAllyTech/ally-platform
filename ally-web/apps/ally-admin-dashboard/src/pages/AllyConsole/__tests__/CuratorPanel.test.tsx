@@ -73,6 +73,7 @@ const lesson = (id: string, overrides: Record<string, unknown> = {}) => ({
   releaseId: null,
   authorKind: "curator",
   decidedBy: null,
+  decidedByName: null,
   decidedAt: null,
   createdAt: "2026-10-22T10:00:00.000Z",
   ...overrides,
@@ -100,6 +101,7 @@ const AUDIT = [
     action: "approved",
     actorKind: "human",
     actorUserId: 7,
+    actorName: "Asha Rao",
     detail: { notes: "fine", tenantCount: 2, nested: { skip: true } },
     createdAt: "2026-10-22T11:00:00.000Z",
   },
@@ -110,6 +112,7 @@ const AUDIT = [
     action: "curator_run",
     actorKind: "curator",
     actorUserId: null,
+    actorName: null,
     detail: null,
     createdAt: "2026-10-22T03:00:00.000Z",
   },
@@ -120,6 +123,7 @@ const AUDIT = [
     action: "stage_changed",
     actorKind: "human",
     actorUserId: 12,
+    actorName: "Ravi Kumar",
     detail: null,
     createdAt: "2026-10-21T03:00:00.000Z",
   },
@@ -295,7 +299,7 @@ describe("CuratorPanel", () => {
     expect(screen.queryByTestId("playbook-caps")).not.toBeInTheDocument();
   });
 
-  it("lists the learning audit with who did it: you, another user's id, or the system", () => {
+  it("lists the learning audit with who did it: you, another person by name, or the system", () => {
     render(<CuratorPanel />);
 
     const [approved, curatorRun, stage] = screen.getAllByTestId("learning-audit-row");
@@ -305,7 +309,8 @@ describe("CuratorPanel", () => {
     expect(approved).not.toHaveTextContent("skip");
     expect(curatorRun).toHaveTextContent("Curator ran");
     expect(curatorRun).toHaveTextContent("The curator");
-    expect(stage).toHaveTextContent("user 12");
+    expect(stage).toHaveTextContent("Ravi Kumar");
+    expect(stage).not.toHaveTextContent("user 12");
   });
 
   it("says when the audit is empty", () => {

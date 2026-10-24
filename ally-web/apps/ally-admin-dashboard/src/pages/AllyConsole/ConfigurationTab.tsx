@@ -160,7 +160,7 @@ export const ConfigurationTab: React.FC = () => {
             {strings.auditEmpty}
           </p>
         ) : (
-          <ConfigAuditTable rows={audit.data} />
+          <ConfigAuditTable rows={audit.data} showScope />
         )}
       </section>
 

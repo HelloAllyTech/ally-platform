@@ -6618,7 +6618,15 @@ export const en = {
       auditHeading: "Recent changes",
       auditHelp: "Every override that was set or cleared, newest first.",
       auditEmpty: "No override has been changed yet.",
-      auditColumns: { when: "When", scope: "Key", from: "From", to: "To", by: "By" },
+      auditColumns: {
+        when: "When",
+        appliesTo: "Applies to",
+        scope: "Key",
+        from: "From",
+        to: "To",
+        by: "By",
+      },
+      scopeGone: "No longer exists",
       unset: "Release value",
       courseHeading: "Course settings",
       courseIntro:

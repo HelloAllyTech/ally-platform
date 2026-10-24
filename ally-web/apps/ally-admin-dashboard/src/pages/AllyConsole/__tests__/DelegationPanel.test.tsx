@@ -60,6 +60,7 @@ const delegation = (overrides: Record<string, unknown> = {}) => ({
   unlocked: 2,
   changedAt: "2026-10-20T09:30:00.000Z",
   changedBy: 7,
+  changedByName: "Asha Rao",
   reason: "first week",
   autoRevert: true,
   stages: STAGES,
@@ -97,11 +98,16 @@ describe("DelegationPanel", () => {
     expect(screen.getByTestId("delegation-changed")).toHaveTextContent("Reason: first week");
   });
 
-  it("shows a bare user id for someone else, and says so when the system lowered it", () => {
+  it("names someone else (their id only when they have no name), and says so when the system lowered it", () => {
     h.userId.current = 99;
     const { unmount } = render(<DelegationPanel />);
-    expect(screen.getByTestId("delegation-changed")).toHaveTextContent("Last changed by user 7");
+    expect(screen.getByTestId("delegation-changed")).toHaveTextContent("Last changed by Asha Rao");
     unmount();
+
+    h.delegation.mockReturnValue(ok(delegation({ changedByName: null })));
+    const nameless = render(<DelegationPanel />);
+    expect(screen.getByTestId("delegation-changed")).toHaveTextContent("Last changed by user 7");
+    nameless.unmount();
 
     h.delegation.mockReturnValue(ok(delegation({ changedBy: null, reason: null })));
     render(<DelegationPanel />);

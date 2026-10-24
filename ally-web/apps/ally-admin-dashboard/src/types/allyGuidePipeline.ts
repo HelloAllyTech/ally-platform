@@ -25,8 +25,10 @@ export interface AllyGuideDelegation {
   /** The highest stage whose preconditions all hold. */
   unlocked: AllyGuideDelegationStage;
   changedAt: string | null;
-  /** A bare user id; null when the system lowered it. */
+  /** Null when the system lowered it. */
   changedBy: number | null;
+  /** Their display name; null for the system or a user without one. */
+  changedByName: string | null;
   reason: string | null;
   preconditions: AllyGuidePrecondition[];
   stages: { stage: AllyGuideDelegationStage; label: string; unlocked: boolean }[];
@@ -68,6 +70,7 @@ export interface AllyGuideLesson {
   releaseId: string | null;
   authorKind: string;
   decidedBy: number | null;
+  decidedByName: string | null;
   decidedAt: string | null;
   createdAt: string;
 }
@@ -116,6 +119,7 @@ export interface AllyGuideLearningAuditRow {
   action: AllyGuideLearningAuditAction;
   actorKind: string;
   actorUserId: number | null;
+  actorName: string | null;
   detail: Record<string, unknown> | null;
   createdAt: string;
 }
@@ -128,6 +132,7 @@ export interface AllyGuideTrailRow {
   action: string;
   actorKind: string;
   actorUserId: number | null;
+  actorName: string | null;
   lessonId?: string | null;
   detail: Record<string, unknown> | null;
 }
