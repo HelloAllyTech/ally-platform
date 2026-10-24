@@ -130,6 +130,7 @@ export const Stage: FC<StageProps> = ({
       commented: Boolean(saved?.comment),
       failed: saved?.status === "error",
       prominent: entry.id === lastAllyId,
+      seeded: saved?.seeded ?? false,
       onRate: (rating, comment) => void actions.rateMessage(entry.id, rating, comment),
     };
   };

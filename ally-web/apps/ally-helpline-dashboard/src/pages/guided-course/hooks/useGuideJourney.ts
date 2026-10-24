@@ -131,7 +131,22 @@ export interface MessageRating {
   rating: 1 | -1;
   comment?: string;
   status: "sending" | "saved" | "error";
+  /** Given before this page loaded (bootstrap `myRating`): shown, not thanked again. */
+  seeded?: boolean;
 }
+
+/** The learner's earlier thumbs, from bootstrap's `myRating`. */
+export const seedRatings = (
+  messages: ReadonlyArray<{ id: string; myRating?: 1 | -1 }>,
+): Record<string, MessageRating> =>
+  Object.fromEntries(
+    messages
+      .filter(message => message.myRating === 1 || message.myRating === -1)
+      .map(message => [
+        message.id,
+        { rating: message.myRating as 1 | -1, status: "saved" as const, seeded: true },
+      ]),
+  );
 
 export type SignInSource = "card" | "allowance" | "paused" | "item" | "voice" | "header";
 
@@ -318,6 +333,8 @@ export const useGuideJourney = (
           setEnrolled(outcome.bootstrap.access.enrolled);
           // After signing in, what was typed meanwhile is still waiting to go.
           dispatch({ type: "hydrate", bootstrap: outcome.bootstrap, keepQueued: wasClaiming });
+          // Thumbs given before this page loaded (`myRating`) show as given.
+          setRatings(seedRatings(outcome.bootstrap.messages));
           if (outcome.claim) trackClaim(outcome.claim);
           send({ type: "BOOT_OK" });
           break;

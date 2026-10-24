@@ -217,6 +217,26 @@ describe("GuidedCourse: finale, advice, thumbs, memory provenance, scenes on rel
       expect(JSON.stringify(track.mock.calls)).not.toContain("night shifts");
     });
 
+    it("thumbs given earlier come back on reload, without a fresh thank-you", async () => {
+      const first = renderJourney();
+      await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+      const row = (await screen.findAllByTestId("message-feedback")).at(-1) as HTMLElement;
+      fireEvent.click(within(row).getByRole("button", { name: "Helpful" }));
+      await waitFor(() => expect(server.ratings.size).toBe(1));
+      first.unmount();
+
+      renderJourney();
+      await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+      const again = (await screen.findAllByTestId("message-feedback")).at(-1) as HTMLElement;
+      expect(within(again).getByRole("button", { name: "Helpful" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(within(again).queryByText("Thanks.")).not.toBeInTheDocument();
+      const bootstraps = requests(/\/bootstrap$/);
+      expect(bootstraps.length).toBeGreaterThanOrEqual(2);
+    });
+
     it("no thumbs in a CARE moment", async () => {
       renderJourney();
       await screen.findByTestId("journey-shell", {}, { timeout: 3000 });

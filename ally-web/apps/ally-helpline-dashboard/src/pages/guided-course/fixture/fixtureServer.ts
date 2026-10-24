@@ -430,7 +430,7 @@ export class GuideFixtureServer {
               title: "Leave a line for the next learner",
               body: "What would you tell someone just starting this course?",
               maxChars: 200,
-              // The fixture plays the server once advice lines are wired into the finale.
+              // As the server sends it (1ef63b4f6); "nomentor" shows the door hidden.
               available: !lower.includes("nomentor"),
             },
           ],
@@ -702,6 +702,15 @@ export class GuideFixtureServer {
         text: (e.data as { text: string }).text,
         turnId: (e.data as { turnId?: string | null }).turnId ?? null,
         createdAt: e.at,
+        // The learner's own thumb, as the server returns it (`myRating`).
+        ...(e.type === "assistant.message" &&
+        this.ratings.get((e.data as { messageId: string }).messageId)
+          ? {
+              myRating: this.ratings.get((e.data as { messageId: string }).messageId)!.rating as
+                | 1
+                | -1,
+            }
+          : {}),
       }));
     const current = this.nextItem() ?? null;
     return {

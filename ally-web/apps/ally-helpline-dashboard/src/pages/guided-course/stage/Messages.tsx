@@ -62,6 +62,8 @@ export interface MessageFeedbackProps {
   failed: boolean;
   /** Always shown on Ally's latest message; on hover or focus for the rest. */
   prominent: boolean;
+  /** Given on an earlier visit: shown as given, without a fresh "Thanks". */
+  seeded?: boolean;
   onRate: (rating: 1 | -1, comment?: string) => void;
 }
 
@@ -94,6 +96,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
   commented,
   failed,
   prominent,
+  seeded = false,
   onRate,
 }) => {
   const { t } = useTranslation();
@@ -130,7 +133,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
         {thumb(1, t("guide.message.helpful"))}
         {thumb(-1, t("guide.message.notHelpful"))}
         {failed && <span className="g-caption ml-1">{t("guide.message.feedbackFailed")}</span>}
-        {rating !== null && !failed && !askingWhy && (
+        {rating !== null && !failed && !askingWhy && !seeded && (
           <span className="g-caption ml-1">{t("guide.message.feedbackThanks")}</span>
         )}
       </div>

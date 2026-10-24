@@ -64,6 +64,8 @@ export interface JourneyHistoryMessage {
   turnId: string | null;
   createdAt: string | null;
   interrupted?: boolean;
+  /** The learner's own thumb on this message of Ally's, if they gave one. */
+  myRating?: 1 | -1;
 }
 
 export interface JourneyNextStep {
@@ -220,6 +222,7 @@ export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): Jo
       turnId: message.turnId ?? null,
       createdAt: message.createdAt,
       interrupted: message.interrupted ?? false,
+      ...(message.myRating === 1 || message.myRating === -1 ? { myRating: message.myRating } : {}),
     })),
     cards: (wire.cards ?? []).map(({ seq, card }) => ({ ...card, seq })),
     prefs: { guidance: asGuidance(wire.prefs?.guidance) },
