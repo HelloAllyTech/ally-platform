@@ -308,6 +308,51 @@ export const GUIDE_POLICY_SCHEMA: PolicySchema = {
     overridableBy: [],
   },
 
+  // ── Peers (plan §4.9, Appendix A "Peer") ─────────────────────────────
+  'peer.minGroupSize': {
+    group: 'Peers',
+    type: 'int',
+    default: 5,
+    min: 5,
+    max: 50,
+    unit: 'learners',
+    description:
+      'No peer pattern is shown over fewer learners than this, so no one can be singled out.',
+    overridableBy: [],
+    pinned: true,
+  },
+  'peer.adviceMinFinishers': {
+    group: 'Peers',
+    type: 'int',
+    default: 10,
+    min: 5,
+    max: 100,
+    unit: 'finishers',
+    description:
+      'Advice lines from past learners appear once this many in the organisation have finished the course.',
+    overridableBy: ['org'],
+  },
+  'peer.adviceMaxChars': {
+    group: 'Peers',
+    type: 'int',
+    default: 200,
+    min: 80,
+    max: 400,
+    unit: 'characters',
+    description: 'Longest advice line a finisher can leave.',
+    overridableBy: [],
+  },
+  'peer.advicePerLearnerPerCourse': {
+    group: 'Peers',
+    type: 'int',
+    default: 1,
+    min: 1,
+    max: 3,
+    unit: 'lines',
+    description: 'Advice lines one learner can leave on one course.',
+    overridableBy: [],
+  },
+
   // ── Safety (pinned core, plan §6) ────────────────────────────────────
   'safety.sentinelDeadlineMs': {
     group: 'Safety',
