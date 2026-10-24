@@ -364,3 +364,16 @@ export class GuideMicroActivityResponseDto {
   @MaxLength(2000)
   text?: string;
 }
+
+/** POST /v1/guide/messages/:messageId/feedback (plan §9.1). */
+export class GuideMessageFeedbackDto {
+  @ApiProperty({ enum: [1, -1] })
+  @IsIn([1, -1])
+  rating!: 1 | -1;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  comment?: string;
+}

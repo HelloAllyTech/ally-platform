@@ -5,6 +5,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -30,6 +31,7 @@ import {
   GuideVoiceSessionDto,
   GuideAppointmentDto,
   GuideCardEventDto,
+  GuideMessageFeedbackDto,
   GuideMicroActivityResponseDto,
   GuidePrefsUpdateDto,
   GuideTurnRequestDto,
@@ -386,6 +388,44 @@ export class GuideLearnerController {
         releaseId: ga.id,
       },
     });
+  }
+
+  @Post('messages/:messageId/feedback')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({
+    summary:
+      "Thumbs up or down on one of Ally's messages (one per learner per message; sending again replaces it)",
+  })
+  async messageFeedback(
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: GuideMessageFeedbackDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const rows: Array<{ threadId: string; role: string }> =
+      await this.dataSource.query(
+        `SELECT m."threadId", m."role" FROM "guide_messages" m WHERE m."id" = $1`,
+        [messageId],
+      );
+    const message = rows[0];
+    if (!message || message.role !== 'ally') {
+      throw new NotFoundException('Message not found');
+    }
+    // Only on Ally's messages in the learner's own thread.
+    await this.threads.getOwned(message.threadId, user);
+    await this.dataSource.query(
+      `INSERT INTO "guide_turn_feedback" ("messageId", "userId", "rating", "comment", "tenant_id")
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT ("messageId", "userId")
+       DO UPDATE SET "rating" = EXCLUDED."rating", "comment" = EXCLUDED."comment", "updatedAt" = now()`,
+      [
+        messageId,
+        user.id,
+        dto.rating,
+        dto.comment?.trim() || null,
+        user.tenantId,
+      ],
+    );
+    return { messageId, rating: dto.rating };
   }
 
   @Get('threads/:threadId/messages')
