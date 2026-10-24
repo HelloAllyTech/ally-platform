@@ -60,7 +60,9 @@ jobs:
           # the raw `git push`/`git tag` calls below — the gh CLI calls elsewhere in this job
           # (workflow dispatch, run status reads) keep using the default GITHUB_TOKEN via the
           # job-level GH_TOKEN env var, unaffected by this.
-          token: ${{ secrets.RELEASE_BOT_PAT }}
+          # Falls back to GITHUB_TOKEN so the kill switch below still runs when the PAT
+          # isn't configured; only the version-bump push needs the PAT.
+          token: ${{ secrets.RELEASE_BOT_PAT || github.token }}
 
       - name: Check kill switch
         id: gate_enabled
