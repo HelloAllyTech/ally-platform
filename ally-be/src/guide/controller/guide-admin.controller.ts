@@ -307,8 +307,15 @@ export class GuideAdminController {
   @Get('alerts')
   @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
   @ApiOperation({ summary: 'Alerts that fired, newest first' })
-  listAlerts(@Query('limit') limit?: string) {
-    return this.alerts.list(Number(limit) || 50);
+  listAlerts(@Query('limit') limit?: string, @Query('open') open?: string) {
+    return this.alerts.list(Number(limit) || 50, open === 'true');
+  }
+
+  @Get('alerts/counts')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'Open (unacknowledged) and total alerts' })
+  alertCounts() {
+    return this.alerts.counts();
   }
 
   @Post('alerts/check')

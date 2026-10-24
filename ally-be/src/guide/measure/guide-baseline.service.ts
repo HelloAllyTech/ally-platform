@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { userNames } from '../admin/user-names';
 import {
   GuideBaselineCohortMetrics,
   GuideBaselineMetrics,
@@ -171,10 +172,33 @@ export class GuideBaselineService {
     );
   }
 
-  list(limit = 20): Promise<GuideBaselineSnapshot[]> {
-    return this.snapshots.find({
-      order: { createdAt: 'DESC' },
-      take: Math.min(Math.max(limit, 1), 100),
-    });
+  /**
+   * Newest first, and always the very first snapshot — the pre-launch
+   * baseline every later one is read against — marked `first`, even when
+   * it falls outside the page.
+   */
+  async list(limit = 20) {
+    const [page, first] = await Promise.all([
+      this.snapshots.find({
+        order: { createdAt: 'DESC' },
+        take: Math.min(Math.max(limit, 1), 100),
+      }),
+      this.snapshots.findOne({ where: {}, order: { createdAt: 'ASC' } }),
+    ]);
+    const rows =
+      first && !page.some((row) => row.id === first.id)
+        ? [...page, first]
+        : page;
+    const names = await userNames(
+      this.dataSource,
+      rows.map((row) => row.capturedByUserId),
+    );
+    return rows.map((row) => ({
+      ...row,
+      first: row.id === first?.id,
+      capturedByName: row.capturedByUserId
+        ? (names.get(row.capturedByUserId) ?? null)
+        : null,
+    }));
   }
 }

@@ -179,6 +179,33 @@ export class GuideAdminService {
         GROUP BY 1`,
       [ALLY_GUIDE_AGENT_KEY, window, canaryId],
     );
+    // Learning, beside engagement (plan §4.13): a change that lifts use
+    // while learning falls is reverted. Read for the learners whose thread
+    // is in each arm, on that thread's course, within the window.
+    const learning: Array<Record<string, any>> = await this.dataSource.query(
+      `WITH arms AS (
+         SELECT CASE WHEN th."arm" = 'canary' AND th."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",
+                th."userId", th."trackId"
+           FROM "guide_threads" th
+          WHERE th."userId" IS NOT NULL AND th."status" = 'active' AND th."releaseId" IS NOT NULL)
+       SELECT arms."arm",
+              count(a."id") FILTER (WHERE a."attemptNumber" = 1 AND a."status" <> 'PENDING_GRADING') AS "quizFirstAttempts",
+              avg((a."passed" IS TRUE)::int) FILTER (WHERE a."attemptNumber" = 1 AND a."status" <> 'PENDING_GRADING') AS "quizPassRate",
+              (SELECT count(*) FROM "track_item_progress" tip2
+                 JOIN "track_enrollments" te2 ON te2."id" = tip2."trackEnrollmentId"
+                 JOIN arms a2 ON a2."userId" = te2."userId" AND a2."trackId" = te2."trackId"
+                WHERE a2."arm" = arms."arm" AND tip2."status" = 'COMPLETED'
+                  AND tip2."completedAt" >= now() - ($2::int * interval '1 day')) AS "itemsCompleted"
+         FROM arms
+         LEFT JOIN "track_enrollments" te ON te."userId" = arms."userId" AND te."trackId" = arms."trackId"
+         LEFT JOIN "track_item_progress" tip ON tip."trackEnrollmentId" = te."id"
+         LEFT JOIN "track_quiz_attempts" a ON a."trackItemProgressId" = tip."id"
+               AND a."createdAt" >= now() - ($2::int * interval '1 day')
+        WHERE $1::text IS NOT NULL
+        GROUP BY arms."arm"`,
+      [ALLY_GUIDE_AGENT_KEY, window, canaryId],
+    );
+    const learningBy = new Map(learning.map((row) => [row.arm, row] as const));
     const thumbsBy = new Map(thumbs.map((row) => [row.arm, row] as const));
     return rows
       .map((row) => {
@@ -202,6 +229,20 @@ export class GuideAdminService {
           refusals: num(row.refusals),
           thumbsUp: up,
           thumbsDown: down,
+          quizFirstAttempts: num(learningBy.get(row.arm)?.quizFirstAttempts),
+          quizFirstAttemptPassRate:
+            learningBy.get(row.arm)?.quizPassRate == null
+              ? null
+              : Number(
+                  Number(learningBy.get(row.arm)!.quizPassRate).toFixed(4),
+                ),
+          itemsCompletedPerThread: threads
+            ? Number(
+                (
+                  num(learningBy.get(row.arm)?.itemsCompleted) / threads
+                ).toFixed(2),
+              )
+            : null,
         };
       })
       .sort((a, b) => (a.arm === 'ga' ? -1 : b.arm === 'ga' ? 1 : 0));

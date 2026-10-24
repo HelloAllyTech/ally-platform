@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
+import { userNames } from '../admin/user-names';
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { scheduledTaskRegistry } from 'src/scheduler/registry/scheduled-task.registry';
@@ -84,9 +85,16 @@ export class GuideAlertService implements OnModuleInit {
       if (!id) continue;
       const alert = (await this.alerts.findOne({ where: { id } }))!;
       created.push(alert);
-      if (await this.post(firing)) {
-        await this.alerts.update(id, { notifiedAt: new Date() });
-      }
+      // Where it went: posted, no channel configured, or the post failed.
+      const delivery = !this.config.allyGuideAlertWebhookUrl
+        ? 'no_channel'
+        : (await this.post(firing))
+          ? 'posted'
+          : 'failed';
+      await this.alerts.update(id, {
+        ...(delivery === 'posted' ? { notifiedAt: new Date() } : {}),
+        value: { ...firing.value, delivery },
+      });
     }
     return created;
   }
@@ -251,11 +259,33 @@ export class GuideAlertService implements OnModuleInit {
     }
   }
 
-  list(limit = 50): Promise<GuideAlert[]> {
-    return this.alerts.find({
+  /** Newest first; `open` keeps the unacknowledged only. Names beside ids. */
+  async list(limit = 50, open = false) {
+    const rows = await this.alerts.find({
+      where: open ? { acknowledgedAt: IsNull() } : {},
       order: { createdAt: 'DESC' },
       take: Math.min(Math.max(limit, 1), 200),
     });
+    const names = await userNames(
+      this.dataSource,
+      rows.map((row) => row.acknowledgedBy),
+    );
+    return rows.map((row) => ({
+      ...row,
+      delivery: (row.value?.delivery as string | undefined) ?? null,
+      acknowledgedByName: row.acknowledgedBy
+        ? (names.get(row.acknowledgedBy) ?? null)
+        : null,
+    }));
+  }
+
+  /** Counts for the Overview tile: open (unacknowledged) and all. */
+  async counts(): Promise<{ open: number; total: number }> {
+    const [open, total] = await Promise.all([
+      this.alerts.count({ where: { acknowledgedAt: IsNull() } }),
+      this.alerts.count(),
+    ]);
+    return { open, total };
   }
 
   async acknowledge(id: string, userId: number): Promise<GuideAlert> {

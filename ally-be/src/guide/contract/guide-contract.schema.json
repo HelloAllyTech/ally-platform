@@ -1465,7 +1465,15 @@
       "properties": {
         "kind": {
           "type": "string",
-          "enum": ["quick_check", "micro_dilemma", "rehearse_line", "teach_back", "predict_beat", "reflection", "spaced_recall"]
+          "enum": [
+            "quick_check",
+            "micro_dilemma",
+            "rehearse_line",
+            "teach_back",
+            "predict_beat",
+            "reflection",
+            "spaced_recall"
+          ]
         },
         "intro": {
           "type": "string"
@@ -1553,7 +1561,12 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["questionId", "correct", "correctOptionId", "feedback"],
+            "required": [
+              "questionId",
+              "correct",
+              "correctOptionId",
+              "feedback"
+            ],
             "properties": {
               "questionId": {
                 "type": "string"
