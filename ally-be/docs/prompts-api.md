@@ -1,82 +1,119 @@
-# Prompts API (dashboard & sync)
+# Prompts API (Skills Store)
 
-This doc describes how prompt templates are exposed to the **Admin Dashboard** (ally-web) and to other services (e.g. ally-ai-learn) via the API.
+The Skills Store (ally-be's `prompts` tables, edited in the admin dashboard's
+**Skills Store**) is the **single source of truth for prompt text**. Every
+runtime — ally-be, ally-ai, ally-ai-learn — serves each prompt's **live
+version**. Git holds only each prompt's **default** (see
+[Prompts folder](./prompts-folder.md)) and its **contract** (the variables the
+code supplies, declared in code: `src/prompt/contracts/` here,
+`app/prompts/contracts.py` in ally-ai and ally-ai-learn).
 
-## How prompts reach the dashboard
+## Lifecycle of a prompt
 
-1. **Source of truth (codebase):** Prompt `.txt` files live in `src/prompts/` (see [Prompts folder](./prompts-folder.md)). Optional `_meta/<stem>.meta.json` files provide display **name** and **description**.
-2. **Sync on startup:** `PromptsSyncService` runs when the app starts. It scans `src/prompts/`, reads each `.txt` (and any `.meta.json`), and syncs to the database:
-   - **New** prompt codes → new row + version 1.
-   - **Existing** prompt codes → only `defaultPrompt`, `name`, and `description` are updated. **Dashboard-edited content is not overwritten** (it lives in `prompts_versions`; sync does not change `currentVersion`).
-3. **Dashboard:** The Admin Dashboard calls the APIs below to list, view, edit, and revert prompts. It shows the **current version** (or codebase default when "Use dashboard version" is off).
+1. **New prompt:** add its default `.txt` and its contract in the same PR. On
+   deploy, sync sees a code the store doesn't have and creates it, with the
+   default live as version 1.
+2. **Every change after that** is a new **version** in the store: from the
+   Skills Store editor, or from a laptop with the `prompts` CLI
+   (`scripts/prompts/prompts.mjs`). A new version is a **draft** (candidate):
+   it is translated, can be tested, and serves nothing until it is
+   **published** (promoted).
+3. **Sync never changes an existing prompt's live text.** It refreshes only
+   what Git owns: the default text (`defaultPrompt`: the fallback when the
+   store is unreachable and the Revert baseline), file metadata, and the
+   contract. Editing a default file changes nothing in production.
+
+Versions are immutable. A version carries the English text **and** its model
+settings (`provider`, `model`, `temperature`); the row mirrors the live
+version's settings for readers.
+
+## The one write path
+
+Every writer — editor, CLI, skill experiment Apply, Builder's eval publish,
+Revert — goes through `PromptVersioningService`:
+
+- **Create a version** with the newest version number you started from
+  (`baseVersion`, drafts included). The prompt row is locked
+  (`SELECT … FOR UPDATE`); if anything newer exists the write is refused with
+  `409` `errorCode: SKILLS_STORE_STALE_BASE` (`details: {latestVersion,
+  currentVersion}`). A version that breaks the prompt's contract is refused
+  with `422` `SKILLS_STORE_CONTRACT_VIOLATION` (`details: {missing, unknown}`).
+  Translations of the draft start in the background.
+- **Publish (promote)** with the live version you saw
+  (`expectedCurrentVersion`). Refused with `409 SKILLS_STORE_STALE_BASE` if it
+  moved, and `409 SKILLS_STORE_TRANSLATIONS_PENDING` while any translation of
+  the draft is still running. A **failed** translation does not block: the
+  result lists it in `failedLanguages`, that language keeps serving English,
+  and it is retried from the editor. Judge rubrics need
+  `confirmJudgeRubricChange` (`409 SKILLS_STORE_JUDGE_RUBRIC_PINNED`): a
+  judge's results are labelled by a version pinned in code, so bump it in the
+  same change. Putting an earlier version live again needs `rollback: true`.
+- **Retention** never deletes the live version or any draft; it keeps the 20
+  published versions below the live one. Sessions record each version's
+  content hash, so the text that ran stays identifiable.
 
 ## API overview
 
-Base path: **`/api/v1/prompts`**
+Base path: **`/api/v1/prompts`** (admin session) and **`/api/v1/skills-store`**
+(the CLI, with a Skills Store key).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/prompts` | Bearer (VIEW_PROMPT) | List prompts (paginated, sortable, searchable). |
-| GET | `/api/v1/prompts/by-codes?codes=code1,code2` | Bearer (VIEW_PROMPT) | Get prompt **content** by codes (e.g. for ally-ai-learn). Returns `Record<promptCode, content>`. |
-| POST | `/api/v1/prompts` | Bearer (EDIT_PROMPT) | Create new prompts (bulk). |
-| POST | `/api/v1/prompts/sync` | **x-api-key** (AI key) | Sync from payload (used by deployment/ally-ai-learn). Add new prompts; for existing, updates only `defaultPrompt`, `name`, `description`. |
-| GET | `/api/v1/prompts/by-type/:promptType` | Bearer (VIEW_PROMPT) | List the variants of one `promptType` (e.g. `main_agent`) for the studio pickers. Includes variants with `visibleInStudio=false` — see below. |
-| PUT | `/api/v1/prompts/:id` | Bearer (EDIT_PROMPT) | Update a prompt (name, description, content, useDashboardOverride, visibleInStudio). Creating a new version only when content is updated and useDashboardOverride is true. |
-| GET | `/api/v1/prompts/:id/usage` | Bearer (VIEW_PROMPT) | Count + sample (≤10) of scenarios referencing this prompt. The `scenarios.metadata` key searched follows `promptType`: `selectedEvaluatorPromptCode` for `transcript_evaluator`, `selectedMainPromptCode` otherwise. |
-| POST | `/api/v1/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Revert prompt to codebase default (copies `defaultPrompt` into a new version and sets it as current). |
+| GET | `/prompts` | Bearer (VIEW_PROMPT) | List prompts; `.prompt` is the live text. |
+| GET | `/prompts/by-codes?codes=a,b` | x-api-key | Live text by codes. |
+| POST | `/prompts` | Bearer (EDIT_PROMPT) | Create prompts; each text goes live as version 1. |
+| POST | `/prompts/sync` | x-api-key | Sync defaults + contracts from a service's prompt folder. Creates new prompts; never touches an existing prompt's live text. |
+| GET | `/prompts/by-type/:promptType` | Bearer (VIEW_PROMPT) | Variants of one `promptType` for the studio pickers (see below). |
+| PUT | `/prompts/:id` | Bearer (EDIT_PROMPT) | **Metadata only**: name, description, category, visibility, translation opt-in. Text, model settings or code that differ from live → `400 SKILLS_STORE_USE_VERSIONS`. |
+| GET | `/prompts/:id/versions` | Bearer (VIEW_PROMPT) | Versions newest first: `live`, `candidate` (with translation readiness) and `history`. |
+| POST | `/prompts/:id/versions` | Bearer (EDIT_PROMPT) | Save text + settings as a draft: `{prompt, baseVersion, provider?, model?, temperature?, note?}`. |
+| POST | `/prompts/:id/versions/:version/promote` | Bearer (EDIT_PROMPT) | Publish: `{expectedCurrentVersion, rollback?, confirmJudgeRubricChange?}` → `{version, previousVersion, failedLanguages}`. |
+| POST | `/prompts/:id/versions/:version/translations` | Bearer (EDIT_PROMPT) | (Re)translate a version, retrying failed languages. |
+| GET | `/prompts/:id/translations?version=N` | Bearer (VIEW_PROMPT) | A version's translations (default: live). |
+| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the Git default live as a new version, translations included. |
+| GET | `/prompts/:id/usage` | Bearer (VIEW_PROMPT) | Scenarios referencing this prompt. |
+| GET | `/skills-store/export?codes=&candidates=true` | Skills Store key (pull) | Live (and newest/draft) versions with ready translations: what `prompts pull` reads. |
+| GET | `/skills-store/prompts/:code` | Skills Store key (pull) | One prompt's versions. |
+| POST | `/skills-store/prompts/:code/versions` | Skills Store key (push) | `prompts push`: create a draft (same rules as the editor). Never publishes. |
+| POST | `/skills-store/import` | x-api-key, **local only** | Load an export into this store and serve it. Refused unless `SKILLS_STORE_IMPORT_ENABLED=true`, which only local stacks set. |
+| GET/POST/DELETE | `/skills-store/keys[/:id]` | Bearer (EDIT_PROMPT) | List, generate (key shown once) and revoke Skills Store keys. |
 
-## Authentication
+## Skills Store keys
 
-- **Dashboard (user):** Endpoints other than `POST /sync` use **Bearer token** (access token) and require:
-  - `VIEW_PROMPT` for GET list and by-codes.
-  - `EDIT_PROMPT` for create, update, revert.
-- **Sync (automation):** `POST /api/v1/prompts/sync` uses **x-api-key** (AI API key), not Bearer. This is for deployment scripts and `ally-ai-learn/scripts/sync_prompts.py`.
+Anyone with Skills Store access generates a key in **Skills Store → Keys**,
+with the `pull` and/or `push` scope, and can share it (contractors included)
+and revoke it. Only a sha256 of the key is stored. The CLI sends it as
+`x-skills-store-key`. No key can publish: publishing happens in the Skills
+Store.
 
-## Using the API from the dashboard (ally-web)
-
-The Admin Dashboard typically:
-
-1. **List prompts:** `GET /api/v1/prompts?limit=20&offset=0&sortBy=name&order=ASC&searchName=...`
-2. **Open one prompt:** Uses the same list payload; the selected row's `id` and version info are used for edit.
-3. **Update prompt:** `PUT /api/v1/prompts/:id` with body `{ name?, description?, prompt?, useDashboardOverride? }`. If `prompt` is sent and `useDashboardOverride` is true, a new version is created.
-4. **Revert to default:** `POST /api/v1/prompts/:id/revert`
-
-## Using the sync endpoint (e.g. ally-ai-learn)
-
-From a deployment pipeline or ally-ai-learn:
+## Working on prompts from a laptop
 
 ```bash
-curl -X POST "https://<ally-be-host>/api/v1/prompts/sync" \
-  -H "x-api-key: <AI_API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompts": [
-      {
-        "promptCode": "ally_ai_learn_system_default_system_prompt",
-        "name": "Default System Prompt (Client)",
-        "description": "Defines the AI as the client in counselor-training role-play.",
-        "prompt": "You are an AI roleplay assistant...",
-        "availableVariables": ["language_code"]
-      }
-    ]
-  }'
+# Production's live prompts into the gitignored working copy (.prompts/),
+# loaded into the local stack so local tests run on exactly that text:
+SKILLS_STORE_PROD_KEY=ssk_… node scripts/prompts/prompts.mjs pull --remote prod --into-local
+# edit .prompts/<service>/<code>.txt, then serve your edit locally:
+node scripts/prompts/prompts.mjs apply-local <code>
+node scripts/prompts/prompts.mjs status --remote prod
+node scripts/prompts/prompts.mjs diff <code> --remote prod
+# propose it: a draft in production, published from the Skills Store
+node scripts/prompts/prompts.mjs push <code> --remote prod --note "why"
 ```
 
-Response: `{ "added": 0, "updated": 1 }` (or added/updated counts).
-
-- **promptCode:** Unique code (e.g. from path: `subdir_filename` or `ally_ai_learn_subdir_filename`).
-- **name / description:** Shown in the dashboard; can be overridden by `.meta.json` in ally-be/ally-ai-learn.
-- **prompt:** Full template body (stored as `defaultPrompt` and, for new prompts, as version 1).
-- **availableVariables:** Optional; list of placeholder names (e.g. `{var_name}`) for the UI.
+A push from a stale copy is refused; `prompts pull <code>` merges your edit
+three-way onto the newest version, then push again. `.prompts/` is gitignored
+and CI fails a PR that commits it.
 
 ## Resolving prompt content at runtime
 
-Other services (e.g. learn, translation) resolve content by **promptCode** via `PromptSharedService.getPromptByCode(promptCode)`:
-
-- If the prompt has **useDashboardOverride = true:** content is read from the **current version** in the DB (dashboard-edited).
-- If **useDashboardOverride = false:** content is read from the **folder** `src/prompts/` (or from `defaultPrompt` depending on implementation). So after a deploy, folder content wins for non-override prompts.
-
-This keeps dashboard edits safe on deploy while still allowing "use codebase" per prompt.
+`PromptSharedService.resolvePrompt(code)` returns the live text **and** its
+model settings from one lookup, plus its version and content hash
+(`getPromptByCode` returns just the text). The default text is served only
+when a row has no live version, and the file on disk only for a prompt the
+store has never seen. ally-ai-learn sessions receive every prompt in room
+metadata with `version` and `contentHash`, and the session records exactly
+that map as `metadata.promptVersions` / `promptHashes` (plus the translation's
+hash when one was served).
 
 ## Studio visibility (`visibleInStudio`)
 
@@ -110,5 +147,7 @@ default `main_agent` prompt. `GET /:id/usage` backs the panel's "N simulations a
 keep running on it" line — the switch warns, it never blocks.
 
 ## See also
+
+- [Skills Store design](./skills-store-design.md) — why the store is the single source of truth, the decisions, and how it was built
 
 - [Prompts folder (naming, structure, meta JSON)](./prompts-folder.md)

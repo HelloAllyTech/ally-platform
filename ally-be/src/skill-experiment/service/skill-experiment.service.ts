@@ -349,7 +349,7 @@ export class SkillExperimentService {
   }
 
   /**
-   * Make the best version the skill's own text: a new System Skills version
+   * Make the best version the skill's own text: a new Skills Store version
    * (dashboard override on), then turn the experiment off. From here the skill
    * serves the applied text with or without an experiment.
    */

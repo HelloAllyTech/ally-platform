@@ -24,6 +24,7 @@ import { PromptTranslationService } from './prompt-translation.service';
 import { PromptVersioningService } from './prompt-versioning.service';
 import { PromptVersionSource } from '../entity/prompt-version.entity';
 import { hashPromptBody } from '../util/prompt-contract.util';
+import { ErrorCode } from 'src/exception/error-code.enum';
 
 @Injectable()
 export class PromptsService {
@@ -181,13 +182,13 @@ export class PromptsService {
     if (changed.length) {
       throw new BadRequestException({
         statusCode: 400,
-        code: 'use_versions',
+        errorCode: ErrorCode.SKILLS_STORE_USE_VERSIONS,
         message:
           `${changed.join(', ')} can't be changed here. ` +
           (changed.includes('promptCode')
             ? 'A prompt code is a stable id. '
             : 'Save a new version and publish it instead.'),
-        fields: changed,
+        details: { fields: changed },
       });
     }
   }
@@ -658,9 +659,6 @@ export class PromptsService {
     // Git owns the default text, the file metadata and the contract. The live
     // version, model settings and studio visibility belong to the store.
     //
-    // `availableVariables` carries the studio's labels and required flags, and
-    // is reconciled against the live text on every promotion; sync only seeds
-    // it for a row that has none.
     // `name` is left alone too: a rename in the Skills Store is an admin's
     // choice, and overwriting it could collide with another row's name.
     const updatePayload: Partial<Prompt> = {
@@ -675,6 +673,9 @@ export class PromptsService {
     if (item.contract !== undefined) {
       updatePayload.contract = item.contract ?? null;
     }
+    // `availableVariables` carries the studio's labels and required flags, and
+    // is reconciled against the live text on every promotion; sync only seeds
+    // it for a row that has none.
     const existingVarsCount = Array.isArray(existing.availableVariables)
       ? existing.availableVariables.length
       : 0;

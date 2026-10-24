@@ -230,8 +230,8 @@ describe('PromptsService', () => {
         service.updatePrompt(mockPromptId, dto as UpdatePromptDto),
       ).rejects.toMatchObject({
         response: expect.objectContaining({
-          code: 'use_versions',
-          fields: [field],
+          errorCode: 'SKILLS_STORE_USE_VERSIONS',
+          details: { fields: [field] },
         }),
       });
       expect(promptsRepository.update).not.toHaveBeenCalled();

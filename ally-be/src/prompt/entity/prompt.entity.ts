@@ -31,6 +31,8 @@ export interface PromptContract {
   fragments?: string[];
   /** Bumped on a breaking change; the release check compares live versions against it. */
   contractVersion?: number;
+  /** `'json'` when the code parses the model's answer as JSON. */
+  output?: 'json';
 }
 
 @Entity('prompts')

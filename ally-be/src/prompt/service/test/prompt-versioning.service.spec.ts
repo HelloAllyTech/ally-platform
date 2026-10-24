@@ -94,8 +94,13 @@ function buildStore(initial: {
       .fn()
       .mockResolvedValue((initial.languages ?? []).map((id) => ({ id }))),
   };
-  const service = new PromptVersioningService(dataSource, translation as any);
-  return { service, state, manager, translation };
+  const promptShared = { invalidate: jest.fn() };
+  const service = new PromptVersioningService(
+    dataSource,
+    translation as any,
+    promptShared as any,
+  );
+  return { service, state, manager, translation, promptShared };
 }
 
 const input = (over: Record<string, unknown> = {}) => ({
@@ -147,14 +152,14 @@ describe('PromptVersioningService.createVersion', () => {
     ).rejects.toMatchObject({
       status: 409,
       response: expect.objectContaining({
-        code: 'stale_base',
-        latestVersion: 2,
+        errorCode: 'SKILLS_STORE_STALE_BASE',
+        details: expect.objectContaining({ latestVersion: 2 }),
       }),
     });
     expect(manager.save).not.toHaveBeenCalled();
   });
 
-  it('refuses text that breaks the contract with 422 contract_violation', async () => {
+  it('refuses text that breaks the contract with 422, naming what is wrong', async () => {
     const { service } = buildStore({
       prompt: {
         currentVersion: 2,
@@ -168,9 +173,8 @@ describe('PromptVersioningService.createVersion', () => {
     ).rejects.toMatchObject({
       status: 422,
       response: expect.objectContaining({
-        code: 'contract_violation',
-        missing: ['age'],
-        unknown: ['mood'],
+        errorCode: 'SKILLS_STORE_CONTRACT_VIOLATION',
+        details: { missing: ['age'], unknown: ['mood'] },
       }),
     });
   });
@@ -212,7 +216,7 @@ describe('PromptVersioningService.promote', () => {
   ];
 
   it('moves the live pointer and mirrors the version settings onto the row', async () => {
-    const { service, state } = buildStore({
+    const { service, state, promptShared } = buildStore({
       prompt: { currentVersion: 1, model: 'old-model' },
       versions: candidate(),
     });
@@ -224,6 +228,7 @@ describe('PromptVersioningService.promote', () => {
     );
     expect(state.prompt.currentVersion).toBe(2);
     expect(state.prompt.model).toBe('gpt-5');
+    expect(promptShared.invalidate).toHaveBeenCalled();
     expect(state.versions[1].publishedAt).toBeInstanceOf(Date);
   });
 
@@ -234,7 +239,9 @@ describe('PromptVersioningService.promote', () => {
     });
 
     await expect(service.promote('p1', 2, 0)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'stale_base' }),
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_STALE_BASE',
+      }),
     });
     expect(state.prompt.currentVersion).toBe(1);
   });
@@ -256,8 +263,8 @@ describe('PromptVersioningService.promote', () => {
 
     await expect(service.promote('p1', 2, 1)).rejects.toMatchObject({
       response: expect.objectContaining({
-        code: 'translations_pending',
-        pending: [5],
+        errorCode: 'SKILLS_STORE_TRANSLATIONS_PENDING',
+        details: expect.objectContaining({ pending: [5] }),
       }),
     });
     expect(state.prompt.currentVersion).toBe(1);
@@ -302,7 +309,9 @@ describe('PromptVersioningService.promote', () => {
     });
 
     await expect(service.promote('p1', 2, 1)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'judge_rubric_pinned' }),
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_JUDGE_RUBRIC_PINNED',
+      }),
     });
     await service.promote('p1', 2, 1, { confirmJudgeRubricChange: true });
     expect(state.prompt.currentVersion).toBe(2);
@@ -318,7 +327,9 @@ describe('PromptVersioningService.promote', () => {
     });
 
     await expect(service.promote('p1', 1, 2)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'not_a_candidate' }),
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_NOT_A_CANDIDATE',
+      }),
     });
     await expect(
       service.promote('p1', 1, 2, { allowRollback: true }),

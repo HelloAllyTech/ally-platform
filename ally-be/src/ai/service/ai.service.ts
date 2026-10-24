@@ -110,7 +110,7 @@ function withCorpus(endpoint: string, corpus: KnowledgeCorpus): string {
   return `${endpoint}${separator}corpus=${encodeURIComponent(corpus)}`;
 }
 
-/** The debrief skills (System Skills codes); both are connected to auto-improve. */
+/** The debrief skills (Skills Store codes); both are connected to auto-improve. */
 const SCENARIO_EVALUATION_PROMPT_CODE = 'ally_ai_scenario_scenario_evaluation';
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';

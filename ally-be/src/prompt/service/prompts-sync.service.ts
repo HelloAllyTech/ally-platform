@@ -6,6 +6,9 @@ import { formatLabel } from '../util/format-label.util';
 import { LoggerService } from 'src/logger/logger.service';
 import { parseVariablesFromPrompt } from '../util/parse-variables.util';
 import { LlmRuntime } from 'src/llm/constants/llm-model-registry.constants';
+import { PromptContract } from '../entity/prompt.entity';
+import { PROMPT_CONTRACTS } from '../contracts/prompt-contracts';
+import { toStoreContract } from '../contracts/define-prompt';
 
 const PROMPTS_DIR = 'src/prompts';
 const META_FILENAME_SUFFIX = '.meta.json';
@@ -28,7 +31,7 @@ export interface PromptMeta {
   /**
    * The model a NEW row starts on (`defaultProvider` + `defaultModel` in the
    * sidecar). Applied only when sync creates the row: after that the model is
-   * an admin's choice in System Skills, and a redeploy must never undo it.
+   * an admin's choice in Skills Store, and a redeploy must never undo it.
    * For a call whose output quality depends on a stronger model than its tier
    * default — and whose AI Tasks row must still show the truth, which a model
    * hard-coded at the call site would not.
@@ -202,6 +205,7 @@ export class PromptsSyncService implements OnModuleInit {
       runtimes?: string[];
       defaultProvider?: string;
       defaultModel?: string;
+      contract?: PromptContract;
     }[] = [];
 
     const scanDir = (dir: string, baseDir: string = dir): void => {
@@ -252,6 +256,11 @@ export class PromptsSyncService implements OnModuleInit {
             runtimes,
             defaultProvider,
             defaultModel,
+            // The code's contract, declared in prompt/contracts. The store
+            // refuses a version that breaks it.
+            ...(PROMPT_CONTRACTS[promptCode]
+              ? { contract: toStoreContract(PROMPT_CONTRACTS[promptCode]) }
+              : {}),
           });
         }
       }

@@ -41,6 +41,14 @@ import {
   DeleteCharacterRequest,
   Prompt,
   PromptTranslation,
+  PromptVersionSummary,
+  CreatePromptVersionRequest,
+  CreatePromptVersionResponse,
+  PromotePromptVersionRequest,
+  PromotePromptVersionResponse,
+  SkillsStoreKey,
+  SkillsStoreKeyScope,
+  IssuedSkillsStoreKey,
   TranslatePromptResult,
   GetPromptsQuery,
   LlmModelInfo,
@@ -916,12 +924,97 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
      * Read-only: stored translations for a prompt (one row per language).
      * Drives the read-only Translations panel; refreshes when prompts change.
      */
-    getPromptTranslations: builder.query<PromptTranslation[], string>({
+    getPromptTranslations: builder.query<
+      PromptTranslation[],
+      string | { id: string; version?: number }
+    >({
+      query: arg => {
+        const { id, version } = typeof arg === "string" ? { id: arg, version: undefined } : arg;
+        return {
+          url: ApiEndpoints.SIMULATION_STUDIO.GET_PROMPT_TRANSLATIONS(id),
+          method: HttpMethod.GET,
+          ...(version != null ? { params: { version } } : {}),
+        };
+      },
+      providesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /**
+     * A prompt's versions, newest first: live, drafts (with translation
+     * readiness) and history. The newest version number is the base for the
+     * next save.
+     */
+    getPromptVersions: builder.query<PromptVersionSummary[], string>({
       query: id => ({
-        url: ApiEndpoints.SIMULATION_STUDIO.GET_PROMPT_TRANSLATIONS(id),
+        url: ApiEndpoints.SIMULATION_STUDIO.PROMPT_VERSIONS(id),
         method: HttpMethod.GET,
       }),
       providesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Save text + model settings as a new draft version (never live by itself). */
+    createPromptVersion: builder.mutation<
+      CreatePromptVersionResponse,
+      { id: string; body: CreatePromptVersionRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PROMPT_VERSIONS(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Put a version live (publish a draft, or roll back to an earlier one). */
+    promotePromptVersion: builder.mutation<
+      PromotePromptVersionResponse,
+      { id: string; version: number; body: PromotePromptVersionRequest }
+    >({
+      query: ({ id, version, body }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PROMOTE_PROMPT_VERSION(id, version),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** (Re)translate one version, retrying failed languages. */
+    translatePromptVersion: builder.mutation<{ ok: true }, { id: string; version: number }>({
+      query: ({ id, version }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.TRANSLATE_PROMPT_VERSION(id, version),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Skills Store keys for the `prompts` CLI (never the keys themselves). */
+    getSkillsStoreKeys: builder.query<SkillsStoreKey[], void>({
+      query: () => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SKILLS_STORE_KEYS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    /** Generate a key. The response carries the key once; it is never shown again. */
+    createSkillsStoreKey: builder.mutation<
+      IssuedSkillsStoreKey,
+      { name: string; scopes: SkillsStoreKeyScope[] }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SKILLS_STORE_KEYS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
+    revokeSkillsStoreKey: builder.mutation<{ ok: true }, string>({
+      query: id => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.SKILLS_STORE_KEY(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
     }),
 
     /** Re-translate a prompt into all eligible languages ("Re-translate all"). */
@@ -1702,6 +1795,14 @@ export const {
   useDeletePromptMutation,
   useGetPromptUsageQuery,
   useGetPromptTranslationsQuery,
+  useGetPromptVersionsQuery,
+  useLazyGetPromptVersionsQuery,
+  useCreatePromptVersionMutation,
+  usePromotePromptVersionMutation,
+  useTranslatePromptVersionMutation,
+  useGetSkillsStoreKeysQuery,
+  useCreateSkillsStoreKeyMutation,
+  useRevokeSkillsStoreKeyMutation,
   useRetranslatePromptMutation,
   useRetranslatePromptLanguageMutation,
   useSetTranslationRuntimeModelMutation,

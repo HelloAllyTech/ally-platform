@@ -11,9 +11,33 @@ import { hashPromptBody } from '../util/prompt-contract.util';
 
 const PROMPTS_DIR = 'src/prompts';
 
+/**
+ * How long a resolved prompt is reused before the store is read again. A
+ * publish therefore reaches every ally-be process within this window (at once
+ * in the process that published it, which drops its cached copy).
+ * PROMPT_CACHE_TTL_MS=0 turns caching off, e.g. for local work.
+ */
+const DEFAULT_PROMPT_CACHE_TTL_MS = 60_000;
+
 @Injectable()
 export class PromptSharedService {
+  private readonly cache = new Map<
+    string,
+    { value: ResolvedPrompt | null; expires: number }
+  >();
+
   constructor(private readonly promptsRepository: PromptsRepository) {}
+
+  private get cacheTtlMs(): number {
+    const raw = Number(process.env.PROMPT_CACHE_TTL_MS);
+    return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_PROMPT_CACHE_TTL_MS;
+  }
+
+  /** Drop a prompt's cached copy (or every one), e.g. after a publish. */
+  invalidate(promptCode?: string): void {
+    if (promptCode) this.cache.delete(promptCode);
+    else this.cache.clear();
+  }
 
   /**
    * The live text of a prompt, by code: its live version in the store. The
@@ -32,6 +56,17 @@ export class PromptSharedService {
    * can't pair text and settings from different versions.
    */
   async resolvePrompt(promptCode: string): Promise<ResolvedPrompt | null> {
+    const ttl = this.cacheTtlMs;
+    const hit = ttl ? this.cache.get(promptCode) : undefined;
+    if (hit && hit.expires > Date.now()) return hit.value;
+    const value = await this.resolveFromStore(promptCode);
+    if (ttl) this.cache.set(promptCode, { value, expires: Date.now() + ttl });
+    return value;
+  }
+
+  private async resolveFromStore(
+    promptCode: string,
+  ): Promise<ResolvedPrompt | null> {
     const row = (await this.promptsRepository
       .createQueryBuilder('prompt')
       .leftJoin(

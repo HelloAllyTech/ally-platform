@@ -7,6 +7,12 @@ from pathlib import Path
 
 import httpx
 
+# Run as `python scripts/sync_prompts.py` from the service root: put the root on
+# the path so the prompt contracts import.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.prompts.contracts import contract_payload  # noqa: E402
+
 # Configuration
 PROMPT_DIR = Path("app/prompts")
 
@@ -61,24 +67,27 @@ def scan_prompts():
             except Exception as e:
                 print(f"Error reading meta for {txt_file}: {e}")
 
-        prompts.append(
-            {
-                "promptCode": prompt_code,
-                "prompt": content,
-                "name": meta.get(
-                    "name",
-                    f"AI: {folder_name.capitalize()} - "
-                    f"{name.replace('_', ' ').capitalize()}",
-                ),
-                "description": meta.get(
-                    "description", f"Generated from ally-ai: {rel_path}"
-                ),
-                "category": meta.get("category", folder_name.replace("_", " ").title()),
-                "useDashboardOverride": meta.get("useDashboardOverride", False),
-                "isDefault": meta.get("isDefault", True),
-                "availableVariables": parse_variables_from_prompt(content),
-            }
-        )
+        item = {
+            "promptCode": prompt_code,
+            "prompt": content,
+            "name": meta.get(
+                "name",
+                f"AI: {folder_name.capitalize()} - "
+                f"{name.replace('_', ' ').capitalize()}",
+            ),
+            "description": meta.get(
+                "description", f"Generated from ally-ai: {rel_path}"
+            ),
+            "category": meta.get("category", folder_name.replace("_", " ").title()),
+            "availableVariables": parse_variables_from_prompt(content),
+        }
+        # The Skills Store is the source of truth: a sidecar no longer decides
+        # whether the store's text is used, so `useDashboardOverride` /
+        # `isDefault` are not sent. The typed contract from
+        # app/prompts/contracts.py is: the store refuses a version that drops a
+        # required variable.
+        item["contract"] = contract_payload(prompt_code)
+        prompts.append(item)
 
     return prompts
 
@@ -106,7 +115,10 @@ def sync_prompts(prompts, dry_run=False):
             response = client.post(SYNC_ENDPOINT, json=payload, headers=headers)
             response.raise_for_status()
             result = response.json()
-            print(f"Successfully synced! {result.get('count', 0)} prompts processed.")
+            print(
+                f"Successfully synced! {result.get('added', 0)} added, "
+                f"{result.get('updated', 0)} updated."
+            )
     except Exception as e:
         print(f"Error syncing prompts: {e}")
         if isinstance(e, httpx.HTTPStatusError):

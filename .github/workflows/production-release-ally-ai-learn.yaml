@@ -254,6 +254,25 @@ jobs:
       - name: Run tests
         run: ${{ env.TEST_RUN_COMMAND }}
 
+      - name: Prompt contracts vs live prompts (report-only)
+        # Does every LIVE prompt in production satisfy the contracts this
+        # release's code declares (app/prompts/contracts.py)? Report-only: a
+        # failure means a live prompt would render with a required variable
+        # missing; it does not block the deploy yet. Skipped until the
+        # SKILLS_STORE_RELEASE_KEY secret (a Skills Store key with the pull
+        # scope) is set. See scripts/prompts/release-check.mjs.
+        continue-on-error: true
+        env:
+          SKILLS_STORE_URL: ${{ vars.SKILLS_STORE_URL || 'https://api.helloally.ai' }}
+          SKILLS_STORE_KEY: ${{ secrets.SKILLS_STORE_RELEASE_KEY }}
+        run: |
+          if [ -z "$SKILLS_STORE_KEY" ]; then
+            echo "SKILLS_STORE_RELEASE_KEY is not set; skipping the prompt release check."
+            exit 0
+          fi
+          poetry run python -m app.prompts.contracts > /tmp/prompt-contracts.json
+          node ../scripts/prompts/release-check.mjs --contracts /tmp/prompt-contracts.json
+
   build-push-image:
     name: Build and Push Image
     runs-on: ubuntu-22.04
@@ -366,6 +385,31 @@ jobs:
           subnets: ${{ env.SUBNETS }}
           security-groups: ${{ env.SECURITY_GROUPS }}
 
+  require-skills-store:
+    # Deploy order guard: this release reads every prompt from ally-be's Skills
+    # Store and ships minimal default prompt files. Deployed before the ally-be
+    # that has the Skills Store, it would serve those minimal defaults (and its
+    # prompt sync would overwrite the text ally-be's migration publishes).
+    # ally-be answers an unauthenticated export with 401 once the Skills Store
+    # is live, and 404 before.
+    name: Require the Skills Store on ally-be
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: ally-be serves the Skills Store
+        env:
+          ALLY_BE_URL: ${{ vars.SKILLS_STORE_URL || 'https://api.helloally.ai' }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "$ALLY_BE_URL/api/v1/skills-store/export")
+          if [ "$status" = "404" ]; then
+            echo "::error::ally-be at $ALLY_BE_URL has no Skills Store yet (404). Deploy ally-be first."
+            exit 1
+          fi
+          echo "ally-be Skills Store present (HTTP $status)."
+
   deploy-to-ecs-service:
     name: Deploy to ECS Service
     runs-on: ubuntu-22.04
@@ -385,6 +429,7 @@ jobs:
       - prepare-env
       - build-push-image
       - run-db-migration
+      - require-skills-store
 
     steps:
       - uses: actions/checkout@v4

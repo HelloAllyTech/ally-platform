@@ -684,7 +684,6 @@ export interface Prompt {
   promptCode: string;
   prompt: string;
   version?: number;
-  useDashboardOverride?: boolean;
   defaultPrompt?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -775,6 +774,102 @@ export interface PromptTranslation {
   error?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Where one version of a prompt stands with its translations. `pending`
+ * languages are still translating; `failed` ones keep serving English until
+ * retried. Absent `translatable` means the prompt isn't translated at all.
+ */
+export interface PromptVersionTranslations {
+  translatable: boolean;
+  ready: number[];
+  failed: { languageId: number; error?: string | null }[];
+  pending: number[];
+}
+
+/** One immutable version of a prompt in the Skills Store (mirrors ally-be). */
+export interface PromptVersionSummary {
+  version: number;
+  /** `candidate` = saved but not live yet (shown as "Draft"). */
+  status: "live" | "candidate" | "history";
+  prompt: string;
+  provider: string | null;
+  model: string | null;
+  temperature: number | null;
+  contentHash: string;
+  source: string | null;
+  note: string | null;
+  createdBy: number | null;
+  createdAt: string;
+  publishedAt: string | null;
+  translations?: PromptVersionTranslations;
+}
+
+export interface CreatePromptVersionRequest {
+  prompt: string;
+  /** The newest version the editor started from (drafts included). */
+  baseVersion: number | null;
+  provider?: string | null;
+  model?: string | null;
+  temperature?: number | null;
+  note?: string | null;
+}
+
+export interface CreatePromptVersionResponse {
+  version: number;
+  contentHash: string;
+  status: "candidate";
+}
+
+export interface PromotePromptVersionRequest {
+  expectedCurrentVersion: number | null;
+  rollback?: boolean;
+  confirmJudgeRubricChange?: boolean;
+}
+
+export interface PromotePromptVersionResponse {
+  version: number;
+  previousVersion: number | null;
+  failedLanguages: { languageId: number; error?: string | null }[];
+}
+
+/**
+ * `errorCode` values the Skills Store write path returns, with what rides in
+ * `details` (the repo's ErrorCode convention: `{statusCode, message, error,
+ * errorCode, details}`).
+ */
+export type SkillsStoreErrorCode =
+  /** details: { latestVersion, currentVersion } */
+  | "SKILLS_STORE_STALE_BASE"
+  /** details: { missing } — required placeholders the text leaves out */
+  | "SKILLS_STORE_CONTRACT_VIOLATION"
+  /** details: { translatable, ready, failed, pending } */
+  | "SKILLS_STORE_TRANSLATIONS_PENDING"
+  | "SKILLS_STORE_JUDGE_RUBRIC_PINNED"
+  | "SKILLS_STORE_NOT_A_CANDIDATE"
+  /** details: { fields } */
+  | "SKILLS_STORE_USE_VERSIONS";
+
+export type SkillsStoreKeyScope = "pull" | "push";
+
+/** A key for the `prompts` CLI. The key itself is only ever shown once, at creation. */
+export interface SkillsStoreKey {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: SkillsStoreKeyScope[];
+  createdBy: number | null;
+  createdAt: string;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+}
+
+export interface IssuedSkillsStoreKey {
+  id: string;
+  name: string;
+  scopes: SkillsStoreKeyScope[];
+  key: string;
 }
 
 /** Result of translating a prompt into all eligible languages. */

@@ -49,3 +49,25 @@ export function mainPromptVersionSql(sessionAlias: string): string {
     (SELECT value FROM ${entries} AS e(key, value) ORDER BY e.key COLLATE "C" LIMIT 1)
   )`;
 }
+
+/**
+ * The content hash of the main-agent prompt a session ran, from the session's
+ * record (`metadata.promptHashes`, written from the exact map shipped to the
+ * agent). Every judge links to a session — directly by `scenarioSessionId`, or
+ * through `kb_retrievals.session_id` — so any judge's results can be sliced by
+ * the exact text that ran, not just its version number. Null for sessions
+ * recorded before hashes existed.
+ */
+export function mainPromptHash(
+  promptHashes: Record<string, unknown> | null | undefined,
+  selectedMainPromptCode: string | null | undefined,
+): string | null {
+  const code = selectedMainPromptCode || DEFAULT_MAIN_AGENT_PROMPT_CODE;
+  const hash = promptHashes?.[code];
+  return typeof hash === 'string' ? hash : null;
+}
+
+/** SQL form of {@link mainPromptHash} for a `scenario_sessions` alias. */
+export function mainPromptHashSql(sessionAlias: string): string {
+  return `${sessionAlias}.metadata->'promptHashes'->>COALESCE(NULLIF(${sessionAlias}.metadata->>'selectedMainPromptCode', ''), '${DEFAULT_MAIN_AGENT_PROMPT_CODE}')`;
+}

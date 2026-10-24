@@ -52,6 +52,11 @@ export interface ExportedPrompt {
   /** Newest version number, candidates included: the base for the next push. */
   latestVersion: number | null;
   live: ExportedVersion | null;
+  /**
+   * The newest version (a draft when one exists, else the live one): the text
+   * the next push builds on, so an edit never silently drops a draft.
+   */
+  latest: ExportedVersion | null;
   candidates: ExportedVersion[];
   /** Ready translations of the live body and of every candidate body. */
   translations: ExportedTranslation[];
@@ -144,8 +149,15 @@ export class SkillsStoreService {
               )
               .map(toExported)
           : [];
+        const newest = mine.length ? mine[mine.length - 1] : null;
+        const latest =
+          newest && newest.version !== liveRow?.version
+            ? toExported(newest)
+            : live;
         const hashes = new Set(
-          [live, ...candidates].filter(Boolean).map((v) => v!.contentHash),
+          [live, latest, ...candidates]
+            .filter(Boolean)
+            .map((v) => v!.contentHash),
         );
         return {
           promptCode: p.promptCode,
@@ -160,6 +172,7 @@ export class SkillsStoreService {
           contract: p.contract ?? null,
           latestVersion: mine.length ? mine[mine.length - 1].version : null,
           live,
+          latest,
           candidates,
           translations: translations
             .filter(

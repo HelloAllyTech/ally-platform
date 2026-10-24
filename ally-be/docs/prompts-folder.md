@@ -144,10 +144,11 @@ If a prompt has to derive an id, expect it to guess wrong.
 
 **A tool the deployed prompt has never heard of must be harmless.** `search_corpus` was added
 to the tool belt in the same change as the grounding guidance that tells the model when to use
-it — but if the production prompt row is dashboard-overridden, only the tool ships. An unused
-tool is inert, which is why this is safe; the reverse is not. Guidance that reaches the model
-without the tool existing would produce calls to a tool that isn't there. **Add the tool first,
-then the guidance, and treat the dashboard override as the thing that actually ships.**
+it — but production serves the prompt's live version in the Skills Store, so only the tool
+ships with the deploy. An unused tool is inert, which is why this is safe; the reverse is not.
+Guidance that reaches the model without the tool existing would produce calls to a tool that
+isn't there. **Add the tool first, then publish the guidance as a new version in the Skills
+Store.**
 
 ### Course Copilot (`course_copilot/`)
 
@@ -175,46 +176,46 @@ One agent prompt and eleven one-shot specialist prompts, all under the "Course C
   a quiz answer) are the product's design rules, so change them deliberately.
 - Like `character_interview/`, each specialist's output shape is **also validated in code**
   (`src/course-copilot/service/specialists/*` normalise ids and shapes, then run the track
-  validator). The same rule applies: if a prompt may be dashboard-overridden, a changed output
-  shape needs the normaliser to accept the old one too.
+  validator). The same rule applies: the live text is in the Skills Store and changes on its own
+  schedule, so a changed output shape needs the normaliser to accept the old one too.
 
-### Which prompts the dashboard actually drives
+### Defaults in Git, live text in the Skills Store
 
-`useDashboardOverride` decides whether a row's `prompts_versions` content ships or the
-`.txt` in this folder does. It defaults to **false**, and the failure that causes is
-silent in the studio rather than in the runtime: an admin edits a prompt, sees a new
-version saved, and the next run uses the file. No error, no warning, and the edit is
-inert.
+The Skills Store is the source of truth for prompt text: every runtime serves a prompt's
+**live version**. A `.txt` in this folder is the prompt's **default**:
 
-As of 2026-09-25 this one is **override: true**, so the studio is what ships and
-editing its `.txt` here does not:
+- it **creates** the prompt the first time it deploys (live as version 1);
+- it is the **fallback** a service uses if the store can't be reached;
+- it is what **Revert** puts back live, as a new version;
+- it is the open-source default for anyone running Ally without our store.
 
-| Prompt                       | File                             |
-| ---------------------------- | -------------------------------- |
-| `builder_interviewer_system` | `builder/interviewer_system.txt` |
+After the first deploy, **editing the `.txt` changes nothing in production** — sync never
+touches an existing prompt's live text. Change a prompt by saving and publishing a new version
+in the Skills Store, or with the `prompts` CLI (`scripts/prompts/prompts.mjs`, see
+[prompts-api.md](./prompts-api.md)). CI (`scripts/prompts/check-prompts.mjs`) fails a PR that
+edits an existing default without changing its contract, unless it carries the
+`prompt-default-refresh` label.
 
-(`builder_coder_guidance` and `builder_finalise_guidance` were switched at the same time.
-Their files are gone with Builder's runner build, which was their only reader; any stored
-rows for them are unused.)
+### Contracts: the variables the code supplies
 
-Turning the flag on is not a one-line change, because the two copies drift apart while it
-is off and nothing reconciles them. When these were switched, the stored version of
-`builder_interviewer_system` was a 5,960-character snapshot against a 11,320-character
-file, and `builder_coder_guidance` held _different_ advice from its file rather than older
-advice — the file carrying Ally's traps (guarded paths, merged migrations), the stored
-version carrying general discipline (never invent a requirement, match the surrounding
-code). Flipping the flag without looking would have silently picked one and dropped the
-other.
+Each prompt's contract is declared **in code**, next to the code that fills it:
+`src/prompt/contracts/prompt-contracts.ts` here (`definePrompt`), and
+`app/prompts/contracts.py` in ally-ai and ally-ai-learn (one Pydantic model per prompt). A
+variable is `required` when the code always supplies it and the text depends on it; anything
+else is optional. Contracts start **open** (undeclared variables allowed); close one once its
+list is complete and the store refuses unknown variables too.
 
-**So: read both, merge by hand, write the merged text and the flag in the same request,
-and update the `.txt` to match.** The update endpoint only commits a new version when
-content and `useDashboardOverride: true` arrive together, which is what keeps the live
-prompt from passing through a wrong state on the way.
+From the contract: the call site gets its input type; sync sends the contract to the store,
+which refuses a version that drops a required variable; each service's test suite checks its
+defaults satisfy their contracts; and the release check
+(`scripts/prompts/release-check.mjs`) checks production's live text against the new code's
+contracts before a deploy. When a code change needs a new variable, add it as optional,
+publish a version that uses it, then make it required — so no live text ever breaks.
 
 **Since 2026-10-21 the prompt editor cannot change Builder's prompts directly.**
 `builder_interviewer_system` and `builder_platform_rules` are gated by Builder's replay eval
 (`src/builder/constants/builder-eval-gate.constants.ts`): `PUT /prompts/:id` and the revert
-refuse any change to their text, override flag or model settings with a 409. A change goes
+refuse any new version of their text or model settings with a 409. A change goes
 to `POST /v1/builder/eval/prompt-candidates` instead, which replays the eval fixtures with the
 candidate, compares against the live settings, and publishes it through the same update path
 only if nothing got measurably worse. Renaming or re-describing them still works. How the
@@ -359,7 +360,7 @@ subdir/_meta/<stem>.meta.json
 **starts on** when sync creates it — e.g. `product_updates/_meta/consolidate.meta.json` starts on
 `openai` / `gpt-5`, because its output is public copy and the reasoning-tier default wrote too much
 jargon in side-by-side runs. Sync never applies them to a row that already exists: from then on the
-model is an admin's choice in System Skills, and a redeploy must not undo it. Prefer this to naming a
+model belongs to the prompt's versions in the Skills Store, and a redeploy must not undo it. Prefer this to naming a
 model at the call site — the prompt row is the layer the AI Tasks screen reads, so the screen keeps
 showing what actually runs. The registry row's `provider`/`defaultModel` still describe the tier
 fallback, which the completion service retries on if the prompt's model fails.

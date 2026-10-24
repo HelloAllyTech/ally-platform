@@ -13,6 +13,7 @@ import {
 } from '../entity/prompt-version.entity';
 import { PromptTranslation } from '../entity/prompt-translation.entity';
 import { PromptTranslationService } from './prompt-translation.service';
+import { PromptSharedService } from './prompt-shared.service';
 import {
   PROMPT_VERSION_HISTORY_LIMIT,
   TRANSLATABLE_PROMPT_TYPES,
@@ -29,15 +30,16 @@ import {
   isBuilderEvalGatedPrompt,
 } from 'src/builder/constants/builder-eval-gate.constants';
 import { LoggerService } from 'src/logger/logger.service';
+import { ErrorCode } from 'src/exception/error-code.enum';
 import { JUDGE_RUBRIC_PROMPT_CODES } from '../constants/judge-rubric.constants';
 
-/** Error codes a writer can branch on; each rides on the response body as `code`. */
+/** Error codes a writer can branch on: the response's `errorCode`, with `details`. */
 export const SKILLS_STORE_ERROR = {
-  STALE_BASE: 'stale_base',
-  CONTRACT_VIOLATION: 'contract_violation',
-  TRANSLATIONS_PENDING: 'translations_pending',
-  JUDGE_RUBRIC_PINNED: 'judge_rubric_pinned',
-  NOT_A_CANDIDATE: 'not_a_candidate',
+  STALE_BASE: ErrorCode.SKILLS_STORE_STALE_BASE,
+  CONTRACT_VIOLATION: ErrorCode.SKILLS_STORE_CONTRACT_VIOLATION,
+  TRANSLATIONS_PENDING: ErrorCode.SKILLS_STORE_TRANSLATIONS_PENDING,
+  JUDGE_RUBRIC_PINNED: ErrorCode.SKILLS_STORE_JUDGE_RUBRIC_PINNED,
+  NOT_A_CANDIDATE: ErrorCode.SKILLS_STORE_NOT_A_CANDIDATE,
 } as const;
 
 export interface CreateVersionInput {
@@ -114,6 +116,7 @@ export class PromptVersioningService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly promptTranslationService: PromptTranslationService,
+    private readonly promptShared: PromptSharedService,
   ) {}
 
   async createVersion(
@@ -142,12 +145,14 @@ export class PromptVersioningService {
       if ((input.baseVersion ?? null) !== latest) {
         throw new ConflictException({
           statusCode: 409,
-          code: SKILLS_STORE_ERROR.STALE_BASE,
+          errorCode: SKILLS_STORE_ERROR.STALE_BASE,
           message:
             `This prompt has changed since version ${input.baseVersion ?? 'none'}: ` +
             `the newest version is now ${latest ?? 'none'}. Pull it, merge your change, and try again.`,
-          latestVersion: latest,
-          currentVersion: prompt.currentVersion ?? null,
+          details: {
+            latestVersion: latest,
+            currentVersion: prompt.currentVersion ?? null,
+          },
         });
       }
 
@@ -155,9 +160,9 @@ export class PromptVersioningService {
       if (violation) {
         throw new UnprocessableEntityException({
           statusCode: 422,
-          code: SKILLS_STORE_ERROR.CONTRACT_VIOLATION,
+          errorCode: SKILLS_STORE_ERROR.CONTRACT_VIOLATION,
           message: `This text breaks the prompt's contract: ${describeViolation(violation)}.`,
-          ...violation,
+          details: violation,
         });
       }
 
@@ -206,7 +211,7 @@ export class PromptVersioningService {
       confirmJudgeRubricChange?: boolean;
     } = {},
   ): Promise<PromoteResult> {
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const prompt = await this.lockPrompt(manager, promptId);
       if (
         !options.evalApproved &&
@@ -218,10 +223,12 @@ export class PromptVersioningService {
       if ((expectedCurrentVersion ?? null) !== current) {
         throw new ConflictException({
           statusCode: 409,
-          code: SKILLS_STORE_ERROR.STALE_BASE,
+          errorCode: SKILLS_STORE_ERROR.STALE_BASE,
           message: `The live version changed to ${current ?? 'none'} while you were looking at ${expectedCurrentVersion ?? 'none'}. Refresh and try again.`,
-          latestVersion: await this.latestVersionNumber(manager, promptId),
-          currentVersion: current,
+          details: {
+            latestVersion: await this.latestVersionNumber(manager, promptId),
+            currentVersion: current,
+          },
         });
       }
       const target = await manager.findOne(PromptVersion, {
@@ -245,7 +252,7 @@ export class PromptVersioningService {
       ) {
         throw new ConflictException({
           statusCode: 409,
-          code: SKILLS_STORE_ERROR.NOT_A_CANDIDATE,
+          errorCode: SKILLS_STORE_ERROR.NOT_A_CANDIDATE,
           message: `Version ${version} was live before. Roll back explicitly to serve it again.`,
         });
       }
@@ -256,7 +263,7 @@ export class PromptVersioningService {
       ) {
         throw new ConflictException({
           statusCode: 409,
-          code: SKILLS_STORE_ERROR.JUDGE_RUBRIC_PINNED,
+          errorCode: SKILLS_STORE_ERROR.JUDGE_RUBRIC_PINNED,
           message:
             `${prompt.promptCode} is a judge rubric. Its results are labelled by a version pinned in code, ` +
             'so bump the judge’s PROMPT_VERSION (and the backlog drainer’s target) in the same change, then confirm.',
@@ -271,9 +278,9 @@ export class PromptVersioningService {
       ) {
         throw new ConflictException({
           statusCode: 409,
-          code: SKILLS_STORE_ERROR.TRANSLATIONS_PENDING,
+          errorCode: SKILLS_STORE_ERROR.TRANSLATIONS_PENDING,
           message: `Translations are still running for ${readiness.pending.length} language(s). It can go live once they finish.`,
-          ...readiness,
+          details: readiness,
         });
       }
 
@@ -307,6 +314,9 @@ export class PromptVersioningService {
         failedLanguages: readiness.failed,
       };
     });
+    // This process serves the new version at once; others within the cache TTL.
+    this.promptShared.invalidate();
+    return result;
   }
 
   /**
@@ -344,10 +354,12 @@ export class PromptVersioningService {
     const current = prompt.currentVersion ?? null;
     const summaries: VersionSummary[] = [];
     for (const v of versions) {
+      // A version that was never live is a draft wherever it sits — one saved
+      // before a newer draft was published is still unpublished, not history.
       const status: VersionSummary['status'] =
         v.version === current
           ? 'live'
-          : v.version > (current ?? 0) && !v.publishedAt
+          : !v.publishedAt
             ? 'candidate'
             : 'history';
       summaries.push({

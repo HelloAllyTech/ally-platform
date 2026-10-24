@@ -32,6 +32,9 @@ vi.mock("../PromptManagement", () => ({
 vi.mock("../experiments/SkillExperimentsTab", () => ({
   SkillExperimentsTab: () => <span>experiments tab</span>,
 }));
+vi.mock("../SkillsStoreKeysTab", () => ({
+  SkillsStoreKeysTab: () => <span>keys tab</span>,
+}));
 
 import { en, Permissions } from "@constants";
 
@@ -61,5 +64,24 @@ describe("SystemSkillsPage", () => {
     expect(screen.getByText("skill list")).toBeInTheDocument();
     fireEvent.click(screen.getByText(en.skillExperiments.tabs.experiments));
     expect(screen.getByText("experiments tab")).toBeInTheDocument();
+  });
+
+  it("offers the Keys tab only to an admin who can edit prompts", () => {
+    renderPage("/manage-prompts?tab=keys");
+    // Without the permission the request for the tab falls back to the list.
+    expect(screen.getByText("skill list")).toBeInTheDocument();
+    expect(screen.queryByText(en.skillsStore.keys.tab)).not.toBeInTheDocument();
+  });
+
+  it("opens the Keys tab for an admin who can edit prompts", () => {
+    mockPermissions = [Permissions.EDIT_PROMPT];
+    renderPage();
+    fireEvent.click(screen.getByText(en.skillsStore.keys.tab));
+    expect(screen.getByText("keys tab")).toBeInTheDocument();
+  });
+
+  it("titles the page Skills Store", () => {
+    renderPage();
+    expect(screen.getByRole("heading", { name: "Skills Store" })).toBeInTheDocument();
   });
 });

@@ -9,7 +9,7 @@
 The prompts system provides:
 
 1. **Local templates** -- `.txt` files in `app/prompts/` loaded by `PromptManager`
-2. **Backend overrides** -- `promptData.prompts` from scenario metadata override local when present. ally-be only includes prompts with `useDashboardOverride=true` (enabled from Dashboard).
+2. **The Skills Store** -- `promptData.prompts` in the session metadata carries every prompt's live version from ally-be (with `version` and `contentHash`), and wins whenever present. The local `.txt` is a fallback, logged as `[PROMPT_SOURCE] … using fallback`.
 3. **Template resolution** -- `load_template()`, `load_and_format()` in `app/prompts/resolver.py` centralize resolve + fallback + format
 4. **Sync to ally-be** -- `scripts/sync_prompts.py` syncs prompts to ally-be on deployment (runs from `start.sh`)
 
@@ -70,7 +70,7 @@ For non-English scenarios (`language_code` not starting with `"en"`), the system
 
 ## Dashboard Override
 
-In ally-be, each prompt has `useDashboardOverride`. When **enabled** (toggle in Prompt Management), the dashboard-edited prompt is sent in scenario metadata (`promptData.prompts`). ally-ai-learn uses those when present; otherwise falls back to local `.txt`. Prompts with override disabled are never sent—ally-ai-learn always uses local for them.
+The Skills Store (ally-be) is the source of truth for prompt text: every `ally_ai_learn_*` prompt's live version is sent in the session metadata, and the session records exactly that map (`metadata.promptVersions` / `promptHashes`). The `.txt` files here are defaults: they create a new prompt on its first deploy and are the fallback if the metadata lacks one. Each prompt's contract — the variables the code supplies, and which are required — is declared in `app/prompts/contracts.py`; the resolver logs `[PROMPT_CONTRACT]` at ERROR when a required one isn't supplied, and `[PROMPT_FALLBACK]` when a selected variant doesn't resolve. Change a prompt's text with a new version in the Skills Store or `scripts/prompts/prompts.mjs push`, not by editing its file.
 
 ## Sync to ally-be
 
