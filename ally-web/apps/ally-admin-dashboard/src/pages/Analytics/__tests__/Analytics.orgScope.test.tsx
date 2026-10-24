@@ -59,6 +59,7 @@ vi.mock("../tabs/ScribeTab", () => ({ ScribeTab: () => <div>scribe</div> }));
 vi.mock("../tabs/RatingsCommentsTab", () => ({
   RatingsCommentsTab: () => <div>ratings and comments</div>,
 }));
+vi.mock("../tabs/AllyGuideTab", () => ({ AllyGuideTab: () => <div>ally</div> }));
 
 import { Analytics } from "../Analytics";
 
@@ -86,6 +87,7 @@ describe("Analytics for an organization-restricted admin", () => {
     expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual([
       "Highlights",
       "Ratings & comments",
+      "Ally",
       "Scribe",
     ]);
     expect(screen.getByText("highlights for org-a")).toBeInTheDocument();
