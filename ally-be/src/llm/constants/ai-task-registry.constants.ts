@@ -2196,6 +2196,29 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_landing_page_writer',
   },
   {
+    id: 'course-copilot-ally-notes',
+    task: LlmTask.COURSE_COPILOT_ALLY_NOTES,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      "An admin clicks Draft with Copilot in the course builder's Ally notes (the Ally guide's course layer)",
+    detail:
+      'One call per click, outside any Copilot session. It drafts the notes the Ally guide ' +
+      'reads about this course (who the learners are, where it is emotionally heavy and how ' +
+      'to pace it, the ideas it returns to) and per-item tension overrides, from the saved ' +
+      'outline: titles, types, default tension, trigger warnings and short article and ' +
+      'roleplay-scenario excerpts — never quiz answer keys. JSON mode. A second call only ' +
+      "when the output can't be parsed or quotes one of the course's correct answers " +
+      '(checked in code, the same check that blocks saving notes). Nothing is saved ' +
+      'server-side; the trainer saves through the guide-notes PUT. Tagged with ' +
+      'metadata.trackId, so it never counts against a build budget.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_ally_notes_writer',
+  },
+  {
     id: 'course-copilot-summary',
     task: LlmTask.COURSE_COPILOT_SUMMARY,
     runtime: LlmRuntime.ALLY_BE,

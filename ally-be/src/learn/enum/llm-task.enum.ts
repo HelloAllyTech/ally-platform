@@ -312,6 +312,8 @@ export enum LlmTask {
   // The one Course Copilot call made outside a session: an admin's click on the
   // builder's Landing page tab. Tagged with metadata.trackId, not a session id.
   COURSE_COPILOT_LANDING_PAGE = 'course_copilot_landing_page',
+  // Also outside a session: the builder's Ally notes "Draft with Copilot".
+  COURSE_COPILOT_ALLY_NOTES = 'course_copilot_ally_notes',
 
   // The Ally guide (src/guide): the learner-facing course companion. One label
   // per role; every row carries metadata.guideThreadId and guideTurnId, and
