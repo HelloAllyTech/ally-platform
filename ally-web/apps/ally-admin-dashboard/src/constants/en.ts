@@ -5451,6 +5451,152 @@ export const en = {
   // The Ally Console (ally guide admin) and the organisation's Ally tab. Written for the Ally team:
   // plain words for what a control does, and the exact blast radius of anything that changes what
   // learners see.
+  allyAnalytics: {
+    tabLabel: "Ally",
+    intro:
+      "How learners use Ally and, beside it, whether they are learning. Rates over fewer than the minimum number of learners are withheld, and the courses Ally runs on are compared with learners on the same courses who did not use it as a reference, not as a control.",
+    scopeNote: (sections: string[]) =>
+      `Platform-wide whatever organisation is chosen: ${sections.join(", ")}.`,
+    withheld: (min: number) => `Fewer than ${min} learners, so the rate is withheld.`,
+    weekAxis: "Week",
+    glance: {
+      title: "Ally at a glance",
+      learners: "Learners",
+      conversations: "Conversations",
+      messages: "Learner messages",
+      thumbsUp: "Rated up",
+      thumbsUpDetail: (count: number, of: number) => `${count} of ${of} rated replies`,
+      cost: "Model cost",
+      costPerLearner: "Cost per learner",
+      withheldCost: "Withheld under 5 learners",
+    },
+    firstWins: {
+      title: "First-session wins",
+      caption:
+        "Per week: the share of new Ally conversations whose first completed item came within the first session (an hour), and within 5 minutes. The target is 90% within 5 minutes.",
+      session: "Within the first session",
+      fiveMinutes: "Within 5 minutes",
+      axis: "Share of new conversations (%)",
+    },
+    items: {
+      title: "Items per learning day",
+      caption:
+        "Per week: course items Ally learners completed on the course of their conversation, per learner-day with Ally activity. An engagement measure: read it beside the quiz pass rate.",
+      series: "Items per learning day",
+      axis: "Items per learning day",
+    },
+    returns: {
+      title: "7-day return",
+      caption:
+        "Learners by the week of their first Ally day, and the share who wrote to Ally again within 7 days. The current week is incomplete.",
+      series: "Wrote again within 7 days",
+      axis: "Share of learners (%)",
+    },
+    appointments: {
+      title: "Appointments set and kept",
+      caption:
+        "Per week: closing-ritual appointments set (bars) and the share of due ones kept (line): the learner wrote within an hour before to a day after the time.",
+      set: "Appointments set",
+      kept: "Share kept",
+      axisLeft: "Appointments set",
+      axisRight: "Share kept (%)",
+    },
+    voice: {
+      title: "Voice adoption",
+      caption: "Per week: the share of active Ally learners who spoke to Ally at least once.",
+      series: "Spoke to Ally",
+      axis: "Share of active learners (%)",
+    },
+    quiz: {
+      title: "Quiz first-attempt pass",
+      caption:
+        "Per week: the first-attempt pass rate on the courses Ally runs on, for learners with an Ally conversation on the course, and for learners on the same courses without one as a reference line. The groups are self-selected: it is a reference, not a control.",
+      ally: "With Ally",
+      classic: "Same courses, without Ally",
+      axis: "First-attempt pass (%)",
+    },
+    roleplay: {
+      title: "Roleplay score at completion",
+      caption:
+        "Per week: the mean roleplay score recorded when the item completed, Ally learners beside learners on the same courses without Ally. Per-attempt scores are not stored on the course, so first-to-last change is not available yet.",
+      ally: "With Ally",
+      classic: "Same courses, without Ally",
+      axis: "Mean roleplay score",
+    },
+    paired: {
+      title: "Engagement vs learning",
+      caption:
+        "The guard chart: engagement (items per learning day, share of rated replies rated up) and learning (quiz first-attempt pass) on one timeline. A week is flagged when engagement rose by 5% or more while learning stayed within 2 points or fell, the thresholds the canary's learning guard uses.",
+      engagementHeading: "Engagement",
+      learningHeading: "Learning",
+      items: "Items per learning day",
+      thumbs: "Rated up (%)",
+      pass: "Quiz first-attempt pass (%)",
+      axisEngagement: "Items per learning day",
+      axisThumbs: "Rated up (%)",
+      axisLearning: "First-attempt pass (%)",
+      flagsHeading: "Weeks the guard flagged",
+      flagWords: {
+        ok: "Fine",
+        engagement_up_learning_flat: "Engagement up, learning flat",
+        learning_fell: "Learning fell",
+        too_few: "Too few learners to say",
+      } as Record<string, string>,
+      flagHelp: {
+        engagement_up_learning_flat:
+          "Engagement rose against the previous week while learning stayed within 2 points or fell. This is the pattern the plan says to revert.",
+        learning_fell: "Quiz first-attempt pass fell against the previous week.",
+        too_few: "Too few learners that week for a rate.",
+        ok: "No flag.",
+      } as Record<string, string>,
+      noneFlagged: "No week is flagged in this window.",
+      columns: {
+        week: "Week",
+        items: "Items per day",
+        thumbs: "Rated up",
+        pass: "Quiz pass",
+        guard: "Guard",
+      },
+    },
+    health: {
+      title: "CARE and CRISIS entries",
+      caption:
+        "Per week: conversations entering CARE mode and the crisis response, per 100 active Ally learners. A health measure, never a target.",
+      care: "Entered CARE mode",
+      crisis: "Entered the crisis response",
+      axis: "Per 100 active learners",
+    },
+    offCourse: {
+      title: "Off-course and refusal rates",
+      caption:
+        "Per week: the share of learner turns where Ally steered back to the course (steer level 1 or more), and the share of replies that were refusals.",
+      offCourse: "Steered back to the course",
+      refusals: "Refusals",
+      axis: "Share of turns (%)",
+    },
+    courses: {
+      title: "Cost per learner per course",
+      caption:
+        "Learners, turns, model cost and cost per learner for each course with Ally conversations in the window. Courses with too few learners are folded into one unnamed row.",
+      columns: {
+        course: "Course",
+        learners: "Learners",
+        turns: "Turns",
+        cost: "Model cost",
+        perLearner: "Per learner",
+      },
+      folded: (count: number) => `Other courses (${count})`,
+    },
+    states: {
+      empty: "No Ally activity in this window.",
+      loadFailed: "There was a problem fetching Ally's numbers.",
+    },
+    source: {
+      summary: "Ally conversations, per window",
+      weekly: "Ally conversations, by ISO week",
+      courses: "Ally conversations, by course",
+    },
+  },
   allyConsole: {
     navLabel: "Ally",
     title: "Ally Console",
@@ -5543,6 +5689,48 @@ export const en = {
           "The canary has not answered a turn in this window yet, so there is nothing to compare.",
         tooFew: (turns: number, minimum: number) =>
           `The canary has answered ${turns} ${turns === 1 ? "turn" : "turns"} in this window. Fewer than ${minimum} is too few to read anything into, so treat the differences below as noise.`,
+        decision: {
+          heading: "What the pipeline would do",
+          help: "The automatic verdict on this canary from the evidence so far, with every threshold and the learning guard. It decides on the criteria whose judges agree with people; the rest never count.",
+          verdicts: { wait: "Keep waiting", promote: "Promote", revert: "Revert" } as Record<
+            string,
+            string
+          >,
+          verdict: (label: string) => `The pipeline's verdict: ${label}.`,
+          emergency:
+            "Revert now: a safety reason, so every canary conversation would move to the live release at its next turn.",
+          stage: (stage: number, automatic: boolean) =>
+            automatic
+              ? `Delegation stage ${stage}: a promote verdict promotes on its own.`
+              : `Delegation stage ${stage}: the pipeline advises and a person promotes.`,
+          notReady: "There is not enough evidence yet to decide.",
+          daysRunning: (days: number) =>
+            days === 1 ? "Running for 1 day." : `Running for ${days} days.`,
+          thresholdsHeading: "Thresholds",
+          thresholdColumns: { threshold: "Threshold", need: "Needed", have: "So far", met: "Met" },
+          met: "Met",
+          notMet: "Not yet",
+          criteriaHeading: "Criteria the judges agree with people on",
+          criteriaColumns: {
+            criterion: "Criterion",
+            live: "Live fails",
+            canary: "Canary fails",
+            verdict: "Verdict",
+          },
+          criterionVerdicts: {
+            better: "Canary better",
+            same: "Same",
+            worse: "Canary worse",
+            too_few: "Too few judged",
+          } as Record<string, string>,
+          noCriteria: "No criterion is trusted yet, so none can count toward the decision.",
+          guard: {
+            pass: "Learning guard: holding.",
+            fail: "Learning guard: failed.",
+            pending: "Learning guard: waiting for enough learners.",
+          } as Record<string, string>,
+          loadFailed: "the canary's decision",
+        },
         scope:
           "This sets health, safety, feedback and learning side by side. Learning is read for the learners whose conversation is in each arm, on that conversation's course, so the groups are small: look at the attempt counts before you lean on a difference.",
         guard: {
@@ -6647,7 +6835,14 @@ export const en = {
       },
     },
     evals: {
-      views: { evaluator: "Evaluator", reviews: "Reviews", cases: "Cases", runs: "Runs" },
+      views: {
+        evaluator: "Evaluator",
+        reviews: "Reviews",
+        cases: "Cases",
+        runs: "Runs",
+        curator: "Curator",
+        synthetic: "Synthetic",
+      },
       viewLabel: "Evals section",
       intro:
         "How Ally learns from itself: a nightly evaluator reads a sample of conversations, people label the ones that matter, the saved cases become tests, and every release is replayed against them before it goes live. Everything here shows ids, counts and verdicts; the words of a conversation need the transcripts permission.",
@@ -7053,6 +7248,291 @@ export const en = {
       libraryHeading: "Documents for Ally",
       libraryDescription:
         "Protocols, handbooks and policies Ally can draw on for this organisation's learners.",
+    },
+    delegation: {
+      heading: "How much runs on its own",
+      help: "Progressive delegation: Ally earns autonomy a step at a time. At stage 1 the curator only proposes and people run every step. At stage 2 the gate, shadow and canary run themselves and a person promotes. At stage 3 promotion is automatic too.",
+      stageLine: (stage: number, label: string) => `Stage ${stage}: ${label}`,
+      autoRevert: "A bad canary is always reverted automatically, at every stage.",
+      unlockedUpTo: (stage: number) =>
+        stage === 1 ? "Only stage 1 is unlocked." : `Stages up to ${stage} are unlocked.`,
+      stageWords: { current: "Current", unlocked: "Unlocked", locked: "Locked" },
+      changed: (who: string, at: string) => `Last changed by ${who}, ${at}.`,
+      changedBySystem: (at: string) => `Lowered automatically, ${at}.`,
+      reason: (reason: string) => `Reason: ${reason}`,
+      you: "you",
+      user: (id: number) => `user ${id}`,
+      preconditionsHeading: "What each stage needs",
+      preconditionsHelp:
+        "Every requirement with its actual figure beside what it needs. A stage unlocks when all of its own and the earlier stages' requirements are met, and it is lowered automatically if they stop holding.",
+      columns: {
+        requirement: "Requirement",
+        stage: "Needed for",
+        need: "Needed",
+        have: "Actual",
+        met: "Met",
+      },
+      neededFor: (stage: number) => `Stage ${stage}`,
+      met: "Met",
+      notMet: "Not met",
+      nothingYet: "Nothing yet",
+      raise: (stage: number) => `Raise to stage ${stage}…`,
+      lower: (stage: number) => `Lower to stage ${stage}…`,
+      raiseLocked: (stage: number) =>
+        `Stage ${stage} is locked until every requirement for it is met.`,
+      raiseOneAtATime: "A stage is raised one step at a time.",
+      dialog: {
+        raiseTitle: (stage: number) => `Raise to stage ${stage}?`,
+        lowerTitle: (stage: number) => `Lower to stage ${stage}?`,
+        raiseBody: {
+          2: "The gate, shadow and canary will run on their own from the next pass of the pipeline. A person still promotes.",
+          3: "Promotion becomes automatic too: a canary that is clearly better, with the learning guard holding, goes live without a person.",
+        } as Record<number, string>,
+        lowerBody:
+          "Takes effect at once. Anything the pipeline has already started is not undone, and you can raise it again later.",
+        reasonLabel: "Reason (optional)",
+        reasonHint: "Kept in the learning audit.",
+        reasonPlaceholder: "For example: the first automatic promotions looked too eager",
+        cancel: "Cancel",
+        confirmRaise: (stage: number) => `Raise to stage ${stage}`,
+        confirmLower: (stage: number) => `Lower to stage ${stage}`,
+        working: "Saving…",
+        success: (stage: number) => `Delegation is now stage ${stage}.`,
+        failed: "Could not change the stage.",
+      },
+      loadFailed: "the delegation stage",
+    },
+    curator: {
+      intro:
+        "The curator reads trusted evidence each day and proposes at most five lessons or tweaks. Each goes through guardrails; what passes becomes a draft release, and what it is unsure of is quarantined for a person. What you see here is the curator's own text and counts, never a learner's words.",
+      run: "Run the curator now…",
+      runDialog: {
+        title: "Run the curator now",
+        body: "Reads the trusted evidence and writes a draft release if it finds changes that clear the guardrails. It also runs daily, and does nothing while a curator release is still in the pipeline. It runs in the background and spends model budget.",
+        cancel: "Cancel",
+        confirm: "Run curator",
+        working: "Starting…",
+        started: "Started. Proposed changes appear below when it finishes.",
+        failed: "Could not start the curator.",
+      },
+      lessonsHeading: "Proposed changes",
+      lessonsHelp:
+        "Everything the curator proposed. A change in quarantine needs a person: approving it lets the next curator run carry it, through every other guardrail again.",
+      statusLabel: "Which changes to show",
+      statuses: {
+        quarantined: "Needs a person",
+        proposed: "Proposed",
+        approved: "Approved",
+        active: "In the playbook",
+        blocked: "Blocked by a guardrail",
+        rejected: "Rejected",
+        retired: "Retired",
+        all: "All",
+      } as Record<string, string>,
+      scopeFilter: "Scope",
+      allScopes: "Every scope",
+      scopes: { platform: "Everyone", org: "One organisation", course: "One course" } as Record<
+        string,
+        string
+      >,
+      kinds: { lesson: "Lesson", policy: "Setting change", prompt: "Prompt change" } as Record<
+        string,
+        string
+      >,
+      columns: { change: "Change", scope: "For", status: "Status", when: "Proposed", action: "" },
+      blockedBy: (reason: string) => `Stopped by: ${reason.replace(/_/g, " ")}`,
+      rationale: (text: string) => `Why: ${text}`,
+      decided: (who: string, at: string) => `Decided by ${who}, ${at}`,
+      emptyTitles: {
+        quarantined: "Nothing needs a person",
+        proposed: "No proposed changes",
+        approved: "No approved changes waiting",
+        active: "Nothing from the curator is in the playbook",
+        blocked: "No change was blocked",
+        rejected: "No change was rejected",
+        retired: "No lesson has been retired",
+        all: "The curator has not proposed anything yet",
+      } as Record<string, string>,
+      emptyMessage: "When the curator runs, what it proposes appears here.",
+      limitNote: (limit: number) => `Showing the newest ${limit}.`,
+      loadFailed: "the proposed changes",
+      approve: "Approve",
+      reject: "Reject",
+      retire: "Retire",
+      approveLabel: (text: string) => `Approve: ${text}`,
+      rejectLabel: (text: string) => `Reject: ${text}`,
+      retireLabel: (text: string) => `Retire: ${text}`,
+      decisionDialog: {
+        approveTitle: "Approve this change?",
+        approveBody:
+          "The next curator run carries it, through every other guardrail again. Approving does not put it live by itself.",
+        rejectTitle: "Reject this change?",
+        rejectBody:
+          "The curator will not carry it. This cannot be undone, but it can propose a new one.",
+        retireTitle: "Retire this lesson?",
+        retireBody: "It leaves the playbook: the next curator release drops it.",
+        notesLabel: "Notes (optional)",
+        notesHint: "Kept in the learning audit.",
+        cancel: "Cancel",
+        confirmApprove: "Approve change",
+        confirmReject: "Reject change",
+        confirmRetire: "Retire lesson",
+        working: "Saving…",
+        approved: "Approved.",
+        rejected: "Rejected.",
+        retired: "Retired.",
+        failed: "Could not save that decision.",
+      },
+      playbookHeading: "The playbook",
+      playbookHelp:
+        "The lessons the live release carries, by scope, with each scope's cap. Retiring one drops it from the next curator release.",
+      playbookRelease: (version: number | null) =>
+        version === null ? "There is no live release." : `Carried by the live release v${version}.`,
+      playbookEmpty: "The live release carries no lessons.",
+      capPlatform: (used: number, max: number) => `Everyone: ${used} of ${max}`,
+      capScoped: (label: string, used: number, max: number) =>
+        `${label}, fullest: ${used} of ${max}`,
+      playbookColumns: { lesson: "Lesson", scope: "For", action: "" },
+      loadPlaybookFailed: "the playbook",
+      auditHeading: "What the loop did",
+      auditHelp:
+        "The curator's runs, every decision on a change, stage changes and the pipeline's own steps, newest first.",
+      auditColumns: { when: "When", what: "What", who: "Who", detail: "Detail" },
+      auditEmpty: "The loop has not done anything yet.",
+      auditActions: {
+        proposed: "Change proposed",
+        quarantined: "Change quarantined",
+        blocked: "Change blocked",
+        approved: "Change approved",
+        rejected: "Change rejected",
+        activated: "Lesson went into the playbook",
+        retired: "Lesson retired",
+        curator_run: "Curator ran",
+        stage_changed: "Delegation stage changed",
+        pipeline_step: "Pipeline step",
+      } as Record<string, string>,
+      actors: {
+        system: "The system",
+        curator: "The curator",
+        human: "A person",
+        seed: "The system",
+      } as Record<string, string>,
+      auditLoadFailed: "the learning audit",
+    },
+    loop: {
+      trailHeading: "Full trail",
+      trailHelp:
+        "Everything that happened to this release, oldest first: created, gate, shadow, canary, decision, then live or reverted.",
+      trailEmpty: "Nothing has happened to this release yet.",
+      trailColumns: { when: "When", what: "What", who: "Who", detail: "Detail" },
+      changeSet: "What the curator changed",
+      changeSetHelp: "The set of lessons and tweaks this curator release carries.",
+      trailLoadFailed: "this release's trail",
+      sources: { release: "Release", learning: "Learning loop" } as Record<string, string>,
+      shadowHeading: "Shadow",
+      shadowHelp:
+        "Replays recent real conversations on this release in dry run and compares it with what the live release said. Nothing is shown to anyone. Only check names and counts are kept.",
+      shadowRun: "Run shadow…",
+      shadowNeedsGa:
+        "A shadow compares a candidate with the live release, so it is not offered for the live release.",
+      shadowRunDialog: {
+        title: (version: string) => `Shadow ${version}?`,
+        body: "Replays recent real conversations on this release, in dry run, and compares each reply with what the live release said. It calls the models for real, takes minutes and costs money. It runs in the background.",
+        cancel: "Cancel",
+        confirm: "Start shadow",
+        working: "Starting…",
+        started: "Started. The report appears below when it finishes.",
+        failed: "Could not start the shadow.",
+      },
+      shadowEmpty: "This release has not been shadowed.",
+      shadowColumns: { status: "Result", turns: "Turns", started: "Started", cost: "Cost" },
+      shadowStatuses: {
+        running: "Running",
+        passed: "Passed",
+        failed: "Failed",
+        inconclusive: "Inconclusive",
+        error: "Errored",
+      } as Record<string, string>,
+      shadowOpen: (when: string) => `Open the shadow report from ${when}`,
+      shadowLoadFailed: "the shadow reports",
+      report: {
+        heading: "Shadow report",
+        reasonsHeading: "Why",
+        sides: { ga: "Live release", candidate: "This release" },
+        measures: {
+          passRate: "Checks passed",
+          safety: "Safety check failures",
+          words: "Mean words per reply",
+        },
+        newSafety: (count: number) =>
+          count === 0
+            ? "No turn failed a safety check that the live release passed."
+            : `${count} ${count === 1 ? "turn" : "turns"} failed a safety check that the live release passed.`,
+        crisis: (count: number) =>
+          count === 0
+            ? "The two never disagreed about giving the crisis response."
+            : `${count} ${count === 1 ? "turn" : "turns"} where one gave the crisis response and the other did not.`,
+        errors: (count: number) =>
+          `${count} ${count === 1 ? "turn" : "turns"} errored and were left out.`,
+        byCheckHeading: "Checks that failed",
+        byCheckColumns: { check: "Check", ga: "Live release", candidate: "This release" },
+        failedRun: (message: string) => `The shadow itself failed: ${message}`,
+        loadFailed: "this shadow report",
+      },
+    },
+    synthetic: {
+      heading: "Synthetic monitoring",
+      help: "Each night, scripted learner journeys run against the live release, step by step, and every reply is checked. Drift means the pass rate fell against recent nights, or a journey that used to pass now fails.",
+      run: "Run now…",
+      runDialog: {
+        title: "Run the synthetic journeys now",
+        body: "Runs the scripted journeys on the live release, in dry run. It calls the models for real and costs money; it also runs every night. It runs in the background.",
+        cancel: "Cancel",
+        confirm: "Run journeys",
+        working: "Starting…",
+        started: "Started. The night appears in the list when it finishes.",
+        failed: "Could not start the journeys.",
+      },
+      columns: {
+        night: "Night",
+        release: "Release",
+        status: "Status",
+        journeys: "Journeys",
+        passRate: "Passed",
+        safety: "Safety failures",
+        drift: "Drift",
+        cost: "Cost",
+      },
+      statuses: { running: "Running", completed: "Done", error: "Errored" } as Record<
+        string,
+        string
+      >,
+      driftYes: "Drift",
+      driftNo: "Steady",
+      emptyTitle: "No synthetic night has run yet",
+      emptyMessage: "The journeys run every night, or start them now.",
+      loadFailed: "the synthetic runs",
+      open: (night: string) => `Open the synthetic run of ${night}`,
+      detail: {
+        title: (night: string) => `Synthetic run of ${night}`,
+        close: "Close",
+        loadFailed: "this synthetic run",
+        verdictHeading: "Drift",
+        steady: "No drift: the pass rate and every journey look as they did on recent nights.",
+        baseline: (median: number | null) =>
+          median === null
+            ? "There is no recent baseline yet."
+            : `Recent median pass rate: ${Math.round(median * 100)}%.`,
+        newlyFailing: (keys: string) => `Newly failing: ${keys}`,
+        journeysHeading: "Journeys",
+        journeyColumns: { journey: "Journey", result: "Result", steps: "Steps that failed" },
+        passed: "Passed",
+        failed: "Failed",
+        stepFailed: (index: number, checks: string) => `Step ${index}: ${checks}`,
+        stepSafety: "safety",
+        errored: (message: string) => `The run itself failed: ${message}`,
+        noJourneys: "No journeys were recorded.",
+      },
     },
     settings: {
       intro:

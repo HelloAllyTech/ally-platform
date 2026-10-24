@@ -16,6 +16,13 @@ vi.mock("../EvaluatorPanel", () => ({
 }));
 vi.mock("../ReviewsPanel", () => ({ ReviewsPanel: () => <div data-testid="reviews-panel" /> }));
 vi.mock("../EvalCasesPanel", () => ({ EvalCasesPanel: () => <div data-testid="cases-panel" /> }));
+vi.mock("../DelegationPanel", () => ({
+  DelegationPanel: () => <div data-testid="delegation-panel" />,
+}));
+vi.mock("../CuratorPanel", () => ({ CuratorPanel: () => <div data-testid="curator-panel" /> }));
+vi.mock("../SyntheticPanel", () => ({
+  SyntheticPanel: () => <div data-testid="synthetic-panel" />,
+}));
 vi.mock("../EvalRunsPanel", () => ({ EvalRunsPanel: () => <div data-testid="runs-panel" /> }));
 
 // eslint-disable-next-line import/first
@@ -36,6 +43,8 @@ describe("EvalsTab", () => {
     ["Reviews", "reviews-panel"],
     ["Cases", "cases-panel"],
     ["Runs", "runs-panel"],
+    ["Curator", "curator-panel"],
+    ["Synthetic", "synthetic-panel"],
     ["Evaluator", "evaluator-panel"],
   ])("shows the %s view when chosen, and only that one", (name, testId) => {
     render(<EvalsTab />);
@@ -43,7 +52,11 @@ describe("EvalsTab", () => {
     fireEvent.click(screen.getByRole("button", { name }));
 
     expect(screen.getByTestId(testId)).toBeInTheDocument();
-    expect(screen.getAllByTestId(/-panel$/)).toHaveLength(1);
+    // The delegation stage sits above every view; exactly one view shows beneath it.
+    expect(screen.getByTestId("delegation-panel")).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId(/-panel$/).filter(el => el.dataset.testid !== "delegation-panel"),
+    ).toHaveLength(1);
   });
 
   it("can open on another view", () => {

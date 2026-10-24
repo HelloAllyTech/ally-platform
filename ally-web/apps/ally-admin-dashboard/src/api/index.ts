@@ -44,3 +44,4 @@ export * from "./publicRoadmap";
 export * from "./courseCopilot";
 export * from "./allyGuide";
 export * from "./allyGuideLearning";
+export * from "./allyGuidePipeline";

@@ -21,6 +21,12 @@ vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   usePromoteAllyGuideReleaseMutation: () => [h.promote, { isLoading: false }],
   useStopAllyGuideCanaryMutation: () => [h.stop, { isLoading: false }],
+  // The verdict has its own suite; here it only has to stay out of the way.
+  useGetAllyGuideCanaryDecisionQuery: () => ({
+    data: { canary: null },
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 // eslint-disable-next-line import/first

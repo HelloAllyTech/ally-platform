@@ -539,6 +539,11 @@ export const ApiEndpoints = {
     COACHING_LOOP: "/v1/analytics/coaching-loop",
     // Ratings & comments tab (AAQ-238/239): learners' own post-session words.
     LEARNER_FEEDBACK: "/v1/analytics/learner-feedback",
+    // The Ally tab (AAQ-240 to AAQ-251).
+    ALLY_GUIDE_SUMMARY: "/v1/analytics/ally-guide/summary",
+    ALLY_GUIDE_WEEKLY: "/v1/analytics/ally-guide/weekly",
+    ALLY_GUIDE_ENGAGEMENT_VS_LEARNING: "/v1/analytics/ally-guide/engagement-vs-learning",
+    ALLY_GUIDE_COURSES: "/v1/analytics/ally-guide/courses",
     ORG_HEALTH: "/v1/analytics/org-health",
     // Helping skills → "Is the measure sound?" (AAQ-220..223), Quality &
     // sentiment confidence (AAQ-230/231) and the Orgs scorecard (AAQ-232).
@@ -855,6 +860,22 @@ export const ApiEndpoints = {
     EVAL_RUN: (id: string) => `/v1/guide/admin/eval-runs/${id}`,
     EVAL_RUN_OUTPUTS: (id: string) => `/v1/guide/admin/eval-runs/${id}/outputs`,
     RELEASE_EVAL_RUNS: (id: string) => `/v1/guide/admin/releases/${id}/eval-runs`,
+    // Learning loop, second half: delegation, the curator, shadow, the canary's decision, synthetic.
+    DELEGATION: "/v1/guide/admin/delegation",
+    CURATOR_RUN: "/v1/guide/admin/curator/run",
+    PLAYBOOK: "/v1/guide/admin/playbook",
+    LESSONS: "/v1/guide/admin/lessons",
+    LESSON_APPROVE: (id: string) => `/v1/guide/admin/lessons/${id}/approve`,
+    LESSON_REJECT: (id: string) => `/v1/guide/admin/lessons/${id}/reject`,
+    LESSON_RETIRE: (id: string) => `/v1/guide/admin/lessons/${id}/retire`,
+    LEARNING_AUDIT: "/v1/guide/admin/learning/audit",
+    RELEASE_TRAIL: (id: string) => `/v1/guide/admin/releases/${id}/trail`,
+    RELEASE_SHADOW: (id: string) => `/v1/guide/admin/releases/${id}/shadow`,
+    SHADOW_REPORTS: "/v1/guide/admin/shadow-reports",
+    SHADOW_REPORT: (id: string) => `/v1/guide/admin/shadow-reports/${id}`,
+    CANARY_DECISION: "/v1/guide/admin/canary/decision",
+    SYNTHETIC_RUNS: "/v1/guide/admin/synthetic-runs",
+    SYNTHETIC_RUN: (id: string) => `/v1/guide/admin/synthetic-runs/${id}`,
   },
   // Text helpline org settings (platform admin only; EDIT_GLOBAL_SETTINGS).
   HELPLINE_ADMIN: {
@@ -1135,6 +1156,10 @@ export const TAG_TYPES = {
   ALLY_GUIDE_REVIEWS: "allyGuideReviews",
   ALLY_GUIDE_EVALS: "allyGuideEvals",
   ALLY_GUIDE_NOTES: "allyGuideNotes",
+  ALLY_GUIDE_DELEGATION: "allyGuideDelegation",
+  ALLY_GUIDE_LESSONS: "allyGuideLessons",
+  ALLY_GUIDE_SHADOW: "allyGuideShadow",
+  ALLY_GUIDE_SYNTHETIC: "allyGuideSynthetic",
   AI_LAB_SKILLS: "aiLabSkills",
   AI_LAB_VARIABLES: "aiLabVariables",
   AI_LAB_VALUES: "aiLabValues",

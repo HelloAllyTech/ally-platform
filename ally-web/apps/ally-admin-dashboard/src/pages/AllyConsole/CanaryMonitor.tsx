@@ -33,6 +33,7 @@ import {
   MIN_TURNS_TO_COMPARE,
   pickArms,
 } from "./canaryComparison";
+import { CanaryDecision } from "./CanaryDecision";
 import { PromoteReleaseDialog, StopCanaryDialog } from "./ReleaseDialogs";
 
 const DASH = "—";
@@ -124,6 +125,8 @@ export const CanaryMonitor: React.FC<CanaryMonitorProps> = ({ canary, live, arms
               </div>
             )}
           </div>
+
+          <CanaryDecision />
 
           {!canaryArm ? (
             <p className="text-sm text-typography-700" data-testid="canary-not-served">

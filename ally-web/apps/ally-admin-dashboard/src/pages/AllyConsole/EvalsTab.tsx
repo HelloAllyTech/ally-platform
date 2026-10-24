@@ -3,12 +3,15 @@ import React, { useState } from "react";
 import { ContentSwitcher, Switch } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
+import { CuratorPanel } from "./CuratorPanel";
+import { DelegationPanel } from "./DelegationPanel";
 import { EvalCasesPanel } from "./EvalCasesPanel";
 import { EvalRunsPanel } from "./EvalRunsPanel";
 import { EvaluatorPanel } from "./EvaluatorPanel";
 import { ReviewsPanel } from "./ReviewsPanel";
+import { SyntheticPanel } from "./SyntheticPanel";
 
-const VIEWS = ["evaluator", "reviews", "cases", "runs"] as const;
+const VIEWS = ["evaluator", "reviews", "cases", "runs", "curator", "synthetic"] as const;
 export type EvalsView = (typeof VIEWS)[number];
 
 /**
@@ -24,6 +27,7 @@ export const EvalsTab: React.FC<{ initialView?: EvalsView }> = ({ initialView = 
   return (
     <div className="flex flex-col gap-6" data-testid="ally-evals">
       <p className="max-w-3xl text-sm text-typography-700">{strings.intro}</p>
+      <DelegationPanel />
       <ContentSwitcher
         size="md"
         selectedIndex={VIEWS.indexOf(view)}
@@ -39,6 +43,8 @@ export const EvalsTab: React.FC<{ initialView?: EvalsView }> = ({ initialView = 
       {view === "reviews" && <ReviewsPanel />}
       {view === "cases" && <EvalCasesPanel />}
       {view === "runs" && <EvalRunsPanel />}
+      {view === "curator" && <CuratorPanel />}
+      {view === "synthetic" && <SyntheticPanel />}
     </div>
   );
 };

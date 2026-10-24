@@ -15,6 +15,9 @@ const h = vi.hoisted(() => ({
   startCanary: vi.fn(),
   stopCanary: vi.fn(),
   startEval: vi.fn(),
+  trail: vi.fn(),
+  shadows: vi.fn(),
+  startShadow: vi.fn(),
   evalCases: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -47,6 +50,15 @@ vi.mock("@api", async importOriginal => ({
   useStartAllyGuideCanaryMutation: () => [h.startCanary, { isLoading: false }],
   useStopAllyGuideCanaryMutation: () => [h.stopCanary, { isLoading: false }],
   useStartAllyGuideEvalRunMutation: () => [h.startEval, { isLoading: false }],
+  useGetAllyGuideReleaseTrailQuery: () => h.trail(),
+  useGetAllyGuideShadowReportsQuery: () => h.shadows(),
+  useGetAllyGuideShadowReportQuery: () => ({ data: undefined, isLoading: true }),
+  useStartAllyGuideShadowMutation: () => [h.startShadow, { isLoading: false }],
+  useGetAllyGuideCanaryDecisionQuery: () => ({
+    data: { canary: null },
+    isLoading: false,
+    isError: false,
+  }),
   useGetAllyGuideEvalCasesQuery: () => h.evalCases(),
 }));
 
@@ -131,6 +143,13 @@ describe("ReleasesTab", () => {
     h.startCanary.mockReturnValue({ unwrap: () => Promise.resolve({ id: "rel-4", version: 4 }) });
     h.stopCanary.mockReturnValue({ unwrap: () => Promise.resolve({ id: "rel-4", version: 4 }) });
     h.startEval.mockReturnValue({ unwrap: () => Promise.resolve({ id: "run-1" }) });
+    h.trail.mockReturnValue({
+      data: { release: { id: "rel-4", version: 4, status: "draft", changeSet: null }, trail: [] },
+      isLoading: false,
+      isError: false,
+    });
+    h.shadows.mockReturnValue({ data: [], isLoading: false, isError: false });
+    h.startShadow.mockReturnValue({ unwrap: () => Promise.resolve({ id: "sh-1" }) });
     h.evalCases.mockReturnValue({ data: [], isLoading: false });
   });
 

@@ -24,6 +24,7 @@ import { AllyGuidePromptRef, AllyGuideRelease } from "@types";
 import { formatDateTime } from "@utils";
 
 import { canStartCanary } from "./canaryShare";
+import { ReleaseTrailSection, ShadowSection } from "./ReleaseLoopSections";
 import { ReleaseStatusPill } from "./ReleaseStatusPill";
 
 const PRE_CLASSES =
@@ -185,6 +186,9 @@ const DrawerBody: React.FC<{
         </div>
       )}
       {data.status === "ga" && <p className="text-sm text-typography-700">{strings.promoteGa}</p>}
+
+      <ShadowSection release={data} canEdit={canEdit} />
+      <ReleaseTrailSection releaseId={data.id} />
 
       <Section heading={strings.promptsHeading} help={strings.promptsHelp} testId="release-prompts">
         {prompts.length === 0 ? (
