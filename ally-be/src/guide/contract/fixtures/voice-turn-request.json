@@ -1,0 +1,15 @@
+{
+  "def": "GuideVoiceTurnRequest",
+  "valid": [
+    { "token": "vt", "clientTurnId": "c1", "text": "Can we go on?" },
+    {
+      "token": "vt",
+      "clientTurnId": "c2",
+      "text": "wait",
+      "interruptedTurnId": "u1",
+      "spokenChars": 42,
+      "language": "hi"
+    }
+  ],
+  "invalid": [{ "clientTurnId": "c1", "text": "no token" }]
+}

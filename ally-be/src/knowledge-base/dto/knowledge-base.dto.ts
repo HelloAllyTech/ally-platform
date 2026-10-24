@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -162,6 +162,28 @@ export class CreateKbDocumentDto {
   @IsUUID('4', { each: true })
   tenantIds?: string[];
 }
+
+/**
+ * A document added to an owned corpus (KB_OWNED_CORPORA) by its owner — the platform or one
+ * organisation.
+ *
+ * Deliberately WITHOUT `corpus`, `isGlobal`, `tenantIds` and `characterTopics`. The route
+ * decides the corpus and the owner, and the audience follows the owner; a body that could
+ * name them would let one organisation's admin publish to the platform, or target another
+ * organisation, by editing a request.
+ */
+export class CreateKbOwnedDocumentDto extends PickType(CreateKbDocumentDto, [
+  'title',
+  'sourceType',
+  'text',
+  'sourceUrl',
+  'fileUrl',
+  'fileName',
+  'contentType',
+  'sizeBytes',
+  'language',
+  'tags',
+] as const) {}
 
 export class UpdateKbDocumentAudienceDto {
   @ApiProperty({ description: 'Available to every organisation' })
@@ -327,6 +349,16 @@ export class GetKbDocumentsQueryDto {
   sortDir?: string;
 }
 
+/**
+ * One owner's documents. Fewer filters than the corpus console's list: an owner's library is
+ * small, and the organisation filter is the route itself. Archived (removed) documents are
+ * never listed — removing one is how an owner says they are done with it.
+ */
+export class GetKbOwnedDocumentsQueryDto extends PickType(
+  GetKbDocumentsQueryDto,
+  ['limit', 'offset', 'search', 'status', 'sortBy', 'sortDir'] as const,
+) {}
+
 export class KbDocumentResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: KbCorpus }) corpus!: KbCorpus;
@@ -361,6 +393,14 @@ export class KbDocumentResponseDto {
       'document as restricted.',
   })
   tenantIds!: string[];
+  @ApiProperty({
+    nullable: true,
+    description:
+      'The organisation that owns it, on a corpus whose documents have owners (the Ally ' +
+      "guide's library). Null for the platform's own documents and for every document of " +
+      'the other corpora.',
+  })
+  ownerTenantId!: string | null;
   @ApiProperty() isArchived!: boolean;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;

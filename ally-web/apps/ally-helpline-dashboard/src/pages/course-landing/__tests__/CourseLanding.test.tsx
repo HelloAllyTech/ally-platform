@@ -210,7 +210,12 @@ describe("CourseLanding", () => {
 
     await waitFor(() => expect(screen.getByTestId("item-player")).toBeTruthy());
     expect(mockCheckAccess).toHaveBeenCalledWith({ trackId: TRACK_ID });
-    expect(mockEnrollTrack).toHaveBeenCalledWith({ trackId: TRACK_ID, languageCode: "hi" });
+    // Enrolled from the public link: counted in the public-link cohort.
+    expect(mockEnrollTrack).toHaveBeenCalledWith({
+      trackId: TRACK_ID,
+      languageCode: "hi",
+      entrySource: "public_link",
+    });
   });
 
   it("tells a learner without access after login that the course is not available to them", async () => {

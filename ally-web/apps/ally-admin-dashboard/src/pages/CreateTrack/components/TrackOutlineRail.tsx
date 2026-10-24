@@ -23,6 +23,7 @@ import { CompletionCriteria, TrackItemContent, TrackItemType, TrackSectionFormVa
 import { SectionNode } from "./SectionNode";
 import {
   TrackSelection,
+  isAllyNotesSelection,
   isLandingSelection,
   isSettingsSelection,
   isTranslationsSelection,
@@ -35,6 +36,8 @@ interface TrackOutlineRailProps {
   onSelectSettings: () => void;
   onSelectLanding: () => void;
   onSelectTranslations: () => void;
+  /** Opens the notes for Ally. Omitted when this admin has no access to the Ally guide. */
+  onSelectAllyNotes?: () => void;
   /** Published translation count, shown as a badge on the Languages node. */
   publishedLanguageCount: number;
   onSelectItem: (sectionIndex: number, itemIndex: number) => void;
@@ -60,6 +63,7 @@ export const TrackOutlineRail: FC<TrackOutlineRailProps> = ({
   onSelectSettings,
   onSelectLanding,
   onSelectTranslations,
+  onSelectAllyNotes,
   publishedLanguageCount,
   onSelectItem,
   onAddSection,
@@ -133,6 +137,23 @@ export const TrackOutlineRail: FC<TrackOutlineRailProps> = ({
           </span>
         )}
       </button>
+
+      {onSelectAllyNotes && (
+        <button
+          type="button"
+          onClick={onSelectAllyNotes}
+          className={`w-full flex items-center gap-2 px-2 py-2 max-lg:min-h-10 rounded-md mb-2 ${
+            isAllyNotesSelection(selection)
+              ? "bg-primary-50 text-primary-700"
+              : "hover:bg-secondary-50 text-typography-800"
+          }`}
+        >
+          <Document className="w-4 h-4" />
+          <span className="text-sm font-medium flex-1 text-left">
+            {en.allyConsole.courseNotes.railLabel}
+          </span>
+        </button>
+      )}
 
       <DndContext
         sensors={sensors}

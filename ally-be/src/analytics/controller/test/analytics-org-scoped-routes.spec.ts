@@ -16,6 +16,10 @@ import { FeatureToggleKey } from '../../../authorization/constants/admin-feature
  */
 const ORG_SCOPED_ANALYTICS_ROUTES = [
   'activation',
+  'ally-guide/courses',
+  'ally-guide/engagement-vs-learning',
+  'ally-guide/summary',
+  'ally-guide/weekly',
   'coaching-loop',
   'cohort-retention',
   'competency-map',

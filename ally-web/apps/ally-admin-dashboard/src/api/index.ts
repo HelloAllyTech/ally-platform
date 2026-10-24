@@ -42,3 +42,6 @@ export * from "./helplineAdmin";
 export * from "./skillExperiments";
 export * from "./publicRoadmap";
 export * from "./courseCopilot";
+export * from "./allyGuide";
+export * from "./allyGuideLearning";
+export * from "./allyGuidePipeline";

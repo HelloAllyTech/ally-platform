@@ -30,6 +30,7 @@ import { AppleSignInDto } from '../dto/apple-token.dto';
 import { MagicLinkVerifyDto } from '../dto/magic-link.dto';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+
 import { ImpersonateDto } from '../dto/impersonate.dto';
 import { PostHog } from 'posthog-node';
 import {
@@ -204,11 +205,11 @@ export class AuthController {
   @Version('1')
   @HttpCode(HttpStatus.OK)
   async impersonate(
-    @Body() ImpersonateDto: ImpersonateDto,
+    @Body() impersonateDto: ImpersonateDto,
     @Req() req: { user: { id: string | number } },
   ) {
     const data = await this.authService.impersonate(
-      ImpersonateDto,
+      impersonateDto,
       Number(req.user.id),
     );
     return { message: data.message, data: data.data };

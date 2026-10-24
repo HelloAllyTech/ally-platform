@@ -29,6 +29,13 @@ interface RoleplayItemPlayerProps {
   item: TrackDetailItem;
   trackId: string;
   alreadyCompleted: boolean;
+  /**
+   * Merged into the stashed return-to-track context. Optional: the guided
+   * journey passes `returnTo: "guided"` so the summary comes back to Ally.
+   */
+  trackContextExtras?: Partial<ActiveTrackContext>;
+  /** Called just before the simulation or case opens. Optional. */
+  onBeforeLaunch?: () => void;
 }
 
 /**
@@ -53,6 +60,8 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
   item,
   trackId,
   alreadyCompleted,
+  trackContextExtras,
+  onBeforeLaunch,
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -117,7 +126,8 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
   const challengeDescription = isCase ? caseDetails?.description : scenario?.description;
 
   const launch = async () => {
-    persistTrackContext({ trackId, itemId: item.id });
+    onBeforeLaunch?.();
+    persistTrackContext({ ...trackContextExtras, trackId, itemId: item.id });
 
     if (payload.type === "CASE") {
       navigate(`/case/${payload.caseId}`);

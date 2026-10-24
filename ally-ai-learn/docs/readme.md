@@ -46,6 +46,7 @@
 | -- | [Turn Openers](turn-openers.md) | How each reply starts (pause, filler, interim pieces), chosen by working memory and played under the timing rules |
 | -- | [Thinking Fillers Perf Plan](thinking-fillers-perf-plan.md) | Proposal: measure, then 10x the thinking-filler on speed, cost, diversity, gap bridging, character and context fit |
 | -- | [Text-Chat Roleplays](text-chat.md) | Running a roleplay typed both ways: what is shared with voice, what is switched off, the persona's texting guidance |
+| -- | [Ally Guide Voice Worker](guide-voice-worker.md) | The guide's own worker (`app/guide_worker.py`): speech only, replies from ally-be, barge-in, push-to-talk, crisis pacing |
 | -- | [AI Video Actor](video-actor.md) | EXPERIMENTAL, off everywhere: giving a character a lip-synced face, its two gates, providers and audio-only fallback |
 | 01 | [Worker Lifecycle](01-worker-lifecycle.md) | AgentWorker 3-phase lifecycle, termination |
 | 02 | [Graph Pipeline](02-graph-pipeline.md) | SimulationState, 6 graph nodes, parallel flow, report graph |

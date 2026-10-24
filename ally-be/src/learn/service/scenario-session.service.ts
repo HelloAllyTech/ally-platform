@@ -1,3 +1,7 @@
+import {
+  SCENARIO_SESSION_DEBRIEF_READY_EVENT,
+  ScenarioSessionDebriefReadyEvent,
+} from '../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { CohortContentType } from 'src/cohort/constants/cohort.constants';
 import {
@@ -2220,6 +2224,14 @@ export class ScenarioSessionService {
           { conflictPaths: ['scenarioSessionId'] },
         );
       });
+      // After the write commits: a listener (the Ally guide's after-action
+      // review) reads the feedback back. Only a real debrief, never an error.
+      if ((summary as Record<string, any> | undefined)?.feedback) {
+        this.eventEmitter.emit(SCENARIO_SESSION_DEBRIEF_READY_EVENT, {
+          scenarioSessionId,
+          tenantId,
+        } satisfies ScenarioSessionDebriefReadyEvent);
+      }
     } catch (error) {
       this.logger.error(
         `Failed to persist scenario session details for ${scenarioSessionId}: ${JSON.stringify(error.message)}`,

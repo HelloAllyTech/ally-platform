@@ -204,6 +204,19 @@ export const CHARACTER_INTERVIEW_INTERVIEWER_SYSTEM = definePrompt(
   {},
 );
 
+/** src/prompts/course_copilot/ally_notes_writer.txt */
+export const COURSE_COPILOT_ALLY_NOTES_WRITER = definePrompt(
+  'course_copilot_ally_notes_writer',
+  {
+    course_description: 'optional',
+    course_outline: 'required',
+    course_title: 'optional',
+    current_notes: 'optional',
+    trigger_warnings: 'optional',
+  },
+  { output: 'structured' },
+);
+
 /** src/prompts/course_copilot/annotation_writer.txt */
 export const COURSE_COPILOT_ANNOTATION_WRITER = definePrompt(
   'course_copilot_annotation_writer',
@@ -789,6 +802,7 @@ export const PROMPT_CONTRACTS = Object.fromEntries(
     BUILDER_INTERVIEWER_SYSTEM,
     BUILDER_PLATFORM_RULES,
     CHARACTER_INTERVIEW_INTERVIEWER_SYSTEM,
+    COURSE_COPILOT_ALLY_NOTES_WRITER,
     COURSE_COPILOT_ANNOTATION_WRITER,
     COURSE_COPILOT_ARTICLE_WRITER,
     COURSE_COPILOT_BLUEPRINT_PLANNER,

@@ -9,9 +9,10 @@ import { useEndSimulationMutation } from "@api";
 import { SimulationWarningIllustration } from "@assets";
 import { ButtonVariant, ConfirmationDialog } from "@components";
 import { ErrorBoundary } from "@components/error-boundary/ErrorBoundary";
-import { ROUTES } from "@constants";
+import { buildJourneyRoute, ROUTES } from "@constants";
 import { useLiveKitRoom } from "@hooks";
 import { RoomStatus } from "@types";
+import { readTrackContext } from "@utils/trackContext";
 
 export const Simulation = () => {
   const navigate = useNavigate();
@@ -123,8 +124,19 @@ export const Simulation = () => {
   // The way out when a session can't be started at all. Goes to Learn rather
   // than the post-session summary: there is no session to summarise, and
   // handleRoomDisconnected's summary route would land on an empty debrief.
+  // A roleplay Ally's guided journey launched goes back to Ally instead, who
+  // acknowledges it without judgement (plan §11 C-5).
   const handleExitSimulation = () => {
-    navigate(ROUTES.LEARN, { replace: true });
+    const trackContext = readTrackContext();
+    navigate(
+      trackContext?.returnTo === "guided"
+        ? buildJourneyRoute(trackContext.trackId, {
+            returned: trackContext.cardId,
+            outcome: "aborted",
+          })
+        : ROUTES.LEARN,
+      { replace: true },
+    );
   };
 
   if (roomData) {

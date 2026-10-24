@@ -882,6 +882,15 @@ export interface VideoProgressResult extends TrackItemCompletionResult {
 export interface ActiveTrackContext {
   trackId: string;
   itemId: string;
+  /**
+   * Where the learner came from. Absent for the classic course player;
+   * "guided" when Ally's journey (`/journey/:trackId`) launched the item, so
+   * the way back leads there instead.
+   */
+  returnTo?: "guided";
+  /** Guided only: the thread and the card that launched the item. */
+  threadId?: string;
+  cardId?: string;
 }
 
 export const ACTIVE_TRACK_CONTEXT_KEY = "activeTrackContext";

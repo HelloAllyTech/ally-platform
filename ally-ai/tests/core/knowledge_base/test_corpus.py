@@ -6,8 +6,10 @@ at import — it would fail at the first write, against a collection Weaviate do
 have, for a corpus an admin had already been offered in the UI.
 """
 
+import importlib.util
 import re
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -42,7 +44,11 @@ def test_the_whatsapp_corpus_keeps_the_collection_its_vectors_are_already_in():
 def test_wire_values_match_ally_be():
     # These are the strings stored in ally-be's kb_documents.corpus. A drift here means
     # ally-be asks for a corpus this service does not recognise.
-    assert {c.value for c in KbCorpus} == {"whatsapp_qa", "character_library"}
+    assert {c.value for c in KbCorpus} == {
+        "whatsapp_qa",
+        "character_library",
+        "ally_guide_library",
+    }
 
 
 def test_every_collection_has_a_migration_that_creates_it():
@@ -69,3 +75,31 @@ def test_unknown_corpus_is_a_programming_error_not_a_silent_default():
     corpus and look like a working query."""
     with pytest.raises(KeyError):
         collection_for("not_a_corpus")  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_the_guide_library_collection_carries_the_audience_properties():
+    """The guide library holds organisations' own documents beside global ones, so
+    the audience pair is what keeps one organisation's protocols away from another's
+    learners. A collection created without it would fail every audience-filtered
+    search — and the fix that tempts, searching unrestricted, is the leak."""
+    path = (
+        Path(__file__).parents[3]
+        / "app"
+        / "migrations"
+        / "008-create-guide-library-chunk-collection.py"
+    )
+    spec = importlib.util.spec_from_file_location("migration_008", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    client = MagicMock()
+    client.collections.list_all = AsyncMock(return_value=[])
+    client.collections.create = AsyncMock()
+
+    await migration.up(client)
+
+    kwargs = client.collections.create.call_args.kwargs
+    assert kwargs["name"] == collection_for(KbCorpus.ALLY_GUIDE_LIBRARY)
+    names = {prop.name for prop in kwargs["properties"]}
+    assert {"is_global", "tenant_ids", "document_id"} <= names

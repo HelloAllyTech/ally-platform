@@ -132,6 +132,40 @@ export enum ErrorCode {
   SKILLS_STORE_NOT_A_CANDIDATE = 'SKILLS_STORE_NOT_A_CANDIDATE',
   /** 400. Text and model settings change through a new version, not a metadata update. */
   SKILLS_STORE_USE_VERSIONS = 'SKILLS_STORE_USE_VERSIONS',
+
+  // ── Ally guide (src/guide) ────────────────────────────────────────────────
+  // The same conditions reach a live stream as `turn.failed{code}` in the
+  // guide's own contract (guide-contract.schema.json, GuideFailureCode).
+  /**
+   * 403. A kill switch has the guided course off — for everyone, this tenant
+   * or this course. The client opens the classic course instead.
+   */
+  GUIDE_DISABLED = 'GUIDE_DISABLED',
+  /**
+   * 403. The learner cannot open this course. The reason is not repeated here:
+   * `GET /v1/learn/tracks/:trackId/access` returns it, as it does for classic.
+   */
+  GUIDE_NO_ACCESS = 'GUIDE_NO_ACCESS',
+  /** 400. The learner's message is over the length limit; nothing was stored. */
+  GUIDE_MESSAGE_TOO_LONG = 'GUIDE_MESSAGE_TOO_LONG',
+  /**
+   * 401. An anonymous visitor token is missing, unknown or already spent by
+   * signing in. The client drops it and creates a new visitor.
+   */
+  GUIDE_VISITOR_INVALID = 'GUIDE_VISITOR_INVALID',
+  /**
+   * 400. An org or course config change named a setting that layer may not
+   * change (pinned, platform-only, unknown) or an illegal value. `message` is
+   * an array, one sentence per refused key, each starting with the key.
+   * Nothing was saved.
+   */
+  GUIDE_CONFIG_REFUSED = 'GUIDE_CONFIG_REFUSED',
+  /**
+   * 422. A course's Ally notes contain the text of a quiz answer (a correct
+   * option or an accepted answer), which Ally could pass on to a learner.
+   * `message` names each answer and its item. Nothing was saved.
+   */
+  GUIDE_NOTES_ANSWER_LEAK = 'GUIDE_NOTES_ANSWER_LEAK',
 }
 
 /**

@@ -6,10 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { isUUID } from 'class-validator';
 import { In, Repository } from 'typeorm';
 import { Tenant } from 'src/tenant/entity/tenant.entity';
 import { AiService } from 'src/ai/service/ai.service';
-import { KnowledgeAudienceRequest } from 'src/ai/dto/knowledge.dto';
+import {
+  KnowledgeAudienceRequest,
+  KnowledgeChunkPassage,
+} from 'src/ai/dto/knowledge.dto';
 import { S3Service } from 'src/aws/service/s3.service';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { AppConfigService } from 'src/config/config.service';
@@ -20,11 +24,14 @@ import {
   KB_MAX_FILE_SIZE_BYTES,
   KB_MAX_PASSAGES_PER_DOCUMENT,
   KB_MIN_SIMILARITY_DEFAULT,
+  KB_OWNED_CORPORA,
 } from '../constants/knowledge-base.constants';
 import {
   CreateKbDocumentDto,
+  CreateKbOwnedDocumentDto,
   CreateKbUploadUrlDto,
   GetKbDocumentsQueryDto,
+  GetKbOwnedDocumentsQueryDto,
   GetKbStatsQueryDto,
   KbDocumentResponseDto,
   KbSearchDto,
@@ -35,6 +42,7 @@ import {
 import { KbDocument } from '../entity/kb-document.entity';
 import {
   KbCorpus,
+  KbDocumentScope,
   KbDocumentSourceType,
   KbDocumentStatus,
   KbRetrievalConsumer,
@@ -51,6 +59,46 @@ export interface RetrievalContext {
   sessionId?: string | null;
   userId?: number | null;
 }
+
+/**
+ * Who owns a document of an owned corpus (KB_OWNED_CORPORA): the platform (`tenantId: null`)
+ * or one organisation. Decided by the ROUTE, never by a request body.
+ */
+export interface KbOwner {
+  corpus: KbCorpus;
+  tenantId: string | null;
+}
+
+/**
+ * Who a retrieval is FOR. Required by `searchForAudience`, and it has no "everyone" value:
+ * `tenantId` is the asker's organisation (global documents plus that organisation's), or
+ * null for an anonymous visitor or a learner with no organisation (global documents only).
+ * The unrestricted search is `search()`, which answers owned corpora only to the admin
+ * preview.
+ */
+export interface KbAudience {
+  tenantId: string | null;
+}
+
+/** A passage retrieved for an audience, with where its document sits relative to them. */
+export type KbAudiencePassage = KnowledgeChunkPassage & {
+  scope: KbDocumentScope;
+};
+
+/** The source fields every document is created from, whichever route created it. */
+type KbDocumentSource = Pick<
+  CreateKbDocumentDto,
+  | 'title'
+  | 'sourceType'
+  | 'text'
+  | 'sourceUrl'
+  | 'fileUrl'
+  | 'fileName'
+  | 'contentType'
+  | 'sizeBytes'
+  | 'language'
+  | 'tags'
+>;
 import { KbIngestProducer } from '../producer/kb-ingest.producer';
 import { KbDocumentChunkRepository } from '../repository/kb-document-chunk.repository';
 import { KbDocumentTenantRepository } from '../repository/kb-document-tenant.repository';
@@ -142,6 +190,7 @@ export class KnowledgeBaseService {
       // isGlobal is true, and returning them would invite a UI that renders a document
       // available to everyone as if it were restricted to three organisations.
       tenantIds: entity.isGlobal ? [] : tenantIds,
+      ownerTenantId: entity.ownerTenantId ?? null,
       isArchived: entity.archivedAt != null,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -217,7 +266,10 @@ export class KnowledgeBaseService {
    * applied globally in main.ts, so a 40 MB upload would be rejected long before it reached a
    * controller. The browser PUTs straight to S3 and hands the resulting URL back on create.
    */
-  async createUploadUrl(dto: CreateKbUploadUrlDto) {
+  async createUploadUrl(
+    dto: CreateKbUploadUrlDto,
+    folder: string = KB_DOCUMENT_S3_PREFIX,
+  ) {
     const bucket = this.getBucket();
     if (!UPLOAD_CONTENT_TYPES[dto.contentType]) {
       throw new BadRequestException(
@@ -230,7 +282,7 @@ export class KnowledgeBaseService {
     const { presignedUrl, imageUrl } =
       await this.s3Service.getPresignedUrlForImageUpload(
         bucket,
-        KB_DOCUMENT_S3_PREFIX,
+        folder,
         dto.fileName,
         dto.fileSize,
         dto.contentType,
@@ -247,6 +299,14 @@ export class KnowledgeBaseService {
    * would hold the admin's request open and lose the upload on any transient failure.
    */
   async create(dto: CreateKbDocumentDto): Promise<KbDocumentResponseDto> {
+    if (KB_OWNED_CORPORA.has(dto.corpus)) {
+      // Owned documents go through createOwned, which is where the owner is checked and the
+      // file is tied to that owner's upload folder. Accepted here, a library document could
+      // be targeted at any set of organisations by hand — the leak that corpus must not have.
+      throw new BadRequestException(
+        "Ally library documents are added from the Ally Console — the platform library, or an organisation's own Ally settings.",
+      );
+    }
     const userId = this.currentUserId();
     this.validateSource(dto);
 
@@ -254,12 +314,38 @@ export class KnowledgeBaseService {
     const tenantIds = isGlobal ? [] : (dto.tenantIds ?? []);
     await this.assertTenantsExist(tenantIds);
 
+    return this.insertAndQueue(
+      userId,
+      dto,
+      { corpus: dto.corpus, characterTopics: dto.characterTopics ?? [] },
+      { isGlobal, tenantIds, ownerTenantId: null },
+    );
+  }
+
+  /**
+   * Write a document row and its organisations, then queue its ingest — the part every
+   * create path shares once its own checks have passed.
+   */
+  private async insertAndQueue(
+    userId: number,
+    dto: KbDocumentSource,
+    placement: {
+      corpus: KbCorpus;
+      characterTopics: NonNullable<CreateKbDocumentDto['characterTopics']>;
+    },
+    audience: {
+      isGlobal: boolean;
+      tenantIds: string[];
+      ownerTenantId: string | null;
+    },
+  ): Promise<KbDocumentResponseDto> {
+    const { isGlobal, tenantIds } = audience;
     const document = this.documentRepository.create({
       // Explicit, not left to the column default. The default exists for rows written before
       // this column did; a row written now must say which corpus it belongs to, or the day the
       // default changes every new document silently lands in the wrong one.
-      corpus: dto.corpus,
-      characterTopics: dto.characterTopics ?? [],
+      corpus: placement.corpus,
+      characterTopics: placement.characterTopics,
       title: dto.title.trim(),
       sourceType: dto.sourceType,
       sourceUrl: dto.sourceUrl ?? null,
@@ -270,6 +356,7 @@ export class KnowledgeBaseService {
       language: dto.language ?? null,
       tags: dto.tags ?? [],
       isGlobal,
+      ownerTenantId: audience.ownerTenantId,
       // Pasted text is stored up front so the row is self-sufficient; the extractor still runs over
       // it to derive sections, and every other source type fills this in during ingest.
       rawText:
@@ -326,7 +413,7 @@ export class KnowledgeBaseService {
     return this.toResponse(saved, tenantIds);
   }
 
-  private validateSource(dto: CreateKbDocumentDto): void {
+  private validateSource(dto: KbDocumentSource): void {
     switch (dto.sourceType) {
       case KbDocumentSourceType.PASTE:
         if (!dto.text?.trim()) {
@@ -411,6 +498,14 @@ export class KnowledgeBaseService {
     dto: UpdateKbDocumentAudienceDto,
   ): Promise<KbDocumentResponseDto> {
     const document = await this.findOrFail(id);
+    if (KB_OWNED_CORPORA.has(document.corpus)) {
+      // Retargeting an organisation's own protocol at a second organisation is exactly the
+      // leak an owned corpus must not have, and no screen would show it had happened.
+      throw new BadRequestException(
+        "This document's audience follows its owner: the platform's documents reach everyone, " +
+          "an organisation's own reach only that organisation. Remove it and add it again where it belongs.",
+      );
+    }
     const userId = this.currentUserId();
 
     const tenantIds = dto.isGlobal ? [] : (dto.tenantIds ?? []);
@@ -698,6 +793,16 @@ export class KnowledgeBaseService {
    * guesses.
    */
   async search(dto: KbSearchDto, context: RetrievalContext = {}) {
+    if (
+      KB_OWNED_CORPORA.has(dto.corpus) &&
+      context.consumer !== KbRetrievalConsumer.ADMIN_PREVIEW
+    ) {
+      // Here an omitted tenant means EVERY organisation. That is the admin preview's job,
+      // asked for by name; any other caller of an owned corpus must say who it asks for.
+      throw new Error(
+        `The ${dto.corpus} corpus is searched for a stated audience: use searchForAudience.`,
+      );
+    }
     const startedAt = Date.now();
     const { preferred, rest } = await this.documentRepository.retrievableIds({
       corpus: dto.corpus,
@@ -808,6 +913,255 @@ export class KnowledgeBaseService {
     );
 
     return { passages };
+  }
+
+  /**
+   * Retrieval FOR someone — the only path an owned corpus is searched by on a person's behalf
+   * (plans/ally-guide/plan.md §7.6, §7.14).
+   *
+   * The audience is a required argument, applied three times, each of which would hold alone:
+   *
+   * 1. Postgres resolves the documents this audience may read (`retrievableForAudience`), and
+   *    those ids are the query's `document_ids` — scope as the query itself, as everywhere in
+   *    this module. Another organisation's document is not in the set, so ally-ai is never
+   *    asked about it. An empty set asks ally-ai nothing.
+   * 2. ally-ai applies the same audience inside the vector search (`is_global OR tenant_ids
+   *    contains mine`; for `tenantId: null`, global only). Never `unrestricted`.
+   * 3. Every returned passage is checked against the set from step 1 and dropped if its
+   *    document is not in it — which can only happen if the index and Postgres disagree, so it
+   *    is logged as an error rather than silently tidied.
+   *
+   * One pass, no topic boost: the owned corpora carry no curator topics. Recorded in the
+   * retrieval log like every other search, with the query marked sensitive — a search made
+   * for a person is composed from what they said.
+   */
+  async searchForAudience(
+    request: {
+      corpus: KbCorpus;
+      query: string;
+      limit?: number;
+      minSimilarity?: number;
+    },
+    audience: KbAudience,
+    context: RetrievalContext & { consumer: KbRetrievalConsumer },
+  ): Promise<{ passages: KbAudiencePassage[] }> {
+    const startedAt = Date.now();
+    if (audience.tenantId !== null && !isUUID(audience.tenantId)) {
+      // Loud rather than downgraded to global-only: a malformed organisation id is a caller
+      // bug, and quietly hiding a learner's own protocols would look like a corpus gap.
+      throw new Error(
+        `searchForAudience needs an organisation id or null, got "${audience.tenantId}"`,
+      );
+    }
+
+    const allowed = await this.documentRepository.retrievableForAudience({
+      corpus: request.corpus,
+      tenantId: audience.tenantId,
+    });
+    const ids = [...allowed.keys()];
+    const limit = request.limit ?? 8;
+    const minSimilarity =
+      request.minSimilarity ?? KB_MIN_SIMILARITY_DEFAULT[request.corpus];
+    const fetchLimit = Math.min(limit * 3, 50);
+
+    const raw = ids.length
+      ? await this.searchDocuments(
+          request.corpus,
+          request.query,
+          ids,
+          fetchLimit,
+          minSimilarity,
+          { tenant_id: audience.tenantId, include_global: true },
+        )
+      : [];
+
+    const inAudience = raw.filter((p) => allowed.has(p.document_id));
+    if (inAudience.length < raw.length) {
+      this.logger.error(
+        `[KB_RETRIEVAL] corpus=${request.corpus} dropped ${raw.length - inAudience.length} ` +
+          `passage(s) whose document is outside the audience — the vector index and Postgres ` +
+          `disagree about who may read them; re-index those documents`,
+      );
+    }
+
+    const { kept, decisions } = shapeWithDecisions(inAudience, {
+      limit,
+      perDocumentLimit: KB_MAX_PASSAGES_PER_DOCUMENT,
+    });
+
+    this.logger.info(
+      `[KB_RETRIEVAL] corpus=${request.corpus} ` +
+        `audience=${audience.tenantId ? 'organisation' : 'global_only'} ` +
+        `docs=${ids.length} min_similarity=${minSimilarity} raw=${raw.length} ` +
+        `returned=${kept.length}/${limit}`,
+    );
+
+    await this.recordRetrieval(
+      {
+        corpus: request.corpus,
+        consumer: context.consumer,
+        query: request.query,
+        characterTopics: [],
+        tags: [],
+        minSimilarity,
+        requestedLimit: limit,
+        fetchLimit,
+        // Shaped like a topic-less `search()`: no preferred bucket, one pass over the rest,
+        // null when there was nothing to search — so the two read the same in the log.
+        preferredDocumentCount: 0,
+        restDocumentCount: ids.length,
+        firstPassHits: 0,
+        secondPassHits: ids.length ? inAudience.length : null,
+        returnedCount: kept.length,
+        latencyMs: Date.now() - startedAt,
+        sessionId: context.sessionId ?? null,
+        createdBy: context.userId ?? null,
+        querySensitive: true,
+      },
+      decisions.map((decision, index) => ({
+        chunkId: decision.passage.chunk_id,
+        documentId: decision.passage.document_id,
+        rank: index + 1,
+        similarity: decision.passage.similarity,
+        pass: KbRetrievalPass.REST,
+        outcome: decision.outcome,
+      })),
+    );
+
+    return {
+      passages: kept.map((passage) => ({
+        ...passage,
+        scope: allowed.get(passage.document_id)?.isGlobal
+          ? KbDocumentScope.GLOBAL
+          : KbDocumentScope.ORGANISATION,
+      })),
+    };
+  }
+
+  // ── Owned corpora: the platform's documents, or one organisation's own ───────
+
+  private assertOwnedCorpus(owner: KbOwner): void {
+    if (!KB_OWNED_CORPORA.has(owner.corpus)) {
+      throw new Error(
+        `${owner.corpus} is not a corpus whose documents have owners`,
+      );
+    }
+  }
+
+  /** Each owner uploads into its own folder, which is what ties a file to its owner. */
+  private ownedFolder(owner: KbOwner): string {
+    return `${KB_DOCUMENT_S3_PREFIX}/${owner.corpus}/${owner.tenantId ?? 'platform'}`;
+  }
+
+  /** Presigned upload into this owner's folder. */
+  async createOwnedUploadUrl(owner: KbOwner, dto: CreateKbUploadUrlDto) {
+    this.assertOwnedCorpus(owner);
+    return this.createUploadUrl(dto, this.ownedFolder(owner));
+  }
+
+  /**
+   * Add a document to an owned corpus. The audience follows the owner: the platform's is
+   * global, an organisation's reaches that organisation only.
+   *
+   * Two source rules the generic console does not have, because these callers include admins
+   * restricted to one organisation:
+   *  - a file must be one this API issued for THIS owner's folder. Ingest reads the object with
+   *    the backend's own S3 credentials, so an arbitrary fileUrl would let an organisation
+   *    ingest — and then retrieve — another's upload, or anything else in reach.
+   *  - organisation documents cannot be fetched from a URL: the fetch runs from our servers
+   *    and does not block internal addresses.
+   */
+  async createOwned(
+    owner: KbOwner,
+    dto: CreateKbOwnedDocumentDto,
+  ): Promise<KbDocumentResponseDto> {
+    this.assertOwnedCorpus(owner);
+    const userId = this.currentUserId();
+
+    if (owner.tenantId !== null) {
+      await this.assertTenantsExist([owner.tenantId]);
+      if (dto.sourceType === KbDocumentSourceType.URL) {
+        throw new BadRequestException(
+          'Organisation documents can be pasted, or uploaded as a PDF, Word or EPUB file. ' +
+            'To add a web page, save it as a PDF or paste its text.',
+        );
+      }
+    }
+    this.validateSource(dto);
+    if (
+      dto.sourceType !== KbDocumentSourceType.PASTE &&
+      dto.sourceType !== KbDocumentSourceType.URL
+    ) {
+      this.assertIssuedFileUrl(dto.fileUrl ?? '', this.ownedFolder(owner));
+    }
+
+    return this.insertAndQueue(
+      userId,
+      dto,
+      { corpus: owner.corpus, characterTopics: [] },
+      owner.tenantId === null
+        ? { isGlobal: true, tenantIds: [], ownerTenantId: null }
+        : {
+            isGlobal: false,
+            tenantIds: [owner.tenantId],
+            ownerTenantId: owner.tenantId,
+          },
+    );
+  }
+
+  private assertIssuedFileUrl(fileUrl: string, folder: string): void {
+    const parsed = this.s3Service.parseS3Url(fileUrl);
+    if (
+      !parsed ||
+      parsed.bucket !== this.getBucket() ||
+      !parsed.key.startsWith(`${folder}/`)
+    ) {
+      throw new BadRequestException(
+        'That file was not uploaded here. Upload it again from this page, then add it.',
+      );
+    }
+  }
+
+  /** One owner's documents. Removed (archived) documents are not listed. */
+  async listOwned(owner: KbOwner, dto: GetKbOwnedDocumentsQueryDto) {
+    this.assertOwnedCorpus(owner);
+    const { documents, count } = await this.documentRepository.list({
+      corpus: owner.corpus,
+      owner: { tenantId: owner.tenantId },
+      limit: dto.limit,
+      offset: dto.offset,
+      search: dto.search,
+      status: dto.status,
+      includeArchived: false,
+      sortBy: dto.sortBy,
+      sortDir: dto.sortDir,
+    });
+    const byDocument = await this.documentTenantRepository.tenantIdsByDocument(
+      documents.filter((d) => !d.isGlobal).map((d) => d.id),
+    );
+    return {
+      documents: documents.map((d) =>
+        this.toResponse(d, byDocument.get(d.id) ?? []),
+      ),
+      count,
+    };
+  }
+
+  /**
+   * Remove one of this owner's documents — an ARCHIVE, as everywhere in this module: it stops
+   * being retrievable at once, and its rows stay so citations already recorded still resolve.
+   * Another owner's document, or one in another corpus, is the same 404 as a missing id.
+   */
+  async archiveOwned(
+    owner: KbOwner,
+    id: string,
+  ): Promise<KbDocumentResponseDto> {
+    this.assertOwnedCorpus(owner);
+    const document = await this.documentRepository.findOwned(id, owner);
+    if (!document) {
+      throw new NotFoundException(`Document ${id} was not found`);
+    }
+    return this.archive(id);
   }
 
   /**

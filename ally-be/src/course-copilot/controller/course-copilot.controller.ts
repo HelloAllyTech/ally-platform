@@ -46,6 +46,7 @@ import { CourseCopilotBlueprintService } from '../service/course-copilot-bluepri
 import { CourseCopilotBuildService } from '../service/course-copilot-build.service';
 import { CourseCopilotCostService } from '../service/course-copilot-cost.service';
 import { CourseCopilotLandingPageService } from '../service/course-copilot-landing-page.service';
+import { CourseCopilotAllyNotesService } from '../service/course-copilot-ally-notes.service';
 import {
   COURSE_COPILOT_ANALYTICS_EVENTS,
   CourseCopilotAnalyticsService,
@@ -82,6 +83,7 @@ export class CourseCopilotController {
     private readonly redisService: RedisService,
     private readonly analytics: CourseCopilotAnalyticsService,
     private readonly landingPageService: CourseCopilotLandingPageService,
+    private readonly allyNotesService: CourseCopilotAllyNotesService,
   ) {}
 
   @Post('sessions')
@@ -261,6 +263,23 @@ export class CourseCopilotController {
   })
   draftLandingPage(@Param('trackId', ParseUUIDPipe) trackId: string) {
     return this.landingPageService.draft(trackId);
+  }
+
+  @Post('tracks/:trackId/ally-notes-draft')
+  @RequireFeatureToggle(FeatureToggleKey.COURSE_COPILOT, EDIT)
+  @ApiOperation({
+    summary:
+      "Draft a course's notes for the Ally guide and per-item tension, from the saved course (nothing is saved)",
+    description:
+      'Reads the saved outline — titles, types, default tension, short article and ' +
+      'roleplay excerpts, trigger warnings; never answer keys — and returns `{ draft: ' +
+      '{ notes, tension, draftedByCopilot } }`, `tension` holding only overrides of the ' +
+      'default. A draft that quotes a correct quiz answer is sent back once for repair. ' +
+      'The builder saves it through PUT v1/learn/admin/tracks/:id/guide-notes. 404 when ' +
+      'the course does not exist; 502 with a readable message when no usable draft comes back.',
+  })
+  draftAllyNotes(@Param('trackId', ParseUUIDPipe) trackId: string) {
+    return this.allyNotesService.draft(trackId);
   }
 
   @Post('sessions/:sessionId/messages/stream')

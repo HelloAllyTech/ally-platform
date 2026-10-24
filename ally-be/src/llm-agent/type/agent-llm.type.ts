@@ -14,20 +14,73 @@
 export type AgentContentBlock =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, any> }
-  | { type: 'tool_result'; tool_use_id: string; content: string };
+  | {
+      type: 'tool_result';
+      tool_use_id: string;
+      content: string;
+      /** The tool failed; the model sees the error instead of a result. */
+      is_error?: boolean;
+    }
+  /**
+   * The model's reasoning, as Anthropic returns it. Opaque to every caller:
+   * stored and replayed byte for byte, never edited, because the signature
+   * binds it to the model and to the exact conversation prefix that produced
+   * it (Claude 5.5 rejects a replayed block whose prefix changed). Adapters
+   * for other providers drop it.
+   */
+  | { type: 'thinking'; thinking: string; signature: string }
+  | { type: 'redacted_thinking'; data: string }
+  /**
+   * Anthropic's server-side tool traffic (the tool search that loads a
+   * deferred tool). Opaque: replayed byte for byte, never executed by the
+   * caller. Adapters for other providers drop it.
+   */
+  | { type: 'server_tool_use'; id: string; name: string; input: unknown }
+  | { type: 'tool_search_tool_result'; tool_use_id: string; content: unknown };
 
-export interface AgentMessage {
-  role: 'user' | 'assistant';
-  /** Plain prose, or a block list when the turn carries tool traffic. */
-  content: string | AgentContentBlock[];
-}
+export type AgentMessage =
+  | {
+      role: 'user' | 'assistant';
+      /** Plain prose, or a block list when the turn carries tool traffic. */
+      content: string | AgentContentBlock[];
+    }
+  | {
+      /**
+       * A mid-conversation operator instruction (a mode change, a turn's
+       * situation report). Appended rather than edited into the top-level
+       * system prompt, so the cached prefix and every earlier thinking block
+       * stay valid. Anthropic takes it natively; it must follow a user turn
+       * and be last or be followed by an assistant turn. Other adapters fold
+       * it into their own system channel or a labelled user note.
+       */
+      role: 'system';
+      content: string;
+    };
 
 export interface AgentToolDefinition {
   name: string;
   description: string;
   /** JSON Schema for the tool's arguments. */
   input_schema: Record<string, any>;
+  /**
+   * Have the provider guarantee arguments that match `input_schema` (which
+   * then needs `additionalProperties: false` on every object). Where forced
+   * `tool_choice` is rejected, this is what keeps the schema guarantee.
+   */
+  strict?: boolean;
+  /**
+   * Leave the definition out of the model's context until it searches for
+   * it. Anthropic only: a request with any deferred tool also carries the
+   * provider's tool-search tool, and the model loads a deferred tool by
+   * searching its name and description. Deferred definitions sit outside the
+   * cached prefix, so a long tool list stops costing input on every turn.
+   * Other adapters ignore it and send every tool.
+   */
+  deferLoading?: boolean;
 }
+
+/** How much the model thinks, where the provider exposes a dial for it. */
+export type AgentEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
  * Why the model stopped.
@@ -50,6 +103,17 @@ export type AgentStopReason =
   | 'tool_use'
   | 'max_tokens'
   | 'invalid_tool_call'
+  /**
+   * A safety classifier declined the request. Arrives as a normal response,
+   * so a caller that reads it as a finished turn shows an empty reply; check
+   * it before reading content. `stopDetails` says which category.
+   */
+  | 'refusal'
+  /**
+   * The server paused a long turn (e.g. tool search) and expects the caller
+   * to send the conversation back as is to continue it.
+   */
+  | 'pause_turn'
   | 'other';
 
 export interface AgentUsage {
@@ -72,6 +136,8 @@ export interface AgentTurnResult {
   content: AgentContentBlock[];
   stopReason: AgentStopReason;
   usage: AgentUsage;
+  /** Set with a `refusal` stop: the classifier category, when given. */
+  stopDetails?: { category: string | null; explanation: string | null };
 }
 
 /**
@@ -91,8 +157,12 @@ export interface AgentTurnResult {
  */
 export interface AgentSystemBlock {
   text: string;
-  /** Cache everything up to and including this block, where the provider can. */
-  cache?: boolean;
+  /**
+   * Cache everything up to and including this block, where the provider can.
+   * `true` is the provider default (5 minutes on Anthropic); '1h' keeps a
+   * prefix shared across many sessions warm between their turns.
+   */
+  cache?: boolean | '5m' | '1h';
 }
 
 export interface AgentStreamRequest {
@@ -135,6 +205,45 @@ export interface AgentStreamRequest {
    * takes a timeout at client construction, not per call, so it ignores this.
    */
   timeoutMs?: number;
+  /**
+   * Reasoning depth. Anthropic's `output_config.effort`; on models where
+   * thinking is always on (Claude Opus 5.5) this is the only latency and cost
+   * control. Ignored by providers without one.
+   */
+  effort?: AgentEffort;
+  /**
+   * Structured output: the reply's text is a JSON document matching this
+   * closed schema (`additionalProperties: false` throughout). Anthropic's
+   * `output_config.format`; unlike `jsonMode` the provider enforces the shape.
+   */
+  outputSchema?: Record<string, any>;
+  /**
+   * Stream tool arguments as they are generated instead of after the server
+   * validates them. The caller then owns validation. Off by default.
+   */
+  eagerToolInput?: boolean;
+  /**
+   * Called as soon as the model starts a tool call, before its arguments
+   * arrive — enough for a "looking that up…" caption. A callback rather than
+   * a stream event so existing consumers of the stream are unaffected.
+   */
+  onToolUseStart?: (call: { id: string; name: string }) => void;
+  /**
+   * Cache the conversation itself, up to its last block (Anthropic's
+   * top-level automatic `cache_control`), so a long append-only thread reads
+   * its history from cache each turn. Uses one of the four breakpoints the
+   * API allows, after any the system spans set.
+   */
+  cacheConversation?: boolean;
+  /** Abort the request mid-stream (a safety verdict, a learner barge-in). */
+  signal?: AbortSignal;
+  /**
+   * 'none' forbids tool calls on this pass while keeping `tools` in the
+   * request. A closing pass needs exactly that: removing the tools would
+   * change the request's prefix and invalidate earlier thinking blocks,
+   * while `tool_choice` is outside the prefix. Ignored in JSON mode.
+   */
+  toolChoice?: 'auto' | 'none';
 }
 
 /**

@@ -146,6 +146,21 @@ export const LLM_MODEL_REGISTRY: LlmModelInfo[] = [
     ANTHROPIC_RUNTIMES,
   ),
   entry('anthropic', 'claude-opus-4-7', 'Claude Opus 4.7', ANTHROPIC_RUNTIMES),
+  // The current generation (added for the Ally guide). None accepts a custom
+  // temperature — see modelSupportsTemperature.
+  entry('anthropic', 'claude-opus-5-5', 'Claude Opus 5.5', ANTHROPIC_RUNTIMES),
+  entry(
+    'anthropic',
+    'claude-sonnet-5-5',
+    'Claude Sonnet 5.5',
+    ANTHROPIC_RUNTIMES,
+  ),
+  entry(
+    'anthropic',
+    'claude-haiku-5-5',
+    'Claude Haiku 5.5',
+    ANTHROPIC_RUNTIMES,
+  ),
 ];
 
 /** Registry filtered to models a given runtime can run (all when omitted). */

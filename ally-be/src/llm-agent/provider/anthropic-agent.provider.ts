@@ -9,6 +9,7 @@ import {
   AgentStreamEvent,
   AgentStreamRequest,
   AgentSystemBlock,
+  AgentToolDefinition,
 } from '../type/agent-llm.type';
 import { systemBlocks } from '../util/agent-system.util';
 import { IAgentLlmProvider } from './agent-llm-provider.interface';
@@ -34,7 +35,51 @@ const STOP_REASONS: Record<string, AgentStopReason> = {
   tool_use: 'tool_use',
   max_tokens: 'max_tokens',
   stop_sequence: 'end_turn',
+  refusal: 'refusal',
+  pause_turn: 'pause_turn',
 };
+
+/** `cache: true` is the API default TTL; a string names one explicitly. */
+const cacheControl = (cache: AgentSystemBlock['cache']) =>
+  cache
+    ? {
+        cache_control: {
+          type: 'ephemeral' as const,
+          ...(typeof cache === 'string' ? { ttl: cache } : {}),
+        },
+      }
+    : {};
+
+/**
+ * The provider's server-side tool search (BM25 over names and descriptions).
+ * Added to any request that defers a tool: without it a deferred tool could
+ * never be loaded. Natural-language queries suit tool descriptions written
+ * as sentences better than the regex variant does.
+ */
+export const TOOL_SEARCH_TOOL = {
+  type: 'tool_search_tool_bm25_20251119',
+  name: 'tool_search_tool_bm25',
+} as const;
+
+/**
+ * The neutral tool list in Anthropic's shape: `deferLoading` becomes
+ * `defer_loading`, and the search tool is appended when anything is
+ * deferred. At least one tool always stays loaded — the API rejects a list
+ * where every tool is deferred — so an all-deferred list is sent undeferred.
+ */
+export function anthropicTools(
+  tools: AgentToolDefinition[],
+  eagerToolInput?: boolean,
+): any[] {
+  const anyLoaded = tools.some((tool) => !tool.deferLoading);
+  const deferring = anyLoaded && tools.some((tool) => tool.deferLoading);
+  const mapped = tools.map(({ deferLoading, ...tool }) => ({
+    ...tool,
+    ...(eagerToolInput ? { eager_input_streaming: true } : {}),
+    ...(deferring && deferLoading ? { defer_loading: true } : {}),
+  }));
+  return deferring ? [...mapped, { ...TOOL_SEARCH_TOOL }] : mapped;
+}
 
 /**
  * Anthropic adapter — the identity mapping, since the neutral block vocabulary
@@ -77,12 +122,33 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         ].map((block: AgentSystemBlock) => ({
           type: 'text' as const,
           text: block.text,
-          ...(block.cache
-            ? { cache_control: { type: 'ephemeral' as const } }
-            : {}),
+          ...cacheControl(block.cache),
         })),
+        // Identity: the neutral vocabulary is Anthropic's, including thinking
+        // blocks (replayed verbatim) and mid-conversation `system` messages,
+        // which the SDK's MessageParam does not type yet.
         messages: request.messages as any,
-        ...(request.tools?.length ? { tools: request.tools as any } : {}),
+        ...(request.tools?.length && request.toolChoice && !jsonTool
+          ? { tool_choice: { type: request.toolChoice } }
+          : {}),
+        ...(request.tools?.length
+          ? { tools: anthropicTools(request.tools, request.eagerToolInput) }
+          : {}),
+        ...(request.effort || request.outputSchema
+          ? {
+              output_config: {
+                ...(request.effort ? { effort: request.effort } : {}),
+                ...(request.outputSchema
+                  ? {
+                      format: {
+                        type: 'json_schema' as const,
+                        schema: request.outputSchema,
+                      },
+                    }
+                  : {}),
+              },
+            }
+          : {}),
         // The object comes back as the input of a single tool. Prefilling the
         // assistant turn with `{` — what the autofill path used to do — is a
         // 400 on the 4.6+ family. Structured outputs (`output_config.format`)
@@ -118,9 +184,19 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         modelSupportsTemperature(request.model)
           ? { temperature: request.temperature }
           : {}),
-      },
-      ...(request.timeoutMs !== undefined
-        ? [{ timeout: request.timeoutMs }]
+        ...(request.cacheConversation
+          ? { cache_control: { type: 'ephemeral' as const } }
+          : {}),
+      } as any,
+      ...(request.timeoutMs !== undefined || request.signal
+        ? [
+            {
+              ...(request.timeoutMs !== undefined
+                ? { timeout: request.timeoutMs }
+                : {}),
+              ...(request.signal ? { signal: request.signal } : {}),
+            },
+          ]
         : []),
     );
 
@@ -131,6 +207,15 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         event.delta.text
       ) {
         yield { type: 'text_delta', text: event.delta.text };
+      } else if (
+        event?.type === 'content_block_start' &&
+        event?.content_block?.type === 'tool_use' &&
+        request.onToolUseStart
+      ) {
+        request.onToolUseStart({
+          id: event.content_block.id,
+          name: event.content_block.name,
+        });
       }
     }
 
@@ -147,6 +232,14 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         // a provider-shaped branch to unwrap it.
         content: request.jsonMode ? jsonBlocksAsText(content) : content,
         stopReason: STOP_REASONS[finalMessage?.stop_reason] ?? 'other',
+        ...(finalMessage?.stop_reason === 'refusal'
+          ? {
+              stopDetails: {
+                category: finalMessage?.stop_details?.category ?? null,
+                explanation: finalMessage?.stop_details?.explanation ?? null,
+              },
+            }
+          : {}),
         usage: {
           inputTokens: usage?.input_tokens ?? 0,
           outputTokens: usage?.output_tokens ?? 0,

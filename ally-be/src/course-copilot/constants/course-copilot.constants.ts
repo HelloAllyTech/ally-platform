@@ -136,6 +136,7 @@ export const COURSE_COPILOT_PROMPTS = {
   ROLEPLAY_BRIEF: 'course_copilot_roleplay_brief',
   IMAGE_PROMPT: 'course_copilot_image_prompt',
   LANDING_PAGE_WRITER: 'course_copilot_landing_page_writer',
+  ALLY_NOTES_WRITER: 'course_copilot_ally_notes_writer',
 } as const;
 
 /** AI-task-registry row ids, one per call site. */
@@ -153,6 +154,7 @@ export const COURSE_COPILOT_AI_TASKS = {
   IMAGE_PROMPT: 'course-copilot-image-prompt',
   IMAGE: 'course-copilot-image',
   LANDING_PAGE: 'course-copilot-landing-page',
+  ALLY_NOTES: 'course-copilot-ally-notes',
 } as const;
 
 /** Category every generated roleplay carries, so the library can filter them. */

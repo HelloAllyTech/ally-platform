@@ -23,7 +23,110 @@ import { OpenAITranslationsService } from 'src/common/service/openai-translation
 import { SharedLanguageService } from 'src/language/service/shared-language.service';
 import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
 
+import { missingBadgeTranslationLanguages } from '../badge.service';
+
 jest.mock('src/common/execution/execution-manager');
+
+describe('missingBadgeTranslationLanguages', () => {
+  it('THE BUG: should identify a language as missing if the name is translated but the description is not', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      hi: {
+        name: 'Insignia de prueba',
+        description: 'Test Description', // Name translated, description is not
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should identify a language as missing if the name is not translated but the description is', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      hi: {
+        name: 'Test Badge',
+        description: 'Descripción de prueba',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should identify a language as missing if both name and description are not translated', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      hi: {
+        name: 'Test Badge',
+        description: 'Test Description',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should not identify a language as missing if both name and description are translated', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      hi: {
+        name: 'Insignia de prueba',
+        description: 'Descripción de prueba',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).not.toContain(
+      'hi',
+    );
+  });
+
+  it('should identify a language as missing if there is no entry', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      mr: {
+        name: 'Badge de test',
+        description: 'Description de test',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should identify a language as missing if the entry has no name', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      hi: {
+        description: 'Descripción de prueba',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should identify a language as missing if the badge has a description but the entry does not', () => {
+    const badge = { name: 'Test Badge', description: 'Test Description' };
+    const existing = {
+      hi: {
+        name: 'Insignia de prueba',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should handle badges with no description', () => {
+    const badge = { name: 'Test Badge', description: null };
+    const existing = {
+      hi: {
+        name: 'Test Badge',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).toContain('hi');
+  });
+
+  it('should not identify a language as missing for a badge with no description when name is translated', () => {
+    const badge = { name: 'Test Badge', description: null };
+    const existing = {
+      hi: {
+        name: 'Insignia de prueba',
+      },
+    };
+    expect(missingBadgeTranslationLanguages(badge, existing)).not.toContain(
+      'hi',
+    );
+  });
+});
 
 describe('BadgeService', () => {
   let service: BadgeService;

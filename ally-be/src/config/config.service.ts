@@ -260,6 +260,28 @@ export class AppConfigService {
     return this.nodeEnv === 'local';
   }
 
+  /**
+   * Local/development only: run every Ally guide role on one stand-in model
+   * ("provider:model", e.g. "openai:gpt-5-mini") instead of the release's
+   * routing — for exercising the guide end to end where the release's
+   * provider is unavailable. Ignored in any other environment, so a stray
+   * variable can never change what a production learner talks to.
+   */
+  get allyGuideModelOverride(): { provider: string; model: string } | null {
+    if (!this.isLocal && !this.isDevelopment) return null;
+    const raw = this.configService.get<string>('ALLY_GUIDE_MODEL_OVERRIDE');
+    const match = /^\s*([a-z]+)\s*:\s*(\S+)\s*$/i.exec(raw ?? '');
+    return match ? { provider: match[1].toLowerCase(), model: match[2] } : null;
+  }
+
+  /** Where Ally's alerts are posted (a Slack incoming webhook), or null. */
+  get allyGuideAlertWebhookUrl(): string | null {
+    return (
+      this.configService.get<string>('ALLY_GUIDE_ALERT_WEBHOOK_URL')?.trim() ||
+      null
+    );
+  }
+
   get database() {
     const config = {
       host: this.configService.get<string>('DB_HOST'),
@@ -547,6 +569,10 @@ export class AppConfigService {
         'LEARN_MEDIA_PUBLIC_S3_BUCKET',
       ),
       assetsBucket: this.configService.get<string>('ASSETS_S3_BUCKET'),
+      // Private bucket for agent turn-trace payloads (rendered prompts, tool
+      // I/O). Unset → the trace service falls back to the private audio
+      // bucket; never a public one.
+      agentTraceBucket: this.configService.get<string>('AGENT_TRACE_S3_BUCKET'),
     };
   }
 
@@ -611,6 +637,12 @@ export class AppConfigService {
       simulatedUserAgentName: this.configService.get<string>(
         'SIMULATED_USER_AGENT_NAME',
         'SimulatedUser',
+      ),
+      // The Ally guide's voice worker: its own deployment and capacity, never
+      // the roleplay agent's (plans/ally-guide/plan.md §7.9).
+      guideAgentName: this.configService.get<string>(
+        'LIVEKIT_GUIDE_AGENT_NAME',
+        `${agentName}Guide`,
       ),
     };
   }

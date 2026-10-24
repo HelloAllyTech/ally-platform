@@ -1,3 +1,4 @@
+import { TrackEntrySource } from 'src/guide/enum/guide.enum';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { CohortContentType } from 'src/cohort/constants/cohort.constants';
 import {
@@ -68,6 +69,15 @@ import {
   TRACK_TRIGGER_WARNINGS_BY_SECTION_SQL,
   TrackSectionTriggerWarningRow,
 } from '../constants/track-landing-page.constant';
+
+/** Lenient: an entry source this build doesn't know reads as in-app. */
+const ENTRY_SOURCES: ReadonlySet<string> = new Set(
+  Object.values(TrackEntrySource),
+);
+export const entrySourceOf = (value?: string | null): TrackEntrySource =>
+  value && ENTRY_SOURCES.has(value)
+    ? (value as TrackEntrySource)
+    : TrackEntrySource.IN_APP;
 
 @Injectable()
 export class TrackEnrollmentService {
@@ -501,7 +511,16 @@ export class TrackEnrollmentService {
   }
 
   /** Idempotent enrollment: creates the enrollment + ALL progress rows. */
-  async enroll(trackId: string, appLanguageCode?: string) {
+  /**
+   * `entrySource` records how the learner arrived (plan §8.1), for comparing
+   * the guided experience against classic: `guided` from Ally, `public_link`
+   * from a shared course link, otherwise `in_app`. It never affects access.
+   */
+  async enroll(
+    trackId: string,
+    appLanguageCode?: string,
+    entrySource?: string | null,
+  ) {
     const userId = this.requireUserId();
     const tenantId = ExecutionManager.getTenantId();
 
@@ -542,6 +561,7 @@ export class TrackEnrollmentService {
         trackId,
         userId,
         tenantId,
+        entrySource: entrySourceOf(entrySource),
         languageCode: initialLanguage,
         startedAt: new Date(),
         lastActivityAt: new Date(),

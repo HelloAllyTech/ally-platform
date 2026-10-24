@@ -11,7 +11,8 @@ import {
   TrackOverview,
   TrackPlayer,
   TrackProgress,
-  CourseLanding,
+  CourseLandingSwitch,
+  GuidedCourseGate,
   SuspendedUser,
   ImpersonateHandler,
   Terms,
@@ -77,7 +78,11 @@ const RouteLayout = () => {
           <Route path={ROUTES.TRACK_ITEM} element={<TrackPlayer />} />
           <Route path={ROUTES.TRACK_PROGRESS} element={<TrackProgress />} />
           {/* A course's public share link — outline for anyone, login on Start */}
-          <Route path={ROUTES.COURSE_LANDING} element={<CourseLanding />} />
+          {/* A guided course opens as Ally's journey; `?view=classic` keeps the landing. */}
+          <Route path={ROUTES.COURSE_LANDING} element={<CourseLandingSwitch />} />
+          {/* Ally's guided journey (dark launch): opens only when the guide is on
+              for the course, otherwise the classic course */}
+          <Route path={ROUTES.JOURNEY} element={<GuidedCourseGate />} />
         </Route>
 
         {/* Private Routes */}

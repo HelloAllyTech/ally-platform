@@ -941,6 +941,18 @@ export function missingBadgeTranslationLanguages(
     const entry = existing[code];
     if (!entry?.name) return true;
     if (badge.description && !entry.description) return true;
-    return entry.name.trim() === badge.name.trim();
+
+    if (entry.name.trim() === badge.name.trim()) {
+      return true;
+    }
+
+    if (
+      badge.description &&
+      entry.description?.trim() === badge.description.trim()
+    ) {
+      return true;
+    }
+
+    return false;
   });
 }

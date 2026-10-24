@@ -1870,5 +1870,95 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Ally guide voice worker (app/guide_worker.py) ----
+    # A separate deployment from the roleplay agent: speech in and speech out
+    # only, every reply comes from ally-be. See docs/guide-voice-worker.md.
+    LIVEKIT_GUIDE_AGENT_NAME: Optional[str] = Field(
+        default=None,
+        description=(
+            "LiveKit agent name the guide voice worker registers under. Must "
+            "match ally-be's LIVEKIT_GUIDE_AGENT_NAME; both default to "
+            "`${AGENT_NAME}Guide`."
+        ),
+    )
+    GUIDE_STT_CONFIG: Optional[str] = Field(
+        default=None,
+        description=(
+            "JSON object: base language code (en, hi, ...) or 'default' -> "
+            'STT config ({"provider": ..., "config": {...}}). Unset languages '
+            "use DEFAULT_STT_CONFIG."
+        ),
+    )
+    GUIDE_TTS_CONFIG: Optional[str] = Field(
+        default=None,
+        description=(
+            "JSON object: base language code or 'default' -> Ally's TTS config "
+            '({"provider": ..., "config": {...}}, the shape scenario voices '
+            "use). Unset languages get the Google Chirp 3 HD speaker named by "
+            "GUIDE_TTS_GOOGLE_VOICE."
+        ),
+    )
+    GUIDE_TTS_GOOGLE_VOICE: str = Field(
+        default="Kore",
+        description=(
+            "Chirp 3 HD speaker for Ally's default voice, as "
+            "`<lang>-IN-Chirp3-HD-<speaker>`. A fixed speaker, so Ally keeps "
+            "one voice across replies (Gemini-TTS redraws it per request)."
+        ),
+    )
+    GUIDE_VAD_ENDPOINTING_DELAY: float = Field(
+        default=1.2,
+        description=(
+            "Silence (s) before a turn ends in languages without semantic turn "
+            "detection (anything but en and hi), and whenever the EOU model is "
+            "unavailable. Longer than TURN_MIN_ENDPOINTING_DELAY so a pause "
+            "mid-thought is not taken as the end of the turn."
+        ),
+    )
+    GUIDE_CRISIS_SENTENCE_PAUSE_S: float = Field(
+        default=0.6,
+        description="Silence between sentences of the fixed crisis message.",
+    )
+    GUIDE_CRISIS_SPEAKING_RATE: float = Field(
+        default=0.85,
+        description=(
+            "Speaking rate for the fixed crisis message, on voices that expose "
+            "one (Google). Others are paced by the sentence pauses alone."
+        ),
+    )
+    GUIDE_SLOW_TURN_LINE_AFTER_S: float = Field(
+        default=8.0,
+        description=(
+            "Seconds without a word from ally-be before Ally says it is taking "
+            "a moment (plan §5.12, 'slow turn'). 0 disables."
+        ),
+    )
+    GUIDE_TURN_BUSY_RETRIES: int = Field(
+        default=2,
+        description=(
+            "Retries (fresh clientTurnId) when ally-be answers turn_in_progress "
+            "— usually the turn the learner just spoke over still unwinding."
+        ),
+    )
+    GUIDE_TURN_BUSY_RETRY_DELAY_S: float = Field(default=0.4)
+    GUIDE_TURN_READ_TIMEOUT_S: float = Field(
+        default=60.0,
+        description=(
+            "Read timeout on the voice turn stream; ally-be's own hard turn "
+            "timeout is 45s."
+        ),
+    )
+    GUIDE_PARTICIPANT_JOIN_TIMEOUT_S: float = Field(
+        default=60.0,
+        description="Leave the room if the learner has not joined by then.",
+    )
+    GUIDE_ECS_METRICS_SERVICE: str = Field(
+        default="ally-prd-svc-learn-guide",
+        description=(
+            "CloudWatch `Service` dimension for the guide worker's active "
+            "sessions, so they never count toward the roleplay fleet's scaling."
+        ),
+    )
+
 
 settings = Settings()

@@ -98,7 +98,12 @@ export const CourseLanding: FC = () => {
         }
         setPhase("starting");
         if (!access.enrolled) {
-          await enrollTrack({ trackId, languageCode: i18n.language }).unwrap();
+          // Arrived through the shared course link: the baseline's public-link cohort.
+          await enrollTrack({
+            trackId,
+            languageCode: i18n.language,
+            entrySource: "public_link",
+          }).unwrap();
         }
         const next = await getNextItem({ trackId }).unwrap();
         navigate(

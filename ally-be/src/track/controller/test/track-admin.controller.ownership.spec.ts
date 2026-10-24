@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { TrackGuideNotesService } from '../../service/track-guide-notes.service';
 import { TrackAdminController } from '../track-admin.controller';
 
 /**
@@ -13,6 +14,7 @@ describe('TrackAdminController — course ownership for restricted admins', () =
   let trackTranslationService: Record<string, jest.Mock>;
   let controller: TrackAdminController;
   let trackMediaService: { deleteMedia: jest.Mock };
+  let trackRepository: { update: jest.Mock };
 
   beforeEach(() => {
     trackService = {
@@ -41,6 +43,7 @@ describe('TrackAdminController — course ownership for restricted admins', () =
       unpublish: jest.fn(),
     };
     trackMediaService = { deleteMedia: jest.fn() };
+    trackRepository = { update: jest.fn() };
     controller = new TrackAdminController(
       trackService as any,
       {} as any,
@@ -49,6 +52,11 @@ describe('TrackAdminController — course ownership for restricted admins', () =
       {} as any,
       {} as any,
       {} as any,
+      new TrackGuideNotesService(
+        trackService as any,
+        trackRepository as any,
+        {} as any,
+      ),
     );
   });
 
@@ -91,6 +99,10 @@ describe('TrackAdminController — course ownership for restricted admins', () =
     ],
     ['deleteTrack', () => controller.deleteTrack(TRACK_ID)],
     ['duplicateTrack', () => controller.duplicateTrack(TRACK_ID)],
+    [
+      'saveGuideNotes',
+      () => controller.saveGuideNotes(TRACK_ID, { notes: 'Go gently.' }),
+    ],
   ];
 
   it.each(editingRoutes)(
@@ -104,6 +116,7 @@ describe('TrackAdminController — course ownership for restricted admins', () =
         trackService.upsertStructure,
         trackService.deleteTrack,
         trackService.duplicateTrack,
+        trackRepository.update,
       ]) {
         expect(mock).not.toHaveBeenCalled();
       }

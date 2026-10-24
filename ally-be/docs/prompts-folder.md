@@ -162,7 +162,7 @@ One agent prompt and eleven one-shot specialist prompts, all under the "Course C
   written here, because the tools enforce them.
 - The specialists (`blueprint_planner`, `article_writer`, `quiz_writer`, `journal_writer`,
   `annotation_writer`, `course_meta`, `course_reviewer`, `image_prompt`, `roleplay_brief`,
-  `history_summary`, `landing_page_writer`) are templates with `{{variables}}` rendered by `renderTemplate`, called in
+  `history_summary`, `landing_page_writer`, `ally_notes_writer`) are templates with `{{variables}}` rendered by `renderTemplate`, called in
   JSON mode. Unlike the agent prompt they **throw** when the row is missing — a course built
   from a fallback prompt would be quietly worse rather than visibly broken.
 - `landing_page_writer` is the one specialist that runs outside a session: the builder's Landing
@@ -174,6 +174,10 @@ One agent prompt and eleven one-shot specialist prompts, all under the "Course C
   person and an extraordinary moment; exactly three replies, each labelled for the learner's move
   and never scoring the client's outcome; teasers that never reveal a roleplay's hidden events or
   a quiz answer) are the product's design rules, so change them deliberately.
+- `ally_notes_writer` also runs outside a session (`POST /v1/course-copilot/tracks/:trackId/ally-notes-draft`):
+  it drafts the course's notes for the Ally guide and per-item tension overrides from the saved
+  outline. It is never shown an answer key, and its draft is checked against the course's correct
+  answers in code (one repair pass) — the same check that blocks saving notes that leak one.
 - Like `character_interview/`, each specialist's output shape is **also validated in code**
   (`src/course-copilot/service/specialists/*` normalise ids and shapes, then run the track
   validator). The same rule applies: the live text is in the Skills Store and changes on its own

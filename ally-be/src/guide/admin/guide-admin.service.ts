@@ -1,0 +1,579 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
+import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release.service';
+import { GuideCrisisResponse } from '../entity/guide-crisis-response.entity';
+import { GuideMessage } from '../entity/guide-message.entity';
+import {
+  GuideOrgProfile,
+  GuideOrgProfileValue,
+  GuideSupportLine,
+} from '../entity/guide-org-profile.entity';
+import { GuideCrisisScope, GuideMessageRole } from '../enum/guide.enum';
+import { ALLY_GUIDE_AGENT_KEY } from '../release/guide-release.bundle';
+import { CRISIS_SIGNAL_KIND } from '../safety/guide-crisis.service';
+import { reviewableText } from '../safety/redaction';
+
+/** Guide languages a support line or crisis copy may be written for. */
+export const GUIDE_LANGUAGES = ['en', 'hi', 'mr', 'ta', 'kn'] as const;
+
+const num = (value: unknown): number =>
+  value === null || value === undefined ? 0 : Number(value);
+
+/**
+ * The Ally Console's read models and the organisation layer's editors
+ * (plans/ally-guide/plan.md §10.5): live health, the conversation list, the
+ * redacted transcript, the org's Ally profile and the fixed crisis copy.
+ * Health numbers are platform aggregates; nothing here names a learner.
+ */
+@Injectable()
+export class GuideAdminService {
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly releases: AgentReleaseService,
+    @InjectRepository(GuideMessage)
+    private readonly messages: Repository<GuideMessage>,
+    @InjectRepository(GuideOrgProfile)
+    private readonly orgProfiles: Repository<GuideOrgProfile>,
+    @InjectRepository(GuideCrisisResponse)
+    private readonly crisisResponses: Repository<GuideCrisisResponse>,
+  ) {}
+
+  /** Overview tab: the last `days` days of turns, safety and cost. */
+  async overview(days: number) {
+    const window = Math.min(90, Math.max(1, Math.floor(days)));
+    const [turns, byChannel, traces, crises, ga] = await Promise.all([
+      this.dataSource.query(
+        `SELECT count(*) AS total,
+                count(*) FILTER (WHERE "status" = 'completed') AS completed,
+                count(*) FILTER (WHERE "status" = 'failed') AS failed,
+                count(*) FILTER (WHERE "status" = 'interrupted') AS interrupted,
+                count(DISTINCT "threadId") AS threads,
+                COALESCE(sum("costUsd"), 0) AS cost
+           FROM "agent_turns"
+          WHERE "agentKey" = $1 AND "createdAt" >= now() - ($2::int * interval '1 day')`,
+        [ALLY_GUIDE_AGENT_KEY, window],
+      ),
+      this.dataSource.query(
+        `SELECT "channel",
+                count(*) AS turns,
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY "ttftMs") AS p50,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY "ttftMs") AS p95
+           FROM "agent_turns"
+          WHERE "agentKey" = $1 AND "ttftMs" IS NOT NULL
+            AND "createdAt" >= now() - ($2::int * interval '1 day')
+          GROUP BY "channel"`,
+        [ALLY_GUIDE_AGENT_KEY, window],
+      ),
+      this.dataSource.query(
+        `SELECT count(*) FILTER (WHERE "summary"->>'replyKind' = 'refusal') AS refusals,
+                count(*) FILTER (WHERE "summary"->>'replyKind' = 'crisis') AS "crisisReplies",
+                count(*) FILTER (WHERE "summary"->>'modeAfter' = 'CARE'
+                                   AND COALESCE("summary"->>'modeBefore', '') <> 'CARE') AS "careEntries",
+                count(*) FILTER (WHERE ("summary"->>'restarted')::boolean) AS restarts,
+                COALESCE(sum(("summary"->'usage'->>'input')::bigint), 0) AS input,
+                COALESCE(sum(("summary"->'usage'->>'cacheRead')::bigint), 0) AS "cacheRead",
+                COALESCE(sum(("summary"->'usage'->>'output')::bigint), 0) AS output
+           FROM "agent_turn_traces"
+          WHERE "agentKey" = $1 AND "createdAt" >= now() - ($2::int * interval '1 day')`,
+        [ALLY_GUIDE_AGENT_KEY, window],
+      ),
+      this.dataSource.query(
+        `SELECT count(*) AS crises FROM "guide_signals"
+          WHERE "kind" = $1 AND "occurredAt" >= now() - ($2::int * interval '1 day')`,
+        [CRISIS_SIGNAL_KIND, window],
+      ),
+      this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
+    ]);
+    const canary = await this.releases.getCanary(ALLY_GUIDE_AGENT_KEY);
+    const t = turns[0] ?? {};
+    const tr = traces[0] ?? {};
+    const input = num(tr.input);
+    const cacheRead = num(tr.cacheRead);
+    const total = num(t.total);
+    return {
+      days: window,
+      turns: {
+        total,
+        completed: num(t.completed),
+        failed: num(t.failed),
+        interrupted: num(t.interrupted),
+        successRate: total ? num(t.completed) / total : null,
+      },
+      threads: num(t.threads),
+      timeToFirstTokenMs: byChannel.map((row: any) => ({
+        channel: row.channel,
+        turns: num(row.turns),
+        p50: row.p50 === null ? null : Math.round(Number(row.p50)),
+        p95: row.p95 === null ? null : Math.round(Number(row.p95)),
+      })),
+      safety: {
+        crises: num(crises[0]?.crises),
+        crisisReplies: num(tr.crisisReplies),
+        careEntries: num(tr.careEntries),
+        refusals: num(tr.refusals),
+        restarts: num(tr.restarts),
+      },
+      cache: {
+        readTokens: cacheRead,
+        uncachedInputTokens: input,
+        ratio: input + cacheRead ? cacheRead / (input + cacheRead) : null,
+      },
+      cost: {
+        totalUsd: Number(num(t.cost).toFixed(4)),
+        perThreadUsd: num(t.threads)
+          ? Number((num(t.cost) / num(t.threads)).toFixed(4))
+          : null,
+      },
+      release: ga
+        ? { id: ga.id, version: ga.version, promotedAt: ga.promotedAt }
+        : null,
+      canary: canary
+        ? {
+            id: canary.id,
+            version: canary.version,
+            percent: canary.rolloutPercent ?? null,
+          }
+        : null,
+      arms: await this.arms(window, canary?.id ?? null),
+    };
+  }
+
+  /**
+   * GA against canary over the window (plan §7.4, §4.13): what a person
+   * needs to promote or stop a canary by hand in M2 — volume, failures,
+   * time to first token, cost per thread, safety and thumbs. Only turns of
+   * the canary in flight count as canary; earlier canaries are history.
+   */
+  /** The same per-arm read, for the learning loop's guard (src/guide-learning). */
+  armMetrics(windowDays: number, canaryId: string | null) {
+    return this.arms(windowDays, canaryId);
+  }
+
+  private async arms(window: number, canaryId: string | null) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT CASE WHEN t."arm" = 'canary' AND t."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",
+              count(*) AS turns,
+              count(DISTINCT t."threadId") AS threads,
+              count(*) FILTER (WHERE t."status" = 'failed') AS failed,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY t."ttftMs") AS "ttftP50",
+              COALESCE(sum(t."costUsd"), 0) AS cost,
+              count(*) FILTER (WHERE tr."summary"->>'replyKind' = 'crisis') AS "crisisReplies",
+              count(*) FILTER (WHERE tr."summary"->>'modeAfter' = 'CARE'
+                                 AND COALESCE(tr."summary"->>'modeBefore', '') <> 'CARE') AS "careEntries",
+              count(*) FILTER (WHERE tr."summary"->>'replyKind' = 'refusal') AS refusals
+         FROM "agent_turns" t
+         LEFT JOIN "agent_turn_traces" tr ON tr."turnId" = t."id"
+        WHERE t."agentKey" = $1 AND t."createdAt" >= now() - ($2::int * interval '1 day')
+          AND t."releaseId" IS NOT NULL
+        GROUP BY 1`,
+      [ALLY_GUIDE_AGENT_KEY, window, canaryId],
+    );
+    const thumbs: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT CASE WHEN t."arm" = 'canary' AND t."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",
+              count(*) FILTER (WHERE f."rating" > 0) AS up,
+              count(*) FILTER (WHERE f."rating" < 0) AS down
+         FROM "guide_turn_feedback" f
+         JOIN "guide_messages" m ON m."id" = f."messageId"
+         JOIN "agent_turns" t ON t."id" = m."turnId"
+        WHERE t."agentKey" = $1 AND f."createdAt" >= now() - ($2::int * interval '1 day')
+        GROUP BY 1`,
+      [ALLY_GUIDE_AGENT_KEY, window, canaryId],
+    );
+    // Learning, beside engagement (plan §4.13): a change that lifts use
+    // while learning falls is reverted. Read for the learners whose thread
+    // is in each arm, on that thread's course, within the window.
+    const learning: Array<Record<string, any>> = await this.dataSource.query(
+      `WITH arms AS (
+         SELECT CASE WHEN th."arm" = 'canary' AND th."releaseId" = $3 THEN 'canary' ELSE 'ga' END AS "arm",
+                th."userId", th."trackId"
+           FROM "guide_threads" th
+          WHERE th."userId" IS NOT NULL AND th."status" = 'active' AND th."releaseId" IS NOT NULL)
+       SELECT arms."arm",
+              count(a."id") FILTER (WHERE a."attemptNumber" = 1 AND a."status" <> 'PENDING_GRADING') AS "quizFirstAttempts",
+              avg((a."passed" IS TRUE)::int) FILTER (WHERE a."attemptNumber" = 1 AND a."status" <> 'PENDING_GRADING') AS "quizPassRate",
+              (SELECT count(*) FROM "track_item_progress" tip2
+                 JOIN "track_enrollments" te2 ON te2."id" = tip2."trackEnrollmentId"
+                 JOIN arms a2 ON a2."userId" = te2."userId" AND a2."trackId" = te2."trackId"
+                WHERE a2."arm" = arms."arm" AND tip2."status" = 'COMPLETED'
+                  AND tip2."completedAt" >= now() - ($2::int * interval '1 day')) AS "itemsCompleted"
+         FROM arms
+         LEFT JOIN "track_enrollments" te ON te."userId" = arms."userId" AND te."trackId" = arms."trackId"
+         LEFT JOIN "track_item_progress" tip ON tip."trackEnrollmentId" = te."id"
+         LEFT JOIN "track_quiz_attempts" a ON a."trackItemProgressId" = tip."id"
+               AND a."createdAt" >= now() - ($2::int * interval '1 day')
+        WHERE $1::text IS NOT NULL
+        GROUP BY arms."arm"`,
+      [ALLY_GUIDE_AGENT_KEY, window, canaryId],
+    );
+    const learningBy = new Map(learning.map((row) => [row.arm, row] as const));
+    const thumbsBy = new Map(thumbs.map((row) => [row.arm, row] as const));
+    return rows
+      .map((row) => {
+        const turns = num(row.turns);
+        const threads = num(row.threads);
+        const f = thumbsBy.get(row.arm);
+        const up = num(f?.up);
+        const down = num(f?.down);
+        return {
+          arm: row.arm as 'ga' | 'canary',
+          turns,
+          threads,
+          failureRate: turns ? num(row.failed) / turns : null,
+          ttftP50Ms:
+            row.ttftP50 === null ? null : Math.round(Number(row.ttftP50)),
+          costPerThreadUsd: threads
+            ? Number((num(row.cost) / threads).toFixed(4))
+            : null,
+          crisisReplies: num(row.crisisReplies),
+          careEntries: num(row.careEntries),
+          refusals: num(row.refusals),
+          thumbsUp: up,
+          thumbsDown: down,
+          quizFirstAttempts: num(learningBy.get(row.arm)?.quizFirstAttempts),
+          quizFirstAttemptPassRate:
+            learningBy.get(row.arm)?.quizPassRate == null
+              ? null
+              : Number(
+                  Number(learningBy.get(row.arm)!.quizPassRate).toFixed(4),
+                ),
+          itemsCompletedPerThread: threads
+            ? Number(
+                (
+                  num(learningBy.get(row.arm)?.itemsCompleted) / threads
+                ).toFixed(2),
+              )
+            : null,
+        };
+      })
+      .sort((a, b) => (a.arm === 'ga' ? -1 : b.arm === 'ga' ? 1 : 0));
+  }
+
+  /**
+   * Conversations tab: threads, newest activity first. No content.
+   * Page with `before` = the last row's `cursor` (its updatedAt and id, so
+   * rows sharing a timestamp are never skipped); a bare timestamp still
+   * works. Times stay as the column's own text, never through a JS Date.
+   */
+  async listThreads(query: {
+    limit?: number;
+    before?: string;
+    tenantId?: string;
+    mode?: string;
+    status?: string;
+    threadId?: string;
+  }) {
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const params: unknown[] = [limit];
+    const where: string[] = [];
+    if (query.before) {
+      const [at, id] = query.before.split('|');
+      params.push(at);
+      const atParam = `$${params.length}::timestamp`;
+      if (id) {
+        params.push(id);
+        where.push(
+          `(th."updatedAt", th."id") < (${atParam}, $${params.length}::uuid)`,
+        );
+      } else {
+        where.push(`th."updatedAt" < ${atParam}`);
+      }
+    }
+    if (query.status) {
+      params.push(query.status);
+      where.push(`th."status" = $${params.length}`);
+    }
+    if (query.threadId) {
+      params.push(query.threadId);
+      where.push(`th."id" = $${params.length}`);
+    }
+    if (query.tenantId) {
+      params.push(query.tenantId);
+      where.push(`th."tenant_id" = $${params.length}`);
+    }
+    if (query.mode) {
+      params.push(query.mode);
+      where.push(`th."mode" = $${params.length}`);
+    }
+    const rows = await this.dataSource.query(
+      `SELECT th."id", th."trackId", t."title" AS "trackTitle", th."tenant_id" AS "tenantId",
+              tn."name" AS "tenantName", th."visitorId" IS NOT NULL AND th."userId" IS NULL AS "visitor",
+              th."mode", th."status", th."epoch", th."updatedAt", th."arm",
+              to_char(th."updatedAt", 'YYYY-MM-DD"T"HH24:MI:SS.US') || '|' || th."id" AS "cursor",
+              (SELECT count(*) FROM "agent_turns" a WHERE a."threadId" = th."id") AS turns,
+              (SELECT COALESCE(sum(a."costUsd"), 0) FROM "agent_turns" a WHERE a."threadId" = th."id") AS cost,
+              (SELECT count(*) FROM "guide_signals" s WHERE s."threadId" = th."id" AND s."kind" = '${CRISIS_SIGNAL_KIND}') AS crises
+         FROM "guide_threads" th
+         LEFT JOIN "tracks" t ON t."id" = th."trackId"
+         LEFT JOIN "tenants" tn ON tn."id"::text = th."tenant_id"
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ORDER BY th."updatedAt" DESC, th."id" DESC
+        LIMIT $1`,
+      params,
+    );
+    return rows.map((row: any) => ({
+      id: row.id,
+      trackId: row.trackId,
+      trackTitle: row.trackTitle,
+      tenantId: row.tenantId,
+      tenantName: row.tenantName ?? null,
+      visitor: Boolean(row.visitor),
+      mode: row.mode,
+      status: row.status,
+      epoch: row.epoch,
+      arm: row.arm ?? null,
+      updatedAt: row.updatedAt,
+      cursor: row.cursor,
+      turns: num(row.turns),
+      costUsd: Number(num(row.cost).toFixed(4)),
+      crises: num(row.crises),
+    }));
+  }
+
+  /** A redacted transcript (transcripts permission only). */
+  async transcript(threadId: string) {
+    const rows = await this.messages.find({
+      where: {
+        threadId,
+        role: In([GuideMessageRole.LEARNER, GuideMessageRole.ALLY]),
+      },
+      order: { seq: 'ASC' },
+      take: 500,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      seq: row.seq,
+      role: row.role,
+      kind: row.kind,
+      turnId: row.turnId ?? null,
+      text: reviewableText(row),
+      flags: row.flags ?? null,
+      createdAt: (row as any).createdAt ?? null,
+    }));
+  }
+
+  async orgProfile(tenantId: string) {
+    const row = await this.orgProfiles.findOne({ where: { tenantId } });
+    const names = await this.namesFor([row?.updatedBy]);
+    return {
+      tenantId,
+      version: row?.version ?? 0,
+      profile: row?.profile ?? {},
+      updatedBy: row?.updatedBy ?? null,
+      updatedByName: row?.updatedBy ? (names.get(row.updatedBy) ?? null) : null,
+      updatedAt: (row as any)?.updatedAt ?? null,
+    };
+  }
+
+  async saveOrgProfile(tenantId: string, input: unknown, userId: number) {
+    const profile = normaliseOrgProfile(input);
+    const existing = await this.orgProfiles.findOne({ where: { tenantId } });
+    const saved = await this.orgProfiles.save({
+      ...(existing ? { id: existing.id } : {}),
+      tenantId,
+      profile,
+      version: (existing?.version ?? 0) + 1,
+      updatedBy: userId,
+    });
+    return this.orgProfile(saved.tenantId);
+  }
+
+  async listCrisisResponses(tenantId: string | null) {
+    const rows = await this.crisisResponses.find({
+      where: {
+        active: true,
+        ...(tenantId
+          ? { scope: GuideCrisisScope.TENANT, tenantId }
+          : { scope: GuideCrisisScope.PLATFORM, tenantId: IsNull() }),
+      },
+      order: { languageCode: 'ASC' },
+    });
+    const names = await this.namesFor(rows.map((row) => row.approvedBy));
+    return rows.map((row) => ({
+      ...row,
+      approvedByName: row.approvedBy
+        ? (names.get(row.approvedBy) ?? null)
+        : null,
+    }));
+  }
+
+  /** The release audit trail, newest first, with who did it. */
+  async releaseAudit(limit: number) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT a."id", a."action", a."releaseId", r."version", a."actorKind",
+              a."actorUserId", a."detail", a."createdAt"
+         FROM "agent_release_audit" a
+         LEFT JOIN "agent_releases" r ON r."id" = a."releaseId"
+        WHERE a."agentKey" = $1
+        ORDER BY a."createdAt" DESC
+        LIMIT $2`,
+      [ALLY_GUIDE_AGENT_KEY, Math.min(Math.max(limit, 1), 200)],
+    );
+    const names = await this.namesFor(rows.map((row) => row.actorUserId));
+    return rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      releaseId: row.releaseId,
+      version: row.version ?? null,
+      actorKind: row.actorKind,
+      actorUserId: row.actorUserId ?? null,
+      actorName: row.actorUserId
+        ? (names.get(Number(row.actorUserId)) ?? null)
+        : null,
+      reason: row.detail?.reason ?? null,
+      detail: row.detail ?? {},
+      createdAt: row.createdAt,
+    }));
+  }
+
+  /** People's display names for ids an admin screen shows (never emails). */
+  private async namesFor(
+    ids: Array<number | null | undefined>,
+  ): Promise<Map<number, string>> {
+    const unique = [...new Set(ids.filter((id): id is number => !!id))];
+    if (!unique.length) return new Map();
+    const rows: Array<{ id: number; name: string | null }> =
+      await this.dataSource.query(
+        `SELECT "id", "name" FROM "users" WHERE "id" = ANY($1::int[])`,
+        [unique],
+      );
+    return new Map(
+      rows
+        .filter((row) => row.name?.trim())
+        .map((row) => [Number(row.id), row.name!.trim()] as const),
+    );
+  }
+
+  /**
+   * A new version of the fixed crisis copy for one language. The previous
+   * version is kept, inactive, so what learners were shown stays auditable.
+   */
+  async saveCrisisResponse(input: {
+    tenantId: string | null;
+    languageCode: string;
+    body: string;
+    userId: number;
+  }) {
+    if (!(GUIDE_LANGUAGES as readonly string[]).includes(input.languageCode)) {
+      throw new BadRequestException(
+        `languageCode must be one of ${GUIDE_LANGUAGES.join(', ')}`,
+      );
+    }
+    const body = input.body.trim();
+    if (body.length < 40 || body.length > 1500) {
+      throw new BadRequestException(
+        'Crisis copy must be between 40 and 1,500 characters.',
+      );
+    }
+    const scope = input.tenantId
+      ? GuideCrisisScope.TENANT
+      : GuideCrisisScope.PLATFORM;
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(GuideCrisisResponse);
+      const current = await repo.findOne({
+        where: {
+          scope,
+          languageCode: input.languageCode,
+          active: true,
+          tenantId: input.tenantId ?? IsNull(),
+        },
+      });
+      if (current) await repo.update(current.id, { active: false });
+      return repo.save(
+        repo.create({
+          scope,
+          tenantId: input.tenantId,
+          languageCode: input.languageCode,
+          body,
+          version: (current?.version ?? 0) + 1,
+          active: true,
+          approvedBy: input.userId,
+          approvedAt: new Date(),
+        }),
+      );
+    });
+  }
+
+  /**
+   * Withdraw a version — only within the scope asked for: the platform route
+   * never touches an organisation's approved copy, and an organisation's
+   * route never touches another's or the platform's. Anything else is the
+   * same 404 as a missing id.
+   */
+  async removeCrisisResponse(id: string, tenantId: string | null) {
+    const row = await this.crisisResponses.findOne({
+      where: tenantId
+        ? { id, scope: GuideCrisisScope.TENANT, tenantId }
+        : { id, scope: GuideCrisisScope.PLATFORM, tenantId: IsNull() },
+    });
+    if (!row) throw new NotFoundException('Crisis copy not found');
+    await this.crisisResponses.update(id, { active: false });
+    return { id, active: false };
+  }
+}
+
+const str = (value: unknown, max: number): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, max) : null;
+};
+
+/** Accept only the profile's known fields, trimmed and bounded. */
+export function normaliseOrgProfile(input: unknown): GuideOrgProfileValue {
+  if (!input || typeof input !== 'object') {
+    throw new BadRequestException('profile must be an object');
+  }
+  const raw = input as Record<string, unknown>;
+  const supportLines: Record<string, GuideSupportLine[]> = {};
+  const lines = raw.supportLines;
+  if (lines && typeof lines === 'object') {
+    for (const [language, list] of Object.entries(
+      lines as Record<string, unknown>,
+    )) {
+      if (!(GUIDE_LANGUAGES as readonly string[]).includes(language)) {
+        throw new BadRequestException(
+          `Unknown support-line language "${language}"`,
+        );
+      }
+      if (!Array.isArray(list)) continue;
+      supportLines[language] = list.slice(0, 10).map((line, i) => {
+        const name = str(line?.name, 120);
+        const phone = str(line?.phone, 40);
+        if (!name || !phone) {
+          throw new BadRequestException(
+            `Support line ${i + 1} (${language}) needs a name and a phone number`,
+          );
+        }
+        if (!/^[+\d(][\d\s().-]{2,}$/.test(phone)) {
+          throw new BadRequestException(`"${phone}" is not a phone number`);
+        }
+        return {
+          name,
+          phone,
+          hours: str(line?.hours, 80),
+          url: str(line?.url, 300),
+          isCrisis: Boolean(line?.isCrisis),
+        };
+      });
+    }
+  }
+  return {
+    supportLines,
+    supervisorContact: str(raw.supervisorContact, 200),
+    supervisorWording: str(raw.supervisorWording, 400),
+    protocols: str(raw.protocols, 4000),
+    toneNotes: str(raw.toneNotes, 1000),
+    avoidTopics: Array.isArray(raw.avoidTopics)
+      ? raw.avoidTopics
+          .map((topic) => str(topic, 80))
+          .filter((topic): topic is string => Boolean(topic))
+          .slice(0, 20)
+      : [],
+    outreachEnabled: raw.outreachEnabled !== false,
+    emailEnabled: raw.emailEnabled !== false,
+  };
+}

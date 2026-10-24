@@ -370,6 +370,12 @@ const PERMISSIONS = {
   // the course it made outlives it.
   VIEW_COURSE_COPILOT: 'view:admin:course-copilot',
   EDIT_COURSE_COPILOT: 'edit:admin:course-copilot',
+  // Ally guide (plans/ally-guide/plan.md §10.5): the Ally Console and the org
+  // Ally tab. Reading individual learner transcripts is a separate permission
+  // AND a per-person toggle (ally_guide_transcripts), never a role default.
+  VIEW_ALLY_GUIDE: 'view:admin:ally-guide',
+  EDIT_ALLY_GUIDE: 'edit:admin:ally-guide',
+  REVIEW_ALLY_GUIDE_TRANSCRIPTS: 'review:admin:ally-guide-transcripts',
 
   // === PRODUCT ROADMAP ===
   // Three tiers, because the roadmap is a voting board rather than a CRUD screen:
@@ -535,6 +541,9 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.EDIT_BUILDER,
   PERMISSIONS.VIEW_COURSE_COPILOT,
   PERMISSIONS.EDIT_COURSE_COPILOT,
+  PERMISSIONS.VIEW_ALLY_GUIDE,
+  PERMISSIONS.EDIT_ALLY_GUIDE,
+  PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS,
   // Product Roadmap: SUPER_ADMIN can see the board and vote on it. The management
   // surface (EDIT_PRODUCT_ROADMAP) is deliberately withheld here and granted only to
   // SUPER_DUPER_ADMIN below.
