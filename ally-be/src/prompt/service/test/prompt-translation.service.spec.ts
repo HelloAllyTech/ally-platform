@@ -302,6 +302,52 @@ describe('PromptTranslationService.translateOne', () => {
       expect(result.failed).toBe(1);
       expect(result.translated).toBe(0);
     });
+
+    it('records a failed row when translateOne throws, so the language is not left pending', async () => {
+      getEligibleTargetLanguages.mockResolvedValue([langs[0]]);
+      getPromptByCode.mockResolvedValue('BODY'); // hashBody -> 'hash:4'
+      findForBody.mockResolvedValue(null);
+      jest
+        .spyOn(service, 'translateOne')
+        .mockRejectedValue(new Error('translation prompt is not configured'));
+
+      const result = await service.translatePrompt(promptId);
+
+      expect(result.failed).toBe(1);
+      expect(upsertTranslation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          promptId,
+          languageId: 2,
+          sourceHash: 'hash:4',
+          status: PromptTranslationStatus.FAILED,
+          error: 'translation prompt is not configured',
+        }),
+      );
+    });
+
+    it('translates the languages concurrently', async () => {
+      getEligibleTargetLanguages.mockResolvedValue(langs);
+      findForBody.mockResolvedValue(null);
+      let inFlight = 0;
+      let maxInFlight = 0;
+      jest.spyOn(service, 'translateOne').mockImplementation(async () => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight--;
+        return {
+          status: PromptTranslationStatus.READY,
+          provider: 'gemini',
+          model: 'gemini-2.5-pro',
+          attempts: 1,
+        };
+      });
+
+      const result = await service.translatePrompt(promptId);
+
+      expect(result.translated).toBe(2);
+      expect(maxInFlight).toBe(2);
+    });
   });
 
   describe('overlayTranslations', () => {

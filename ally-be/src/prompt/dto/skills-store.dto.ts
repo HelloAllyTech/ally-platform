@@ -68,6 +68,16 @@ export class CreatePromptVersionRequestDto {
   evalSummary?: Record<string, unknown> | null;
 }
 
+export class RevertPromptRequestDto {
+  @ApiPropertyOptional({
+    description:
+      "Judge rubrics only: confirms the judge's pinned PROMPT_VERSION was bumped",
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirmJudgeRubricChange?: boolean;
+}
+
 export class PromoteVersionRequestDto {
   @ApiProperty({
     description:

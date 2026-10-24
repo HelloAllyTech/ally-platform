@@ -6,6 +6,7 @@
 --
 -- 1. Prompts served from their file today, whose file text gets published as a
 --    new live version. "first version" = the row had no live version at all.
+--    Includes dashboard rows with no live text: they fell back to the file.
 SELECT 'publish file text' AS action,
        p."promptCode",
        CASE WHEN live.id IS NULL THEN 'first version'
@@ -18,10 +19,15 @@ SELECT 'publish file text' AS action,
   LEFT JOIN (SELECT "promptId", MAX(version) AS max_version
                FROM prompts_versions GROUP BY "promptId") mx
     ON mx."promptId" = p.id
- WHERE p."useDashboardOverride" = false
-   AND p."defaultPrompt" IS NOT NULL
+ WHERE p."defaultPrompt" IS NOT NULL
    AND btrim(p."defaultPrompt") <> ''
-   AND (live.id IS NULL OR btrim(live.prompt) <> btrim(p."defaultPrompt"))
+   AND (
+     (p."useDashboardOverride" = false
+       AND (live.id IS NULL OR btrim(live.prompt) <> btrim(p."defaultPrompt")))
+     OR
+     (p."useDashboardOverride" = true
+       AND (live.id IS NULL OR btrim(COALESCE(live.prompt, '')) = ''))
+   )
  ORDER BY p."promptCode";
 
 -- 2. Prompts served from the dashboard whose file text differs: the dashboard

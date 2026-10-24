@@ -13,7 +13,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 3. Translations are kept per English body (`sourceHash`), so a candidate can
  *    be translated before it goes live without disturbing the live rows.
  * 4. `useDashboardOverride` is retired. Every row whose body was served from its
- *    file gets that file text (`defaultPrompt`) published as a new version, then
+ *    file gets that file text (`defaultPrompt`) published as a new version — as
+ *    does an overridden row with no live text, which fell back to
+ *    `defaultPrompt` too — then
  *    every row is marked overridden, so any reader still checking the flag
  *    already behaves as "serve the store".
  * 5. `skills_store_keys`: keys generated in the Skills Store for the `prompts`
@@ -66,6 +68,9 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
 
     // Retire the override flag: publish the file text for every row that was
     // serving it. Skipped when the live version already holds that text.
+    // An overridden row whose live version is missing or blank was serving
+    // `defaultPrompt` as well, and sync is about to replace that column with
+    // the new Git default, so it is published too.
     await queryRunner.query(`
       INSERT INTO "prompts_versions"
         ("promptId", "version", "prompt", "createdBy", "updatedBy",
@@ -80,10 +85,15 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
         FROM "prompts" p
         LEFT JOIN "prompts_versions" live
           ON live."promptId" = p.id AND live."version" = p."currentVersion"
-       WHERE p."useDashboardOverride" = false
-         AND p."defaultPrompt" IS NOT NULL
+       WHERE p."defaultPrompt" IS NOT NULL
          AND btrim(p."defaultPrompt") <> ''
-         AND (live.id IS NULL OR btrim(live."prompt") <> btrim(p."defaultPrompt"))
+         AND (
+           (p."useDashboardOverride" = false
+             AND (live.id IS NULL OR btrim(live."prompt") <> btrim(p."defaultPrompt")))
+           OR
+           (p."useDashboardOverride" = true
+             AND (live.id IS NULL OR btrim(COALESCE(live."prompt", '')) = ''))
+         )
     `);
     await queryRunner.query(`
       UPDATE "prompts" p
@@ -92,7 +102,7 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
                 FROM "prompts_versions" WHERE "source" = 'migration'
                GROUP BY "promptId") v
        WHERE p.id = v."promptId"
-         AND p."useDashboardOverride" = false
+         AND (p."currentVersion" IS NULL OR p."currentVersion" < v.max_version)
     `);
     await queryRunner.query(
       `UPDATE "prompts" SET "useDashboardOverride" = true WHERE "useDashboardOverride" = false`,

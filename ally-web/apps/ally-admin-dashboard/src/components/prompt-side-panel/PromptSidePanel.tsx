@@ -482,6 +482,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [showRevertConfirmModal, setShowRevertConfirmModal] = useState(false);
+  const [showRevertRubricConfirm, setShowRevertRubricConfirm] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingBlock, setEditingBlock] = useState<Prompt | null>(null);
 
@@ -1218,19 +1219,33 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     setShowRevertConfirmModal(true);
   }, []);
 
-  const handleRevertConfirm = useCallback(async () => {
-    if (!selectedPrompt?.id) return;
-    try {
-      // The server puts the default text live as a new version (translations
-      // included); the current version stays in the history.
-      await revertPrompt(selectedPrompt.id).unwrap();
-      toast.success(en.simulation.revertPromptSuccess);
-      setShowRevertConfirmModal(false);
-      onClose();
-    } catch (error) {
-      toast.error(getErrorMessage(error, en.simulation.revertPromptFailed));
-    }
-  }, [selectedPrompt, revertPrompt, onClose]);
+  const runRevert = useCallback(
+    async (confirmJudgeRubricChange: boolean) => {
+      if (!selectedPrompt?.id) return;
+      try {
+        // The server puts the default text live as a new version (translations
+        // included); the current version stays in the history.
+        await revertPrompt({
+          id: selectedPrompt.id,
+          ...(confirmJudgeRubricChange ? { confirmJudgeRubricChange: true } : {}),
+        }).unwrap();
+        toast.success(en.simulation.revertPromptSuccess);
+        setShowRevertConfirmModal(false);
+        onClose();
+      } catch (error) {
+        setShowRevertConfirmModal(false);
+        // A judge rubric goes live only once its pinned version is confirmed bumped.
+        if (skillsStoreErrorCode(error) === "SKILLS_STORE_JUDGE_RUBRIC_PINNED") {
+          setShowRevertRubricConfirm(true);
+          return;
+        }
+        toast.error(getErrorMessage(error, en.simulation.revertPromptFailed));
+      }
+    },
+    [selectedPrompt, revertPrompt, onClose],
+  );
+
+  const handleRevertConfirm = useCallback(() => runRevert(false), [runRevert]);
 
   const handleRevertCancel = useCallback(() => {
     setShowRevertConfirmModal(false);
@@ -1698,6 +1713,23 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         secondaryButton={{
           label: "Cancel",
           onClick: handleRevertCancel,
+        }}
+      />
+      <ActionConfirmationPopup
+        isOpen={showRevertRubricConfirm}
+        onClose={() => setShowRevertRubricConfirm(false)}
+        title={en.skillsStore.versions.judgeRubricTitle}
+        description={en.skillsStore.versions.judgeRubricBody}
+        primaryButton={{
+          label: en.skillsStore.versions.judgeRubricConfirm,
+          onClick: () => {
+            setShowRevertRubricConfirm(false);
+            void runRevert(true);
+          },
+        }}
+        secondaryButton={{
+          label: "Cancel",
+          onClick: () => setShowRevertRubricConfirm(false),
         }}
       />
       <ActionConfirmationPopup

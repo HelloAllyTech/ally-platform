@@ -72,6 +72,8 @@ export interface ImportResult {
   unchanged: string[];
   created: string[];
   candidates: number;
+  /** Prompts that could not be imported; the rest were imported regardless. */
+  failed: Array<{ promptCode: string; error: string }>;
 }
 
 /**
@@ -259,99 +261,152 @@ export class SkillsStoreService {
       unchanged: [],
       created: [],
       candidates: 0,
+      failed: [],
     };
+    // One prompt at a time, and one refusal (a contract the local code
+    // changed, a stale base) skips only that prompt: the rest still import,
+    // and the result names what didn't.
     for (const item of payload.prompts ?? []) {
       if (!item.live?.prompt?.trim()) continue;
-      let prompt = await this.dataSource.manager.findOne(Prompt, {
-        where: { promptCode: item.promptCode },
-      });
-      if (!prompt) {
-        prompt = await this.dataSource.manager.save(
-          Prompt,
-          this.dataSource.manager.create(Prompt, {
-            promptCode: item.promptCode,
-            name: await this.freeName(item.name),
-            description: item.description ?? '',
-            category: item.category ?? undefined,
-            promptType: item.promptType ?? undefined,
-            kind: item.kind ?? undefined,
-            hasStates: item.hasStates,
-            translationEnabled: item.translationEnabled,
-            contract: item.contract,
-            useDashboardOverride: true,
-          }),
-        );
-        result.created.push(item.promptCode);
-      } else {
-        await this.dataSource.manager.update(Prompt, prompt.id, {
-          translationEnabled: item.translationEnabled,
-          ...(item.contract ? { contract: item.contract } : {}),
+      try {
+        await this.importOne(item, payload.exportedAt, result);
+      } catch (err) {
+        // Its prompt row may exist by now, but it isn't served: say failed only.
+        result.created = result.created.filter((c) => c !== item.promptCode);
+        result.failed.push({
+          promptCode: item.promptCode,
+          error: err instanceof Error ? err.message : String(err),
         });
-        prompt.translationEnabled = item.translationEnabled;
-      }
-
-      await this.writeTranslations(prompt.id, item.translations);
-
-      const localLive = await this.dataSource.manager.findOne(PromptVersion, {
-        where: { promptId: prompt.id, version: prompt.currentVersion ?? -1 },
-      });
-      if (
-        localLive &&
-        hashPromptBody(localLive.prompt) === item.live.contentHash &&
-        (localLive.model ?? null) === (item.live.model ?? null)
-      ) {
-        result.unchanged.push(item.promptCode);
-      } else {
-        const created = await this.versioning.createVersion(
-          prompt.id,
-          {
-            body: item.live.prompt,
-            baseVersion: await this.versioning.latestVersionOf(prompt.id),
-            provider: item.live.provider,
-            model: item.live.model,
-            temperature: item.live.temperature,
-            source: PromptVersionSource.IMPORT,
-            note: `Imported live v${item.live.version} on ${payload.exportedAt}.`,
-          },
-          { translate: 'none' },
-        );
-        await this.versioning.promote(
-          prompt.id,
-          created.version,
-          prompt.currentVersion ?? null,
-          {
-            evalApproved: true,
-            requireTranslations: false,
-            confirmJudgeRubricChange: true,
-          },
-        );
-        if (!result.created.includes(item.promptCode)) {
-          result.updated.push(item.promptCode);
-        }
-      }
-
-      for (const candidate of item.candidates ?? []) {
-        await this.versioning.createVersion(
-          prompt.id,
-          {
-            body: candidate.prompt,
-            baseVersion: await this.versioning.latestVersionOf(prompt.id),
-            provider: candidate.provider,
-            model: candidate.model,
-            temperature: candidate.temperature,
-            source: PromptVersionSource.IMPORT,
-            note: `Imported candidate v${candidate.version}${candidate.note ? `: ${candidate.note}` : ''}`,
-          },
-          { translate: 'none' },
-        );
-        result.candidates++;
       }
     }
     this.logger.info(
       `[SKILLS_STORE] import: ${result.updated.length} updated, ${result.created.length} created, ` +
-        `${result.unchanged.length} unchanged, ${result.candidates} candidates`,
+        `${result.unchanged.length} unchanged, ${result.candidates} candidates` +
+        (result.failed.length ? `, ${result.failed.length} failed` : ''),
     );
     return result;
+  }
+
+  private async importOne(
+    item: ExportedPrompt,
+    exportedAt: string,
+    result: ImportResult,
+  ): Promise<void> {
+    const live = item.live;
+    if (!live) return;
+    let prompt = await this.dataSource.manager.findOne(Prompt, {
+      where: { promptCode: item.promptCode },
+    });
+    if (!prompt) {
+      prompt = await this.dataSource.manager.save(
+        Prompt,
+        this.dataSource.manager.create(Prompt, {
+          promptCode: item.promptCode,
+          name: await this.freeName(item.name),
+          description: item.description ?? '',
+          category: item.category ?? undefined,
+          promptType: item.promptType ?? undefined,
+          kind: item.kind ?? undefined,
+          hasStates: item.hasStates,
+          translationEnabled: item.translationEnabled,
+          contract: item.contract,
+          useDashboardOverride: true,
+        }),
+      );
+      result.created.push(item.promptCode);
+    } else {
+      await this.dataSource.manager.update(Prompt, prompt.id, {
+        translationEnabled: item.translationEnabled,
+        ...(item.contract ? { contract: item.contract } : {}),
+      });
+      prompt.translationEnabled = item.translationEnabled;
+    }
+
+    await this.writeTranslations(prompt.id, item.translations);
+
+    const localLive = await this.dataSource.manager.findOne(PromptVersion, {
+      where: { promptId: prompt.id, version: prompt.currentVersion ?? -1 },
+    });
+    if (
+      localLive &&
+      hashPromptBody(localLive.prompt) === live.contentHash &&
+      (localLive.model ?? null) === (live.model ?? null)
+    ) {
+      result.unchanged.push(item.promptCode);
+    } else {
+      const created = await this.versioning.createVersion(
+        prompt.id,
+        {
+          body: live.prompt,
+          baseVersion: await this.versioning.latestVersionOf(prompt.id),
+          provider: live.provider,
+          model: live.model,
+          temperature: live.temperature,
+          source: PromptVersionSource.IMPORT,
+          note: `Imported live v${live.version} on ${exportedAt}.`,
+        },
+        { translate: 'none' },
+      );
+      await this.versioning.promote(
+        prompt.id,
+        created.version,
+        prompt.currentVersion ?? null,
+        {
+          evalApproved: true,
+          requireTranslations: false,
+          confirmJudgeRubricChange: true,
+        },
+      );
+      if (!result.created.includes(item.promptCode)) {
+        result.updated.push(item.promptCode);
+      }
+    }
+
+    // A draft already here (same text and settings) isn't imported twice,
+    // so pulling into a local store again doesn't pile up copies.
+    const existing = await this.dataSource.manager.find(PromptVersion, {
+      where: { promptId: prompt.id },
+      select: [
+        'id',
+        'prompt',
+        'contentHash',
+        'provider',
+        'model',
+        'temperature',
+      ],
+    });
+    const versionKey = (v: {
+      prompt: string;
+      provider?: string | null;
+      model?: string | null;
+      temperature?: number | null;
+    }) =>
+      [
+        hashPromptBody(v.prompt),
+        v.provider ?? '',
+        v.model ?? '',
+        v.temperature ?? '',
+      ].join('|');
+    const have = new Set(existing.map(versionKey));
+    for (const candidate of item.candidates ?? []) {
+      const key = versionKey(candidate);
+      if (have.has(key)) continue;
+      have.add(key);
+      await this.versioning.createVersion(
+        prompt.id,
+        {
+          body: candidate.prompt,
+          baseVersion: await this.versioning.latestVersionOf(prompt.id),
+          provider: candidate.provider,
+          model: candidate.model,
+          temperature: candidate.temperature,
+          source: PromptVersionSource.IMPORT,
+          note: `Imported candidate v${candidate.version}${candidate.note ? `: ${candidate.note}` : ''}`,
+        },
+        { translate: 'none' },
+      );
+      result.candidates++;
+    }
   }
 
   private async writeTranslations(

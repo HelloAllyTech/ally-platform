@@ -70,12 +70,12 @@ Base path: **`/api/v1/prompts`** (admin session) and **`/api/v1/skills-store`**
 | POST | `/prompts/:id/versions/:version/promote` | Bearer (EDIT_PROMPT) | Publish: `{expectedCurrentVersion, rollback?, confirmJudgeRubricChange?}` → `{version, previousVersion, failedLanguages}`. |
 | POST | `/prompts/:id/versions/:version/translations` | Bearer (EDIT_PROMPT) | (Re)translate a version, retrying failed languages. |
 | GET | `/prompts/:id/translations?version=N` | Bearer (VIEW_PROMPT) | A version's translations (default: live). |
-| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the Git default live as a new version, translations included. |
+| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the Git default live as a new version, translations included. Body `{confirmJudgeRubricChange?}` for judge rubrics. A refused revert leaves no draft behind. |
 | GET | `/prompts/:id/usage` | Bearer (VIEW_PROMPT) | Scenarios referencing this prompt. |
 | GET | `/skills-store/export?codes=&candidates=true` | Skills Store key (pull) | Live (and newest/draft) versions with ready translations: what `prompts pull` reads. |
 | GET | `/skills-store/prompts/:code` | Skills Store key (pull) | One prompt's versions. |
 | POST | `/skills-store/prompts/:code/versions` | Skills Store key (push) | `prompts push`: create a draft (same rules as the editor). Never publishes. |
-| POST | `/skills-store/import` | x-api-key, **local only** | Load an export into this store and serve it. Refused unless `SKILLS_STORE_IMPORT_ENABLED=true`, which only local stacks set. |
+| POST | `/skills-store/import` | x-api-key, **local only** | Load an export into this store and serve it. Refused unless `SKILLS_STORE_IMPORT_ENABLED=true`, which only local stacks set. Drafts already present (same text and settings) are skipped; a prompt that can't be imported is listed in `failed` and the rest still import. |
 | GET/POST/DELETE | `/skills-store/keys[/:id]` | Bearer (EDIT_PROMPT) | List, generate (key shown once) and revoke Skills Store keys. |
 
 ## Skills Store keys

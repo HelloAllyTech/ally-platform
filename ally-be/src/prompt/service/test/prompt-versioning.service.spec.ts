@@ -67,12 +67,23 @@ function buildStore(initial: {
       return null;
     }),
     find: jest.fn(async (e: unknown, opts: any) => {
-      if (e === PromptTranslation)
-        return state.translations.filter(
-          (t) => t.sourceHash === opts.where.sourceHash,
-        );
+      if (e === PromptTranslation) {
+        // `sourceHash` is a plain value or an `In([...])` operator.
+        const wanted = opts.where.sourceHash;
+        const hashes: string[] = Array.isArray(wanted?._value)
+          ? wanted._value
+          : [wanted];
+        return state.translations.filter((t) => hashes.includes(t.sourceHash));
+      }
       if (e === PromptVersion) return state.versions;
       return [];
+    }),
+    delete: jest.fn(async (e: unknown, where: any) => {
+      if (e === PromptVersion) {
+        state.versions = state.versions.filter(
+          (v) => v.id !== where.id || !!v.publishedAt,
+        );
+      }
     }),
     update: jest.fn(async (e: unknown, id: string, values: object) => {
       if (e === Prompt) Object.assign(state.prompt, values);
@@ -354,5 +365,151 @@ describe('PromptVersioningService.createAndPromote', () => {
     expect(translation.translateBody).toHaveBeenCalledTimes(1);
     expect(result.version).toBe(2);
     expect(state.prompt.currentVersion).toBe(2);
+  });
+
+  it('refuses a judge rubric before creating anything unless confirmed', async () => {
+    const { service, state } = buildStore({
+      prompt: {
+        promptCode: 'drift_judge_conversation_rubric',
+        currentVersion: 1,
+      },
+      versions: [
+        { id: 'v1', version: 1, prompt: 'Live', publishedAt: new Date() },
+      ],
+    });
+
+    await expect(
+      service.createAndPromote(
+        'p1',
+        input({ baseVersion: 1, source: PromptVersionSource.REVERT }),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_JUDGE_RUBRIC_PINNED',
+      }),
+    });
+    expect(state.versions).toHaveLength(1);
+
+    const result = await service.createAndPromote(
+      'p1',
+      input({ baseVersion: 1, source: PromptVersionSource.REVERT }),
+      { confirmJudgeRubricChange: true },
+    );
+    expect(result.version).toBe(2);
+    expect(state.prompt.currentVersion).toBe(2);
+  });
+
+  it('puts a judge rubric live without confirming when nothing was live yet', async () => {
+    const { service, state } = buildStore({
+      prompt: {
+        promptCode: 'drift_judge_conversation_rubric',
+        currentVersion: null as any,
+      },
+    });
+
+    await service.createAndPromote('p1', input({ baseVersion: null }));
+
+    expect(state.prompt.currentVersion).toBe(1);
+  });
+
+  it('removes the version it created when the promote is refused', async () => {
+    const { service, state } = buildStore({
+      prompt: {
+        currentVersion: 1,
+        translationEnabled: true,
+        promptType: 'main_agent',
+      },
+      versions: [
+        { id: 'v1', version: 1, prompt: 'Live', publishedAt: new Date() },
+      ],
+      // No translation rows: language 2 stays pending.
+      languages: [2],
+    });
+
+    await expect(
+      service.createAndPromote('p1', input({ baseVersion: 1 })),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_TRANSLATIONS_PENDING',
+      }),
+    });
+    expect(state.versions.map((v) => v.version)).toEqual([1]);
+    expect(state.prompt.currentVersion).toBe(1);
+  });
+});
+
+describe('PromptVersioningService.listVersions', () => {
+  it('reads every unpublished body’s translations in one query', async () => {
+    const { service, manager } = buildStore({
+      prompt: {
+        currentVersion: 2,
+        translationEnabled: true,
+        promptType: 'main_agent',
+      },
+      versions: [
+        { id: 'v1', version: 1, prompt: 'Old', publishedAt: new Date() },
+        { id: 'v2', version: 2, prompt: 'Live', publishedAt: new Date() },
+        { id: 'v3', version: 3, prompt: 'Draft A', publishedAt: null },
+        { id: 'v4', version: 4, prompt: 'Draft B', publishedAt: null },
+      ],
+      languages: [2],
+      translations: [
+        {
+          languageId: 2,
+          sourceHash: hashPromptBody('Draft A'),
+          status: 'ready',
+        } as any,
+      ],
+    });
+
+    const versions = await service.listVersions('p1');
+
+    const translationQueries = manager.find.mock.calls.filter(
+      ([e]: [unknown]) => e === PromptTranslation,
+    );
+    expect(translationQueries).toHaveLength(1);
+    const byVersion = new Map(versions.map((v) => [v.version, v]));
+    expect(byVersion.get(3)!.translations!.ready).toEqual([2]);
+    expect(byVersion.get(4)!.translations!.pending).toEqual([2]);
+    expect(byVersion.get(2)!.translations!.pending).toEqual([2]);
+    expect(byVersion.get(1)!.translations).toBeUndefined();
+  });
+});
+
+describe('PromptVersioningService.getVersionBody', () => {
+  it('returns one version’s text, or null for a missing or invalid version', async () => {
+    const { service } = buildStore({
+      prompt: { currentVersion: 1 },
+      versions: [
+        { id: 'v1', version: 1, prompt: 'Live', publishedAt: new Date() },
+      ],
+    });
+
+    await expect(service.getVersionBody('p1', 1)).resolves.toBe('Live');
+    await expect(service.getVersionBody('p1', 9)).resolves.toBeNull();
+    await expect(service.getVersionBody('p1', NaN)).resolves.toBeNull();
+  });
+});
+
+describe('PromptVersioningService.translateDrafts', () => {
+  it('translates every unpublished draft, wherever it sits', async () => {
+    const { service, manager, translation } = buildStore({
+      prompt: { currentVersion: 3 },
+      versions: [],
+    });
+    manager.find.mockResolvedValueOnce([
+      { id: 'v2', version: 2, prompt: 'Never published', publishedAt: null },
+      { id: 'v4', version: 4, prompt: 'Draft', publishedAt: null },
+    ]);
+
+    await service.translateDrafts('p1');
+
+    expect(translation.translateBody).toHaveBeenCalledTimes(2);
+    expect(translation.translateBody).toHaveBeenCalledWith(
+      'p1',
+      'Never published',
+      'v2',
+    );
+    expect(translation.translateBody).toHaveBeenCalledWith('p1', 'Draft', 'v4');
   });
 });

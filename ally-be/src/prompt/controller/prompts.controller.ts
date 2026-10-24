@@ -34,6 +34,7 @@ import { UpdatePromptDto } from '../dto/update-prompt.dto';
 import {
   CreatePromptVersionRequestDto,
   PromoteVersionRequestDto,
+  RevertPromptRequestDto,
 } from '../dto/skills-store.dto';
 import { CreatePromptsDto } from '../dto/create-prompts.dto';
 import { SyncPromptsDto } from '../dto/sync-prompts.dto';
@@ -79,10 +80,12 @@ export class PromptsController {
     @Query('version') version?: string,
   ): Promise<PromptTranslation[]> {
     if (version) {
-      const versions = await this.promptsService.listVersions(id);
-      const match = versions.find((v) => v.version === Number(version));
-      if (!match) return [];
-      return this.promptTranslationService.listTranslations(id, match.prompt);
+      const body = await this.promptsService.getVersionBody(
+        id,
+        Number(version),
+      );
+      if (body === null) return [];
+      return this.promptTranslationService.listTranslations(id, body);
     }
     return this.promptTranslationService.listTranslations(id);
   }
@@ -325,8 +328,13 @@ export class PromptsController {
     permissions: [PERMISSIONS.EDIT_PROMPT],
   })
   @Post(':id/revert')
-  async revertPrompt(@Param('id') id: string): Promise<boolean> {
-    return this.promptsService.revertPrompt(id);
+  async revertPrompt(
+    @Param('id') id: string,
+    @Body() dto: RevertPromptRequestDto = {},
+  ): Promise<boolean> {
+    return this.promptsService.revertPrompt(id, {
+      confirmJudgeRubricChange: dto?.confirmJudgeRubricChange === true,
+    });
   }
 
   @ApiOperation({

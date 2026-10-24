@@ -161,39 +161,53 @@ export class PromptTranslationService {
     const languages = await this.targetsService.getEligibleTargetLanguages();
     const result: TranslatePromptResult = { ...base, eligible: true };
 
-    // Sequential: only a handful of languages, and this keeps well under
-    // provider rate limits when several prompts are enabled at once.
-    for (const language of languages) {
-      const existing = await this.translationRepository.findForBody(
-        promptId,
-        language.id!,
-        sourceHash,
-      );
-      if (
-        existing?.status === PromptTranslationStatus.READY ||
-        (existing?.status === PromptTranslationStatus.FAILED &&
-          !options.retryFailed)
-      ) {
-        result.skipped++;
-        continue;
-      }
-
-      try {
-        const one = await this.translateOne(promptId, language.id!, {
-          body,
-          promptVersionId,
-        });
-        if (one.status === PromptTranslationStatus.READY) result.translated++;
-        else result.failed++;
-      } catch (err) {
-        result.failed++;
-        this.logger.error(
-          `translateBody: ${prompt.promptCode} -> language ${language.id} threw: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
+    // Concurrent across languages: a handful of them, and callers that
+    // publish wait on this, so the wait is one translation, not one per
+    // language.
+    await Promise.all(
+      languages.map(async (language) => {
+        const existing = await this.translationRepository.findForBody(
+          promptId,
+          language.id!,
+          sourceHash,
         );
-      }
-    }
+        if (
+          existing?.status === PromptTranslationStatus.READY ||
+          (existing?.status === PromptTranslationStatus.FAILED &&
+            !options.retryFailed)
+        ) {
+          result.skipped++;
+          return;
+        }
+
+        try {
+          const one = await this.translateOne(promptId, language.id!, {
+            body,
+            promptVersionId,
+          });
+          if (one.status === PromptTranslationStatus.READY) result.translated++;
+          else result.failed++;
+        } catch (err) {
+          result.failed++;
+          const error = err instanceof Error ? err.message : String(err);
+          this.logger.error(
+            `translateBody: ${prompt.promptCode} -> language ${language.id} threw: ${error}`,
+          );
+          // Record it: with no row the language reads as pending, and a
+          // promote would wait on a translation nothing is running.
+          await this.translationRepository
+            .upsertTranslation({
+              promptId,
+              languageId: language.id!,
+              sourceHash,
+              status: PromptTranslationStatus.FAILED,
+              error,
+              ...(promptVersionId ? { promptVersionId } : {}),
+            })
+            .catch(() => undefined);
+        }
+      }),
+    );
 
     return result;
   }

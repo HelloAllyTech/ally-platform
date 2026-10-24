@@ -241,8 +241,9 @@ jobs:
             echo "SKILLS_STORE_RELEASE_KEY is not set; skipping the prompt release check."
             exit 0
           fi
-          (cd ally-be && npm ci --ignore-scripts --no-audit --no-fund \
-            && npx ts-node --transpile-only scripts/prompt-contracts-json.ts) > /tmp/ally-be-contracts.json
+          # Only the contracts JSON goes to the file: npm's own output stays out of it.
+          (cd ally-be && npm ci --ignore-scripts --no-audit --no-fund >&2)
+          (cd ally-be && npx ts-node --transpile-only scripts/prompt-contracts-json.ts) > /tmp/ally-be-contracts.json
           node scripts/prompts/release-check.mjs --contracts /tmp/ally-be-contracts.json
 
   build:

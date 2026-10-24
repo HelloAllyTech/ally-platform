@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull } from 'typeorm';
 import { Prompt } from '../entity/prompt.entity';
 import {
   PromptVersion,
@@ -257,17 +257,12 @@ export class PromptVersioningService {
         });
       }
 
-      if (
-        JUDGE_RUBRIC_PROMPT_CODES.has(prompt.promptCode) &&
-        !options.confirmJudgeRubricChange
-      ) {
-        throw new ConflictException({
-          statusCode: 409,
-          errorCode: SKILLS_STORE_ERROR.JUDGE_RUBRIC_PINNED,
-          message:
-            `${prompt.promptCode} is a judge rubric. Its results are labelled by a version pinned in code, ` +
-            'so bump the judge’s PROMPT_VERSION (and the backlog drainer’s target) in the same change, then confirm.',
-        });
+      // A rubric's first live version can't mix with earlier results.
+      if (current !== null) {
+        this.assertJudgeRubricConfirmed(
+          prompt.promptCode,
+          options.confirmJudgeRubricChange,
+        );
       }
 
       const readiness = await this.readinessWith(manager, prompt, target);
@@ -324,22 +319,50 @@ export class PromptVersioningService {
    * directly (sync of a new prompt, import into a local store, revert, an
    * experiment's Apply). Translations run in the foreground first, so the
    * version and its translations go live together.
+   *
+   * All or nothing: when the promote is refused, the version created for it is
+   * removed again, so a refused publish never leaves a stray draft behind.
    */
   async createAndPromote(
     promptId: string,
     input: CreateVersionInput,
-    options: { evalApproved?: boolean } = {},
+    options: {
+      evalApproved?: boolean;
+      confirmJudgeRubricChange?: boolean;
+    } = {},
   ): Promise<PromoteResult> {
+    // Refuse up front what promote would refuse whatever the text says.
+    const prompt = await this.dataSource.manager.findOne(Prompt, {
+      where: { id: promptId },
+      select: ['id', 'promptCode', 'currentVersion'],
+    });
+    if (!prompt) throw new NotFoundException('Prompt not found');
+    if (prompt.currentVersion != null) {
+      this.assertJudgeRubricConfirmed(
+        prompt.promptCode,
+        options.confirmJudgeRubricChange,
+      );
+    }
+
     const created = await this.createVersion(promptId, input, {
       translate: 'none',
     });
-    const current = await this.currentVersionOf(promptId);
-    await this.promptTranslationService.translateBody(
-      promptId,
-      created.prompt,
-      created.id,
-    );
-    return this.promote(promptId, created.version, current, options);
+    try {
+      await this.promptTranslationService.translateBody(
+        promptId,
+        created.prompt,
+        created.id,
+      );
+      return await this.promote(
+        promptId,
+        created.version,
+        prompt.currentVersion ?? null,
+        options,
+      );
+    } catch (err) {
+      await this.discardDraft(created);
+      throw err;
+    }
   }
 
   async listVersions(promptId: string): Promise<VersionSummary[]> {
@@ -352,6 +375,13 @@ export class PromptVersioningService {
       order: { version: 'DESC' },
     });
     const current = prompt.currentVersion ?? null;
+    const isHistory = (v: PromptVersion) =>
+      v.version !== current && !!v.publishedAt;
+    const readiness = await this.readinessFor(
+      this.dataSource.manager,
+      prompt,
+      versions.filter((v) => !isHistory(v)).map((v) => v.prompt),
+    );
     const summaries: VersionSummary[] = [];
     for (const v of versions) {
       // A version that was never live is a draft wherever it sits — one saved
@@ -377,17 +407,37 @@ export class PromptVersioningService {
         createdAt: v.createdAt,
         publishedAt: v.publishedAt ?? null,
         ...(status !== 'history'
-          ? {
-              translations: await this.readinessWith(
-                this.dataSource.manager,
-                prompt,
-                v,
-              ),
-            }
+          ? { translations: readiness.get(hashPromptBody(v.prompt))! }
           : {}),
       });
     }
     return summaries;
+  }
+
+  /** One version's text, or null when the prompt has no such version. */
+  async getVersionBody(
+    promptId: string,
+    version: number,
+  ): Promise<string | null> {
+    if (!Number.isInteger(version)) return null;
+    const row = await this.dataSource.manager.findOne(PromptVersion, {
+      where: { promptId, version },
+      select: ['id', 'prompt'],
+    });
+    return row?.prompt ?? null;
+  }
+
+  /**
+   * Translate every draft (any version never published), in the background.
+   * For when translation is switched on: drafts saved while it was off would
+   * otherwise wait on translations nothing is running.
+   */
+  async translateDrafts(promptId: string): Promise<void> {
+    const drafts = await this.dataSource.manager.find(PromptVersion, {
+      where: { promptId, publishedAt: IsNull() },
+      order: { version: 'ASC' },
+    });
+    for (const draft of drafts) this.translateInBackground(promptId, draft);
   }
 
   async getReadiness(
@@ -459,33 +509,96 @@ export class PromptVersioningService {
     prompt: Prompt,
     version: PromptVersion,
   ): Promise<TranslationReadiness> {
+    const byHash = await this.readinessFor(manager, prompt, [version.prompt]);
+    return byHash.get(hashPromptBody(version.prompt))!;
+  }
+
+  /**
+   * Readiness of several bodies of one prompt, keyed by body hash: one
+   * languages lookup and one translations query however many bodies.
+   */
+  private async readinessFor(
+    manager: EntityManager,
+    prompt: Prompt,
+    bodies: string[],
+  ): Promise<Map<string, TranslationReadiness>> {
     const translatable =
       !!prompt.translationEnabled &&
       TRANSLATABLE_PROMPT_TYPES.includes(prompt.promptType ?? '');
-    const result: TranslationReadiness = {
-      translatable,
-      ready: [],
-      failed: [],
-      pending: [],
-    };
-    if (!translatable) return result;
-    const languages =
-      await this.promptTranslationService.getEligibleTargetLanguages();
-    const rows = await manager.find(PromptTranslation, {
-      where: {
-        promptId: prompt.id,
-        sourceHash: hashPromptBody(version.prompt),
-      },
-    });
-    const byLanguage = new Map(rows.map((r) => [r.languageId, r]));
-    for (const language of languages) {
-      const row = byLanguage.get(language.id!);
-      if (row?.status === 'ready') result.ready.push(language.id!);
-      else if (row?.status === 'failed')
-        result.failed.push({ languageId: language.id!, error: row.error });
-      else result.pending.push(language.id!);
+    const hashes = [...new Set(bodies.map((b) => hashPromptBody(b)))];
+    const out = new Map<string, TranslationReadiness>(
+      hashes.map((h) => [
+        h,
+        { translatable, ready: [], failed: [], pending: [] },
+      ]),
+    );
+    if (!translatable || !hashes.length) return out;
+    const [languages, rows] = await Promise.all([
+      this.promptTranslationService.getEligibleTargetLanguages(),
+      manager.find(PromptTranslation, {
+        where: { promptId: prompt.id, sourceHash: In(hashes) },
+      }),
+    ]);
+    const byKey = new Map(
+      rows.map((r) => [`${r.sourceHash}:${r.languageId}`, r]),
+    );
+    for (const [hash, result] of out) {
+      for (const language of languages) {
+        const row = byKey.get(`${hash}:${language.id}`);
+        if (row?.status === 'ready') result.ready.push(language.id!);
+        else if (row?.status === 'failed')
+          result.failed.push({ languageId: language.id!, error: row.error });
+        else result.pending.push(language.id!);
+      }
     }
-    return result;
+    return out;
+  }
+
+  private assertJudgeRubricConfirmed(
+    promptCode: string,
+    confirmed: boolean | undefined,
+  ): void {
+    if (!JUDGE_RUBRIC_PROMPT_CODES.has(promptCode) || confirmed) return;
+    throw new ConflictException({
+      statusCode: 409,
+      errorCode: SKILLS_STORE_ERROR.JUDGE_RUBRIC_PINNED,
+      message:
+        `${promptCode} is a judge rubric. Its results are labelled by a version pinned in code, ` +
+        'so bump the judge’s PROMPT_VERSION (and the backlog drainer’s target) in the same change, then confirm.',
+    });
+  }
+
+  /**
+   * Remove a version `createAndPromote` made when its promote was refused.
+   * Only while it is still the newest, unpublished version: once anyone has
+   * built on it, it stays.
+   */
+  private async discardDraft(version: PromptVersion): Promise<void> {
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        const prompt = await this.lockPrompt(manager, version.promptId);
+        const latest = await this.latestVersionNumber(
+          manager,
+          version.promptId,
+        );
+        if (
+          latest !== version.version ||
+          prompt.currentVersion === version.version
+        ) {
+          return;
+        }
+        await manager.delete(PromptVersion, {
+          id: version.id,
+          publishedAt: IsNull(),
+        });
+      });
+    } catch (err) {
+      this.logger.error(
+        `[SKILLS_STORE] could not remove refused v${version.version} of ${version.promptId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   /**

@@ -1513,8 +1513,33 @@ describe("PromptSidePanel Component", () => {
         fireEvent.click(screen.getByRole("button", { name: "Revert" }));
       });
 
-      expect(mockRevertPrompt).toHaveBeenCalledWith("1");
+      expect(mockRevertPrompt).toHaveBeenCalledWith({ id: "1" });
       expect(mockOnUpdate).not.toHaveBeenCalled();
+    });
+
+    it("asks to confirm a judge rubric's pinned version, then reverts with it", async () => {
+      mockRevertPrompt
+        .mockReturnValueOnce(
+          rejected({
+            status: 409,
+            data: { errorCode: "SKILLS_STORE_JUDGE_RUBRIC_PINNED", message: "pinned" },
+          }),
+        )
+        .mockReturnValueOnce(resolved(true));
+      renderAutoSavePanel({ ...mockPrompt, defaultPrompt: "Default text" });
+
+      fireEvent.click(screen.getByText("Restore default"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "I've bumped it — publish" }));
+      });
+
+      expect(mockRevertPrompt).toHaveBeenLastCalledWith({
+        id: "1",
+        confirmJudgeRubricChange: true,
+      });
     });
   });
 });

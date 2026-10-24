@@ -203,12 +203,15 @@ async function pull(args) {
         ? fs.readFileSync(baseOf(p.promptCode), 'utf8')
         : '';
       if (hashBody(base) === hashBody(theirs)) {
-        summary.unchanged++; // the store didn't move; keep the edits as they are
-        continue;
+        // The text didn't move: keep the edits as they are. The lock below
+        // still moves to the newest version, or the next push is refused as
+        // stale even though there is nothing to merge.
+        summary.unchanged++;
+      } else {
+        const result = merge(mine, base, theirs);
+        writeFile(file, result.text);
+        (result.conflicts ? summary.conflicts : summary.merged).push(p.promptCode);
       }
-      const result = merge(mine, base, theirs);
-      writeFile(file, result.text);
-      (result.conflicts ? summary.conflicts : summary.merged).push(p.promptCode);
     } else {
       if (prev && prev.contentHash === newest.contentHash) summary.unchanged++;
       else summary.updated++;
@@ -396,6 +399,8 @@ async function applyLocal(args) {
       `${res.data.created.length} created, ${res.data.unchanged.length} unchanged.` +
       (edited.length ? ` Your edits are live locally for: ${edited.join(', ')}.` : ''),
   );
+  for (const f of res.data.failed ?? []) console.log(`  not imported: ${f.promptCode}: ${f.error}`);
+  if (res.data.failed?.length) process.exitCode = 1;
   if (edited.length)
     console.log(
       '  Edited prompts serve English locally until translated: their translations were made from the old text.',

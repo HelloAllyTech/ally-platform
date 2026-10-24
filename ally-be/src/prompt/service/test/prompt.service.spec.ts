@@ -131,6 +131,7 @@ describe('PromptsService', () => {
             promote: jest.fn(),
             latestVersionOf: jest.fn().mockResolvedValue(3),
             listVersions: jest.fn(),
+            translateDrafts: jest.fn().mockResolvedValue(undefined),
           }),
         },
         {
@@ -291,6 +292,8 @@ describe('PromptsService', () => {
       await service.updatePrompt(mockPromptId, { translationEnabled: true });
 
       expect(translatePrompt).toHaveBeenCalledWith(mockPromptId);
+      // Drafts saved while translation was off are translated too.
+      expect(versioning.translateDrafts).toHaveBeenCalledWith(mockPromptId);
     });
 
     it('does not translate for a non-translatable promptType', async () => {
@@ -326,6 +329,24 @@ describe('PromptsService', () => {
           model: 'gpt-5',
           source: 'revert',
         }),
+        {},
+      );
+    });
+
+    it('passes the judge-rubric confirmation through', async () => {
+      (promptsRepository.findOne as jest.Mock).mockResolvedValue({
+        ...mockPrompt,
+        defaultPrompt: 'Default text.',
+      });
+
+      await service.revertPrompt(mockPromptId, {
+        confirmJudgeRubricChange: true,
+      });
+
+      expect(versioning.createAndPromote).toHaveBeenCalledWith(
+        mockPromptId,
+        expect.anything(),
+        { confirmJudgeRubricChange: true },
       );
     });
 

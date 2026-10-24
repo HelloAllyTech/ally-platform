@@ -251,6 +251,10 @@ export class PromptsService {
     return this.versioning.listVersions(id);
   }
 
+  getVersionBody(id: string, version: number) {
+    return this.versioning.getVersionBody(id, version);
+  }
+
   /**
    * Fire-and-forget re-translation when a `translationEnabled` main_agent/
    * branching source changes its English body (a new version) or when
@@ -293,6 +297,19 @@ export class PromptsService {
           }`,
         ),
       );
+    // translatePrompt covers the live text only; drafts need theirs too, or
+    // publishing them waits on translations nothing is running.
+    if (justEnabled) {
+      void this.versioning
+        .translateDrafts(id)
+        .catch((err: unknown) =>
+          this.logger.error(
+            `Translating drafts failed for ${id}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          ),
+        );
+    }
   }
 
   async getPrompts(
@@ -820,7 +837,10 @@ export class PromptsService {
    * default, put live with the live model settings, translations included.
    * Goes through the same write path as every other change.
    */
-  async revertPrompt(id: string): Promise<boolean> {
+  async revertPrompt(
+    id: string,
+    options: { confirmJudgeRubricChange?: boolean } = {},
+  ): Promise<boolean> {
     const prompt = await this.promptsRepository.findOne({ where: { id } });
     if (!prompt) {
       throw new NotFoundException('Prompt not found');
@@ -830,16 +850,20 @@ export class PromptsService {
         'Cannot revert: this prompt has no default text in Git',
       );
     }
-    await this.versioning.createAndPromote(id, {
-      body: prompt.defaultPrompt,
-      baseVersion: await this.versioning.latestVersionOf(id),
-      provider: prompt.provider ?? null,
-      model: prompt.model ?? null,
-      temperature: prompt.temperature ?? null,
-      source: PromptVersionSource.REVERT,
-      note: 'Reverted to the default text in Git.',
-      createdBy: Number(ExecutionManager.getUserId()) || 0,
-    });
+    await this.versioning.createAndPromote(
+      id,
+      {
+        body: prompt.defaultPrompt,
+        baseVersion: await this.versioning.latestVersionOf(id),
+        provider: prompt.provider ?? null,
+        model: prompt.model ?? null,
+        temperature: prompt.temperature ?? null,
+        source: PromptVersionSource.REVERT,
+        note: 'Reverted to the default text in Git.',
+        createdBy: Number(ExecutionManager.getUserId()) || 0,
+      },
+      options,
+    );
     return true;
   }
 }
