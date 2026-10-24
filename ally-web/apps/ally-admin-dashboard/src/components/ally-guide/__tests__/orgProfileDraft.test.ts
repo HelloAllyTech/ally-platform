@@ -135,8 +135,11 @@ describe("validateLine (the server's rules, applied before a save)", () => {
     expect(validateLine({ ...base, phone: "12" })).toEqual({ phone: "phoneInvalid" });
     expect(validateLine({ ...base, phone: "080 2222 3333" })).toEqual({});
     expect(validateLine({ ...base, phone: "1-800-891-4416" })).toEqual({});
-    // ally-be's pattern needs a digit or + FIRST, so a leading bracket is refused there too.
-    expect(validateLine({ ...base, phone: "(080) 2222-3333" })).toEqual({ phone: "phoneInvalid" });
+    // ally-be now accepts a leading bracket, the common way to write an Indian landline.
+    expect(validateLine({ ...base, phone: "(080) 2222-3333" })).toEqual({});
+    // Anything else must still start with a digit or +.
+    expect(validateLine({ ...base, phone: ") 2222 3333" })).toEqual({ phone: "phoneInvalid" });
+    expect(validateLine({ ...base, phone: "-2222 3333" })).toEqual({ phone: "phoneInvalid" });
   });
 
   it("allows an empty link but not one that is not http or https", () => {

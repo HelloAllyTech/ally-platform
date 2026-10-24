@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button, CarbonToggle, TextArea, TextInput } from "@ally-ui-mono/ui-shared";
 import {
   useGetAllyGuideOrgCrisisResponsesQuery,
+  useDeleteAllyGuideOrgCrisisResponseMutation,
   useGetAllyGuideOrgProfileQuery,
   useSaveAllyGuideOrgCrisisResponseMutation,
   useSaveAllyGuideOrgProfileMutation,
@@ -85,6 +86,7 @@ export const AllyOrgTab: React.FC<AllyOrgTabProps> = ({ tenantId }) => {
   const crisisQuery = useGetAllyGuideOrgCrisisResponsesQuery(tenantId);
   const [saveProfile, { isLoading: isSaving }] = useSaveAllyGuideOrgProfileMutation();
   const [saveCrisis] = useSaveAllyGuideOrgCrisisResponseMutation();
+  const [withdrawCrisis] = useDeleteAllyGuideOrgCrisisResponseMutation();
 
   const baseline = useMemo(() => draftFromProfile(profileQuery.data?.profile), [profileQuery.data]);
   const [draft, setDraft] = useState<OrgProfileDraft>(baseline);
@@ -151,15 +153,20 @@ export const AllyOrgTab: React.FC<AllyOrgTabProps> = ({ tenantId }) => {
     );
   }
 
-  const { version, updatedBy, updatedAt } = profileQuery.data;
+  const { version, updatedBy, updatedByName, updatedAt } = profileQuery.data;
   const who =
     version === 0
       ? null
-      : approverLabel(updatedBy, currentUserId, {
-          you: en.allyConsole.crisisCopy.approverYou,
-          user: en.allyConsole.crisisCopy.approverUser,
-          unknown: en.allyConsole.crisisCopy.approverUnknown,
-        });
+      : approverLabel(
+          updatedBy,
+          currentUserId,
+          {
+            you: en.allyConsole.crisisCopy.approverYou,
+            user: en.allyConsole.crisisCopy.approverUser,
+            unknown: en.allyConsole.crisisCopy.approverUnknown,
+          },
+          updatedByName,
+        );
 
   const disabled = !canEditOrg;
 
@@ -401,6 +408,10 @@ export const AllyOrgTab: React.FC<AllyOrgTabProps> = ({ tenantId }) => {
             canEdit={canEditOrg}
             supportLines={previewLines}
             switcher
+            scope="organisation"
+            onWithdraw={async row => {
+              await withdrawCrisis({ tenantId, id: row.id }).unwrap();
+            }}
             onSave={(languageCode, body) => saveCrisis({ tenantId, languageCode, body }).unwrap()}
           />
         )}

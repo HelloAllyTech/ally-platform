@@ -5462,6 +5462,9 @@ export const en = {
       overview: "Overview",
       conversations: "Conversations",
       releases: "Releases",
+      playground: "Playground",
+      alerts: "Alerts",
+      baseline: "Baseline",
       settings: "Settings",
       crisisCopy: "Crisis copy",
     },
@@ -5510,6 +5513,109 @@ export const en = {
       emptyTitle: "No Ally conversations in this window yet",
       emptyMessage:
         "Once learners start talking to Ally, turns, timings, safety counts and cost appear here.",
+      alertsTile: {
+        label: "Open alerts",
+        help: "Alerts the health rules have raised that nobody has acknowledged yet. The rules run every 15 minutes.",
+        failed: "Could not load the alerts",
+        none: "Nothing needs attention",
+        ofTotal: (total: number) => `of ${total} raised in all`,
+        review: "Review alerts",
+      },
+      canary: {
+        title: "Canary",
+        help: "A canary is a new release shown to a small share of new conversations while the live release serves the rest. This sets the two side by side over the window. Promoting it and stopping it are your decision: nothing here does either for you.",
+        none: "No canary is running.",
+        noneDetail:
+          "To try a release on a share of new conversations, start a canary from a draft on the Releases tab.",
+        summary: (canary: string, percent: number | null, live: string | null) =>
+          `${canary} is ${percent === null ? "in canary" : `taking ${percent}% of new conversations`}${
+            live ? `, and ${live} serves the rest.` : "."
+          }`,
+        measure: "Measure",
+        gaColumn: (version: string | null) => (version ? `Live ${version}` : "Live"),
+        canaryColumn: (version: string) => `Canary ${version}`,
+        difference: "Canary compared with live",
+        notServed:
+          "The canary has not answered a turn in this window yet, so there is nothing to compare.",
+        tooFew: (turns: number, minimum: number) =>
+          `The canary has answered ${turns} ${turns === 1 ? "turn" : "turns"} in this window. Fewer than ${minimum} is too few to read anything into, so treat the differences below as noise.`,
+        scope:
+          "This sets health, safety, feedback and learning side by side. Learning is read for the learners whose conversation is in each arm, on that conversation's course, so the groups are small: look at the attempt counts before you lean on a difference.",
+        guard: {
+          title: "Engagement is up on the canary while quiz passing is lower",
+          body: (improved: string, gaPass: string, canaryPass: string) =>
+            `The canary is ahead of live on ${improved}, but its learners pass quizzes at the first attempt less often (${canaryPass} against ${gaPass}). The plan says to revert a change that raises engagement while learning is flat or falling.`,
+          sizes: (attempts: number) =>
+            `That rests on ${attempts} graded first ${attempts === 1 ? "attempt" : "attempts"} on the canary. Small groups swing a lot, so look before acting.`,
+          measures: {
+            itemsCompletedPerThread: "items completed per conversation",
+            turnsPerThread: "turns per conversation",
+          } as Record<string, string>,
+        },
+        promote: "Promote…",
+        stop: "Stop canary…",
+        openReleases: "Open releases",
+        directions: {
+          better: "better than live",
+          worse: "worse than live",
+          same: "no difference",
+          differs: "differs from live: worth a look",
+        } as Record<string, string>,
+        metrics: {
+          turns: {
+            label: "Turns",
+            help: "Turns each release answered in the window. The canary only takes its share, so it is always the smaller.",
+          },
+          threads: {
+            label: "Conversations",
+            help: "Conversations with at least one turn on that release.",
+          },
+          failureRate: {
+            label: "Failed turns",
+            help: "Share of turns that ended in a failure instead of a reply. Lower is better.",
+          },
+          ttftP50Ms: {
+            label: "Median time to first token",
+            help: "How long the typical learner waited before Ally began to answer. Lower is better.",
+          },
+          costPerThreadUsd: {
+            label: "Cost per conversation",
+            help: "Model spend divided by conversations. Lower is better.",
+          },
+          crisisReplies: {
+            label: "Crisis replies per 100 turns",
+            help: "Turns answered with the fixed crisis copy. Per 100 turns so a small canary can sit beside the live release. More can mean a classifier that over-triggers or one that catches more, so a difference is a prompt to look, not a score.",
+          },
+          careEntries: {
+            label: "Care mode entries per 100 turns",
+            help: "Turns where a conversation moved into care mode. A difference is a prompt to look, not a score.",
+          },
+          refusals: {
+            label: "Refusals per 100 turns",
+            help: "Turns where Ally declined to engage. A difference is a prompt to look, not a score.",
+          },
+          thumbsUp: {
+            label: "Thumbs up per 100 turns",
+            help: "Learners who rated a reply well, per 100 turns. Higher is better.",
+          },
+          thumbsDown: {
+            label: "Thumbs down per 100 turns",
+            help: "Learners who rated a reply badly, per 100 turns. Lower is better.",
+          },
+          quizFirstAttempts: {
+            label: "Graded first quiz attempts",
+            help: "How many first attempts at a quiz the pass rate below rests on. Few attempts means a shaky rate.",
+          },
+          quizFirstAttemptPassRate: {
+            label: "Passed a quiz at the first attempt",
+            help: "Learning, not engagement: the share of first quiz attempts that passed, for learners whose conversation is in that arm. Higher is better.",
+          },
+          itemsCompletedPerThread: {
+            label: "Items completed per conversation",
+            help: "Course items finished in the window by the learners in that arm, divided by conversations. Higher is better, but read it with the quiz pass rate.",
+          },
+        } as Record<string, { label: string; help: string }>,
+      },
       tiles: {
         turns: "Turns",
         turnsDetail: (threads: number) =>
@@ -5533,6 +5639,8 @@ export const en = {
         releaseDetail: (when: string) => `Live since ${when}`,
         releaseNone: "No live release",
         releaseNoneDetail: "Ally has no GA release, so it cannot answer.",
+        canaryDetail: (version: string, percent: number | null) =>
+          percent === null ? `Canary: ${version}` : `Canary: ${version} at ${percent}%`,
         releaseHelp:
           "The release (prompts, models, policy) that new conversations start on. GA means generally available.",
         openReleases: "Open releases",
@@ -5572,6 +5680,14 @@ export const en = {
       mode: "Mode",
       clearFilters: "Clear filters",
       noOrganisation: "No organisation",
+      notSignedIn: "Not signed in",
+      statusFilter: "Status",
+      visitor: "Visitor",
+      visitorHelp:
+        "Someone who has not signed in, chatting from a public course link. Still anonymous: no name or account is attached.",
+      canary: "Canary",
+      canaryHelp:
+        "This conversation was served by the release currently in canary, not the live one.",
       columns: {
         course: "Course",
         organisation: "Organisation",
@@ -5754,6 +5870,54 @@ export const en = {
       noneLive: "No release is live.",
       rollback: "Roll back…",
       rollbackNeedsTwo: "There is no earlier release to roll back to.",
+      rollbackChecking: "Checking where a rollback would land…",
+      canaryPill: (percent: number | null) =>
+        percent === null ? "Canary" : `Canary · ${percent}%`,
+      canaryBanner: {
+        title: (version: string, percent: number | null) =>
+          percent === null
+            ? `${version} is in canary`
+            : `${version} is in canary at ${percent}% of new conversations`,
+        body: (live: string | null) =>
+          `Compare it with ${live ?? "the live release"} on the Overview, then promote it or stop it. Nothing decides for you.`,
+        compare: "Compare on Overview",
+        promote: "Promote…",
+        stop: "Stop canary…",
+      },
+      audit: {
+        heading: "History",
+        help: "Every change to a release: who made it, when and why. Newest first.",
+        columns: { when: "When", what: "What happened", who: "Who", reason: "Reason" },
+        none: "No changes have been recorded yet.",
+        noReason: "None given",
+        emergency: "Emergency",
+        actors: {
+          you: "You",
+          seed: "The system",
+          curator: "The curator",
+          person: "A person",
+          user: (id: number) => `User ${id}`,
+        },
+        wording: {
+          created: (version: number | null) =>
+            version === null ? "Created a release" : `Created v${version}`,
+          statusChanged: (version: number | null) =>
+            version === null ? "Changed a release's status" : `Changed the status of v${version}`,
+          promoted: (to: number | null, from: number | null) =>
+            `Promoted ${to === null ? "a release" : `v${to}`} to live${from === null ? "" : `, replacing v${from}`}`,
+          rolledBack: (to: number | null, from: number | null) =>
+            `Rolled back${to === null ? "" : ` to v${to}`}${from === null ? "" : ` from v${from}`}`,
+          emergencyRollback: (to: number | null, from: number | null) =>
+            `Emergency rollback${to === null ? "" : ` to v${to}`}${from === null ? "" : ` from v${from}`}`,
+          emergencyStop: "Emergency stop: every conversation moved to the live release",
+          note: "Added a note",
+          canaryStarted: (version: number | null, percent: number | null) =>
+            `Started a canary of ${version === null ? "a release" : `v${version}`}${percent === null ? "" : ` at ${percent}%`}`,
+          canaryStopped: (version: number | null, emergency: boolean) =>
+            `Stopped the canary${version === null ? "" : ` v${version}`}${emergency ? " (emergency)" : ""}`,
+          unknown: (action: string) => `Unrecognised change (${action})`,
+        },
+      },
       columns: {
         version: "Version",
         status: "Status",
@@ -5818,6 +5982,16 @@ export const en = {
         off: "Off",
         promote: "Promote…",
         promoteGa: "This release is already live.",
+        startCanary: "Start canary…",
+        changeCanary: "Change share…",
+        stopCanary: "Stop canary…",
+        canaryRunning: (percent: number | null) =>
+          percent === null
+            ? "This release is in canary."
+            : `This release is in canary at ${percent}% of new conversations.`,
+        canaryHelp:
+          "A canary shows this release to a small share of new conversations while the live release serves the rest. You compare them on the Overview and decide.",
+        shareMeta: "Canary share",
       },
       promoteDialog: {
         title: (version: string) => `Promote ${version} to live?`,
@@ -5825,6 +5999,12 @@ export const en = {
           current
             ? `${version} becomes the live release and ${current} is retired. Conversations already under way finish on their current release and move at their next epoch; new ones start on ${version}.`
             : `${version} becomes the live release. Conversations already under way move at their next epoch; new ones start on ${version}.`,
+        canaryBody: (version: string, current: string | null) =>
+          current
+            ? `${version} becomes the live release for everyone and the canary ends. ${current} is retired. Conversations already under way move at their next epoch.`
+            : `${version} becomes the live release for everyone and the canary ends. Conversations already under way move at their next epoch.`,
+        otherCanary: (canary: string, version: string) =>
+          `${canary} stays in canary, and is now compared with ${version}.`,
         undo: "You can roll back afterwards.",
         cancel: "Cancel",
         confirm: (version: string) => `Promote ${version}`,
@@ -5834,10 +6014,14 @@ export const en = {
       },
       rollbackDialog: {
         title: "Roll back the live release",
-        body: (current: string | null) =>
-          current
-            ? `Goes back to the release that was live before ${current}. ${current} is retired.`
-            : "Goes back to the release that was live before the current one.",
+        body: (current: string | null, target: string | null) =>
+          target
+            ? current
+              ? `Goes back to ${target}, the release that was live before ${current}. ${current} is retired.`
+              : `Goes back to ${target}, the release that was live before the current one.`
+            : current
+              ? `Goes back to the release that was live before ${current}. ${current} is retired.`
+              : "Goes back to the release that was live before the current one.",
         reasonLabel: "Reason (optional)",
         reasonHint:
           "Kept in the release audit trail. Say what you saw, so the next person understands.",
@@ -5855,7 +6039,370 @@ export const en = {
         success: (version: string) => `Rolled back. ${version} is live.`,
         failed: "Could not roll back.",
       },
+      startCanaryDialog: {
+        title: (version: string) => `Start a canary of ${version}?`,
+        changeTitle: (version: string) => `Change the canary share of ${version}`,
+        body: (version: string, live: string | null) =>
+          `${version} answers the share of new conversations you set below. Everyone else stays on ${live ?? "the live release"}. Conversations already under way are placed when their next epoch starts, and one conversation stays on the same side for as long as this canary runs.`,
+        oneAtATime:
+          "Only one canary can run at a time. You promote it or stop it yourself: nothing does either automatically.",
+        shareLabel: "Share of new conversations (%)",
+        shareHelp: (max: number) =>
+          `A whole number from 1 to ${max}. A canary never takes more than ${max}%, so most learners stay on the live release. 20 is the usual start.`,
+        shareInvalid: (max: number) => `Enter a whole number from 1 to ${max}.`,
+        reasonLabel: "Reason (optional)",
+        reasonHint: "Kept in the release history, so the next person knows why.",
+        reasonPlaceholder: "For example: trying a shorter opening for Hindi learners",
+        cancel: "Cancel",
+        confirm: (percent: number | null) =>
+          percent === null ? "Start canary" : `Start at ${percent}%`,
+        confirmChange: (percent: number | null) =>
+          percent === null ? "Change share" : `Change to ${percent}%`,
+        working: "Saving…",
+        success: (version: string, percent: number) => `${version} is in canary at ${percent}%.`,
+        failed: "Could not start the canary.",
+      },
+      stopCanaryDialog: {
+        title: (version: string) => `Stop the canary ${version}?`,
+        body: (version: string, live: string | null) =>
+          `${version} stops taking new conversations and is retired. Conversations in the canary finish their current epoch on ${version}, then move to ${live ?? "the live release"}.`,
+        retired:
+          "A retired release cannot go back into canary. It can still be promoted from its page, or you can create a new release.",
+        reasonLabel: "Reason (optional)",
+        reasonHint:
+          "Kept in the release history. Say what you saw, so the next person understands.",
+        reasonPlaceholder: "For example: crisis replies doubled against the live release",
+        emergencyLabel: "Emergency (moves every conversation to the live release at its next turn)",
+        emergencyHelp:
+          "Without this, canary conversations finish their current epoch first. Use it for a safety reason only.",
+        emergencyWarningTitle: "Every canary conversation switches on its next turn",
+        emergencyWarning:
+          "Each one loses its prompt cache once, so the next replies are slower and cost more. That is the price of acting at once.",
+        cancel: "Keep it running",
+        confirm: "Stop canary",
+        confirmEmergency: "Stop canary now",
+        working: "Stopping…",
+        success: (version: string) => `The canary ${version} has stopped.`,
+        failed: "Could not stop the canary.",
+      },
     },
+    playground: {
+      intro:
+        "Try a release on a scripted conversation, with no learner involved. Choose two releases, a draft included, and they answer the same lines side by side. Nothing is saved and nothing reaches a learner, but the models are called for real: each run takes 5 to 30 seconds and costs money, and the cost is shown.",
+      needsEditTitle: "Running the Playground needs the edit permission",
+      needsEdit:
+        "Each run calls the models and costs money, so only people who can edit the Ally guide can start one. Yours is read-only.",
+      scenario: {
+        heading: "Scenario",
+        help: "The imagined learner and the course they are on. Both releases get exactly this.",
+      },
+      course: {
+        label: "Course",
+        help: "The course Ally helps the imagined learner with. Its outline, and how far through it the learner is, become part of what Ally is told.",
+        searchLabel: "Search courses",
+        searchPlaceholder: "Type part of a course title…",
+        choose: "Choose a course",
+        loading: "Loading courses…",
+        failed: "Could not load courses. Check your connection and try again.",
+        noMatches: "No courses match that search.",
+        shownOf: (shown: number, total: number) =>
+          `Showing ${shown} of ${total}. Type to narrow the list.`,
+      },
+      organisation: {
+        label: "Organisation layer",
+        none: "None: Ally without an organisation",
+        help: "Uses that organisation's Ally profile (its name, support lines and crisis copy) as its learners would get it. Leave it on None to see Ally without one.",
+      },
+      progress: {
+        label: "Items completed",
+        help: "How far through the course the imagined learner is. 0 means just starting.",
+        invalid: (max: number) => `Enter a whole number from 0 to ${max}.`,
+      },
+      mode: {
+        label: "Safety mode",
+        help: "Which mode the conversation is in. Care and Crisis follow-up change how Ally answers. Crisis itself is not a choice: the safety monitor decides that from what the learner says.",
+      },
+      guidance: {
+        label: "Guidance dial",
+        help: "The learner's own control for how much Ally talks and steers.",
+        options: {
+          lead: "Lead me",
+          walk: "Walk with me (default)",
+          drive: "I'll drive",
+        } as Record<string, string>,
+      },
+      channel: {
+        label: "Channel",
+        help: "Voice replies are shorter than text ones.",
+      },
+      visitor: {
+        label: "Run as an anonymous visitor",
+        help: "Uses the public outline of the course and the visitor message limit. Progress and the organisation layer do not apply.",
+      },
+      releases: {
+        heading: "Releases to compare",
+        help: "Both get exactly the same lines. One run each is one sample and models vary from run to run, so send a line again to see how much.",
+        a: "Release A",
+        b: "Release B",
+        noneB: "No second release",
+        option: (version: string, status: string) => `${version} · ${status}`,
+        loadFailed: "Could not load the releases.",
+      },
+      conversation: {
+        heading: "Conversation",
+        empty: "Nothing sent yet. Write what the learner says below, then send it.",
+        learner: "Learner",
+        ally: "Ally",
+        action: (label: string) => `Action: ${label}`,
+        reset: "Start over",
+        resetHelp: "Clears the conversation in both columns. The scenario above stays.",
+      },
+      message: {
+        label: "What the learner says",
+        placeholder: "For example: I feel stuck on this lesson",
+        help: (max: number) => `Up to ${max} characters.`,
+        tooLong: (max: number) => `That is more than ${max} characters.`,
+      },
+      action: {
+        label: "Card action (optional)",
+        help: "A button the learner pressed. Send it with a message, or alone by leaving the message empty.",
+        none: "None: just the message",
+        options: {
+          start: "Pressed Start",
+          continue: "Pressed Continue",
+          locked_peek: "Tapped a locked item",
+          not_now: "Pressed Not now",
+          safe_now: "Tapped I'm safe right now",
+        } as Record<string, string>,
+      },
+      send: "Send to both",
+      sendOne: "Send",
+      sending: "Running…",
+      cannotSend: {
+        course: "Choose a course first.",
+        release: "Choose a release first.",
+        nothing: "Write a message or choose a card action.",
+        busy: "Wait for the current run to finish.",
+        progress: "Fix the number of items completed.",
+        tooLong: "Shorten the message.",
+      },
+      pane: {
+        running: (version: string) => `Asking ${version}…`,
+        runningHint: "This usually takes 5 to 30 seconds.",
+        stop: "Stop waiting",
+        stopped:
+          "Stopped waiting. The server may still finish this run, so it may still cost money.",
+        failed: "This run failed.",
+        retry: "Try again",
+        replyKinds: {
+          crisis: "Fixed crisis copy",
+          refusal: "Refusal",
+          model: "Model reply",
+        } as Record<string, string>,
+        crisisNote:
+          "The safety monitor recognised acute risk, so the fixed crisis copy was sent and the model was not asked.",
+        reply: "Ally's reply",
+        facts: {
+          model: "Model",
+          time: "Took",
+          cost: "Cost",
+          tokens: "Tokens",
+        },
+        tokens: (input: number, output: number, cached: number) =>
+          `${input} in, ${output} out${cached > 0 ? `, ${cached} from cache` : ""}`,
+        sentinelHeading: "Safety monitor verdict",
+        sentinelNone: "The safety monitor did not run: there was no message.",
+        situationHeading: "Situation report",
+        situationHelp:
+          "What Ally was told about this turn before it answered: the mode, the pacing, where the learner is in the course and what to do next.",
+        toolsHeading: "Tools called",
+        toolsHelp:
+          "What Ally did besides talk. A dry run reports what it would have done and changed nothing.",
+        toolsNone: "No tools were called.",
+        dryRun: "Dry run",
+        dryRunHelp: "This tool reported what it would have done and changed nothing.",
+        toolFailed: "failed",
+        toolInput: "Input",
+        toolResult: "Result",
+        totals: (cost: string, time: string) => `This turn: ${cost}, ${time}`,
+      },
+    },
+    alerts: {
+      intro:
+        "The health rules are checked every 15 minutes. An alert stays open until someone acknowledges it, so the team can tell what has been looked at. Alerts carry numbers only: never a learner, an organisation or a message.",
+      filterLabel: "Which alerts to show",
+      openFilter: (count: number) => `Open (${count})`,
+      allFilter: "All",
+      checkNow: "Check now",
+      checking: "Checking…",
+      checkHelp:
+        "The rules run every 15 minutes anyway. This runs them now. An alert is raised once per rule per window, so asking again does not repeat one.",
+      checked: (count: number) =>
+        count === 0
+          ? "Checked: nothing new fired."
+          : `Checked: ${count} new ${count === 1 ? "alert" : "alerts"} fired.`,
+      checkFailed: "Could not run the rules.",
+      refresh: "Refresh",
+      emptyTitle: "No alerts have fired",
+      emptyMessage: "When a rule fires, it appears here and in the team channel if one is set up.",
+      noneOpenTitle: "Nothing needs attention",
+      noneOpenMessage: (acknowledged: number) =>
+        acknowledged === 0
+          ? "Every alert has been acknowledged."
+          : `${acknowledged} earlier ${acknowledged === 1 ? "alert has" : "alerts have"} been acknowledged. Choose All to read them.`,
+      limitNote: (limit: number) => `Showing the newest ${limit}. Older alerts are not listed.`,
+      columns: {
+        when: "Raised",
+        severity: "Severity",
+        rule: "Rule",
+        what: "What happened",
+        status: "Status",
+        channel: "Team channel",
+      },
+      severities: { critical: "Critical", warning: "Warning" } as Record<string, string>,
+      rules: {
+        turn_failures: {
+          label: "Turn failures",
+          help: "More than 5% of turns failed over the last 30 minutes. Critical above 20%. Usually a provider outage or a bad release.",
+        },
+        ttft_slo: {
+          label: "Slow first token",
+          help: "The slowest 5% of text turns waited more than 5 seconds for the first word, over the last hour.",
+        },
+        cost_anomaly: {
+          label: "Cost anomaly",
+          help: "Today's spend is more than twice the median of the last 7 days.",
+        },
+        crisis_spike: {
+          label: "Crisis spike",
+          help: "Far more crisis replies in the last 24 hours than the daily average. Check the classifier and the last release change.",
+        },
+        anonymous_cap: {
+          label: "Anonymous spend cap",
+          help: "Visitors who have not signed in have used most of today's spend cap. At the cap, anonymous chat pauses.",
+        },
+        cache_health: {
+          label: "Cache health",
+          help: "Conversations already under way read too little of their prompt from cache over the last hour. A part of the prompt may be changing on every turn.",
+        },
+      } as Record<string, { label: string; help: string }>,
+      open: "Open",
+      acknowledgedBy: (who: string, at: string) => `Acknowledged by ${who}, ${at}`,
+      acknowledgedUnknown: (at: string) => `Acknowledged ${at}`,
+      you: "you",
+      user: (id: number) => `user ${id}`,
+      acknowledge: "Acknowledge",
+      acknowledgeLabel: (summary: string) => `Acknowledge alert: ${summary}`,
+      acknowledging: "Saving…",
+      acknowledged: "Acknowledged.",
+      acknowledgeFailed: "Could not acknowledge this alert.",
+      posted: (at: string) => `Posted ${at}`,
+      notPosted: "Not posted",
+      notPostedHelp: "The alert was not posted to a team channel. It is still here either way.",
+      noChannel: "No team channel",
+      noChannelHelp:
+        "No team channel is set up, so alerts appear only here. Ask whoever runs the platform to set one up.",
+      postFailed: "Post failed",
+      postFailedHelp:
+        "A team channel is set up but the post did not go through. Nobody was told except through this tab.",
+    },
+    baseline: {
+      intro:
+        "Before Ally, public courses already had learners. This is how they did: the number Ally is compared against, in place of a group held back from it. Capture one before launch and again whenever it helps, and each snapshot is kept so later ones can be read against the first.",
+      capture: "Capture a snapshot…",
+      emptyTitle: "No baseline has been captured",
+      emptyMessage:
+        "Capture one before Ally reaches learners, so there is a before to compare with. It reads enrollments on public courses over the days you choose.",
+      latestSummary: (taken: string, by: string, days: number, courses: number) =>
+        `Latest snapshot: taken ${taken} by ${by}, covering ${days} days of enrollments on ${courses} public ${courses === 1 ? "course" : "courses"}.`,
+      by: { you: "you", user: (id: number) => `user ${id}`, unknown: "someone" },
+      onlyOne:
+        "This is the only snapshot so far. Capture another after launch to see what changed against it.",
+      compareHeading: "Before Ally and since",
+      compareHelp:
+        "The first snapshot is the before. The latest splits learners by how they entered the course, so guided learners can be set against it.",
+      noGuided:
+        "No guided learners are in the latest snapshot yet, so there is nothing to set against the before.",
+      smallGroups:
+        "Small groups swing a lot. Check the enrollment counts before reading a difference.",
+      measure: "Measure",
+      baselineColumn: (date: string) => `Before Ally (${date})`,
+      allColumn: "All enrollments",
+      cohortHelp:
+        "How the learner entered the course. Enrollments from before entry sources were recorded are Earlier. From launch, classic enrollments are Public link or In the app, and Ally's are Guided.",
+      cohorts: {
+        guided: "Guided by Ally",
+        public_link: "Public link",
+        in_app: "In the app",
+        outreach: "Outreach",
+        unknown: "Earlier (source not recorded)",
+        all: "All enrollments",
+      } as Record<string, string>,
+      learners: (count: number) => `${count} ${count === 1 ? "learner" : "learners"}`,
+      difference: "Guided compared with before",
+      groups: {
+        volume: "Volume",
+        engagement: "Engagement",
+        learning: "Learning",
+      } as Record<string, string>,
+      groupHelp: {
+        volume: "How many enrollments the figures rest on.",
+        engagement: "Whether learners keep going. Judged together with learning, never alone.",
+        learning:
+          "Whether learners are learning. Engagement that rises while this stays flat or falls is a reason to revert.",
+      } as Record<string, string>,
+      metrics: {
+        enrollments: "Enrollments",
+        completionRate: "Completed the course",
+        medianDaysToComplete: "Median days to complete",
+        itemsCompletedPerEnrollment: "Items completed per enrollment",
+        firstDayWinRate: "Finished something on day one",
+        returnWithin7dRate: "Came back within 7 days",
+        quizFirstAttemptPassRate: "Passed a quiz at the first attempt",
+      } as Record<string, string>,
+      quizAttempts: (count: number) => `${count} first ${count === 1 ? "attempt" : "attempts"}`,
+      days: (value: string) => `${value} days`,
+      directions: {
+        better: "better than before",
+        worse: "worse than before",
+        same: "no difference",
+      } as Record<string, string>,
+      guard: {
+        title: "Engagement is up while quiz passing is lower",
+        body: (improved: string, baselinePass: string, guidedPass: string) =>
+          `Guided learners are ahead of the before on ${improved}, but they pass quizzes at the first attempt less often (${guidedPass} against ${baselinePass}). The plan says to revert a change that raises engagement while learning is flat or falling.`,
+        sizes: (guided: number, baseline: number, attempts: number) =>
+          `That rests on ${guided} guided ${guided === 1 ? "learner" : "learners"} against ${baseline} before, and ${attempts} guided quiz ${attempts === 1 ? "attempt" : "attempts"}. Small groups swing a lot, so look before acting.`,
+      },
+      historyHeading: "Snapshots",
+      historyHelp: "Every snapshot taken, newest first. The oldest is the before.",
+      historyColumns: {
+        taken: "Taken",
+        by: "By",
+        window: "Window",
+        enrollments: "Enrollments",
+        note: "Note",
+      },
+      window: (days: number) => `${days} days`,
+      noNote: "No note",
+      captureDialog: {
+        title: "Capture a baseline snapshot",
+        body: "Reads enrollments on public courses that started in the window you choose, and stores the result. It changes nothing for learners. Every snapshot is kept.",
+        windowLabel: "Days of enrollments to read",
+        windowHelp: (min: number, max: number) =>
+          `A whole number from ${min} to ${max}. 90 is the usual choice: long enough to smooth out a quiet week.`,
+        windowInvalid: (min: number, max: number) => `Enter a whole number from ${min} to ${max}.`,
+        noteLabel: "Note (optional)",
+        noteHint: "Why this snapshot was taken, for whoever reads it later.",
+        notePlaceholder: "For example: the week before launch",
+        cancel: "Cancel",
+        confirm: "Capture",
+        working: "Capturing…",
+        success: "Snapshot captured.",
+        failed: "Could not capture a snapshot.",
+      },
+    },
+
     settings: {
       intro:
         "The kill switches. They sit outside releases so they act at once: every change reaches learners within about 30 seconds. If these settings ever cannot be read, Ally switches itself off and learners see the classic course.",
@@ -5928,6 +6475,10 @@ export const en = {
       approverUnknown: "someone unrecorded",
       noCopy: "No copy saved for this language yet.",
       noCopyFallback: "Learners see English, then the built-in default, until you save one.",
+      // An organisation's copy sits in front of the platform's: the server tries the organisation's
+      // message for the language, then the platform's, then the same two for English, then the default.
+      noCopyFallbackOrg:
+        "Learners see the platform's message for this language, then English, then the built-in default, until you save one.",
       bodyLabel: (language: string) => `${language} crisis message`,
       counter: (length: number, min: number, max: number) => `${length} / ${max} (at least ${min})`,
       tooShort: (min: number) => `At least ${min} characters.`,
@@ -5951,6 +6502,8 @@ export const en = {
       withdrawDialog: {
         title: (language: string) => `Withdraw the ${language} crisis message?`,
         body: "Learners in this language fall back to English, then to the built-in default, until you save a new one. The withdrawn version is kept in the record.",
+        bodyOrg:
+          "Learners in this language fall back to the platform's message for it, then English, then the built-in default, until you save a new one. The withdrawn version is kept in the record.",
         cancel: "Keep it",
         confirm: "Withdraw",
         working: "Withdrawing…",
@@ -6011,7 +6564,7 @@ export const en = {
           nameRequired: "Every line needs a name.",
           phoneRequired: "Every line needs a phone number.",
           phoneInvalid:
-            "Start with a digit or +, then use only digits, spaces, brackets, dots and dashes.",
+            "Start with a digit, + or a bracket, then use only digits, spaces, brackets, dots and dashes.",
           urlInvalid: "A link must start with http:// or https://.",
         },
         lineLabel: (n: number) => `Support line ${n}`,

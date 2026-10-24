@@ -40,7 +40,8 @@ describe("allyGuideAPI", () => {
       body: text ? JSON.parse(text) : undefined,
     });
     const key = `${request.method} ${url.pathname.replace("/api", "")}`;
-    return new Response(JSON.stringify(answers[key] ?? {}), {
+    // `in`, not `??`: an answer of `null` is an answer, and must not be swapped for `{}`.
+    return new Response(JSON.stringify(key in answers ? answers[key] : {}), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -130,6 +131,18 @@ describe("allyGuideAPI", () => {
       await dispatch(allyGuideAPI.endpoints.getAllyGuideOverview.initiate({ days: 30 }));
 
       expect(sent[0]).toMatchObject({ method: "GET", url: "/api/v1/guide/admin/overview?days=30" });
+    });
+
+    it("re-reads the overview after the live release or the canary changes", async () => {
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideOverview.initiate({ days: 7 }));
+      sent.length = 0;
+
+      await dispatch(allyGuideAPI.endpoints.stopAllyGuideCanary.initiate({ emergency: false }));
+
+      await vi.waitFor(() => {
+        const gets = sent.filter(request => request.method === "GET").map(request => request.url);
+        expect(gets).toContain("/api/v1/guide/admin/overview?days=7");
+      });
     });
 
     it("leaves absent filters off the URL entirely", async () => {
@@ -269,6 +282,292 @@ describe("allyGuideAPI", () => {
     });
   });
 
+  describe("conversations, by cursor", () => {
+    it("pages with a row's cursor and filters by status as well as mode and organisation", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.getAllyGuideThreads.initiate({
+          limit: 25,
+          before: "2026-10-23T10:00:00.123456|11111111-aaaa-4bbb-8ccc-000000000001",
+          status: "archived",
+          mode: "CARE",
+          tenantId: "tenant-a",
+        }),
+      );
+
+      const url = new URL(`http://x${sent[0].url}`);
+      // The cursor carries its own `|`; it must reach the server whole, once decoded.
+      expect(url.searchParams.get("before")).toBe(
+        "2026-10-23T10:00:00.123456|11111111-aaaa-4bbb-8ccc-000000000001",
+      );
+      expect(url.searchParams.get("status")).toBe("archived");
+      expect(url.searchParams.get("mode")).toBe("CARE");
+      expect(url.searchParams.get("tenantId")).toBe("tenant-a");
+    });
+
+    it("reads one conversation by id, for a link to a thread the list has not loaded", async () => {
+      answers["GET /v1/guide/admin/threads/thread-1"] = { id: "thread-1", tenantName: "Acme" };
+      const result = await dispatch(allyGuideAPI.endpoints.getAllyGuideThread.initiate("thread-1"));
+
+      expect(sent[0]).toMatchObject({ method: "GET", url: "/api/v1/guide/admin/threads/thread-1" });
+      expect(result.data).toEqual({ id: "thread-1", tenantName: "Acme" });
+    });
+  });
+
+  describe("rollback target, audit and canary", () => {
+    it("reads where a rollback would land", async () => {
+      answers["GET /v1/guide/admin/releases/rollback-target"] = { releaseId: "rel-2", version: 2 };
+      const result = await dispatch(allyGuideAPI.endpoints.getAllyGuideRollbackTarget.initiate());
+
+      expect(sent[0].url).toBe("/api/v1/guide/admin/releases/rollback-target");
+      expect(result.data).toEqual({ releaseId: "rel-2", version: 2 });
+    });
+
+    it("reads 'no earlier release' as null, not as a failure", async () => {
+      answers["GET /v1/guide/admin/releases/rollback-target"] = null;
+      const result = await dispatch(allyGuideAPI.endpoints.getAllyGuideRollbackTarget.initiate());
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.data).toBeNull();
+    });
+
+    it("reads an empty 200 body, which is how Nest answers a null return, as null too", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response("", { status: 200 })),
+      );
+      const result = await dispatch(allyGuideAPI.endpoints.getAllyGuideRollbackTarget.initiate());
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.data).toBeNull();
+    });
+
+    it("reads the audit trail with a limit, or without one", async () => {
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideReleaseAudit.initiate({ limit: 50 }));
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideReleaseAudit.initiate());
+
+      expect(sent[0].url).toBe("/api/v1/guide/admin/releases/audit?limit=50");
+      expect(sent[1].url).toBe("/api/v1/guide/admin/releases/audit");
+    });
+
+    it("starts a canary with the share in the body and the release in the path", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.startAllyGuideCanary.initiate({
+          id: "rel-4",
+          percent: 20,
+          reason: "  Try the warmer opening  ",
+        }),
+      );
+
+      expect(sent[0]).toMatchObject({
+        method: "POST",
+        url: "/api/v1/guide/admin/releases/rel-4/canary",
+        body: { percent: 20, reason: "Try the warmer opening" },
+      });
+      expect(sent[0].body).not.toHaveProperty("id");
+    });
+
+    it("drops a blank canary reason", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.startAllyGuideCanary.initiate({
+          id: "rel-4",
+          percent: 5,
+          reason: "  ",
+        }),
+      );
+
+      expect(sent[0].body).toEqual({ percent: 5 });
+    });
+
+    it("stops the canary, always saying whether it is an emergency", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.stopAllyGuideCanary.initiate({
+          emergency: true,
+          reason: "Crisis replies doubled",
+        }),
+      );
+      await dispatch(allyGuideAPI.endpoints.stopAllyGuideCanary.initiate({ emergency: false }));
+
+      expect(sent[0]).toMatchObject({
+        method: "POST",
+        url: "/api/v1/guide/admin/releases/canary/stop",
+        body: { emergency: true, reason: "Crisis replies doubled" },
+      });
+      expect(sent[1].body).toEqual({ emergency: false });
+    });
+
+    it("re-reads the release list and the rollback target after a canary starts or stops", async () => {
+      answers["GET /v1/guide/admin/releases"] = [];
+      answers["GET /v1/guide/admin/releases/rollback-target"] = null;
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideReleases.initiate());
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideRollbackTarget.initiate());
+      sent.length = 0;
+
+      await dispatch(
+        allyGuideAPI.endpoints.startAllyGuideCanary.initiate({ id: "rel-4", percent: 20 }),
+      );
+
+      await vi.waitFor(() => {
+        const gets = sent.filter(request => request.method === "GET").map(request => request.url);
+        expect(gets).toContain("/api/v1/guide/admin/releases");
+        expect(gets).toContain("/api/v1/guide/admin/releases/rollback-target");
+      });
+    });
+  });
+
+  describe("playground", () => {
+    it("posts the scenario as it is and answers with the run, never caching it", async () => {
+      answers["POST /v1/guide/admin/playground"] = {
+        reply: "Hello",
+        replyKind: "model",
+        toolCalls: [],
+      };
+      const body = {
+        releaseId: "rel-4",
+        trackId: "track-1",
+        message: "Hi",
+        progress: 2,
+        mode: "CARE" as const,
+        history: [{ role: "learner" as const, text: "Earlier" }],
+      };
+      const result = await dispatch(allyGuideAPI.endpoints.runAllyGuidePlayground.initiate(body));
+
+      expect(sent[0]).toMatchObject({
+        method: "POST",
+        url: "/api/v1/guide/admin/playground",
+        body,
+      });
+      expect(result.data).toMatchObject({ reply: "Hello" });
+    });
+
+    it("hands the server's message through on a refusal, for the pane to show", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify({ message: "A message or an intent is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }),
+        ),
+      );
+      const result = await dispatch(
+        allyGuideAPI.endpoints.runAllyGuidePlayground.initiate({
+          releaseId: "r",
+          trackId: "t",
+          message: "",
+        }),
+      );
+
+      expect(result.error).toMatchObject({
+        status: 400,
+        data: { message: "A message or an intent is required" },
+      });
+    });
+  });
+
+  describe("alerts", () => {
+    it("reads the alerts with a limit", async () => {
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideAlerts.initiate({ limit: 100 }));
+
+      expect(sent[0]).toMatchObject({ method: "GET", url: "/api/v1/guide/admin/alerts?limit=100" });
+    });
+
+    it("asks for unacknowledged alerts only with open=true, and leaves it off otherwise", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.getAllyGuideAlerts.initiate({ limit: 200, open: true }),
+      );
+      await dispatch(
+        allyGuideAPI.endpoints.getAllyGuideAlerts.initiate({ limit: 200, open: false }),
+      );
+
+      expect(sent[0].url).toBe("/api/v1/guide/admin/alerts?limit=200&open=true");
+      expect(sent[1].url).toBe("/api/v1/guide/admin/alerts?limit=200");
+    });
+
+    it("reads how many alerts are open and in all, and re-reads them after an acknowledgement", async () => {
+      answers["GET /v1/guide/admin/alerts/counts"] = { open: 2, total: 9 };
+      const result = await dispatch(allyGuideAPI.endpoints.getAllyGuideAlertCounts.initiate());
+      expect(result.data).toEqual({ open: 2, total: 9 });
+      sent.length = 0;
+
+      await dispatch(allyGuideAPI.endpoints.acknowledgeAllyGuideAlert.initiate("alert-1"));
+
+      await vi.waitFor(() =>
+        expect(sent.map(request => request.url)).toContain("/api/v1/guide/admin/alerts/counts"),
+      );
+    });
+
+    it("runs the rules now and answers with what newly fired", async () => {
+      answers["POST /v1/guide/admin/alerts/check"] = [{ id: "a1", rule: "turn_failures" }];
+      const result = await dispatch(allyGuideAPI.endpoints.checkAllyGuideAlerts.initiate());
+
+      expect(sent[0]).toMatchObject({ method: "POST", url: "/api/v1/guide/admin/alerts/check" });
+      expect(result.data).toEqual([{ id: "a1", rule: "turn_failures" }]);
+    });
+
+    it("acknowledges one alert by id, and refreshes the list", async () => {
+      answers["GET /v1/guide/admin/alerts"] = [];
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideAlerts.initiate());
+      sent.length = 0;
+
+      await dispatch(allyGuideAPI.endpoints.acknowledgeAllyGuideAlert.initiate("alert-1"));
+
+      expect(sent[0]).toMatchObject({
+        method: "POST",
+        url: "/api/v1/guide/admin/alerts/alert-1/ack",
+      });
+      await vi.waitFor(() =>
+        expect(
+          sent.some(request => request.method === "GET" && request.url.includes("/alerts")),
+        ).toBe(true),
+      );
+    });
+  });
+
+  describe("baseline", () => {
+    it("reads the snapshots with a limit", async () => {
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideBaselines.initiate({ limit: 100 }));
+
+      expect(sent[0]).toMatchObject({
+        method: "GET",
+        url: "/api/v1/guide/admin/baseline?limit=100",
+      });
+    });
+
+    it("captures a snapshot with the window and a trimmed note, dropping a blank one", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.captureAllyGuideBaseline.initiate({
+          windowDays: 90,
+          note: "  before launch ",
+        }),
+      );
+      await dispatch(
+        allyGuideAPI.endpoints.captureAllyGuideBaseline.initiate({ windowDays: 30, note: "   " }),
+      );
+
+      expect(sent[0]).toMatchObject({
+        method: "POST",
+        url: "/api/v1/guide/admin/baseline",
+        body: { windowDays: 90, note: "before launch" },
+      });
+      expect(sent[1].body).toEqual({ windowDays: 30 });
+    });
+
+    it("refreshes the snapshot list after a capture", async () => {
+      answers["GET /v1/guide/admin/baseline"] = [];
+      await dispatch(allyGuideAPI.endpoints.getAllyGuideBaselines.initiate());
+      sent.length = 0;
+
+      await dispatch(allyGuideAPI.endpoints.captureAllyGuideBaseline.initiate({ windowDays: 90 }));
+
+      await vi.waitFor(() =>
+        expect(
+          sent.some(request => request.method === "GET" && request.url.includes("/baseline")),
+        ).toBe(true),
+      );
+    });
+  });
+
   describe("platform crisis copy", () => {
     it("reads the active copy", async () => {
       await dispatch(allyGuideAPI.endpoints.getAllyGuideCrisisResponses.initiate());
@@ -374,6 +673,20 @@ describe("allyGuideAPI", () => {
         body: { languageCode: "en", body: "y".repeat(60) },
       });
       expect(sent[0].body).not.toHaveProperty("tenantId");
+    });
+
+    it("withdraws an organisation's own copy by id, with the organisation in the query", async () => {
+      await dispatch(
+        allyGuideAPI.endpoints.deleteAllyGuideOrgCrisisResponse.initiate({
+          tenantId: "tenant-a",
+          id: "copy-1",
+        }),
+      );
+
+      expect(sent[0]).toMatchObject({
+        method: "DELETE",
+        url: "/api/v1/guide/admin/org-crisis-responses/copy-1?tenantId=tenant-a",
+      });
     });
   });
 });

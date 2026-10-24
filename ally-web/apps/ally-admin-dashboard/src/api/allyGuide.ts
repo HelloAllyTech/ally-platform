@@ -1,12 +1,19 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AllyGuideAlert,
+  AllyGuideAlertCounts,
+  AllyGuideBaselineSnapshot,
   AllyGuideCrisisResponse,
   AllyGuideOrgProfile,
   AllyGuideOrgProfileValue,
   AllyGuideOverview,
+  AllyGuidePlaygroundBody,
+  AllyGuidePlaygroundResult,
   AllyGuideRelease,
+  AllyGuideReleaseAuditRow,
   AllyGuideReleaseDetail,
   AllyGuideRollbackBody,
+  AllyGuideRollbackTarget,
   AllyGuideSwitches,
   AllyGuideThreadRow,
   AllyGuideThreadsQuery,
@@ -14,7 +21,9 @@ import {
   AllyGuideTranscriptMessage,
   AllyGuideTurnPayload,
   AllyGuideTurnTrace,
+  CaptureAllyGuideBaselineBody,
   SaveAllyGuideCrisisResponseBody,
+  StartAllyGuideCanaryBody,
   UpdateAllyGuideSwitchesBody,
 } from "@types";
 
@@ -73,6 +82,9 @@ export const allyGuideAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
         params: { days },
       }),
+      // The overview carries the live release and the canary, so a promote, rollback or canary
+      // change must re-read it: a monitor still showing a canary that was just stopped is a lie.
+      providesTags: [TAG_TYPES.ALLY_GUIDE_RELEASES],
     }),
 
     // ── Conversations and the Turn Inspector ────────────────────────────────────
@@ -81,12 +93,20 @@ export const allyGuideAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.ALLY_GUIDE.THREADS,
         method: HttpMethod.GET,
         // Absent filters are left off the URL entirely: the server reads `tenantId=""` as a
-        // filter on the empty string, not as "no filter".
+        // filter on the empty string, not as "no filter". `before` is a row's `cursor`.
         params: Object.fromEntries(
           Object.entries((params ?? {}) as AllyGuideThreadsQuery).filter(
             ([, value]) => value !== undefined && value !== "",
           ),
         ),
+      }),
+    }),
+
+    /** One conversation row, for a deep link to a thread the list has not loaded. No content. */
+    getAllyGuideThread: builder.query<AllyGuideThreadRow, string>({
+      query: threadId => ({
+        url: ApiEndpoints.ALLY_GUIDE.THREAD_BY_ID(threadId),
+        method: HttpMethod.GET,
       }),
     }),
 
@@ -155,6 +175,131 @@ export const allyGuideAPI = baseAPI.injectEndpoints({
         },
       }),
       invalidatesTags: [TAG_TYPES.ALLY_GUIDE_RELEASES],
+    }),
+
+    /**
+     * The release a rollback would land on now, or null when there is none. Provides the release tag,
+     * so every promote, rollback and canary change re-reads it.
+     */
+    getAllyGuideRollbackTarget: builder.query<AllyGuideRollbackTarget | null, void>({
+      query: () => ({
+        url: ApiEndpoints.ALLY_GUIDE.RELEASE_ROLLBACK_TARGET,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.ALLY_GUIDE_RELEASES],
+    }),
+
+    /** Who changed which release, when and why, newest first. */
+    getAllyGuideReleaseAudit: builder.query<AllyGuideReleaseAuditRow[], { limit?: number } | void>({
+      query: arg => ({
+        url: ApiEndpoints.ALLY_GUIDE.RELEASE_AUDIT,
+        method: HttpMethod.GET,
+        params: arg ? { limit: arg.limit } : undefined,
+      }),
+      providesTags: [TAG_TYPES.ALLY_GUIDE_RELEASES],
+    }),
+
+    /**
+     * Puts a draft in front of a share of new conversations. 400 `{message}` when the share is out of
+     * range, the release cannot go to canary, or another release is already in canary. Starting a
+     * canary that is already running changes its share.
+     */
+    startAllyGuideCanary: builder.mutation<AllyGuideRelease, StartAllyGuideCanaryBody>({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.ALLY_GUIDE.RELEASE_CANARY(id),
+        method: HttpMethod.POST,
+        // `reason` is optional on the wire; a blank one is dropped rather than stored.
+        body: {
+          percent: body.percent,
+          ...(body.reason?.trim() ? { reason: body.reason.trim() } : {}),
+        },
+      }),
+      invalidatesTags: [TAG_TYPES.ALLY_GUIDE_RELEASES],
+    }),
+
+    /**
+     * Ends the canary without promoting it. With `emergency`, every conversation moves to the live
+     * release at its next turn; without, canary conversations finish their epoch first.
+     */
+    stopAllyGuideCanary: builder.mutation<AllyGuideRelease, AllyGuideRollbackBody>({
+      query: body => ({
+        url: ApiEndpoints.ALLY_GUIDE.RELEASE_CANARY_STOP,
+        method: HttpMethod.POST,
+        body: {
+          emergency: body.emergency,
+          ...(body.reason?.trim() ? { reason: body.reason.trim() } : {}),
+        },
+      }),
+      invalidatesTags: [TAG_TYPES.ALLY_GUIDE_RELEASES],
+    }),
+
+    // ── Playground ──────────────────────────────────────────────────────────────
+    /**
+     * One dry-run turn of any release, a draft included. Nothing is stored and no learner is
+     * charged, but the models are called for real, so a run takes 5–30 s and costs money. Not cached:
+     * every run is its own answer.
+     */
+    runAllyGuidePlayground: builder.mutation<AllyGuidePlaygroundResult, AllyGuidePlaygroundBody>({
+      query: body => ({
+        url: ApiEndpoints.ALLY_GUIDE.PLAYGROUND,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    // ── Alerts ──────────────────────────────────────────────────────────────────
+    /** Newest first. `open` keeps the unacknowledged only, however old. */
+    getAllyGuideAlerts: builder.query<AllyGuideAlert[], { limit?: number; open?: boolean } | void>({
+      query: arg => ({
+        url: ApiEndpoints.ALLY_GUIDE.ALERTS,
+        method: HttpMethod.GET,
+        params: arg ? { limit: arg.limit, ...(arg.open ? { open: "true" } : {}) } : undefined,
+      }),
+      providesTags: [TAG_TYPES.ALLY_GUIDE_ALERTS],
+    }),
+
+    /** How many alerts are open and how many there are in all, without reading them. */
+    getAllyGuideAlertCounts: builder.query<AllyGuideAlertCounts, void>({
+      query: () => ({ url: ApiEndpoints.ALLY_GUIDE.ALERTS_COUNTS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.ALLY_GUIDE_ALERTS],
+    }),
+
+    /** Runs the alert rules now. Answers with the alerts that newly fired (none when nothing did). */
+    checkAllyGuideAlerts: builder.mutation<AllyGuideAlert[], void>({
+      query: () => ({ url: ApiEndpoints.ALLY_GUIDE.ALERTS_CHECK, method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.ALLY_GUIDE_ALERTS],
+    }),
+
+    acknowledgeAllyGuideAlert: builder.mutation<AllyGuideAlert, string>({
+      query: id => ({ url: ApiEndpoints.ALLY_GUIDE.ALERT_ACK(id), method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.ALLY_GUIDE_ALERTS],
+    }),
+
+    // ── Baseline ────────────────────────────────────────────────────────────────
+    /** Snapshots, newest first. */
+    getAllyGuideBaselines: builder.query<AllyGuideBaselineSnapshot[], { limit?: number } | void>({
+      query: arg => ({
+        url: ApiEndpoints.ALLY_GUIDE.BASELINE,
+        method: HttpMethod.GET,
+        params: arg ? { limit: arg.limit } : undefined,
+      }),
+      providesTags: [TAG_TYPES.ALLY_GUIDE_BASELINE],
+    }),
+
+    /** Captures a snapshot now. Every snapshot is kept, so a later one can be read against the first. */
+    captureAllyGuideBaseline: builder.mutation<
+      AllyGuideBaselineSnapshot,
+      CaptureAllyGuideBaselineBody
+    >({
+      query: body => ({
+        url: ApiEndpoints.ALLY_GUIDE.BASELINE,
+        method: HttpMethod.POST,
+        body: {
+          windowDays: body.windowDays,
+          ...(body.note?.trim() ? { note: body.note.trim() } : {}),
+        },
+      }),
+      invalidatesTags: [TAG_TYPES.ALLY_GUIDE_BASELINE],
     }),
 
     // ── Platform crisis copy ────────────────────────────────────────────────────
@@ -246,6 +391,21 @@ export const allyGuideAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.ALLY_GUIDE_CRISIS_RESPONSES, id: `org:${tenantId}` },
       ],
     }),
+
+    /** Withdraws one of the organisation's own versions; it falls back to the platform's copy. */
+    deleteAllyGuideOrgCrisisResponse: builder.mutation<
+      { id: string; active: false },
+      { tenantId: string; id: string }
+    >({
+      query: ({ tenantId, id }) => ({
+        url: ApiEndpoints.ALLY_GUIDE.ORG_CRISIS_RESPONSE_BY_ID(id),
+        method: HttpMethod.DELETE,
+        params: { tenantId },
+      }),
+      invalidatesTags: (_result, _error, { tenantId }) => [
+        { type: TAG_TYPES.ALLY_GUIDE_CRISIS_RESPONSES, id: `org:${tenantId}` },
+      ],
+    }),
   }),
 });
 
@@ -255,6 +415,7 @@ export const {
   useGetAllyGuideOverviewQuery,
   useGetAllyGuideThreadsQuery,
   useLazyGetAllyGuideThreadsQuery,
+  useGetAllyGuideThreadQuery,
   useGetAllyGuideThreadTracesQuery,
   useGetAllyGuideTurnTraceQuery,
   useGetAllyGuideTranscriptQuery,
@@ -264,6 +425,17 @@ export const {
   useGetAllyGuideReleaseQuery,
   usePromoteAllyGuideReleaseMutation,
   useRollbackAllyGuideReleaseMutation,
+  useGetAllyGuideRollbackTargetQuery,
+  useGetAllyGuideReleaseAuditQuery,
+  useStartAllyGuideCanaryMutation,
+  useStopAllyGuideCanaryMutation,
+  useRunAllyGuidePlaygroundMutation,
+  useGetAllyGuideAlertsQuery,
+  useGetAllyGuideAlertCountsQuery,
+  useCheckAllyGuideAlertsMutation,
+  useAcknowledgeAllyGuideAlertMutation,
+  useGetAllyGuideBaselinesQuery,
+  useCaptureAllyGuideBaselineMutation,
   useGetAllyGuideCrisisResponsesQuery,
   useSaveAllyGuideCrisisResponseMutation,
   useDeleteAllyGuideCrisisResponseMutation,
@@ -271,4 +443,5 @@ export const {
   useSaveAllyGuideOrgProfileMutation,
   useGetAllyGuideOrgCrisisResponsesQuery,
   useSaveAllyGuideOrgCrisisResponseMutation,
+  useDeleteAllyGuideOrgCrisisResponseMutation,
 } = allyGuideAPI;

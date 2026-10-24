@@ -12,7 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@ally-ui-mono/ui-shared";
-import { useGetTenantsQuery, useLazyGetAllyGuideThreadsQuery } from "@api";
+import {
+  useGetAllyGuideThreadQuery,
+  useGetTenantsQuery,
+  useLazyGetAllyGuideThreadsQuery,
+} from "@api";
 import { formatCount, formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill, PillTone } from "@components/ally-guide/Pill";
@@ -20,13 +24,14 @@ import { FilterDropdown } from "@components/filters";
 import { ListToolbar } from "@components/toolbar";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { AllyGuideMode, AllyGuideThreadRow } from "@types";
+import { AllyGuideMode, AllyGuideThreadRow, AllyGuideThreadStatus } from "@types";
 import { formatRelativeTime, formatTimestamp } from "@utils";
 
 import {
   EMPTY_THREAD_FILTERS,
   hasActiveThreadFilters,
   matchesThreadFilters,
+  organisationOptions,
   serverQueryFor,
   serverQueryKey,
   THREADS_PAGE_SIZE,
@@ -34,15 +39,19 @@ import {
 } from "./conversationFilters";
 import { TurnInspector } from "./TurnInspector";
 
-/** The organisation list is read once, at the size the other pickers in the admin use. */
+/**
+ * The organisation list feeds the Filter popover only (the table's names come from each row). It is
+ * read once, at the size the other pickers in the admin use.
+ */
 const TENANT_PAGE_SIZE = 200;
 
 const MODES: AllyGuideMode[] = ["NORMAL", "CARE", "CRISIS", "CRISIS_FOLLOWUP"];
+const STATUSES: AllyGuideThreadStatus[] = ["active", "completed", "merged", "archived"];
 
 const modeTone = (mode: AllyGuideMode): PillTone =>
   mode === "NORMAL" ? "neutral" : mode === "CARE" ? "warning" : "danger";
 
-/** One page at a time, appended: the server's cursor is the last row's `updatedAt`. */
+/** One page at a time, appended: the server's cursor is the last row's own `cursor`. */
 const useThreads = (filters: ThreadFilters) => {
   const [fetchPage] = useLazyGetAllyGuideThreadsQuery();
   const [rows, setRows] = useState<AllyGuideThreadRow[]>([]);
@@ -87,7 +96,7 @@ const useThreads = (filters: ThreadFilters) => {
     setIsLoadingMore(true);
     try {
       const page = await fetchPage(
-        { limit: THREADS_PAGE_SIZE, before: last.updatedAt, ...query },
+        { limit: THREADS_PAGE_SIZE, before: last.cursor, ...query },
         false,
       ).unwrap();
       if (mine !== generation.current) return;
@@ -129,26 +138,42 @@ export const ConversationsTab: React.FC = () => {
   const { rows, status, error, exhausted, isLoadingMore, loadFirst, loadMore } =
     useThreads(filters);
 
+  // Only for the Filter popover. If the list cannot be read (no access to organisations), the
+  // popover still offers every organisation seen on a loaded row.
   const { data: tenantPage } = useGetTenantsQuery({ limit: TENANT_PAGE_SIZE });
-  const tenants = useMemo(() => tenantPage?.data ?? [], [tenantPage]);
-  const tenantNames = useMemo(
-    () => Object.fromEntries(tenants.map(tenant => [tenant.id, tenant.name])),
-    [tenants],
+  const organisations = useMemo(
+    () => organisationOptions(tenantPage?.data ?? [], rows),
+    [tenantPage, rows],
+  );
+  const organisationNames = useMemo(
+    () => Object.fromEntries(organisations.map(option => [option.value, option.label])),
+    [organisations],
   );
 
   const visible = useMemo(
-    () => rows.filter(row => matchesThreadFilters(row, filters, search, tenantNames)),
-    [rows, filters, search, tenantNames],
+    () => rows.filter(row => matchesThreadFilters(row, filters, search)),
+    [rows, filters, search],
   );
   const filtering = hasActiveThreadFilters(filters, search);
-  const multiFacet = filters.tenantIds.length > 1 || filters.modes.length > 1;
+  const multiFacet =
+    filters.tenantIds.length > 1 || filters.modes.length > 1 || filters.statuses.length > 1;
 
   const open = (id: string) => setSearchParams({ tab: "conversations", thread: id });
   const close = () => setSearchParams({ tab: "conversations" });
   const selectedRow = rows.find(row => row.id === selectedId);
+  // A link to a conversation the list has not loaded: ask for just that row, for the header.
+  const { data: linkedRow } = useGetAllyGuideThreadQuery(selectedId ?? "", {
+    skip: !selectedId || Boolean(selectedRow),
+  });
 
-  const tenantLabel = (tenantId: string | null) =>
-    tenantId ? (tenantNames[tenantId] ?? tenantId.slice(0, 8)) : strings.noOrganisation;
+  /** The organisation as the table says it: the server's name, "Visitor" before sign-in, or nothing. */
+  const organisationText = (row: AllyGuideThreadRow) =>
+    row.tenantName ??
+    (row.tenantId
+      ? row.tenantId.slice(0, 8)
+      : row.visitor
+        ? strings.notSignedIn
+        : strings.noOrganisation);
 
   // Chips are drawn here, not by ListToolbar's `filterChips`: those run every label through a
   // capitalisation helper that lower-cases everything after the first letter, which would turn an
@@ -172,26 +197,29 @@ export const ConversationsTab: React.FC = () => {
       </div>
     );
 
-  // The organisation section is left out until the list has loaded: FilterDropdown reports only the
-  // sections it was given, so an empty one would come back as "cleared" and wipe a chosen filter.
+  // The organisation section is left out until there is something to offer: FilterDropdown reports
+  // only the sections it was given, so an empty one would come back as "cleared" and wipe a chosen
+  // filter.
   const sections = useMemo(
     () => [
-      ...(tenants.length > 0
-        ? [
-            {
-              id: "tenantIds" as const,
-              label: strings.organisation,
-              options: tenants.map(tenant => ({ value: tenant.id, label: tenant.name })),
-            },
-          ]
+      ...(organisations.length > 0
+        ? [{ id: "tenantIds" as const, label: strings.organisation, options: organisations }]
         : []),
       {
         id: "modes" as const,
         label: strings.mode,
         options: MODES.map(mode => ({ value: mode, label: en.allyConsole.modes[mode] })),
       },
+      {
+        id: "statuses" as const,
+        label: strings.statusFilter,
+        options: STATUSES.map(status => ({
+          value: status,
+          label: en.allyConsole.threadStatuses[status],
+        })),
+      },
     ],
-    [tenants, strings.organisation, strings.mode],
+    [organisations, strings.organisation, strings.mode, strings.statusFilter],
   );
 
   return (
@@ -206,13 +234,18 @@ export const ConversationsTab: React.FC = () => {
           <>
             {chip(
               strings.organisation,
-              filters.tenantIds.map(id => tenantLabel(id)),
+              filters.tenantIds.map(id => organisationNames[id] ?? id.slice(0, 8)),
               () => setFilters(current => ({ ...current, tenantIds: [] })),
             )}
             {chip(
               strings.mode,
               filters.modes.map(mode => en.allyConsole.modes[mode]),
               () => setFilters(current => ({ ...current, modes: [] })),
+            )}
+            {chip(
+              strings.statusFilter,
+              filters.statuses.map(status => en.allyConsole.threadStatuses[status]),
+              () => setFilters(current => ({ ...current, statuses: [] })),
             )}
           </>
         }
@@ -223,7 +256,7 @@ export const ConversationsTab: React.FC = () => {
           onClick: () => void loadFirst(),
         }}
       />
-      <FilterDropdown<{ tenantIds: string[]; modes: string[] }>
+      <FilterDropdown<{ tenantIds: string[]; modes: string[]; statuses: string[] }>
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         sections={sections}
@@ -233,10 +266,15 @@ export const ConversationsTab: React.FC = () => {
             // still be loading), so only a section that came back replaces what was chosen.
             tenantIds: next.tenantIds ?? current.tenantIds,
             modes: (next.modes as AllyGuideMode[] | undefined) ?? current.modes,
+            statuses: (next.statuses as AllyGuideThreadStatus[] | undefined) ?? current.statuses,
           }))
         }
         anchorRect={filterButtonRef.current?.getBoundingClientRect() ?? null}
-        currentFilters={{ tenantIds: filters.tenantIds, modes: filters.modes }}
+        currentFilters={{
+          tenantIds: filters.tenantIds,
+          modes: filters.modes,
+          statuses: filters.statuses,
+        }}
       />
 
       {status === "loading" ? (
@@ -317,11 +355,27 @@ export const ConversationsTab: React.FC = () => {
                         >
                           {title}
                         </button>
-                        <div className="font-mono text-xs text-typography-700">
-                          {row.id.slice(0, 8)}
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-xs text-typography-700">
+                            {row.id.slice(0, 8)}
+                          </span>
+                          {row.arm === "canary" && (
+                            <Pill tone="info" title={strings.canaryHelp}>
+                              {strings.canary}
+                            </Pill>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="py-3 pr-4">{tenantLabel(row.tenantId)}</TableCell>
+                      <TableCell className="py-3 pr-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{organisationText(row)}</span>
+                          {row.visitor && (
+                            <Pill tone="neutral" title={strings.visitorHelp}>
+                              {strings.visitor}
+                            </Pill>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="py-3 pr-4">
                         <Pill tone={modeTone(row.mode)}>
                           {en.allyConsole.modes[row.mode] ?? row.mode}
@@ -372,12 +426,7 @@ export const ConversationsTab: React.FC = () => {
         </>
       )}
 
-      <TurnInspector
-        threadId={selectedId}
-        thread={selectedRow}
-        organisationName={selectedRow?.tenantId ? tenantLabel(selectedRow.tenantId) : null}
-        onClose={close}
-      />
+      <TurnInspector threadId={selectedId} thread={selectedRow ?? linkedRow} onClose={close} />
     </div>
   );
 };

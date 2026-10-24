@@ -9,6 +9,8 @@ import "@constants";
 const h = vi.hoisted(() => ({
   fetchPage: vi.fn(),
   tenants: vi.fn(),
+  linked: vi.fn(),
+  linkedAsked: vi.fn(),
 }));
 
 vi.mock(
@@ -20,6 +22,11 @@ vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useLazyGetAllyGuideThreadsQuery: () => [h.fetchPage],
   useGetTenantsQuery: () => h.tenants(),
+  useGetAllyGuideThreadQuery: (id: string, options?: { skip?: boolean }) => {
+    if (options?.skip) return { data: undefined };
+    h.linkedAsked(id);
+    return h.linked();
+  },
 }));
 // The inspector has its own suite; here it only needs to show what it was opened with.
 vi.mock("../TurnInspector", () => ({
@@ -38,20 +45,35 @@ vi.mock("../TurnInspector", () => ({
 // eslint-disable-next-line import/first
 import { ConversationsTab } from "../ConversationsTab";
 
-const row = (index: number, overrides: Record<string, unknown> = {}) => ({
-  id: `00000000-0000-0000-0000-${String(index).padStart(12, "0")}`,
-  trackId: `track-${index}`,
-  trackTitle: `Course ${index}`,
-  tenantId: "tenant-a",
-  mode: "NORMAL",
-  status: "active",
-  epoch: 1,
-  updatedAt: new Date(Date.UTC(2026, 9, 23, 10, 0, 0) - index * 60_000).toISOString(),
-  turns: index + 1,
-  costUsd: 0.5,
-  crises: 0,
-  ...overrides,
-});
+const TENANT_NAMES: Record<string, string> = {
+  "tenant-a": "Acme Counselling",
+  "tenant-b": "Brightside",
+};
+
+const row = (index: number, overrides: Record<string, unknown> = {}) => {
+  const id = `00000000-0000-0000-0000-${String(index).padStart(12, "0")}`;
+  const updatedAt = new Date(Date.UTC(2026, 9, 23, 10, 0, 0) - index * 60_000).toISOString();
+  const tenantId = "tenantId" in overrides ? (overrides.tenantId as string | null) : "tenant-a";
+  return {
+    id,
+    trackId: `track-${index}`,
+    trackTitle: `Course ${index}`,
+    tenantId,
+    // The server resolves the name; the console no longer joins it from the organisation list.
+    tenantName: tenantId ? (TENANT_NAMES[tenantId] ?? null) : null,
+    visitor: false,
+    mode: "NORMAL",
+    status: "active",
+    epoch: 1,
+    arm: null,
+    updatedAt,
+    cursor: `${updatedAt.replace("Z", "000")}|${id}`,
+    turns: index + 1,
+    costUsd: 0.5,
+    crises: 0,
+    ...overrides,
+  };
+};
 
 const page = (from: number, count: number) =>
   Array.from({ length: count }, (_, i) => row(from + i));
@@ -81,6 +103,7 @@ describe("ConversationsTab", () => {
         ],
       },
     });
+    h.linked.mockReturnValue({ data: undefined });
     h.fetchPage.mockImplementation(() =>
       reply([row(1), row(2, { mode: "CRISIS", crises: 2, tenantId: "tenant-b" })]),
     );
@@ -143,11 +166,20 @@ describe("ConversationsTab", () => {
       expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
     });
 
-    it("falls back to a short id for an organisation it has no name for, and says when there is none", async () => {
-      h.tenants.mockReturnValue({ data: { data: [] } });
+    it("names the organisation from the row itself, without the organisation list", async () => {
+      // The list failed (or the admin cannot read organisations): the table must not care.
+      h.tenants.mockReturnValue({ data: undefined });
+      renderTab();
+
+      const rows = await screen.findAllByTestId("thread-row");
+      expect(within(rows[0]).getByText("Acme Counselling")).toBeInTheDocument();
+      expect(within(rows[1]).getByText("Brightside")).toBeInTheDocument();
+    });
+
+    it("falls back to a short id for an organisation with no name, and says when there is none", async () => {
       h.fetchPage.mockReturnValue(
         reply([
-          row(1, { tenantId: "9f8e7d6c-1111-2222-3333-444455556666" }),
+          row(1, { tenantId: "9f8e7d6c-1111-2222-3333-444455556666", tenantName: null }),
           row(2, { tenantId: null }),
         ]),
       );
@@ -157,10 +189,28 @@ describe("ConversationsTab", () => {
       expect(within(rows[0]).getByText("9f8e7d6c")).toBeInTheDocument();
       expect(within(rows[1]).getByText("No organisation")).toBeInTheDocument();
     });
+
+    it("marks an anonymous visitor as one, in words, and says they are not signed in", async () => {
+      h.fetchPage.mockReturnValue(reply([row(1, { tenantId: null, visitor: true })]));
+      renderTab();
+
+      const [visitorRow] = await screen.findAllByTestId("thread-row");
+      expect(within(visitorRow).getByText("Visitor")).toBeInTheDocument();
+      expect(within(visitorRow).getByText("Not signed in")).toBeInTheDocument();
+    });
+
+    it("marks a conversation served by the canary, and leaves the rest unmarked", async () => {
+      h.fetchPage.mockReturnValue(reply([row(1, { arm: "canary" }), row(2, { arm: "ga" })]));
+      renderTab();
+
+      const [canaryRow, gaRow] = await screen.findAllByTestId("thread-row");
+      expect(within(canaryRow).getByText("Canary")).toBeInTheDocument();
+      expect(within(gaRow).queryByText("Canary")).not.toBeInTheDocument();
+    });
   });
 
   describe("paging", () => {
-    it("loads more with the last row's updatedAt as the cursor and appends", async () => {
+    it("loads more with the last row's cursor, not its timestamp, and appends", async () => {
       const first = page(1, 25);
       h.fetchPage.mockReturnValueOnce(reply(first)).mockReturnValueOnce(reply(page(26, 3)));
       renderTab();
@@ -169,10 +219,7 @@ describe("ConversationsTab", () => {
       fireEvent.click(screen.getByRole("button", { name: "Load more" }));
 
       await waitFor(() => expect(screen.getAllByTestId("thread-row")).toHaveLength(28));
-      expect(h.fetchPage).toHaveBeenLastCalledWith(
-        { limit: 25, before: first[24].updatedAt },
-        false,
-      );
+      expect(h.fetchPage).toHaveBeenLastCalledWith({ limit: 25, before: first[24].cursor }, false);
     });
 
     it("says that is every conversation once a page comes back short", async () => {
@@ -249,6 +296,33 @@ describe("ConversationsTab", () => {
       expect(await screen.findByText("Mode:")).toBeInTheDocument();
     });
 
+    it("sends a single chosen status to the server too", async () => {
+      renderTab();
+      await screen.findAllByTestId("thread-row");
+
+      fireEvent.click(screen.getByRole("button", { name: /^Filter$/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
+      fireEvent.click(screen.getByLabelText("Archived"));
+      fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+      await waitFor(() =>
+        expect(h.fetchPage).toHaveBeenLastCalledWith({ limit: 25, status: "archived" }, false),
+      );
+      expect(await screen.findByText("Status:")).toBeInTheDocument();
+    });
+
+    it("still offers the organisations on screen when the organisation list cannot be read", async () => {
+      h.tenants.mockReturnValue({ data: undefined });
+      renderTab();
+      await screen.findAllByTestId("thread-row");
+
+      fireEvent.click(screen.getByRole("button", { name: /^Filter$/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Organisation/ }));
+
+      expect(screen.getByLabelText("Acme Counselling")).toBeInTheDocument();
+      expect(screen.getByLabelText("Brightside")).toBeInTheDocument();
+    });
+
     it("keeps an organisation's name exactly as written on its chip", async () => {
       h.tenants.mockReturnValue({
         data: {
@@ -304,7 +378,37 @@ describe("ConversationsTab", () => {
       expect(screen.getByTestId("inspector-id")).toHaveTextContent(row(2).id);
     });
 
-    it("opens a linked conversation by id before the list has loaded its row", async () => {
+    it("opens a linked conversation by id, asking the server for just that row", async () => {
+      h.linked.mockReturnValue({ data: row(9, { trackTitle: "A linked course" }) });
+      renderTab(`/ally?tab=conversations&thread=${row(9).id}`);
+
+      expect(screen.getByTestId("inspector-id")).toHaveTextContent(row(9).id);
+      expect(h.linkedAsked).toHaveBeenCalledWith(row(9).id);
+      // The header has the course, though the list never held this row.
+      expect(screen.getByTestId("inspector-title")).toHaveTextContent("A linked course");
+      await screen.findAllByTestId("thread-row");
+    });
+
+    it("stops asking, and prefers the list's own row, once the list holds the conversation", async () => {
+      // While the list loads the row is fetched in parallel, which keeps a link fast; the copy it
+      // returns here is deliberately different so we can tell which one the header uses.
+      h.linked.mockReturnValue({ data: row(1, { trackTitle: "Fetched copy" }) });
+      renderTab(`/ally?tab=conversations&thread=${row(1).id}`);
+      await screen.findAllByTestId("thread-row");
+      const askedOnce = h.linkedAsked.mock.calls.length;
+
+      // Any later render must not ask again.
+      fireEvent.change(screen.getByPlaceholderText("Search by course or conversation id…"), {
+        target: { value: "course" },
+      });
+
+      expect(h.linkedAsked.mock.calls.length).toBe(askedOnce);
+      expect(screen.getByTestId("inspector-title")).toHaveTextContent("Course 1");
+      expect(screen.getByTestId("inspector-title")).not.toHaveTextContent("Fetched copy");
+    });
+
+    it("still opens by id alone when the row cannot be fetched", async () => {
+      h.linked.mockReturnValue({ data: undefined, isError: true });
       renderTab(`/ally?tab=conversations&thread=${row(9).id}`);
 
       expect(screen.getByTestId("inspector-id")).toHaveTextContent(row(9).id);

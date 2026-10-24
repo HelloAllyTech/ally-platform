@@ -118,6 +118,13 @@ describe("CrisisCopyEditor", () => {
       expect(screen.getByTestId("crisis-copy-en-meta")).toHaveTextContent("2026");
     });
 
+    it("shows the approver's name, not their id, when the API gives one", () => {
+      renderEditor({ rows: [row("en", { approvedBy: 12, approvedByName: "Dr Rao" })] });
+
+      expect(screen.getByTestId("crisis-copy-en-meta")).toHaveTextContent("Approved by Dr Rao");
+      expect(screen.getByTestId("crisis-copy-en-meta")).not.toHaveTextContent("user 12");
+    });
+
     it("says 'you' for the admin's own approval", () => {
       renderEditor();
 
@@ -246,6 +253,28 @@ describe("CrisisCopyEditor", () => {
       fireEvent.click(within(card("en")).getByRole("button", { name: "Discard changes" }));
 
       expect(within(card("en")).getByRole("textbox")).toHaveValue(MESSAGE);
+    });
+  });
+
+  describe("an organisation's copy sits in front of the platform's", () => {
+    it("says what learners see when none is saved: the platform's message first", () => {
+      renderEditor({ scope: "organisation", onWithdraw: undefined });
+
+      expect(
+        within(card("mr")).getByText(/Learners see the platform's message for this language/),
+      ).toBeInTheDocument();
+      expect(within(card("mr")).queryByText(/^Learners see English, then/)).not.toBeInTheDocument();
+    });
+
+    it("says where learners fall back to when it is withdrawn, naming the platform's message", () => {
+      renderEditor({ scope: "organisation" });
+
+      fireEvent.click(within(card("en")).getByRole("button", { name: "Withdraw…" }));
+
+      const dialog = screen.getByRole("dialog");
+      expect(
+        within(dialog).getByText(/fall back to the platform's message for it, then English/),
+      ).toBeInTheDocument();
     });
   });
 

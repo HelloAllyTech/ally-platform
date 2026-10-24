@@ -39,10 +39,14 @@ const THREAD = {
   trackId: "track-1",
   trackTitle: "New Counselor Foundations",
   tenantId: "tenant-a",
+  tenantName: "Acme Counselling",
+  visitor: false,
   mode: "CARE",
   status: "active",
   epoch: 2,
+  arm: null,
   updatedAt: "2026-10-23T10:00:00.000Z",
+  cursor: "2026-10-23T10:00:00.000000|11111111-aaaa-bbbb-cccc-000000000001",
   turns: 2,
   costUsd: 0.0731,
   crises: 1,
@@ -145,12 +149,14 @@ const ok = (data: unknown, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-const renderInspector = (threadId: string | null = THREAD.id) =>
+const renderInspector = (
+  threadId: string | null = THREAD.id,
+  thread: Partial<Record<keyof typeof THREAD, unknown>> | undefined = threadId ? {} : undefined,
+) =>
   render(
     <TurnInspector
       threadId={threadId}
-      thread={threadId ? { ...THREAD } : undefined}
-      organisationName="Acme Counselling"
+      thread={thread ? ({ ...THREAD, ...thread } as never) : undefined}
       onClose={vi.fn()}
     />,
   );
@@ -196,6 +202,28 @@ describe("TurnInspector", () => {
     renderInspector(null);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("takes the organisation's name from the conversation row, which the server resolves", () => {
+    renderInspector(THREAD.id, { tenantName: "Brightside" });
+
+    expect(within(screen.getByRole("dialog")).getByText("Brightside")).toBeInTheDocument();
+  });
+
+  it("marks an anonymous visitor's conversation as one, and a canary one as a canary", () => {
+    renderInspector(THREAD.id, { visitor: true, tenantName: null, tenantId: null, arm: "canary" });
+
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("Visitor")).toBeInTheDocument();
+    expect(dialog.getByText("Canary")).toBeInTheDocument();
+  });
+
+  it("marks neither for an ordinary signed-in conversation on the live release", () => {
+    renderInspector();
+
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.queryByText("Visitor")).not.toBeInTheDocument();
+    expect(dialog.queryByText("Canary")).not.toBeInTheDocument();
   });
 
   it("names the conversation: course, organisation, mode, status, epoch, turns and cost", () => {

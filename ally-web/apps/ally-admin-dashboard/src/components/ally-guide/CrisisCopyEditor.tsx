@@ -32,6 +32,11 @@ interface CrisisCopyEditorProps {
    * already has a lot on it (an organisation's tab). The platform tab stacks them.
    */
   switcher?: boolean;
+  /**
+   * Whose copy this is. An organisation's message sits in front of the platform's, so what learners
+   * fall back to when it is missing or withdrawn is different, and the wording says so.
+   */
+  scope?: "platform" | "organisation";
 }
 
 interface CardProps extends Omit<CrisisCopyEditorProps, "rows" | "switcher"> {
@@ -46,6 +51,7 @@ const CrisisCopyCard: React.FC<CardProps> = ({
   supportLines,
   onSave,
   onWithdraw,
+  scope = "platform",
 }) => {
   const strings = en.allyConsole.crisisCopy;
   const languageName = en.allyConsole.languages[language];
@@ -71,14 +77,20 @@ const CrisisCopyCard: React.FC<CardProps> = ({
   const textAreaId = `ally-crisis-copy-${language}`;
   const counter = strings.counter(trimmed.length, CRISIS_COPY_MIN, CRISIS_COPY_MAX);
   // A language with no copy says what learners get instead, right where the admin is about to write it.
-  const helperText = row ? counter : `${strings.noCopyFallback} ${counter}`;
+  const fallback = scope === "organisation" ? strings.noCopyFallbackOrg : strings.noCopyFallback;
+  const helperText = row ? counter : `${fallback} ${counter}`;
 
   const approver = row
-    ? approverLabel(row.approvedBy, currentUserId, {
-        you: strings.approverYou,
-        user: strings.approverUser,
-        unknown: strings.approverUnknown,
-      })
+    ? approverLabel(
+        row.approvedBy,
+        currentUserId,
+        {
+          you: strings.approverYou,
+          user: strings.approverUser,
+          unknown: strings.approverUnknown,
+        },
+        row.approvedByName,
+      )
     : null;
 
   const closeSave = () => {
@@ -224,7 +236,9 @@ const CrisisCopyCard: React.FC<CardProps> = ({
         onConfirm={() => void confirmWithdraw()}
         onClose={() => setWithdrawOpen(false)}
       >
-        <p>{strings.withdrawDialog.body}</p>
+        <p>
+          {scope === "organisation" ? strings.withdrawDialog.bodyOrg : strings.withdrawDialog.body}
+        </p>
       </ConfirmDialog>
     </section>
   );
@@ -245,6 +259,7 @@ export const CrisisCopyEditor: React.FC<CrisisCopyEditorProps> = ({
   onSave,
   onWithdraw,
   switcher = false,
+  scope = "platform",
 }) => {
   const strings = en.allyConsole.crisisCopy;
   const byLanguage = new Map(rows.map(row => [row.languageCode, row]));
@@ -287,6 +302,7 @@ export const CrisisCopyEditor: React.FC<CrisisCopyEditorProps> = ({
               supportLines={supportLines}
               onSave={onSave}
               onWithdraw={onWithdraw}
+              scope={scope}
             />
           </div>
         );

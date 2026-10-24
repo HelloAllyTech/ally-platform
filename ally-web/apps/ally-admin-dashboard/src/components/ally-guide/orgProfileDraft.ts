@@ -22,7 +22,7 @@ export const LIMITS = {
 } as const;
 
 /** Same pattern as the server's phone check. */
-const PHONE_PATTERN = /^[+\d][\d\s().-]{2,}$/;
+const PHONE_PATTERN = /^[+\d(][\d\s().-]{2,}$/;
 const URL_PATTERN = /^https?:\/\/\S+$/i;
 
 export interface DraftLine {

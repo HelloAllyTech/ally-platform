@@ -119,4 +119,12 @@ describe("approverLabel", () => {
     expect(approverLabel(null, 7, strings)).toBe("someone unrecorded");
     expect(approverLabel(12, undefined, strings)).toBe("user 12");
   });
+
+  it("prefers the person's name to their id, and 'you' to their name", () => {
+    expect(approverLabel(12, 7, strings, "Dr Rao")).toBe("Dr Rao");
+    expect(approverLabel(12, 12, strings, "Dr Rao")).toBe("you");
+    // A blank or missing name falls back to the id rather than showing nothing.
+    expect(approverLabel(12, 7, strings, "  ")).toBe("user 12");
+    expect(approverLabel(12, 7, strings, null)).toBe("user 12");
+  });
 });

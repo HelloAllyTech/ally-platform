@@ -20,7 +20,6 @@ interface TurnInspectorProps {
   threadId: string | null;
   /** The list row, when the drawer was opened from the list (a deep link has only the id). */
   thread?: AllyGuideThreadRow;
-  organisationName?: string | null;
   onClose: () => void;
 }
 
@@ -143,12 +142,7 @@ const InspectorBody: React.FC<Required<Pick<TurnInspectorProps, "threadId">>> = 
  * payload on request. Without that grant it says so quietly and still shows everything the summary
  * traces hold, which is content-free by construction.
  */
-export const TurnInspector: React.FC<TurnInspectorProps> = ({
-  threadId,
-  thread,
-  organisationName,
-  onClose,
-}) => {
+export const TurnInspector: React.FC<TurnInspectorProps> = ({ threadId, thread, onClose }) => {
   const strings = en.allyConsole.inspector;
   const open = threadId !== null;
 
@@ -162,7 +156,17 @@ export const TurnInspector: React.FC<TurnInspectorProps> = ({
       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-normal text-typography-700">
         {thread ? (
           <>
-            {organisationName && <span>{organisationName}</span>}
+            {thread.tenantName && <span>{thread.tenantName}</span>}
+            {thread.visitor && (
+              <Pill tone="neutral" title={en.allyConsole.conversations.visitorHelp}>
+                {en.allyConsole.conversations.visitor}
+              </Pill>
+            )}
+            {thread.arm === "canary" && (
+              <Pill tone="info" title={en.allyConsole.conversations.canaryHelp}>
+                {en.allyConsole.conversations.canary}
+              </Pill>
+            )}
             <Pill
               tone={
                 thread.mode === "NORMAL" ? "neutral" : thread.mode === "CARE" ? "warning" : "danger"

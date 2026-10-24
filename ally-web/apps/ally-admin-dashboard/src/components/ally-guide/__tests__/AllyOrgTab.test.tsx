@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   crisis: vi.fn(),
   saveProfile: vi.fn(),
   saveCrisis: vi.fn(),
+  withdrawCrisis: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   access: { current: { canEditOrg: true, canViewOrg: true } as Record<string, boolean> },
@@ -28,6 +29,7 @@ vi.mock("@api", async importOriginal => ({
   useGetAllyGuideOrgCrisisResponsesQuery: () => h.crisis(),
   useSaveAllyGuideOrgProfileMutation: () => [h.saveProfile, { isLoading: false }],
   useSaveAllyGuideOrgCrisisResponseMutation: () => [h.saveCrisis],
+  useDeleteAllyGuideOrgCrisisResponseMutation: () => [h.withdrawCrisis],
 }));
 
 // eslint-disable-next-line import/first
@@ -118,6 +120,21 @@ describe("AllyOrgTab", () => {
       expect(within(lines[0]).getByLabelText("Link")).toHaveValue("https://acme.org/help");
       expect(within(lines[0]).getByLabelText("Crisis line")).toBeChecked();
       expect(within(lines[1]).getByLabelText("Crisis line")).not.toBeChecked();
+    });
+
+    it("names the person who saved it, not their id", () => {
+      h.profile.mockReturnValue(loaded({ ...PROFILE, updatedBy: 9, updatedByName: "Priya Nair" }));
+      renderTab();
+
+      expect(screen.getByTestId("ally-org-version")).toHaveTextContent("saved by Priya Nair");
+      expect(screen.getByTestId("ally-org-version")).not.toHaveTextContent("user 9");
+    });
+
+    it("falls back to the id when the API has no name for them", () => {
+      h.profile.mockReturnValue(loaded({ ...PROFILE, updatedBy: 9, updatedByName: null }));
+      renderTab();
+
+      expect(screen.getByTestId("ally-org-version")).toHaveTextContent("saved by user 9");
     });
 
     it("shows the version, who saved it, and the two outreach switches as saved", () => {
@@ -278,7 +295,9 @@ describe("AllyOrgTab", () => {
       fireEvent.click(within(saveBar()).getByRole("button", { name: "Save profile" }));
 
       expect(h.saveProfile).not.toHaveBeenCalled();
-      expect(within(first).getByRole("alert")).toHaveTextContent("Start with a digit or +");
+      expect(within(first).getByRole("alert")).toHaveTextContent(
+        "Start with a digit, + or a bracket",
+      );
       expect(
         within(saveBar()).getByText("Fix the highlighted fields to save."),
       ).toBeInTheDocument();
@@ -355,7 +374,7 @@ describe("AllyOrgTab", () => {
       expect(h.saveProfile).not.toHaveBeenCalled();
     });
 
-    it("has no way to withdraw a version: the organisation layer has no such route", () => {
+    it("withdraws the organisation's own version through the organisation route, naming this organisation", async () => {
       h.crisis.mockReturnValue(
         loaded([
           {
@@ -374,7 +393,28 @@ describe("AllyOrgTab", () => {
       renderTab();
 
       expect(screen.getByTestId("crisis-copy-en-meta")).toHaveTextContent("Version 1");
-      expect(screen.queryByRole("button", { name: "Withdraw…" })).not.toBeInTheDocument();
+
+      fireEvent.click(
+        within(screen.getByTestId("crisis-copy-en")).getByRole("button", { name: "Withdraw…" }),
+      );
+      // The wording is the organisation's: its learners fall back to the platform's message first.
+      expect(screen.getByRole("dialog")).toHaveTextContent("fall back to the platform's message");
+      expect(h.withdrawCrisis).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+
+      await waitFor(() =>
+        expect(h.withdrawCrisis).toHaveBeenCalledWith({ tenantId: TENANT, id: "c1" }),
+      );
+    });
+
+    it("says an organisation with no copy of its own uses the platform's", () => {
+      renderTab();
+
+      expect(
+        within(screen.getByTestId("crisis-copy-en")).getByText(
+          /Learners see the platform's message for this language/,
+        ),
+      ).toBeInTheDocument();
     });
 
     it("previews the card with the support lines as currently drafted, unsaved ones included", () => {

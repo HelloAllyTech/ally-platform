@@ -10,6 +10,12 @@ const DASH = "—";
 /** The languages Ally has fixed crisis copy and support lines for, in the order the console lists them. */
 export const ALLY_GUIDE_LANGUAGES: AllyGuideLanguage[] = ["en", "hi", "mr", "ta", "kn"];
 
+/**
+ * How many alerts one read asks for: the most the API returns. The Alerts tab and the Overview's
+ * open-alerts tile ask for the same number so they share one cached answer.
+ */
+export const ALERTS_PAGE_LIMIT = 200;
+
 /** "840 ms" under a second, "1.24 s" above it; a dash when there is no figure. */
 export const formatMs = (ms: number | null | undefined): string => {
   if (ms === null || ms === undefined || !Number.isFinite(ms)) return DASH;
@@ -107,11 +113,16 @@ export const toPrettyJson = (value: unknown): string => {
   }
 };
 
-/** Who approved a crisis message: "you", "user 12", or an honest "someone unrecorded". */
+/**
+ * Who did something an admin screen records: "you" for the signed-in admin, their display name when
+ * the API gives one, otherwise "user 12", or an honest "someone unrecorded" when there is no id at
+ * all. The id is only the fallback now: the API returns names beside ids.
+ */
 export const approverLabel = (
   approvedBy: number | null | undefined,
   currentUserId: number | string | null | undefined,
   strings: { you: string; user: (id: number) => string; unknown: string },
+  name?: string | null,
 ): string => {
   if (approvedBy === null || approvedBy === undefined) return strings.unknown;
   if (
@@ -121,5 +132,5 @@ export const approverLabel = (
   ) {
     return strings.you;
   }
-  return strings.user(approvedBy);
+  return name?.trim() ? name.trim() : strings.user(approvedBy);
 };
