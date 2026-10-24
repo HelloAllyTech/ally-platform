@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ErrorCode } from 'src/exception/error-code.enum';
 import { DataSource } from 'typeorm';
 import { AgentConfigOverrideAudit } from 'src/llm-agent/entity/agent-config-override-audit.entity';
 import { AgentConfigOverride } from 'src/llm-agent/entity/agent-config-override.entity';
@@ -124,15 +130,28 @@ export class GuideConfigAdminService {
     userId: number;
   }): Promise<GuideConfigLayerView> {
     await this.scopeName(input.layer, input.scopeId);
-    await this.overrides.save({
-      agentKey: ALLY_GUIDE_AGENT_KEY,
-      layer: input.layer,
-      scopeId: input.scopeId,
-      schema: GUIDE_POLICY_SCHEMA,
-      change: input.change,
-      actorUserId: input.userId,
-      expectedVersion: input.expectedVersion,
-    });
+    try {
+      await this.overrides.save({
+        agentKey: ALLY_GUIDE_AGENT_KEY,
+        layer: input.layer,
+        scopeId: input.scopeId,
+        schema: GUIDE_POLICY_SCHEMA,
+        change: input.change,
+        actorUserId: input.userId,
+        expectedVersion: input.expectedVersion,
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        const body = error.getResponse() as { message?: unknown };
+        throw new BadRequestException({
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: body.message,
+          error: 'Bad Request',
+          errorCode: ErrorCode.GUIDE_CONFIG_REFUSED,
+        });
+      }
+      throw error;
+    }
     return this.layerView(input.layer, input.scopeId);
   }
 

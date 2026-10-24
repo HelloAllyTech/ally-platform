@@ -60,6 +60,8 @@ import { TokenUser } from 'src/auth/type/auth.types';
 import { TrackSortBy, TrackSortOrder } from '../type/track.type';
 import { BranchingResetDto } from '../dto/branching-reset.dto';
 import { TrackBranchingService } from '../service/track-branching.service';
+import { TrackGuideNotesService } from '../service/track-guide-notes.service';
+import { UpdateTrackGuideNotesDto } from '../dto/track-guide-notes.dto';
 
 @ApiTags('Learn Tracks (Admin)')
 @ApiBearerAuth()
@@ -74,6 +76,7 @@ export class TrackAdminController {
     private readonly trackCoverImageService: TrackCoverImageService,
     private readonly imageGenerationJobService: ImageGenerationJobService,
     private readonly trackBranchingService: TrackBranchingService,
+    private readonly trackGuideNotesService: TrackGuideNotesService,
   ) {}
 
   @ApiOperation({ summary: 'List tracks' })
@@ -219,6 +222,36 @@ export class TrackAdminController {
   ): Promise<SuccessResponse> {
     await this.trackService.assertCallerMayEdit(id);
     return this.trackService.upsertStructure(id, dto);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Ally notes (the guided course's course layer)
+   * ---------------------------------------------------------------- */
+
+  @ApiOperation({
+    summary:
+      "The course's notes for Ally and every item's pacing tension (default and override)",
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_ADMIN_TRACK])
+  @Get('tracks/:id/guide-notes')
+  async getGuideNotes(@Param('id', ParseUUIDPipe) id: string) {
+    return this.trackGuideNotesService.get(id);
+  }
+
+  @ApiOperation({
+    summary: "Replace the course's notes for Ally and per-item tension",
+    description:
+      'Refused with 422 GUIDE_NOTES_ANSWER_LEAK when the notes contain the text of a ' +
+      'quiz answer (a correct option or accepted answer anywhere in the course): Ally ' +
+      'reads these notes and must never hold an answer it could pass on.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_ADMIN_TRACK])
+  @Put('tracks/:id/guide-notes')
+  async saveGuideNotes(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateTrackGuideNotesDto,
+  ) {
+    return this.trackGuideNotesService.save(id, dto);
   }
 
   /* ---------------------------------------------------------------- *

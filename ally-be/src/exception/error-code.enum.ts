@@ -139,6 +139,19 @@ export enum ErrorCode {
    * signing in. The client drops it and creates a new visitor.
    */
   GUIDE_VISITOR_INVALID = 'GUIDE_VISITOR_INVALID',
+  /**
+   * 400. An org or course config change named a setting that layer may not
+   * change (pinned, platform-only, unknown) or an illegal value. `message` is
+   * an array, one sentence per refused key, each starting with the key.
+   * Nothing was saved.
+   */
+  GUIDE_CONFIG_REFUSED = 'GUIDE_CONFIG_REFUSED',
+  /**
+   * 422. A course's Ally notes contain the text of a quiz answer (a correct
+   * option or an accepted answer), which Ally could pass on to a learner.
+   * `message` names each answer and its item. Nothing was saved.
+   */
+  GUIDE_NOTES_ANSWER_LEAK = 'GUIDE_NOTES_ANSWER_LEAK',
 }
 
 /**

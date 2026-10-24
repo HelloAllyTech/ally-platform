@@ -15,6 +15,7 @@ import { TrackLearnerController } from './controller/track-learner.controller';
 import { TrackComponentTemplateController } from './controller/track-component-template.controller';
 import { TrackComponentTemplateService } from './service/track-component-template.service';
 import { TrackComponentTemplateRepository } from './repository/track-component-template.repository';
+import { TrackGuideNotesService } from './service/track-guide-notes.service';
 import { TrackService } from './service/track.service';
 import { TrackSharedService } from './service/track-shared.service';
 import { TrackTenantService } from './service/track-tenant.service';
@@ -70,6 +71,7 @@ import { TrackTranslationGateway } from './gateway/track-translation.gateway';
   ],
   providers: [
     TrackService,
+    TrackGuideNotesService,
     TrackComponentTemplateService,
     TrackComponentTemplateRepository,
     TrackSharedService,

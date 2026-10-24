@@ -4,38 +4,10 @@ import { SessionItemStatus } from 'src/common/type/common.type';
 import { Track } from 'src/track/entity/track.entity';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
 import { TrackSharedService } from 'src/track/service/track-shared.service';
-import { TrackItemType } from 'src/track/type/track.type';
+import { TRACK_TRIGGER_WARNINGS_BY_ITEM_SQL } from 'src/track/constants/track-trigger-warnings.constant';
 import { TrackGuideNotes } from 'src/track/type/track-guide-notes.type';
 import { CourseContext } from '../context/guide-context';
 import { LearnerTrackView, buildCourseSpine } from './course-spine';
-
-/**
- * Trigger warnings per item: a roleplay's own scenario, or every scenario in
- * a case. The landing page's equivalent groups by chapter; the Conductor
- * needs them per item for tension and atmosphere.
- */
-const TRIGGER_WARNINGS_BY_ITEM_SQL = `
-  WITH item_scenarios AS (
-    SELECT ti."id" AS "itemId", ti."scenarioId" AS "scenarioId"
-    FROM "track_items" ti
-    WHERE ti."trackId" = $1::uuid
-      AND ti."deletedAt" IS NULL
-      AND ti."type" = '${TrackItemType.ROLEPLAY}'
-      AND ti."scenarioId" IS NOT NULL
-    UNION ALL
-    SELECT ti."id", ci."scenarioId"
-    FROM "track_items" ti
-    JOIN "case_items" ci
-      ON ci."caseId" = ti."caseId" AND ci."deletedAt" IS NULL
-    WHERE ti."trackId" = $1::uuid
-      AND ti."deletedAt" IS NULL
-      AND ti."type" = '${TrackItemType.CASE}'
-  )
-  SELECT DISTINCT s."itemId" AS "itemId", tw."name" AS "name"
-  FROM item_scenarios s
-  JOIN "scenario_trigger_warnings" stw ON stw."scenarioId" = s."scenarioId"
-  JOIN "trigger_warnings" tw ON tw."id" = stw."triggerWarningId"
-`;
 
 /**
  * The Conductor's view of a course for one learner (plans/ally-guide/plan.md
@@ -193,7 +165,9 @@ export class GuideConductorService {
     trackId: string,
   ): Promise<Map<string, string[]>> {
     const rows: Array<{ itemId: string; name: string }> =
-      await this.dataSource.query(TRIGGER_WARNINGS_BY_ITEM_SQL, [trackId]);
+      await this.dataSource.query(TRACK_TRIGGER_WARNINGS_BY_ITEM_SQL, [
+        trackId,
+      ]);
     const byItem = new Map<string, string[]>();
     for (const row of rows) {
       const list = byItem.get(row.itemId) ?? [];

@@ -121,8 +121,8 @@ export class AgentConfigOverrideService {
   /**
    * Apply a change to one scope's overrides.
    *
-   * @throws BadRequestException `{ message, errors: OverrideRefusalDetail[] }`
-   *   when any key is refused — nothing is written.
+   * @throws BadRequestException `{ message: string[], errors:
+   *   OverrideRefusalDetail[] }` when any key is refused — nothing is written.
    * @throws ConflictException when `expectedVersion` is given and someone
    *   saved in between.
    */
@@ -137,11 +137,12 @@ export class AgentConfigOverrideService {
   }): Promise<AgentConfigOverride> {
     const errors = refusalsFor(input.schema, input.layer, input.change);
     if (errors.length) {
+      // `message` is the array the exception filter passes to the client:
+      // one sentence per refused key, each starting with the key. `errors`
+      // is for in-process callers (the filter drops it).
       throw new BadRequestException({
-        message:
-          errors.length === 1
-            ? errors[0].message
-            : `${errors.length} settings can't be saved. Fix them and save again.`,
+        message: errors.map((error) => error.message),
+        error: 'Bad Request',
         errors,
       });
     }
