@@ -9,7 +9,10 @@ import { GuideOrgProfileValue } from '../entity/guide-org-profile.entity';
 import { ORCHESTRATOR_SYSTEM_PROMPT } from '../prompts/orchestrator.prompt';
 import { enabledSkills, skillIndex } from '../skills/guide-skills';
 import { asData } from '../prompts/sentinel.prompt';
-import { GuideReleaseBundle } from '../release/guide-release.bundle';
+import {
+  GuideReleaseBundle,
+  scopedLessons,
+} from '../release/guide-release.bundle';
 
 /**
  * The orchestrator's context (plans/ally-guide/plan.md §7.6), as pure
@@ -166,11 +169,34 @@ export interface SystemSpans {
   hashes: { persona: string; org: string; course: string };
 }
 
+/**
+ * The three cached spans. The playbook (plan §7.4 `lessonSnapshot`) rides
+ * with the span its scope shares a cache with: platform lessons in S1,
+ * an organisation's lessons in S2, a course's in S3 — so a lesson never
+ * reaches a conversation outside its scope, and a new playbook changes the
+ * span hashes, which starts a new epoch like any release change.
+ */
 export function buildSystemSpans(
   bundle: GuideReleaseBundle,
   orgSpan: string,
   courseSpan: string,
+  scope: { tenantId?: string | null; trackId?: string | null } = {},
 ): SystemSpans {
+  const scoped = scopedLessons(bundle, scope);
+  if (scoped.org.length) {
+    orgSpan = [
+      orgSpan,
+      '# Lessons for this organisation, from earlier conversations',
+      ...scoped.org.map((lesson) => `- ${lesson}`),
+    ].join('\n');
+  }
+  if (scoped.course.length) {
+    courseSpan = [
+      courseSpan,
+      '# Lessons for this course, from earlier conversations',
+      ...scoped.course.map((lesson) => `- ${lesson}`),
+    ].join('\n');
+  }
   // The skill index lives in S1 with the persona: it changes only with the
   // release, so it shares the release's hour-long cache (plan §7.6).
   const skills = skillIndex(enabledSkills(bundle));

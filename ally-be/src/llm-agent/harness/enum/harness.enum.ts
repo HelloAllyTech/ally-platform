@@ -21,6 +21,12 @@ export enum AgentReleaseAuthorKind {
   SEED = 'seed',
   HUMAN = 'human',
   CURATOR = 'curator',
+  /**
+   * The learning loop acting on its own (plan §7.13 progressive delegation):
+   * an automatic gate, shadow, canary start, canary decision, promotion or
+   * revert. Never a person; a person is always HUMAN.
+   */
+  SYSTEM = 'system',
 }
 
 export enum AgentReleaseAuditAction {
@@ -31,6 +37,13 @@ export enum AgentReleaseAuditAction {
   EMERGENCY_ROLLBACK = 'emergency_rollback',
   CANARY_STARTED = 'canary_started',
   CANARY_STOPPED = 'canary_stopped',
+  /** Shadow replay started / finished (plan §7.4 lifecycle). */
+  SHADOW_STARTED = 'shadow_started',
+  SHADOW_COMPLETED = 'shadow_completed',
+  /** The canary monitor's decision changed: wait, promote or revert, with its evidence. */
+  CANARY_DECIDED = 'canary_decided',
+  /** The canary was reverted automatically (auto-revert is always on). */
+  CANARY_REVERTED = 'canary_reverted',
   NOTE = 'note',
 }
 

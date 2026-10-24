@@ -109,6 +109,51 @@ describe('system spans', () => {
     expect(c.hashes.persona).toBe(a.hashes.persona);
   });
 
+  it('shows each lesson only in the span of its scope', () => {
+    const bundle = {
+      ...GUIDE_DEFAULT_BUNDLE,
+      lessonSnapshot: ['Ask before explaining.'],
+      playbook: [
+        { id: 'p', scope: 'platform' as const, text: 'Ask before explaining.' },
+        {
+          id: 'o1',
+          scope: 'org' as const,
+          tenantId: 't1',
+          text: 'Org one lesson.',
+        },
+        {
+          id: 'o2',
+          scope: 'org' as const,
+          tenantId: 't2',
+          text: 'Org two lesson.',
+        },
+        {
+          id: 'c',
+          scope: 'course' as const,
+          trackId: 'tr1',
+          text: 'Course lesson.',
+        },
+      ],
+    };
+    const spans = buildSystemSpans(bundle, 'org', 'course', {
+      tenantId: 't1',
+      trackId: 'tr1',
+    });
+    const [s1, s2, s3] = spans.blocks.map((b) => b.text);
+    expect(s1).toContain('Ask before explaining.');
+    expect(s1).not.toContain('Org one lesson.');
+    expect(s2).toContain('Org one lesson.');
+    expect(s2).not.toContain('Org two lesson.');
+    expect(s3).toContain('Course lesson.');
+    const other = buildSystemSpans(bundle, 'org', 'course', { tenantId: 't2' });
+    expect(other.blocks[1].text).toContain('Org two lesson.');
+    expect(other.blocks[2].text).not.toContain('Course lesson.');
+    // A visitor (no organisation) sees no organisation lesson.
+    expect(buildSystemSpans(bundle, 'org', 'course').blocks[1].text).toBe(
+      'org',
+    );
+  });
+
   it('wraps organisation text as data', () => {
     expect(buildOrgSpan({ protocols: 'Call <supervisor> first' })).toContain(
       'Call ‹supervisor› first',

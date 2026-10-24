@@ -129,6 +129,10 @@ export class GuidePlaygroundService {
       bundle,
       buildOrgSpan(org?.profile ?? null),
       buildCourseSpan(course),
+      {
+        tenantId: visitor ? null : (input.tenantId ?? null),
+        trackId: input.trackId,
+      },
     );
     const history = (input.history ?? []).slice(-20);
     const mode = input.mode ?? GuideMode.NORMAL;
