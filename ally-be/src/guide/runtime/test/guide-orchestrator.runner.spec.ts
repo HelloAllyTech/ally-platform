@@ -186,6 +186,24 @@ describe('runOrchestrator', () => {
     expect(repeatsEarlierText('Yes.', earlier)).toBe(false);
   });
 
+  it('continues a paused turn instead of ending it', async () => {
+    const { stream, requests } = streamOf([
+      [final([{ type: 'text', text: 'Looking.' }], 'pause_turn')],
+      [final([{ type: 'text', text: 'Found it.' }])],
+    ]);
+    const gate = new ReleaseGate(async () => undefined);
+    await gate.release();
+    const out = await runOrchestrator({
+      ...base(),
+      stream,
+      executeTool: jest.fn(),
+      gate,
+    });
+    expect(requests).toHaveLength(2);
+    expect(requests[1].messages.at(-1)).toMatchObject({ role: 'assistant' });
+    expect(out.text).toBe('Looking.\n\nFound it.');
+  });
+
   it('closes with tool_choice none after the pass limit, keeping the tools', async () => {
     const toolPass = () => [
       final(

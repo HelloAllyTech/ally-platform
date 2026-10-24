@@ -244,6 +244,10 @@ export async function runOrchestrator(
         if (passText && !muted) texts.push(passText);
       }
 
+      // A paused turn continues: the assistant content is already appended,
+      // so the next pass resends the conversation as it stands.
+      if (final.stopReason === 'pause_turn') continue;
+
       const uses = content.filter(
         (block): block is Extract<AgentContentBlock, { type: 'tool_use' }> =>
           block.type === 'tool_use',

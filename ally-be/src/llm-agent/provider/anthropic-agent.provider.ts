@@ -36,6 +36,7 @@ const STOP_REASONS: Record<string, AgentStopReason> = {
   max_tokens: 'max_tokens',
   stop_sequence: 'end_turn',
   refusal: 'refusal',
+  pause_turn: 'pause_turn',
 };
 
 /** `cache: true` is the API default TTL; a string names one explicitly. */

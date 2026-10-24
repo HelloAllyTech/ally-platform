@@ -109,6 +109,11 @@ export type AgentStopReason =
    * it before reading content. `stopDetails` says which category.
    */
   | 'refusal'
+  /**
+   * The server paused a long turn (e.g. tool search) and expects the caller
+   * to send the conversation back as is to continue it.
+   */
+  | 'pause_turn'
   | 'other';
 
 export interface AgentUsage {
