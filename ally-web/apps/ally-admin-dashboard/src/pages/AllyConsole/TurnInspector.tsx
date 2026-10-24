@@ -9,6 +9,7 @@ import { en } from "@constants";
 import { useAllyGuideAccess } from "@hooks";
 import { AllyGuideThreadRow } from "@types";
 
+import { EffectiveConfigPanel } from "./EffectiveConfigPanel";
 import { TranscriptPane } from "./TranscriptPane";
 import { TurnCard } from "./TurnCard";
 
@@ -118,19 +119,23 @@ const InspectorBody: React.FC<Required<Pick<TurnInspectorProps, "threadId">>> = 
           subtitle={strings.transcriptsLocked.message}
           data-testid="transcripts-locked"
         />
+        <EffectiveConfigPanel threadId={threadId} />
         {turnsColumn}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
-      {turnsColumn}
-      <TranscriptPane
-        threadId={threadId}
-        activeTurnId={chosenTurnId}
-        onSelectTurn={openFromTranscript}
-      />
+    <div className="flex flex-col gap-8">
+      <EffectiveConfigPanel threadId={threadId} />
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
+        {turnsColumn}
+        <TranscriptPane
+          threadId={threadId}
+          activeTurnId={chosenTurnId}
+          onSelectTurn={openFromTranscript}
+        />
+      </div>
     </div>
   );
 };

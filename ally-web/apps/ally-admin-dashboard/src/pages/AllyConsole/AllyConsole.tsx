@@ -6,10 +6,14 @@ import { Tabs } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import { useAllyGuideAccess } from "@hooks";
 
+import { AdviceTab } from "./AdviceTab";
 import { AlertsTab } from "./AlertsTab";
 import { BaselineTab } from "./BaselineTab";
+import { ConfigurationTab } from "./ConfigurationTab";
 import { ConversationsTab } from "./ConversationsTab";
 import { CrisisCopyTab } from "./CrisisCopyTab";
+import { EvalsTab } from "./EvalsTab";
+import { LibraryTab } from "./LibraryTab";
 import { OverviewTab } from "./OverviewTab";
 import { PlaygroundTab } from "./PlaygroundTab";
 import { ReleasesTab } from "./ReleasesTab";
@@ -20,8 +24,12 @@ export enum AllyConsoleTab {
   CONVERSATIONS = "conversations",
   RELEASES = "releases",
   PLAYGROUND = "playground",
+  EVALS = "evals",
   ALERTS = "alerts",
   BASELINE = "baseline",
+  CONFIGURATION = "configuration",
+  LIBRARY = "library",
+  ADVICE = "advice",
   SETTINGS = "settings",
   CRISIS_COPY = "crisis-copy",
 }
@@ -31,8 +39,12 @@ const ALL_TAB_ITEMS = [
   { id: AllyConsoleTab.CONVERSATIONS, label: en.allyConsole.tabs.conversations },
   { id: AllyConsoleTab.RELEASES, label: en.allyConsole.tabs.releases },
   { id: AllyConsoleTab.PLAYGROUND, label: en.allyConsole.tabs.playground },
+  { id: AllyConsoleTab.EVALS, label: en.allyConsole.tabs.evals },
   { id: AllyConsoleTab.ALERTS, label: en.allyConsole.tabs.alerts },
   { id: AllyConsoleTab.BASELINE, label: en.allyConsole.tabs.baseline },
+  { id: AllyConsoleTab.CONFIGURATION, label: en.allyConsole.tabs.configuration },
+  { id: AllyConsoleTab.LIBRARY, label: en.allyConsole.tabs.library },
+  { id: AllyConsoleTab.ADVICE, label: en.allyConsole.tabs.advice },
   { id: AllyConsoleTab.SETTINGS, label: en.allyConsole.tabs.settings },
   { id: AllyConsoleTab.CRISIS_COPY, label: en.allyConsole.tabs.crisisCopy },
 ];
@@ -73,8 +85,16 @@ export const AllyConsole: React.FC = () => {
         return <ReleasesTab onOpenOverview={() => go(AllyConsoleTab.OVERVIEW)} />;
       case AllyConsoleTab.PLAYGROUND:
         return <PlaygroundTab />;
+      case AllyConsoleTab.EVALS:
+        return <EvalsTab />;
       case AllyConsoleTab.ALERTS:
         return <AlertsTab />;
+      case AllyConsoleTab.CONFIGURATION:
+        return <ConfigurationTab />;
+      case AllyConsoleTab.LIBRARY:
+        return <LibraryTab />;
+      case AllyConsoleTab.ADVICE:
+        return <AdviceTab />;
       case AllyConsoleTab.BASELINE:
         return <BaselineTab />;
       case AllyConsoleTab.SETTINGS:

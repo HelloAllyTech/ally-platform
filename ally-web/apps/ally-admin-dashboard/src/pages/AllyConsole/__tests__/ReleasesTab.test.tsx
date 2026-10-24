@@ -14,6 +14,8 @@ const h = vi.hoisted(() => ({
   audit: vi.fn(),
   startCanary: vi.fn(),
   stopCanary: vi.fn(),
+  startEval: vi.fn(),
+  evalCases: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   access: { current: { canEdit: true } as Record<string, boolean> },
@@ -44,6 +46,8 @@ vi.mock("@api", async importOriginal => ({
   useGetAllyGuideReleaseAuditQuery: () => h.audit(),
   useStartAllyGuideCanaryMutation: () => [h.startCanary, { isLoading: false }],
   useStopAllyGuideCanaryMutation: () => [h.stopCanary, { isLoading: false }],
+  useStartAllyGuideEvalRunMutation: () => [h.startEval, { isLoading: false }],
+  useGetAllyGuideEvalCasesQuery: () => h.evalCases(),
 }));
 
 // eslint-disable-next-line import/first
@@ -126,6 +130,8 @@ describe("ReleasesTab", () => {
     h.audit.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() });
     h.startCanary.mockReturnValue({ unwrap: () => Promise.resolve({ id: "rel-4", version: 4 }) });
     h.stopCanary.mockReturnValue({ unwrap: () => Promise.resolve({ id: "rel-4", version: 4 }) });
+    h.startEval.mockReturnValue({ unwrap: () => Promise.resolve({ id: "run-1" }) });
+    h.evalCases.mockReturnValue({ data: [], isLoading: false });
   });
 
   describe("the list", () => {
@@ -674,6 +680,105 @@ describe("ReleasesTab", () => {
       expect(screen.getAllByTestId("ally-load-failed").length).toBeGreaterThan(0);
       // The releases themselves are still there.
       expect(screen.getAllByTestId("release-row").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("running evals on a release", () => {
+    const openRunDialog = async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open release v4" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Run evals…" }));
+      return screen.getByRole("dialog", { name: "Run evals on v4" });
+    };
+
+    it("explains that the models are called for real and that the run goes on in the background", async () => {
+      render(<ReleasesTab />);
+
+      const dialog = await openRunDialog();
+
+      expect(dialog).toHaveTextContent("models are called for real");
+      expect(dialog).toHaveTextContent("starts in the background");
+      expect(h.startEval).not.toHaveBeenCalled();
+    });
+
+    it("starts a smoke run by default, with no target cases", async () => {
+      render(<ReleasesTab />);
+      const dialog = await openRunDialog();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "Start Smoke run" }));
+
+      await waitFor(() =>
+        expect(h.startEval).toHaveBeenCalledWith({
+          releaseId: "rel-4",
+          kind: "smoke",
+          targetCaseIds: undefined,
+        }),
+      );
+      expect(h.toastSuccess).toHaveBeenCalledWith("Started. Follow it on the Evals tab.");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
+    it("offers the active cases as targets for a gate, and sends the ones ticked", async () => {
+      h.evalCases.mockReturnValue({
+        data: [
+          { id: "c-1", title: "Mentions the hotline too early" },
+          { id: "c-2", title: "Quiz answer extraction" },
+        ],
+        isLoading: false,
+      });
+      render(<ReleasesTab />);
+      const dialog = await openRunDialog();
+      expect(within(dialog).queryByTestId("eval-run-targets")).not.toBeInTheDocument();
+
+      fireEvent.click(within(dialog).getByLabelText(/Gate: every active case/));
+      fireEvent.click(within(dialog).getByLabelText("Quiz answer extraction"));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Start Gate run" }));
+
+      await waitFor(() => expect(h.startEval).toHaveBeenCalled());
+      expect(h.startEval).toHaveBeenCalledWith({
+        releaseId: "rel-4",
+        kind: "gate",
+        targetCaseIds: ["c-2"],
+      });
+    });
+
+    it("says there are no active cases to pick when there are none", async () => {
+      render(<ReleasesTab />);
+      const dialog = await openRunDialog();
+
+      fireEvent.click(within(dialog).getByLabelText(/Gate: every active case/));
+
+      expect(within(dialog).getByText("There are no active cases to pick.")).toBeInTheDocument();
+    });
+
+    it("keeps the dialog open with the server's message when a run cannot start", async () => {
+      h.startEval.mockReturnValue({
+        unwrap: () =>
+          Promise.reject({
+            status: 409,
+            data: { message: "An eval run is already running for this release" },
+          }),
+      });
+      render(<ReleasesTab />);
+      const dialog = await openRunDialog();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "Start Smoke run" }));
+
+      await waitFor(() =>
+        expect(h.toastError).toHaveBeenCalledWith(
+          "An eval run is already running for this release",
+        ),
+      );
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("offers no run to an admin who can only view", async () => {
+      h.access.current = { canEdit: false };
+      render(<ReleasesTab />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Open release v4" }));
+
+      expect(await screen.findByTestId("release-detail")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Run evals…" })).not.toBeInTheDocument();
     });
   });
 });

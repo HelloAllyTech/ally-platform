@@ -79,6 +79,8 @@ interface ReleaseDrawerProps {
   /** Start a canary of this release, or change the share of one already running. */
   onStartCanary: (release: AllyGuideRelease) => void;
   onStopCanary: (release: AllyGuideRelease) => void;
+  /** Start an eval run (smoke or gate) of this release. */
+  onRunEvals: (release: AllyGuideRelease) => void;
   onClose: () => void;
 }
 
@@ -88,7 +90,8 @@ const DrawerBody: React.FC<{
   onPromote: (release: AllyGuideRelease) => void;
   onStartCanary: (release: AllyGuideRelease) => void;
   onStopCanary: (release: AllyGuideRelease) => void;
-}> = ({ releaseId, canEdit, onPromote, onStartCanary, onStopCanary }) => {
+  onRunEvals: (release: AllyGuideRelease) => void;
+}> = ({ releaseId, canEdit, onPromote, onStartCanary, onStopCanary, onRunEvals }) => {
   const strings = en.allyConsole.releases.detail;
   const { data, isLoading, isError, error, refetch } = useGetAllyGuideReleaseQuery(releaseId);
 
@@ -159,10 +162,15 @@ const DrawerBody: React.FC<{
           {strings.canaryRunning(data.rolloutPercent ?? null)}
         </p>
       )}
-      {canEdit && data.status !== "ga" && (
+      {canEdit && (
         <div className="flex flex-wrap gap-3">
-          <Button kind="primary" size="md" onClick={() => onPromote(data)}>
-            {strings.promote}
+          {data.status !== "ga" && (
+            <Button kind="primary" size="md" onClick={() => onPromote(data)}>
+              {strings.promote}
+            </Button>
+          )}
+          <Button kind="tertiary" size="md" onClick={() => onRunEvals(data)}>
+            {en.allyConsole.evals.runs.start}
           </Button>
           {canStartCanary(data.status) && (
             <Button kind="tertiary" size="md" onClick={() => onStartCanary(data)}>
@@ -237,6 +245,7 @@ export const ReleaseDrawer: React.FC<ReleaseDrawerProps> = ({
   onPromote,
   onStartCanary,
   onStopCanary,
+  onRunEvals,
   onClose,
 }) => {
   const strings = en.allyConsole.releases.detail;
@@ -270,6 +279,7 @@ export const ReleaseDrawer: React.FC<ReleaseDrawerProps> = ({
           onPromote={onPromote}
           onStartCanary={onStartCanary}
           onStopCanary={onStopCanary}
+          onRunEvals={onRunEvals}
         />
       )}
     </SidePanel>

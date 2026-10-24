@@ -8,6 +8,7 @@ import { en } from "@constants";
 import { AllyGuideThreadTrace, AllyGuideTraceSummary } from "@types";
 import { formatTimestamp } from "@utils";
 
+import { SaveEvalCaseButton } from "./SaveEvalCaseButton";
 import { StageWaterfall } from "./StageWaterfall";
 import { TurnPayload } from "./TurnPayload";
 
@@ -278,7 +279,12 @@ export const TurnCard: React.FC<TurnCardProps> = ({
           )}
 
           {canReadPayload && (
-            <TurnPayload turnId={trace.turnId} hasPayload={detail.data?.trace?.hasPayload} />
+            <>
+              <TurnPayload turnId={trace.turnId} hasPayload={detail.data?.trace?.hasPayload} />
+              <div>
+                <SaveEvalCaseButton turnId={trace.turnId} />
+              </div>
+            </>
           )}
         </div>
       )}

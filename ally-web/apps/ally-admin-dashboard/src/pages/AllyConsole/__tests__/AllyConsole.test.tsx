@@ -49,6 +49,12 @@ vi.mock("../ReleasesTab", () => ({
 vi.mock("../PlaygroundTab", () => ({ PlaygroundTab: () => <div data-testid="playground-tab" /> }));
 vi.mock("../AlertsTab", () => ({ AlertsTab: () => <div data-testid="alerts-tab" /> }));
 vi.mock("../BaselineTab", () => ({ BaselineTab: () => <div data-testid="baseline-tab" /> }));
+vi.mock("../EvalsTab", () => ({ EvalsTab: () => <div data-testid="evals-tab" /> }));
+vi.mock("../ConfigurationTab", () => ({
+  ConfigurationTab: () => <div data-testid="configuration-tab" />,
+}));
+vi.mock("../LibraryTab", () => ({ LibraryTab: () => <div data-testid="library-tab" /> }));
+vi.mock("../AdviceTab", () => ({ AdviceTab: () => <div data-testid="advice-tab" /> }));
 vi.mock("../SettingsTab", () => ({ SettingsTab: () => <div data-testid="settings-tab" /> }));
 vi.mock("../CrisisCopyTab", () => ({ CrisisCopyTab: () => <div data-testid="crisis-copy-tab" /> }));
 
@@ -77,7 +83,7 @@ describe("AllyConsole", () => {
     expect(screen.getByText(/control room for Ally/)).toBeInTheDocument();
   });
 
-  it("offers the eight tabs, in order", () => {
+  it("offers the twelve tabs, in order", () => {
     renderAt();
 
     expect(
@@ -86,8 +92,12 @@ describe("AllyConsole", () => {
         "conversations",
         "releases",
         "playground",
+        "evals",
         "alerts",
         "baseline",
+        "configuration",
+        "library",
+        "advice",
         "settings",
         "crisis-copy",
       ].map(id => screen.getByTestId(`tab-${id}`).textContent),
@@ -96,8 +106,12 @@ describe("AllyConsole", () => {
       "Conversations",
       "Releases",
       "Playground",
+      "Evals",
       "Alerts",
       "Baseline",
+      "Configuration",
+      "Library",
+      "Advice",
       "Settings",
       "Crisis copy",
     ]);
@@ -130,7 +144,11 @@ describe("AllyConsole", () => {
     ["conversations", "conversations-tab"],
     ["releases", "releases-tab"],
     ["playground", "playground-tab"],
+    ["evals", "evals-tab"],
     ["alerts", "alerts-tab"],
+    ["configuration", "configuration-tab"],
+    ["library", "library-tab"],
+    ["advice", "advice-tab"],
     ["baseline", "baseline-tab"],
     ["settings", "settings-tab"],
     ["crisis-copy", "crisis-copy-tab"],

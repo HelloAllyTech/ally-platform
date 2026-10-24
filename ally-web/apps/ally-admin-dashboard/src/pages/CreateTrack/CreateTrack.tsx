@@ -16,7 +16,7 @@ import { WandStars, WarningAlt } from "@assets";
 import { ActionConfirmationPopup, Button, Header } from "@components";
 import { ButtonVariant } from "@components/types";
 import { DEFAULT_TRACK_FORM_VALUES, ROUTES, TRACK_ENTITY_LABEL, en } from "@constants";
-import { useCanUseCourseCopilot, useContentAuthoring } from "@hooks";
+import { useAllyGuideAccess, useCanUseCourseCopilot, useContentAuthoring } from "@hooks";
 import {
   CompletionCriteria,
   SimulationStatus,
@@ -25,6 +25,7 @@ import {
   TrackItemType,
 } from "@types";
 
+import { AllyNotesEditor } from "./components/AllyNotesEditor";
 import { ItemEditorCanvas } from "./components/ItemEditorCanvas";
 import { LandingPageEditor } from "./components/landing/LandingPageEditor";
 import { TrackOutlineRail } from "./components/TrackOutlineRail";
@@ -34,6 +35,7 @@ import {
   TrackSelection,
   isLandingSelection,
   isSettingsSelection,
+  isAllyNotesSelection,
   isTranslationsSelection,
 } from "./components/types";
 import {
@@ -57,6 +59,7 @@ export const CreateTrack: FC = () => {
 
   const [trackId, setTrackId] = useState<string | null>(id ?? null);
   const canUseCourseCopilot = useCanUseCourseCopilot();
+  const allyAccess = useAllyGuideAccess();
   // Create Courses off: an existing course opens read-only — the outline and
   // every editor render, nothing saves (ally-be refuses the write anyway). New
   // courses are blocked at the route.
@@ -305,6 +308,9 @@ export const CreateTrack: FC = () => {
     if (isTranslationsSelection(selection)) {
       return <TrackTranslationsEditor trackId={trackId} isDirty={isDirty} />;
     }
+    if (isAllyNotesSelection(selection)) {
+      return <AllyNotesEditor trackId={trackId} canDraft={canUseCourseCopilot} />;
+    }
     const { sectionIndex, itemIndex } = selection;
     const item = sections[sectionIndex]?.items?.[itemIndex];
     if (!item) {
@@ -420,6 +426,7 @@ export const CreateTrack: FC = () => {
             onSelectSettings={() => setSelection("settings")}
             onSelectLanding={() => setSelection("landing")}
             onSelectTranslations={() => setSelection("translations")}
+            onSelectAllyNotes={allyAccess.canView ? () => setSelection("allyNotes") : undefined}
             publishedLanguageCount={publishedLanguageCount}
             onSelectItem={(sectionIndex, itemIndex) => setSelection({ sectionIndex, itemIndex })}
             onAddSection={handleAddSection}

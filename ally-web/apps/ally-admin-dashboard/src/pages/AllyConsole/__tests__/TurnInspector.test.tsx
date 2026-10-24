@@ -29,6 +29,8 @@ vi.mock("@api", async importOriginal => ({
   useGetAllyGuideTranscriptQuery: () => h.transcript(),
   useGetAllyGuideTurnPayloadQuery: (id: string, options?: { skip?: boolean }) =>
     options?.skip ? { data: undefined, isFetching: false, isError: false } : h.payload(id),
+  useSaveAllyGuideTurnAsEvalCaseMutation: () => [vi.fn(), { isLoading: false }],
+  useGetAllyGuideThreadConfigQuery: () => ({ data: undefined, isLoading: true }),
 }));
 
 // eslint-disable-next-line import/first
@@ -249,6 +251,10 @@ describe("TurnInspector", () => {
       expect(within(pane).getByText(/\[phone masked\]/)).toBeInTheDocument();
       expect(screen.queryByTestId("transcripts-locked")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Show payload" })).toBeInTheDocument();
+      // Saving a turn as an eval case stores its redacted words, so it needs the same grant.
+      expect(screen.getAllByRole("button", { name: "Save as eval case…" }).length).toBeGreaterThan(
+        0,
+      );
       // Beside the turns, not instead of them.
       expect(screen.getAllByTestId("turn-card")).toHaveLength(2);
     });
@@ -265,6 +271,7 @@ describe("TurnInspector", () => {
       );
       expect(screen.queryByTestId("transcript-pane")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Show payload" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Save as eval case…" })).not.toBeInTheDocument();
       // Everything content-free is still there.
       expect(screen.getAllByTestId("turn-card")).toHaveLength(2);
       expect(screen.getByTestId("stage-waterfall")).toBeInTheDocument();
@@ -317,6 +324,24 @@ describe("TurnInspector", () => {
       renderInspector();
 
       expect(screen.getByTestId("transcript-empty")).toHaveTextContent("No messages");
+    });
+  });
+
+  describe("the effective config", () => {
+    it("is offered without the transcripts grant, since it holds no learner text, and starts shut", () => {
+      h.access.current = { canReadTranscripts: false };
+      renderInspector();
+
+      expect(screen.getByRole("button", { name: "Show effective config" })).toBeInTheDocument();
+      expect(screen.queryByTestId("effective-config")).not.toBeInTheDocument();
+    });
+
+    it("is offered beside the transcript with the grant too", () => {
+      h.access.current = { canReadTranscripts: true };
+      renderInspector();
+
+      expect(screen.getByRole("button", { name: "Show effective config" })).toBeInTheDocument();
+      expect(screen.getByTestId("transcript-pane")).toBeInTheDocument();
     });
   });
 

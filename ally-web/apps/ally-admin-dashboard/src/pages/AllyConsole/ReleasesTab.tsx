@@ -28,6 +28,7 @@ import {
 } from "./ReleaseDialogs";
 import { ReleaseDrawer } from "./ReleaseDrawer";
 import { ReleaseStatusPill } from "./ReleaseStatusPill";
+import { StartEvalRunDialog } from "./StartEvalRunDialog";
 
 interface ReleasesTabProps {
   /** Jumps to the Overview, where a canary is compared with the live release. */
@@ -61,6 +62,7 @@ export const ReleasesTab: React.FC<ReleasesTabProps> = ({ onOpenOverview }) => {
   const [rollbackOpen, setRollbackOpen] = useState(false);
   const [startingCanary, setStartingCanary] = useState<AllyGuideRelease | null>(null);
   const [stoppingCanary, setStoppingCanary] = useState<AllyGuideRelease | null>(null);
+  const [evalRelease, setEvalRelease] = useState<AllyGuideRelease | null>(null);
 
   if (isLoading) return <LoadingBlock lines={6} />;
   if (isError || !data) {
@@ -230,8 +232,13 @@ export const ReleasesTab: React.FC<ReleasesTabProps> = ({ onOpenOverview }) => {
           setOpenId(null);
           setStoppingCanary(release);
         }}
+        onRunEvals={release => {
+          setOpenId(null);
+          setEvalRelease(release);
+        }}
         onClose={() => setOpenId(null)}
       />
+      <StartEvalRunDialog release={evalRelease} onClose={() => setEvalRelease(null)} />
       <PromoteReleaseDialog
         release={promoting}
         current={live}
