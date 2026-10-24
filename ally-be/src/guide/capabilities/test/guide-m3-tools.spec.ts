@@ -187,6 +187,7 @@ function setup(
     practice as never,
     peer as never,
     library as never,
+    { receiptFor: jest.fn() } as never,
   );
   const ctx: any = {
     threadId: 'th1',

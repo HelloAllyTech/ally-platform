@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * reminder, so the reminder has to know which it is. Existing rows are
  * sessions.
  */
-export class AddGuideAppointmentPurpose1980720000000 implements MigrationInterface {
-  name = 'AddGuideAppointmentPurpose1980720000000';
+export class AddGuideAppointmentPurpose1980725000000 implements MigrationInterface {
+  name = 'AddGuideAppointmentPurpose1980725000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
