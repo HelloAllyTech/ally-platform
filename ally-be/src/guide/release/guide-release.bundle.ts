@@ -24,6 +24,11 @@ import {
   TUTOR_SYSTEM_PROMPT,
 } from '../prompts/tutor.prompt';
 import {
+  GUIDE_DEFAULT_SKILL_DEFS,
+  GUIDE_SKILL_IDS,
+  GuideSkillDef,
+} from '../skills/guide-skills';
+import {
   SENTINEL_PROMPT_CODE,
   SENTINEL_PROMPT_VERSION,
   SENTINEL_SYSTEM_PROMPT,
@@ -120,7 +125,32 @@ export interface GuidePolicy {
     voiceMaxSessionMinutes: number;
     turnHardTimeoutMs: number;
   };
+  /**
+   * Appendix A "Peer". Optional so a release frozen before it existed stays
+   * readable; read it through `peerPolicy()`.
+   */
+  peer?: GuidePeerPolicy;
 }
+
+export interface GuidePeerPolicy {
+  /** No aggregate is shown over fewer learners than this. */
+  minGroupSize: number;
+  /** Advice lines appear once the org has this many finishers of the course. */
+  adviceMinFinishers: number;
+  adviceMaxChars: number;
+  advicePerLearnerPerCourse: number;
+}
+
+export const GUIDE_DEFAULT_PEER_POLICY: GuidePeerPolicy = {
+  minGroupSize: 5,
+  adviceMinFinishers: 10,
+  adviceMaxChars: 200,
+  advicePerLearnerPerCourse: 1,
+};
+
+/** The release's peer policy, or the defaults for a release from before it. */
+export const peerPolicy = (bundle: { policy: GuidePolicy }): GuidePeerPolicy =>
+  bundle.policy.peer ?? GUIDE_DEFAULT_PEER_POLICY;
 
 /** One role's prompt, frozen into the release. */
 export interface GuidePromptRef {
@@ -149,6 +179,11 @@ export interface GuideReleaseBundle {
   /** Capability id → enabled. Unknown ids are ignored; absent ids are off. */
   capabilities: Record<string, boolean>;
   skills: Record<string, boolean>;
+  /**
+   * Each enabled skill's text, frozen like the prompts. Optional: releases
+   * from before skills existed have none (see `enabledSkills`).
+   */
+  skillDefs?: Record<string, GuideSkillDef>;
   policy: GuidePolicy;
   /** Frozen lesson text (the playbook). Empty until the learning loop exists. */
   lessonSnapshot: string[];
@@ -199,6 +234,7 @@ export const GUIDE_DEFAULT_POLICY: GuidePolicy = {
     voiceMaxSessionMinutes: 30,
     turnHardTimeoutMs: 45_000,
   },
+  peer: GUIDE_DEFAULT_PEER_POLICY,
 };
 
 const OPUS: GuideModelRoute = {
@@ -282,8 +318,14 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
     show_wellbeing_resources: true,
     set_guidance: true,
     consult_tutor: true,
+    consult_coach: true,
+    consult_assessor: true,
+    get_peer_signals: true,
+    search_library: true,
+    load_skill: true,
   },
-  skills: {},
+  skills: Object.fromEntries(GUIDE_SKILL_IDS.map((id) => [id, true])),
+  skillDefs: GUIDE_DEFAULT_SKILL_DEFS,
   policy: GUIDE_DEFAULT_POLICY,
   lessonSnapshot: [],
 };

@@ -41,6 +41,8 @@ export interface GuideThreadPacing {
     answered?: number;
     correct?: number;
   } | null;
+  /** Skills loaded in an epoch: their text is already in that epoch's history. */
+  skillsLoaded?: { epoch: number; ids: string[] } | null;
 }
 
 /** What the current epoch's frozen context prefix was built from (plan §7.6). */

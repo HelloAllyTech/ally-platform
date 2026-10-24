@@ -7,6 +7,7 @@ import {
 import { CourseSpine } from '../conductor/course-spine';
 import { GuideOrgProfileValue } from '../entity/guide-org-profile.entity';
 import { ORCHESTRATOR_SYSTEM_PROMPT } from '../prompts/orchestrator.prompt';
+import { enabledSkills, skillIndex } from '../skills/guide-skills';
 import { asData } from '../prompts/sentinel.prompt';
 import { GuideReleaseBundle } from '../release/guide-release.bundle';
 
@@ -170,8 +171,12 @@ export function buildSystemSpans(
   orgSpan: string,
   courseSpan: string,
 ): SystemSpans {
+  // The skill index lives in S1 with the persona: it changes only with the
+  // release, so it shares the release's hour-long cache (plan §7.6).
+  const skills = skillIndex(enabledSkills(bundle));
   const persona = [
     bundle.prompts.orchestrator?.text ?? ORCHESTRATOR_SYSTEM_PROMPT,
+    ...(skills ? [skills] : []),
     ...(bundle.lessonSnapshot.length
       ? [
           '# Lessons from earlier conversations',
