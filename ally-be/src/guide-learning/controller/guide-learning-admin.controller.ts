@@ -1,3 +1,4 @@
+import { LoggerService } from 'src/logger/logger.service';
 import {
   Body,
   Controller,
@@ -63,6 +64,10 @@ const REVIEW = { permissions: [PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS] };
 @ApiSecurity('access-token')
 @Controller('v1/guide/admin')
 export class GuideLearningAdminController {
+  private readonly logger = LoggerService.getInstance(
+    'GuideLearningAdminController',
+  );
+
   constructor(
     private readonly evaluator: GuideEvaluatorService,
     private readonly reviews: GuideReviewService,
@@ -100,14 +105,24 @@ export class GuideLearningAdminController {
   }
 
   @Post('evaluator/run')
-  @HttpCode(200)
+  @HttpCode(202)
   @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
   @ApiOperation({
     summary:
       'Run the nightly evaluator now for one UTC day (default yesterday). Turns already judged are skipped',
   })
   runEvaluator(@Body() dto: RunEvaluatorDto) {
-    return this.evaluator.runNight(dto.night);
+    // A night can take many minutes: run it after replying; the summary and
+    // the review queue show the result (as eval runs do).
+    const night = dto.night;
+    setImmediate(() => {
+      this.evaluator
+        .runNight(night)
+        .catch((error) =>
+          this.logger.error('Evaluator run failed', error as Error),
+        );
+    });
+    return { started: true, night: night ?? null };
   }
 
   @Get('evaluator/kappa')

@@ -29,7 +29,9 @@ export const MAX_CANDIDATES_PER_NIGHT = 5_000;
 /** Messages of context before the learner message in a window. */
 export const WINDOW_CONTEXT_MESSAGES = 6;
 /** Judge output limit: thirteen short verdicts fit comfortably. */
-export const JUDGE_MAX_TOKENS = 2_000;
+// Room to think before a structured verdict: on the live run, 2,000 left a
+// reasoning model's critic and verifier stopped at max_tokens with nothing.
+export const JUDGE_MAX_TOKENS = 8_000;
 export const JUDGE_TIMEOUT_MS = 60_000;
 /** A judge call is refused when the day has less than this left. */
 export const JUDGE_RESERVE_USD = 0.05;
