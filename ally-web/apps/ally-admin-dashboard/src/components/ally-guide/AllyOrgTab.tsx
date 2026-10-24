@@ -19,9 +19,11 @@ import { formatDateTime, getErrorMessage } from "@utils";
 
 import { ALLY_GUIDE_LANGUAGES, approverLabel } from "./allyGuideFormat";
 import { AddItemInput, ChipList } from "./ChipList";
+import { ConfigLayerEditor } from "./ConfigLayerEditor";
 import { ErrorPanel, LoadingBlock, ViewOnlyNote } from "./ConsoleStates";
 import { CrisisCopyEditor } from "./CrisisCopyEditor";
 import { InfoTip } from "./InfoTip";
+import { LibraryPanel } from "./LibraryPanel";
 import {
   draftFromProfile,
   isDraftDirty,
@@ -415,6 +417,27 @@ export const AllyOrgTab: React.FC<AllyOrgTabProps> = ({ tenantId }) => {
             onSave={(languageCode, body) => saveCrisis({ tenantId, languageCode, body }).unwrap()}
           />
         )}
+      </Section>
+
+      <Section
+        id="ally-org-config"
+        heading={en.allyConsole.orgSections.configHeading}
+        description={en.allyConsole.orgSections.configDescription}
+      >
+        <ConfigLayerEditor
+          layer="org"
+          scopeId={tenantId}
+          canEdit={canEditOrg}
+          what="this organisation's Ally settings"
+        />
+      </Section>
+
+      <Section
+        id="ally-org-library"
+        heading={en.allyConsole.orgSections.libraryHeading}
+        description={en.allyConsole.orgSections.libraryDescription}
+      >
+        <LibraryPanel scope="organisation" tenantId={tenantId} canEdit={canEditOrg} />
       </Section>
     </div>
   );

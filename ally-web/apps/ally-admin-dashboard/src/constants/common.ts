@@ -179,6 +179,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    // The trainer's notes for Ally and per-item tension.
+    GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
     TENANT_VISIBILITY: (tenantId: string) => `/v1/learn/admin/tracks/tenant/${tenantId}`,
     MEDIA_UPLOAD_URL: "/v1/learn/admin/tracks/media/upload-url",
@@ -696,6 +698,9 @@ export const ApiEndpoints = {
     // Drafts the story fields of a SAVED course's landing page. Returns the draft; saves nothing.
     TRACK_LANDING_PAGE_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/landing-page-draft`,
+    // Drafts a saved course's notes for Ally. Returns the draft; saves nothing.
+    TRACK_ALLY_NOTES_DRAFT: (trackId: string) =>
+      `/v1/course-copilot/tracks/${trackId}/ally-notes-draft`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -812,6 +817,44 @@ export const ApiEndpoints = {
     ORG_PROFILE: "/v1/guide/admin/org-profile",
     ORG_CRISIS_RESPONSES: "/v1/guide/admin/org-crisis-responses",
     ORG_CRISIS_RESPONSE_BY_ID: (id: string) => `/v1/guide/admin/org-crisis-responses/${id}`,
+    // Configuration plane (plan §7.5).
+    CONFIG_SCHEMA: "/v1/guide/admin/config/schema",
+    CONFIG_OVERRIDES: "/v1/guide/admin/config/overrides",
+    CONFIG_AUDIT: "/v1/guide/admin/config/audit",
+    CONFIG_COURSE: (trackId: string) => `/v1/guide/admin/config/course/${trackId}`,
+    CONFIG_ORG: "/v1/guide/admin/config/org",
+    THREAD_CONFIG: (threadId: string) => `/v1/guide/admin/threads/${threadId}/config`,
+    // Advice moderation.
+    ADVICE: "/v1/guide/admin/advice",
+    ADVICE_MODERATE: (id: string) => `/v1/guide/admin/advice/${id}/moderate`,
+    // Library: the platform's, and one organisation's own.
+    LIBRARY_DOCUMENTS: "/v1/guide/admin/library/documents",
+    LIBRARY_UPLOAD_URL: "/v1/guide/admin/library/documents/upload-url",
+    LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/library/documents/${id}`,
+    ORG_LIBRARY_DOCUMENTS: "/v1/guide/admin/org-library/documents",
+    ORG_LIBRARY_UPLOAD_URL: "/v1/guide/admin/org-library/documents/upload-url",
+    ORG_LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/org-library/documents/${id}`,
+    // Learning loop (plan §7.13, §10.5 "Evals").
+    EVALUATOR_RUBRIC: "/v1/guide/admin/evaluator/rubric",
+    EVALUATOR_SUMMARY: "/v1/guide/admin/evaluator/summary",
+    EVALUATOR_KAPPA: "/v1/guide/admin/evaluator/kappa",
+    EVALUATOR_RUN: "/v1/guide/admin/evaluator/run",
+    REVIEWS: "/v1/guide/admin/reviews",
+    REVIEW: (id: string) => `/v1/guide/admin/reviews/${id}`,
+    REVIEW_CLAIM: (id: string) => `/v1/guide/admin/reviews/${id}/claim`,
+    REVIEW_SUBMIT: (id: string) => `/v1/guide/admin/reviews/${id}/submit`,
+    REVIEW_DISMISS: (id: string) => `/v1/guide/admin/reviews/${id}/dismiss`,
+    EVAL_SUITES: "/v1/guide/admin/eval-suites",
+    EVAL_CASES: "/v1/guide/admin/eval-cases",
+    EVAL_CASE_ACCEPT: (id: string) => `/v1/guide/admin/eval-cases/${id}/accept`,
+    EVAL_CASE_RETIRE: (id: string) => `/v1/guide/admin/eval-cases/${id}/retire`,
+    EVAL_CASE_VARIANTS: (id: string) => `/v1/guide/admin/eval-cases/${id}/variants`,
+    RED_TEAM_GENERATE: "/v1/guide/admin/red-team/generate",
+    TURN_EVAL_CASE: (turnId: string) => `/v1/guide/admin/turns/${turnId}/eval-case`,
+    EVAL_RUNS: "/v1/guide/admin/eval-runs",
+    EVAL_RUN: (id: string) => `/v1/guide/admin/eval-runs/${id}`,
+    EVAL_RUN_OUTPUTS: (id: string) => `/v1/guide/admin/eval-runs/${id}/outputs`,
+    RELEASE_EVAL_RUNS: (id: string) => `/v1/guide/admin/releases/${id}/eval-runs`,
   },
   // Text helpline org settings (platform admin only; EDIT_GLOBAL_SETTINGS).
   HELPLINE_ADMIN: {
@@ -1086,6 +1129,12 @@ export const TAG_TYPES = {
   ALLY_GUIDE_ORG_PROFILE: "allyGuideOrgProfile",
   ALLY_GUIDE_ALERTS: "allyGuideAlerts",
   ALLY_GUIDE_BASELINE: "allyGuideBaseline",
+  ALLY_GUIDE_CONFIG: "allyGuideConfig",
+  ALLY_GUIDE_ADVICE: "allyGuideAdvice",
+  ALLY_GUIDE_LIBRARY: "allyGuideLibrary",
+  ALLY_GUIDE_REVIEWS: "allyGuideReviews",
+  ALLY_GUIDE_EVALS: "allyGuideEvals",
+  ALLY_GUIDE_NOTES: "allyGuideNotes",
   AI_LAB_SKILLS: "aiLabSkills",
   AI_LAB_VARIABLES: "aiLabVariables",
   AI_LAB_VALUES: "aiLabValues",

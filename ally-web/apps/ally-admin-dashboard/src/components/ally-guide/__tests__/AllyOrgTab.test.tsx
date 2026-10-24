@@ -13,6 +13,9 @@ const h = vi.hoisted(() => ({
   saveProfile: vi.fn(),
   saveCrisis: vi.fn(),
   withdrawCrisis: vi.fn(),
+  configLayer: vi.fn(),
+  saveConfig: vi.fn(),
+  library: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   access: { current: { canEditOrg: true, canViewOrg: true } as Record<string, boolean> },
@@ -30,6 +33,13 @@ vi.mock("@api", async importOriginal => ({
   useSaveAllyGuideOrgProfileMutation: () => [h.saveProfile, { isLoading: false }],
   useSaveAllyGuideOrgCrisisResponseMutation: () => [h.saveCrisis],
   useDeleteAllyGuideOrgCrisisResponseMutation: () => [h.withdrawCrisis],
+  // The configuration and library sections have their own suites.
+  useGetAllyGuideConfigLayerQuery: (arg: unknown) => h.configLayer(arg),
+  useSaveAllyGuideConfigMutation: () => [h.saveConfig],
+  useGetAllyGuideLibraryQuery: (arg: unknown) => h.library(arg),
+  useCreateAllyGuideLibraryUploadUrlMutation: () => [vi.fn()],
+  useCreateAllyGuideLibraryDocumentMutation: () => [vi.fn()],
+  useArchiveAllyGuideLibraryDocumentMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -92,6 +102,100 @@ describe("AllyOrgTab", () => {
     h.crisis.mockReturnValue(loaded([]));
     h.saveProfile.mockReturnValue({ unwrap: () => Promise.resolve(PROFILE) });
     h.saveCrisis.mockReturnValue({ unwrap: () => Promise.resolve({ version: 1 }) });
+    h.configLayer.mockReturnValue({
+      data: {
+        layer: "org",
+        scopeId: TENANT,
+        scopeName: "Brightside",
+        version: 2,
+        updatedAt: null,
+        updatedBy: null,
+        fields: [
+          {
+            key: "nudgeAfterDays",
+            type: "int",
+            min: 1,
+            max: 30,
+            description: "Days of quiet before one nudge.",
+            overridableBy: ["org", "course"],
+            group: "Steering",
+            releaseValue: 3,
+            override: null,
+          },
+        ],
+        audit: [],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    h.saveConfig.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    h.library.mockReturnValue({
+      data: {
+        documents: [
+          {
+            id: "d-1",
+            title: "Our safeguarding protocol",
+            sourceType: "pdf",
+            fileName: "protocol.pdf",
+            status: "indexed",
+            statusMessage: null,
+            chunkCount: 4,
+            indexedChunkCount: 4,
+            isArchived: false,
+            createdAt: "2026-10-20T09:00:00.000Z",
+          },
+        ],
+        count: 1,
+      },
+      isLoading: false,
+      isError: false,
+    });
+  });
+
+  describe("the settings and library sections", () => {
+    it("asks for this organisation's config layer, by the organisation's id", () => {
+      renderTab();
+
+      expect(h.configLayer).toHaveBeenCalledWith({ layer: "org", scopeId: TENANT });
+      expect(screen.getByText("Ally settings for this organisation")).toBeInTheDocument();
+      expect(screen.getByTestId("config-field-nudgeAfterDays")).toBeInTheDocument();
+    });
+
+    it("saves a setting for this organisation with the version it loaded", async () => {
+      renderTab();
+
+      fireEvent.change(screen.getByLabelText("nudgeAfterDays"), { target: { value: "7" } });
+      fireEvent.click(screen.getByRole("button", { name: "Save 1 change" }));
+
+      await waitFor(() => expect(h.saveConfig).toHaveBeenCalledTimes(1));
+      expect(h.saveConfig).toHaveBeenCalledWith({
+        layer: "org",
+        scopeId: TENANT,
+        set: { nudgeAfterDays: 7 },
+        clear: [],
+        expectedVersion: 2,
+      });
+    });
+
+    it("lists this organisation's own documents, from its own library", () => {
+      renderTab();
+
+      expect(h.library).toHaveBeenCalledWith({ scope: "organisation", tenantId: TENANT });
+      expect(screen.getByText("Documents for Ally")).toBeInTheDocument();
+      expect(screen.getByTestId("library-row")).toHaveTextContent("Our safeguarding protocol");
+      expect(screen.getByRole("button", { name: "Add a document…" })).toBeInTheDocument();
+    });
+
+    it("lets an admin who can only view read both, and change neither", () => {
+      h.access.current = { canEditOrg: false, canViewOrg: true };
+      renderTab();
+
+      expect(screen.getByLabelText("nudgeAfterDays")).toBeDisabled();
+      expect(screen.getByTestId("config-view-only")).toBeInTheDocument();
+      expect(screen.getByTestId("library-row")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add a document…" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
   });
 
   describe("what it shows", () => {
@@ -547,7 +651,7 @@ describe("AllyOrgTab", () => {
     it("says so, shows everything, and disables every field", () => {
       renderTab();
 
-      expect(screen.getByText(/View only/)).toBeInTheDocument();
+      expect(screen.getAllByText(/View only/).length).toBeGreaterThan(0);
       expect(field("Supervisor contact")).toBeDisabled();
       expect(field("Protocols")).toBeDisabled();
       expect(
