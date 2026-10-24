@@ -17,7 +17,7 @@ from app.core.scenario_session_evaluation.service import run_actor_evaluation
     "app.core.scenario_session_evaluation.service._send_webhook", new_callable=AsyncMock
 )
 @patch("app.core.scenario_session_evaluation.service.evaluate_actor_goals")
-async def test_run_actor_evaluation_handles_generic_exception(
+async def test_run_actor_evaluation_logs_error_on_generic_exception(
     mock_evaluate_actor_goals, mock_send_webhook, mock_logger, mock_traceback
 ):
     mock_evaluate_actor_goals.side_effect = Exception("Something went wrong")
@@ -37,9 +37,12 @@ async def test_run_actor_evaluation_handles_generic_exception(
     assert payload.status == "FAILED"
     assert "Traceback" in payload.error_message
 
-    mock_logger.warning.assert_called_once_with(
-        "Actor evaluation failed for session=%s", "test_session_id", exc_info=True
+    mock_logger.error.assert_called_once_with(
+        "Actor evaluation failed for session=%s",
+        "test_session_id",
+        exc_info=True,
     )
+    mock_logger.warning.assert_not_called()
     mock_logger.exception.assert_not_called()
 
 
