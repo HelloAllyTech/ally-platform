@@ -167,6 +167,14 @@ export const ApiEndpoints = {
     /** A LiveKit room with the guide's voice worker: `{token, roomName, serverUrl}`. */
     VOICE_SESSION: (threadId: string) => `/v1/guide/threads/${threadId}/voice-session`,
     PREFS: "/v1/guide/prefs",
+    /** A side quest's answer: marked against its key, or one Coach note (ungraded). */
+    MICRO_ACTIVITY_RESPONSES: (threadId: string, cardId: string) =>
+      `/v1/guide/threads/${threadId}/micro-activities/${cardId}/responses`,
+    NOTEBOOK: "/v1/guide/notebook",
+    NOTEBOOK_EXPORT: "/v1/guide/notebook/export",
+    NOTEBOOK_ENTRY: (entryId: string) => `/v1/guide/notebook/${entryId}`,
+    MEMORY: "/v1/guide/memory",
+    MEMORY_ITEM: (memoryId: string) => `/v1/guide/memory/${memoryId}`,
     // Anonymous visitors (M2): the visitor token goes in x-guide-visitor.
     PUBLIC_VISITORS: "/v1/guide/public/visitors",
     PUBLIC_BOOTSTRAP: (trackId: string) => `/v1/guide/public/tracks/${trackId}/bootstrap`,

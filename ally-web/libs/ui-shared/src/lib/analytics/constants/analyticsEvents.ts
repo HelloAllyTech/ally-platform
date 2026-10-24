@@ -152,6 +152,10 @@ export const ANALYTICS_EVENTS = {
   GUIDED_SIGN_IN_STARTED: "guided_sign_in_started",
   GUIDED_VISITOR_CLAIMED: "guided_visitor_claimed",
   GUIDED_LANGUAGE_CHANGED: "guided_language_changed",
+  GUIDED_PRACTICE_ANSWERED: "guided_practice_answered",
+  GUIDED_SHELF_OPENED: "guided_shelf_opened",
+  GUIDED_NOTEBOOK_EXPORTED: "guided_notebook_exported",
+  GUIDED_MEMORY_FORGOTTEN: "guided_memory_forgotten",
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
@@ -355,6 +359,9 @@ export const ANALYTICS_PROPS = {
   GUIDED_TURN_MODE: "turn_mode",
   GUIDED_IDENTITY: "identity",
   GUIDED_CLAIM_OUTCOME: "claim_outcome",
+  GUIDED_PRACTICE_KIND: "practice_kind",
+  GUIDED_SHELF: "shelf",
+  GUIDED_SCOPE: "scope",
 
   // Sidebar context
   ACTION: "action",

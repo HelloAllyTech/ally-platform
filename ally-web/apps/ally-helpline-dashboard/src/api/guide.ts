@@ -17,6 +17,8 @@ import type {
   GuideBootstrap,
   GuideCardEventRequest,
   GuideCardState,
+  GuideMicroActivityRequest,
+  GuideMicroActivityResult,
   GuideNextStep,
   GuidePrefs,
   GuidePrefsUpdate,
@@ -69,7 +71,36 @@ export interface GuideAppointmentRequest {
   timezone: string;
 }
 
-const guideAPI = baseAPI.injectEndpoints({
+/** One entry in the learner's notebook (`GET /v1/guide/notebook`). */
+export interface GuideNotebookEntry {
+  id: string;
+  trackId: string | null;
+  /** first_move, possible_self, journal_line, rehearsed_line, reflection, noticing. */
+  kind: string;
+  text: string;
+  createdAt: string | null;
+}
+
+/** One thing Ally remembers (`GET /v1/guide/memory`). */
+export interface GuideMemoryItem {
+  id: string;
+  /** preference, goal, possible_self, strength, struggle, context, commitment, unique_outcome. */
+  kind: string;
+  body: string;
+  lastConfirmedAt: string | null;
+  expiresAt: string | null;
+}
+
+/**
+ * The prefs as the server returns them. `challenge` is read only when the
+ * server sends it (it is stored, but not yet part of the prefs contract), so
+ * the control can't promise something that isn't saved.
+ */
+export type GuidePrefsView = GuidePrefs & { challenge?: "normal" | "more" };
+
+const GUIDE_TAGS = ["GuideNotebook", "GuideMemory", "GuidePrefs"] as const;
+
+const guideAPI = baseAPI.enhanceEndpoints({ addTagTypes: GUIDE_TAGS }).injectEndpoints({
   endpoints: builder => ({
     getGuideAvailability: builder.query<GuideAvailability, { trackId: string }>({
       query: ({ trackId }) => ({
@@ -171,12 +202,87 @@ const guideAPI = baseAPI.injectEndpoints({
       }),
     }),
 
-    putGuidePrefs: builder.mutation<GuidePrefs, GuidePrefsUpdate>({
+    getGuidePrefs: builder.query<GuidePrefsView, void>({
+      query: () => ({ url: ApiEndpoints.GUIDE.PREFS, method: HttpMethod.GET }),
+      providesTags: ["GuidePrefs"],
+    }),
+
+    putGuidePrefs: builder.mutation<
+      GuidePrefsView,
+      GuidePrefsUpdate & { challenge?: "normal" | "more" }
+    >({
       query: body => ({
         url: ApiEndpoints.GUIDE.PREFS,
         method: HttpMethod.PUT,
         body,
       }),
+      // The answer is the whole set: the Preferences panel shows it at once.
+      async onQueryStarted(_body, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(guideAPI.util.upsertQueryData("getGuidePrefs", undefined, data));
+        } catch {
+          // The panel keeps showing what the server last said.
+        }
+      },
+    }),
+
+    /** A side quest's answer. Ungraded: never progress, never XP. */
+    answerGuideMicroActivity: builder.mutation<
+      GuideMicroActivityResult,
+      { threadId: string; cardId: string; body: GuideMicroActivityRequest }
+    >({
+      query: ({ threadId, cardId, body }) => ({
+        url: ApiEndpoints.GUIDE.MICRO_ACTIVITY_RESPONSES(threadId, cardId),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    getGuideNotebook: builder.query<GuideNotebookEntry[], { trackId?: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.GUIDE.NOTEBOOK,
+        method: HttpMethod.GET,
+        params: trackId ? { trackId } : undefined,
+      }),
+      providesTags: ["GuideNotebook"],
+    }),
+
+    /** The notebook as Markdown, for a download. */
+    exportGuideNotebook: builder.query<string, { trackId?: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.GUIDE.NOTEBOOK_EXPORT,
+        method: HttpMethod.GET,
+        params: trackId ? { trackId } : undefined,
+        responseHandler: response => response.text(),
+      }),
+      keepUnusedDataFor: 0,
+    }),
+
+    deleteGuideNotebookEntry: builder.mutation<{ removed: number }, { entryId: string }>({
+      query: ({ entryId }) => ({
+        url: ApiEndpoints.GUIDE.NOTEBOOK_ENTRY(entryId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: ["GuideNotebook"],
+    }),
+
+    getGuideMemory: builder.query<GuideMemoryItem[], void>({
+      query: () => ({ url: ApiEndpoints.GUIDE.MEMORY, method: HttpMethod.GET }),
+      providesTags: ["GuideMemory"],
+    }),
+
+    forgetGuideMemory: builder.mutation<{ forgotten: number }, { memoryId: string }>({
+      query: ({ memoryId }) => ({
+        url: ApiEndpoints.GUIDE.MEMORY_ITEM(memoryId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: ["GuideMemory"],
+    }),
+
+    forgetAllGuideMemory: builder.mutation<{ forgotten: number }, void>({
+      query: () => ({ url: ApiEndpoints.GUIDE.MEMORY, method: HttpMethod.DELETE }),
+      invalidatesTags: ["GuideMemory"],
     }),
   }),
 });
@@ -193,4 +299,12 @@ export const {
   usePutGuideAppointmentMutation,
   usePutGuidePrefsMutation,
   useGetGuideAvailabilityQuery,
+  useGetGuidePrefsQuery,
+  useAnswerGuideMicroActivityMutation,
+  useGetGuideNotebookQuery,
+  useLazyExportGuideNotebookQuery,
+  useDeleteGuideNotebookEntryMutation,
+  useGetGuideMemoryQuery,
+  useForgetGuideMemoryMutation,
+  useForgetAllGuideMemoryMutation,
 } = guideAPI;

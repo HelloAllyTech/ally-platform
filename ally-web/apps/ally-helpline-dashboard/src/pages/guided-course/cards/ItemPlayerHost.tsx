@@ -12,9 +12,10 @@ import {
   TrackItemStatus,
 } from "@types";
 
+import { AskAnchor, AskKind, AskLayer } from "./AskLayer";
 import { itemCardFor } from "./registry";
 
-import type { GuideCard } from "../contract/wire";
+import type { GuideAnchor, GuideCard } from "../contract/wire";
 
 export interface ItemPlayerHostProps {
   card: GuideCard;
@@ -24,6 +25,10 @@ export interface ItemPlayerHostProps {
   onClaim: (cardId: string, result: TrackItemCompletionResult) => void;
   onClose: (cardId: string) => void;
   onLaunch: (cardId: string) => void;
+  /** "Ask about this" (plan §5.8): a turn with the item, and a quote or a moment, attached. */
+  onAsk?: (cardId: string, anchor: GuideAnchor, kind: AskKind) => void;
+  /** Off while Ally is replying, and for a visitor. */
+  askEnabled?: boolean;
 }
 
 const FAILED_COPY: Record<string, string> = {
@@ -65,6 +70,8 @@ export const ItemPlayerHost: FC<ItemPlayerHostProps> = ({
   onClaim,
   onClose,
   onLaunch,
+  onAsk,
+  askEnabled = true,
 }) => {
   const { t, i18n } = useTranslation();
   const itemId = card.trackItem?.id ?? "";
@@ -110,6 +117,16 @@ export const ItemPlayerHost: FC<ItemPlayerHostProps> = ({
     () => ({ returnTo: "guided" as const, threadId, cardId: card.cardId }),
     [threadId, card.cardId],
   );
+  // The video reports its playhead here; the Ask layer listens.
+  const positionRef = useRef<((seconds: number) => void) | null>(null);
+  const handlePosition = useCallback((seconds: number) => positionRef.current?.(seconds), []);
+  const latestAsk = useRef(onAsk);
+  latestAsk.current = onAsk;
+  const handleAsk = useCallback(
+    (anchor: AskAnchor, kind: AskKind) =>
+      latestAsk.current?.(card.cardId, { itemId, ...anchor }, kind),
+    [card.cardId, itemId],
+  );
 
   if (!entry || !itemId) return null;
 
@@ -146,17 +163,25 @@ export const ItemPlayerHost: FC<ItemPlayerHostProps> = ({
   return (
     <ErrorBoundary variant="panel" resetKey={card.cardId}>
       <Suspense fallback={<HostLoading />}>
-        <Adapter
-          payload={payload}
-          itemId={itemId}
-          trackId={trackId}
-          item={item}
-          alreadyCompleted={alreadyCompleted}
-          onCompleted={handleCompleted}
-          onClose={handleClose}
-          onBeforeLaunch={handleLaunch}
-          returnContext={returnContext}
-        />
+        <AskLayer
+          type={card.trackItem?.type}
+          enabled={Boolean(onAsk) && askEnabled}
+          onAsk={handleAsk}
+          positionRef={positionRef}
+        >
+          <Adapter
+            payload={payload}
+            itemId={itemId}
+            trackId={trackId}
+            item={item}
+            alreadyCompleted={alreadyCompleted}
+            onCompleted={handleCompleted}
+            onClose={handleClose}
+            onBeforeLaunch={handleLaunch}
+            returnContext={returnContext}
+            onPosition={handlePosition}
+          />
+        </AskLayer>
       </Suspense>
     </ErrorBoundary>
   );

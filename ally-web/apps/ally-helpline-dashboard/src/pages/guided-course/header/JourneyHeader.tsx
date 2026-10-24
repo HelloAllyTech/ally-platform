@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { GUIDANCE_LEVELS, GuidanceLevel } from "../contract/bootstrap";
 import { AllyPresence, OrbState } from "../presence/AllyPresence";
+import { SHELF_UTILITIES, ShelfUtility } from "../shelf/shelfParts";
 
 /**
  * The guidance dial (plan §5.7): Lead me · Walk with me · I'll drive. It sets
@@ -70,6 +71,8 @@ export interface JourneyHeaderProps {
   onLanguageChange?: (languageCode: string) => void;
   /** A visitor can sign in from the menu at any time. */
   onSignIn?: () => void;
+  /** Notebook, memory and preferences in the Shelf (signed-in learners). */
+  onOpenUtility?: (utility: ShelfUtility) => void;
 }
 
 /** A language's own name ("हिन्दी"), so each option reads to the person who needs it. */
@@ -138,6 +141,7 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
   language = null,
   onLanguageChange,
   onSignIn,
+  onOpenUtility,
 }) => {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -267,6 +271,26 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
               buttonRef.current?.focus();
             }}
           />
+          {onOpenUtility && (
+            <nav
+              aria-label={t("guide.shelf.menu")}
+              className="mt-3 flex flex-col border-t border-[var(--g-line)] pt-2"
+            >
+              {SHELF_UTILITIES.map(utility => (
+                <button
+                  key={utility}
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOpenUtility(utility);
+                  }}
+                  className="min-h-11 w-full rounded-[10px] px-2 text-left font-primary text-[15px] text-[var(--g-ink)] hover:bg-[var(--g-ground)]"
+                >
+                  {t(`guide.shelf.${utility}`)}
+                </button>
+              ))}
+            </nav>
+          )}
           {onLanguageChange && languages.length >= 2 && (
             <CourseLanguage
               languages={languages}

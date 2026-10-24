@@ -1,4 +1,4 @@
-import { FC, ReactNode, RefObject, useEffect, useRef } from "react";
+import { FC, ReactNode, RefObject, useEffect, useId, useRef } from "react";
 
 import { useTranslation } from "react-i18next";
 
@@ -122,6 +122,8 @@ export const ShelfPanel: FC<ShelfPanelProps> = ({
 }) => {
   const ref = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // An item can wait minimised while a Shelf utility is open: two panels, two titles.
+  const titleId = useId();
   const visible = open && !minimised;
   const overlay = mode === "overlay";
   useFocusTrap(ref, visible && overlay, onBack);
@@ -142,7 +144,7 @@ export const ShelfPanel: FC<ShelfPanelProps> = ({
         ref={ref}
         role={overlay ? "dialog" : "complementary"}
         aria-modal={overlay ? true : undefined}
-        aria-labelledby="guide-shelf-title"
+        aria-labelledby={titleId}
         hidden={!visible}
         data-testid="shelf-panel"
         className={
@@ -164,7 +166,7 @@ export const ShelfPanel: FC<ShelfPanelProps> = ({
           <div className="min-w-0 flex-1">
             <p className="g-label text-[var(--g-ink-faint)]">{typeWord}</p>
             <h2
-              id="guide-shelf-title"
+              id={titleId}
               ref={headingRef}
               tabIndex={-1}
               className="truncate font-primary text-base font-semibold outline-none"

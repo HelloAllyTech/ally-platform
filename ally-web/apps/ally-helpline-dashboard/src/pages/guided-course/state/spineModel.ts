@@ -58,14 +58,46 @@ export interface BuildSpineInput {
   sections: JourneySpineSection[];
   progress?: SpineProgress | null;
   cards?: Record<string, GuideCard>;
+  /** Side quests without a `trackItem`, placed by `practiceItemIds`. */
+  practiceItems?: Record<string, string>;
 }
 
+/**
+ * The item each side quest belongs to, for its mark on the map. The card
+ * names it when the server sends `trackItem`; until then it is the course
+ * card shown just before it in the conversation (practice is offered beside
+ * the item in focus), or the current item when none came before.
+ */
+export const practiceItemIds = (
+  order: ReadonlyArray<{ kind: string; id: string }>,
+  cards: Record<string, GuideCard>,
+  currentItemId: string | null = null,
+): Record<string, string> => {
+  const out: Record<string, string> = {};
+  let last: string | null = null;
+  for (const entry of order) {
+    if (entry.kind !== "card") continue;
+    const card = cards[entry.id];
+    if (!card) continue;
+    if (card.kind === "course_item" && card.trackItem?.id) last = card.trackItem.id;
+    if (card.kind === "micro_activity" && !card.trackItem?.id) {
+      const itemId = last ?? currentItemId;
+      if (itemId) out[card.cardId] = itemId;
+    }
+  }
+  return out;
+};
+
 /** Item ids whose course card the server has marked done, plus practice pips per item. */
-const cardSignals = (cards: Record<string, GuideCard> = {}) => {
+const cardSignals = (
+  cards: Record<string, GuideCard> = {},
+  practiceItems: Record<string, string> = {},
+) => {
   const done = new Set<string>();
   const pips = new Map<string, number>();
   for (const card of Object.values(cards)) {
-    const itemId = card.trackItem?.id;
+    const itemId =
+      card.trackItem?.id ?? (card.kind === "micro_activity" ? practiceItems[card.cardId] : null);
     if (!itemId) continue;
     if (card.kind === "course_item" && card.state === "done") done.add(itemId);
     if (card.kind === "micro_activity" && card.state === "done") {
@@ -75,8 +107,13 @@ const cardSignals = (cards: Record<string, GuideCard> = {}) => {
   return { done, pips };
 };
 
-export const buildSpineModel = ({ sections, progress, cards }: BuildSpineInput): SpineModel => {
-  const { done, pips } = cardSignals(cards);
+export const buildSpineModel = ({
+  sections,
+  progress,
+  cards,
+  practiceItems,
+}: BuildSpineInput): SpineModel => {
+  const { done, pips } = cardSignals(cards, practiceItems);
 
   // Before the server names a current item, it is the first open one.
   let currentItemId = progress?.currentItemId ?? null;

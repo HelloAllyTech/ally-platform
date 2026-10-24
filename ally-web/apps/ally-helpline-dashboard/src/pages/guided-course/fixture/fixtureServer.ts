@@ -10,7 +10,8 @@
  * replays after `Last-Event-ID`, pings every 15 s, and turns stream word by
  * word. Phrases in a message trigger the designed states:
  *   crisis-demo · care-demo · fail-demo · slow-demo · provider-demo ·
- *   other-tab-demo · closing-demo · practice-demo · offline (use devtools)
+ *   other-tab-demo · closing-demo · practice-demo · quickcheck-demo ·
+ *   reflection-demo · offline (use devtools)
  *
  * `?fixture=visitor` plays a signed-out visitor: the landing, an allowance of
  * four messages (the counter shows at two), the sign-in card when it runs
@@ -32,6 +33,9 @@ import type {
   GuideCrisisState,
   GuideEvent,
   GuideMode,
+  GuideMicroActivityRequest,
+  GuideMicroActivityResult,
+  GuidePrefs,
   GuideTurnRequest,
 } from "../contract/wire";
 
@@ -79,6 +83,49 @@ export class GuideFixtureServer {
   private turnCount = 0;
   private busy = false;
   private turnsByClientId = new Map<string, string>();
+  /** M3 Shelf data: the learner's prefs, notebook and what Ally remembers. */
+  private prefs: GuidePrefs & { challenge?: "normal" | "more" } = {
+    guidance: "walk",
+    voiceEnabled: true,
+    sideQuests: true,
+    memoryEnabled: true,
+    outreach: "in_app",
+    preferClassic: false,
+  };
+  private notebook = [
+    {
+      id: "fx-note-1",
+      trackId: "",
+      kind: "first_move",
+      text: "I'd say: I'm glad you called. Take your time.",
+      createdAt: "2026-10-20T10:00:00.000Z",
+    },
+    {
+      id: "fx-note-2",
+      trackId: "",
+      kind: "noticing",
+      text: "You waited before you spoke.",
+      createdAt: "2026-10-21T10:00:00.000Z",
+    },
+  ];
+  private memories = [
+    {
+      id: "fx-mem-1",
+      kind: "goal",
+      body: "Wants to feel steadier on night shifts.",
+      lastConfirmedAt: "2026-10-21T10:00:00.000Z",
+      expiresAt: "2027-04-19T10:00:00.000Z",
+    },
+    {
+      id: "fx-mem-2",
+      kind: "preference",
+      body: "Likes short examples before the theory.",
+      lastConfirmedAt: null,
+      expiresAt: null,
+    },
+  ];
+  /** Side quests the fixture can mark: card id → the course's answers. */
+  private practiceKeys = new Map<string, Record<string, string>>();
   readonly requests: Array<{ method: string; path: string; body: unknown }> = [];
   /** Visitor mode: whether the visitor has a thread yet, and what's left of the allowance. */
   private visitor: boolean;
@@ -89,6 +136,8 @@ export class GuideFixtureServer {
     readonly trackId: string,
     private readonly options: FixtureOptions = {},
   ) {
+    // Field initialisers can run before `trackId` is assigned: fill it in here.
+    for (const entry of this.notebook) entry.trackId = trackId;
     this.visitor = Boolean(options.visitor);
     const limit = options.allowance ?? 4;
     this.allowance = { remaining: limit, limit };
@@ -310,6 +359,56 @@ export class GuideFixtureServer {
       this.ephemeral("turn.completed", { turnId });
       return;
     }
+    if (lower.includes("quickcheck-demo") || lower.includes("reflection-demo")) {
+      const written = lower.includes("reflection-demo");
+      await this.streamReply(turnId, "Want to try a quick one? It's optional.");
+      const cardId = `fx-sq-${turnId}`;
+      const activity = written
+        ? {
+            kind: "reflection",
+            prompt: "When did a silence on a call feel hard to sit with?",
+            placeholder: "A sentence or two is plenty.",
+          }
+        : {
+            kind: "quick_check",
+            intro: "Two questions on how a call opens.",
+            questions: [
+              {
+                id: "q1",
+                prompt: "The caller goes quiet. What comes first?",
+                options: [
+                  { id: "a", text: "Wait a little longer" },
+                  { id: "b", text: "Ask if they're still there" },
+                  { id: "c", text: "Fill the silence" },
+                ],
+              },
+              {
+                id: "q2",
+                prompt: "What does a reflection do?",
+                options: [
+                  { id: "a", text: "Shows you heard them" },
+                  { id: "b", text: "Fixes the problem" },
+                ],
+              },
+            ],
+          };
+      if (!written) this.practiceKeys.set(cardId, { q1: "a", q2: "a" });
+      // Like the server's: no trackItem on a side quest card.
+      const card: GuideCard = {
+        cardId,
+        kind: "micro_activity",
+        presentation: "inline",
+        state: "ready",
+        title: written ? "A moment to reflect" : "Opening a call",
+        meta: { format: "practice" },
+        cta: { label: "Try it", action: "open" },
+        payload: { activity },
+      };
+      const event = this.durable("card.presented", { card });
+      this.cards.set(card.cardId, { ...card, seq: event.seq });
+      this.ephemeral("turn.completed", { turnId });
+      return;
+    }
     if (lower.includes("practice-demo")) {
       await this.streamReply(
         turnId,
@@ -367,12 +466,68 @@ export class GuideFixtureServer {
       return;
     }
 
+    // "Ask about this": the answer names what was asked about.
+    if (request.anchor?.itemId) {
+      const anchor = request.anchor;
+      const item = FIXTURE_ITEMS.find(i => i.id === anchor.itemId);
+      const about = anchor.quote
+        ? `On “${anchor.quote.slice(0, 60)}”: that's the caller testing whether it's safe to say more.`
+        : typeof anchor.timestampSec === "number"
+          ? `At that moment the counsellor waits, and it works because the caller fills the silence.`
+          : `That's covered in “${item?.title ?? "the first article"}”. Have another look there.`;
+      await this.streamReply(turnId, about);
+      this.ephemeral("turn.completed", { turnId });
+      return;
+    }
+
     await this.streamReply(
       turnId,
       "Good question. The short answer: give the caller room first, then reflect what you hear. When you're ready, the next step is below.",
     );
     this.ephemeral("next_step", this.nextStepData());
     this.ephemeral("turn.completed", { turnId });
+  }
+
+  /** `POST threads/:id/micro-activities/:cardId/responses`: marked, or one note. */
+  private answerPractice(cardId: string, body: GuideMicroActivityRequest): Response {
+    const card = this.cards.get(cardId);
+    if (!card || card.kind !== "micro_activity")
+      return json({ message: "Practice not found" }, 404);
+    if (card.state === "done") {
+      return json({ statusCode: 400, message: "This practice is already done." }, 400);
+    }
+    const key = this.practiceKeys.get(cardId);
+    const kind =
+      (card.payload as { activity?: { kind?: string } } | undefined)?.activity?.kind ?? "";
+    let result: GuideMicroActivityResult;
+    if (key) {
+      if (!body?.answers?.length)
+        return json({ statusCode: 400, message: "Choose an answer first." }, 400);
+      result = {
+        cardId,
+        kind,
+        results: body.answers.map(answer => ({
+          questionId: answer.questionId,
+          correct: key[answer.questionId] === answer.optionId,
+          correctOptionId: key[answer.questionId] ?? "",
+          feedback:
+            key[answer.questionId] === answer.optionId
+              ? "Yes. Giving the silence room lets the caller choose what comes next."
+              : "Most callers fill a silence themselves if you give it a few seconds.",
+        })),
+      };
+    } else {
+      if (!body?.text?.trim())
+        return json({ statusCode: 400, message: "Write something first." }, 400);
+      result = {
+        cardId,
+        kind,
+        note: "Noticing that it felt hard is the first step; next time, count three breaths before you speak.",
+      };
+    }
+    this.cards.set(cardId, { ...card, state: "done" });
+    this.durable("card.updated", { cardId, state: "done" });
+    return json(result, 201);
   }
 
   acceptTurn(request: GuideTurnRequest): Response {
@@ -520,14 +675,7 @@ export class GuideFixtureServer {
       },
       messages,
       cards: [...this.cards.values()].map(({ seq, ...card }) => ({ seq, card })),
-      prefs: {
-        guidance: "walk",
-        voiceEnabled: true,
-        sideQuests: true,
-        memoryEnabled: true,
-        outreach: "in_app",
-        preferClassic: false,
-      },
+      prefs: { ...this.prefs },
       nextStep: this.nextStepData(),
       ...(this.mode === "CRISIS" && this.crisis ? { crisis: this.crisis } : {}),
     };
@@ -755,8 +903,37 @@ export class GuideFixtureServer {
       );
     }
     if (m(/^\/v1\/guide\/threads\/[^/]+\/appointment$/)) return json({ ok: true });
-    if (m(/^\/v1\/guide\/prefs$/))
-      return json({ guidance: (body as { guidance?: string })?.guidance ?? "walk" });
+    if (m(/^\/v1\/guide\/prefs$/)) {
+      if (method === "PUT") this.prefs = { ...this.prefs, ...(body as Partial<GuidePrefs>) };
+      return json({ ...this.prefs });
+    }
+    if ((match = m(/^\/v1\/guide\/threads\/[^/]+\/micro-activities\/([^/]+)\/responses$/))) {
+      return this.answerPractice(
+        decodeURIComponent(match[1]),
+        (body ?? {}) as GuideMicroActivityRequest,
+      );
+    }
+    if (m(/^\/v1\/guide\/notebook\/export$/)) {
+      const markdown = ["# Notebook", ...this.notebook.map(n => `- ${n.text}`)].join("\n");
+      return new Response(markdown, { status: 200, headers: { "Content-Type": "text/markdown" } });
+    }
+    if ((match = m(/^\/v1\/guide\/notebook\/([^/]+)$/)) && method === "DELETE") {
+      this.notebook = this.notebook.filter(n => n.id !== decodeURIComponent(match![1]));
+      return json({ removed: 1 });
+    }
+    if (m(/^\/v1\/guide\/notebook$/)) return json(this.notebook);
+    if ((match = m(/^\/v1\/guide\/memory\/([^/]+)$/)) && method === "DELETE") {
+      this.memories = this.memories.filter(n => n.id !== decodeURIComponent(match![1]));
+      return json({ forgotten: 1 });
+    }
+    if (m(/^\/v1\/guide\/memory$/)) {
+      if (method === "DELETE") {
+        const forgotten = this.memories.length;
+        this.memories = [];
+        return json({ forgotten });
+      }
+      return json(this.memories);
+    }
 
     if ((match = m(/^\/v1\/learn\/tracks\/([^/]+)\/public$/))) {
       return json(fixturePublicOutline(decodeURIComponent(match[1])));

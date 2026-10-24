@@ -10,6 +10,7 @@ import { buildJourneyRoute, ROUTES } from "@constants";
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
 import { useAnalytics } from "@hooks/useAnalytics";
 
+import { AskKind } from "./cards/AskLayer";
 import { ItemPlayerHost } from "./cards/ItemPlayerHost";
 import { itemCardFor } from "./cards/registry";
 import { CrisisCard } from "./cards/special/CrisisCard";
@@ -33,6 +34,10 @@ import {
 } from "./layout/useViewportWidth";
 import { AllyPresence, OrbState } from "./presence/AllyPresence";
 import { BreatheWithMe } from "./presence/BreatheWithMe";
+import { MemoryPanel } from "./shelf/MemoryPanel";
+import { NotebookPanel } from "./shelf/NotebookPanel";
+import { PreferencesPanel } from "./shelf/PreferencesPanel";
+import { ShelfUtility } from "./shelf/shelfParts";
 import { JourneySpine, ProgressThread, SpineList } from "./spine/JourneySpine";
 import {
   AllowanceNote,
@@ -51,6 +56,7 @@ import { lastAllyMessage, SIGN_IN_REFUSALS } from "./state/guideFeedReducer";
 import { useGuideVoice } from "./voice/useGuideVoice";
 import { VoiceButton, VoiceRoom } from "./voice/VoiceRoom";
 
+import type { GuideAnchor } from "./contract/wire";
 import type { SpineNode } from "./state/spineModel";
 import "./guided.css";
 
@@ -180,10 +186,35 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
   const mode = shelfMode(width, shelfWidth, spinePinned && !compact);
   const minimised = Boolean(activeCard && minimisedCardId === activeCard.cardId);
 
+  // ------------------------------------------------------- shelf utilities
+  // Notebook, memory and preferences share the Shelf with the items. An open
+  // item steps back (minimised, its place kept) while a utility is up.
+  const [utility, setUtility] = useState<ShelfUtility | null>(null);
+  const openUtility = useCallback(
+    (next: ShelfUtility) => {
+      if (activeCard && !minimised) actions.minimiseCard(activeCard.cardId);
+      setUtility(next);
+      track(ANALYTICS_EVENTS.GUIDED_SHELF_OPENED, {
+        [ANALYTICS_PROPS.COURSE_ID]: trackId,
+        [ANALYTICS_PROPS.GUIDED_SHELF]: next,
+      });
+    },
+    [activeCard, minimised, actions, track, trackId],
+  );
+  // Opening a card puts the utility away.
+  const shownCardId = activeCard && !minimised ? activeCard.cardId : null;
+  useEffect(() => {
+    if (shownCardId) setUtility(null);
+  }, [shownCardId]);
+  const utilityMode = shelfMode(width, "utility", spinePinned && !compact);
+
   // ----------------------------------------------------------------- crisis
   const inCrisis = feed.mode === "CRISIS" || atmosphere === "still";
   useEffect(() => {
-    if (inCrisis) setSheet(null);
+    if (inCrisis) {
+      setSheet(null);
+      setUtility(null);
+    }
   }, [inCrisis]);
 
   // ------------------------------------------------------------------ orb
@@ -401,6 +432,14 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
       ? `${activeEntry ? t(activeEntry.typeWordKey) : ""} · ${activeCard.title}`
       : null;
 
+  // Asked from a Shelf that covers the conversation: step back so the answer shows.
+  const askAbout = (cardId: string, anchor: GuideAnchor, kind: AskKind) => {
+    actions.askAbout(cardId, anchor, kind);
+    if (activePresentation === "shelf" && (mode === "overlay" || compact)) {
+      actions.minimiseCard(cardId);
+    }
+  };
+
   const playerHost = activeCard ? (
     <ItemPlayerHost
       key={activeCard.cardId}
@@ -410,6 +449,8 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
       onClaim={actions.claimCard}
       onClose={actions.closeCard}
       onLaunch={actions.launchCard}
+      onAsk={askAbout}
+      askEnabled={!busy && !visitor && !inCrisis}
     />
   ) : null;
 
@@ -436,6 +477,8 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
         // The course language is saved on the enrolment, so a visitor reads the default for now.
         onLanguageChange={!visitor && journey.enrolled ? changeLanguage : undefined}
         onSignIn={visitor ? () => requestSignIn("header") : undefined}
+        // The notebook, memory and settings are a signed-in learner's.
+        onOpenUtility={visitor ? undefined : openUtility}
       />
       {compact && !inCrisis && <ProgressThread model={spine} onOpen={() => setSheet("spine")} />}
 
@@ -553,7 +596,7 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
         {shelfCard && !inCrisis && (
           <ShelfPanel
             open
-            minimised={minimised}
+            minimised={minimised || Boolean(utility)}
             mode={mode}
             sheet={compact}
             width={shelfWidth}
@@ -566,6 +609,41 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisit
             }
           >
             {playerHost}
+          </ShelfPanel>
+        )}
+        {utility && !inCrisis && (
+          <ShelfPanel
+            open
+            minimised={false}
+            mode={utilityMode}
+            sheet={compact}
+            width="utility"
+            title={t(`guide.shelf.${utility}`)}
+            typeWord={t("guide.header.allyLabel")}
+            onBack={() => setUtility(null)}
+          >
+            {utility === "notebook" ? (
+              <NotebookPanel
+                trackId={trackId}
+                onExported={scope =>
+                  track(ANALYTICS_EVENTS.GUIDED_NOTEBOOK_EXPORTED, {
+                    [ANALYTICS_PROPS.COURSE_ID]: trackId,
+                    [ANALYTICS_PROPS.GUIDED_SCOPE]: scope,
+                  })
+                }
+              />
+            ) : utility === "memory" ? (
+              <MemoryPanel
+                onForgotten={scope =>
+                  track(ANALYTICS_EVENTS.GUIDED_MEMORY_FORGOTTEN, {
+                    [ANALYTICS_PROPS.COURSE_ID]: trackId,
+                    [ANALYTICS_PROPS.GUIDED_SCOPE]: scope,
+                  })
+                }
+              />
+            ) : (
+              <PreferencesPanel guidance={guidance} onGuidanceChange={actions.setGuidance} />
+            )}
           </ShelfPanel>
         )}
       </div>

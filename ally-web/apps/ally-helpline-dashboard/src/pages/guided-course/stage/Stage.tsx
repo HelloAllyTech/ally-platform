@@ -7,6 +7,7 @@ import { SceneReceipt, SceneTitleCard } from "./SceneCards";
 import { ItemCard } from "../cards/ItemCard";
 import { CARD_KIND_RENDERER } from "../cards/registry";
 import { ClosingRitualCard } from "../cards/special/ClosingRitualCard";
+import { activityOf, SideQuestCard } from "../cards/special/SideQuestCard";
 import {
   AccessDeniedCard,
   CourseInfoCard,
@@ -98,6 +99,8 @@ export const Stage: FC<StageProps> = ({
   );
 
   const careMode = feed.mode === "CARE" || feed.mode === "CRISIS_FOLLOWUP";
+  // "Ask about this" waits while Ally is replying; a visitor can't open items anyway.
+  const askEnabled = journey.session.turn === "idle" && journey.identity !== "visitor";
 
   const renderCard = (card: GuideCard): ReactNode => {
     const renderer = CARD_KIND_RENDERER[card.kind]?.renderer;
@@ -119,10 +122,26 @@ export const Stage: FC<StageProps> = ({
             onClaim={actions.claimCard}
             onClose={actions.closeCard}
             onLaunch={actions.launchCard}
+            onAsk={actions.askAbout}
+            askEnabled={askEnabled}
           />
         );
-      case "micro_activity":
-        return careMode ? null : (
+      case "micro_activity": {
+        if (careMode) return null;
+        const activity = activityOf(card);
+        if (activity) {
+          return (
+            <SideQuestCard
+              card={card}
+              activity={activity}
+              practice={journey.practice[card.cardId]}
+              onAnswer={(cardId, request) => void actions.answerPractice(cardId, request)}
+              onSkip={actions.dismissCard}
+            />
+          );
+        }
+        // A card from before the Coach: a prompt and choices that reply in the conversation.
+        return (
           <MicroActivityCard
             card={card}
             onChoose={text => actions.submitTurn({ text, source: "practice" })}
@@ -130,6 +149,7 @@ export const Stage: FC<StageProps> = ({
             onSkip={() => actions.dismissCard(card.cardId)}
           />
         );
+      }
       case "closing_ritual":
         return feed.mode === "CRISIS" ? null : (
           <ClosingRitualCard

@@ -17,6 +17,7 @@ import {
   useOpenVisitorThreadMutation,
   usePostGuideCardEventMutation,
   usePutGuideAppointmentMutation,
+  useAnswerGuideMicroActivityMutation,
   usePutGuidePrefsMutation,
   useSendGuideTurnMutation,
   useSendVisitorTurnMutation,
@@ -53,11 +54,17 @@ import {
   queuedEchoes,
   SIGN_IN_REFUSALS,
 } from "../state/guideFeedReducer";
-import { buildSpineModel, chapterHasWarnings } from "../state/spineModel";
+import { buildSpineModel, chapterHasWarnings, practiceItemIds } from "../state/spineModel";
 import { dropVisitorToken, readVisitorToken, storeVisitorToken } from "../visitor/visitorToken";
 
 import type { AppointmentSlot } from "../cards/special/appointment";
-import type { GuideAnchor, GuideCardEventRequest, GuideTurnRequest } from "../contract/wire";
+import type {
+  GuideAnchor,
+  GuideCardEventRequest,
+  GuideMicroActivityRequest,
+  GuideMicroActivityResult,
+  GuideTurnRequest,
+} from "../contract/wire";
 
 const GUIDANCE_KEY = "allyGuideGuidance";
 const SPINE_REFRESH_DELAY_MS = 400;
@@ -94,7 +101,8 @@ export type TurnSource =
   | "start"
   | "care"
   | "crisis"
-  | "landing";
+  | "landing"
+  | "ask";
 
 export interface SubmitTurnInput {
   text: string;
@@ -106,6 +114,15 @@ export interface SubmitTurnInput {
 
 /** Sources that stay out of analytics (plan §6.3: nothing about distress leaves the thread). */
 const PRIVATE_SOURCES: TurnSource[] = ["care", "crisis"];
+
+/** A side quest's answer on this page: kept here so a folded scene doesn't lose it. */
+export interface PracticeState {
+  status: "sending" | "done" | "error";
+  request: GuideMicroActivityRequest;
+  result?: GuideMicroActivityResult;
+  /** The server's line for a refusal (e.g. "Choose an answer first."). */
+  message?: string;
+}
 
 export type SignInSource = "card" | "allowance" | "paused" | "item" | "voice" | "header";
 
@@ -134,7 +151,7 @@ export const useGuideJourney = (
     onSignInRequired,
   }: UseGuideJourneyOptions = {},
 ) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { track } = useAnalytics();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -148,6 +165,7 @@ export const useGuideJourney = (
   const [minimisedCardId, setMinimisedCardId] = useState<string | null>(null);
   const [helpRequested, setHelpRequested] = useState(false);
   const [enrolled, setEnrolled] = useState(true);
+  const [practice, setPractice] = useState<Record<string, PracticeState>>({});
   const [now, setNow] = useState(() => Date.now());
   // A signed-out visitor (M2) talks through the public routes with their own token.
   const [identity, setIdentity] = useState<JourneyIdentity>("learner");
@@ -182,6 +200,7 @@ export const useGuideJourney = (
   const [sendGuideTurn] = useSendGuideTurnMutation();
   const [postGuideCardEvent] = usePostGuideCardEventMutation();
   const [putGuidePrefs] = usePutGuidePrefsMutation();
+  const [answerGuideMicroActivity] = useAnswerGuideMicroActivityMutation();
   const [putGuideAppointment] = usePutGuideAppointmentMutation();
   const [enrollGuideThread] = useEnrollGuideThreadMutation();
   const [enrollTrack] = useEnrollTrackMutation();
@@ -670,6 +689,47 @@ export const useGuideJourney = (
     [postCardEvent],
   );
 
+  /**
+   * "Ask about this" (plan §5.8): a turn in the learner's words with the item
+   * and the quote or moment attached. Ally answers in the conversation.
+   */
+  const askAbout = useCallback(
+    (_cardId: string, anchor: GuideAnchor, kind: "article" | "video" | "quiz") => {
+      submitTurn({ text: t(`guide.ask.${kind}Turn`), anchor, source: "ask", verb: kind });
+    },
+    [submitTurn, t],
+  );
+
+  /**
+   * Answers a side quest (plan §4.6): marked against its key, or one Coach
+   * note for a written answer. Ungraded; the server moves the card to done
+   * and Ally follows up on her own. A card already done is shown as done.
+   */
+  const answerPractice = useCallback(
+    async (cardId: string, request: GuideMicroActivityRequest) => {
+      if (!threadId || identityRef.current === "visitor") return;
+      setPractice(prev => ({ ...prev, [cardId]: { status: "sending", request } }));
+      try {
+        const result = await answerGuideMicroActivity({ threadId, cardId, body: request }).unwrap();
+        setPractice(prev => ({ ...prev, [cardId]: { status: "done", request, result } }));
+        dispatch({ type: "card/localState", cardId, state: "done" });
+        const card = feedRef.current.cards[cardId];
+        track(ANALYTICS_EVENTS.GUIDED_PRACTICE_ANSWERED, {
+          ...courseProps,
+          [ANALYTICS_PROPS.GUIDED_PRACTICE_KIND]:
+            result.kind ??
+            ((card?.payload as { activity?: { kind?: string } } | undefined)?.activity?.kind ||
+              "unknown"),
+        });
+      } catch (error) {
+        const data = (error as { data?: { message?: unknown } } | undefined)?.data;
+        const message = typeof data?.message === "string" ? data.message : undefined;
+        setPractice(prev => ({ ...prev, [cardId]: { status: "error", request, message } }));
+      }
+    },
+    [threadId, answerGuideMicroActivity, track, courseProps],
+  );
+
   // The server can ask for a card to open in the Shelf (`shelf.open`).
   useEffect(() => {
     const request = feed.shelfRequest;
@@ -796,8 +856,13 @@ export const useGuideJourney = (
         sections: bootstrap?.spine ?? [],
         progress: feed.progress,
         cards: feed.cards,
+        practiceItems: practiceItemIds(
+          feed.entries,
+          feed.cards,
+          feed.progress?.currentItemId ?? null,
+        ),
       }),
-    [bootstrap?.spine, feed.progress, feed.cards],
+    [bootstrap?.spine, feed.progress, feed.cards, feed.entries],
   );
   const sceneSectionId =
     (feed.currentSceneId && feed.scenes[feed.currentSceneId]?.sectionId) || spine.currentChapterId;
@@ -817,6 +882,7 @@ export const useGuideJourney = (
     atmosphere,
     cues,
     enrolled,
+    practice,
     minimisedCardId,
     helpRequested,
     identity,
@@ -839,6 +905,8 @@ export const useGuideJourney = (
       claimCard,
       launchCard,
       dismissCard,
+      answerPractice,
+      askAbout,
       setGuidance,
       scheduleAppointment,
       chooseSafe,

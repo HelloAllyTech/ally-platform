@@ -2,6 +2,7 @@ import { FC, ReactNode } from "react";
 
 import { useTranslation } from "react-i18next";
 
+import { formatMoment } from "../cards/AskLayer";
 import { AllyPresence } from "../presence/AllyPresence";
 
 import type { GuideMemoryRef } from "../contract/wire";
@@ -69,11 +70,15 @@ export const LearnerBubble: FC<{
   const { t } = useTranslation();
   return (
     <div className="g-rise flex flex-col items-end gap-1" data-testid={`learner-${entry.id}`}>
-      {entry.anchor?.quote && (
+      {entry.anchor?.quote ? (
         <p className="g-caption max-w-[85%] truncate">
           {t("guide.message.about", { quote: entry.anchor.quote })}
         </p>
-      )}
+      ) : typeof entry.anchor?.timestampSec === "number" ? (
+        <p className="g-caption max-w-[85%]">
+          {t("guide.message.aboutMoment", { time: formatMoment(entry.anchor.timestampSec) })}
+        </p>
+      ) : null}
       <div
         className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md border border-[var(--g-learner-edge)] bg-[var(--g-learner-bubble)] px-4 py-2.5 font-secondary text-[17px] leading-[26px] text-[var(--g-ink)] ${
           entry.status === "sending" ? "opacity-80" : ""
