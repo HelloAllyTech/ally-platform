@@ -253,6 +253,38 @@ const INTENT_TEXT: Record<string, string> = {
   safe_now: 'The learner tapped "I\'m safe right now" on the crisis card.',
 };
 
+/**
+ * Lines of a reply that echo the conversation's own scaffolding — an intent
+ * note, a tag — rather than speak to the learner. A model continuing the
+ * transcript instead of answering writes them; they never reach the learner.
+ */
+const ECHO_PATTERNS: RegExp[] = [
+  ...Object.values(INTENT_TEXT).map(
+    (text) =>
+      new RegExp(
+        `^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
+        'i',
+      ),
+  ),
+  /^\s*<\/?(learner_message|learner_action|platform_event|situation_report|asking_about)\b/i,
+  /^\s*(learner|user|ally|assistant)\s*:/i,
+];
+
+/** The reply without echoed scaffolding lines; `stripped` says if any went. */
+export function stripEchoedScaffolding(text: string): {
+  text: string;
+  stripped: boolean;
+} {
+  const lines = text.split('\n');
+  const kept = lines.filter(
+    (line) => !ECHO_PATTERNS.some((pattern) => pattern.test(line)),
+  );
+  return {
+    text: kept.join('\n').trim(),
+    stripped: kept.length !== lines.length,
+  };
+}
+
 export interface LearnerTurnInput {
   text: string;
   intent?: string | null;

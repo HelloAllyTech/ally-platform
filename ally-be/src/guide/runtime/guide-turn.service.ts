@@ -82,6 +82,7 @@ import {
   buildLearnerMessage,
   buildOrgSpan,
   buildSystemSpans,
+  stripEchoedScaffolding,
 } from '../context/guide-context';
 import { recentConversation, replayHistory } from '../context/guide-history';
 import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
@@ -1477,7 +1478,13 @@ export class GuideTurnService {
       return;
     }
     ctx.replyKind = 'model';
-    ctx.replyText = output.text.trim();
+    const cleaned = stripEchoedScaffolding(output.text);
+    if (cleaned.stripped) {
+      this.logger.warn(
+        `Guide turn ${ctx.turnId}: reply echoed scaffolding; stripped`,
+      );
+    }
+    ctx.replyText = cleaned.text || output.text.trim();
     ctx.learnerRendered = [
       ctx.learnerMessage!,
       { role: 'system', content: ctx.situation! },

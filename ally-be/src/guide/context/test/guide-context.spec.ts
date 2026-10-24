@@ -16,6 +16,7 @@ import {
   buildOrgSpan,
   buildSystemSpans,
   plainText,
+  stripEchoedScaffolding,
 } from '../guide-context';
 import { recentConversation, replayHistory } from '../guide-history';
 
@@ -360,5 +361,33 @@ describe('renderSituationReport', () => {
     expect(report({ mode: GuideMode.CARE })).toContain('CARE:');
     expect(report({ overlay: 'real_case' })).toContain('REAL CASE');
     expect(report({ overlay: 'pii' })).toContain('IDENTIFYING DETAILS');
+  });
+});
+
+describe('stripEchoedScaffolding', () => {
+  it('drops a line that echoes an intent note or a tag, and keeps the reply', () => {
+    expect(
+      stripEchoedScaffolding(
+        'How are you now, after that roleplay?\nThe learner pressed Continue.',
+      ),
+    ).toEqual({
+      text: 'How are you now, after that roleplay?',
+      stripped: true,
+    });
+    expect(
+      stripEchoedScaffolding('Sure.\n<learner_message>next</learner_message>')
+        .text,
+    ).toBe('Sure.');
+    expect(stripEchoedScaffolding('Learner: what now?\nOkay.').text).toBe(
+      'Okay.',
+    );
+  });
+
+  it('leaves an ordinary reply alone, even one that mentions Continue', () => {
+    const reply = 'When you are ready, press Continue and we will go on.';
+    expect(stripEchoedScaffolding(reply)).toEqual({
+      text: reply,
+      stripped: false,
+    });
   });
 });
