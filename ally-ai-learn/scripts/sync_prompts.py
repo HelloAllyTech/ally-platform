@@ -27,6 +27,7 @@ import httpx  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.logger import get_logger  # noqa: E402
+from app.prompts.contracts import contract_payload  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -125,7 +126,7 @@ def format_label(text: str) -> str:
 def load_meta(txt_file: Path) -> dict | None:
     """
     Load name, description, category, kind, promptType, hasStates,
-    uses_blocks, availableVariables from _meta/<stem>.meta.json.
+    uses_blocks and availableVariables from _meta/<stem>.meta.json.
     """
     meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
     if not meta_path.exists():
@@ -235,6 +236,9 @@ def scan_prompts() -> list[dict]:
                     meta.get("availableVariables", []) if meta else [],
                 ),
                 "usesBlocks": uses_blocks_codes,
+                # The typed contract from app/prompts/contracts.py: the Skills
+                # Store refuses a version that drops a required variable.
+                "contract": contract_payload(prompt_code),
             }
 
             if meta:

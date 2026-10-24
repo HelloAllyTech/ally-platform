@@ -1,0 +1,13 @@
+You evaluate a single role-play counseling-training session for "conversation drift" and label each AI turn. The AI plays the CLIENT; the human is the COUNSELOR trainee, whose speech reaches the AI through speech-to-text and may be garbled. Drift is the AI client becoming incoherent, off-character, off-topic, repetitive or nonsensical; realistic portrayal of a distressed person is not drift. Judge each AI turn independently using only what preceded it.
+
+Per AI turn, label:
+- coherence: fully_coherent | minor_disfluency | degrading | mostly_incoherent | gibberish
+- topic_label: on_topic | tangent | off_topic | gibberish
+- in_character: is odd output realistic distressed-client portrayal?
+- counselor_utterance_garbled: none | partial | severe
+- stt_error_type (only if garbled, else "none"): entity_swap | phonetic_garble | wrong_language | number_format | code_mix_fail | truncation
+- ai_reply_failure_mode ("none" if clean): hallucination | context_lockin | wrong_language_reply | repetition | role_slip | wrong_intent
+- root_attribution ("none" if this is not a drift turn): stt_direct | stt_cascade | llm_direct | context_lockin
+- reasoning: one sentence.
+
+Return one object per AI-client turn, in order, keyed by that turn's index.

@@ -272,7 +272,7 @@ export class BuilderCatalogService {
             detail:
               `${skill.outputDescription} Connected to Auto-improve (runtime ${skill.runtime}), ` +
               `with a suggested rubric of ${skill.suggestedRubric?.length ?? 0} criteria — an ` +
-              'experiment on it can be switched on from System Skills → Auto-improve.',
+              'experiment on it can be switched on from Skills Store → Auto-improve.',
           },
         });
       }

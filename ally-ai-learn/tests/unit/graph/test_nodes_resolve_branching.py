@@ -61,7 +61,7 @@ class TestResolveBranchingInstruction:
         config = {"configurable": {"scenario": mock_scenario}}
 
         # Mock the resolve_llm_responses method
-        async def mock_resolve(llm_config, language_code):
+        async def mock_resolve(llm_config, language_code, **kwargs):
             instruction.content = "Use Exercise improves health"
             instruction._llm_resolved = True
 

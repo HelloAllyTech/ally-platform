@@ -514,10 +514,8 @@ export class HelplineCopilotService
 
   /**
    * Prompt overrides keyed by full code, as ally-ai's helpline service reads
-   * them (cached 60 s). The prompt TEXT is sent only when an admin switched the
-   * row to its dashboard override: otherwise the row holds a seeded copy that
-   * can be older than ally-ai's own file, and sending it would silently undo a
-   * prompt fix. Provider / model / temperature are sent whenever set.
+   * them (cached 60 s). The Skills Store is the source of truth, so the live
+   * text is always sent, with its model settings when set.
    */
   private async promptOverrides(): Promise<HelplinePromptOverrides> {
     if (this.promptCache && this.promptCache.expires > Date.now()) {
@@ -530,10 +528,7 @@ export class HelplineCopilotService
       });
       value = (rows ?? []).reduce<HelplinePromptOverrides>((acc, row) => {
         const entry: HelplinePromptOverrides[string] = {};
-        const dashboard =
-          (row as { useDashboardOverride?: boolean }).useDashboardOverride ===
-          true;
-        if (dashboard && row.prompt?.trim()) {
+        if (row.prompt?.trim()) {
           entry.prompt = row.prompt.trim();
           if (row.availableVariables) {
             entry.availableVariables = row.availableVariables;

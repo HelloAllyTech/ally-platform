@@ -493,7 +493,7 @@ class TestBranchingVsNonBranchingSeparation:
         )
 
         # Mock LLM resolution to fail
-        async def failing_resolve(llm_config, language_code):
+        async def failing_resolve(llm_config, language_code, **kwargs):
             raise Exception("LLM resolution failure")
 
         instruction.resolve_llm_responses = failing_resolve

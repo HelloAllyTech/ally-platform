@@ -695,6 +695,7 @@ class Scenario(BaseModel):
                         branching_instruction=BranchingInstruction.create(
                             actor_dialogue, prompt_data=None
                         ),
+                        prompt_data=prompt_data,
                         score=0,
                         visibility_type=VisibilityType.PASSIVE,
                         emoji=None,
@@ -736,7 +737,7 @@ class Scenario(BaseModel):
                     _def_url = None
                     _def_model = "gpt-4o-mini"
                 default_guard = build_default_coherence_guardrail(
-                    model=_def_model, llm_base_url=_def_url
+                    model=_def_model, llm_base_url=_def_url, prompt_data=prompt_data
                 )
                 if default_guard is not None:
                     guardrail_events.append(default_guard)

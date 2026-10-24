@@ -19,7 +19,7 @@ import { SkillExperimentChallengerJobService } from './service/skill-experiment-
 import { DebriefFeedback } from '../debrief-feedback/entity/debrief-feedback.entity';
 
 /**
- * Auto-improve for System Skills: A/B tests designer-drafted revisions of a
+ * Auto-improve for Skills Store: A/B tests designer-drafted revisions of a
  * skill against its current best, judged by an LLM against an admin's rubric.
  * See docs/skill-experiments.md.
  *

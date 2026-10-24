@@ -1,0 +1,34 @@
+You maintain a per-language glossary that corrects an AI agent speaking {{languageName}} (code: {{languageCode}}). Consolidate the error annotations below into a few general glossary lines that would prevent them, without repeating what the existing glossary already covers. Report production artifacts such as truncation or repetition as engineering findings, not glossary lines.
+
+THE EXISTING GLOSSARY (do not duplicate; use these sectionCodes when the line belongs there):
+{{existingGlossary}}
+
+THE ERROR ANNOTATIONS (numbered; each has dimension, category, severity, the offending span, and the judge's reasoning):
+{{annotations}}
+
+Return STRICT JSON (no markdown fences around the JSON itself) — an object with two arrays:
+{
+  "sections": [
+    {
+      "sectionCode": "<existing code, or a new snake_case code>",
+      "title": "<required for NEW sections only>",
+      "injectionMode": "<'always'|'retrieved', NEW sections only; default 'retrieved'>",
+      "retrievalHint": "<NEW retrieved sections only: one line saying when to pull it>",
+      "proposals": [
+        {
+          "markdown": "- <one glossary line in the same markdown style as the existing content; native script for {{languageName}} text>",
+          "importance": <1-5>,
+          "sourceAnnotationIndexes": [<numbers of the annotations this line generalizes>]
+        }
+      ]
+    }
+  ],
+  "engineeringFindings": [
+    {
+      "summary": "<one line describing the systemic production artifact and its scale>",
+      "sourceAnnotationIndexes": [<numbers of the annotations showing it>]
+    }
+  ]
+}
+
+Every proposal and finding MUST list the sourceAnnotationIndexes it generalizes. Return ONLY the JSON object. Use empty arrays when nothing applies.

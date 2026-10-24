@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ScenarioInteractionMode } from '../../enum/scenario-interaction-mode.enum';
 import { In } from 'typeorm';
-import { ScenarioSharedService } from '../scenario-shared.service';
+import {
+  ScenarioSharedService,
+  promptRecordFrom,
+} from '../scenario-shared.service';
 import { ScenariosRepository } from '../../repository/scenario.repository';
 import { ScenarioVersionRepository } from '../../repository/scenario-version.repository';
 import { ScenarioSessionRepository } from '../../repository/scenario-session.repository';
@@ -2159,9 +2162,9 @@ describe('ScenarioSharedService', () => {
 
       const result = await (service as any).getPromptsForScenarioSession();
 
+      // Every ally-ai-learn prompt ships: the store is the source of truth.
       expect(promptSharedService.getPromptsByOptions).toHaveBeenCalledWith({
         promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
-        useDashboardOverrideOnly: true,
       });
       expect(result).toEqual({});
     });
@@ -2172,11 +2175,15 @@ describe('ScenarioSharedService', () => {
           promptCode: 'ally_ai_learn_system_default_system_prompt',
           prompt: 'Default prompt text',
           availableVariables: [],
+          version: 7,
+          contentHash: 'hash-7',
         },
         {
           promptCode: 'ally_ai_learn_system_audio_tag_guidance',
           prompt: 'Audio tag guidance text',
           availableVariables: [],
+          version: 2,
+          contentHash: 'hash-2',
         },
         {
           promptCode: 'ally_ai_learn_counselor_report_generation_prompt',
@@ -2190,24 +2197,40 @@ describe('ScenarioSharedService', () => {
 
       expect(promptSharedService.getPromptsByOptions).toHaveBeenCalledWith({
         promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
-        useDashboardOverrideOnly: true,
       });
       expect(result).toEqual({
         ally_ai_learn_system_default_system_prompt: {
           prompt: 'Default prompt text',
           availableVariables: [],
           hasStates: false,
+          version: 7,
+          contentHash: 'hash-7',
         },
         ally_ai_learn_system_audio_tag_guidance: {
           prompt: 'Audio tag guidance text',
           availableVariables: [],
           hasStates: false,
+          version: 2,
+          contentHash: 'hash-2',
         },
         ally_ai_learn_counselor_report_generation_prompt: {
           prompt: 'Report generation text',
           availableVariables: [],
           hasStates: false,
+          version: null,
         },
+      });
+      // What the session records comes from this same map.
+      expect(promptRecordFrom(result)).toEqual({
+        promptVersions: {
+          ally_ai_learn_system_default_system_prompt: 7,
+          ally_ai_learn_system_audio_tag_guidance: 2,
+        },
+        promptHashes: {
+          ally_ai_learn_system_default_system_prompt: 'hash-7',
+          ally_ai_learn_system_audio_tag_guidance: 'hash-2',
+        },
+        translatedPrompts: [],
       });
     });
 
@@ -2231,6 +2254,7 @@ describe('ScenarioSharedService', () => {
           prompt: 'Second value',
           availableVariables: [],
           hasStates: false,
+          version: null,
         },
       });
     });

@@ -17,6 +17,29 @@ export interface AvailableVariable {
 
 export type AvailableVariableEntry = string | AvailableVariable;
 
+/**
+ * The code's contract with a prompt, declared in its `.meta.json` sidecar and
+ * written by sync. The store refuses a version that breaks it, so a code change
+ * and the live text can't drift apart silently.
+ */
+export interface PromptContract {
+  /** Every placeholder the code supplies. A body may use only these. Null = undeclared. */
+  variables?: string[] | null;
+  /** Placeholders a body must contain. */
+  required?: string[];
+  /** Text the runtime appends after rendering (audio-tag guidance, glossary). */
+  fragments?: string[];
+  /** Bumped on a breaking change; the release check compares live versions against it. */
+  contractVersion?: number;
+  /**
+   * How the code reads the model's answer. `'json'`: it parses free text as
+   * JSON, so the text itself must ask for JSON (CI checks the default does).
+   * `'structured'`: the provider enforces JSON or a schema (response_format,
+   * structured output), so the text need not.
+   */
+  output?: 'json' | 'structured';
+}
+
 @Entity('prompts')
 @Index('uq_prompts_name_idx', ['name'], { unique: true })
 @Index('uq_prompts_code_idx', ['promptCode'], { unique: true })
@@ -62,8 +85,17 @@ export class Prompt extends BaseWithoutTenantEntity {
   @Column({ type: 'text', nullable: true })
   defaultPrompt?: string;
 
-  @Column({ type: 'boolean', default: false })
+  /**
+   * Retired. The Skills Store is the source of truth: every prompt serves its
+   * live version. Kept (always true) only so readers on an older build still
+   * resolve the store during a rolling deploy.
+   */
+  @Column({ type: 'boolean', default: true })
   useDashboardOverride!: boolean;
+
+  /** See {@link PromptContract}. Null until sync writes the sidecar's contract. */
+  @Column({ type: 'jsonb', nullable: true })
+  contract?: PromptContract | null;
 
   @Column({ type: 'boolean', default: false })
   isObsolete!: boolean;

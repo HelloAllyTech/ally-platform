@@ -221,7 +221,7 @@ export class SkillExperimentEngineService {
       {
         type: SkillExperimentEventType.RESET,
         message:
-          'The skill text was edited in System Skills, so the experiment restarted from the new text.',
+          'The skill text was edited in Skills Store, so the experiment restarted from the new text.',
       },
     );
     return true;

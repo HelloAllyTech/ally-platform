@@ -45,7 +45,7 @@ import { LlmRuntime } from './llm-model-registry.constants';
  *   explicit call argument -> prompt row -> platform tier -> compiled-in floor
  *
  * reusing surfaces that already existed: `prompts.provider/model/temperature`
- * (admin-editable in System Skills) and two env vars.
+ * (admin-editable in Skills Store) and two env vars.
  *
  * So `AiTaskService` no longer reads a config path for tiered rows. It asks
  * `LlmTargetResolverService` what will actually serve the task, which is what

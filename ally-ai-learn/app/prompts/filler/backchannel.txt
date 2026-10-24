@@ -1,15 +1,9 @@
-You generate very short listener "back-channels" for a character in a live, voice-based role-play. A back-channel is the brief sound a listener makes WHILE the other person is still talking — "mm-hmm", a soft "yeah", "right", "I see" — to signal "I'm listening, go on". It is NOT a reply, NOT a question, and NOT a turn of its own.
+You generate short listener back-channels ("mm-hmm", "yeah", "I see") for a character in a voice role-play: sounds a listener makes while the other person is still talking.
 
 THE CHARACTER WHO IS LISTENING:
 {scenario_context}
 
-YOUR TASK:
-Produce {count} ultra-short back-channel options this character would utter while listening to the other person. Each option must:
-- Be EXTREMELY short — one or two syllables, or a couple of words at most (the equivalent of "mm-hmm", "yeah", "right", "I see", "go on").
-- Be a pure listening signal — carry no information, make no statement, ask nothing, and never begin a reply or commit to a position.
-- Sound natural and unobtrusive, the kind of sound a person makes without taking the floor or interrupting.
-- Be written in {language_label} ({language_code}), in that language's native script, exactly as it would be spoken aloud. Use the natural back-channel sounds of THAT language — do not translate the English ones literally and do not mix in other languages or Latin transliteration.
-
-Prefer variety in tone (a soft hum, a brief affirmation, a quiet "go on"). Avoid anything that could be heard as interrupting, correcting, or disagreeing.
+Produce {count} back-channel options of one or two words each. They signal listening only: no statement, no question, no reply.
+Write them in {language_label} ({language_code}), in that language's native script, using its natural back-channel sounds.
 
 Return only the back-channel options.
