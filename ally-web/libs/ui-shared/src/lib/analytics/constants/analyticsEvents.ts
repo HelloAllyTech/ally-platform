@@ -138,6 +138,21 @@ export const ANALYTICS_EVENTS = {
   // course id and which reply was picked — never the reply text.
   COURSE_LANDING_FIRST_MOVE_CHOSEN: "course_landing_first_move_chosen",
 
+  // Ally's guided journey (`/journey/:trackId`). Never the learner's words,
+  // and nothing about CARE or a crisis: those stay out of analytics entirely.
+  GUIDED_JOURNEY_OPENED: "guided_journey_opened",
+  GUIDED_MESSAGE_SENT: "guided_message_sent",
+  GUIDED_CARD_OPENED: "guided_card_opened",
+  GUIDED_GUIDANCE_CHANGED: "guided_guidance_changed",
+  GUIDED_CLASSIC_VIEW_OPENED: "guided_classic_view_opened",
+  GUIDED_FAILURE_SHOWN: "guided_failure_shown",
+  GUIDED_APPOINTMENT_CHOSEN: "guided_appointment_chosen",
+  GUIDED_VOICE_STARTED: "guided_voice_started",
+  GUIDED_VOICE_FALLBACK: "guided_voice_fallback",
+  GUIDED_SIGN_IN_STARTED: "guided_sign_in_started",
+  GUIDED_VISITOR_CLAIMED: "guided_visitor_claimed",
+  GUIDED_LANGUAGE_CHANGED: "guided_language_changed",
+
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
 } as const;
@@ -329,6 +344,17 @@ export const ANALYTICS_PROPS = {
   // Course landing page context
   COURSE_ID: "course_id",
   REPLY_INDEX: "reply_index",
+  // Ally's guided journey
+  GUIDED_ENTRY: "entry",
+  GUIDED_VERB: "verb",
+  GUIDED_ITEM_TYPE: "item_type",
+  GUIDED_PRESENTATION: "presentation",
+  GUIDED_LEVEL: "level",
+  GUIDED_FAILURE_CODE: "failure_code",
+  GUIDED_SLOT: "slot",
+  GUIDED_TURN_MODE: "turn_mode",
+  GUIDED_IDENTITY: "identity",
+  GUIDED_CLAIM_OUTCOME: "claim_outcome",
 
   // Sidebar context
   ACTION: "action",

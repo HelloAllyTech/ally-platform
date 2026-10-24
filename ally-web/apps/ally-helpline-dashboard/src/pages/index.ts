@@ -14,6 +14,7 @@ export * from "./track-overview";
 export * from "./track-player";
 export * from "./track-progress";
 export * from "./course-landing";
+export * from "./guided-course";
 export * from "./post-call-summary/PostCallSummary";
 export * from "./scenario/Scenario";
 export * from "./search/Search";

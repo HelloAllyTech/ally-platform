@@ -7,7 +7,7 @@ import { ProgressVideoPlayer, ProgressVideoPlayerHandle } from "@ally-ui-mono/ui
 import { useReportVideoProgressMutation } from "@api";
 import { TickGreenBackground } from "@assets";
 import { useVideoWatchProgress } from "@hooks";
-import { StartVideoItemPayload, VideoInterjection } from "@types";
+import { StartVideoItemPayload, TrackItemCompletionResult, VideoInterjection } from "@types";
 
 import { VideoInterjectionOverlay } from "./VideoInterjectionOverlay";
 
@@ -16,6 +16,12 @@ interface VideoItemPlayerProps {
   itemId: string;
   trackId: string;
   alreadyCompleted: boolean;
+  /**
+   * Called once, when a watch report first comes back completed. Optional:
+   * the classic player doesn't pass it (its Next gate reads the course
+   * detail); the guided journey uses it to claim the card.
+   */
+  onCompleted?: (result: TrackItemCompletionResult) => void;
 }
 
 /** Minimal shape of the YouTube IFrame API we touch. */
@@ -101,10 +107,14 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
   itemId,
   trackId,
   alreadyCompleted,
+  onCompleted,
 }) => {
   const { t } = useTranslation();
   const [reportVideoProgress] = useReportVideoProgressMutation();
   const [completed, setCompleted] = useState(alreadyCompleted);
+  const onCompletedRef = useRef(onCompleted);
+  onCompletedRef.current = onCompleted;
+  const reportedCompletion = useRef(false);
   const [playbackError, setPlaybackError] = useState(false);
   const requiredPct = Math.round(payload.requiredWatchPct ?? 0);
   // YouTube/Vimeo embeds rarely have a stored durationSeconds (the admin
@@ -123,7 +133,13 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
           trackId,
           watchedPct: pct,
         }).unwrap();
-        if (result.completed) setCompleted(true);
+        if (result.completed) {
+          setCompleted(true);
+          if (!reportedCompletion.current) {
+            reportedCompletion.current = true;
+            onCompletedRef.current?.(result);
+          }
+        }
       } catch {
         // Monotonic server-side; a dropped report is recovered by the next.
       }

@@ -149,6 +149,31 @@ export const ApiEndpoints = {
     JOURNAL_SUBMIT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal/submit`,
     ANNOTATION_ATTEMPTS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/annotation-attempts`,
   },
+  // Ally guide: the guided course experience at /journey/:trackId.
+  GUIDE: {
+    /** No login: is the guided experience on for this course. */
+    AVAILABILITY: (trackId: string) => `/v1/guide/public/availability/${trackId}`,
+    BOOTSTRAP: (trackId: string) => `/v1/guide/tracks/${trackId}/bootstrap`,
+    /** Get or create the learner's thread for a course. */
+    THREADS: (trackId: string) => `/v1/guide/tracks/${trackId}/threads`,
+    ENROLL: (threadId: string) => `/v1/guide/threads/${threadId}/enroll`,
+    TURNS: (threadId: string) => `/v1/guide/threads/${threadId}/turns`,
+    MESSAGES: (threadId: string) => `/v1/guide/threads/${threadId}/messages`,
+    /** SSE; resume with the Last-Event-ID header. */
+    EVENTS: (threadId: string) => `/v1/guide/threads/${threadId}/events`,
+    CARD_EVENTS: (threadId: string, cardId: string) =>
+      `/v1/guide/threads/${threadId}/cards/${cardId}/events`,
+    APPOINTMENT: (threadId: string) => `/v1/guide/threads/${threadId}/appointment`,
+    /** A LiveKit room with the guide's voice worker: `{token, roomName, serverUrl}`. */
+    VOICE_SESSION: (threadId: string) => `/v1/guide/threads/${threadId}/voice-session`,
+    PREFS: "/v1/guide/prefs",
+    // Anonymous visitors (M2): the visitor token goes in x-guide-visitor.
+    PUBLIC_VISITORS: "/v1/guide/public/visitors",
+    PUBLIC_BOOTSTRAP: (trackId: string) => `/v1/guide/public/tracks/${trackId}/bootstrap`,
+    PUBLIC_THREADS: (trackId: string) => `/v1/guide/public/tracks/${trackId}/threads`,
+    PUBLIC_TURNS: (threadId: string) => `/v1/guide/public/threads/${threadId}/turns`,
+    PUBLIC_EVENTS: (threadId: string) => `/v1/guide/public/threads/${threadId}/events`,
+  },
   // Course discussions — the thread beneath a Track 2.0 item.
   COURSE_DISCUSSION: {
     GET: (itemId: string) => `/v1/learn/track-items/${itemId}/discussion`,

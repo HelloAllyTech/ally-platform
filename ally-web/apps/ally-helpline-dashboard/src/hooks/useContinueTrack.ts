@@ -1,13 +1,16 @@
 import { useNavigate } from "react-router-dom";
 
 import { useLazyGetNextTrackItemQuery } from "@api";
-import { buildTrackItemRoute, buildTrackRoute } from "@constants";
+import { buildJourneyRoute, buildTrackItemRoute, buildTrackRoute } from "@constants";
 import { ACTIVE_TRACK_CONTEXT_KEY, ActiveTrackContext } from "@types";
 
 /**
  * Advances a track-launched roleplay/case session back into the track: looks
  * up the next unlocked item and navigates there, or back to the track
  * overview once the track is complete.
+ *
+ * When Ally's guided journey launched it (`returnTo: "guided"`), the way
+ * back is the journey itself: Ally, not the course order, says what's next.
  */
 export const useContinueTrack = (trackContext: ActiveTrackContext | null) => {
   const navigate = useNavigate();
@@ -15,6 +18,11 @@ export const useContinueTrack = (trackContext: ActiveTrackContext | null) => {
 
   return async () => {
     if (!trackContext) return;
+    if (trackContext.returnTo === "guided") {
+      sessionStorage.removeItem(ACTIVE_TRACK_CONTEXT_KEY);
+      navigate(buildJourneyRoute(trackContext.trackId, { returned: trackContext.cardId }));
+      return;
+    }
     try {
       const result = await getNextTrackItem({ trackId: trackContext.trackId }).unwrap();
       sessionStorage.removeItem(ACTIVE_TRACK_CONTEXT_KEY);

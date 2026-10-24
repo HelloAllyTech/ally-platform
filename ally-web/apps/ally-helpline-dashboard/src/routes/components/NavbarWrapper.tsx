@@ -22,8 +22,10 @@ const NavbarWrapper: FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const { BadgeModal } = useAchievementBadgeModal();
 
+  // Ally's journey celebrates by its own rules (capped by the room's mood, and
+  // never during CARE or a crisis), so badges wait until the learner leaves it.
   const shouldShowBadgeModal =
-    isAuthenticated && !isPathExcluded(pathname, [ROUTES.SIMULATION_SUMMARY_FULL]);
+    isAuthenticated && !isPathExcluded(pathname, [ROUTES.SIMULATION_SUMMARY_FULL, ROUTES.JOURNEY]);
 
   useEffect(() => {
     // checkAuth only for logged in users

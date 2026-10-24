@@ -72,6 +72,9 @@ export const ROUTES = {
   // ally-admin-dashboard and the `/course` entries in public/.well-known
   // (they hand the link to the mobile app when it is installed).
   COURSE_LANDING: "/course/:trackId",
+  // Ally's guided journey through a course (dark launch). Never added to the
+  // public/.well-known app-link files: the native app must not claim it.
+  JOURNEY: "/journey/:trackId",
   SIMULATION: "/simulation/:id/:scenarioTitle",
   SIMULATION_SUMMARY: "/simulation-summary",
   SIMULATION_SUMMARY_FULL: "/simulation-summary/:sessionId",
@@ -99,6 +102,17 @@ export const ROUTES = {
 // file must not gain component/icon imports, see @assets mock note below).
 export const buildTrackRoute = (trackId: string) => `/track/${trackId}`;
 export const buildCourseLandingRoute = (trackId: string) => `/course/${trackId}`;
+/** `returned` names the card a roleplay or case was launched from, so the journey can resume it. */
+export const buildJourneyRoute = (
+  trackId: string,
+  params?: { returned?: string | null; outcome?: "completed" | "aborted" | null },
+) => {
+  const query = new URLSearchParams();
+  if (params?.returned) query.set("returned", params.returned);
+  if (params?.outcome) query.set("outcome", params.outcome);
+  const search = query.toString();
+  return `/journey/${trackId}${search ? `?${search}` : ""}`;
+};
 export const buildTrackItemRoute = (trackId: string, itemId: string) =>
   `/track/${trackId}/item/${itemId}`;
 /** Query param pointing the track player at a discussion post to highlight. */
@@ -126,6 +140,8 @@ export const excludeNavBar = [
   ROUTES.SIMULATION_SUMMARY_FULL,
   // Full-screen track player (page-turner) hides the nav bar
   ROUTES.TRACK_ITEM,
+  // So does Ally's guided journey, which has its own header
+  ROUTES.JOURNEY,
 ] as string[];
 
 export const navBarOptions = [
@@ -143,6 +159,7 @@ export const navBarOptions = [
       ROUTES.TRACK_ITEM,
       ROUTES.TRACK_PROGRESS,
       ROUTES.COURSE_LANDING,
+      ROUTES.JOURNEY,
     ],
     permissions: [Permissions.EDIT_SCENARIO_SESSION],
   },
