@@ -10,7 +10,7 @@ to this service.
 
 | | |
 |---|---|
-| Workflow | **Production Release** (`.github/workflows/production-release.yaml`) |
+| Workflow | **Production Release** (monorepo root `.github/workflows/production-release-ally-ai.yaml`) |
 | Release branch | `master` |
 | Runtime in CI | Python 3.12 |
 | Package manager | Poetry (venv cached on `poetry.lock`) |

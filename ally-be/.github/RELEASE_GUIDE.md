@@ -10,7 +10,7 @@ to this service.
 
 | | |
 |---|---|
-| Workflow | **Production Release** (`.github/workflows/production-release.yaml`) |
+| Workflow | **Production Release** (monorepo root `.github/workflows/production-release-ally-be.yaml`) |
 | Release branch | `master` |
 | Runtime in CI | Node.js 24 |
 | Package manager | npm |
