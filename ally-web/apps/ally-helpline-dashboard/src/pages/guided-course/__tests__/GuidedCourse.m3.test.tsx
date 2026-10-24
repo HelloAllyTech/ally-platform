@@ -120,6 +120,29 @@ describe("GuidedCourse M3: side quests, the Shelf utilities and Ask about this",
       expect(JSON.stringify(track.mock.calls)).not.toMatch(/still there|correct/);
     });
 
+    it("a quick check answered earlier comes back marked after a reload", async () => {
+      const first = renderJourney();
+      await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+      send("quickcheck-demo");
+      const quest = await screen.findByTestId("side-quest");
+      const card = quest.closest("[data-testid^='card-']") as HTMLElement;
+      fireEvent.click(within(card).getByRole("radio", { name: /Ask if they're still there/ }));
+      fireEvent.click(within(card).getByRole("radio", { name: /Shows you heard them/ }));
+      fireEvent.click(within(card).getByRole("button", { name: "Check my answer" }));
+      await waitFor(() => expect(within(card).getAllByTestId("option-mark")).toHaveLength(3));
+      first.unmount();
+
+      renderJourney();
+      const again = await screen.findByTestId("side-quest", {}, { timeout: 3000 });
+      const q1 = within(again).getByTestId("question-q1");
+      expect(within(q1).getByText(/Ask if they're still there/)).toHaveTextContent("Your answer");
+      expect(within(q1).getByText(/Wait a little longer/)).toHaveTextContent(
+        "✓ The course's answer",
+      );
+      expect(within(q1).getAllByRole("radio")[0]).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Check my answer" })).not.toBeInTheDocument();
+    });
+
     it("a written practice gets one note from Ally", async () => {
       renderJourney();
       await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
@@ -222,7 +245,7 @@ describe("GuidedCourse M3: side quests, the Shelf utilities and Ask about this",
       expect(JSON.stringify(track.mock.calls)).not.toContain("night shifts");
     });
 
-    it("preferences: optional practice, outreach, and challenge only once the server keeps it", async () => {
+    it("preferences: optional practice, outreach, and challenge only while practice is on", async () => {
       renderJourney();
       await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
       openMenu();
@@ -231,9 +254,10 @@ describe("GuidedCourse M3: side quests, the Shelf utilities and Ask about this",
       const panel = await screen.findByTestId("preferences-panel");
       const practice = await within(panel).findByRole("switch", { name: "Optional practice" });
       expect(practice).toHaveAttribute("aria-checked", "true");
-      expect(within(panel).queryByTestId("challenge-switch")).not.toBeInTheDocument();
+      expect(within(panel).getByTestId("challenge-switch")).toBeInTheDocument();
       fireEvent.click(practice);
       await waitFor(() => expect(practice).toHaveAttribute("aria-checked", "false"));
+      expect(within(panel).queryByTestId("challenge-switch")).not.toBeInTheDocument();
 
       fireEvent.click(within(panel).getByRole("radio", { name: "Off" }));
       await waitFor(() =>
@@ -246,20 +270,21 @@ describe("GuidedCourse M3: side quests, the Shelf utilities and Ask about this",
       });
     });
 
-    it("shows the challenge switch when the server returns it", async () => {
-      (server as unknown as { prefs: Record<string, unknown> }).prefs.challenge = "normal";
+    it("saves more challenge and shows what the server kept", async () => {
       renderJourney();
       await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
       openMenu();
       fireEvent.click(screen.getByRole("button", { name: "Preferences" }));
       const panel = await screen.findByTestId("preferences-panel");
       const challenge = await within(panel).findByRole("switch", { name: "More challenge" });
+      expect(challenge).toHaveAttribute("aria-checked", "false");
       fireEvent.click(challenge);
       await waitFor(() =>
         expect(requests(/\/v1\/guide\/prefs$/).map(r => r.body)).toContainEqual({
           challenge: "more",
         }),
       );
+      await waitFor(() => expect(challenge).toHaveAttribute("aria-checked", "true"));
     });
   });
 

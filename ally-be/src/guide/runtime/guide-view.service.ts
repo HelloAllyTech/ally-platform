@@ -34,6 +34,7 @@ import { GuideThread } from '../entity/guide-thread.entity';
 import { sceneViews } from './guide-scene.service';
 import {
   GuideCardKind,
+  GuideCardState,
   GuideMessageRole,
   GuideMode,
   GuideThreadStatus,
@@ -49,6 +50,7 @@ export const DEFAULT_GUIDE_PREFS: GuidePrefs = {
   guidance: 'walk',
   voiceEnabled: false,
   sideQuests: true,
+  challenge: 'normal',
   memoryEnabled: true,
   outreach: 'in_app',
   preferClassic: false,
@@ -403,6 +405,7 @@ const PREF_KEYS: Array<keyof GuidePrefs> = [
   'guidance',
   'voiceEnabled',
   'sideQuests',
+  'challenge',
   'memoryEnabled',
   'outreach',
   'preferClassic',
@@ -496,5 +499,40 @@ export function cardView(row: GuideCard): GuideCardEvent {
     }),
     cardId: row.id,
     state: row.state as GuideCardEvent['state'],
+    ...(presented ? answeredPractice(row, presented) : {}),
+  };
+}
+
+/**
+ * A done side quest comes back with what the learner answered and its marks
+ * or note, so a reload shows the card as it was left. Only once answered:
+ * before that the key never leaves the row (`payload.spec`).
+ */
+function answeredPractice(
+  row: GuideCard,
+  presented: GuideCardEvent,
+): Pick<GuideCardEvent, 'payload'> | null {
+  if (
+    row.kind !== GuideCardKind.MICRO_ACTIVITY ||
+    row.state !== GuideCardState.DONE ||
+    !row.payload?.result
+  ) {
+    return null;
+  }
+  const stored = row.payload.response as
+    | Array<{ questionId: string; optionId: string }>
+    | { text?: string }
+    | undefined;
+  const response = Array.isArray(stored)
+    ? { answers: stored }
+    : stored?.text !== undefined
+      ? { text: stored.text }
+      : undefined;
+  return {
+    payload: {
+      ...(presented.payload ?? {}),
+      result: row.payload.result,
+      ...(response ? { response } : {}),
+    },
   };
 }

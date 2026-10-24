@@ -148,6 +148,14 @@ export class GuidePrefsUpdateDto {
   @IsBoolean()
   sideQuests?: boolean;
 
+  @ApiPropertyOptional({
+    enum: ['normal', 'more'],
+    description: 'More challenge: side quests always stretch',
+  })
+  @IsOptional()
+  @IsIn(['normal', 'more'])
+  challenge?: 'normal' | 'more';
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

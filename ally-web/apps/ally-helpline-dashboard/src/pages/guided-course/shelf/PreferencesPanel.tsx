@@ -27,7 +27,7 @@ export const PreferencesPanel: FC<{
   const [putPrefs, { isLoading: saving }] = usePutGuidePrefsMutation();
   const [failed, setFailed] = useState(false);
 
-  const save = async (patch: GuidePrefsUpdate & { challenge?: "normal" | "more" }) => {
+  const save = async (patch: GuidePrefsUpdate) => {
     setFailed(false);
     try {
       await putPrefs(patch).unwrap();
@@ -55,8 +55,8 @@ export const PreferencesPanel: FC<{
               testId="side-quests-switch"
             />
           </div>
-          {/* Shown only once the server keeps it, so the switch never promises what isn't saved. */}
-          {prefs.challenge !== undefined && prefs.sideQuests && (
+          {/* How hard the practice is only means something while practice is on. */}
+          {prefs.sideQuests && (
             <SettingSwitch
               label={t("guide.prefs.challenge")}
               hint={t("guide.prefs.challengeHint")}

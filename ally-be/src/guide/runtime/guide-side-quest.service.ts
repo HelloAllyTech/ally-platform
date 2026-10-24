@@ -14,7 +14,7 @@ import {
   CoachActivity,
   GuideCoachService,
 } from '../capabilities/specialists/guide-coach.service';
-import { CourseSpine } from '../conductor/course-spine';
+import { CourseSpine, SpineItem } from '../conductor/course-spine';
 import { GuideCourseContentService } from '../content/guide-course-content.service';
 import { SideQuestKind } from '../conductor/side-quests';
 import { GuideCard as GuideCardEvent } from '../contract/generated/guide-contract';
@@ -123,9 +123,13 @@ export class GuideSideQuestService {
       data: Record<string, unknown>,
     ) => Promise<number>;
   }): Promise<GuideCardEvent | null> {
-    const spec = await this.make(input);
+    const focusItem = this.focusItem(input);
+    const spec = await this.make(input, focusItem);
     if (!spec) return null;
     const title = spec.activity.title;
+    const section = focusItem
+      ? input.spine.sections.find((s) => s.id === focusItem.sectionId)
+      : undefined;
     const saved = await this.cards.save(
       this.cards.create({
         threadId: input.threadId,
@@ -133,7 +137,7 @@ export class GuideSideQuestService {
         presentation: GuideCardPresentation.INLINE,
         state: GuideCardState.READY,
         title: title.slice(0, 255),
-        trackItemId: input.focusItemId,
+        trackItemId: focusItem?.id ?? null,
         payload: { spec, kind: input.kind },
         tenantId: input.tenantId,
       }),
@@ -147,6 +151,18 @@ export class GuideSideQuestService {
       framing: input.framing,
       meta: { format: 'practice' },
       cta: { label: 'Try it', action: 'open' },
+      // The item it practises, so the Spine counts it there.
+      ...(focusItem
+        ? {
+            trackItem: {
+              id: focusItem.id,
+              type: focusItem.type as any,
+              title: focusItem.title,
+              sectionId: focusItem.sectionId,
+              sectionTitle: section?.title ?? null,
+            },
+          }
+        : {}),
       payload: { activity: learnerSafeActivity(spec) },
     };
     const seq = await input.emitDurable('card.presented', { card });
@@ -157,18 +173,45 @@ export class GuideSideQuestService {
     return card;
   }
 
-  private async make(input: {
+  /**
+   * The item the practice is about: the one asked for, else — for the Coach —
+   * the practice conversation ahead (a rehearsal) or the last item done. The
+   * Assessor without a focus draws on the whole course, so none.
+   */
+  private focusItem(input: {
     kind: SideQuestKind;
-    trackId: string;
     focusItemId: string | null;
     spine: CourseSpine;
-    languageCode: string;
-    difficulty: SideQuestDifficulty;
-    bundle: GuideReleaseBundle;
-    tier?: GuideBudgetTier;
-    attribution: GuideCallAttribution;
-    onCost?: (usd: number) => void;
-  }): Promise<SideQuestSpec | null> {
+  }): SpineItem | null {
+    const asked = input.spine.items.find(
+      (item) => item.id === input.focusItemId,
+    );
+    if (asked) return asked;
+    if (ASSESSOR_KINDS.has(input.kind)) return null;
+    return (
+      (input.kind === 'rehearse_line'
+        ? input.spine.current
+        : [...input.spine.items]
+            .reverse()
+            .find((item) => item.state === 'completed')) ?? null
+    );
+  }
+
+  private async make(
+    input: {
+      kind: SideQuestKind;
+      trackId: string;
+      focusItemId: string | null;
+      spine: CourseSpine;
+      languageCode: string;
+      difficulty: SideQuestDifficulty;
+      bundle: GuideReleaseBundle;
+      tier?: GuideBudgetTier;
+      attribution: GuideCallAttribution;
+      onCost?: (usd: number) => void;
+    },
+    focusItem: SpineItem | null,
+  ): Promise<SideQuestSpec | null> {
     const focusIds = input.focusItemId ? [input.focusItemId] : [];
     if (ASSESSOR_KINDS.has(input.kind)) {
       const activity = await this.assessor.generate({
@@ -185,16 +228,6 @@ export class GuideSideQuestService {
       });
       return activity ? { source: 'assessor', activity } : null;
     }
-    // A rehearsal is about the practice conversation ahead; the others
-    // about what was just done.
-    const focusItem =
-      input.spine.items.find((item) => item.id === input.focusItemId) ??
-      (input.kind === 'rehearse_line'
-        ? input.spine.current
-        : [...input.spine.items]
-            .reverse()
-            .find((item) => item.state === 'completed')) ??
-      null;
     const focus = focusItem
       ? {
           itemId: focusItem.id,

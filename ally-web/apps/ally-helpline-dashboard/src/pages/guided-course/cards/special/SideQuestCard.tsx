@@ -5,7 +5,12 @@ import { useTranslation } from "react-i18next";
 import { MESSAGE_MAX_CHARS } from "../../stage/ComposerArea";
 import { CardFrame } from "../CardFrame";
 
-import type { GuideCard, GuideMicroActivity, GuideMicroActivityRequest } from "../../contract/wire";
+import type {
+  GuideCard,
+  GuideMicroActivity,
+  GuideMicroActivityRequest,
+  GuideMicroActivityResult,
+} from "../../contract/wire";
 import type { PracticeState } from "../../hooks/useGuideJourney";
 
 /** The kinds a learner writes an answer to; the rest are questions with options. */
@@ -20,6 +25,20 @@ export const activityOf = (card: GuideCard): GuideMicroActivity | null => {
   if (!activity || typeof activity !== "object") return null;
   const kind = (activity as { kind?: unknown }).kind;
   return typeof kind === "string" ? (activity as GuideMicroActivity) : null;
+};
+
+/**
+ * A side quest answered before this page loaded: the server sends back the
+ * learner's answer and its marks or note on the done card, so it reads as it
+ * was left. Undefined for an older card without them (only the receipt shows).
+ */
+export const savedPracticeOf = (card: GuideCard): PracticeState | undefined => {
+  if (card.state !== "done") return undefined;
+  const payload = card.payload as
+    | { result?: GuideMicroActivityResult; response?: GuideMicroActivityRequest }
+    | undefined;
+  if (!payload?.result) return undefined;
+  return { status: "done", request: payload.response ?? {}, result: payload.result };
 };
 
 const isWritten = (activity: GuideMicroActivity): boolean =>

@@ -1,3 +1,6 @@
+import { SessionItemStatus } from 'src/common/type/common.type';
+import { TrackItemType } from 'src/track/type/track.type';
+import { buildCourseSpine } from '../../conductor/course-spine';
 import { GuideSideQuestService } from '../guide-side-quest.service';
 
 function setup(card: any) {
@@ -125,5 +128,93 @@ describe('GuideSideQuestService.respond', () => {
         answers: [{ questionId: 'q1', optionId: 'a' }],
       }),
     ).rejects.toThrow('not found');
+  });
+});
+
+describe('GuideSideQuestService.present', () => {
+  const spine = buildCourseSpine({
+    id: 'tr1',
+    title: 'Course',
+    enrolled: true,
+    sections: [
+      {
+        id: 's1',
+        title: 'Openings',
+        order: 1,
+        items: [
+          {
+            id: 'i1',
+            type: TrackItemType.ARTICLE,
+            order: 1,
+            title: 'Listening',
+            status: SessionItemStatus.COMPLETED,
+          },
+        ],
+      },
+    ],
+  });
+
+  function presenter(focusItemId: string | null) {
+    const saved: any[] = [];
+    const cards = {
+      create: jest.fn((row: any) => row),
+      save: jest.fn(async (row: any) => {
+        saved.push(row);
+        return { ...row, id: 'c9' };
+      }),
+      update: jest.fn(async () => undefined),
+    };
+    const assessor = {
+      generate: jest.fn(async () => ({
+        kind: 'quick_check',
+        title: 'Silence',
+        intro: '',
+        questions: [],
+      })),
+    };
+    const service = new GuideSideQuestService(
+      cards as never,
+      assessor as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    return {
+      saved,
+      present: () =>
+        service.present({
+          threadId: 'th1',
+          tenantId: 'org',
+          trackId: 'tr1',
+          kind: 'quick_check',
+          focusItemId,
+          framing: null,
+          spine,
+          languageCode: 'en',
+          difficulty: 'core' as never,
+          bundle: {} as never,
+          attribution: {} as never,
+          emitDurable: jest.fn(async () => 7),
+        }),
+    };
+  }
+
+  it('carries the item it practises, so the Spine counts it there', async () => {
+    const t = presenter('i1');
+    const card = await t.present();
+    expect(card?.trackItem).toEqual({
+      id: 'i1',
+      type: TrackItemType.ARTICLE,
+      title: 'Listening',
+      sectionId: 's1',
+      sectionTitle: 'Openings',
+    });
+    expect(t.saved[0].trackItemId).toBe('i1');
+  });
+
+  it('a quick check on the whole course carries no item', async () => {
+    const card = await presenter(null).present();
+    expect(card?.trackItem).toBeUndefined();
   });
 });

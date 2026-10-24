@@ -87,10 +87,11 @@ export class GuideFixtureServer {
   private busy = false;
   private turnsByClientId = new Map<string, string>();
   /** M3 Shelf data: the learner's prefs, notebook and what Ally remembers. */
-  private prefs: GuidePrefs & { challenge?: "normal" | "more" } = {
+  private prefs: GuidePrefs = {
     guidance: "walk",
     voiceEnabled: true,
     sideQuests: true,
+    challenge: "normal",
     memoryEnabled: true,
     outreach: "in_app",
     preferClassic: false,
@@ -475,7 +476,7 @@ export class GuideFixtureServer {
             ],
           };
       if (!written) this.practiceKeys.set(cardId, { q1: "a", q2: "a" });
-      // Like the server's: no trackItem on a side quest card.
+      // Like the server's for a quick check with no focus item: no trackItem.
       const card: GuideCard = {
         cardId,
         kind: "micro_activity",
@@ -607,7 +608,12 @@ export class GuideFixtureServer {
         note: "Noticing that it felt hard is the first step; next time, count three breaths before you speak.",
       };
     }
-    this.cards.set(cardId, { ...card, state: "done" });
+    // Like the server's: the done card carries its result and the learner's answer.
+    this.cards.set(cardId, {
+      ...card,
+      state: "done",
+      payload: { ...(card.payload ?? {}), result, response: body },
+    });
     this.durable("card.updated", { cardId, state: "done" });
     return json(result, 201);
   }

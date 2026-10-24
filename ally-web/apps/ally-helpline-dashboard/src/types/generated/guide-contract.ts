@@ -531,6 +531,8 @@ export interface GuidePrefs {
   guidance: 'lead' | 'walk' | 'drive';
   voiceEnabled: boolean;
   sideQuests: boolean;
+  /** More challenge: "more" makes every side quest stretch, whatever the pacing. */
+  challenge: 'normal' | 'more';
   memoryEnabled: boolean;
   outreach: 'off' | 'in_app' | 'in_app_email';
   preferClassic: boolean;
@@ -541,6 +543,8 @@ export interface GuidePrefsUpdate {
   guidance?: 'lead' | 'walk' | 'drive';
   voiceEnabled?: boolean;
   sideQuests?: boolean;
+  /** More challenge: "more" makes every side quest stretch, whatever the pacing. */
+  challenge?: 'normal' | 'more';
   memoryEnabled?: boolean;
   outreach?: 'off' | 'in_app' | 'in_app_email';
   preferClassic?: boolean;
@@ -567,7 +571,7 @@ export interface GuideThreadOpened {
   claim?: 'claimed' | 'merged' | 'none';
 }
 
-/** A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered. */
+/** A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered. Once the card is done, bootstrap also carries `card.payload.result` (a GuideMicroActivityResult) and `card.payload.response` (the learner's own GuideMicroActivityRequest). */
 export interface GuideMicroActivity {
   kind: 'quick_check' | 'micro_dilemma' | 'rehearse_line' | 'teach_back' | 'predict_beat' | 'reflection' | 'spaced_recall';
   intro?: string;

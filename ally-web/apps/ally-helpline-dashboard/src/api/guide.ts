@@ -96,12 +96,8 @@ export interface GuideNotebookEntry {
 /** One thing Ally remembers (`GET /v1/guide/memory`), with the learner's words it came from. */
 export type GuideMemoryItem = GuideMemoryView;
 
-/**
- * The prefs as the server returns them. `challenge` is read only when the
- * server sends it (it is stored, but not yet part of the prefs contract), so
- * the control can't promise something that isn't saved.
- */
-export type GuidePrefsView = GuidePrefs & { challenge?: "normal" | "more" };
+/** The prefs as the server returns them: always the whole set. */
+export type GuidePrefsView = GuidePrefs;
 
 const GUIDE_TAGS = ["GuideNotebook", "GuideMemory", "GuidePrefs", "GuideAdvice"] as const;
 
@@ -212,10 +208,7 @@ const guideAPI = baseAPI.enhanceEndpoints({ addTagTypes: GUIDE_TAGS }).injectEnd
       providesTags: ["GuidePrefs"],
     }),
 
-    putGuidePrefs: builder.mutation<
-      GuidePrefsView,
-      GuidePrefsUpdate & { challenge?: "normal" | "more" }
-    >({
+    putGuidePrefs: builder.mutation<GuidePrefsView, GuidePrefsUpdate>({
       query: body => ({
         url: ApiEndpoints.GUIDE.PREFS,
         method: HttpMethod.PUT,

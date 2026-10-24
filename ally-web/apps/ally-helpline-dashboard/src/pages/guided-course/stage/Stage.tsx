@@ -14,7 +14,7 @@ import { ItemCard } from "../cards/ItemCard";
 import { CARD_KIND_RENDERER } from "../cards/registry";
 import { ClosingRitualCard } from "../cards/special/ClosingRitualCard";
 import { FinaleCard as FinaleRevealCard, finalePayloadOf } from "../cards/special/FinaleReveal";
-import { activityOf, SideQuestCard } from "../cards/special/SideQuestCard";
+import { activityOf, savedPracticeOf, SideQuestCard } from "../cards/special/SideQuestCard";
 import {
   AccessDeniedCard,
   CourseInfoCard,
@@ -167,7 +167,7 @@ export const Stage: FC<StageProps> = ({
             <SideQuestCard
               card={card}
               activity={activity}
-              practice={journey.practice[card.cardId]}
+              practice={journey.practice[card.cardId] ?? savedPracticeOf(card)}
               onAnswer={(cardId, request) => void actions.answerPractice(cardId, request)}
               onSkip={actions.dismissCard}
             />

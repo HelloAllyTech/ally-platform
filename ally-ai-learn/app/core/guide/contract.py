@@ -560,6 +560,7 @@ class GuidePrefs(_GuideModel):
     guidance: Literal["lead", "walk", "drive"]
     voice_enabled: bool = Field(alias="voiceEnabled")
     side_quests: bool = Field(alias="sideQuests")
+    challenge: Literal["normal", "more"]
     memory_enabled: bool = Field(alias="memoryEnabled")
     outreach: Literal["off", "in_app", "in_app_email"]
     prefer_classic: bool = Field(alias="preferClassic")
@@ -571,6 +572,7 @@ class GuidePrefsUpdate(_GuideModel):
     guidance: Optional[Literal["lead", "walk", "drive"]] = None
     voice_enabled: Optional[bool] = Field(default=None, alias="voiceEnabled")
     side_quests: Optional[bool] = Field(default=None, alias="sideQuests")
+    challenge: Optional[Literal["normal", "more"]] = None
     memory_enabled: Optional[bool] = Field(default=None, alias="memoryEnabled")
     outreach: Optional[Literal["off", "in_app", "in_app_email"]] = None
     prefer_classic: Optional[bool] = Field(default=None, alias="preferClassic")
@@ -598,7 +600,7 @@ class GuideMicroActivityQuestions(_GuideModel):
 
 
 class GuideMicroActivity(_GuideModel):
-    """A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered."""
+    """A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered. Once the card is done, bootstrap also carries `card.payload.result` (a GuideMicroActivityResult) and `card.payload.response` (the learner's own GuideMicroActivityRequest)."""
 
     kind: Literal["quick_check", "micro_dilemma", "rehearse_line", "teach_back", "predict_beat", "reflection", "spaced_recall"]
     intro: Optional[str] = None

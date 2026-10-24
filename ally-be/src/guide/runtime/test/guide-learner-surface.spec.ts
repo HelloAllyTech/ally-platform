@@ -108,6 +108,88 @@ describe('cardView', () => {
       } as never),
     ).toEqual({ ...presented, state: 'done' });
   });
+
+  const practice = (state: string) =>
+    cardView({
+      id: 'q1',
+      kind: 'micro_activity',
+      presentation: 'inline',
+      state,
+      title: 'Silence',
+      payload: {
+        spec: { source: 'assessor', activity: { title: 'Silence' } },
+        card: {
+          cardId: 'q1',
+          kind: 'micro_activity',
+          presentation: 'inline',
+          state: 'ready',
+          title: 'Silence',
+          payload: { activity: { kind: 'quick_check' } },
+        },
+        response: [{ questionId: 'a', optionId: 'x' }],
+        result: {
+          cardId: 'q1',
+          kind: 'quick_check',
+          results: [
+            {
+              questionId: 'a',
+              correct: false,
+              correctOptionId: 'y',
+              feedback: 'f',
+            },
+          ],
+        },
+      },
+    } as never);
+
+  it("brings a done side quest back with the learner's answer and its marks", () => {
+    expect(practice('done').payload).toEqual({
+      activity: { kind: 'quick_check' },
+      response: { answers: [{ questionId: 'a', optionId: 'x' }] },
+      result: expect.objectContaining({
+        results: [expect.objectContaining({ correctOptionId: 'y' })],
+      }),
+    });
+  });
+
+  it('never sends the key or the spec on a side quest not yet done', () => {
+    const card = practice('ready');
+    expect(card.payload).toEqual({ activity: { kind: 'quick_check' } });
+    expect(JSON.stringify(card)).not.toMatch(/correctOptionId|spec/);
+  });
+});
+
+describe('GuideViewService prefs', () => {
+  it('saves and returns the challenge setting, defaulting to normal', async () => {
+    const saved: any[] = [];
+    let row: any = null;
+    const prefs = {
+      findOne: jest.fn(async () => row),
+      save: jest.fn(async (value: any) => {
+        saved.push(value);
+        row = value;
+      }),
+    };
+    const none = {} as never;
+    const view = new GuideViewService(
+      none,
+      none,
+      none,
+      none,
+      none,
+      none,
+      none,
+      none,
+      prefs as never,
+      none,
+    );
+    const user = { id: 3, tenantId: 'org' };
+    expect((await view.prefsFor(user)).challenge).toBe('normal');
+    const after = await view.updatePrefs(user, { challenge: 'more' });
+    expect(after.challenge).toBe('more');
+    expect(saved[0].prefs).toEqual({ challenge: 'more' });
+    expect((await view.prefsFor(user)).challenge).toBe('more');
+  });
 });
 
 describe('GuideViewService.bootstrap', () => {

@@ -119,6 +119,7 @@
         "guidance": "walk",
         "voiceEnabled": false,
         "sideQuests": true,
+        "challenge": "normal",
         "memoryEnabled": true,
         "outreach": "in_app",
         "preferClassic": false
@@ -167,6 +168,7 @@
         "guidance": "walk",
         "voiceEnabled": false,
         "sideQuests": true,
+        "challenge": "normal",
         "memoryEnabled": true,
         "outreach": "in_app",
         "preferClassic": false

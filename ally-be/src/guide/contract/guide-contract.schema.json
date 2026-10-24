@@ -1551,6 +1551,7 @@
         "guidance",
         "voiceEnabled",
         "sideQuests",
+        "challenge",
         "memoryEnabled",
         "outreach",
         "preferClassic"
@@ -1565,6 +1566,11 @@
         },
         "sideQuests": {
           "type": "boolean"
+        },
+        "challenge": {
+          "description": "More challenge: \"more\" makes every side quest stretch, whatever the pacing.",
+          "type": "string",
+          "enum": ["normal", "more"]
         },
         "memoryEnabled": {
           "type": "boolean"
@@ -1592,6 +1598,11 @@
         },
         "sideQuests": {
           "type": "boolean"
+        },
+        "challenge": {
+          "description": "More challenge: \"more\" makes every side quest stretch, whatever the pacing.",
+          "type": "string",
+          "enum": ["normal", "more"]
         },
         "memoryEnabled": {
           "type": "boolean"
@@ -1658,7 +1669,7 @@
       }
     },
     "GuideMicroActivity": {
-      "description": "A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered.",
+      "description": "A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered. Once the card is done, bootstrap also carries `card.payload.result` (a GuideMicroActivityResult) and `card.payload.response` (the learner's own GuideMicroActivityRequest).",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind"],
