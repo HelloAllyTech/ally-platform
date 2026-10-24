@@ -1,5 +1,11 @@
 import "@testing-library/jest-dom";
 import { beforeAll, expect, vi } from "vitest";
+import { configure } from "@testing-library/react";
+
+// findBy*/waitFor default to 1s, which a loaded CI runner overruns on the heavier pages
+// (guided-course finale, ask-about-this) and fails a release after its tag is burned.
+// A passing assertion still returns immediately; only a real failure waits this long.
+configure({ asyncUtilTimeout: 5000 });
 
 // Mock posthog-js globally — no network calls in tests, all methods are spies
 vi.mock("posthog-js", () => ({

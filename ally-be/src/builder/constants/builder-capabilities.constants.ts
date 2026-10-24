@@ -341,11 +341,17 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     reuseWhen:
       'A request wants a learner-facing AI guide, coach or tutor inside a course, a conversational ' +
       'course experience, or a new long-running agent that needs releases, rollback, turn traces ' +
-      'or an event stream with replay. Build the agent on the harness rather than a new loop.',
+      'or an event stream with replay. Build the agent on the harness rather than a new loop. ' +
+      'For improving the guide over time (nightly evaluator, review queue, curator, shadow replay, ' +
+      'canary decision, synthetic monitoring), extend src/guide-learning instead of a new pipeline.',
     extendVia:
       'A new agent: an agentKey, its stages and a release bundle on the harness. Ally itself: ' +
       'release bundle policy keys and capabilities.',
-    modules: ['ally-be:src/guide', 'ally-be:src/llm-agent/harness'],
+    modules: [
+      'ally-be:src/guide',
+      'ally-be:src/guide-learning',
+      'ally-be:src/llm-agent/harness',
+    ],
     keywords: [
       'ally',
       'guide',
