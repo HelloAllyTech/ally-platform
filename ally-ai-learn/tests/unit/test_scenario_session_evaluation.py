@@ -11,6 +11,39 @@ from app.core.scenario_session_evaluation.service import run_actor_evaluation
 
 
 @pytest.mark.asyncio
+@patch("app.core.scenario_session_evaluation.service.traceback.format_exc")
+@patch("app.core.scenario_session_evaluation.service.logger")
+@patch(
+    "app.core.scenario_session_evaluation.service._send_webhook", new_callable=AsyncMock
+)
+@patch("app.core.scenario_session_evaluation.service.evaluate_actor_goals")
+async def test_run_actor_evaluation_handles_generic_exception(
+    mock_evaluate_actor_goals, mock_send_webhook, mock_logger, mock_traceback
+):
+    mock_evaluate_actor_goals.side_effect = Exception("Something went wrong")
+    mock_traceback.return_value = "Traceback"
+
+    request = ActorEvaluationRequest(
+        scenario_session_id="test_session_id",
+        transcript=[ActorEvaluationTurn(role="user", content="Hello")],
+        goals=[ActorEvaluationGoal(id="1", title="Test Goal", category="Test")],
+    )
+
+    await run_actor_evaluation(request)
+
+    mock_send_webhook.assert_called_once()
+    args, _ = mock_send_webhook.call_args
+    payload = args[1]
+    assert payload.status == "FAILED"
+    assert "Traceback" in payload.error_message
+
+    mock_logger.warning.assert_called_once_with(
+        "Actor evaluation failed for session=%s", "test_session_id", exc_info=True
+    )
+    mock_logger.exception.assert_not_called()
+
+
+@pytest.mark.asyncio
 @patch(
     "app.core.scenario_session_evaluation.service._send_webhook", new_callable=AsyncMock
 )
