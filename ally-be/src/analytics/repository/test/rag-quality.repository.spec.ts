@@ -74,7 +74,11 @@ describe('RagQualityRepository', () => {
       await repository.selectRetrievals({ sinceDays: 30 });
       const [sql, params] = query.mock.calls[0];
       expect(sql).toContain('r.corpus = ANY(');
-      expect(params).toContainEqual(['whatsapp_qa', 'character_library']);
+      expect(params).toContainEqual([
+        'whatsapp_qa',
+        'character_library',
+        'ally_guide_library',
+      ]);
     });
 
     it('scopes "already judged" to one model and rubric version', async () => {
@@ -91,7 +95,7 @@ describe('RagQualityRepository', () => {
       expect(sql).toContain('judge_prompt_version');
       // $1 is the judgeable-corpus list; the pinned pair follows it.
       expect(params).toEqual([
-        ['whatsapp_qa', 'character_library'],
+        ['whatsapp_qa', 'character_library', 'ally_guide_library'],
         'gemini-2.5-pro',
         'v1',
       ]);
@@ -102,7 +106,7 @@ describe('RagQualityRepository', () => {
       const [sql, params] = query.mock.calls[0];
       expect(sql).toContain('r.consumer = $2');
       expect(params).toEqual([
-        ['whatsapp_qa', 'character_library'],
+        ['whatsapp_qa', 'character_library', 'ally_guide_library'],
         'interview_agent',
       ]);
     });

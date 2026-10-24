@@ -14,6 +14,9 @@ import { GuideLearnerDataService } from './learner/guide-learner-data.service';
 import { GuideConductorService } from './conductor/guide-conductor.service';
 import { GuideAdminService } from './admin/guide-admin.service';
 import { GuideAdminController } from './controller/guide-admin.controller';
+import { GuideLibraryAdminController } from './controller/guide-library-admin.controller';
+import { GuideLibraryService } from './knowledge/guide-library.service';
+import { KnowledgeBaseModule } from 'src/knowledge-base/knowledge-base.module';
 import { GuideLearnerController } from './controller/guide-learner.controller';
 import { GuidePublicController } from './controller/guide-public.controller';
 import { GuideVoiceController } from './controller/guide-voice.controller';
@@ -94,14 +97,19 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
     LiveKitModule,
     AwsModule,
     NotificationModule,
+    // Ally's library (GuideLibraryService, GuideLibraryAdminController). The KB module
+    // imports only aws/ai, so this adds no cycle.
+    KnowledgeBaseModule,
   ],
   controllers: [
     GuideLearnerController,
     GuidePublicController,
     GuideAdminController,
+    GuideLibraryAdminController,
     GuideVoiceController,
   ],
   providers: [
+    GuideLibraryService,
     GuideAssessorService,
     GuideCoachService,
     GuideSideQuestService,

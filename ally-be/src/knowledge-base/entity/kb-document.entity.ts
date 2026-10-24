@@ -36,8 +36,13 @@ import {
  * so the warning is answered structurally instead: ally-ai's retrieval takes a REQUIRED
  * audience argument, and this platform refuses to answer a WhatsApp contact whose
  * organisation it could not resolve rather than falling back to something plausible.
+ *
+ * The Ally guide's library adds OWNERSHIP beside audience — `ownerTenantId`, see there —
+ * because its organisation documents are an organisation's own, managed by that
+ * organisation, rather than central material shared out.
  */
 @Entity('kb_documents')
+@Index('idx_kb_documents_corpus_owner', ['corpus', 'ownerTenantId'])
 export class KbDocument extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -135,6 +140,24 @@ export class KbDocument extends BaseWithoutTenantEntity {
   @Index('idx_kb_documents_is_global')
   @Column({ type: 'boolean', name: 'is_global', default: false })
   isGlobal!: boolean;
+
+  /**
+   * The organisation this document BELONGS to, for corpora whose documents have an owner
+   * (KB_OWNED_CORPORA — the Ally guide's library). Null means the platform's own.
+   *
+   * Ownership, not audience, and the two are kept apart on purpose. Audience is who may
+   * RETRIEVE a document (`isGlobal` + `kb_document_tenants`) and is what every search filters
+   * on; ownership is who may MANAGE it, and is what the organisation-scoped admin routes
+   * filter on — an organisation lists, adds and removes its own documents and can never reach
+   * another's or the platform's. For an owned corpus the audience is derived from this column
+   * at creation (null → global; an organisation → that organisation only) and cannot be
+   * retargeted afterwards, so the two never disagree.
+   *
+   * Always null on the other corpora, whose documents are curated centrally and targeted by
+   * hand. A uuid, like `kb_document_tenants.tenant_id`, so the two compare without a cast.
+   */
+  @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
+  ownerTenantId?: string | null;
 
   @Index('idx_kb_documents_status')
   @Column({

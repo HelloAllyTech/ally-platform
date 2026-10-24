@@ -62,6 +62,16 @@ export const KB_CHUNK_OVERLAP_TOKENS = 60;
  * The larger overlap (120, holding ~15%) follows the target for the same reason it exists at
  * 400: below roughly 10% a thought that straddles a boundary is lost from both neighbours.
  *
+ * `ally_guide_library` — 600, between the two, because its material is two kinds of thing. The
+ * helper-craft half reads like the WhatsApp corpus (one idea, its qualification), and Ally's
+ * reply is a chat turn of about that size. The organisation half is protocols and handbooks,
+ * whose unit of use is a PROCEDURE: who to call, in what order, what to write down. Those run
+ * 300–700 tokens, and a 400-token cut lands inside one — retrieving steps 1–4 of a six-step
+ * escalation protocol without 5 and 6 is worse than retrieving nothing, because it reads as
+ * complete. Stacks, "Document chunking requires semantic and contextual consideration": chunks
+ * should be semantically complete sections. Five 600-token passages is ~3000 tokens of tool
+ * result per search, which Ally's context can carry. Overlap 90 holds the ~15%.
+ *
  * Sizing is fixed at INGEST, so changing a profile only affects documents chunked afterwards.
  * Re-chunking an existing one is the `chunkVersion` path — it writes new chunk rows and deletes
  * the old generation's vectors, so a profile change is applied by re-indexing, never in place.
@@ -85,6 +95,12 @@ export const KB_CHUNK_PROFILES: Record<KbCorpus, KbChunkProfile> = {
     minTokens: 640,
     maxTokens: 1040,
     overlapTokens: 120,
+  },
+  [KbCorpus.ALLY_GUIDE_LIBRARY]: {
+    targetTokens: 600,
+    minTokens: 480,
+    maxTokens: 780,
+    overlapTokens: 90,
   },
 };
 
@@ -143,6 +159,11 @@ export const KB_URL_MAX_BYTES = 10 * 1024 * 1024;
  * That is what makes this agentic RAG rather than a threshold pretending to be one, and it is
  * why the floor is now permissive and the agent is told to weigh what comes back.
  *
+ * The Ally guide's library is 0.35 for the interview agent's reason exactly: Ally reads what
+ * comes back and is told to say the library has nothing rather than stretch a weak passage, so
+ * precision belongs to its judgement and recall to this layer. Its retrievals are logged under
+ * their own consumer (`ally_guide`), so its curve can be read apart from the others'.
+ *
  * Still not a tuned value — `kb_retrievals` + `kb_retrieval_passages` exist to replace it with
  * a precision/recall curve over real traffic. `KbSearchDto.minSimilarity` overrides it per
  * request and the retrieval preview now exposes it, so "nothing matched" can be distinguished
@@ -151,7 +172,26 @@ export const KB_URL_MAX_BYTES = 10 * 1024 * 1024;
 export const KB_MIN_SIMILARITY_DEFAULT: Record<KbCorpus, number> = {
   [KbCorpus.WHATSAPP_QA]: 0.35,
   [KbCorpus.CHARACTER_LIBRARY]: 0.35,
+  [KbCorpus.ALLY_GUIDE_LIBRARY]: 0.35,
 };
+
+/**
+ * Corpora whose documents BELONG to someone: the platform (`owner_tenant_id` null) or one
+ * organisation. For these, three rules replace the hand-targeting the other corpora use:
+ *
+ *  - The audience FOLLOWS THE OWNER and is never set directly. A platform document is global;
+ *    an organisation's reaches that organisation only. `setAudience` refuses these, because
+ *    retargeting an organisation's own protocol at a second organisation is exactly the leak
+ *    this corpus must not have, and no screen would show it happened.
+ *  - They are written only through the owner-scoped methods (`createOwned`, `archiveOwned`),
+ *    which is where the owner is checked. The generic console's create refuses them.
+ *  - They are searched only for a stated audience. `search()` — whose omitted tenant means
+ *    "every organisation" — answers for them only to the permission-gated admin preview, by
+ *    name; everything else goes through `searchForAudience`.
+ */
+export const KB_OWNED_CORPORA: ReadonlySet<KbCorpus> = new Set([
+  KbCorpus.ALLY_GUIDE_LIBRARY,
+]);
 
 /**
  * Max passages one document may contribute to a single retrieval.
