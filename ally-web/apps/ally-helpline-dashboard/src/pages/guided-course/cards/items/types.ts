@@ -29,4 +29,6 @@ export interface ItemAdapterProps<P extends StartTrackItemResponse = StartTrackI
   onBeforeLaunch: () => void;
   /** Stashed with the return-to-track context so the learner comes back to Ally. */
   returnContext: Partial<ActiveTrackContext>;
+  /** Video only: the playhead, for "Ask about this moment" (plan §5.8). */
+  onPosition?: (seconds: number) => void;
 }

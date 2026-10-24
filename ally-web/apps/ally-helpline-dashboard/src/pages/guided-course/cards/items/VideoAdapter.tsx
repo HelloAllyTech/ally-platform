@@ -13,6 +13,7 @@ const VideoAdapter: FC<ItemAdapterProps<StartVideoItemPayload>> = ({
   trackId,
   alreadyCompleted,
   onCompleted,
+  onPosition,
 }) => (
   <VideoItemPlayer
     payload={payload}
@@ -20,6 +21,7 @@ const VideoAdapter: FC<ItemAdapterProps<StartVideoItemPayload>> = ({
     trackId={trackId}
     alreadyCompleted={alreadyCompleted}
     onCompleted={onCompleted}
+    onPosition={onPosition}
   />
 );
 

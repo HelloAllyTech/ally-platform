@@ -22,6 +22,12 @@ interface VideoItemPlayerProps {
    * detail); the guided journey uses it to claim the card.
    */
   onCompleted?: (result: TrackItemCompletionResult) => void;
+  /**
+   * The playhead, in seconds, whenever the player reports it. Optional: the
+   * guided journey uses it to offer "Ask about this moment" on pause;
+   * classic doesn't pass it.
+   */
+  onPosition?: (seconds: number) => void;
 }
 
 /** Minimal shape of the YouTube IFrame API we touch. */
@@ -108,8 +114,11 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
   trackId,
   alreadyCompleted,
   onCompleted,
+  onPosition,
 }) => {
   const { t } = useTranslation();
+  const onPositionRef = useRef(onPosition);
+  onPositionRef.current = onPosition;
   const [reportVideoProgress] = useReportVideoProgressMutation();
   const [completed, setCompleted] = useState(alreadyCompleted);
   const onCompletedRef = useRef(onCompleted);
@@ -157,6 +166,15 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
   }, [recordPct, flush]);
 
   const handlePlaybackError = useCallback(() => setPlaybackError(true), []);
+
+  // YouTube and Vimeo report the playhead through `onTime`; pass it on too.
+  const trackTime = useCallback(
+    (seconds: number) => {
+      recordTime(seconds);
+      onPositionRef.current?.(seconds);
+    },
+    [recordTime],
+  );
 
   // The S3 path renders the shared <video>-backed ProgressVideoPlayer, which
   // exposes no onError prop. A native media element's "error" event doesn't
@@ -274,6 +292,7 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
               onProgress={p => {
                 recordPct(p.watchedPct);
                 checkInterjections(p.position);
+                onPositionRef.current?.(p.position);
               }}
               onPauseOrEnd={() => flush()}
             />
@@ -297,7 +316,7 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
     return (
       <YouTubeVideo
         url={payload.url}
-        onTime={recordTime}
+        onTime={trackTime}
         onDuration={setDuration}
         onError={handlePlaybackError}
         controls={renderTrackedControls()}
@@ -310,7 +329,7 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
     return (
       <VimeoVideo
         url={payload.url}
-        onTime={recordTime}
+        onTime={trackTime}
         onDuration={setDuration}
         onError={handlePlaybackError}
         controls={renderTrackedControls()}

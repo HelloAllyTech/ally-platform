@@ -207,11 +207,27 @@ export const JourneySpine: FC<{
                       key={node.id}
                       type="button"
                       onClick={() => onSelect(node)}
-                      aria-label={`${node.title} · ${t(STATE_KEY[node.state])}`}
+                      aria-label={[
+                        node.title,
+                        t(STATE_KEY[node.state]),
+                        node.practicePips > 0
+                          ? t("guide.scene.practices", { count: node.practicePips })
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                       aria-current={node.state === "current" ? "step" : undefined}
-                      className="flex h-7 w-7 items-center justify-center rounded-full"
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full"
                     >
                       <NodeDot node={node} bloom={bloomItemId === node.id} />
+                      {/* Optional practice done beside this item: a small mark under it. */}
+                      {node.practicePips > 0 && (
+                        <span
+                          aria-hidden="true"
+                          data-testid="practice-mark"
+                          className="absolute -bottom-0.5 h-1.5 w-1.5 rounded-full bg-[var(--g-ally-label)]"
+                        />
+                      )}
                     </button>
                   ))}
                   <span aria-hidden="true" className="h-3 w-px bg-[var(--g-line)]" />

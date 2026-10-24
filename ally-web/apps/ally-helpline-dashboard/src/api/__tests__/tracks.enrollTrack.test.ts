@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `baseAPI` reads VITE_API_BASE_URL once, at module load (see tracks.articleQuestion.test.ts).
 vi.hoisted(() => {
-  import.meta.env.VITE_API_BASE_URL ||= "http://test.local";
+  (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL ||= "http://test.local";
 });
 
 import { baseAPI } from "../baseAPI";

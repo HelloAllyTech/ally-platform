@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GuideCard } from "../../contract/wire";
 
 import type { JourneySpineSection } from "../../contract/bootstrap";
-import { buildSpineModel, chapterHasWarnings, findNode } from "../spineModel";
+import { buildSpineModel, chapterHasWarnings, findNode, practiceItemIds } from "../spineModel";
 
 const item = (id: string, state: "locked" | "available" | "done", extra = {}) => ({
   id,
@@ -97,5 +97,37 @@ describe("buildSpineModel", () => {
       percent: 0,
       currentItemId: null,
     });
+  });
+
+  it("places a side quest without a trackItem under the course card shown before it", () => {
+    const card = (cardId: string, extra: Partial<GuideCard>): GuideCard => ({
+      cardId,
+      kind: "course_item",
+      presentation: "shelf",
+      state: "ready",
+      title: cardId,
+      ...extra,
+    });
+    const cards: Record<string, GuideCard> = {
+      early: card("early", { kind: "micro_activity", state: "done" }),
+      ca: card("ca", { trackItem: { id: "a", type: "ARTICLE", title: "a" } }),
+      sq1: card("sq1", { kind: "micro_activity", state: "done" }),
+      cb: card("cb", { trackItem: { id: "b", type: "ARTICLE", title: "b" } }),
+      sq2: card("sq2", { kind: "micro_activity", state: "ready" }),
+      named: card("named", {
+        kind: "micro_activity",
+        state: "done",
+        trackItem: { id: "a", type: "ARTICLE", title: "a" },
+      }),
+    };
+    const order = ["early", "ca", "sq1", "cb", "sq2", "named"].map(id => ({ kind: "card", id }));
+    const placed = practiceItemIds(order, cards, "b");
+    // Before any course card: the current item. A named one keeps its own.
+    expect(placed).toEqual({ early: "b", sq1: "a", sq2: "b" });
+
+    const model = buildSpineModel({ sections, cards, practiceItems: placed });
+    // Done ones only: "sq1" and "named" under a, "early" under b; "sq2" isn't done.
+    expect(findNode(model, "a")?.practicePips).toBe(2);
+    expect(findNode(model, "b")?.practicePips).toBe(1);
   });
 });

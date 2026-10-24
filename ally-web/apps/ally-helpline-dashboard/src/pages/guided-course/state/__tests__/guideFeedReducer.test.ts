@@ -139,6 +139,7 @@ const bootstrap = (overrides: Partial<JourneyBootstrap> = {}): JourneyBootstrap 
   nextStep: null,
   crisis: null,
   allowance: null,
+  scenes: [],
   complete: true,
   ...overrides,
 });
@@ -462,5 +463,74 @@ describe("guideFeedReducer", () => {
       );
       expect(state.allowance).toEqual({ remaining: 2, limit: 5 });
     });
+  });
+
+  it("regroups the feed by chapter scene on reload: title cards, receipts, and who belongs where", () => {
+    const state = guideFeedReducer(initialFeedState, {
+      type: "hydrate",
+      bootstrap: bootstrap({
+        thread: { id: "t1", mode: "NORMAL", atmosphere: "bright", lastEventSeq: 9 },
+        scenes: [
+          {
+            sceneId: "sc1",
+            sectionId: "s1",
+            title: "Opening",
+            stakes: "Meera calls.",
+            openedSeq: 1,
+            closedSeq: 5,
+            receipt: { behaviourLabels: ["Stayed with silence"], sideQuests: 1 },
+          },
+          {
+            sceneId: "sc2",
+            sectionId: "s2",
+            title: "Listening",
+            stakes: null,
+            openedSeq: 6,
+            closedSeq: null,
+          },
+        ],
+        messages: [
+          { id: "m1", seq: 2, role: "ally", kind: "chat", text: "Hi", turnId: "u1", createdAt: "" },
+          {
+            id: "m2",
+            seq: 7,
+            role: "ally",
+            kind: "chat",
+            text: "Next",
+            turnId: "u2",
+            createdAt: "",
+          },
+        ],
+        cards: [
+          {
+            seq: 3,
+            cardId: "c1",
+            kind: "course_item",
+            presentation: "shelf",
+            state: "done",
+            title: "Opening a call",
+          },
+        ],
+      }),
+    });
+    expect(state.entries.map(e => `${e.kind}:${e.id}`)).toEqual([
+      "scene:scene:sc1",
+      "message:m1",
+      "card:c1",
+      "receipt:receipt:sc1",
+      "scene:scene:sc2",
+      "message:m2",
+    ]);
+    expect(state.entries.map(e => ("sceneId" in e ? e.sceneId : null))).toEqual([
+      "sc1",
+      "sc1",
+      "sc1",
+      "sc1",
+      "sc2",
+      "sc2",
+    ]);
+    expect(state.scenes.sc1).toMatchObject({ closed: true, receipt: { sideQuests: 1 } });
+    expect(state.scenes.sc2).toMatchObject({ closed: false, receipt: null });
+    expect(state.currentSceneId).toBe("sc2");
   });
 });

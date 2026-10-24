@@ -13,10 +13,16 @@ import { GUIDE_VISITOR_HEADER } from "../pages/guided-course/visitor/visitorToke
 
 import type { JourneyThread } from "../pages/guided-course/contract/bootstrap";
 import type {
+  GuideAdviceLineRequest,
+  GuideAdviceLines,
+  GuideAdviceLineView,
   GuideAvailability,
   GuideBootstrap,
   GuideCardEventRequest,
   GuideCardState,
+  GuideMicroActivityRequest,
+  GuideMemoryView,
+  GuideMicroActivityResult,
   GuideNextStep,
   GuidePrefs,
   GuidePrefsUpdate,
@@ -67,9 +73,39 @@ export interface GuideAppointmentRequest {
   at: string;
   /** IANA zone, so the reminder fires at local wall-clock time (plan §11 E-8). */
   timezone: string;
+  /** `session` (the closing ritual, the default) or `spaced_recall` (the finale's look back). */
+  purpose?: "session" | "spaced_recall";
 }
 
-const guideAPI = baseAPI.injectEndpoints({
+/** Thumbs on one of Ally's messages: one per learner per message, sending again replaces it. */
+export interface GuideMessageFeedbackRequest {
+  rating: 1 | -1;
+  comment?: string;
+}
+
+/** One entry in the learner's notebook (`GET /v1/guide/notebook`). */
+export interface GuideNotebookEntry {
+  id: string;
+  trackId: string | null;
+  /** first_move, possible_self, journal_line, rehearsed_line, reflection, noticing. */
+  kind: string;
+  text: string;
+  createdAt: string | null;
+}
+
+/** One thing Ally remembers (`GET /v1/guide/memory`), with the learner's words it came from. */
+export type GuideMemoryItem = GuideMemoryView;
+
+/**
+ * The prefs as the server returns them. `challenge` is read only when the
+ * server sends it (it is stored, but not yet part of the prefs contract), so
+ * the control can't promise something that isn't saved.
+ */
+export type GuidePrefsView = GuidePrefs & { challenge?: "normal" | "more" };
+
+const GUIDE_TAGS = ["GuideNotebook", "GuideMemory", "GuidePrefs", "GuideAdvice"] as const;
+
+const guideAPI = baseAPI.enhanceEndpoints({ addTagTypes: GUIDE_TAGS }).injectEndpoints({
   endpoints: builder => ({
     getGuideAvailability: builder.query<GuideAvailability, { trackId: string }>({
       query: ({ trackId }) => ({
@@ -171,10 +207,115 @@ const guideAPI = baseAPI.injectEndpoints({
       }),
     }),
 
-    putGuidePrefs: builder.mutation<GuidePrefs, GuidePrefsUpdate>({
+    getGuidePrefs: builder.query<GuidePrefsView, void>({
+      query: () => ({ url: ApiEndpoints.GUIDE.PREFS, method: HttpMethod.GET }),
+      providesTags: ["GuidePrefs"],
+    }),
+
+    putGuidePrefs: builder.mutation<
+      GuidePrefsView,
+      GuidePrefsUpdate & { challenge?: "normal" | "more" }
+    >({
       query: body => ({
         url: ApiEndpoints.GUIDE.PREFS,
         method: HttpMethod.PUT,
+        body,
+      }),
+      // The answer is the whole set: the Preferences panel shows it at once.
+      async onQueryStarted(_body, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(guideAPI.util.upsertQueryData("getGuidePrefs", undefined, data));
+        } catch {
+          // The panel keeps showing what the server last said.
+        }
+      },
+    }),
+
+    /** A side quest's answer. Ungraded: never progress, never XP. */
+    answerGuideMicroActivity: builder.mutation<
+      GuideMicroActivityResult,
+      { threadId: string; cardId: string; body: GuideMicroActivityRequest }
+    >({
+      query: ({ threadId, cardId, body }) => ({
+        url: ApiEndpoints.GUIDE.MICRO_ACTIVITY_RESPONSES(threadId, cardId),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    getGuideNotebook: builder.query<GuideNotebookEntry[], { trackId?: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.GUIDE.NOTEBOOK,
+        method: HttpMethod.GET,
+        params: trackId ? { trackId } : undefined,
+      }),
+      providesTags: ["GuideNotebook"],
+    }),
+
+    /** The notebook as Markdown, for a download. */
+    exportGuideNotebook: builder.query<string, { trackId?: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.GUIDE.NOTEBOOK_EXPORT,
+        method: HttpMethod.GET,
+        params: trackId ? { trackId } : undefined,
+        responseHandler: response => response.text(),
+      }),
+      keepUnusedDataFor: 0,
+    }),
+
+    deleteGuideNotebookEntry: builder.mutation<{ removed: number }, { entryId: string }>({
+      query: ({ entryId }) => ({
+        url: ApiEndpoints.GUIDE.NOTEBOOK_ENTRY(entryId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: ["GuideNotebook"],
+    }),
+
+    getGuideMemory: builder.query<GuideMemoryItem[], void>({
+      query: () => ({ url: ApiEndpoints.GUIDE.MEMORY, method: HttpMethod.GET }),
+      providesTags: ["GuideMemory"],
+    }),
+
+    forgetGuideMemory: builder.mutation<{ forgotten: number }, { memoryId: string }>({
+      query: ({ memoryId }) => ({
+        url: ApiEndpoints.GUIDE.MEMORY_ITEM(memoryId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: ["GuideMemory"],
+    }),
+
+    forgetAllGuideMemory: builder.mutation<{ forgotten: number }, void>({
+      query: () => ({ url: ApiEndpoints.GUIDE.MEMORY, method: HttpMethod.DELETE }),
+      invalidatesTags: ["GuideMemory"],
+    }),
+
+    /** Finishers' approved lines (empty until enough have finished) and the learner's own. */
+    getGuideAdvice: builder.query<GuideAdviceLines, { trackId: string }>({
+      query: ({ trackId }) => ({ url: ApiEndpoints.GUIDE.ADVICE(trackId), method: HttpMethod.GET }),
+      providesTags: ["GuideAdvice"],
+    }),
+
+    /** The learner's one line for this course; rewritable while it waits for review. */
+    submitGuideAdvice: builder.mutation<
+      GuideAdviceLineView,
+      { trackId: string; body: GuideAdviceLineRequest }
+    >({
+      query: ({ trackId, body }) => ({
+        url: ApiEndpoints.GUIDE.ADVICE(trackId),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: ["GuideAdvice"],
+    }),
+
+    rateGuideMessage: builder.mutation<
+      { messageId: string; rating: 1 | -1 },
+      { messageId: string; body: GuideMessageFeedbackRequest }
+    >({
+      query: ({ messageId, body }) => ({
+        url: ApiEndpoints.GUIDE.MESSAGE_FEEDBACK(messageId),
+        method: HttpMethod.POST,
         body,
       }),
     }),
@@ -193,4 +334,15 @@ export const {
   usePutGuideAppointmentMutation,
   usePutGuidePrefsMutation,
   useGetGuideAvailabilityQuery,
+  useGetGuidePrefsQuery,
+  useAnswerGuideMicroActivityMutation,
+  useGetGuideNotebookQuery,
+  useLazyExportGuideNotebookQuery,
+  useDeleteGuideNotebookEntryMutation,
+  useGetGuideMemoryQuery,
+  useForgetGuideMemoryMutation,
+  useForgetAllGuideMemoryMutation,
+  useGetGuideAdviceQuery,
+  useSubmitGuideAdviceMutation,
+  useRateGuideMessageMutation,
 } = guideAPI;

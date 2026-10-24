@@ -406,3 +406,34 @@
 .g-scrim {
   background: var(--g-scrim);
 }
+
+/* ------------------------------------------------------------- finale */
+
+/* The reveal (plan §5.10): each part rises in turn; the map fills node by
+   node. A hushed finale shows everything at once, without motion. */
+.g-finale-step {
+  animation: g-rise calc(var(--dur-quick) * 2 * var(--atm-motion)) var(--ease-out) both;
+  animation-delay: calc(var(--step, 0) * 450ms * var(--atm-motion));
+}
+.g-finale-node {
+  background: var(--g-line);
+  transition: background-color 300ms var(--ease-out);
+  transition-delay: calc(var(--node, 0) * 90ms * var(--atm-motion));
+}
+.g-finale[data-swept="true"] .g-finale-node {
+  background: var(--g-xp-line);
+}
+.g-finale[data-hushed="true"] .g-finale-step {
+  animation: none;
+}
+.g-finale[data-hushed="true"] .g-finale-node {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-finale-step {
+    animation: none;
+  }
+  .g-finale-node {
+    transition: none;
+  }
+}

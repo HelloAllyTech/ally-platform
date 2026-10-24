@@ -67,6 +67,8 @@ export const ItemCard: FC<ItemCardProps> = ({
   onClaim,
   onClose,
   onLaunch,
+  onAsk,
+  askEnabled,
 }) => {
   const { t } = useTranslation();
   const primaryRef = useRef<HTMLButtonElement>(null);
@@ -131,6 +133,8 @@ export const ItemCard: FC<ItemCardProps> = ({
               onClaim={onClaim}
               onClose={onClose}
               onLaunch={onLaunch}
+              onAsk={onAsk}
+              askEnabled={askEnabled}
             />
           </div>
         )}
@@ -186,6 +190,8 @@ export const ItemCard: FC<ItemCardProps> = ({
             onClaim={onClaim}
             onClose={onClose}
             onLaunch={onLaunch}
+            onAsk={onAsk}
+            askEnabled={askEnabled}
           />
         </div>
       )}

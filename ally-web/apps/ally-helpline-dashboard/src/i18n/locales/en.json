@@ -3181,7 +3181,15 @@
       "interrupted": "Cut off partway.",
       "queued": "Will send when you're back online.",
       "notSent": "Not sent.",
-      "remembered": "Remembered: {{from}}"
+      "remembered": "Remembered: {{from}}",
+      "aboutMoment": "About {{time}} in the video",
+      "helpful": "Helpful",
+      "notHelpful": "Not helpful",
+      "feedbackThanks": "Thanks.",
+      "feedbackFailed": "That didn't send.",
+      "whyLabel": "What missed?",
+      "whyPlaceholder": "What missed? (optional)",
+      "whySend": "Send"
     },
     "stage": {
       "label": "Conversation with Ally"
@@ -3271,7 +3279,25 @@
       "practices_other": "{{count}} optional practices"
     },
     "notebook": {
-      "saved": "Saved to your notebook"
+      "saved": "Saved to your notebook",
+      "intro": "Your own words and the moments Ally noticed along the way. Nothing here is scored.",
+      "scope": "Show",
+      "scope_course": "This course",
+      "scope_all": "All courses",
+      "export": "Download",
+      "exportFailed": "The download didn't work. Try again.",
+      "removeFailed": "That didn't delete. Try again.",
+      "empty": "Nothing here yet. Your first move, your reflections and the moments Ally notices will collect here.",
+      "deleteQuestion": "Delete this entry?",
+      "kind": {
+        "first_move": "First move",
+        "possible_self": "Who you're becoming",
+        "journal_line": "Journal",
+        "rehearsed_line": "Rehearsed line",
+        "reflection": "Reflection",
+        "noticing": "Ally noticed",
+        "other": "Note"
+      }
     },
     "practice": {
       "label": "Optional practice",
@@ -3279,7 +3305,27 @@
       "skip": "Skip",
       "footer": "Doesn't count toward the course.",
       "skipped": "Skipped",
-      "failed": "That one didn't load. Let's skip it."
+      "failed": "That one didn't load. Let's skip it.",
+      "kind": {
+        "quick_check": "Quick check",
+        "micro_dilemma": "What would you do?",
+        "rehearse_line": "Rehearse a line",
+        "teach_back": "Teach it back",
+        "predict_beat": "Predict what happens",
+        "reflection": "Reflection",
+        "spaced_recall": "Look back"
+      },
+      "noXp": "No XP",
+      "check": "Check my answer",
+      "sendWritten": "Get a note from Ally",
+      "sending": "Sending…",
+      "note": "Ally's note",
+      "yourAnswer": "Your answer",
+      "courseAnswer": "The course's answer",
+      "yoursAndCourse": "Your answer · the course's answer",
+      "notSent": "That didn't send. Try again.",
+      "placeholder": "Write your answer…",
+      "doneReceipt": "Practice done"
     },
     "courseInfo": {
       "label": "About this course",
@@ -3327,7 +3373,28 @@
     "finale": {
       "title": "Where you started, where you are",
       "before": "Before",
-      "now": "Now"
+      "now": "Now",
+      "label": "You finished the course",
+      "framing": "Where you started, what Ally noticed, and three ways to keep going.",
+      "open": "Open",
+      "map": "The course map, complete",
+      "mapLine_one": "{{count}} step, all done",
+      "mapLine_other": "{{count}} steps, all done",
+      "possibleSelf": "Who you said you want to become",
+      "stillFits": "It still fits",
+      "changed": "It's changed",
+      "noticed": "What Ally noticed",
+      "doors": "Three ways to keep going",
+      "atTheStart": "At the very start",
+      "allyAsked": "Ally asked: {{question}}",
+      "nowPlaceholder": "How would you answer now?",
+      "sendNow": "Send to Ally",
+      "sent": "Sent to Ally.",
+      "fieldTake": "I'll try it",
+      "fieldReply": "I'll try it on my next shift.",
+      "fieldTaken": "Noted. Come back and tell Ally how it went.",
+      "remindOn": "Remind me {{when}}",
+      "anotherDay": "Another day"
     },
     "spine": {
       "label": "Course map",
@@ -3398,6 +3465,75 @@
       "items_one": "{{count}} item",
       "items_other": "{{count}} items",
       "outcomes": "What you'll be able to do"
+    },
+    "shelf": {
+      "menu": "Your notebook and settings",
+      "notebook": "Notebook",
+      "memory": "What Ally remembers",
+      "preferences": "Preferences",
+      "loading": "Loading…",
+      "loadFailed": "That didn't load. Try again.",
+      "keep": "Keep",
+      "delete": "Delete"
+    },
+    "memory": {
+      "intro": "What Ally remembers about you between conversations and courses. You can forget any of it.",
+      "switch": "Let Ally remember things",
+      "onHint": "Ally uses these to pick up where you left off.",
+      "offHint": "Ally won't use what's here or remember anything new. What's here stays until you forget it.",
+      "empty": "Ally doesn't remember anything about you yet.",
+      "forget": "Forget",
+      "forgetQuestion": "Forget this?",
+      "forgetAll": "Forget everything",
+      "forgetAllQuestion": "Forget everything Ally remembers?",
+      "forgetAllConfirm": "Forget everything",
+      "until": "Kept until {{date}}",
+      "failed": "That didn't work. Try again.",
+      "kind": {
+        "preference": "Preference",
+        "goal": "Goal",
+        "possible_self": "Who you're becoming",
+        "strength": "Strength",
+        "struggle": "Something hard",
+        "context": "About you",
+        "commitment": "Commitment",
+        "unique_outcome": "A moment that stood out",
+        "other": "Note"
+      },
+      "why": "Why Ally remembers this",
+      "youSaid": "You said this on {{date}}"
+    },
+    "prefs": {
+      "sideQuests": "Optional practice",
+      "sideQuestsHint": "Short practice now and then. It never counts toward the course or earns XP.",
+      "challenge": "More challenge",
+      "challengeHint": "Harder optional practice. Course quizzes never change.",
+      "outreach": "Reminders from Ally",
+      "outreachHint": "For the time you choose to come back, and once if you've been away a while.",
+      "outreach_off": "Off",
+      "outreach_in_app": "In the app",
+      "outreach_in_app_email": "In the app and by email",
+      "failed": "That didn't save. Try again."
+    },
+    "ask": {
+      "article": "Ask Ally",
+      "video": "Ask about this moment · {{time}}",
+      "quiz": "Where is this covered?",
+      "articleTurn": "Can you help me with this part?",
+      "videoTurn": "Can you help me with this moment?",
+      "quizTurn": "Where is this covered in the course?"
+    },
+    "advice": {
+      "placeholder": "One line for someone just starting…",
+      "send": "Leave it",
+      "update": "Update it",
+      "count": "{{count}}/{{max}}",
+      "review": "Each line is reviewed before it's shared, without your name.",
+      "pending": "Waiting for review. You can still change it.",
+      "approved": "Shared with people who start this course after you.",
+      "rejected": "This one wasn't shared.",
+      "failed": "That didn't save. Try again.",
+      "fromOthers": "From people who finished before you"
     }
   }
 }
