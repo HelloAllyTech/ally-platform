@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -26,6 +27,9 @@ import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release
 import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.service';
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
 import { GuideAdminService } from '../admin/guide-admin.service';
+import { GuideConfigAdminService } from '../config/guide-config-admin.service';
+import { GuideConfigResolverService } from '../config/guide-config-resolver.service';
+import { AgentConfigLayer } from 'src/llm-agent/harness/enum/harness.enum';
 import { GuideBaselineService } from '../measure/guide-baseline.service';
 import { GuidePlaygroundService } from '../admin/guide-playground.service';
 import { GuideAlertService } from '../measure/guide-alert.service';
@@ -36,6 +40,7 @@ import { GuideAdviceStatus } from '../entity/guide-advice-line.entity';
 import {
   GuideAdviceModerationDto,
   GuideBaselineCaptureDto,
+  GuideConfigOverrideDto,
   GuideCanaryStartDto,
   GuidePlaygroundRunDto,
   GuideCrisisResponseDto,
@@ -71,6 +76,8 @@ export class GuideAdminController {
     private readonly alerts: GuideAlertService,
     private readonly outreach: GuideOutreachService,
     private readonly peer: GuidePeerService,
+    private readonly configResolver: GuideConfigResolverService,
+    private readonly configAdmin: GuideConfigAdminService,
   ) {}
 
   @Get('overview')
@@ -505,4 +512,128 @@ export class GuideAdminController {
       createdAt: t.createdAt,
     }));
   }
+
+  // ── Configuration plane (plan §7.5) ───────────────────────────────────
+
+  @Get('threads/:threadId/config')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      'Effective config: every policy value this thread runs under, with the layer it came from',
+    description:
+      'Resolved release → org → course → learner → runtime. `pending` shows a value saved since ' +
+      'the epoch began, which the thread picks up at its next epoch. No learner text.',
+  })
+  explainConfig(@Param('threadId', ParseUUIDPipe) threadId: string) {
+    return this.configResolver.explain(threadId);
+  }
+
+  @Get('config/schema')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      'Every policy key: type, limits, unit, description, who may override it, and the live release value',
+  })
+  configSchema() {
+    return this.configAdmin.schema();
+  }
+
+  @Get('config/overrides')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary: 'Every organisation and course that overrides Ally config',
+  })
+  listConfigOverrides(@Query('layer') layer?: string) {
+    return this.configAdmin.listOverrides(parseLayer(layer));
+  }
+
+  @Get('config/audit')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'Config override changes, newest first' })
+  configAudit(
+    @Query('layer') layer?: string,
+    @Query('scopeId') scopeId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.configAdmin.auditLog({
+      layer: parseLayer(layer),
+      scopeId: scopeId || undefined,
+      limit: Number(limit) || undefined,
+    });
+  }
+
+  @Get('config/org')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE_ORG, VIEW)
+  @OrgScopedRoute()
+  @ApiOperation({
+    summary:
+      "An organisation's Ally config: the settings it may change, its overrides and recent changes",
+  })
+  orgConfig(@Query('tenantId') tenantId: string) {
+    return this.configAdmin.layerView(
+      AgentConfigLayer.ORG,
+      requireScope(tenantId, 'tenantId'),
+    );
+  }
+
+  @Put('config/org')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE_ORG, EDIT)
+  @OrgScopedRoute()
+  @ApiOperation({
+    summary:
+      "Change an organisation's Ally config (audited; each conversation picks it up at its next epoch)",
+  })
+  saveOrgConfig(
+    @Query('tenantId') tenantId: string,
+    @Body() dto: GuideConfigOverrideDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.configAdmin.save({
+      layer: AgentConfigLayer.ORG,
+      scopeId: requireScope(tenantId, 'tenantId'),
+      change: { set: dto.set, clear: dto.clear },
+      expectedVersion: dto.expectedVersion,
+      userId: user.id,
+    });
+  }
+
+  @Get('config/course/:trackId')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary:
+      "A course's Ally config: the settings it may change, its overrides and recent changes",
+  })
+  courseConfig(@Param('trackId', ParseUUIDPipe) trackId: string) {
+    return this.configAdmin.layerView(AgentConfigLayer.COURSE, trackId);
+  }
+
+  @Put('config/course/:trackId')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      "Change a course's Ally config (audited; each conversation picks it up at its next epoch)",
+  })
+  saveCourseConfig(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Body() dto: GuideConfigOverrideDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.configAdmin.save({
+      layer: AgentConfigLayer.COURSE,
+      scopeId: trackId,
+      change: { set: dto.set, clear: dto.clear },
+      expectedVersion: dto.expectedVersion,
+      userId: user.id,
+    });
+  }
 }
+
+const parseLayer = (value?: string): AgentConfigLayer | undefined =>
+  value === AgentConfigLayer.ORG || value === AgentConfigLayer.COURSE
+    ? value
+    : undefined;
+
+const requireScope = (value: string | undefined, name: string): string => {
+  if (!value?.trim()) throw new BadRequestException(`${name} is required`);
+  return value.trim();
+};

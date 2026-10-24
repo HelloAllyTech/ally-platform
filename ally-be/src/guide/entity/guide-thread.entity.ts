@@ -60,6 +60,21 @@ export interface GuideEpochSnapshot {
   startSeq?: number;
   /** The latest emergency rollback when the epoch began (audit id). */
   emergencyRollbackId?: string | null;
+  /**
+   * The org and course config overrides frozen when the epoch began (plan
+   * §7.5): an admin's change reaches the thread at its next epoch. Absent on
+   * epochs that began before the config plane existed (= release defaults).
+   */
+  config?: GuideEpochConfig | null;
+}
+
+/** The org and course overrides as they stood when an epoch began. */
+export interface GuideEpochConfig {
+  /** Dot-path policy key → value, as stored in `agent_config_overrides`. */
+  org: Record<string, number | boolean | string | null>;
+  course: Record<string, number | boolean | string | null>;
+  /** The override rows' versions then; a higher version now means "pending". */
+  versions: { org: number | null; course: number | null };
 }
 
 /**

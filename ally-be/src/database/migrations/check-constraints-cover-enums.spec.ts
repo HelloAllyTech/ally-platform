@@ -314,6 +314,7 @@ describe('CHECK constraints cover their enums', () => {
       Object.values(AgentReleaseAuthorKind),
     ],
     ['CHK_agent_config_overrides_layer', Object.values(AgentConfigLayer)],
+    ['CHK_agent_config_override_audit_layer', Object.values(AgentConfigLayer)],
     ['CHK_agent_turns_status', Object.values(AgentTurnStatus)],
     ['CHK_agent_turns_trigger', Object.values(AgentTurnTrigger)],
     ['CHK_agent_turns_channel', Object.values(AgentChannel)],

@@ -29,6 +29,11 @@ import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.servi
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
 import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
 import { AgentMessage } from 'src/llm-agent/type/agent-llm.type';
+import {
+  PolicyLayer,
+  PolicyValue,
+  nonReleaseValues,
+} from 'src/llm-agent/harness/config/policy-schema';
 import { TraceCarrier } from 'src/observability/tracing';
 import {
   GUIDE_LEARNER_TOOLS,
@@ -124,6 +129,7 @@ import {
   sessionStartMode,
 } from '../safety/sentinel';
 import { GuideSettingsService } from '../settings/guide-settings.service';
+import { GuideConfigResolverService } from '../config/guide-config-resolver.service';
 import {
   GuideVisitorService,
   VisitorRefusal,
@@ -231,7 +237,10 @@ export interface GuideTurnContext extends HarnessTurnContext {
   learnerSeq?: number;
 
   releaseId: string | null;
+  /** The release bundle with its policy resolved for this thread and turn. */
   bundle: GuideReleaseBundle | null;
+  /** Policy keys some layer above the release decided, for the trace. */
+  configSources?: Record<string, { value: PolicyValue; source: PolicyLayer }>;
   tier?: GuideBudgetTier;
   model?: string;
   epoch?: { number: number; snapshot: GuideEpochSnapshot; isNew: boolean };
@@ -362,6 +371,7 @@ export class GuideTurnService {
     private readonly triggers: Repository<GuideTrigger>,
     private readonly learnerData: GuideLearnerDataService,
     private readonly visitors: GuideVisitorService,
+    private readonly configResolver: GuideConfigResolverService,
   ) {}
 
   /**
@@ -935,6 +945,12 @@ export class GuideTurnService {
         tier,
       );
       ctx.history = [];
+      // The org and course overrides as they stand now hold for the whole
+      // epoch: a change an admin saves later reaches it at the next one.
+      const config = await this.configResolver.freezeEpoch({
+        tenantId: visitor ? null : ctx.tenantId || null,
+        trackId: thread.trackId,
+      });
       ctx.epoch = {
         number: thread.epoch + 1,
         isNew: true,
@@ -948,6 +964,7 @@ export class GuideTurnService {
           reason: decision.reason,
           startSeq: ctx.learnerSeq,
           emergencyRollbackId: emergencyId,
+          config,
         },
       };
       const recent = await this.threads.recentRows(
@@ -987,7 +1004,21 @@ export class GuideTurnService {
       }
     }
 
-    const bundle = release.bundle as unknown as GuideReleaseBundle;
+    // The release's policy, resolved through the epoch's org and course
+    // overrides, the learner's own switches and the moment (plan §7.5).
+    // A copy: the release object is cached and shared between turns.
+    const releaseBundle = release.bundle as unknown as GuideReleaseBundle;
+    const resolved = this.configResolver.resolve({
+      bundle: releaseBundle,
+      epochConfig: ctx.epoch.snapshot.config ?? null,
+      prefs: prefsRow?.prefs ?? null,
+      runtime: { mode: ctx.mode, visitor },
+    });
+    const bundle: GuideReleaseBundle = {
+      ...releaseBundle,
+      policy: resolved.policy,
+    };
+    ctx.configSources = nonReleaseValues(resolved.resolved);
     ctx.releaseId = release.id;
     ctx.bundle = bundle;
     ctx.tier = tier;
@@ -1930,6 +1961,7 @@ export class GuideTurnService {
           : null,
         model: ctx.model ?? null,
         tier: ctx.tier ?? null,
+        config: ctx.configSources ?? null,
         modeBefore: ctx.thread?.mode ?? null,
         modeAfter: ctx.mode,
         restarted: ctx.restarted,

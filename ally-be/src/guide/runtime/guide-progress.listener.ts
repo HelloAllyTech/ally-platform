@@ -1,3 +1,4 @@
+import { epochPolicy } from '../config/guide-config';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -260,7 +261,8 @@ export class GuideProgressListener {
           mode,
           releaseWindowOpen: releaseWindowOpen(
             pacing,
-            GUIDE_DEFAULT_POLICY.releaseWindowMaxTurns,
+            epochPolicy(GUIDE_DEFAULT_POLICY, thread.epochSnapshot?.config)
+              .releaseWindowMaxTurns,
           ),
           spine,
         });
@@ -319,7 +321,8 @@ export class GuideProgressListener {
         mode,
         releaseWindowOpen: releaseWindowOpen(
           thread.pacing ?? {},
-          GUIDE_DEFAULT_POLICY.releaseWindowMaxTurns,
+          epochPolicy(GUIDE_DEFAULT_POLICY, thread.epochSnapshot?.config)
+            .releaseWindowMaxTurns,
         ),
         spine,
       });

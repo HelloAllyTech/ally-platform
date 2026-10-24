@@ -5,6 +5,7 @@ import {
   IsIn,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -397,4 +398,35 @@ export class GuideAdviceModerationDto {
   @IsString()
   @MaxLength(200)
   reason?: string;
+}
+
+/**
+ * A change to one organisation's or course's Ally config (plan §7.5).
+ * `set` writes values (null is a value: "off"); `clear` hands keys back to
+ * the layer below. Each key is checked against the policy schema.
+ */
+export class GuideConfigOverrideDto {
+  @ApiPropertyOptional({
+    description: 'Policy key → value, e.g. { "releaseWindowMaxTurns": 8 }',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  set?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  clear?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'The version you loaded; a save over a newer change is refused (409)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedVersion?: number;
 }

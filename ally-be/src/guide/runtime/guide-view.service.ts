@@ -1,3 +1,4 @@
+import { epochPolicy } from '../config/guide-config';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -139,9 +140,12 @@ export class GuideViewService {
         : null,
       this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
     ]);
-    const policy =
+    // The thread's epoch holds the org and course overrides it runs under.
+    const policy = epochPolicy(
       (ga?.bundle as unknown as GuideReleaseBundle | undefined)?.policy ??
-      GUIDE_DEFAULT_POLICY;
+        GUIDE_DEFAULT_POLICY,
+      thread?.epochSnapshot?.config,
+    );
     const spine = course.spine;
     const view: GuideBootstrap = {
       ...empty,
@@ -228,9 +232,12 @@ export class GuideViewService {
       }),
       this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
     ]);
-    const policy =
+    // The thread's epoch holds the org and course overrides it runs under.
+    const policy = epochPolicy(
       (ga?.bundle as unknown as GuideReleaseBundle | undefined)?.policy ??
-      GUIDE_DEFAULT_POLICY;
+        GUIDE_DEFAULT_POLICY,
+      thread?.epochSnapshot?.config,
+    );
     const spine = course.spine;
     const view: GuideBootstrap = {
       ...withAccess,

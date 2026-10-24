@@ -7,6 +7,7 @@ import { TrackItemType } from 'src/track/type/track.type';
 import { buildCourseSpine } from '../../conductor/course-spine';
 import { GuideMode } from '../../enum/guide.enum';
 import { GUIDE_DEFAULT_BUNDLE } from '../../release/guide-release.bundle';
+import { GuideConfigResolverService } from '../../config/guide-config-resolver.service';
 import { CLEAR_VERDICT, SentinelVerdict } from '../../safety/sentinel';
 import { matchFirstPersonRisk } from 'src/common/safety/first-person-risk.matcher';
 import { keywordVerdict } from '../../safety/sentinel';
@@ -82,6 +83,9 @@ function setup(
     thread?: Record<string, any>;
     historyRows?: any[];
     triggers?: any[];
+    orgOverrides?: Record<string, unknown>;
+    courseOverrides?: Record<string, unknown>;
+    prefs?: Record<string, unknown>;
   } = {},
 ) {
   const events: Array<{ type: string; durable: boolean; data: any }> = [];
@@ -241,6 +245,21 @@ function setup(
     count: jest.fn(async () => (options.triggers ?? []).length),
     update: jest.fn(async () => undefined),
   };
+  const configResolver = new GuideConfigResolverService(
+    {
+      forScopes: jest.fn(async () => ({
+        org: options.orgOverrides
+          ? { values: options.orgOverrides, version: 1 }
+          : null,
+        course: options.courseOverrides
+          ? { values: options.courseOverrides, version: 1 }
+          : null,
+      })),
+    } as never,
+    releases as never,
+    repo(null) as never,
+    repo(null) as never,
+  );
   const service = new GuideTurnService(
     threads as never,
     bus as never,
@@ -255,12 +274,13 @@ function setup(
     sentinel as never,
     crisis as never,
     tools as never,
-    repo(null) as never,
+    repo(options.prefs ? { prefs: options.prefs } : null) as never,
     repo(null) as never,
     repo({ id: 1, name: 'Asha Rao' }) as never,
     triggers as never,
     learnerData as never,
     visitors as never,
+    configResolver as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(
@@ -983,5 +1003,78 @@ describe('chunkForStreaming', () => {
     const chunks = chunkForStreaming(text, 12);
     expect(chunks.join('')).toBe(text);
     expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  describe('resolved config (plan §7.5)', () => {
+    it('a new epoch freezes the org and course overrides and the turn runs on them', async () => {
+      const t = setup({
+        orgOverrides: { releaseWindowMaxTurns: 7, 'steer.l3OffSpineTurns': 10 },
+        courseOverrides: { releaseWindowMaxTurns: 9 },
+      });
+      const ctx = await t.run();
+      expect(ctx.epoch?.isNew).toBe(true);
+      expect(ctx.bundle!.policy.releaseWindowMaxTurns).toBe(9);
+      expect(ctx.bundle!.policy.steer.l3OffSpineTurns).toBe(10);
+      // The shared release object is never mutated.
+      expect(GUIDE_DEFAULT_BUNDLE.policy.releaseWindowMaxTurns).toBe(6);
+      const saved = t.threads.saveState.mock.calls[0][1];
+      expect(saved.epochSnapshot.config).toEqual({
+        org: { releaseWindowMaxTurns: 7, 'steer.l3OffSpineTurns': 10 },
+        course: { releaseWindowMaxTurns: 9 },
+        versions: { org: 1, course: 1 },
+      });
+      const summary = (t.traces.write.mock.calls[0] as any)[0].summary;
+      expect(summary.config.releaseWindowMaxTurns).toEqual({
+        value: 9,
+        source: 'course',
+      });
+    });
+
+    it('a continuing epoch keeps the overrides it began with', async () => {
+      const snapshotHashes = {};
+      const t = setup({
+        orgOverrides: { releaseWindowMaxTurns: 12 },
+        thread: {
+          epoch: 1,
+          lastLearnerActivityAt: new Date(),
+          epochSnapshot: {
+            releaseId: 'rel-1',
+            tier: 'premium',
+            startedAt: new Date().toISOString(),
+            startSeq: 1,
+            layerHashes: snapshotHashes,
+            config: {
+              org: { releaseWindowMaxTurns: 4 },
+              course: {},
+              versions: { org: 1, course: null },
+            },
+          },
+        },
+      });
+      const probe = await setup().run();
+      Object.assign(snapshotHashes, probe.system!.hashes);
+      const ctx = await t.run();
+      expect(ctx.epoch?.isNew).toBe(false);
+      expect(ctx.bundle!.policy.releaseWindowMaxTurns).toBe(4);
+    });
+
+    it("the learner's side-quest switch applies at once, above every layer", async () => {
+      const t = setup({
+        courseOverrides: { 'sideQuestCadence.walk': 1 },
+        prefs: { sideQuests: false },
+      });
+      const ctx = await t.run();
+      expect(ctx.bundle!.policy.sideQuestCadence).toEqual({
+        lead: null,
+        walk: null,
+        drive: null,
+      });
+    });
+
+    it('ignores a stored override of a pinned key', async () => {
+      const t = setup({ orgOverrides: { 'safety.messageMaxChars': 50 } });
+      const ctx = await t.run();
+      expect(ctx.bundle!.policy.safety.messageMaxChars).toBe(2_000);
+    });
   });
 });

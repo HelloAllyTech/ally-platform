@@ -63,6 +63,8 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { GuideAlert } from './entity/guide-alert.entity';
 import { GuidePlaygroundService } from './admin/guide-playground.service';
 import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
+import { GuideConfigAdminService } from './config/guide-config-admin.service';
+import { GuideConfigResolverService } from './config/guide-config-resolver.service';
 
 /**
  * The Ally guide (plans/ally-guide/plan.md). A leaf module: it reads courses
@@ -116,6 +118,8 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
     GuideLibraryService,
     GuidePracticeHistoryService,
     GuidePeerService,
+    GuideConfigResolverService,
+    GuideConfigAdminService,
     GuideAssessorService,
     GuideCoachService,
     GuideSideQuestService,
