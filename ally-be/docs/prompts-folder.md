@@ -205,6 +205,11 @@ variable is `required` when the code always supplies it and the text depends on 
 else is optional. Contracts start **open** (undeclared variables allowed); close one once its
 list is complete and the store refuses unknown variables too.
 
+A contract's `output` says how the code reads the answer: `'json'` when it parses free text as
+JSON (CI's structured-default check makes one cheap model call to confirm the default still
+answers in JSON; a `_system`/`_user` pair is sent as one call), `'structured'` when the provider
+enforces the shape (`jsonMode`, `response_format`, `with_structured_output`), so the text needn't.
+
 From the contract: the call site gets its input type; sync sends the contract to the store,
 which refuses a version that drops a required variable; each service's test suite checks its
 defaults satisfy their contracts; and the release check

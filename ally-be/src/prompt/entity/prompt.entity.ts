@@ -31,8 +31,13 @@ export interface PromptContract {
   fragments?: string[];
   /** Bumped on a breaking change; the release check compares live versions against it. */
   contractVersion?: number;
-  /** `'json'` when the code parses the model's answer as JSON. */
-  output?: 'json';
+  /**
+   * How the code reads the model's answer. `'json'`: it parses free text as
+   * JSON, so the text itself must ask for JSON (CI checks the default does).
+   * `'structured'`: the provider enforces JSON or a schema (response_format,
+   * structured output), so the text need not.
+   */
+  output?: 'json' | 'structured';
 }
 
 @Entity('prompts')

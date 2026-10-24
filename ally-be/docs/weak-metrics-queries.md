@@ -110,8 +110,11 @@ Three things worth knowing about these tables:
   `main_agent`/`base_role` entry, else the first. Tables without the column (feedback claims,
   transcripts, turn metrics) derive it from the session with the same rule. The two agree on
   every judged turn in production, which is what lets one filter selection govern the whole
-  tab; if you write a query against a table with no column, mirror
-  `mainPromptVersionSql()` rather than inventing a third rule. Older rows carry NULL — those
+  tab; if you write a query against a table with no column, use
+  `mainPromptVersionSql()` (`src/analytics/util/main-prompt-version.util.ts`, shared by the judge
+  repositories and this one) rather than inventing a third rule. The same util's
+  `mainPromptHashSql()` reads the main prompt's content hash from `metadata->'promptHashes'`,
+  which identifies the exact text even after a Skills Store version is pruned. Older rows carry NULL — those
   sessions predate the metadata, and any prompt-version filter excludes them.
 - **`language_judgment_sessions` is the denominator.** A clean session has a row there and no
   annotations. Without joining it, "no errors" and "never judged" are indistinguishable.

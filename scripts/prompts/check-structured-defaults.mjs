@@ -1,8 +1,11 @@
 #!/usr/bin/env node
-// CI check: does every structured prompt's DEFAULT still make a model answer in
-// the shape the code parses? For each prompt whose contract says
-// `output: 'json'`, render its default in Git with sample values for its
-// variables, make ONE cheap model call, and check the answer parses as JSON.
+// CI check: does every free-text JSON prompt's DEFAULT still make a model answer
+// in the shape the code parses? For each prompt whose contract says
+// `output: 'json'` (the code parses free text, with no provider JSON mode),
+// render its default in Git with sample values for its variables, make ONE
+// cheap model call, and check the answer parses as JSON. A `_system`/`_user`
+// pair is checked as the one call it is. `output: 'structured'` prompts are
+// skipped: the provider enforces their shape, not the text.
 //
 //   OPENAI_API_KEY=... node scripts/prompts/check-structured-defaults.mjs \
 //     --contracts be.json --contracts ai.json --contracts learn.json
@@ -60,29 +63,55 @@ function parses(text) {
   }
 }
 
-const structured = listPrompts().filter((p) => contracts[p.code]?.output === 'json');
+const prompts = listPrompts();
+const byCode = new Map(prompts.map((p) => [p.code, p]));
+const isJson = (code) => contracts[code]?.output === 'json';
+
+/**
+ * The calls to check: a `_user` prompt with a `_system` sibling is sent with
+ * it (and the sibling isn't checked alone); anything else is the system
+ * message with a generic user turn.
+ */
+const calls = [];
+const paired = new Set();
+for (const prompt of prompts) {
+  if (!isJson(prompt.code) || !prompt.code.endsWith('_user')) continue;
+  const system = byCode.get(prompt.code.replace(/_user$/, '_system'));
+  if (!system) continue;
+  paired.add(system.code);
+  calls.push({ label: `${system.file} + ${prompt.file}`, code: prompt.code, system, user: prompt });
+}
+for (const prompt of prompts) {
+  if (!isJson(prompt.code) || paired.has(prompt.code)) continue;
+  if (calls.some((c) => c.user === prompt)) continue;
+  calls.push({ label: prompt.file, code: prompt.code, system: prompt });
+}
+
 const problems = [];
-for (const prompt of structured) {
+for (const call of calls) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       model,
       temperature: 0,
-      max_tokens: 1200,
+      max_tokens: 4000,
       messages: [
-        { role: 'system', content: render(prompt) },
-        { role: 'user', content: 'Respond now, following the instructions above.' },
+        { role: 'system', content: render(call.system) },
+        {
+          role: 'user',
+          content: call.user ? render(call.user) : 'Respond now, following the instructions above.',
+        },
       ],
     }),
   }).catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
   if (!res.ok) {
-    problems.push(`${prompt.file}: model call failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    problems.push(`${call.label}: model call failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
     continue;
   }
   const answer = (await res.json()).choices?.[0]?.message?.content ?? '';
   if (!parses(answer)) {
-    problems.push(`${prompt.file} (${prompt.code}): the answer isn't JSON: ${answer.slice(0, 160).replace(/\s+/g, ' ')}`);
+    problems.push(`${call.label} (${call.code}): the answer isn't JSON: ${answer.slice(0, 160).replace(/\s+/g, ' ')}`);
   }
 }
 
@@ -91,4 +120,4 @@ if (problems.length) {
   for (const line of problems) console.error(`  - ${line}`);
   process.exit(1);
 }
-console.log(`Structured-default check passed: ${structured.length} default(s) answer in JSON with ${model}.`);
+console.log(`Structured-default check passed: ${calls.length} call(s) over the 'json' defaults answer in JSON with ${model}.`);

@@ -31,8 +31,9 @@ class PromptInputs(BaseModel):
     contract_version: ClassVar[int] = 1
     # Text the runtime appends after templating, outside the template.
     fragments: ClassVar[list[str]] = []
-    # "json" when the code parses the model's answer as JSON; CI then checks
-    # that the default actually produces parseable JSON.
+    # How the code reads the answer: "json" when it parses free text as JSON
+    # (CI checks the default produces parseable JSON); "structured" when the
+    # provider enforces it (with_structured_output, response_format).
     output_format: ClassVar[Optional[str]] = None
 
 
@@ -41,15 +42,17 @@ class AnalysisCounselorAnalysisInputs(PromptInputs):
     (`analysis/counselor_analysis.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    message: Optional[str] = None
+    message: str
 
 
 class AudioDiarizationInputs(PromptInputs):
     """ally_ai_audio_diarization — Diarization (`audio/diarization.txt`)."""
 
-    transcription: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    transcription: str
 
 
 class HelplineCopilotTurnInputs(PromptInputs):
@@ -57,9 +60,11 @@ class HelplineCopilotTurnInputs(PromptInputs):
     ally_ai_helpline_copilot_turn — Helpline Copilot Turn (`helpline/copilot_turn.txt`).
     """
 
-    conversation: Optional[str] = None
-    nudge_instruction: Optional[str] = None
-    risk_instruction: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    conversation: str
+    nudge_instruction: str
+    risk_instruction: str
     rolling_summary: Optional[str] = None
     talker_language: Optional[str] = None
 
@@ -69,8 +74,10 @@ class HelplineRiskClassifyInputs(PromptInputs):
     (`helpline/risk_classify.txt`).
     """
 
+    output_format: ClassVar[Optional[str]] = "structured"
+
     language_name: Optional[str] = None
-    message: Optional[str] = None
+    message: str
     recent: Optional[str] = None
 
 
@@ -79,7 +86,9 @@ class KnowledgeCrisisClassifyInputs(PromptInputs):
     (`knowledge/crisis_classify.txt`).
     """
 
-    message: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    message: str
 
 
 class KnowledgeTranslateQueryInputs(PromptInputs):
@@ -87,7 +96,9 @@ class KnowledgeTranslateQueryInputs(PromptInputs):
     (`knowledge/translate_query.txt`).
     """
 
-    question: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    question: str
 
 
 class KnowledgeWhatsappAnswerInputs(PromptInputs):
@@ -95,10 +106,12 @@ class KnowledgeWhatsappAnswerInputs(PromptInputs):
     (`knowledge/whatsapp_answer.txt`).
     """
 
+    output_format: ClassVar[Optional[str]] = "structured"
+
     history: Optional[str] = None
     max_chars: Optional[str] = None
-    passages: Optional[str] = None
-    question: Optional[str] = None
+    passages: str
+    question: str
 
 
 class NotesContentEnhanceInputs(PromptInputs):
@@ -106,13 +119,17 @@ class NotesContentEnhanceInputs(PromptInputs):
     ally_ai_notes_content_enhance — Content Enhancement (`notes/content_enhance.txt`).
     """
 
-    content: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    content: str
 
 
 class NudgeNudgeInputs(PromptInputs):
     """ally_ai_nudge_nudge — Generate Nudge (`nudge/nudge.txt`)."""
 
-    chat_history: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    chat_history: str
     conversation: Optional[str] = None
     suggestion: Optional[str] = None
 
@@ -122,12 +139,12 @@ class ScenarioScenarioEvaluationInputs(PromptInputs):
     (`scenario/scenario_evaluation.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
     SCENARIO_BEHAVIOUR_GUIDANCE: Optional[str] = None
     SKILL_COVERAGE_DESCRIPTIONS: Optional[str] = None
     SUPERVISOR_NOTE_SECTION: Optional[str] = None
-    chat_history: Optional[str] = None
+    chat_history: str
 
 
 class ScenarioScenarioEvaluationWithMemoryInputs(PromptInputs):
@@ -136,12 +153,12 @@ class ScenarioScenarioEvaluationWithMemoryInputs(PromptInputs):
     (`scenario/scenario_evaluation_with_memory.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
     SCENARIO_BEHAVIOUR_GUIDANCE: Optional[str] = None
     SKILL_COVERAGE_DESCRIPTIONS: Optional[str] = None
     SUPERVISOR_NOTE_SECTION: Optional[str] = None
-    chat_history: Optional[str] = None
+    chat_history: str
     custom_prompt_section: Optional[str] = None
     previous_summary: Optional[str] = None
 
@@ -178,8 +195,10 @@ class SharedSupervisorNoteRepairInputs(PromptInputs):
     (`shared/supervisor_note_repair.txt`).
     """
 
-    MISSING_SECTIONS: Optional[str] = None
-    NOTE: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    MISSING_SECTIONS: str
+    NOTE: str
 
 
 class SharedWorkerTypeEarlyProfessionalInputs(PromptInputs):
@@ -212,8 +231,6 @@ class SimulationSimulationAnalysisInputs(PromptInputs):
     (`simulation/simulation_analysis.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
-
     chat_history: Optional[str] = None
 
 
@@ -222,8 +239,6 @@ class SimulationSimulationAnalysisWithMemoryInputs(PromptInputs):
     ally_ai_simulation_simulation_analysis_with_memory — Simulation Analysis with Memory
     (`simulation/simulation_analysis_with_memory.txt`).
     """
-
-    output_format: ClassVar[Optional[str]] = "json"
 
     chat_history: Optional[str] = None
     custom_prompt_section: Optional[str] = None
@@ -235,9 +250,9 @@ class SummaryDictationSummaryInputs(PromptInputs):
     (`summary/dictation_summary.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    chat_history: Optional[str] = None
+    chat_history: str
 
 
 class SummaryDynamicSummaryInputs(PromptInputs):
@@ -245,18 +260,18 @@ class SummaryDynamicSummaryInputs(PromptInputs):
     ally_ai_summary_dynamic_summary — Dynamic Summary (`summary/dynamic_summary.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    chat_history: Optional[str] = None
-    key_descriptions: Optional[str] = None
+    chat_history: str
+    key_descriptions: str
 
 
 class SummarySummaryInputs(PromptInputs):
     """ally_ai_summary_summary — Session Summary (`summary/summary.txt`)."""
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    chat_history: Optional[str] = None
+    chat_history: str
 
 
 class TagsPositivityRatingInputs(PromptInputs):
@@ -264,15 +279,17 @@ class TagsPositivityRatingInputs(PromptInputs):
     ally_ai_tags_positivity_rating — Positivity Rating (`tags/positivity_rating.txt`).
     """
 
-    tags: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    tags: str
 
 
 class UserIdentifyUserInputs(PromptInputs):
     """ally_ai_user_identify_user — Identify User (`user/identify_user.txt`)."""
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    conversations: Optional[str] = None
+    conversations: str
 
 
 PROMPT_CONTRACTS: dict[str, type[PromptInputs]] = {

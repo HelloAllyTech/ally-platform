@@ -17,7 +17,10 @@ describe('main prompt version and hash from a session record', () => {
 
   it('uses the selected prompt, not a guess by name', () => {
     expect(
-      mainPromptVersion(versions, 'ally_ai_learn_system_main_agent_prompt_full'),
+      mainPromptVersion(
+        versions,
+        'ally_ai_learn_system_main_agent_prompt_full',
+      ),
     ).toBe('5');
     expect(
       mainPromptHash(hashes, 'ally_ai_learn_system_main_agent_prompt_full'),

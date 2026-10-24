@@ -16,17 +16,18 @@ import { definePrompt } from './define-prompt';
 export const AGENT_BUILDER_ALLOWED_FILLER_WORDS = definePrompt(
   'agent_builder_allowed_filler_words',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/backstory.txt */
 export const AGENT_BUILDER_BACKSTORY = definePrompt('agent_builder_backstory', {
-  actorDescription: 'optional',
+  actorDescription: 'required',
   agentTestCases: 'optional',
   competency: 'optional',
 });
@@ -35,7 +36,7 @@ export const AGENT_BUILDER_BACKSTORY = definePrompt('agent_builder_backstory', {
 export const AGENT_BUILDER_CHALLENGE_DESCRIPTION = definePrompt(
   'agent_builder_challenge_description',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
   },
@@ -45,45 +46,48 @@ export const AGENT_BUILDER_CHALLENGE_DESCRIPTION = definePrompt(
 export const AGENT_BUILDER_KNOWLEDGE_SOURCES = definePrompt(
   'agent_builder_knowledge_sources',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
     numKnowledgeSources: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/language_voices.txt */
 export const AGENT_BUILDER_LANGUAGE_VOICES = definePrompt(
   'agent_builder_language_voices',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     personaAge: 'optional',
     personaGender: 'optional',
     voiceCandidates: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/linguistic_style_samples.txt */
 export const AGENT_BUILDER_LINGUISTIC_STYLE_SAMPLES = definePrompt(
   'agent_builder_linguistic_style_samples',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/opening_statements.txt */
 export const AGENT_BUILDER_OPENING_STATEMENTS = definePrompt(
   'agent_builder_opening_statements',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
   },
 );
 
@@ -91,16 +95,16 @@ export const AGENT_BUILDER_OPENING_STATEMENTS = definePrompt(
 export const AGENT_BUILDER_PERSONA = definePrompt(
   'agent_builder_persona',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/reminders.txt */
 export const AGENT_BUILDER_REMINDERS = definePrompt('agent_builder_reminders', {
-  actorDescription: 'optional',
+  actorDescription: 'required',
   agentTestCases: 'optional',
   competency: 'optional',
 });
@@ -109,7 +113,7 @@ export const AGENT_BUILDER_REMINDERS = definePrompt('agent_builder_reminders', {
 export const AGENT_BUILDER_ROLE_INSTRUCTION = definePrompt(
   'agent_builder_role_instruction',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
   },
@@ -119,62 +123,67 @@ export const AGENT_BUILDER_ROLE_INSTRUCTION = definePrompt(
 export const AGENT_BUILDER_SPOKEN_LANGUAGES = definePrompt(
   'agent_builder_spoken_languages',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     availableLanguages: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/states.txt */
 export const AGENT_BUILDER_STATES = definePrompt(
   'agent_builder_states',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/agent_builder/title.txt */
 export const AGENT_BUILDER_TITLE = definePrompt(
   'agent_builder_title',
   {
-    actorDescription: 'optional',
+    actorDescription: 'required',
     agentTestCases: 'optional',
     competency: 'optional',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/analytics_suggestions/generate.txt */
 export const ANALYTICS_SUGGESTIONS_GENERATE = definePrompt(
   'analytics_suggestions_generate',
   {},
+  { output: 'json' },
 );
 
 /** src/prompts/bug_hunter/classify_miss.txt */
 export const BUG_HUNTER_CLASSIFY_MISS = definePrompt(
   'bug_hunter_classify_miss',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/bug_hunter/classify_repo.txt */
 export const BUG_HUNTER_CLASSIFY_REPO = definePrompt(
   'bug_hunter_classify_repo',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/bug_hunter/decide.txt */
 export const BUG_HUNTER_DECIDE = definePrompt(
   'bug_hunter_decide',
   {},
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/bug_hunter/review_study.txt */
 export const BUG_HUNTER_REVIEW_STUDY = definePrompt(
   'bug_hunter_review_study',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/builder/interviewer_system.txt */
@@ -202,7 +211,7 @@ export const COURSE_COPILOT_ANNOTATION_WRITER = definePrompt(
     brief_json: 'optional',
     course_outline: 'optional',
     helpful_behaviours: 'optional',
-    item_json: 'optional',
+    item_json: 'required',
     label_instruction: 'optional',
     line_count: 'optional',
     max_labels: 'optional',
@@ -210,6 +219,7 @@ export const COURSE_COPILOT_ANNOTATION_WRITER = definePrompt(
     objectives: 'optional',
     unhelpful_behaviours: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/article_writer.txt */
@@ -219,19 +229,20 @@ export const COURSE_COPILOT_ARTICLE_WRITER = definePrompt(
     brief_json: 'optional',
     course_outline: 'optional',
     image_instruction: 'optional',
-    item_json: 'optional',
+    item_json: 'required',
     next_practice: 'optional',
     objectives: 'optional',
     question_count: 'optional',
     word_target: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/blueprint_planner.txt */
 export const COURSE_COPILOT_BLUEPRINT_PLANNER = definePrompt(
   'course_copilot_blueprint_planner',
   {
-    brief_json: 'optional',
+    brief_json: 'required',
     duration_minutes: 'optional',
     games_json: 'optional',
     item_minutes_json: 'optional',
@@ -245,6 +256,7 @@ export const COURSE_COPILOT_BLUEPRINT_PLANNER = definePrompt(
     trainer_notes: 'optional',
     video_urls_json: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/course_meta.txt */
@@ -257,6 +269,7 @@ export const COURSE_COPILOT_COURSE_META = definePrompt(
     working_description: 'optional',
     working_title: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/course_reviewer.txt */
@@ -265,9 +278,10 @@ export const COURSE_COPILOT_COURSE_REVIEWER = definePrompt(
   {
     allowed_tools: 'optional',
     brief_json: 'optional',
-    course_digest: 'optional',
+    course_digest: 'required',
     max_findings: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/history_summary.txt */
@@ -286,6 +300,7 @@ export const COURSE_COPILOT_IMAGE_PROMPT = definePrompt(
     image_purpose: 'optional',
     image_title: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/interviewer_system.txt */
@@ -300,11 +315,12 @@ export const COURSE_COPILOT_JOURNAL_WRITER = definePrompt(
   {
     brief_json: 'optional',
     course_outline: 'optional',
-    item_json: 'optional',
+    item_json: 'required',
     objectives: 'optional',
     preceding_practice: 'optional',
     prompt_count: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/landing_page_writer.txt */
@@ -318,6 +334,7 @@ export const COURSE_COPILOT_LANDING_PAGE_WRITER = definePrompt(
     current_landing_page: 'optional',
     trigger_warnings: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/quiz_writer.txt */
@@ -328,12 +345,13 @@ export const COURSE_COPILOT_QUIZ_WRITER = definePrompt(
     brief_json: 'optional',
     course_outline: 'optional',
     difficulty: 'optional',
-    item_json: 'optional',
+    item_json: 'required',
     likert_instruction: 'optional',
     objectives: 'optional',
     question_count: 'optional',
     type_instruction: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/course_copilot/roleplay_brief.txt */
@@ -360,6 +378,7 @@ export const COURSE_COPILOT_ROLEPLAY_BRIEF = definePrompt(
     terminalOutcome: 'optional',
     unhelpfulBehaviours: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/cover_image_generation.txt */
@@ -373,9 +392,9 @@ export const COVER_IMAGE_GENERATION = definePrompt('cover_image_generation', {
 
 /** src/prompts/enhance_field.txt */
 export const ENHANCE_FIELD = definePrompt('enhance_field', {
-  currentValue: 'optional',
+  currentValue: 'required',
   fieldLabel: 'optional',
-  guidance: 'optional',
+  guidance: 'required',
 });
 
 /** src/prompts/enhance_state.txt */
@@ -384,9 +403,9 @@ export const ENHANCE_STATE = definePrompt(
   {
     currentGuidelines: 'optional',
     currentName: 'optional',
-    guidance: 'optional',
+    guidance: 'required',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/event_builder/branch_instruction.txt */
@@ -395,7 +414,7 @@ export const EVENT_BUILDER_BRANCH_INSTRUCTION = definePrompt(
   {
     className: 'optional',
     competency: 'optional',
-    eventDescription: 'optional',
+    eventDescription: 'required',
     simulationContext: 'optional',
   },
 );
@@ -405,9 +424,10 @@ export const EVENT_BUILDER_CLASSIFIER = definePrompt(
   'event_builder_classifier',
   {
     competency: 'optional',
-    eventDescription: 'optional',
+    eventDescription: 'required',
     simulationContext: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/event_builder/examples.txt */
@@ -416,11 +436,11 @@ export const EVENT_BUILDER_EXAMPLES = definePrompt(
   {
     className: 'optional',
     competency: 'optional',
-    eventDescription: 'optional',
+    eventDescription: 'required',
     numExamples: 'optional',
     simulationContext: 'optional',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/event_builder/feedback.txt */
@@ -429,10 +449,10 @@ export const EVENT_BUILDER_FEEDBACK = definePrompt(
   {
     className: 'optional',
     competency: 'optional',
-    eventDescription: 'optional',
+    eventDescription: 'required',
     simulationContext: 'optional',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/event_builder/tags.txt */
@@ -441,17 +461,17 @@ export const EVENT_BUILDER_TAGS = definePrompt(
   {
     className: 'optional',
     competency: 'optional',
-    eventDescription: 'optional',
+    eventDescription: 'required',
     simulationContext: 'optional',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/mobile_release_whats_new.txt */
 export const MOBILE_RELEASE_WHATS_NEW = definePrompt(
   'mobile_release_whats_new',
   {
-    commits: 'optional',
+    commits: 'required',
   },
 );
 
@@ -479,18 +499,19 @@ export const OPENAI_TRANSLATION_CODE_MIXED_SYSTEM = definePrompt(
   'openai_translation_code_mixed_system',
   {
     fullContext: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
     preserveWords: 'optional',
     toneGuidance: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/openai_translation/general_text_translation.txt */
 export const OPENAI_TRANSLATION_GENERAL_TEXT_TRANSLATION = definePrompt(
   'openai_translation_general_text_translation',
   {
-    languageName: 'optional',
-    text: 'optional',
+    languageName: 'required',
+    text: 'required',
   },
 );
 
@@ -498,33 +519,37 @@ export const OPENAI_TRANSLATION_GENERAL_TEXT_TRANSLATION = definePrompt(
 export const OPENAI_TRANSLATION_LEARN_BEHAVIOR_INSTRUCTION = definePrompt(
   'openai_translation_learn_behavior_instruction',
   {
-    inputJson: 'optional',
-    languageName: 'optional',
+    inputJson: 'required',
+    languageName: 'required',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/openai_translation/session_event.txt */
 export const OPENAI_TRANSLATION_SESSION_EVENT = definePrompt(
   'openai_translation_session_event',
   {
-    inputJson: 'optional',
-    languageName: 'optional',
+    inputJson: 'required',
+    languageName: 'required',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/openai_translation/speech_reexpression_user.txt */
 export const OPENAI_TRANSLATION_SPEECH_REEXPRESSION_USER = definePrompt(
   'openai_translation_speech_reexpression_user',
   {
-    inputJson: 'optional',
-    languageName: 'optional',
+    inputJson: 'required',
+    languageName: 'required',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/product_updates/consolidate.txt */
 export const PRODUCT_UPDATES_CONSOLIDATE = definePrompt(
   'product_updates_consolidate',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/roadmap/classify_goal.txt */
@@ -538,6 +563,7 @@ export const ROADMAP_CLASSIFY_GOAL = definePrompt(
 export const ROADMAP_DUPLICATE_CHECK = definePrompt(
   'roadmap_duplicate_check',
   {},
+  { output: 'json' },
 );
 
 /** src/prompts/roadmap/generate_claude_prompt.txt */
@@ -569,39 +595,44 @@ export const ROADMAP_SUMMARISE_INTERVIEW = definePrompt(
 export const SCRIBE_VOICE_NOTE_FIELD_EXTRACTION_SYSTEM = definePrompt(
   'scribe_voice_note_field_extraction_system',
   {},
+  { output: 'json' },
 );
 
 /** src/prompts/scribe_voice_note/field_extraction_user.txt */
 export const SCRIBE_VOICE_NOTE_FIELD_EXTRACTION_USER = definePrompt(
   'scribe_voice_note_field_extraction_user',
   {
-    fields: 'optional',
-    transcript: 'optional',
+    fields: 'required',
+    transcript: 'required',
   },
+  { output: 'json' },
 );
 
 /** src/prompts/skill_experiment/challenger_generator.txt */
 export const SKILL_EXPERIMENT_CHALLENGER_GENERATOR = definePrompt(
   'skill_experiment_challenger_generator',
   {
-    championPrompt: 'optional',
-    feedback: 'optional',
+    championPrompt: 'required',
+    feedback: 'required',
     learnerName: 'optional',
     rubric: 'optional',
     transcript: 'optional',
   },
+  { output: 'structured' },
 );
 
 /** src/prompts/skill_experiment/designer.txt */
 export const SKILL_EXPERIMENT_DESIGNER = definePrompt(
   'skill_experiment_designer',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/skill_experiment/judge.txt */
 export const SKILL_EXPERIMENT_JUDGE = definePrompt(
   'skill_experiment_judge',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/track_memory/facts.txt */
@@ -609,26 +640,27 @@ export const TRACK_MEMORY_FACTS = definePrompt(
   'track_memory_facts',
   {
     existingFacts: 'optional',
-    newDisclosures: 'optional',
+    newDisclosures: 'required',
   },
   { output: 'json' },
 );
 
 /** src/prompts/track_memory/fold.txt */
 export const TRACK_MEMORY_FOLD = definePrompt('track_memory_fold', {
-  sessionMemories: 'optional',
+  sessionMemories: 'required',
 });
 
 /** src/prompts/track_quiz/open_ended_grading_user.txt */
 export const TRACK_QUIZ_OPEN_ENDED_GRADING_USER = definePrompt(
   'track_quiz_open_ended_grading_user',
   {
-    answer: 'optional',
+    answer: 'required',
     criteria: 'optional',
-    guidance: 'optional',
-    maxScore: 'optional',
-    question: 'optional',
+    guidance: 'required',
+    maxScore: 'required',
+    question: 'required',
   },
+  { output: 'json' },
 );
 
 /** src/prompts/ux_signals/triage.txt */
@@ -645,7 +677,7 @@ export const AGENT_TEMPLATE_TRANSLATION = definePrompt(
   {
     age: 'optional',
     behavior_instructions_json: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
     language_label: 'optional',
     linguistic_samples: 'optional',
     name: 'optional',
@@ -657,6 +689,7 @@ export const AGENT_TEMPLATE_TRANSLATION = definePrompt(
 export const DRIFT_JUDGE_CONVERSATION_RUBRIC = definePrompt(
   'drift_judge_conversation_rubric',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/glossary/adjudication.txt */
@@ -665,8 +698,8 @@ export const GLOSSARY_ADJUDICATION = definePrompt(
   {
     existingGlossary: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
-    proposals: 'optional',
+    languageName: 'required',
+    proposals: 'required',
   },
   { output: 'json' },
 );
@@ -675,10 +708,10 @@ export const GLOSSARY_ADJUDICATION = definePrompt(
 export const GLOSSARY_CONSOLIDATION = definePrompt(
   'glossary_consolidation',
   {
-    annotations: 'optional',
+    annotations: 'required',
     existingGlossary: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
   },
   { output: 'json' },
 );
@@ -689,7 +722,7 @@ export const GLOSSARY_GENERATION = definePrompt(
   {
     evalConfig: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
   },
   { output: 'json' },
 );
@@ -698,10 +731,10 @@ export const GLOSSARY_GENERATION = definePrompt(
 export const GLOSSARY_LEXEME_PAIRING = definePrompt(
   'glossary_lexeme_pairing',
   {
-    candidates: 'optional',
+    candidates: 'required',
     existingGlossary: 'optional',
     languageCode: 'optional',
-    languageName: 'optional',
+    languageName: 'required',
     learnerLexicon: 'optional',
   },
   { output: 'json' },
@@ -711,23 +744,23 @@ export const GLOSSARY_LEXEME_PAIRING = definePrompt(
 export const LANGUAGE_QUALITY_JUDGE_RUBRIC = definePrompt(
   'language_quality_judge_rubric',
   {},
+  { output: 'structured' },
 );
 
 /** src/prompts/openai_translation/tooltip_translation.txt */
 export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
   'openai_translation_tooltip_translation',
   {
-    inputJson: 'optional',
-    languageName: 'optional',
+    inputJson: 'required',
+    languageName: 'required',
   },
-  { output: 'json' },
+  { output: 'structured' },
 );
 
 /** src/prompts/roadmap/opportunity_interview.txt */
 export const ROADMAP_OPPORTUNITY_INTERVIEW = definePrompt(
   'roadmap_opportunity_interview',
   {},
-  { output: 'json' },
 );
 
 /** src/prompts/roadmap/release_notes.txt */

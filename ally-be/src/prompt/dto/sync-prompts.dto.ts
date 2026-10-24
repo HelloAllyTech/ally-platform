@@ -120,8 +120,8 @@ export class SyncPromptItemDto {
 
   @ApiPropertyOptional({
     description:
-      "The code's contract with this prompt, from its `.meta.json`: " +
-      '`{ variables, required, fragments, contractVersion }`. The store refuses ' +
+      "The code's contract with this prompt, declared in code (prompt-contracts.ts, " +
+      'contracts.py): `{ variables, required, fragments, contractVersion, output }`. The store refuses ' +
       'a version that breaks it.',
   })
   @IsOptional()

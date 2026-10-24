@@ -328,6 +328,8 @@ State (`coherence_consecutive_misses`, `coherence_escalations`, `coherence_quiet
 
 `GuardrailEvent` itself (its config-time `branching_instruction`, its default `detector_type: "CATEGORY"`, and how it differs from the score/feedback detection types documented above) is not otherwise covered by this reference — see [`docs/events-off-gate-design.md`](events-off-gate-design.md) and [`app/core/events/event_types/guardrail/guardrail_event.py`](../app/core/events/event_types/guardrail/guardrail_event.py) directly. COHERENCE only changes whether a classified violation actually fires (and, once the cap is spent, whether to classify at all), not how the classification itself works.
 
+Its `prompt_data` field carries the session's prompt data, so the four classifier prompts (`events/guardrail_system`/`_user`, `events/coherence_guardrail_system`/`_user`) render from the Skills Store text in room metadata rather than the local defaults; see [`docs/12-prompts-system.md`](12-prompts-system.md).
+
 ---
 
 ## AI usage (cost) per detection type

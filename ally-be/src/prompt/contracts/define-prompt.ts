@@ -33,10 +33,12 @@ export interface PromptDefinition<
   /** Bump on a breaking change; the release check compares live text against it. */
   contractVersion: number;
   /**
-   * `'json'` when the code parses the model's answer as JSON. CI then renders
-   * the default and checks one cheap model call returns parseable JSON.
+   * How the code reads the answer. `'json'`: it parses free text as JSON, so
+   * the text must ask for JSON; CI renders the default and checks one cheap
+   * model call returns parseable JSON. `'structured'`: the provider enforces
+   * JSON or a schema (jsonMode, response_format), so no model check is needed.
    */
-  output?: 'json';
+  output?: 'json' | 'structured';
 }
 
 /** A template value: anything the call site stringifies into the text. */
@@ -55,7 +57,11 @@ export type PromptInputs<D extends PromptDefinition> =
 export function definePrompt<const S extends Record<string, VariableRule>>(
   code: string,
   variables: S,
-  options: { open?: boolean; contractVersion?: number; output?: 'json' } = {},
+  options: {
+    open?: boolean;
+    contractVersion?: number;
+    output?: 'json' | 'structured';
+  } = {},
 ): PromptDefinition<S> {
   return {
     code,

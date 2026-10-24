@@ -23,7 +23,7 @@ Decided on 2026-10-24 by Gopi.
 | What stays in Git? | Only each prompt's base version (a minimal default) and its contract. IP is a concern, so the defaults are cut down to minimal bases as the last step of the branch; updates never reach Git |
 | Must a v2v run pass before a translated prompt is published? | No |
 | Do DB-only prompts get a default and contract in Git? | Migration-seeded ones yes; dashboard variants no |
-| Should CI make a cheap model call per structured default? | Yes: one call per prompt whose contract says `output: json`, checking the answer parses |
+| Should CI make a cheap model call per structured default? | Yes: one call per prompt whose contract says `output: json` (the code parses free text), checking the answer parses. Prompts whose JSON the provider enforces are `output: structured` and need no call |
 | Resolver cache TTL | 60 s |
 | Is a diff in the Skills Store enough review? | Yes, no second approver |
 | Which judges carry the prompt hash? | All of them, through the session record: every judge row links to a session (directly, or through `kb_retrievals.session_id`), and every session records each prompt's version and content hash. Chosen per Stacks' "Instrument Only What Tests Current Assumptions" and "Validate Prompt and Tool Changes Through Multiple Testing Stages" |
@@ -172,7 +172,7 @@ The contract is **declared in code**, next to the code that fills the prompt —
 
 - **`required`**: placeholders the body must contain, because the code always supplies them and depends on them.
 - **`variables`**: every placeholder the code supplies, once a contract is closed; `null` while it is open (the default), so only `required` is enforced.
-- **`output`**: `json` when the code parses the answer as JSON; CI makes one cheap model call to check the default still answers in JSON.
+- **`output`**: how the code reads the answer. `json` when it parses free text as JSON, so the text itself must ask for JSON; CI makes one cheap model call to check the default still answers in JSON (a `_system`/`_user` pair as one call). `structured` when the provider enforces the shape (`jsonMode`, `response_format`, `with_structured_output`), so the text needn't and no call is made.
 - **`fragments`** (ally-ai-learn main agent): text appended after templating.
 - **`contractVersion`**: bumped on any breaking change.
 
@@ -422,7 +422,7 @@ Built on branch `feat/skills-store` (one PR, ally-be + ally-web + ally-ai + ally
 
 Verified locally: migration on the local DB (29 file-served prompts published, all 152 served from the store); CLI pull/status/diff/push, stale-base refusal and three-way merge; publishing from the Skills Store; translation gate (pending → 409, ready → live); key generation; release check (pass and a deliberate failure); a v2v voice session with every prompt served from the store and the session recording each prompt's version and hash.
 
-**Base versions in Git.** The defaults were cut to minimal bases as the last step: ally-be 207k → 70k characters (64 defaults, plus 10 new defaults with contracts for the migration-seeded prompts), ally-ai 58k → 21k, ally-ai-learn 44k → 17k. Every placeholder, output format and parser-checked marker is kept; the structured check passes on all 31 JSON prompts.
+**Base versions in Git.** The defaults were cut to minimal bases as the last step: ally-be 207k → 70k characters (64 defaults, plus 10 new defaults with contracts for the migration-seeded prompts), ally-ai 58k → 21k, ally-ai-learn 44k → 17k. Every placeholder, output format and parser-checked marker is kept. 88 prompts have their answer parsed as JSON: 13 parse free text (`output: json`, and the structured check passes on all of them), 75 rely on provider-enforced JSON (`output: structured`).
 
 **Deploy order (required).** Deploy **ally-be first**. Its migration publishes today's text of every file-served prompt from the database copy before any service syncs the new minimal defaults. The ally-ai and ally-ai-learn release workflows enforce this: a `require-skills-store` job blocks their deploy until production ally-be serves the Skills Store. Before deploying, run `scripts/prompts/migration-preview.sql` read-only against production to see which prompts get their file text published, and which dashboard-edited prompts have file edits that never shipped.
 
@@ -433,10 +433,11 @@ Verified locally: migration on the local DB (29 file-served prompts published, a
 All earlier questions are decided (see Decisions). Left for the review:
 
 - [ ] 23 database-only prompts have no references in code (for example the old Builder guidance prompts, the V2V tester's `trainee_*`/`judge_*`/`director_*` rows, `roleplay_copilot_*`): delete them, or keep them?
-- [ ] 31 prompts are marked `output: json` by a first pass (the default asks for JSON); confirm the list against the call sites.
-- [ ] Retrievals that don't come from a roleplay session (WhatsApp) run through ally-ai, which doesn't record which prompt versions ran yet.
-- [ ] Contracts start open with few `required` variables; tighten them per prompt as owners confirm what the code always supplies.
-- [ ] Fixed in the build: a never-published version now lists as a draft wherever it sits, not as "Earlier".
+- [x] Output markers confirmed against every call site: 88 prompts are parsed as JSON (13 `json`, 75 `structured`); 3 marked prompts with no caller were unmarked.
+- [x] WhatsApp replies now record the Skills Store version and content hash of each knowledge prompt sent to ally-ai (`wa_messages.retrieval_meta.prompt_versions`/`prompt_hashes`).
+- [x] Contracts tightened from the call sites: 93 variables are now `required` (ally-be 60, ally-ai 22, ally-ai-learn 11) where every caller always supplies a non-empty value the prompt depends on; 8 in the ally-ai-learn main-agent prompts that were required but not always supplied (`competency`, the seven working-memory sections) are optional again; `role_instructions` stays required, since main-agent text without it drops the scenario's role. Everything else stays optional; contracts stay open.
+- [ ] 3 marked-then-unmarked prompts have no caller at all (`roadmap_opportunity_interview`, ally-ai's two `simulation_analysis` prompts): delete them with the 23 above?
+- [x] Fixed in the build: a never-published version now lists as a draft wherever it sits, not as "Earlier".
 
 ## Sources
 

@@ -31,8 +31,9 @@ class PromptInputs(BaseModel):
     contract_version: ClassVar[int] = 1
     # Text the runtime appends after templating, outside the template.
     fragments: ClassVar[list[str]] = []
-    # "json" when the code parses the model's answer as JSON; CI then checks
-    # that the default actually produces parseable JSON.
+    # How the code reads the answer: "json" when it parses free text as JSON
+    # (CI checks the default produces parseable JSON); "structured" when the
+    # provider enforces it (with_structured_output, response_format).
     output_format: ClassVar[Optional[str]] = None
 
 
@@ -41,7 +42,7 @@ class BranchingChatSummarySystemInputs(PromptInputs):
     (`branching/chat_summary_system.txt`).
     """
 
-    pass
+    output_format: ClassVar[Optional[str]] = "structured"
 
 
 class BranchingLlmResponseSystemInputs(PromptInputs):
@@ -50,7 +51,7 @@ class BranchingLlmResponseSystemInputs(PromptInputs):
     (`branching/llm_response_system.txt`).
     """
 
-    pass
+    output_format: ClassVar[Optional[str]] = "structured"
 
 
 class CounselorAntiRepetitionGuidanceInputs(PromptInputs):
@@ -91,7 +92,7 @@ class EvaluationEvaluatorSystemInputs(PromptInputs):
     (`evaluation/evaluator_system.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
     pass
 
@@ -101,6 +102,8 @@ class EventsBehaviorDetectionSystemInputs(PromptInputs):
     (`events/behavior_detection_system.txt`).
     """
 
+    output_format: ClassVar[Optional[str]] = "structured"
+
     behaviors: Optional[str] = None
 
 
@@ -109,7 +112,9 @@ class EventsBehaviorDetectionUserInputs(PromptInputs):
     (`events/behavior_detection_user.txt`).
     """
 
-    message: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    message: str
 
 
 class EventsBinaryClassifierBatchSystemInputs(PromptInputs):
@@ -118,7 +123,9 @@ class EventsBinaryClassifierBatchSystemInputs(PromptInputs):
     (`events/binary_classifier_batch_system.txt`).
     """
 
-    classes_block: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    classes_block: str
 
 
 class EventsBinaryClassifierSystemInputs(PromptInputs):
@@ -126,7 +133,9 @@ class EventsBinaryClassifierSystemInputs(PromptInputs):
     (`events/binary_classifier_system.txt`).
     """
 
-    class_name: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    class_name: str
     examples_block: Optional[str] = None
 
 
@@ -135,7 +144,9 @@ class EventsBinaryClassifierUserInputs(PromptInputs):
     (`events/binary_classifier_user.txt`).
     """
 
-    message: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    message: str
 
 
 class EventsCoherenceGuardrailSystemInputs(PromptInputs):
@@ -143,9 +154,9 @@ class EventsCoherenceGuardrailSystemInputs(PromptInputs):
     System Prompt (`events/coherence_guardrail_system.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    helper_dialogue: Optional[str] = None
+    helper_dialogue: str
 
 
 class EventsCoherenceGuardrailUserInputs(PromptInputs):
@@ -154,8 +165,10 @@ class EventsCoherenceGuardrailUserInputs(PromptInputs):
     Prompt (`events/coherence_guardrail_user.txt`).
     """
 
+    output_format: ClassVar[Optional[str]] = "structured"
+
     conversation_context: Optional[str] = None
-    counselor_message: Optional[str] = None
+    counselor_message: str
 
 
 class EventsGuardrailSystemInputs(PromptInputs):
@@ -163,9 +176,9 @@ class EventsGuardrailSystemInputs(PromptInputs):
     (`events/guardrail_system.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
-    helper_dialogue: Optional[str] = None
+    helper_dialogue: str
 
 
 class EventsGuardrailUserInputs(PromptInputs):
@@ -173,7 +186,9 @@ class EventsGuardrailUserInputs(PromptInputs):
     (`events/guardrail_user.txt`).
     """
 
-    counselor_message: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    counselor_message: str
 
 
 class EventsHelperParaphrasedSystemInputs(PromptInputs):
@@ -182,7 +197,7 @@ class EventsHelperParaphrasedSystemInputs(PromptInputs):
     Prompt (`events/helper_paraphrased_system.txt`).
     """
 
-    pass
+    output_format: ClassVar[Optional[str]] = "structured"
 
 
 class EventsHelperParaphrasedUserInputs(PromptInputs):
@@ -190,14 +205,18 @@ class EventsHelperParaphrasedUserInputs(PromptInputs):
     Prompt (`events/helper_paraphrased_user.txt`).
     """
 
-    agent_message: Optional[str] = None
-    counselor_message: Optional[str] = None
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    agent_message: str
+    counselor_message: str
 
 
 class FillerBackchannelInputs(PromptInputs):
     """
     ally_ai_learn_filler_backchannel — Back-channel Prompt (`filler/backchannel.txt`).
     """
+
+    output_format: ClassVar[Optional[str]] = "structured"
 
     count: Optional[str] = None
     language_code: Optional[str] = None
@@ -210,6 +229,8 @@ class FillerInterimReplyInputs(PromptInputs):
     working memory) (`filler/interim_reply.txt`).
     """
 
+    output_format: ClassVar[Optional[str]] = "structured"
+
     language_code: Optional[str] = None
     language_label: Optional[str] = None
     scenario_context: Optional[str] = None
@@ -219,6 +240,8 @@ class FillerPredictiveFillerInputs(PromptInputs):
     """ally_ai_learn_filler_predictive_filler — Predictive Filler Prompt
     (`filler/predictive_filler.txt`).
     """
+
+    output_format: ClassVar[Optional[str]] = "structured"
 
     character_voice: Optional[str] = None
     count: Optional[str] = None
@@ -234,7 +257,7 @@ class SupervisorLiveNoteInputs(PromptInputs):
     (`supervisor/live_note.txt`).
     """
 
-    output_format: ClassVar[Optional[str]] = "json"
+    output_format: ClassVar[Optional[str]] = "structured"
 
     LANGUAGE: str
 
@@ -270,7 +293,7 @@ class SystemBranchingAgentPromptInputs(PromptInputs):
     language_label: Optional[str] = None
     linguistic_samples: Optional[str] = None
     name: Optional[str] = None
-    next_instruction: Optional[str] = None
+    next_instruction: str
     retrieved_context: Optional[str] = None
 
 
@@ -280,6 +303,8 @@ class SystemClientWorkingMemoryUpdaterInputs(PromptInputs):
     (writes what Main Agent Prompt #3 reads)
     (`system/client_working_memory_updater.txt`).
     """
+
+    output_format: ClassVar[Optional[str]] = "structured"
 
     current_state: str
     language_label: str
@@ -303,7 +328,7 @@ class SystemMainAgentPromptInputs(PromptInputs):
     allowed_fillers: Optional[str] = None
     behavior_instructions_json: Optional[str] = None
     character_profile_text: Optional[str] = None
-    competency: str
+    competency: Optional[str] = None
     current_location: Optional[str] = None
     custom_fields_text: Optional[str] = None
     dialogue_length_instruction: Optional[str] = None
@@ -377,13 +402,13 @@ class SystemMainAgentPromptWorkingMemorySplitInputs(PromptInputs):
     role_instructions: str
     sexual_orientation: Optional[str] = None
     state_x_guidelines: Optional[str] = None
-    working_memory_disclosed: str
-    working_memory_register: str
-    working_memory_salient: str
-    working_memory_speech_fragments: str
-    working_memory_stance: str
-    working_memory_unresolved: str
-    working_memory_withheld: str
+    working_memory_disclosed: Optional[str] = None
+    working_memory_register: Optional[str] = None
+    working_memory_salient: Optional[str] = None
+    working_memory_speech_fragments: Optional[str] = None
+    working_memory_stance: Optional[str] = None
+    working_memory_unresolved: Optional[str] = None
+    working_memory_withheld: Optional[str] = None
 
 
 class SystemRollingSummaryInputs(PromptInputs):
@@ -391,7 +416,7 @@ class SystemRollingSummaryInputs(PromptInputs):
     (`system/rolling_summary.txt`).
     """
 
-    pass
+    output_format: ClassVar[Optional[str]] = "structured"
 
 
 class SystemTextChatGuidanceInputs(PromptInputs):
