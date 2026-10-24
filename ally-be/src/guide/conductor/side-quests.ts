@@ -76,7 +76,14 @@ export function planSideQuest(input: {
   if (input.mode !== GuideMode.NORMAL) return closed('not in a hard moment');
   if (input.releaseWindowOpen) return closed('release window');
   if (input.quizOpen) return closed('a quiz is open');
-  if (!spine.enrolled || spine.finished) return closed('nothing to practise');
+  const backAfterBreak =
+    (input.returnedAfterDays ?? 0) > SPACED_RECALL_AFTER_DAYS;
+  if (!spine.enrolled) return closed('nothing to practise');
+  // A finished course still invites spaced recall on a return — the
+  // finale's look back (plan §4.6 "and in the endgame").
+  if (spine.finished && !backAfterBreak) {
+    return closed('nothing to practise');
+  }
   const state = (pacing.sideQuest ?? {}) as SideQuestPacing;
   const turn = pacing.learnerTurns ?? 0;
   if (state.atTurn != null && turn - state.atTurn < SIDE_QUEST_MIN_TURN_GAP) {
@@ -105,6 +112,7 @@ export function planSideQuest(input: {
       reason: 'back after a break',
     };
   }
+  if (spine.finished) return closed('nothing to practise');
 
   const cadence = input.policy.sideQuestCadence[input.guidance];
   if (cadence == null) return closed('the learner leads (only if they ask)');

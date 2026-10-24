@@ -386,6 +386,28 @@ describe('GuideLearnerDataService', () => {
     });
   });
 
+  it('books the finale’s look back as a spaced-recall appointment', async () => {
+    const t = setup();
+    const recall = await t.service.setAppointment(
+      { id: 'th1' } as never,
+      owner,
+      {
+        at: '2026-10-30T04:30:00Z',
+        timezone: 'Asia/Kolkata',
+        purpose: 'spaced_recall',
+      },
+      new Date('2026-10-23T12:00:00Z'),
+    );
+    expect(recall.purpose).toBe('spaced_recall');
+    const session = await t.service.setAppointment(
+      { id: 'th1' } as never,
+      owner,
+      { at: '2026-10-24T03:30:00Z', timezone: 'Asia/Kolkata' },
+      new Date('2026-10-23T12:00:00Z'),
+    );
+    expect(session.purpose).toBe('session');
+  });
+
   it('validates time zones and renders the notebook as Markdown', () => {
     expect(isValidTimezone('Asia/Kolkata')).toBe(true);
     expect(isValidTimezone('Nowhere/Land')).toBe(false);

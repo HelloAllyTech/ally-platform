@@ -114,6 +114,14 @@ export enum GuideAppointmentStatus {
   MISSED = 'missed',
 }
 
+/** Why the learner booked a time (plan §5.10 closing ritual, §3 stage 13 finale). */
+export enum GuideAppointmentPurpose {
+  /** The closing ritual: come back to carry on with the course. */
+  SESSION = 'session',
+  /** The finale's spaced-recall door: a short look back, after the course. */
+  SPACED_RECALL = 'spaced_recall',
+}
+
 export enum GuideCrisisScope {
   PLATFORM = 'platform',
   TENANT = 'tenant',

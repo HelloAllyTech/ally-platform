@@ -86,6 +86,8 @@ function setup(
     orgOverrides?: Record<string, unknown>;
     courseOverrides?: Record<string, unknown>;
     prefs?: Record<string, unknown>;
+    spine?: any;
+    finale?: any;
   } = {},
 ) {
   const events: Array<{ type: string; durable: boolean; data: any }> = [];
@@ -170,7 +172,7 @@ function setup(
       description: null,
       languageCode: 'en',
       trainerNotes: null,
-      spine: SPINE,
+      spine: options.spine ?? SPINE,
     })),
     loadPublicCourse: jest.fn(async () => ({
       title: 'Course',
@@ -266,6 +268,13 @@ function setup(
       async (): Promise<string | null> => 'Their goals:\n- Calmer openings',
     ),
   };
+  const finale = {
+    present: jest.fn(
+      async (): Promise<any> =>
+        options.finale ?? { presented: false, reason: 'not_finished' },
+    ),
+    payloadFor: jest.fn(async (): Promise<any> => null),
+  };
   const service = new GuideTurnService(
     threads as never,
     bus as never,
@@ -289,6 +298,7 @@ function setup(
     configResolver as never,
     curator as never,
     summariser as never,
+    finale as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(
@@ -322,6 +332,7 @@ function setup(
     releases,
     curator,
     summariser,
+    finale,
   };
 }
 
@@ -975,6 +986,67 @@ describe('GuideTurnService', () => {
       summary: 'Earlier: they work nights.',
       summarisedThroughSeq: 40,
     });
+  });
+
+  const finishedSpine = () => ({
+    ...SPINE,
+    finished: true,
+    current: null,
+    completed: SPINE.total,
+  });
+  const finalePayload = {
+    hushed: false,
+    firstMove: { text: 'I would listen', question: null, invitation: 'Now?' },
+    possibleSelf: null,
+    noticings: [],
+    doors: [],
+  };
+
+  it('presents the finale on a finished course and tells Ally to host it, once', async () => {
+    const t = setup({
+      spine: finishedSpine(),
+      finale: {
+        presented: true,
+        card: { cardId: 'f1', kind: 'finale', title: 'Looking back' },
+        payload: finalePayload,
+      },
+    });
+    const ctx = await t.run();
+    expect(t.finale.present).toHaveBeenCalled();
+    expect(ctx.presented).toEqual([
+      expect.objectContaining({ cardId: 'f1', kind: 'finale' }),
+    ]);
+    expect(ctx.situation).toContain('the finale is on their screen');
+    expect(ctx.situation).toContain(
+      'invite them to answer their first move again',
+    );
+    expect(ctx.pacing.finaleHosted).toBe(true);
+
+    const again = setup({
+      spine: finishedSpine(),
+      thread: { pacing: { finaleHosted: true } },
+    });
+    await again.run();
+    expect(again.finale.present).not.toHaveBeenCalled();
+  });
+
+  it('hosts a finale already on screen that no turn has hosted yet', async () => {
+    const t = setup({
+      spine: finishedSpine(),
+      finale: { presented: false, reason: 'already_shown' },
+    });
+    t.finale.payloadFor.mockResolvedValue(finalePayload);
+    const ctx = await t.run();
+    expect(ctx.situation).toContain('the finale is on their screen');
+  });
+
+  it('waits out a crisis before the finale', async () => {
+    const t = setup({
+      spine: finishedSpine(),
+      thread: await continuingThread(GuideMode.CRISIS),
+    });
+    await t.run({ text: 'ok' });
+    expect(t.finale.present).not.toHaveBeenCalled();
   });
 
   it('does not curate on a thread’s first conversation', async () => {

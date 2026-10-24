@@ -118,6 +118,36 @@ export interface GuideSceneReceipt {
   noticing?: string | null;
 }
 
+/** One of the finale's three doors (plan §4.3 endgame). field_assignment: try one thing on the next real shift and come back to tell Ally. spaced_recall: book a short look back — the client saves `suggestedAt` (or the learner's own pick) with PUT threads/:id/appointment and purpose spaced_recall. mentor: leave a line for the next learner (`available` is false until advice lines ship; hide it then). */
+export interface GuideFinaleDoor {
+  kind: 'field_assignment' | 'spaced_recall' | 'mentor';
+  title: string;
+  body: string;
+  /** spaced_recall: seven days from the finale, ISO. */
+  suggestedAt?: string | null;
+  /** mentor: the advice line's length limit. */
+  maxChars?: number | null;
+  available?: boolean;
+}
+
+/** `card.payload` of a `finale` card (plan §3 stage 13, §5.10), presented when the course completes. Every part is the learner's own or Ally's noticing, never a score; a part with nothing behind it is null or empty and the reveal skips it. `hushed` (heavy trigger warnings, or a hard moment) means a quiet reveal: no festive motion. */
+export interface GuideFinalePayload {
+  hushed: boolean;
+  /** The notebook's first move beside an invitation to answer the same question now. `question` is what Ally had asked, when it is known. */
+  firstMove: {
+    text: string;
+    question: string | null;
+    invitation: string;
+  } | null;
+  possibleSelf: {
+    text: string;
+    invitation: string;
+  } | null;
+  /** Ally's noticing moments in this course, oldest first. */
+  noticings: Array<string>;
+  doors: Array<GuideFinaleDoor>;
+}
+
 /** A chapter scene as bootstrap returns it: what scene.opened and scene.closed said, with the seqs they were sent at. */
 export interface GuideSceneView {
   sceneId: string;

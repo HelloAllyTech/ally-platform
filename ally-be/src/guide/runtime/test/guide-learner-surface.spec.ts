@@ -477,6 +477,13 @@ describe('GuideProgressListener', () => {
     const scenes = {
       closeChapter: jest.fn(async () => null),
     };
+    const finale = {
+      present: jest.fn(async () => ({
+        presented: true,
+        card: { cardId: 'f1' },
+        payload: {},
+      })),
+    };
     const listener = new GuideProgressListener(
       dataSource as never,
       threadService as never,
@@ -486,9 +493,54 @@ describe('GuideProgressListener', () => {
       turns as never,
       threads as never,
       scenes as never,
+      finale as never,
     );
-    return { listener, bus, threadService, turns, queries, params, scenes };
+    return {
+      listener,
+      bus,
+      threadService,
+      turns,
+      queries,
+      params,
+      scenes,
+      finale,
+      threads,
+    };
   }
+
+  it('presents the finale on course completion, keeps the thread open, and lets Ally host it', async () => {
+    const t = setup({ present: true });
+    await t.listener.onTrackCompleted(event);
+    expect(t.threads.update).toHaveBeenCalledWith('th1', {
+      completedAt: expect.any(Date),
+    });
+    expect(t.finale.present).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      expect.anything(),
+      'Course',
+    );
+    expect(t.turns.acceptTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'th1' }),
+      { id: 3, tenantId: 'org' },
+      {
+        dedupeKey: 'th1:course_completed:enr1',
+        description: 'The learner has finished the whole course.',
+      },
+    );
+  });
+
+  it('ends a heavy course quietly', async () => {
+    const t = setup();
+    await t.listener.onTrackCompleted(event);
+    const milestone = t.bus.appendDurable.mock.calls.find(
+      (call: any[]) => call[1] === 'milestone',
+    );
+    // The test course's practice carries content warnings.
+    expect(milestone?.[2]).toMatchObject({
+      kind: 'course_complete',
+      tone: 'quiet',
+    });
+  });
 
   it('closes the chapter’s scene when the chapter is complete', async () => {
     const t = setup();

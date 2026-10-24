@@ -133,6 +133,17 @@ describe('planSideQuest', () => {
       'spaced_recall',
     );
   });
+
+  it('a finished course offers only the look back, on a return', () => {
+    const finished = { ...spineWith(3), finished: true, current: null };
+    expect(planSideQuest(base({ spine: finished }))).toMatchObject({
+      open: false,
+      reason: 'nothing to practise',
+    });
+    expect(
+      planSideQuest(base({ spine: finished, returnedAfterDays: 7 })),
+    ).toMatchObject({ open: true, suggested: 'spaced_recall' });
+  });
 });
 
 describe('sideQuestDifficulty', () => {

@@ -35,6 +35,7 @@ import { GUIDE_DEFAULT_POLICY } from '../release/guide-release.bundle';
 import { GuideCardService } from './guide-card.service';
 import { GuideEventBusService } from './guide-event-bus.service';
 import { GuideSceneService } from './guide-scene.service';
+import { GuideFinaleService, isHeavyCourse } from './guide-finale.service';
 import { GuideThreadService } from './guide-thread.service';
 import { GuideTurnService } from './guide-turn.service';
 
@@ -90,6 +91,7 @@ export class GuideProgressListener {
     @InjectRepository(GuideThread)
     private readonly threads: Repository<GuideThread>,
     private readonly scenes: GuideSceneService,
+    private readonly finale: GuideFinaleService,
   ) {}
 
   @OnEvent(TRACK_EVENTS.ITEM_COMPLETED, { async: true })
@@ -332,12 +334,19 @@ export class GuideProgressListener {
         ),
         spine,
       });
-      const tone = celebrationFor({
+      const celebration = celebrationFor({
         mode,
         atmosphere,
         item: { boss: false, triggerWarnings: [], tension: 'medium' },
         courseFinished: kind === 'course_complete',
       });
+      // A heavy course ends quietly, whatever the atmosphere at the end.
+      const tone =
+        kind === 'course_complete' &&
+        celebration !== 'none' &&
+        isHeavyCourse(spine)
+          ? 'quiet'
+          : celebration;
       if (tone !== 'none') {
         await this.bus.appendDurable(thread.id, 'milestone', {
           kind,
@@ -348,7 +357,33 @@ export class GuideProgressListener {
       if (kind === 'course_complete') {
         // The thread stays open after the course (plan D3).
         await this.threads.update(thread.id, { completedAt: new Date() });
+        await this.finishWithFinale(thread, spine, dedupeKey);
       }
+    }
+  }
+
+  /**
+   * The finale (plan §3 stage 13): presented now, and hosted by Ally if the
+   * learner is watching. In a crisis it waits; the next turn after the
+   * crisis presents it (GuideTurnService.prepare).
+   */
+  private async finishWithFinale(
+    thread: GuideThread,
+    spine: CourseSpine,
+    dedupeKey: string,
+  ): Promise<void> {
+    const outcome = await this.finale.present(thread, spine, spine.title);
+    if (!outcome.presented || !thread.userId) return;
+    // The turn's prepare stage tells Ally how to host it (once per thread).
+    if (await this.cards.isPresent(thread.id)) {
+      await this.turns.acceptTrigger(
+        thread,
+        { id: thread.userId, tenantId: thread.tenantId! },
+        {
+          dedupeKey: threadDedupeKey(thread.id, dedupeKey),
+          description: 'The learner has finished the whole course.',
+        },
+      );
     }
   }
 

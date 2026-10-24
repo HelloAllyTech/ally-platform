@@ -189,6 +189,15 @@ export class GuideAppointmentDto {
   @IsString()
   @MaxLength(64)
   timezone!: string;
+
+  @ApiPropertyOptional({
+    enum: ['session', 'spaced_recall'],
+    description:
+      'session (the closing ritual, the default) or spaced_recall (the finale door: a short look back after the course).',
+  })
+  @IsOptional()
+  @IsIn(['session', 'spaced_recall'])
+  purpose?: 'session' | 'spaced_recall';
 }
 
 /** POST /v1/guide/voice/turns (contract GuideVoiceTurnRequest). */

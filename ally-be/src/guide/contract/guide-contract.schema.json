@@ -332,6 +332,91 @@
         }
       }
     },
+    "GuideFinaleDoor": {
+      "description": "One of the finale's three doors (plan §4.3 endgame). field_assignment: try one thing on the next real shift and come back to tell Ally. spaced_recall: book a short look back — the client saves `suggestedAt` (or the learner's own pick) with PUT threads/:id/appointment and purpose spaced_recall. mentor: leave a line for the next learner (`available` is false until advice lines ship; hide it then).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "body"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["field_assignment", "spaced_recall", "mentor"]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "suggestedAt": {
+          "description": "spaced_recall: seven days from the finale, ISO.",
+          "type": ["string", "null"]
+        },
+        "maxChars": {
+          "description": "mentor: the advice line's length limit.",
+          "type": ["integer", "null"]
+        },
+        "available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "GuideFinalePayload": {
+      "description": "`card.payload` of a `finale` card (plan §3 stage 13, §5.10), presented when the course completes. Every part is the learner's own or Ally's noticing, never a score; a part with nothing behind it is null or empty and the reveal skips it. `hushed` (heavy trigger warnings, or a hard moment) means a quiet reveal: no festive motion.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hushed", "firstMove", "possibleSelf", "noticings", "doors"],
+      "properties": {
+        "hushed": {
+          "type": "boolean"
+        },
+        "firstMove": {
+          "description": "The notebook's first move beside an invitation to answer the same question now. `question` is what Ally had asked, when it is known.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["text", "question", "invitation"],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "question": {
+              "type": ["string", "null"]
+            },
+            "invitation": {
+              "type": "string"
+            }
+          }
+        },
+        "possibleSelf": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["text", "invitation"],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "invitation": {
+              "type": "string"
+            }
+          }
+        },
+        "noticings": {
+          "description": "Ally's noticing moments in this course, oldest first.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "doors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GuideFinaleDoor"
+          }
+        }
+      }
+    },
     "GuideSceneView": {
       "description": "A chapter scene as bootstrap returns it: what scene.opened and scene.closed said, with the seqs they were sent at.",
       "type": "object",

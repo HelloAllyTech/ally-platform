@@ -1,4 +1,7 @@
+import { GuideAppointmentPurpose } from '../../enum/guide.enum';
 import {
+  OUTREACH_RECALL_STEP,
+  buildOutreachUserMessage,
   outreachPassesLint,
   outreachTemplate,
 } from '../../prompts/outreach.prompt';
@@ -45,6 +48,24 @@ describe('outreach text', () => {
     const appointment = outreachTemplate({ ...facts, kind: 'appointment' });
     expect(appointment.body).toContain('You picked now');
     expect(outreachPassesLint(appointment)).toBe(true);
+  });
+
+  it('a spaced-recall reminder names the look back, not a next activity', () => {
+    const recall = {
+      ...facts,
+      kind: 'appointment' as const,
+      recall: true,
+      nextTitle: OUTREACH_RECALL_STEP,
+      nextMinutes: 3,
+    };
+    const template = outreachTemplate(recall);
+    expect(template.body).toContain(
+      'short look back at New Counselor Foundations',
+    );
+    expect(outreachPassesLint(template)).toBe(true);
+    const message = buildOutreachUserMessage(recall);
+    expect(message).toContain('the learner has finished the course');
+    expect(message).not.toContain('last finished');
   });
 
   it('reads the hour in the learner’s own timezone', () => {
@@ -210,6 +231,31 @@ describe('GuideOutreachService.eligibility', () => {
         'idle',
       ),
     ).toEqual({ ok: false, reason: 'visitor' });
+  });
+
+  it('a finished course still gets the look back the learner booked at its finale', async () => {
+    const done = setup({});
+    const finished = { ...done.thread, completedAt: new Date() };
+    expect(
+      (
+        await done.service.eligibility(
+          finished,
+          'appointment',
+          GuideAppointmentPurpose.SPACED_RECALL,
+        )
+      ).ok,
+    ).toBe(true);
+    // ...but never after a crisis, finished or not.
+    const crisis = setup({ lastCrisisDaysAgo: 2 });
+    expect(
+      (
+        await crisis.service.eligibility(
+          { ...crisis.thread, completedAt: new Date() },
+          'appointment',
+          GuideAppointmentPurpose.SPACED_RECALL,
+        )
+      ).ok,
+    ).toBe(false);
   });
 
   it('the unsubscribe link works once signed and never when tampered with', async () => {

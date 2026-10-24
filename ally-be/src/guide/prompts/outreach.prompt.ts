@@ -47,22 +47,35 @@ export interface OutreachFacts {
   lastCompletedTitle: string | null;
   nextTitle: string;
   nextMinutes: number;
+  /** The finale's spaced-recall look back: the course is finished. */
+  recall?: boolean;
 }
+
+/** The step a spaced-recall reminder names (plan §4.6 "in the endgame"). */
+export const OUTREACH_RECALL_STEP = 'a short look back: three quick questions';
 
 export function buildOutreachUserMessage(facts: OutreachFacts): string {
   return [
     `<reminder kind="${facts.kind}" language="${asData(facts.languageCode)}">`,
     `course: ${asData(facts.courseTitle)}`,
-    `progress: ${facts.completed} of ${facts.total} activities finished`,
-    facts.lastCompletedTitle
-      ? `last finished: ${asData(facts.lastCompletedTitle)}`
-      : 'last finished: none yet',
+    facts.recall
+      ? 'progress: the learner has finished the course'
+      : `progress: ${facts.completed} of ${facts.total} activities finished`,
+    facts.recall
+      ? ''
+      : facts.lastCompletedTitle
+        ? `last finished: ${asData(facts.lastCompletedTitle)}`
+        : 'last finished: none yet',
     `next step: ${asData(facts.nextTitle)}, about ${facts.nextMinutes} minutes`,
-    facts.kind === 'appointment'
-      ? 'This is the time the learner chose to come back.'
-      : 'The learner has not been back for a while.',
+    facts.recall
+      ? 'At the end of the course the learner chose this time for a short look back, to help it stick.'
+      : facts.kind === 'appointment'
+        ? 'This is the time the learner chose to come back.'
+        : 'The learner has not been back for a while.',
     '</reminder>',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** Words a reminder may never use (plan §4.8: no loss or guilt language). */
@@ -99,6 +112,12 @@ export function outreachTemplate(facts: OutreachFacts): {
   body: string;
 } {
   const step = `${facts.nextTitle} · about ${facts.nextMinutes} min`;
+  if (facts.recall) {
+    return {
+      title: `A look back at ${facts.courseTitle}`.slice(0, 50),
+      body: `You picked now for a short look back at ${facts.courseTitle}: three quick questions, about ${facts.nextMinutes} min.`,
+    };
+  }
   if (facts.kind === 'appointment') {
     return {
       title: `Time for ${facts.courseTitle}`.slice(0, 50),

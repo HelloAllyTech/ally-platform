@@ -80,6 +80,7 @@ import {
   AgentTurnTrigger,
 } from '../../llm-agent/harness/enum/harness.enum';
 import {
+  GuideAppointmentPurpose,
   GuideAppointmentStatus,
   GuideCardKind,
   GuideCardPresentation,
@@ -353,6 +354,7 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_guide_learner_memories_status', Object.values(GuideMemoryStatus)],
     ['CHK_guide_notebook_entries_kind', Object.values(GuideNotebookKind)],
     ['CHK_guide_appointments_status', Object.values(GuideAppointmentStatus)],
+    ['CHK_guide_appointments_purpose', Object.values(GuideAppointmentPurpose)],
     ['CHK_guide_crisis_responses_scope', Object.values(GuideCrisisScope)],
     ['CHK_track_enrollments_entry_source', Object.values(TrackEntrySource)],
   ])('%s accepts every enum value', (constraint, values) => {

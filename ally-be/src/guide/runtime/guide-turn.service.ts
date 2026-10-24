@@ -139,6 +139,7 @@ import {
 } from '../visitor/guide-visitor.service';
 import { budgetTier, decideEpoch, estimateTokens } from './guide-epoch';
 import { GuideSummariserService } from '../context/guide-summariser.service';
+import { GuideFinaleService, finaleHostingNote } from './guide-finale.service';
 import { GuideEventBusService } from './guide-event-bus.service';
 import { GuideModelService } from './guide-model.service';
 import { ReleaseGate, runOrchestrator } from './guide-orchestrator.runner';
@@ -378,6 +379,7 @@ export class GuideTurnService {
     private readonly configResolver: GuideConfigResolverService,
     private readonly curator: GuideMemoryCuratorService,
     private readonly summariser: GuideSummariserService,
+    private readonly finale: GuideFinaleService,
   ) {}
 
   /**
@@ -1179,6 +1181,39 @@ export class GuideTurnService {
         possibleSelfOfferedAtTurn: pacing.learnerTurns ?? 0,
       };
       ctx.pacing = pacing;
+    }
+
+    // The finale (plan §3 stage 13): presented when the course is finished
+    // if it has not been yet (it waits out a crisis), and hosted by Ally once.
+    if (
+      !visitor &&
+      spine.finished &&
+      ctx.mode !== GuideMode.CRISIS &&
+      !pacing.finaleHosted
+    ) {
+      const outcome = await this.finale.present(thread, spine, course.title, {
+        emit: async (type, data) => {
+          const event = await this.bus.appendDurable(
+            ctx.threadId,
+            type,
+            data,
+            ctx.turnId,
+          );
+          ctx.lastSeq = event.seq;
+          return event.seq;
+        },
+      });
+      if (outcome.presented) ctx.presented.push(outcome.card);
+      const payload = outcome.presented
+        ? outcome.payload
+        : outcome.reason === 'already_shown'
+          ? await this.finale.payloadFor(ctx.threadId)
+          : null;
+      if (payload) {
+        events.push(finaleHostingNote(payload));
+        pacing = { ...pacing, finaleHosted: true };
+        ctx.pacing = pacing;
+      }
     }
 
     if (ctx.visitorId) {

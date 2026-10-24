@@ -119,6 +119,40 @@ class GuideSceneReceipt(_GuideModel):
     noticing: Optional[str] = None
 
 
+class GuideFinaleDoor(_GuideModel):
+    """One of the finale's three doors (plan §4.3 endgame). field_assignment: try one thing on the next real shift and come back to tell Ally. spaced_recall: book a short look back — the client saves `suggestedAt` (or the learner's own pick) with PUT threads/:id/appointment and purpose spaced_recall. mentor: leave a line for the next learner (`available` is false until advice lines ship; hide it then)."""
+
+    kind: Literal["field_assignment", "spaced_recall", "mentor"]
+    title: str
+    body: str
+    suggested_at: Optional[str] = Field(default=None, alias="suggestedAt")
+    max_chars: Optional[int] = Field(default=None, alias="maxChars")
+    available: Optional[bool] = None
+
+
+class GuideFinalePayloadFirstMove(_GuideModel):
+    """The notebook's first move beside an invitation to answer the same question now. `question` is what Ally had asked, when it is known."""
+
+    text: str
+    question: Optional[str]
+    invitation: str
+
+
+class GuideFinalePayloadPossibleSelf(_GuideModel):
+    text: str
+    invitation: str
+
+
+class GuideFinalePayload(_GuideModel):
+    """`card.payload` of a `finale` card (plan §3 stage 13, §5.10), presented when the course completes. Every part is the learner's own or Ally's noticing, never a score; a part with nothing behind it is null or empty and the reveal skips it. `hushed` (heavy trigger warnings, or a hard moment) means a quiet reveal: no festive motion."""
+
+    hushed: bool
+    first_move: Optional[GuideFinalePayloadFirstMove] = Field(alias="firstMove")
+    possible_self: Optional[GuideFinalePayloadPossibleSelf] = Field(alias="possibleSelf")
+    noticings: list[str]
+    doors: list[GuideFinaleDoor]
+
+
 class GuideSceneView(_GuideModel):
     """A chapter scene as bootstrap returns it: what scene.opened and scene.closed said, with the seqs they were sent at."""
 

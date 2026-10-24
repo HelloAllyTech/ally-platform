@@ -21,12 +21,14 @@ import { GuideOrgProfile } from '../entity/guide-org-profile.entity';
 import { GuideOutreach } from '../entity/guide-outreach.entity';
 import { GuideThread } from '../entity/guide-thread.entity';
 import {
+  GuideAppointmentPurpose,
   GuideAppointmentStatus,
   GuideMode,
   GuideThreadStatus,
 } from '../enum/guide.enum';
 import {
   OUTREACH_OUTPUT_SCHEMA,
+  OUTREACH_RECALL_STEP,
   OUTREACH_SYSTEM_PROMPT,
   OutreachFacts,
   buildOutreachUserMessage,
@@ -158,7 +160,7 @@ export class GuideOutreachService implements OnModuleInit {
       const decision: Go | Skip = stale
         ? { ok: false, reason: 'stale' }
         : thread
-          ? await this.eligibility(thread, 'appointment')
+          ? await this.eligibility(thread, 'appointment', appointment.purpose)
           : { ok: false, reason: 'no_thread' };
       if (!decision.ok || !thread) {
         await this.record(thread, appointment.userId, {
@@ -174,6 +176,7 @@ export class GuideOutreachService implements OnModuleInit {
       }
       const delivered = await this.deliver(thread, 'appointment', decision, {
         appointmentId: appointment.id,
+        recall: appointment.purpose === GuideAppointmentPurpose.SPACED_RECALL,
       });
       await this.appointments.update(appointment.id, {
         status: delivered
@@ -233,11 +236,19 @@ export class GuideOutreachService implements OnModuleInit {
   async eligibility(
     thread: GuideThread,
     kind: 'appointment' | 'idle',
+    /** The finale's look back is the one reminder a finished course gets. */
+    purpose: GuideAppointmentPurpose = GuideAppointmentPurpose.SESSION,
   ): Promise<Go | Skip> {
     if (!thread.userId || !thread.tenantId) {
       return { ok: false, reason: 'visitor' };
     }
-    if (thread.status !== GuideThreadStatus.ACTIVE || thread.completedAt) {
+    const recall =
+      kind === 'appointment' &&
+      purpose === GuideAppointmentPurpose.SPACED_RECALL;
+    if (
+      thread.status !== GuideThreadStatus.ACTIVE ||
+      (thread.completedAt && !recall)
+    ) {
       return { ok: false, reason: 'course_finished' };
     }
     const policy = GUIDE_DEFAULT_POLICY;
@@ -365,9 +376,9 @@ export class GuideOutreachService implements OnModuleInit {
     thread: GuideThread,
     kind: 'appointment' | 'idle',
     decision: Go,
-    extra: { appointmentId?: string },
+    extra: { appointmentId?: string; recall?: boolean },
   ): Promise<boolean> {
-    const facts = await this.facts(thread, kind);
+    const facts = await this.facts(thread, kind, extra.recall === true);
     if (!facts) {
       await this.record(thread, thread.userId!, {
         kind,
@@ -448,6 +459,8 @@ export class GuideOutreachService implements OnModuleInit {
   private async facts(
     thread: GuideThread,
     kind: 'appointment' | 'idle',
+    /** The finale's spaced-recall look back: the step is a few questions. */
+    recall = false,
   ): Promise<OutreachFacts | null> {
     const course = await ExecutionManager.runWithContext(
       async () => {
@@ -459,11 +472,25 @@ export class GuideOutreachService implements OnModuleInit {
       },
       { path: 'guide-outreach' },
     ).catch(() => null);
-    const next = course?.spine.current;
-    if (!course || !next) return null;
+    if (!course) return null;
     const done = course.spine.items.filter(
       (item) => item.state === 'completed',
     );
+    if (recall) {
+      return {
+        kind,
+        recall: true,
+        courseTitle: course.title,
+        languageCode: course.languageCode,
+        completed: course.spine.completed,
+        total: course.spine.total,
+        lastCompletedTitle: null,
+        nextTitle: OUTREACH_RECALL_STEP,
+        nextMinutes: 3,
+      };
+    }
+    const next = course.spine.current;
+    if (!next) return null;
     return {
       kind,
       courseTitle: course.title,

@@ -1,6 +1,9 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
-import { GuideAppointmentStatus } from '../enum/guide.enum';
+import {
+  GuideAppointmentPurpose,
+  GuideAppointmentStatus,
+} from '../enum/guide.enum';
 
 /**
  * The time a learner chose to come back (plan §4.8). Stored with the IANA
@@ -29,6 +32,14 @@ export class GuideAppointment extends BaseWithoutTenantEntity {
     default: GuideAppointmentStatus.SCHEDULED,
   })
   status!: GuideAppointmentStatus;
+
+  /** A session (closing ritual) or the finale's spaced-recall look back. */
+  @Column({
+    type: 'varchar',
+    length: 16,
+    default: GuideAppointmentPurpose.SESSION,
+  })
+  purpose!: GuideAppointmentPurpose;
 
   @Column({ name: 'tenant_id', type: 'varchar' })
   tenantId!: string;

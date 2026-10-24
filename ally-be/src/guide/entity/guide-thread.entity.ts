@@ -32,6 +32,8 @@ export interface GuideThreadPacing {
   closedEpoch?: number | null;
   /** `learnerTurns` when Ally was first told to ask about their possible self. */
   possibleSelfOfferedAtTurn?: number | null;
+  /** Ally has been told to host the finale (once per thread, plan §5.10). */
+  finaleHosted?: boolean | null;
   /** A visitor's last sign-in suggestion, by their turn count. */
   signInOfferedAtTurn?: number | null;
   /** Side quests: when the last was offered, and how they have gone (plan §4.6). */

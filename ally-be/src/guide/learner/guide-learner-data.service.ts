@@ -13,6 +13,7 @@ import { GuideMessage } from '../entity/guide-message.entity';
 import { GuideNotebookEntry } from '../entity/guide-notebook-entry.entity';
 import { GuideThread } from '../entity/guide-thread.entity';
 import {
+  GuideAppointmentPurpose,
   GuideAppointmentStatus,
   GuideMemoryKind,
   GuideMemoryStatus,
@@ -448,7 +449,12 @@ export class GuideLearnerDataService {
   async setAppointment(
     thread: GuideThread,
     owner: Owner,
-    input: { at: string; timezone: string },
+    input: {
+      at: string;
+      timezone: string;
+      /** The closing ritual's session (default) or the finale's look back. */
+      purpose?: 'session' | 'spaced_recall';
+    },
     now = new Date(),
   ) {
     const at = new Date(input.at);
@@ -478,6 +484,10 @@ export class GuideLearnerDataService {
         at,
         timezone: input.timezone,
         status: GuideAppointmentStatus.SCHEDULED,
+        purpose:
+          input.purpose === GuideAppointmentPurpose.SPACED_RECALL
+            ? GuideAppointmentPurpose.SPACED_RECALL
+            : GuideAppointmentPurpose.SESSION,
       }),
     );
     return appointmentView(saved);
@@ -514,6 +524,7 @@ function appointmentView(row: GuideAppointment) {
     at: row.at instanceof Date ? row.at.toISOString() : String(row.at),
     timezone: row.timezone,
     status: row.status,
+    purpose: row.purpose ?? GuideAppointmentPurpose.SESSION,
   };
 }
 
