@@ -232,7 +232,12 @@ describe("AllyGuideTab", () => {
     h.weekly.mockReturnValue(
       ok({
         ...base,
-        weeks: [week("2026-10-12"), week("2026-10-19", { voiceAdoption: rate(null, true) })],
+        weeks: [
+          week("2026-10-12"),
+          week("2026-10-19", {
+            voiceAdoption: { ...rate(null, true), count: 1, of: 2, learners: 2 },
+          }),
+        ],
       }),
     );
     render(<AllyGuideTab {...filters} />);
@@ -244,6 +249,27 @@ describe("AllyGuideTab", () => {
     expect(
       screen.getByText("Fewer than 5 learners, so the rate is withheld.", { selector: "*" }),
     ).toBeInTheDocument();
+  });
+
+  it("says a chart is withheld, not empty, when every rate was withheld", () => {
+    const withheld = { ...rate(null, true), count: 1, of: 2, learners: 1 };
+    h.weekly.mockReturnValue(
+      ok({
+        ...base,
+        weeks: [
+          week("2026-10-12", { voiceAdoption: withheld }),
+          week("2026-10-19", { voiceAdoption: withheld }),
+        ],
+      }),
+    );
+    render(<AllyGuideTab {...filters} />);
+
+    // Voice adoption has nothing to draw, but there was activity behind it.
+    expect(screen.queryByText("No Ally activity in this window.")).toBeNull();
+    expect(
+      screen.getAllByText("Fewer than 5 learners, so the rate is withheld.", { selector: "*" })
+        .length,
+    ).toBeGreaterThan(0);
   });
 
   it("lists the courses with cost per learner, and the folded row by how many it folds", () => {

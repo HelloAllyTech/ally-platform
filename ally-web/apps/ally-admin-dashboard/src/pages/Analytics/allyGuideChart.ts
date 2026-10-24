@@ -38,7 +38,15 @@ export const valueSeries = (
 export const hasWithheld = (
   weeks: readonly AllyWeek[],
   picks: readonly ((week: AllyWeek) => AllyRate)[],
-): boolean => weeks.some(week => picks.some(pick => pick(week).suppressed));
+): boolean =>
+  // The server also marks an empty week suppressed; only a rate with something
+  // behind it was withheld.
+  weeks.some(week =>
+    picks.some(pick => {
+      const rate = pick(week);
+      return rate.suppressed && (rate.of > 0 || rate.learners > 0);
+    }),
+  );
 
 /** Whether a series has anything to draw: at least one point that is not a gap. */
 export const hasPoints = (series: readonly ChartDatum[]): boolean =>

@@ -116,7 +116,8 @@ const LineCard = ({
       onRetry={onRetry}
       errorSubtitle={strings.states.loadFailed}
       empty={!loading && !hasPoints(data)}
-      emptyText={strings.states.empty}
+      // Activity whose every rate was withheld is not "no activity".
+      emptyText={withheldNote ?? strings.states.empty}
     >
       <LineChart data={data} options={opts} />
     </ChartCard>
@@ -325,7 +326,9 @@ export const AllyGuideTab = ({ query }: AnalyticsTabFilters) => {
           !hasPoints(pairedSeries.thumbs) &&
           !hasPoints(learningSeries)
         }
-        emptyText={strings.states.empty}
+        emptyText={
+          (summary.data?.learners ?? 0) > 0 ? strings.withheld(minGroup) : strings.states.empty
+        }
         height="auto"
       >
         <div className="flex flex-col gap-4" data-testid="ally-paired">
@@ -460,6 +463,12 @@ export const AllyGuideTab = ({ query }: AnalyticsTabFilters) => {
           leftTitle={strings.items.axis}
           percent={false}
           legend={false}
+          // A figure, not a rate: the server withholds it below the group minimum.
+          withheldNote={
+            weeks.some(week => week.activeLearners > 0 && week.activeLearners < minGroup)
+              ? strings.withheld(minGroup)
+              : undefined
+          }
         />
         <LineCard
           {...common}

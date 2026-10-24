@@ -113,10 +113,22 @@ describe("hasWithheld", () => {
   it("is true when any chosen rate in any week was withheld", () => {
     expect(
       hasWithheld(
-        [week("2026-10-12"), week("2026-10-19", { firstWinWithin5Min: rate(null, true) })],
+        [
+          week("2026-10-12"),
+          week("2026-10-19", {
+            firstWinWithin5Min: { ...rate(null, true), count: 2, of: 3, learners: 1 },
+          }),
+        ],
         picks,
       ),
     ).toBe(true);
+  });
+
+  it("is false when the only suppressed rates had nothing behind them", () => {
+    // The server marks an empty week suppressed too; that is no activity, not a withheld rate.
+    expect(hasWithheld([week("2026-10-19", { firstWinWithin5Min: rate(null, true) })], picks)).toBe(
+      false,
+    );
   });
 
   it("ignores a withheld rate the chart does not plot", () => {
