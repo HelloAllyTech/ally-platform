@@ -353,6 +353,96 @@ export const GUIDE_POLICY_SCHEMA: PolicySchema = {
     overridableBy: [],
   },
 
+  // ── Learning loop (plan §7.13, Appendix A) ──────────────────────────
+  'evaluator.dailyBudgetUsd': {
+    group: 'Learning loop',
+    type: 'number',
+    default: 25,
+    min: 0,
+    max: 500,
+    unit: 'USD per day',
+    description:
+      'Spend ceiling for the nightly evaluator and the weekly red team; past it, only the free checks run.',
+    overridableBy: [],
+  },
+  'evaluator.flaggedMax': {
+    group: 'Learning loop',
+    type: 'int',
+    default: 200,
+    min: 0,
+    max: 2000,
+    unit: 'windows per night',
+    description:
+      'Every flagged conversation window is judged each night, up to this many.',
+    overridableBy: [],
+  },
+  'evaluator.randomShare': {
+    group: 'Learning loop',
+    type: 'number',
+    default: 0.05,
+    min: 0,
+    max: 1,
+    unit: 'share',
+    description: 'Share of the other windows sampled at random for judging.',
+    overridableBy: [],
+  },
+  'evaluator.randomMax': {
+    group: 'Learning loop',
+    type: 'int',
+    default: 300,
+    min: 0,
+    max: 5000,
+    unit: 'windows per night',
+    description: 'Most random windows judged in a night.',
+    overridableBy: [],
+  },
+  'evaluator.calibrationShare': {
+    group: 'Learning loop',
+    type: 'number',
+    default: 0.02,
+    min: 0,
+    max: 0.2,
+    unit: 'share',
+    description: 'Share of judged windows sent to people to check the judges.',
+    overridableBy: [],
+  },
+  'evaluator.kappaThreshold': {
+    group: 'Learning loop',
+    type: 'number',
+    default: 0.6,
+    min: 0.4,
+    max: 1,
+    unit: 'kappa',
+    description:
+      'Agreement with people a criterion needs before automated decisions use it.',
+    overridableBy: [],
+    pinned: true,
+  },
+  'evaluator.kappaMinPairs': {
+    group: 'Learning loop',
+    type: 'int',
+    default: 20,
+    min: 5,
+    max: 500,
+    unit: 'paired labels',
+    description:
+      'Labelled pairs a criterion needs before its agreement is trusted.',
+    overridableBy: [],
+    pinned: true,
+  },
+  'evaluator.gateRepetitions': {
+    group: 'Learning loop',
+    type: 'int',
+    default: 3,
+    min: 1,
+    max: 10,
+    unit: 'repetitions',
+    description:
+      'Times every case runs in a release gate; any safety failure fails the gate.',
+    overridableBy: [],
+    pinned: true,
+  },
+
   // ── Safety (pinned core, plan §6) ────────────────────────────────────
   'safety.sentinelDeadlineMs': {
     group: 'Safety',
