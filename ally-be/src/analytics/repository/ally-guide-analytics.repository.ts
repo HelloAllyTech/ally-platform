@@ -93,6 +93,11 @@ export interface AllyGuideTotalsRow {
 }
 
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
+/**
+ * A week key. The queries return weeks as `YYYY-MM-DD` text: a timestamp
+ * column comes back as a Date in the server's local zone, whose ISO string
+ * lands on the previous day east of UTC.
+ */
 const iso = (v: unknown) =>
   v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
 
@@ -170,7 +175,7 @@ export class AllyGuideAnalyticsRepository {
   activity(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', m."createdAt") AS week,
+       SELECT to_char(date_trunc('week', m."createdAt"), 'YYYY-MM-DD') AS week,
               count(DISTINCT th."userId") AS learners,
               count(DISTINCT th."userId") FILTER (WHERE m."channel" = 'voice') AS "voiceLearners",
               count(*) AS "learnerMessages",
@@ -202,7 +207,7 @@ export class AllyGuideAnalyticsRepository {
        won AS (
          SELECT th.*, ((th."pacing"->>'firstWinAt')::timestamptz AT TIME ZONE 'UTC') AS "winAt"
            FROM th WHERE th."createdAt" >= $1 AND th."createdAt" < $2)
-       SELECT date_trunc('week', "createdAt") AS week,
+       SELECT to_char(date_trunc('week', "createdAt"), 'YYYY-MM-DD') AS week,
               count(*) AS "newThreads",
               count(DISTINCT "userId") AS learners,
               count(*) FILTER (WHERE "winAt" <= "createdAt" + interval '60 minutes') AS "winsInSession",
@@ -225,7 +230,7 @@ export class AllyGuideAnalyticsRepository {
   items(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', tip."completedAt") AS week,
+       SELECT to_char(date_trunc('week', tip."completedAt"), 'YYYY-MM-DD') AS week,
               count(*) AS items, count(DISTINCT tip."userId") AS learners
          FROM "track_item_progress" tip
          JOIN "track_enrollments" te ON te."id" = tip."trackEnrollmentId"
@@ -256,7 +261,7 @@ export class AllyGuideAnalyticsRepository {
        firsts AS (
          SELECT "userId", date_trunc('week', day) AS week, min(day) AS first
            FROM days WHERE day < $2 GROUP BY 1, 2)
-       SELECT f.week, count(*) AS cohort,
+       SELECT to_char(f.week, 'YYYY-MM-DD') AS week, count(*) AS cohort,
               count(*) FILTER (WHERE EXISTS (
                 SELECT 1 FROM days d WHERE d."userId" = f."userId"
                    AND d.day > f.first AND d.day <= f.first + interval '7 days')) AS returned
@@ -276,7 +281,7 @@ export class AllyGuideAnalyticsRepository {
   appointments(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', a."createdAt") AS week,
+       SELECT to_char(date_trunc('week', a."createdAt"), 'YYYY-MM-DD') AS week,
               count(*) AS set,
               count(DISTINCT a."userId") AS learners,
               count(*) FILTER (WHERE a."at" < now() AND a."status" <> 'cancelled') AS due,
@@ -309,7 +314,7 @@ export class AllyGuideAnalyticsRepository {
   quizFirstAttempts(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', a."createdAt") AS week,
+       SELECT to_char(date_trunc('week', a."createdAt"), 'YYYY-MM-DD') AS week,
               EXISTS (SELECT 1 FROM th WHERE th."userId" = a."userId" AND th."trackId" = ti."trackId") AS ally,
               count(*) AS attempts, count(DISTINCT a."userId") AS learners,
               avg((a."passed" IS TRUE)::int) AS rate
@@ -338,7 +343,7 @@ export class AllyGuideAnalyticsRepository {
   roleplayScores(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', tip."completedAt") AS week,
+       SELECT to_char(date_trunc('week', tip."completedAt"), 'YYYY-MM-DD') AS week,
               EXISTS (SELECT 1 FROM th WHERE th."userId" = tip."userId" AND th."trackId" = ti."trackId") AS ally,
               count(*) AS attempts, count(DISTINCT tip."userId") AS learners,
               avg(tip."score") AS rate
@@ -368,7 +373,7 @@ export class AllyGuideAnalyticsRepository {
   health(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', t."createdAt") AS week,
+       SELECT to_char(date_trunc('week', t."createdAt"), 'YYYY-MM-DD') AS week,
               count(DISTINCT th."userId") AS learners,
               count(*) FILTER (WHERE t."trigger" = 'learner_message') AS "learnerTurns",
               count(*) FILTER (WHERE tr."summary"->>'replyKind' = 'refusal') AS refusals,
@@ -400,7 +405,7 @@ export class AllyGuideAnalyticsRepository {
   crises(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', s."occurredAt") AS week, count(*) AS "crisisEntries"
+       SELECT to_char(date_trunc('week', s."occurredAt"), 'YYYY-MM-DD') AS week, count(*) AS "crisisEntries"
          FROM "guide_signals" s JOIN th ON th."id" = s."threadId"
         WHERE s."kind" = 'crisis_entered' AND s."occurredAt" >= $1 AND s."occurredAt" < $2
         GROUP BY 1 ORDER BY 1`,
@@ -417,7 +422,7 @@ export class AllyGuideAnalyticsRepository {
   thumbs(start: Date, end: Date, tenantId?: string) {
     return this.run(
       `WITH ${this.threads(tenantId)}
-       SELECT date_trunc('week', f."createdAt") AS week,
+       SELECT to_char(date_trunc('week', f."createdAt"), 'YYYY-MM-DD') AS week,
               count(*) FILTER (WHERE f."rating" > 0) AS up,
               count(*) FILTER (WHERE f."rating" < 0) AS down,
               count(DISTINCT f."userId") AS learners
