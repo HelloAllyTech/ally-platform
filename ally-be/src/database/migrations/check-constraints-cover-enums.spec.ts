@@ -103,6 +103,17 @@ import {
   SkillObservationStatus,
   SkillVariantStatus,
 } from '../../skill-experiment/enum/skill-experiment.enum';
+import {
+  AgentEvalCaseSource,
+  AgentEvalCaseStatus,
+  AgentEvalRunKind,
+  AgentEvalRunStatus,
+  AgentEvalSuiteKind,
+  AgentEvaluationSample,
+  AgentEvaluationStatus,
+  AgentReviewReason,
+  AgentReviewStatus,
+} from '../../llm-agent/harness/enum/eval.enum';
 
 /**
  * Every value a TypeScript enum can produce must be a value its column's CHECK
@@ -318,6 +329,16 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_agent_turns_status', Object.values(AgentTurnStatus)],
     ['CHK_agent_turns_trigger', Object.values(AgentTurnTrigger)],
     ['CHK_agent_turns_channel', Object.values(AgentChannel)],
+    // The harness's learning loop (plan §7.13).
+    ['CHK_agent_eval_suites_kind', Object.values(AgentEvalSuiteKind)],
+    ['CHK_agent_eval_cases_source', Object.values(AgentEvalCaseSource)],
+    ['CHK_agent_eval_cases_status', Object.values(AgentEvalCaseStatus)],
+    ['CHK_agent_eval_runs_kind', Object.values(AgentEvalRunKind)],
+    ['CHK_agent_eval_runs_status', Object.values(AgentEvalRunStatus)],
+    ['CHK_agent_evaluations_sample', Object.values(AgentEvaluationSample)],
+    ['CHK_agent_evaluations_status', Object.values(AgentEvaluationStatus)],
+    ['CHK_agent_reviews_reason', Object.values(AgentReviewReason)],
+    ['CHK_agent_reviews_status', Object.values(AgentReviewStatus)],
     ['CHK_guide_threads_status', Object.values(GuideThreadStatus)],
     ['CHK_guide_threads_mode', Object.values(GuideMode)],
     ['CHK_guide_messages_role', Object.values(GuideMessageRole)],
