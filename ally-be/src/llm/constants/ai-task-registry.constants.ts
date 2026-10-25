@@ -1541,8 +1541,8 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'provider has no key here or its call fails. The Analytics Agent it calls records its ' +
       'own usage.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-sonnet-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ROADMAP_COPILOT_MODEL',
     configPath: 'roadmapCopilot.model',
     promptOverride: 'roadmap_opportunity_copilot',
@@ -2301,19 +2301,19 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'with tool_choice none) whose text is held until the Sentinel clears the message. ' +
       'Context is a frozen per-epoch prefix — persona + safety core (cached 1h), the ' +
       'organisation layer (1h), the course outline (5m) — then the epoch history replayed ' +
-      'byte for byte with its thinking blocks, the learner message, and a per-turn ' +
+      'byte for byte (with its thinking blocks on Claude), the learner message, and a per-turn ' +
       'situation report as a mid-conversation system message. A Sentinel verdict that ' +
-      'changes the mode restarts the reply once. Model by budget tier: Opus 5.5 (effort ' +
-      'medium) → Sonnet 5.5 past $3 a thread or $1.50 a learner-day → Haiku 5.5 past $6, ' +
-      'switching only at an epoch boundary. With more than 15 tools, the occasional ones ' +
+      'changes the mode restarts the reply once. Model by budget tier: GPT-5 (reasoning ' +
+      'effort low) → GPT-5 mini past $3 a thread or $1.50 a learner-day and past $6; voice ' +
+      'answers on GPT-5 mini at every tier, switching only at an epoch boundary. With more than 15 tools, the occasional ones ' +
       '(set_guidance, show_course_info, get_peer_signals, consult_assessor, record_noticing, ' +
-      "search_library) are deferred behind the provider's tool search, and load_skill " +
+      "search_library) are deferred behind Anthropic's tool search (other providers get every tool), and load_skill " +
       'appends a skill as a tool result. An anonymous visitor gets the same call with ' +
       'platform defaults, the public outline and four tools (the library global-only), charged to the visitor and ' +
       'capped at 12 messages or $0.25 per course per 24 h, under a $25 daily anonymous ceiling.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.orchestrator',
   },
   {
@@ -2328,11 +2328,11 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'adds latency only when it is slower than the reply. Sees the message, the last six ' +
       'turns and the current item, and returns a closed structured verdict (risk, whose ' +
       'state it is about, real-case and identifying-detail overlays). Skipped when the ' +
-      'first-person keyword layer has already matched. Effort low; Haiku because latency ' +
+      'first-person keyword layer has already matched. Effort low; GPT-5 mini because latency ' +
       'gates safety here.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-haiku-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
     configuredBy: 'ally_guide release modelRouting.sentinel',
   },
   {
@@ -2350,8 +2350,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'answer left with none is reported as not covered. Same budget tiers as the ' +
       'orchestrator.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.tutor',
   },
   {
@@ -2368,8 +2368,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'call a fixed template is sent instead. Skipped after a crisis (30 days) or CARE (14), ' +
       'for visitors, finished courses, opted-out learners and organisations with outreach off.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.outreach_writer',
   },
   {
@@ -2392,8 +2392,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'what the quiz player already showed for the latest attempt, and its reply is ' +
       'checked for unearned key material before the orchestrator gets it.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.assessor',
   },
   {
@@ -2413,8 +2413,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       "debrief's learner-facing summary, read-only. Never a score (a line reporting one is " +
       'dropped), never about a real client. Same budget tiers as the orchestrator.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.coach',
   },
   {
@@ -2431,8 +2431,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'and names the revision it read; never over a forgotten note. Background, not on the ' +
       'learning path; at most one call per thread per window.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.memory_curator',
   },
   {
@@ -2449,8 +2449,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'transcript itself is never edited. Runs inside that turn before the reply, with a ' +
       '20 s deadline; on failure the epoch opens with the last few messages only.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-haiku-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
     configuredBy: 'ally_guide release modelRouting.summariser',
   },
   {
@@ -2500,8 +2500,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'evaluator.dailyBudgetUsd) with the verifier and the red team; past it, windows get the ' +
       'deterministic checks only. Charged to agentKey ally_guide_learning, never to a learner.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.evaluator_critic',
   },
   {
@@ -2515,8 +2515,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'verdicts. Any criterion the two judge differently sends the window to the human ' +
       'review queue. Same budget and ledger key as the critic. Effort low.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'openai',
-    defaultModel: 'gpt-5',
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
     configuredBy: 'ally_guide release modelRouting.evaluator_verifier',
   },
   {
@@ -2534,8 +2534,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'PROPOSED case that runs in a gate only once a person accepts it. Shares the ' +
       'evaluator’s daily budget and ledger key.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.red_team',
   },
   {
@@ -2556,8 +2556,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'caps); survivors become a curator DRAFT release that goes through the eval gate, shadow ' +
       'and canary. Charged to the learning loop’s ledger key and daily budget.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5-5',
+    provider: 'openai',
+    defaultModel: 'gpt-5',
     configuredBy: 'ally_guide release modelRouting.curator',
   },
 ];

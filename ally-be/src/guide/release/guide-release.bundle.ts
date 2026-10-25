@@ -420,20 +420,19 @@ export function evaluatorPolicy(
   return { ...GUIDE_DEFAULT_POLICY.evaluator, ...(policy?.evaluator ?? {}) };
 }
 
-const OPUS: GuideModelRoute = {
-  provider: 'anthropic',
-  model: 'claude-opus-5-5',
-};
-const SONNET: GuideModelRoute = {
-  provider: 'anthropic',
-  model: 'claude-sonnet-5-5',
-};
-const HAIKU: GuideModelRoute = {
-  provider: 'anthropic',
-  model: 'claude-haiku-5-5',
-};
-/** The verifier's family must differ from the critic's (plan §7.13). */
+/**
+ * The default models. OpenAI carries every live role: it is the provider
+ * every environment is funded for, and Claude routes can be set per release
+ * once an Anthropic key is (plans/ally-guide/build-log.md). `effort` becomes
+ * OpenAI's reasoning_effort, the latency lever on the gpt-5 family.
+ */
 const GPT5: GuideModelRoute = { provider: 'openai', model: 'gpt-5' };
+const GPT5_MINI: GuideModelRoute = { provider: 'openai', model: 'gpt-5-mini' };
+/** The verifier's family must differ from the critic's (plan §7.13). */
+const GEMINI_PRO: GuideModelRoute = {
+  provider: 'gemini',
+  model: 'gemini-2.5-pro',
+};
 
 /**
  * The code's current defaults. Prompts and capabilities are added as step 1.1
@@ -487,27 +486,47 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
   modelRouting: {
     orchestrator: {
       text: {
-        premium: { ...OPUS, effort: 'medium' },
-        degraded: { ...SONNET, effort: 'medium' },
-        lite: { ...HAIKU, effort: 'medium' },
+        premium: { ...GPT5, effort: 'low' },
+        degraded: { ...GPT5_MINI, effort: 'low' },
+        lite: { ...GPT5_MINI, effort: 'low' },
       },
+      // Voice answers on the faster model at every tier: the reply is heard
+      // as it streams, and a long pause reads as Ally not listening.
       voice: {
-        premium: { ...OPUS, effort: 'low' },
-        degraded: { ...SONNET, effort: 'low' },
-        lite: { ...HAIKU, effort: 'low' },
+        premium: { ...GPT5_MINI, effort: 'low' },
+        degraded: { ...GPT5_MINI, effort: 'low' },
+        lite: { ...GPT5_MINI, effort: 'low' },
       },
     },
-    sentinel: { text: { premium: { ...HAIKU, effort: 'low' } } },
-    tutor: { text: { premium: OPUS, degraded: SONNET, lite: HAIKU } },
-    coach: { text: { premium: OPUS, degraded: SONNET, lite: HAIKU } },
-    assessor: { text: { premium: OPUS, degraded: SONNET, lite: HAIKU } },
-    memory_curator: { text: { premium: { ...OPUS, effort: 'low' } } },
-    summariser: { text: { premium: HAIKU } },
-    outreach_writer: { text: { premium: { ...OPUS, effort: 'low' } } },
-    evaluator_critic: { text: { premium: { ...OPUS, effort: 'low' } } },
-    evaluator_verifier: { text: { premium: { ...GPT5, effort: 'low' } } },
-    red_team: { text: { premium: { ...OPUS, effort: 'medium' } } },
-    curator: { text: { premium: { ...OPUS, effort: 'medium' } } },
+    sentinel: { text: { premium: { ...GPT5_MINI, effort: 'low' } } },
+    tutor: {
+      text: {
+        premium: { ...GPT5, effort: 'low' },
+        degraded: GPT5_MINI,
+        lite: GPT5_MINI,
+      },
+    },
+    coach: {
+      text: {
+        premium: { ...GPT5, effort: 'low' },
+        degraded: GPT5_MINI,
+        lite: GPT5_MINI,
+      },
+    },
+    assessor: {
+      text: {
+        premium: { ...GPT5, effort: 'low' },
+        degraded: GPT5_MINI,
+        lite: GPT5_MINI,
+      },
+    },
+    memory_curator: { text: { premium: { ...GPT5, effort: 'low' } } },
+    summariser: { text: { premium: { ...GPT5_MINI, effort: 'low' } } },
+    outreach_writer: { text: { premium: { ...GPT5, effort: 'low' } } },
+    evaluator_critic: { text: { premium: { ...GPT5, effort: 'low' } } },
+    evaluator_verifier: { text: { premium: GEMINI_PRO } },
+    red_team: { text: { premium: { ...GPT5, effort: 'medium' } } },
+    curator: { text: { premium: { ...GPT5, effort: 'medium' } } },
   },
   capabilities: {
     present_course_item: true,
