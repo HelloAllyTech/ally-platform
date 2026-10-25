@@ -83,8 +83,9 @@ async def _send_webhook(
 
 async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
     """Evaluate the actor against the goals and webhook the result back."""
+    raw_llm_response = ""
     try:
-        result = await evaluate_actor_goals(
+        result, raw_llm_response = await evaluate_actor_goals(
             request.transcript,
             request.goals,
             scenario_session_id=request.scenario_session_id,
@@ -98,9 +99,11 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
     except KeyError:
         logger.warning(
             "Actor evaluation failed for session=%s due to a missing key in the "
-            "evaluation result. "
-            "This is expected if the LLM judge returns a malformed response.",
+            "evaluation result. This is expected if the LLM judge returns a "
+            "malformed response. Raw LLM response: %s",
             request.scenario_session_id,
+            raw_llm_response,
+            exc_info=True,
         )
         payload = ActorEvaluationWebhookPayload(
             status="FAILED",

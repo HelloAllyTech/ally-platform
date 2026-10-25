@@ -78,7 +78,7 @@ class TestEvaluateActorGoals:
             build.return_value.with_structured_output.return_value.ainvoke = AsyncMock(
                 return_value=judged
             )
-            result = await evaluate_actor_goals(_transcript(), goals)
+            result, _ = await evaluate_actor_goals(_transcript(), goals)
 
         assert result["not_applicable"] == ["De-escalate acute risk"]
         # The score stays in metrics — it is excluded from the composite
@@ -102,14 +102,15 @@ class TestEvaluateActorGoals:
             build.return_value.with_structured_output.return_value.ainvoke = AsyncMock(
                 return_value=judged
             )
-            result = await evaluate_actor_goals(_transcript(), goals)
+            result, _ = await evaluate_actor_goals(_transcript(), goals)
 
         assert result["not_applicable"] == []
 
     @pytest.mark.asyncio
     async def test_empty_transcript_returns_the_full_shape(self):
-        result = await evaluate_actor_goals([], [_goal("Build rapport")])
+        result, raw_response = await evaluate_actor_goals([], [_goal("Build rapport")])
 
+        assert raw_response == ""
         assert result == {
             "metrics": {},
             "not_applicable": [],
@@ -118,8 +119,9 @@ class TestEvaluateActorGoals:
 
     @pytest.mark.asyncio
     async def test_no_goals_returns_the_full_shape(self):
-        result = await evaluate_actor_goals(_transcript(), [])
+        result, raw_response = await evaluate_actor_goals(_transcript(), [])
 
+        assert raw_response == ""
         assert result == {
             "metrics": {},
             "not_applicable": [],
@@ -160,7 +162,7 @@ class TestActorEvaluationUsage:
                     "parsing_error": None,
                 }
             )
-            result = await evaluate_actor_goals(
+            result, _ = await evaluate_actor_goals(
                 _transcript(), goals, scenario_session_id="sess-42"
             )
 
@@ -209,11 +211,14 @@ async def test_service_passes_the_session_id_to_the_judge():
             service,
             "evaluate_actor_goals",
             AsyncMock(
-                return_value={
-                    "metrics": {},
-                    "not_applicable": [],
-                    "report_markdown": "",
-                }
+                return_value=(
+                    {
+                        "metrics": {},
+                        "not_applicable": [],
+                        "report_markdown": "",
+                    },
+                    "",
+                )
             ),
         ) as judge,
         patch.object(service, "_send_webhook", AsyncMock()),
