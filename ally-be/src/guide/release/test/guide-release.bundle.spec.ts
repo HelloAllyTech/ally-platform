@@ -24,6 +24,20 @@ describe('GUIDE_DEFAULT_BUNDLE', () => {
     }
   });
 
+  it('routes no role to Anthropic by default, since production has no funded key for it', () => {
+    expect(routes.filter((route) => route!.provider === 'anthropic')).toEqual(
+      [],
+    );
+  });
+
+  it('keeps the critic and the verifier in different model families', () => {
+    const { evaluator_critic, evaluator_verifier } =
+      GUIDE_DEFAULT_BUNDLE.modelRouting;
+    expect(evaluator_critic?.text?.premium?.provider).not.toBe(
+      evaluator_verifier?.text?.premium?.provider,
+    );
+  });
+
   it('keeps the budget ladder in order: lite ≤ degraded ≤ premium', () => {
     const { threadSoftCapUsd, threadLiteCapUsd } =
       GUIDE_DEFAULT_BUNDLE.policy.limits;

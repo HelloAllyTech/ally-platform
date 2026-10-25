@@ -170,7 +170,9 @@ export class GuideSentinelService {
         error instanceof Error && /timed? ?out|timeout/i.test(error.message);
       this.logger.warn(
         `Sentinel classifier ${timedOut ? 'timed out' : 'failed'}: ${
-          error instanceof Error ? error.name : 'unknown'
+          error instanceof Error
+            ? `${error.name}: ${error.message.slice(0, 300)}`
+            : 'unknown'
         }`,
       );
       return this.failed(timedOut ? 'timeout' : 'error', latencyMs);

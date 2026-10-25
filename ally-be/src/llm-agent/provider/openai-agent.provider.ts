@@ -1,7 +1,11 @@
 import OpenAI from 'openai';
-import { modelSupportsTemperature } from 'src/common/util/llm-model.util';
+import {
+  isOpenAiReasoningModel,
+  modelSupportsTemperature,
+} from 'src/common/util/llm-model.util';
 import {
   AgentContentBlock,
+  AgentEffort,
   AgentStopReason,
   AgentStreamEvent,
   AgentStreamRequest,
@@ -15,6 +19,10 @@ const STOP_REASONS: Record<string, AgentStopReason> = {
   function_call: 'tool_use',
   length: 'max_tokens',
 };
+
+/** OpenAI's reasoning_effort stops at high; the harness's deeper levels map onto it. */
+const openAiEffort = (effort: AgentEffort): 'low' | 'medium' | 'high' =>
+  effort === 'low' || effort === 'medium' ? effort : 'high';
 
 /** Accumulator for a tool call arriving in fragments across stream deltas. */
 interface PartialToolCall {
@@ -60,6 +68,11 @@ export class OpenAiAgentProvider implements IAgentLlmProvider {
         ...(request.temperature !== undefined &&
         modelSupportsTemperature(request.model)
           ? { temperature: request.temperature }
+          : {}),
+        // The route's effort is the latency lever on a reasoning model: left
+        // unset, gpt-5 reasons at medium, too slow for a live conversation.
+        ...(request.effort && isOpenAiReasoningModel(request.model)
+          ? { reasoning_effort: openAiEffort(request.effort) }
           : {}),
         // A real API-enforced JSON mode; nothing to fall back on in the prompt.
         ...(request.outputSchema

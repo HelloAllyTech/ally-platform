@@ -658,7 +658,15 @@ export class GuideTurnService {
     this.logger.info(
       `Guide turn ${ctx.turnId} on thread ${ctx.threadId}: ${outcome}` +
         (ctx.replyKind ? ` [${ctx.replyKind}]` : '') +
-        (ctx.failure ? ` (${ctx.failure.code} at ${ctx.failure.stage})` : ''),
+        (ctx.failure
+          ? ` (${ctx.failure.code} at ${ctx.failure.stage}` +
+            // The cause, so a production failure names itself: a provider's
+            // error text, never the learner's words.
+            (ctx.failure.code === 'internal_error' && ctx.failure.message
+              ? `: ${ctx.failure.message.slice(0, 300)}`
+              : '') +
+            ')'
+          : ''),
     );
   }
 
