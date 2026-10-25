@@ -172,13 +172,13 @@ MAX_DURATION_GRACE_SECONDS = settings.MAX_DURATION_GRACE_SECONDS
 # in time, killing process" / exit code -10, recurring days after that
 # budget was first tuned). Capped short so a stall can only ever cost a few
 # seconds, never the rest of the shutdown window.
-SUPERVISOR_NOTES_CLOSE_TIMEOUT = 3.0
-BG_AUDIO_CLOSE_TIMEOUT = 3.0
+SUPERVISOR_NOTES_CLOSE_TIMEOUT = 10.0
+BG_AUDIO_CLOSE_TIMEOUT = 10.0
 # Video-actor teardown budget. Shorter than the audio one: its tracks are
 # cosmetic, so a renderer that will not let go must not eat into the shutdown
 # deadline that the session's own finalization needs.
-VIDEO_ACTOR_CLOSE_TIMEOUT = 2.0
-BACKGROUND_TASKS_CLEANUP_TIMEOUT = 3.0
+VIDEO_ACTOR_CLOSE_TIMEOUT = 5.0
+BACKGROUND_TASKS_CLEANUP_TIMEOUT = 10.0
 
 
 def _now_ms() -> int:
