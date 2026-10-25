@@ -9,7 +9,7 @@ the system prompt is built in code with the goal list injected. The LLM tuning
 the report evaluator so the two judges behave identically.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -123,22 +123,20 @@ async def evaluate_actor_goals(
     transcript: List[ActorEvaluationTurn],
     goals: List[ActorEvaluationGoal],
     scenario_session_id: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], str]:
     """Run the LLM judge.
-
-    Returns {'metrics': {...}, 'not_applicable': [...], 'report_markdown': str}.
-
+    Returns a tuple of (evaluation dict, raw LLM response string). The dict
+    is ``{'metrics': {...}, 'not_applicable': [...], 'report_markdown': str}``.
     Raises on LLM failure so the caller can ship a FAILED webhook (we want the
     superadmin to see *that* an evaluation failed, not a silent empty result).
-
     The judge's tokens are emitted to ``llm_usage`` as ``actor_evaluation``,
     attributed by ``scenario_session_id``: this runs in an HTTP request after
     the session, with no LiveKit room to attribute it by.
     """
     if not transcript:
-        return {"metrics": {}, "not_applicable": [], "report_markdown": ""}
+        return {"metrics": {}, "not_applicable": [], "report_markdown": ""}, ""
     if not goals:
-        return {"metrics": {}, "not_applicable": [], "report_markdown": ""}
+        return {"metrics": {}, "not_applicable": [], "report_markdown": ""}, ""
 
     base_llm = _build_evaluator_llm()
     # include_raw because the parsed model alone carries no usage metadata.
@@ -151,7 +149,12 @@ async def evaluate_actor_goals(
             {"role": "user", "content": _build_user_message(transcript)},
         ]
     )
+    raw_content = ""
     if isinstance(raw_result, dict):
+        raw_message = raw_result.get("raw")
+        if raw_message and hasattr(raw_message, "content"):
+            raw_content = str(raw_message.content)
+
         # Emitted before parsing: a parse failure still spent the tokens.
         emit_langchain_usage(
             raw_result.get("raw"),
@@ -191,4 +194,4 @@ async def evaluate_actor_goals(
         "metrics": result.metrics,
         "not_applicable": not_applicable,
         "report_markdown": result.report_markdown,
-    }
+    }, raw_content
