@@ -103,6 +103,7 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
             "malformed response. Raw LLM response: %s",
             request.scenario_session_id,
             raw_llm_response,
+            exc_info=True,
         )
         payload = ActorEvaluationWebhookPayload(
             status="FAILED",
