@@ -85,3 +85,29 @@ def test_missing_required_variable_is_logged_but_still_renders(monkeypatch, capl
     assert result == "Hello ."
     assert "[PROMPT_CONTRACT]" in caplog.text
     assert "name" in caplog.text
+
+
+@patch("app.prompts.resolver.prompt_manager")
+def test_logs_the_store_version_it_renders(mock_prompt_manager, caplog):
+    prompts = {"ally_ai_nudge_nudge": {"prompt": "From the store.", "version": 7}}
+    with caplog.at_level(logging.INFO):
+        assert resolve_template("ally_ai_nudge_nudge", prompts) == "From the store."
+    assert "[PROMPT_SOURCE] ally_ai_nudge_nudge: using store v7, len=15" in (
+        caplog.text
+    )
+    mock_prompt_manager.get_template.assert_not_called()
+
+
+@patch("app.prompts.resolver.prompt_manager")
+def test_logs_a_fallback_to_the_local_default(mock_prompt_manager, caplog):
+    mock_prompt_manager.get_template.return_value = "Local default."
+    with caplog.at_level(logging.INFO):
+        assert (
+            resolve_template("ally_ai_nudge_nudge", {}, internal_path="nudge/nudge")
+            == "Local default."
+        )
+    assert "[PROMPT_SOURCE] ally_ai_nudge_nudge: using fallback" in caplog.text
+    assert any(
+        r.levelno == logging.WARNING and "PROMPT_SOURCE" in r.getMessage()
+        for r in caplog.records
+    )
