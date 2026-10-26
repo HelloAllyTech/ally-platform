@@ -5,20 +5,11 @@
  * Everything below `maxWorkers` is verbatim what the `jest` key in
  * package.json held; only the resource limits are new.
  *
- * Two settings, two scopes: `maxWorkers` is local-only, `workerIdleMemoryLimit`
- * applies everywhere. See the note beside each.
- *
- * Why: Jest defaults to (cores - 1) workers, each a Node process running
- * ts-jest over this codebase. On a 10-core / 16 GB dev machine that is 9
- * TypeScript compilers at once, and running it next to the ally-web Vitest
- * suite exhausted the machine. CI is deliberately exempt — a runner is a clean
- * box doing one thing, with a low core count already, and throttling it would
- * slow every pipeline to fix a problem it does not have.
+ * `workerIdleMemoryLimit` applies everywhere. See the note beside it.
  *
  * Overrides: JEST_MAX_WORKERS=8 to raise it, =1 to serialise for debugging.
  * Applies in CI too, if a pipeline ever needs to pin the pool.
  */
-const isCI = Boolean(process.env.CI);
 const requested = Number.parseInt(process.env.JEST_MAX_WORKERS ?? '', 10);
 const explicit = Number.isFinite(requested) && requested > 0 ? requested : null;
 // 3, not 4: measured on a 10-core / 16 GB machine, `npx jest src/learn` peaked at
@@ -41,9 +32,7 @@ module.exports = {
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/$1',
   },
-  // Worker pool size is LOCAL ONLY: a runner is a clean box doing one thing, and
-  // throttling it would slow every pipeline to fix a problem it does not have.
-  ...(maxWorkers ? { maxWorkers } : {}),
+  maxWorkers,
 
   // The memory valve applies EVERYWHERE, including CI, and that is a correction.
   //
