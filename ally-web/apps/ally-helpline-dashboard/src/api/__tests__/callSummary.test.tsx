@@ -26,16 +26,19 @@ vi.mock("@constants", () => ({
   ApiEndpoints: {
     CALL_SUMMARY: {
       GET_CALL_SUMMARY: "/call-summary",
-      UPDATE_CALL_SUMMARY: "/call-summary/update",
+      UPDATE_CALL_SUMMARY: (chatId: string) => `/call-summary/${chatId}`,
+      RETRY_SUMMARY: (chatId: string) => `/call-summary/${chatId}/retry`,
       ENHANCE_CONTENT: "/call-summary/enhance",
-      GET_TAGS: "/call-summary/tags",
-      UPDATE_CALL_INFO: "/call-summary/update-info",
-      EXPORT_CALL_SUMMARY: "/call-summary/export",
-      GET_LOCATIONS: "/call-summary/locations",
-      SEARCH_LOCATIONS: "/call-summary/search-locations",
-      GET_TRANSCRIPT: "/call-summary/transcript",
-      UPDATE_NOTES: "/call-summary/update-notes",
-      SUBMIT_FEEDBACK: "/call-summary/submit-feedback",
+      GET_TAG_POSITIVITY_RATINGS: "/call-summary/tags",
+      UPDATE_CALL_INFO: (chatId: string) => `/call-summary/${chatId}/info`,
+      EXPORT_CALL_SUMMARY: (chatId: string) => `/call-summary/${chatId}/export`,
+      GET_LOCATIONS: "/locations",
+      SEARCH_LOCATIONS: "/locations/search",
+      GET_TRANSCRIPT: (chatId: string) => `/call-summary/${chatId}/transcript`,
+      UPDATE_CALL_SUMMARY_NOTES: (chatId: string) =>
+        `/call-summary/${chatId}/notes`,
+      SUBMIT_FEEDBACK: (chatId: string) => `/call-summary/${chatId}/feedback`,
+      GET_SUMMARY_FIELDS: "/call-summary/fields",
     },
   },
   HttpMethod: {
