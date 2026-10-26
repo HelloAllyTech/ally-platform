@@ -902,13 +902,24 @@ export const AGENT_TEMPLATE_TRANSLATION = definePrompt(
     name: 'optional',
     next_instruction: 'optional',
   },
+  {
+    name: 'Agent Template Translation Prompt',
+    description:
+      'System prompt to translate main_agent/branching prompt templates into Indian languages (Gemini). Preserves {…} placeholders and [audio tags].',
+  },
 );
 
 /** src/prompts/drift_judge/conversation_rubric.txt */
 export const DRIFT_JUDGE_CONVERSATION_RUBRIC = definePrompt(
   'drift_judge_conversation_rubric',
   {},
-  { output: 'structured' },
+  {
+    name: 'Conversation Drift Judge Rubric',
+    description:
+      'Static rubric for the conversation drift judge (see drift-metrics-spec.md). The judge composes the session transcript/persona/language around this text.',
+    category: 'evaluation',
+    output: 'structured',
+  },
 );
 
 /** src/prompts/glossary/adjudication.txt */
@@ -920,7 +931,12 @@ export const GLOSSARY_ADJUDICATION = definePrompt(
     languageName: 'required',
     proposals: 'required',
   },
-  { output: 'json' },
+  {
+    name: 'Glossary adjudication',
+    description:
+      'Decides queued glossary proposals: accepts language rules, rejects persona/behaviour rules, restatements, and rules that fight real usage. Rule FORM is checked deterministically before this prompt runs.',
+    output: 'json',
+  },
 );
 
 /** src/prompts/glossary/consolidation.txt */
@@ -932,7 +948,12 @@ export const GLOSSARY_CONSOLIDATION = definePrompt(
     languageCode: 'optional',
     languageName: 'required',
   },
-  { output: 'json' },
+  {
+    name: 'Language Glossary Consolidation Prompt',
+    description:
+      'System prompt that clusters language-judge error annotations into proposed glossary entries (term pairs, rules, patterns). Output: strict JSON consumed by the consolidation job.',
+    output: 'json',
+  },
 );
 
 /** src/prompts/glossary/generation.txt */
@@ -943,7 +964,12 @@ export const GLOSSARY_GENERATION = definePrompt(
     languageCode: 'optional',
     languageName: 'required',
   },
-  { output: 'json' },
+  {
+    name: 'Language Glossary Generation Prompt',
+    description:
+      'System prompt that generates draft glossary sections (term pairs, rules, patterns) for a language. Output: strict JSON consumed by the glossary seed job.',
+    output: 'json',
+  },
 );
 
 /** src/prompts/glossary/lexeme_pairing.txt */
@@ -956,14 +982,25 @@ export const GLOSSARY_LEXEME_PAIRING = definePrompt(
     languageName: 'required',
     learnerLexicon: 'optional',
   },
-  { output: 'json' },
+  {
+    name: 'Language Glossary Lexeme Pairing Prompt',
+    description:
+      'Pairs words the role-play agent over-uses (vs counsellor speech) with their colloquial equivalents, or keeps them. Output: strict JSON consumed by the lexeme-mining job.',
+    output: 'json',
+  },
 );
 
 /** src/prompts/language_quality_judge/rubric.txt */
 export const LANGUAGE_QUALITY_JUDGE_RUBRIC = definePrompt(
   'language_quality_judge_rubric',
   {},
-  { output: 'structured' },
+  {
+    name: 'Language Quality Judge Rubric',
+    description:
+      'Static rubric for the language-quality judge (see language-eval-judge-schema.md). The judge composes the per-language parameter block, persona and transcript around this text.',
+    category: 'evaluation',
+    output: 'structured',
+  },
 );
 
 /** src/prompts/openai_translation/tooltip_translation.txt */
@@ -973,5 +1010,10 @@ export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
     inputJson: 'required',
     languageName: 'required',
   },
-  { output: 'structured' },
+  {
+    name: 'OpenAI Tooltip Translation Prompt',
+    description:
+      'Localizes tooltip UI text into natural, concise target-language phrasing while preserving JSON structure, HTML tags, and notranslate spans.',
+    output: 'structured',
+  },
 );

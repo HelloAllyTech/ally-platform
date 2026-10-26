@@ -292,7 +292,7 @@ export class PromptsController {
 
   @ApiOperation({
     summary:
-      'Sync prompts from folder/codebase (add-only, update defaultPrompt)',
+      'Sync prompts from the codebase: creates new prompts from their defaults; updates contract and metadata only',
     description:
       'Accepts x-api-key for deployment scripts (e.g. ally-ai-learn sync).',
   })

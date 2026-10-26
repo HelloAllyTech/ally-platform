@@ -12,17 +12,23 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *    `.meta.json` sidecars.
  * 3. Translations are kept per English body (`sourceHash`), so a candidate can
  *    be translated before it goes live without disturbing the live rows.
- * 4. `useDashboardOverride` is retired. Every row whose body was served from its
- *    file gets that file text (`defaultPrompt`) published as a new version — as
- *    does an overridden row with no live text, which fell back to
- *    `defaultPrompt` too — then
- *    every row is marked overridden, so any reader still checking the flag
- *    already behaves as "serve the store".
- * 5. `skills_store_keys`: keys generated in the Skills Store for the `prompts`
+ * 4. `useDashboardOverride` is retired. Every prompt keeps its current version
+ *    in the store as its live version, whatever the flag said: the store, not
+ *    the file, is the source of truth. Only a row with no usable current
+ *    version (missing or blank) gets its `defaultPrompt` published, so it has
+ *    one. Then every row is marked overridden, so any reader still checking the
+ *    flag already behaves as "serve the store". (1980150000000 snapshots the
+ *    tables first, so the file text a non-overridden row was serving is kept.)
+ * 5. Each prompt's stored default (`defaultPrompt`) becomes its current
+ *    version's text: production's text is the baseline that Revert restores and
+ *    ally-be falls back to. From here on sync writes a Git default only when it
+ *    creates a prompt; the files in Git are minimal bases, never the
+ *    production text.
+ * 6. `skills_store_keys`: keys generated in the Skills Store for the `prompts`
  *    CLI, stored hashed.
  *
  * Idempotent: every DDL uses IF [NOT] EXISTS and the publish step only touches
- * rows whose live body still differs from their file text.
+ * rows with no usable current version.
  */
 export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
   name = 'SkillsStoreVersioning1980200000000';
@@ -66,14 +72,13 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
          AND pv."publishedAt" IS NULL
     `);
 
-    // Retire the override flag: publish the file text for every row that was
-    // serving it. Skipped when the live version already holds that text.
-    // An overridden row whose live version is missing or blank was serving
-    // `defaultPrompt` as well, and sync is about to replace that column with
-    // the new Git default, so it is published too.
-    // The version each row gets is the one inserted here: put it live in the
-    // same statement, so a row whose pointer dangled (a currentVersion beyond
-    // its last version) is repaired too, and a re-run touches nothing.
+    // Retire the override flag. Each row's current version stays live: that is
+    // the version the Skills Store shows, and it is the truth from here on.
+    // Only a row with no usable current version (none, a pointer past its last
+    // version, or blank text) gets `defaultPrompt` published, because sync is
+    // about to replace that column with the new Git default and the row would
+    // otherwise have nothing to serve. The inserted version is put live in the
+    // same statement, and a re-run touches nothing.
     await queryRunner.query(`
       WITH published AS (
         INSERT INTO "prompts_versions"
@@ -84,26 +89,30 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
                p."defaultPrompt", 0, 0,
                p."provider", p."model", p."temperature",
                'migration',
-               'Published the file text that was serving before the Skills Store became the source of truth.',
+               'Published the default text: the prompt had no usable current version when the Skills Store became the source of truth.',
                NOW()
           FROM "prompts" p
           LEFT JOIN "prompts_versions" live
             ON live."promptId" = p.id AND live."version" = p."currentVersion"
          WHERE p."defaultPrompt" IS NOT NULL
            AND btrim(p."defaultPrompt") <> ''
-           AND (
-             (p."useDashboardOverride" = false
-               AND (live.id IS NULL OR btrim(live."prompt") <> btrim(p."defaultPrompt")))
-             OR
-             (p."useDashboardOverride" = true
-               AND (live.id IS NULL OR btrim(COALESCE(live."prompt", '')) = ''))
-           )
+           AND (live.id IS NULL OR btrim(COALESCE(live."prompt", '')) = '')
         RETURNING "promptId", "version"
       )
       UPDATE "prompts" p
          SET "currentVersion" = published."version"
         FROM published
        WHERE p.id = published."promptId"
+    `);
+    // The production text becomes each prompt's stored default.
+    await queryRunner.query(`
+      UPDATE "prompts" p
+         SET "defaultPrompt" = live."prompt"
+        FROM "prompts_versions" live
+       WHERE live."promptId" = p.id
+         AND live."version" = p."currentVersion"
+         AND btrim(COALESCE(live."prompt", '')) <> ''
+         AND p."defaultPrompt" IS DISTINCT FROM live."prompt"
     `);
     await queryRunner.query(
       `UPDATE "prompts" SET "useDashboardOverride" = true WHERE "useDashboardOverride" = false`,

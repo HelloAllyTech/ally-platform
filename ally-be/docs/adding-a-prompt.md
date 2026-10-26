@@ -5,7 +5,7 @@ The one recipe for adding a prompt to ally-be, ally-ai or ally-ai-learn. Each se
 ## How prompts work, in five lines
 
 - **The Skills Store (ally-be) is the source of truth.** Every service runs a prompt's *live version* from the store. Editing a `.txt` file in Git changes nothing that runs once the prompt exists.
-- **A file in Git is a prompt's default.** It creates the prompt on its first deploy, and it is the fallback if the store can't be reached. Keep it a working base, not the tuned production text (the repo is public).
+- **A file in Git is a prompt's seed.** It creates the prompt on its first deploy (its first live version and stored default), and it is the last-resort fallback inside ally-ai and ally-ai-learn if a request arrives without the store's text. After that it never overwrites anything: an existing prompt's stored default, which Revert restores, is its production text. Keep the file a working base, not the tuned production text (the repo is public).
 - **Each prompt has a contract in code:** its code, the variables the code supplies (`required` or `optional`), how the code reads the answer, and how it shows up in the Skills Store (name, description, category). Sync sends it to the store, which refuses a version that drops a required variable.
 - **Adding a prompt is two files per prompt:** the `.txt` default and its contract. There are no `.meta.json` sidecars and no lists to register in.
 - **Changing a prompt's text later** is a new version in the Skills Store, or `node scripts/prompts/prompts.mjs push` from the CLI. See [prompts-api.md](./prompts-api.md).

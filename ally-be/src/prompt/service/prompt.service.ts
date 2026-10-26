@@ -525,9 +525,9 @@ export class PromptsService {
    *
    * - A prompt the store doesn't have yet is created, with its default text
    *   live as version 1. That is how a new prompt reaches production.
-   * - An existing prompt's live text is never touched. Sync refreshes only what
-   *   Git owns: the default text (fallback and Revert baseline), file metadata
-   *   and the code's contract.
+   * - An existing prompt's live text and stored default are never touched.
+   *   Sync refreshes only what Git owns: the file metadata and the code's
+   *   contract.
    * - One bad item (say, a dashboard rename that took its name) is logged and
    *   skipped instead of aborting the rest of the sync.
    *
@@ -673,13 +673,15 @@ export class PromptsService {
       return 'added';
     }
 
-    // Git owns the default text, the file metadata and the contract. The live
-    // version, model settings and studio visibility belong to the store.
+    // Git owns the file metadata and the contract. The live version, model
+    // settings, studio visibility and the stored default belong to the store.
     //
-    // `name` is left alone too: a rename in the Skills Store is an admin's
-    // choice, and overwriting it could collide with another row's name.
+    // `defaultPrompt` is not touched: an existing prompt's default is its
+    // production baseline (what Revert restores), and the file in Git is only
+    // a minimal base that seeds a new prompt. `name` is left alone too: a
+    // rename in the Skills Store is an admin's choice, and overwriting it could
+    // collide with another row's name.
     const updatePayload: Partial<Prompt> = {
-      defaultPrompt: item.prompt,
       description: item.description || '',
       category: item.category,
       kind: item.kind,
@@ -833,8 +835,10 @@ export class PromptsService {
   }
 
   /**
-   * Revert a prompt to its default text from Git: a new version carrying the
-   * default, put live with the live model settings, translations included.
+   * Revert a prompt to its stored default: the production text it had when the
+   * Skills Store took over (or, for a prompt created since, its first text). A
+   * new version carrying it, put live with the live model settings,
+   * translations included.
    * Goes through the same write path as every other change.
    */
   async revertPrompt(
@@ -847,7 +851,7 @@ export class PromptsService {
     }
     if (!prompt.defaultPrompt?.trim()) {
       throw new NotFoundException(
-        'Cannot revert: this prompt has no default text in Git',
+        'Cannot revert: this prompt has no stored default text',
       );
     }
     await this.versioning.createAndPromote(

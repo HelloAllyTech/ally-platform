@@ -182,7 +182,7 @@ The Skills Store is the source of truth for prompt text: every runtime serves a 
 
 - it **creates** the prompt the first time it deploys (live as version 1);
 - it is the **fallback** a service uses if the store can't be reached;
-- it is what **Revert** puts back live, as a new version;
+- it seeds the prompt's stored default only when the prompt is created; an existing prompt's stored default is its production text from the Skills Store cutover, and that is what **Revert** puts back live;
 - it is the open-source default for anyone running Ally without our store.
 
 After the first deploy, **editing the `.txt` changes nothing in production** — sync never

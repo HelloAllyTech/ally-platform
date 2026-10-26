@@ -625,7 +625,7 @@ describe('PromptsService.syncPrompts — contract default model', () => {
     );
   });
 
-  it("never touches an existing prompt's live text or its admin-chosen name", async () => {
+  it("never touches an existing prompt's live text, stored default or admin-chosen name", async () => {
     const { service, promptsRepository, promptVersionRepository } =
       await build();
     promptsRepository.findOne.mockResolvedValue({
@@ -639,9 +639,7 @@ describe('PromptsService.syncPrompts — contract default model', () => {
 
     expect(promptVersionRepository.save).not.toHaveBeenCalled();
     const payload = promptsRepository.update.mock.calls[0]?.[1] ?? {};
-    expect(payload).toEqual(
-      expect.objectContaining({ defaultPrompt: item.prompt }),
-    );
+    expect(payload).not.toHaveProperty('defaultPrompt');
     expect(payload).not.toHaveProperty('name');
     expect(payload).not.toHaveProperty('availableVariables');
   });

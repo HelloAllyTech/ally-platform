@@ -134,7 +134,7 @@ export class PromptsSyncService implements OnModuleInit {
 
     const result = await this.promptsService.syncPrompts({ prompts: items });
     this.logger.info(
-      `Prompts sync: ${result.added} added, ${result.updated} defaultPrompt updated`,
+      `Prompts sync: ${result.added} added, ${result.updated} contract/metadata updated`,
     );
     return result;
   }

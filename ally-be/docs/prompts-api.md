@@ -70,7 +70,7 @@ Base path: **`/api/v1/prompts`** (admin session) and **`/api/v1/skills-store`**
 | POST | `/prompts/:id/versions/:version/promote` | Bearer (EDIT_PROMPT) | Publish: `{expectedCurrentVersion, rollback?, confirmJudgeRubricChange?}` → `{version, previousVersion, failedLanguages}`. |
 | POST | `/prompts/:id/versions/:version/translations` | Bearer (EDIT_PROMPT) | (Re)translate a version, retrying failed languages. |
 | GET | `/prompts/:id/translations?version=N` | Bearer (VIEW_PROMPT) | A version's translations (default: live). |
-| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the Git default live as a new version, translations included. Body `{confirmJudgeRubricChange?}` for judge rubrics. A refused revert leaves no draft behind. |
+| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the prompt's stored default live as a new version (its production text at the Skills Store cutover, or its first text if created since), translations included. Body `{confirmJudgeRubricChange?}` for judge rubrics. A refused revert leaves no draft behind. |
 | GET | `/prompts/:id/usage` | Bearer (VIEW_PROMPT) | Scenarios referencing this prompt. |
 | GET | `/skills-store/export?codes=&candidates=true` | Skills Store key (pull) | Live (and newest/draft) versions with ready translations: what `prompts pull` reads. |
 | GET | `/skills-store/prompts/:code` | Skills Store key (pull) | One prompt's versions. |

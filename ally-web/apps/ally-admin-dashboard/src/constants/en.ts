@@ -483,7 +483,7 @@ export const en = {
     revertPromptFailed: "Failed to restore prompt to default",
     restoreDefault: "Restore default",
     revertToDefaultConfirm:
-      "This puts the default text from the codebase live as a new version, with the current model settings. The current version stays in the history, so you can roll back.",
+      "This puts the prompt's stored default live as a new version, with the current model settings: the production text it had when the Skills Store took over, or its first text if it was created since. The current version stays in the history, so you can roll back.",
     deletePrompts: "Delete Prompts",
     deletePromptsConfirmation:
       "Are you sure you want to delete selected prompts? This action cannot be undone.",
