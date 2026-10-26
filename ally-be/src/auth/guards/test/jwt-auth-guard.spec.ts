@@ -111,4 +111,13 @@ describe('JwtAuthGuard', () => {
     );
     expect(mockCanActivate).toHaveBeenCalledWith(mockContext);
   });
+
+  it('should throw UnauthorizedException with custom message for expired token', () => {
+    const error = new Error('jwt expired');
+    error.name = 'JsonWebTokenError';
+
+    expect(() => guard.handleRequest(null, null, error)).toThrow(
+      'Token expired',
+    );
+  });
 });
