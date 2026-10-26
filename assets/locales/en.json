@@ -178,7 +178,8 @@
       "otp": {
         "title": "Verify your email address",
         "enterCode": "Enter the security code sent to",
-        "expires": "This code will expire in {{minutes}}. Need a new code?",
+        "expires_one": "This code will expire in {{minutes}} minute. Need a new code?",
+        "expires_other": "This code will expire in {{minutes}} minutes. Need a new code?",
         "resend": "Resend",
         "resendWithCountdown": "Resend ({{seconds}})",
         "verify": "Verify",

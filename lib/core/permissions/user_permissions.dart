@@ -33,6 +33,11 @@ class UserPermissions {
   static const viewSimulationReviewThreads = 'view:simulation-review-threads';
   static const editSimulationReviewThread = 'edit:simulation-review-thread';
 
+  /// Not in RN's enum: ally-be's `PERMISSIONS.SIMULATION_REVIEWER_ACCESS`,
+  /// the exact gate on `/scenario-session-reviews/unread-count` (held by
+  /// SIMULATION_REVIEWER and the admin roles; learners get a 403).
+  static const simulationReviewerAccess = 'simulation-reviewer:access';
+
   // === SCRIBE REVIEW ===
   static const viewScribeReview = 'view:scribe-review';
   static const editScribeReview = 'edit:scribe-review';

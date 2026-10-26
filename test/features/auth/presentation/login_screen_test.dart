@@ -419,7 +419,19 @@ void main() {
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
 
-      expect(find.text('This code will expire in 5. Need a new code?'), findsOneWidget);
+      expect(find.text('This code will expire in 5 minutes. Need a new code?'), findsOneWidget);
+    });
+
+    testWidgets('uses the singular unit for a one-minute code', (tester) async {
+      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 60);
+
+      await pumpLogin(tester);
+      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.pump();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('This code will expire in 1 minute. Need a new code?'), findsOneWidget);
     });
   });
 }

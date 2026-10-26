@@ -7,6 +7,7 @@ import 'package:ally_mobile_flutter/features/analytics/data/analytics_repository
 import 'package:ally_mobile_flutter/features/analytics/presentation/user_analytics_screen.dart';
 
 import '../../../support/pump_app.dart';
+import '../../../support/signed_in_auth.dart';
 
 class MockAnalyticsRepository extends Mock implements AnalyticsRepository {}
 
@@ -37,6 +38,7 @@ void main() {
       overrides: [
         analyticsRepositoryProvider.overrideWithValue(repository),
         accountRepositoryProvider.overrideWithValue(accountRepository),
+        signedInAuthOverride(),
       ],
     );
 

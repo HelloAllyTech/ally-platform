@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
 
 class MockDio extends Mock implements Dio {}
@@ -326,6 +329,36 @@ void main() {
             '/scenario-session-reviews/rev-1/comments',
             data: {'threadId': 'th-1', 'content': 'me too'},
           )).called(1);
+    });
+  });
+
+  group('unreadReviewCountProvider', () {
+    ProviderContainer containerWith(List<String> permissions) {
+      final container = ProviderContainer(
+        overrides: [
+          reviewsRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith((ref) async => permissions),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('is 0 without asking the backend when the user is not a reviewer', () async {
+      // ally-be answers a learner's unread-count with a 403, which Riverpod
+      // retried — 6 failed requests per launch.
+      final container = containerWith([UserPermissions.viewSimulationReviews]);
+
+      expect(await container.read(unreadReviewCountProvider.future), 0);
+      verifyNever(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/unread-count'));
+    });
+
+    test('fetches the count for a reviewer', () async {
+      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/unread-count'))
+          .thenAnswer((_) async => _response({'count': 2}));
+      final container = containerWith([UserPermissions.simulationReviewerAccess]);
+
+      expect(await container.read(unreadReviewCountProvider.future), 2);
     });
   });
 }

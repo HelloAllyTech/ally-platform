@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_state.dart';
 import '../../../core/network/api_client.dart';
 import 'user_profile.dart';
 
@@ -81,7 +83,17 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   return AccountRepository(ref.watch(apiClientProvider));
 });
 
+/// Signed out, there is no user to fetch — and the router listens to this
+/// provider from launch, so fetching anyway sent `/users/me` with no token
+/// on every cold start (5 times, with Riverpod's retries), and each 401 fell
+/// through to "Your session has expired" on a learner who had never signed
+/// in. Stays loading until sign-in, then fetches; watching auth also drops
+/// the previous account's profile on sign-out.
 final currentUserProvider = FutureProvider<UserProfile>((ref) {
+  final isAuthenticated = ref.watch(
+    authControllerProvider.select((state) => state.isAuthenticated),
+  );
+  if (!isAuthenticated) return Completer<UserProfile>().future;
   return ref.watch(accountRepositoryProvider).getUser();
 });
 

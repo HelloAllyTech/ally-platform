@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/permissions/permissions_repository.dart';
+import '../../../core/permissions/user_permissions.dart';
 import 'review_models.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/reviewsApi.ts`.
@@ -188,8 +190,15 @@ final reviewsListProvider = FutureProvider.family<List<ReviewItem>, ReviewListQu
 /// scribeUnread.count > 0`) — the scribe-review half isn't modeled yet
 /// since scribe review browsing itself isn't ported, only Scribe
 /// recording. Revisit once that lands.
-final unreadReviewCountProvider = FutureProvider<int>((ref) {
-  return ref.watch(reviewsRepositoryProvider).getUnreadCount();
+///
+/// Only reviewers can have unread reviews: ally-be answers anyone else with
+/// a 403, which Riverpod then retried — 6 failed calls per launch for every
+/// learner. RN fires it unconditionally too, but RTK Query doesn't retry.
+final unreadReviewCountProvider = FutureProvider<int>((ref) async {
+  final repository = ref.watch(reviewsRepositoryProvider);
+  final permissions = await ref.watch(userPermissionsProvider.future);
+  if (!permissions.contains(UserPermissions.simulationReviewerAccess)) return 0;
+  return repository.getUnreadCount();
 });
 
 final reviewDetailProvider = FutureProvider.family<ReviewItem, String>((

@@ -1,12 +1,25 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
 import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
 
 class MockDio extends Mock implements Dio {}
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController({required this.isAuthenticated});
+
+  final bool isAuthenticated;
+
+  @override
+  AuthState build() => AuthState(isAuthenticated: isAuthenticated);
+
+  void setAuthenticated(bool value) => state = AuthState(isAuthenticated: value);
+}
 
 Response<T> _response<T>(T? data, {int statusCode = 200}) => Response<T>(
       data: data,
@@ -250,6 +263,55 @@ void main() {
           },
         ),
       ).called(1);
+    });
+  });
+
+  group('currentUserProvider', () {
+    Map<String, dynamic> userJson() => {
+          'id': 7,
+          'email': 'jane@example.com',
+          'name': 'Jane',
+          'phone': '',
+          'profileImageUrl': null,
+          'profileCompleted': true,
+        };
+
+    ProviderContainer containerWith(_FakeAuthController auth) {
+      final container = ProviderContainer(
+        overrides: [
+          accountRepositoryProvider.overrideWithValue(repository),
+          authControllerProvider.overrideWith(() => auth),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('never calls /users/me while signed out', () async {
+      // The router listens to this provider from the very first frame, so a
+      // signed-out fetch here was a 401 on every cold start — which the auth
+      // interceptor then surfaced as "Your session has expired".
+      final container = containerWith(_FakeAuthController(isAuthenticated: false));
+      container.listen(currentUserProvider, (_, _) {});
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(currentUserProvider).isLoading, isTrue);
+      verifyNever(() => dio.get<Map<String, dynamic>>('/users/me'));
+    });
+
+    test('fetches the user once signed in', () async {
+      when(() => dio.get<Map<String, dynamic>>('/users/me'))
+          .thenAnswer((_) async => _response(userJson()));
+      final auth = _FakeAuthController(isAuthenticated: false);
+      final container = containerWith(auth);
+      container.listen(currentUserProvider, (_, _) {});
+      await Future<void>.delayed(Duration.zero);
+
+      auth.setAuthenticated(true);
+      final user = await container.read(currentUserProvider.future);
+
+      expect(user.email, 'jane@example.com');
+      verify(() => dio.get<Map<String, dynamic>>('/users/me')).called(1);
     });
   });
 }

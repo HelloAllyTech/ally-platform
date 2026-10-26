@@ -428,7 +428,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ref.t('auth.login.otp.expires', {'minutes': _otpExpiryMinutes}),
+                        ref.t(
+                          _otpExpiryMinutes == 1
+                              ? 'auth.login.otp.expires_one'
+                              : 'auth.login.otp.expires_other',
+                          {'minutes': _otpExpiryMinutes},
+                        ),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       TextButton(

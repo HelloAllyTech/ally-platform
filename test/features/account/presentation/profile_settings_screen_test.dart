@@ -12,6 +12,7 @@ import 'package:ally_mobile_flutter/features/account/presentation/profile_settin
 
 import '../../../support/fake_network_image.dart';
 import '../../../support/pump_app.dart';
+import '../../../support/signed_in_auth.dart';
 
 class MockAccountRepository extends Mock implements AccountRepository {}
 
@@ -70,7 +71,7 @@ void main() {
           tester,
           initialLocation: '/profile',
           routes: routes(),
-          overrides: [accountRepositoryProvider.overrideWithValue(repository)],
+          overrides: [accountRepositoryProvider.overrideWithValue(repository), signedInAuthOverride()],
         );
 
         expect(find.text('Jane Doe'), findsOneWidget);
@@ -120,7 +121,7 @@ void main() {
           tester,
           initialLocation: '/profile',
           routes: routes(),
-          overrides: [accountRepositoryProvider.overrideWithValue(repositoryWithPhoto)],
+          overrides: [accountRepositoryProvider.overrideWithValue(repositoryWithPhoto), signedInAuthOverride()],
         );
 
         await tester.tap(find.text('Upload Image'));
