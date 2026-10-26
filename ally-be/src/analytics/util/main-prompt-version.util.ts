@@ -51,6 +51,26 @@ export function mainPromptVersionSql(sessionAlias: string): string {
 }
 
 /**
+ * SQL form of the main-agent prompt CODE a session ran, with the same rule as
+ * {@link mainPromptVersion}: the selected prompt, else the default one, when
+ * the session's record has it; the name match only for sessions recorded
+ * before every prompt shipped. Every analytics query that groups by "which
+ * main prompt" must use this, or the default prompt's sessions are credited to
+ * whichever variant a guess picks first.
+ */
+export function mainPromptCodeSql(sessionAlias: string): string {
+  const pv = `${sessionAlias}.metadata->'promptVersions'`;
+  const ran = `COALESCE(NULLIF(${sessionAlias}.metadata->>'selectedMainPromptCode', ''), '${DEFAULT_MAIN_AGENT_PROMPT_CODE}')`;
+  const keys = `jsonb_object_keys(CASE WHEN jsonb_typeof(${pv}) = 'object' THEN ${pv} ELSE '{}'::jsonb END)`;
+  return `CASE WHEN jsonb_typeof(${pv}) = 'object' AND ${pv} ? ${ran} THEN ${ran}
+    ELSE COALESCE(NULLIF(${sessionAlias}.metadata->>'selectedMainPromptCode', ''),
+      (SELECT k FROM ${keys} AS k
+        WHERE (k LIKE '%main_agent%' OR k LIKE '%base_role%') AND k NOT LIKE '%\\_copy\\_%'
+        ORDER BY k COLLATE "C" LIMIT 1))
+  END`;
+}
+
+/**
  * The content hash of the main-agent prompt a session ran, from the session's
  * record (`metadata.promptHashes`, written from the exact map shipped to the
  * agent). Every judge links to a session — directly by `scenarioSessionId`, or

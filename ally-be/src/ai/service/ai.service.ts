@@ -1311,6 +1311,8 @@ export class AiService {
           provider?: string;
           model?: string;
           temperature?: number;
+          version?: number | null;
+          contentHash?: string;
         }
       > = {};
       for (const p of prompts) {
@@ -1331,6 +1333,10 @@ export class AiService {
         const entry = {
           prompt: p.prompt,
           availableVariables: p.availableVariables || [],
+          // Which Skills Store version this is, for ally-ai's [PROMPT_SOURCE]
+          // log and anything it records about what ran (same as ai-learn's).
+          version: p.version ?? null,
+          ...(p.contentHash ? { contentHash: p.contentHash } : {}),
           // Prompt-level LLM overrides (honored by ally-ai's text-gen / drift
           // judge). Omitted when unset so the runtime keeps its defaults.
           ...(p.provider ? { provider: p.provider } : {}),

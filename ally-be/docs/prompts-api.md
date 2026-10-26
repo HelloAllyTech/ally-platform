@@ -88,6 +88,22 @@ Store.
 
 ## Working on prompts from a laptop
 
+**Set up once (a person does this, never a coding agent):**
+
+1. In the admin dashboard, go to **Skills Store → Keys** and create a key with **pull** (to read
+   production's prompts) and **push** (to propose drafts). Name it after yourself so it's easy to
+   revoke.
+2. Save it where only you can read it, and load it in the shell you run the CLI from:
+   `pbpaste > ~/.skills-store-prod-key && chmod 600 ~/.skills-store-prod-key`, then
+   `export SKILLS_STORE_PROD_KEY=$(cat ~/.skills-store-prod-key)`. Never commit it or paste it
+   into a chat.
+3. The local stack needs no Skills Store key: `apply-local` and `--into-local` use local ally-be's
+   own `API_KEY` from `ally-be/.env`.
+
+A coding agent that needs production's prompts and finds no `SKILLS_STORE_PROD_KEY` asks the
+developer to set it up. It doesn't create a key. A full pull is about 1 MB; pass codes to pull
+only some (`prompts pull <code> <code>`).
+
 ```bash
 # Production's live prompts into the gitignored working copy (.prompts/),
 # loaded into the local stack so local tests run on exactly that text:

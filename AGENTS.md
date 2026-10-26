@@ -76,7 +76,7 @@ Add migration file in `app/migrations/` following the `NNN-description.py` patte
 - **Lima VM**: All repos run inside a Lima VM for local development. Commands (npm, poetry, docker, etc.) execute within the VM context.
 - **HIPAA**: This platform handles mental health data. Never log PII/PHI outside of designated audit loggers. Use `phi_logger` in ally-ai.
 - **Multi-tenant**: All ally-be queries must respect tenant isolation. Entities have `tenantId` columns.
-- **Prompts**: the Skills Store (ally-be) is the source of truth; a `.txt` in a service is only the default and fallback, so editing it changes nothing that runs. Adding a prompt: [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md). Changing one: a new version in the Skills Store or `scripts/prompts/prompts.mjs push`.
+- **Prompts**: the Skills Store (ally-be) is the source of truth; a `.txt` in a service is only the default and fallback, so editing it changes nothing that runs. Adding a prompt: [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md). Changing one: a new version in the Skills Store, or `scripts/prompts/prompts.mjs` pull/push, which needs a Skills Store key the developer sets up once ([how](ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop)); an agent asks for it rather than creating one.
 - **LiveKit rooms**: ally-ai-learn agents join LiveKit rooms created by ally-be. Room metadata carries scenario configuration.
 - **SQS in dev**: Use LocalStack (auto-started by docker-compose). Queue URLs differ between local and production.
 - **Weaviate**: Runs alongside ally-ai. Schema changes need migrations. Dev instance via docker-compose.

@@ -39,7 +39,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Changing the DB schema | [`DATA_SCHEMA.md`](DATA_SCHEMA.md) §the affected domain, then the migration recipe below |
 | Auth, roles, permissions | **[Gotchas](https://tech.helloally.ai/#/wiki/memory.md) — this area has bitten us four times.** See the roles note below |
 | Adding a prompt | [`docs/adding-a-prompt.md`](docs/adding-a-prompt.md) — the recipe for all three services (default `.txt` + contract) |
-| Editing a prompt, or the Skills Store | [`docs/prompts-api.md`](docs/prompts-api.md) and [`docs/prompts-folder.md`](docs/prompts-folder.md); auto-improve experiments: [`docs/skill-experiments.md`](docs/skill-experiments.md) |
+| Editing a prompt, or the Skills Store | Live text is in the Skills Store, not the `.txt`: pull, edit and push with the `prompts` CLI, which needs a Skills Store key ([set up once](docs/prompts-api.md#working-on-prompts-from-a-laptop)). Then [`docs/prompts-api.md`](docs/prompts-api.md) and [`docs/prompts-folder.md`](docs/prompts-folder.md); auto-improve experiments: [`docs/skill-experiments.md`](docs/skill-experiments.md) |
 | **Adding, removing or re-pointing an AI/LLM call** | [`docs/ai-task-registry.md`](docs/ai-task-registry.md) — then add your row to `src/llm/constants/ai-task-registry.constants.ts` **in the same PR**. CI enforces both halves |
 | Calling ally-ai | `src/ai/` — service-to-service auth is `X-API-Key` |
 | Real-time / WebSocket work | `src/**/*.gateway.ts` — namespaces are `/microphone-chat`, `/cloud-telephony-chat`, `/scenario-report` |

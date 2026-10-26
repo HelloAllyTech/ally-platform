@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { mainPromptVersion } from '../util/main-prompt-version.util';
 import { DataSource } from 'typeorm';
 import {
   countableSessionPredicate,
@@ -31,6 +32,7 @@ export interface LanguageSessionRow {
   eval_config: Record<string, any> | null;
   persona: string | null;
   prompt_versions: Record<string, unknown> | null;
+  selected_main_prompt_code: string | null;
   occurred_at: Date | null;
   llm_provider: string | null;
   llm_model: string | null;
@@ -108,6 +110,7 @@ const sessionProjection = (extraSelect = '') => `
              sc.prompt          AS persona,
              sc.engine          AS engine,
              s.metadata->'promptVersions' AS prompt_versions,
+             NULLIF(s.metadata->>'selectedMainPromptCode', '') AS selected_main_prompt_code,
              s."createdAt"      AS occurred_at,
              (sc.metadata->'languageCharacteristics'->>(s.metadata->>'languageId'))
                IS NOT NULL AS register_directive_configured,
@@ -276,17 +279,6 @@ export class LanguageJudgeRepository {
     );
   }
 
-  /** Headline prompt version: prefer the main agent prompt, else any. */
-  private mainPromptVersion(pv: Record<string, unknown> | null): string | null {
-    if (!pv) return null;
-    for (const [code, version] of Object.entries(pv)) {
-      if (code.includes('main_agent') || code.includes('base_role'))
-        return String(version);
-    }
-    const first = Object.values(pv)[0];
-    return first != null ? String(first) : null;
-  }
-
   /**
    * Persist one session's judgment atomically: upsert the session row (the
    * denominator), then DELETE + re-INSERT its annotations. Delete-then-insert
@@ -305,7 +297,13 @@ export class LanguageJudgeRepository {
       roundTripWerPct?: number | null;
     },
   ): Promise<void> {
-    const promptVersion = this.mainPromptVersion(session.prompt_versions);
+    // The shared rule, as the drift and filler judges stamp: the selected
+    // prompt, else the default. A guess by name picked the default prompt for
+    // every session once every variant shipped.
+    const promptVersion = mainPromptVersion(
+      session.prompt_versions,
+      session.selected_main_prompt_code,
+    );
     const turnsGarbled = result.per_turn.filter(
       (t) => t.input_garbled && t.input_garbled !== 'none',
     ).length;
