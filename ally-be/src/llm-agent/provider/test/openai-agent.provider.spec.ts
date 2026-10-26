@@ -273,6 +273,29 @@ describe('OpenAiAgentProvider', () => {
     expect(captured[1].temperature).toBe(0.4);
   });
 
+  it('sends the route effort as reasoning_effort, only to reasoning models', async () => {
+    const captured: any[] = [];
+    const provider = new OpenAiAgentProvider(
+      'key',
+      fakeClient(
+        [{ choices: [{ delta: {}, finish_reason: 'stop' }] }],
+        captured,
+      ),
+    );
+
+    await drain(provider, request({ model: 'gpt-5', effort: 'low' }));
+    expect(captured[0].reasoning_effort).toBe('low');
+    // OpenAI stops at high; the harness's deeper levels map onto it.
+    await drain(provider, request({ model: 'gpt-5-mini', effort: 'max' }));
+    expect(captured[1].reasoning_effort).toBe('high');
+    // A non-reasoning model rejects the field.
+    await drain(provider, request({ model: 'gpt-4o', effort: 'low' }));
+    expect(captured[2].reasoning_effort).toBeUndefined();
+    // No effort on the route: the model's own default.
+    await drain(provider, request({ model: 'gpt-5' }));
+    expect(captured[3].reasoning_effort).toBeUndefined();
+  });
+
   it('converts tool definitions to the function schema', async () => {
     const captured: any[] = [];
     const provider = new OpenAiAgentProvider(

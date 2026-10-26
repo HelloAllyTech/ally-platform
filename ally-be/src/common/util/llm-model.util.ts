@@ -108,6 +108,17 @@ const claudeModelAcceptsTemperature = (name: string): boolean =>
   TEMPERATURE_CLAUDE_MODELS.some((pattern) => pattern.test(name));
 
 /**
+ * Whether an OpenAI model reasons before answering and so takes
+ * `reasoning_effort`: the o-series and the gpt-5 family, except the
+ * `-chat` variants, which are non-reasoning.
+ */
+export const isOpenAiReasoningModel = (model?: string | null): boolean => {
+  const name = (model ?? '').trim().toLowerCase();
+  if (!name || name.includes('-chat')) return false;
+  return /^(o1|o3|o4|gpt-5)/.test(name);
+};
+
+/**
  * Whether a model accepts a custom `temperature`. OpenAI reasoning models
  * (o-series, gpt-5 family) only allow the default and 400 on any other value;
  * Gemini 3+ deprecated it (see {@link isGemini3OrLater}); Claude models from
