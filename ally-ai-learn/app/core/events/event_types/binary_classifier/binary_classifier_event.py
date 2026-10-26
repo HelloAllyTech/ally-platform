@@ -29,10 +29,6 @@ class BinaryClassifierEvent(BaseEvent):
     data: BinaryClassifierData
     model: str = "gpt-4o-mini"  # Default model for classification
 
-    #: The session's prompt data (Skills Store text in ``prompts``), so the
-    #: classifier prompts render from the store rather than the local defaults.
-    prompt_data: Optional[object] = None
-
     # Shared client across all instances to avoid per-call SSL/connection overhead
     _CLIENT: ClassVar[Optional[AsyncOpenAI]] = None
 
@@ -88,11 +84,8 @@ class BinaryClassifierEvent(BaseEvent):
             return set()
 
         client = cls._get_client()
-        # One session's events share its prompt data.
         system_prompt, user_prompt = get_batch_binary_classifier_prompt(
-            [(e.event_id, e.data) for e in events],
-            text,
-            prompt_data=events[0].prompt_data,
+            [(e.event_id, e.data) for e in events], text
         )
         messages = [
             ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
@@ -157,7 +150,6 @@ class BinaryClassifierEvent(BaseEvent):
                 text,
                 self.data.positive_examples,
                 self.data.negative_examples,
-                prompt_data=self.prompt_data,
             )
 
             messages = [

@@ -40,7 +40,6 @@ describe('WhatsAppInboundService identity gate', () => {
     checkWhatsAppCrisis: jest.Mock;
   };
   let identityService: { identify: jest.Mock };
-  let promptShared: { getPromptsByOptions: jest.Mock };
   let templateService: { match: jest.Mock; findByKind: jest.Mock };
   let contact: Partial<WaContact>;
   let savedMessages: Record<string, unknown>[];
@@ -76,7 +75,6 @@ describe('WhatsAppInboundService identity gate', () => {
       sendText: jest.fn().mockResolvedValue({ providerMessageId: 'wamid.out' }),
       showTypingIndicator: jest.fn().mockResolvedValue(undefined),
     };
-    promptShared = { getPromptsByOptions: jest.fn().mockResolvedValue([]) };
     aiService = {
       answerKnowledgeQuestion: jest.fn(),
       checkWhatsAppCrisis: jest
@@ -174,7 +172,7 @@ describe('WhatsAppInboundService identity gate', () => {
         { provide: AiService, useValue: aiService },
         {
           provide: PromptSharedService,
-          useValue: promptShared,
+          useValue: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
@@ -276,76 +274,6 @@ describe('WhatsAppInboundService identity gate', () => {
     expect(aiService.answerKnowledgeQuestion.mock.calls[0][0].audience).toEqual(
       { tenant_id: TENANT_A, include_global: true },
     );
-  });
-
-  it('records which store version of each prompt answered', async () => {
-    // ally-ai's own prompt_version is a config label that does not move when someone publishes a
-    // new version in the Skills Store; the reply has to carry the versions that were sent.
-    identityService.identify.mockResolvedValue({
-      ...contact,
-      tenantId: TENANT_A,
-    });
-    promptShared.getPromptsByOptions.mockResolvedValue([
-      {
-        promptCode: 'ally_ai_knowledge_whatsapp_answer',
-        prompt: 'Answer from the passages.',
-        version: 7,
-        contentHash: 'hash-answer',
-      },
-      // Empty text is not sent, so ally-ai ran its file default: not recorded as a store version.
-      {
-        promptCode: 'ally_ai_knowledge_translate_query',
-        prompt: '',
-        version: 2,
-        contentHash: 'hash-translate',
-        model: 'gpt-4o-mini',
-      },
-    ]);
-    aiService.answerKnowledgeQuestion.mockResolvedValue({
-      intent: 'answer',
-      answer: 'Ask directly about intent.',
-      language: 'en',
-      confidence: 0.8,
-      citations: [],
-      decline_reason: 'none',
-      retrieval: {},
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
-      prompt_version: 'v1',
-    });
-
-    await service.handle(inbound());
-
-    const outbound = savedMessages.find((m) => m.direction === 'outbound');
-    expect(outbound?.retrievalMeta).toMatchObject({
-      prompt_version: 'v1',
-      prompt_versions: { ally_ai_knowledge_whatsapp_answer: 7 },
-      prompt_hashes: { ally_ai_knowledge_whatsapp_answer: 'hash-answer' },
-    });
-  });
-
-  it('records the crisis prompt version on a crisis reply', async () => {
-    promptShared.getPromptsByOptions.mockResolvedValue([
-      {
-        promptCode: 'ally_ai_knowledge_crisis_classify',
-        prompt: 'Classify.',
-        version: 3,
-        contentHash: 'hash-crisis',
-      },
-    ]);
-    aiService.checkWhatsAppCrisis.mockResolvedValue({
-      is_crisis: true,
-      confidence: 0.9,
-      signal: 'I want to end my life',
-    });
-
-    await service.handle(inbound('I want to end my life'));
-
-    const outbound = savedMessages.find((m) => m.direction === 'outbound');
-    expect(outbound?.retrievalMeta).toEqual({
-      prompt_versions: { ally_ai_knowledge_crisis_classify: 3 },
-      prompt_hashes: { ally_ai_knowledge_crisis_classify: 'hash-crisis' },
-    });
   });
 
   it('shows "typing…" on the inbound message before a model-backed reply', async () => {

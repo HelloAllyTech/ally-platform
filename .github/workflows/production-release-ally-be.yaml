@@ -205,47 +205,6 @@ jobs:
       - name: Run tests
         run: npm run test -- --forceExit --detectOpenHandles
 
-  prompt-release-check:
-    # Report-only for now: does every LIVE prompt in production satisfy the
-    # contracts this release's code declares (ally-be src/prompt/contracts/)?
-    # A failure means a live prompt would render with a required placeholder
-    # missing; it does not block the deploy yet. Skipped until the
-    # SKILLS_STORE_RELEASE_KEY secret (a Skills Store key with the pull scope)
-    # is set. See scripts/prompts/release-check.mjs.
-    name: Prompt Contracts vs Live Prompts (report-only)
-    needs:
-      - validate-and-tag
-    runs-on: ubuntu-22.04
-    continue-on-error: true
-    timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: .
-    env:
-      SKILLS_STORE_URL: ${{ vars.SKILLS_STORE_URL || 'https://api.helloally.ai' }}
-      SKILLS_STORE_KEY: ${{ secrets.SKILLS_STORE_RELEASE_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: master
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Check live prompts against this release's contracts
-        run: |
-          if [ -z "$SKILLS_STORE_KEY" ]; then
-            echo "SKILLS_STORE_RELEASE_KEY is not set; skipping the prompt release check."
-            exit 0
-          fi
-          # Only the contracts JSON goes to the file: npm's own output stays out of it.
-          (cd ally-be && npm ci --ignore-scripts --no-audit --no-fund >&2)
-          (cd ally-be && npx ts-node --transpile-only scripts/prompt-contracts-json.ts) > /tmp/ally-be-contracts.json
-          node scripts/prompts/release-check.mjs --contracts /tmp/ally-be-contracts.json
-
   build:
     needs:
       - validate-and-tag

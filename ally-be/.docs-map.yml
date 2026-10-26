@@ -34,13 +34,9 @@ rules:
 
   - id: prompt-conventions
     watch:
-      - "src/prompt/contracts/define-prompt.ts"
-      - "src/prompt/contracts/index.ts"
-      - "src/prompt/service/prompts-sync.service.ts"
-    requires: docs/adding-a-prompt.md
-    why: >
-      How a prompt is declared (its contract and Skills Store details) and synced is the
-      recipe for adding one. Adding a prompt needs no doc change; changing the conventions does.
+      - "src/prompts/**"
+    requires: docs/prompts-folder.md
+    why: Prompt folder layout and .meta.json conventions are documented, not discoverable.
 
   - id: weak-metrics-definitions
     watch:

@@ -77,10 +77,6 @@ export type PromptDetailResponse = {
 export type PromptsWithPromptCode = {
   prompt: string;
   promptCode: string;
-  /** Live version number; null when the default text from Git was served. */
-  version?: number | null;
-  /** sha256 of the trimmed text that will run — what sessions record. */
-  contentHash?: string;
   availableVariables?: AvailableVariableEntry[];
   hasStates?: boolean;
   /** Prompt-level LLM provider override; forwarded to the runtime. */
@@ -99,23 +95,6 @@ export type PromptSearchOptions = {
   promptCode?: string[];
   /** When set, fetches prompts where promptCode LIKE 'prefix%' (e.g. ally_ai_learn_) */
   promptCodePrefix?: string;
-  /**
-   * Retired with `useDashboardOverride`: ignored. Every prompt in the store is
-   * served, so there is nothing left to filter on.
-   */
+  /** When true, only include prompts with useDashboardOverride=true (dashboard-edited) */
   useDashboardOverrideOnly?: boolean;
-};
-
-/** A prompt's live text and settings from one lookup (see PromptSharedService.resolvePrompt). */
-export type ResolvedPrompt = {
-  promptCode: string;
-  prompt: string;
-  /** Live version number; null when the default text was served. */
-  version: number | null;
-  contentHash: string;
-  /** `store` = a live version; `default` = no version, so the Git default. */
-  source: 'store' | 'default';
-  provider?: string;
-  model?: string;
-  temperature?: number;
 };

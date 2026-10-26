@@ -428,8 +428,8 @@ describe('AiService', () => {
     });
   });
 
-  describe('getPromptOverrides keys', () => {
-    it('sends every ally-ai prompt under the full code ally-ai reads, plus the legacy key', async () => {
+  describe('getPromptOverrides key for connected skills', () => {
+    it('sends a connected skill under its full code as well as the legacy key, and leaves others alone', async () => {
       mockPromptSharedService.getPromptsByOptions.mockResolvedValue([
         { promptCode: 'ally_ai_scenario_scenario_evaluation', prompt: 'A' },
         { promptCode: 'ally_ai_summary_summary', prompt: 'B' },
@@ -442,9 +442,7 @@ describe('AiService', () => {
       );
       expect(overrides['scenario/scenario/evaluation'].prompt).toBe('A');
       expect(overrides['summary/summary'].prompt).toBe('B');
-      // Not only connected skills: the Skills Store is the source of truth
-      // for every prompt, so every live version must reach ally-ai.
-      expect(overrides['ally_ai_summary_summary'].prompt).toBe('B');
+      expect(overrides['ally_ai_summary_summary']).toBeUndefined();
     });
   });
 

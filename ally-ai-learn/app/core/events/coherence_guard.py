@@ -150,7 +150,7 @@ def default_guard_enabled() -> bool:
     return bool(getattr(settings, "STT_COHERENCE_GUARD_DEFAULT_ENABLED", False))
 
 
-def build_default_coherence_guardrail(*, model: str, llm_base_url, prompt_data=None):
+def build_default_coherence_guardrail(*, model: str, llm_base_url):
     """Build the platform-default COHERENCE guardrail event.
 
     Returns the event, or None on any failure — a scenario must never fail to
@@ -180,7 +180,6 @@ def build_default_coherence_guardrail(*, model: str, llm_base_url, prompt_data=N
             emoji=None,
             emoji_message=None,
             detection_config=DetectionConfig(min_gap_time=min_gap_s()),
-            prompt_data=prompt_data,
         )
     except Exception:  # noqa: BLE001
         logger.exception(

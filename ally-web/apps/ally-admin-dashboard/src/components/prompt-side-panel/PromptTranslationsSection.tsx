@@ -19,11 +19,6 @@ interface Props {
   translationEnabled: boolean;
   /** Flip the opt-in flag on the parent form (auto-saved like any edit). */
   onToggleEnabled: (value: boolean) => void;
-  /**
-   * The version whose translations to show (each version's English text has
-   * its own). Omitted = the live version.
-   */
-  version?: number;
 }
 
 /** Poll cadence while a translation is still in flight. */
@@ -72,7 +67,6 @@ const PromptTranslationsSection: React.FC<Props> = ({
   promptId,
   translationEnabled,
   onToggleEnabled,
-  version,
 }) => {
   const { data: languages } = useGetLanguagesQuery({});
   // Poll only while something is genuinely in flight — the background translate
@@ -80,13 +74,10 @@ const PromptTranslationsSection: React.FC<Props> = ({
   // showing "Translating…" until a manual refresh. Polling stops once every row
   // is settled (ready/failed) or stuck (timed out), so it never runs forever.
   const [pollMs, setPollMs] = useState(0);
-  const { data: translations, isFetching } = useGetPromptTranslationsQuery(
-    version != null ? { id: promptId, version } : promptId,
-    {
-      skip: !promptId || !translationEnabled,
-      pollingInterval: pollMs,
-    },
-  );
+  const { data: translations, isFetching } = useGetPromptTranslationsQuery(promptId, {
+    skip: !promptId || !translationEnabled,
+    pollingInterval: pollMs,
+  });
   useEffect(() => {
     const active = (translations ?? []).some(r => isInFlight(r.status) && !isStuck(r));
     setPollMs(active ? POLL_MS : 0);

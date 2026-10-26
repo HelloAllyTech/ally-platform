@@ -70,18 +70,11 @@ rules:
       Module wiring and WebSocket gateways are the service's public shape; the repo page
       describes it to every other service and to agents.
 
-  - id: prompt-conventions
+  - id: ally-be-prompt-conventions
     watch:
-      - "ally-be/src/prompt/contracts/define-prompt.ts"
-      - "ally-be/src/prompt/contracts/index.ts"
-      - "ally-be/src/prompt/service/prompts-sync.service.ts"
-      - "ally-ai/scripts/sync_prompts.py"
-      - "ally-ai-learn/scripts/sync_prompts.py"
-    requires: ally-be/docs/adding-a-prompt.md
-    why: >
-      How a prompt is declared (its contract and Skills Store details) and synced is the
-      recipe every developer and agent follows to add one. Adding a prompt doesn't change
-      the conventions, so it needs no doc change; changing how contracts or sync work does.
+      - "ally-be/src/prompts/**"
+    requires: ally-be/docs/prompts-folder.md
+    why: Prompt folder layout and .meta.json conventions are documented, not discoverable.
 
   - id: ally-be-weak-metrics-definitions
     watch:

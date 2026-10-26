@@ -6,18 +6,14 @@ import { PromptSidePanel } from "../PromptSidePanel";
 import { Prompt } from "@types";
 
 // Mock sonner toast
-const { mockToastError, mockToastSuccess, mockToastWarning, mockToastMessage } = vi.hoisted(() => ({
+const { mockToastError, mockToastSuccess } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
-  mockToastWarning: vi.fn(),
-  mockToastMessage: vi.fn(),
 }));
 vi.mock("sonner", () => ({
   toast: {
     error: mockToastError,
     success: mockToastSuccess,
-    warning: mockToastWarning,
-    message: mockToastMessage,
   },
 }));
 
@@ -97,32 +93,7 @@ let mockUsageCount = 0;
 /** The prompt codes Builder's eval gates; reset in beforeEach. */
 let mockGatedCodes: string[] = [];
 const mockSubmitCandidate = vi.fn();
-/** The versions list the panel reads; reset in beforeEach. Newest first. */
-let mockVersions: any[] | undefined;
-const mockRefetchVersions = vi.fn(async () => ({ data: mockVersions }));
-const mockCreateVersion = vi.fn();
-const mockPromoteVersion = vi.fn();
-const mockTranslateVersion = vi.fn();
-const mockFetchVersions = vi.fn();
-/** Wrap a value the way an RTK mutation's return does. */
-const resolved = (value: unknown) => ({ unwrap: () => Promise.resolve(value) });
-const rejected = (error: unknown) => ({ unwrap: () => Promise.reject(error) });
 vi.mock("@api", () => ({
-  useGetPromptVersionsQuery: () => ({
-    data: mockVersions,
-    refetch: mockRefetchVersions,
-    isFetching: false,
-  }),
-  useLazyGetPromptVersionsQuery: () => [mockFetchVersions],
-  useCreatePromptVersionMutation: () => [mockCreateVersion, { isLoading: false }],
-  usePromotePromptVersionMutation: () => [mockPromoteVersion, { isLoading: false }],
-  useTranslatePromptVersionMutation: () => [mockTranslateVersion, { isLoading: false }],
-  useGetLanguagesQuery: () => ({
-    data: [
-      { id: 2, label: "Hindi" },
-      { id: 5, label: "Marathi" },
-    ],
-  }),
   // Which prompts go live only through Builder's replay eval, and the call that proposes a change.
   useGetBuilderEvalGatedPromptsQuery: () => ({ data: mockGatedCodes }),
   useSubmitBuilderEvalPromptCandidateMutation: () => [mockSubmitCandidate, { isLoading: false }],
@@ -180,75 +151,65 @@ vi.mock("@hooks", () => ({
 vi.mock("../SkillExperimentNotice", () => ({ SkillExperimentNotice: () => null }));
 
 // Mock constants
-vi.mock("@constants", async () => {
-  // The Skills Store copy is used as-is (its wording is under test in places).
-  const { en: realEn } = await vi.importActual<any>("../../../constants/en");
-  const mocked: any = {
-    MAIN_AGENT_PROMPT_VARIABLE_CATALOG: [],
-    PROMPT_LLM_MODEL_OPTIONS: [
-      {
-        provider: "openai",
-        label: "OpenAI",
-        models: [{ value: "gpt-4o", label: "gpt-4o" }],
-      },
-    ],
-    PROMPT_TEMPERATURE_DEFAULT: 0.7,
-    providerForModel: (model?: string) => (model === "gpt-4o" ? "openai" : undefined),
-    ROUTES: { BUILDER_EVAL: "/builder/eval" },
-    en: {
-      builder: {
-        eval: {
-          promptGate: {
-            noticeTitle: "Changes to this prompt go live only after the eval passes",
-            noticeBody: "Edits are not saved as you type.",
-            stagedBadge: "Not live",
-            stagedHint: "You have changes that have not been through the eval.",
-            submit: "Run eval and publish",
-            submitting: "Submitting…",
-            nothingChanged: "Change the text or the model first.",
-            costHint: "Runs the fixtures twice over.",
-            submitted: "Eval started. The change publishes if it passes.",
-            openEval: "Open Eval",
-            failed: "Couldn't start the eval for this change.",
-            blocked: "This is a Builder prompt: its text and model change only through the eval.",
-          },
+vi.mock("@constants", () => ({
+  MAIN_AGENT_PROMPT_VARIABLE_CATALOG: [],
+  PROMPT_LLM_MODEL_OPTIONS: [
+    {
+      provider: "openai",
+      label: "OpenAI",
+      models: [{ value: "gpt-4o", label: "gpt-4o" }],
+    },
+  ],
+  PROMPT_TEMPERATURE_DEFAULT: 0.7,
+  providerForModel: (model?: string) => (model === "gpt-4o" ? "openai" : undefined),
+  ROUTES: { BUILDER_EVAL: "/builder/eval" },
+  en: {
+    builder: {
+      eval: {
+        promptGate: {
+          noticeTitle: "Changes to this prompt go live only after the eval passes",
+          noticeBody: "Edits are not saved as you type.",
+          stagedBadge: "Not live",
+          stagedHint: "You have changes that have not been through the eval.",
+          submit: "Run eval and publish",
+          submitting: "Submitting…",
+          nothingChanged: "Change the text or the model first.",
+          costHint: "Runs the fixtures twice over.",
+          submitted: "Eval started. The change publishes if it passes.",
+          openEval: "Open Eval",
+          failed: "Couldn't start the eval for this change.",
+          blocked: "This is a Builder prompt: its text and model change only through the eval.",
         },
       },
-      simulation: {
-        editPrompt: "Edit Prompt",
-        restoreDefault: "Restore default",
-        createPrompt: "Create new prompt",
-        promptName: "Prompt Name",
-        enterPromptName: "Enter prompt name",
-        promptCode: "Prompt Code",
-        enterPromptCode: "Enter prompt code",
-        promptDescription: "Description",
-        enterPromptDescription: "Enter description",
-        promptText: "Prompt",
-        enterPrompt: "Enter prompt text",
-        promptRequired: "Prompt name, description, prompt code and prompt text are required",
-        unsavedChangesWarning: "You have unsaved changes. Do you want to close anyway?",
-        availableVariables: "Available variables",
-        usedBlocks: "Used Blocks",
-        blocksHelpTitle: "What are blocks?",
-        blocksHelpText:
-          "Blocks are reusable prompt fragments referenced by this prompt. They are mainly used for optional or shared sections so the main prompt stays easier to read and maintain.",
-        revertToDefault: "Revert to default",
-        revertToDefaultConfirm: "Revert this prompt to the codebase default?",
-        revertPromptSuccess: "Prompt reverted to codebase default",
-        revertPromptFailed: "Failed to revert prompt to codebase default.",
-      },
     },
-  };
-  return {
-    ...mocked,
-    en: {
-      ...mocked.en,
-      common: { ...realEn.common, ...(mocked.en.common ?? {}) },
-      skillsStore: realEn.skillsStore,
+    simulation: {
+      editPrompt: "Edit Prompt",
+      restoreDefault: "Restore default",
+      createPrompt: "Create new prompt",
+      promptName: "Prompt Name",
+      enterPromptName: "Enter prompt name",
+      promptCode: "Prompt Code",
+      enterPromptCode: "Enter prompt code",
+      promptDescription: "Description",
+      enterPromptDescription: "Enter description",
+      promptText: "Prompt",
+      enterPrompt: "Enter prompt text",
+      promptRequired: "Prompt name, description, prompt code and prompt text are required",
+      unsavedChangesWarning: "You have unsaved changes. Do you want to close anyway?",
+      availableVariables: "Available variables",
+      usedBlocks: "Used Blocks",
+      blocksHelpTitle: "What are blocks?",
+      blocksHelpText:
+        "Blocks are reusable prompt fragments referenced by this prompt. They are mainly used for optional or shared sections so the main prompt stays easier to read and maintain.",
+      revertToDefault: "Revert to default",
+      revertToDefaultConfirm: "Revert this prompt to the codebase default?",
+      revertPromptSuccess: "Prompt reverted to codebase default",
+      revertPromptFailed: "Failed to revert prompt to codebase default.",
+      useDashboardOverride: "Use dashboard version",
+      useDashboardOverrideLabel: "Use dashboard version",
     },
-  };
-});
+  },
+}));
 
 const mockPrompt: Prompt = {
   id: "1",
@@ -274,8 +235,6 @@ describe("PromptSidePanel Component", () => {
     mockSubmitCandidate.mockReturnValue({ unwrap: () => Promise.resolve({ id: "suite-1" }) });
     mockUsageCount = 0;
     mockGatedCodes = [];
-    mockVersions = undefined;
-    mockRefetchVersions.mockImplementation(async () => ({ data: mockVersions }));
   });
 
   /** Panel with auto-save wired up (the shape PromptManagement renders). */
@@ -520,7 +479,7 @@ describe("PromptSidePanel Component", () => {
       vi.useRealTimers();
     });
 
-    it("persists a metadata edit after the debounce, never the text", async () => {
+    it("persists an edit after the debounce with the full payload", async () => {
       renderAutoSavePanel();
 
       fireEvent.change(screen.getByPlaceholderText("Enter prompt name"), {
@@ -539,22 +498,17 @@ describe("PromptSidePanel Component", () => {
 
       await advancePastDebounce();
 
-      // The text is saved as a version, so it never rides on the autosave; nor
-      // does the prompt code, a stable id the server won't let change here.
+      // promptCode comes from selectedPrompt (read-only), not from form input.
       expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
-      const [payload] = mockOnAutoSave.mock.calls[0];
-      expect(payload).toEqual(
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "1",
           name: "New Name",
           description: "New Desc",
+          promptCode: "test_prompt_code",
+          prompt: "New Prompt",
         }),
       );
-      expect(payload).not.toHaveProperty("promptCode");
-      expect(payload).not.toHaveProperty("prompt");
-      expect(payload).not.toHaveProperty("model");
-      expect(payload).not.toHaveProperty("useDashboardOverride");
-      expect(mockCreateVersion).not.toHaveBeenCalled();
       expect(screen.getByText("Saved")).toBeInTheDocument();
     });
 
@@ -651,37 +605,27 @@ describe("PromptSidePanel Component", () => {
   });
 
   describe("Keyboard Shortcuts", () => {
-    beforeEach(() => {
-      mockCreateVersion.mockReturnValue(resolved({ version: 2, contentHash: "h2" }));
-    });
-
-    it("saves the text as a new version on Ctrl+Enter", () => {
+    it("saves immediately on Ctrl+Enter when there is a valid pending edit", () => {
       renderAutoSavePanel();
 
       const promptInput = screen.getByPlaceholderText("Enter prompt text");
       fireEvent.change(promptInput, { target: { value: "New prompt text" } });
       fireEvent.keyDown(promptInput, { key: "Enter", ctrlKey: true });
 
-      expect(mockCreateVersion).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "1",
-          body: expect.objectContaining({ prompt: "New prompt text" }),
-        }),
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: "New prompt text" }),
       );
-      expect(mockOnAutoSave).not.toHaveBeenCalled();
     });
 
-    it("saves the text as a new version on Cmd+Enter (Mac)", () => {
+    it("saves immediately on Cmd+Enter (Mac) when there is a valid pending edit", () => {
       renderAutoSavePanel();
 
       const promptInput = screen.getByPlaceholderText("Enter prompt text");
       fireEvent.change(promptInput, { target: { value: "New prompt text" } });
       fireEvent.keyDown(promptInput, { key: "Enter", metaKey: true });
 
-      expect(mockCreateVersion).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.objectContaining({ prompt: "New prompt text" }),
-        }),
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: "New prompt text" }),
       );
     });
 
@@ -827,23 +771,17 @@ describe("PromptSidePanel Component", () => {
       expect(screen.getByRole("option", { name: "Gemini 2.5 Flash" })).toBeInTheDocument();
     });
 
-    it("saves the explicit provider with the model as a new version, not on autosave", async () => {
-      mockCreateVersion.mockReturnValue(resolved({ version: 2, contentHash: "h2" }));
+    it("sends the explicit provider with the model on save", async () => {
       renderAutoSavePanel();
       openPicker();
       fireEvent.click(screen.getByRole("option", { name: "Gemini 2.5 Flash" }));
 
       await advancePastDebounce();
-      expect(mockOnAutoSave).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
-
-      expect(mockCreateVersion).toHaveBeenCalledWith(
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.objectContaining({
-            model: "gemini-2.5-flash",
-            provider: "gemini",
-          }),
+          model: "gemini-2.5-flash",
+          provider: "gemini",
         }),
       );
     });
@@ -864,16 +802,13 @@ describe("PromptSidePanel Component", () => {
       expect(screen.getByRole("checkbox", { name: /Override temperature/i })).toBeDisabled();
       expect(screen.getByText(/doesn’t support a custom temperature/i)).toBeInTheDocument();
 
-      mockCreateVersion.mockReturnValue(resolved({ version: 2, contentHash: "h2" }));
-      fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+      await advancePastDebounce();
 
-      expect(mockCreateVersion).toHaveBeenCalledWith(
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.objectContaining({
-            model: "gpt-5",
-            provider: "openai",
-            temperature: null,
-          }),
+          model: "gpt-5",
+          provider: "openai",
+          temperature: null,
         }),
       );
     });
@@ -965,30 +900,37 @@ describe("PromptSidePanel Component", () => {
       ).toBeInTheDocument();
     });
 
-    it("sends only metadata on a visibility save", async () => {
-      // The server refuses a metadata save that carries text or model changes
-      // (they change through versions), so none are sent.
-      renderAutoSavePanel(variantPrompt);
+    it("omits the body on a visibility-only save, so no duplicate version is minted", async () => {
+      // The backend versions the prompt whenever the payload carries `prompt`
+      // and useDashboardOverride is true, without comparing the text — so
+      // resending an unchanged body on a metadata edit churns version history.
+      renderAutoSavePanel({ ...variantPrompt, useDashboardOverride: false });
       fireEvent.click(getSwitch());
 
       await advancePastDebounce();
 
       const [payload] = mockOnAutoSave.mock.calls[0];
       expect(payload).not.toHaveProperty("prompt");
-      expect(payload).not.toHaveProperty("useDashboardOverride");
+      // And the override flag is left as-is rather than asserted true, which
+      // would move a file-backed prompt onto its DB copy as a side effect.
+      expect(payload.useDashboardOverride).toBe(false);
       expect(payload.visibleInStudio).toBe(false);
     });
 
-    it("does not autosave a text edit; it waits for Save as new version", async () => {
-      renderAutoSavePanel(variantPrompt);
+    it("still sends the body (and enables override) when the text itself changed", async () => {
+      renderAutoSavePanel({ ...variantPrompt, useDashboardOverride: false });
       fireEvent.change(screen.getByTestId("auto-expandable-textarea"), {
         target: { value: "Rewritten body" },
       });
 
       await advancePastDebounce();
 
-      expect(mockOnAutoSave).not.toHaveBeenCalled();
-      expect(screen.getByText(/Unsaved text or model changes/)).toBeInTheDocument();
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "Rewritten body",
+          useDashboardOverride: true,
+        }),
+      );
     });
 
     it("says only that nothing new can use it when a hidden version is unused", () => {
@@ -1179,9 +1121,8 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("leaves every other prompt exactly as it was", async () => {
-      // Not in the gated list: no notice, no eval button; the text is saved as a version.
-      mockCreateVersion.mockReturnValue(resolved({ version: 2, contentHash: "h2" }));
-      renderAutoSavePanel({ ...mockPrompt, defaultPrompt: "Default text" });
+      // Not in the gated list: no notice, no button, and the text autosaves.
+      renderAutoSavePanel({ ...mockPrompt, useDashboardOverride: true });
 
       expect(screen.queryByTestId("prompt-gate-notice")).not.toBeInTheDocument();
       expect(
@@ -1191,20 +1132,14 @@ describe("PromptSidePanel Component", () => {
 
       fireEvent.change(textarea(), { target: { value: "New text" } });
       await advancePastDebounce();
-      expect(mockOnAutoSave).not.toHaveBeenCalled();
 
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
-      });
-      expect(mockCreateVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ body: expect.objectContaining({ prompt: "New text" }) }),
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: "New text", useDashboardOverride: true }),
       );
       expect(mockSubmitCandidate).not.toHaveBeenCalled();
     });
 
-    describe("a version save the server refuses (409, the eval gate)", () => {
-      // The gate refusal carries no errorCode, which is how it is told apart
-      // from a Skills Store conflict.
+    describe("a save the server refuses (409)", () => {
       const refusal = {
         status: 409,
         data: { message: "This is a Builder prompt: changes go live only after the eval." },
@@ -1213,38 +1148,50 @@ describe("PromptSidePanel Component", () => {
       beforeEach(() => {
         // The gate list has not named this prompt (not loaded yet, or the request failed).
         mockGatedCodes = [];
-        mockCreateVersion.mockReturnValue(rejected(refusal));
       });
 
-      const saveVersion = async () => {
-        await act(async () => {
-          fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
-        });
-      };
-
-      it("toasts the server's message once, with a shared id", async () => {
+      it("toasts once, however many edits follow, and stops sending the text", async () => {
+        mockOnAutoSave.mockRejectedValueOnce(refusal);
         renderAutoSavePanel(gatedPrompt);
 
-        fireEvent.change(textarea(), { target: { value: "A" } });
-        await saveVersion();
+        const input = textarea();
+        fireEvent.change(input, { target: { value: "A" } });
+        await advancePastDebounce();
 
+        expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
         expect(mockToastError).toHaveBeenCalledTimes(1);
-        expect(mockToastError).toHaveBeenCalledWith(refusal.data.message, {
-          id: "prompt-eval-gate-refusal",
-        });
+        expect(mockToastError).toHaveBeenCalledWith(refusal.data.message, expect.any(Object));
+
+        // More keystrokes: no more saves, no more toasts.
+        for (const value of ["AB", "ABC", "ABCD"]) {
+          fireEvent.change(input, { target: { value } });
+          await advancePastDebounce();
+        }
+        expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
+        expect(mockToastError).toHaveBeenCalledTimes(1);
       });
 
       it("moves the panel into gated mode, with the staged edit ready to submit", async () => {
+        mockOnAutoSave.mockRejectedValueOnce(refusal);
         renderAutoSavePanel(gatedPrompt);
 
         fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
-        await saveVersion();
+        await advancePastDebounce();
 
         expect(screen.getByTestId("prompt-gate-notice")).toBeInTheDocument();
         expect(submitButton()).toBeEnabled();
-        expect(
-          screen.queryByRole("button", { name: "Save as new version" }),
-        ).not.toBeInTheDocument();
+        // Not the "couldn't save, retry" state: retrying a refusal would only be refused again.
+        expect(screen.queryByText(/Couldn’t save — retry/)).not.toBeInTheDocument();
+      });
+
+      it("gives every toast the same id so a burst replaces rather than stacks", async () => {
+        mockOnAutoSave.mockRejectedValue(refusal);
+        renderAutoSavePanel(gatedPrompt);
+
+        fireEvent.change(textarea(), { target: { value: "A" } });
+        await advancePastDebounce();
+
+        expect(mockToastError.mock.calls[0][1]).toEqual({ id: "prompt-eval-gate-refusal" });
       });
 
       it("still treats any other failure as a retryable save error", async () => {
@@ -1258,287 +1205,6 @@ describe("PromptSidePanel Component", () => {
 
         expect(screen.getByText(/Couldn’t save — retry/)).toBeInTheDocument();
         expect(mockToastError).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe("Versions (Skills Store)", () => {
-    const live = {
-      version: 3,
-      status: "live",
-      prompt: "This is the prompt text",
-      provider: null,
-      model: null,
-      temperature: null,
-      contentHash: "h3",
-      source: "dashboard",
-      note: null,
-      createdBy: 1,
-      createdAt: "2026-10-20T10:00:00Z",
-      publishedAt: "2026-10-20T10:00:00Z",
-      translations: { translatable: false, ready: [], failed: [], pending: [] },
-    };
-    const draft = (over: Record<string, unknown> = {}) => ({
-      ...live,
-      version: 4,
-      status: "candidate",
-      prompt: "A draft text",
-      contentHash: "h4",
-      publishedAt: null,
-      note: "Tighter opening",
-      ...over,
-    });
-    const saveButton = () => screen.getByRole("button", { name: "Save as new version" });
-    const typeText = (value: string) =>
-      fireEvent.change(screen.getByPlaceholderText("Enter prompt text"), { target: { value } });
-
-    it("saves on top of the newest version: baseVersion is its number", async () => {
-      mockVersions = [live];
-      mockCreateVersion.mockReturnValue(resolved({ version: 4, contentHash: "h4" }));
-      renderAutoSavePanel();
-
-      typeText("Better text");
-      fireEvent.change(screen.getByPlaceholderText("What changed? (optional)"), {
-        target: { value: "Clearer ask" },
-      });
-      await act(async () => {
-        fireEvent.click(saveButton());
-      });
-
-      expect(mockCreateVersion).toHaveBeenCalledWith({
-        id: "1",
-        body: expect.objectContaining({
-          prompt: "Better text",
-          baseVersion: 3,
-          note: "Clearer ask",
-        }),
-      });
-      expect(mockOnAutoSave).not.toHaveBeenCalled();
-      expect(mockToastSuccess).toHaveBeenCalledWith(
-        "Saved as draft v4. Publish it to put it live.",
-      );
-      // The new draft is the base now, so nothing is left unsaved.
-      expect(screen.getByText("No unsaved text or model changes.")).toBeInTheDocument();
-    });
-
-    it("edits from the newest draft when there is one", () => {
-      mockVersions = [draft(), live];
-      renderAutoSavePanel();
-
-      expect(screen.getByPlaceholderText("Enter prompt text")).toHaveValue("A draft text");
-      expect(saveButton()).toBeDisabled();
-    });
-
-    it("says someone saved a newer version, keeps the text, and reloads on request", async () => {
-      mockVersions = [live];
-      mockCreateVersion.mockReturnValue(
-        rejected({
-          status: 409,
-          data: {
-            errorCode: "SKILLS_STORE_STALE_BASE",
-            message: "stale",
-            details: { latestVersion: 5, currentVersion: 3 },
-          },
-        }),
-      );
-      renderAutoSavePanel();
-
-      typeText("My unsaved text");
-      await act(async () => {
-        fireEvent.click(saveButton());
-      });
-
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        "Someone saved a newer version (v5) while you were editing.",
-      );
-      expect(screen.getByPlaceholderText("Enter prompt text")).toHaveValue("My unsaved text");
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Reload versions" }));
-      });
-      expect(mockRefetchVersions).toHaveBeenCalled();
-      expect(mockToastError).not.toHaveBeenCalled();
-    });
-
-    it("lists the required placeholders a contract violation reports", async () => {
-      mockVersions = [live];
-      mockCreateVersion.mockReturnValue(
-        rejected({
-          status: 422,
-          data: {
-            errorCode: "SKILLS_STORE_CONTRACT_VIOLATION",
-            message: "contract",
-            details: { missing: ["client_name", "age"] },
-          },
-        }),
-      );
-      renderAutoSavePanel();
-
-      typeText("Text without the placeholders");
-      await act(async () => {
-        fireEvent.click(saveButton());
-      });
-
-      const alert = screen.getByRole("alert");
-      expect(alert).toHaveTextContent("This text leaves out placeholders the code needs.");
-      expect(alert).toHaveTextContent("Missing required: {client_name}, {age}");
-    });
-
-    it("publishes a draft against the live version it saw", async () => {
-      mockVersions = [draft(), live];
-      mockPromoteVersion.mockReturnValue(
-        resolved({ version: 4, previousVersion: 3, failedLanguages: [] }),
-      );
-      renderAutoSavePanel();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-      });
-
-      expect(mockPromoteVersion).toHaveBeenCalledWith({
-        id: "1",
-        version: 4,
-        body: { expectedCurrentVersion: 3 },
-      });
-      expect(mockToastSuccess).toHaveBeenCalledWith("v4 is live.");
-    });
-
-    it("reports failed translations after publishing: those languages keep English", async () => {
-      mockVersions = [draft(), live];
-      mockPromoteVersion.mockReturnValue(
-        resolved({
-          version: 4,
-          previousVersion: 3,
-          failedLanguages: [{ languageId: 5, error: "token mismatch" }],
-        }),
-      );
-      renderAutoSavePanel();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-      });
-
-      expect(mockToastWarning).toHaveBeenCalledWith(
-        "Translation failed for Marathi. Those languages keep serving English until you retry.",
-      );
-    });
-
-    it("waits while translations run: Publish is disabled and progress is shown", () => {
-      mockVersions = [
-        draft({ translations: { translatable: true, ready: [2], failed: [], pending: [5] } }),
-        live,
-      ];
-      renderAutoSavePanel();
-
-      expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
-      expect(screen.getByText(/Translations 1\/2 ready · 1 translating/)).toBeInTheDocument();
-    });
-
-    it("explains a translations_pending refusal instead of a generic failure", async () => {
-      mockVersions = [draft(), live];
-      mockPromoteVersion.mockReturnValue(
-        rejected({
-          status: 409,
-          data: {
-            errorCode: "SKILLS_STORE_TRANSLATIONS_PENDING",
-            message: "pending",
-            details: { translatable: true, ready: [2], failed: [], pending: [5] },
-          },
-        }),
-      );
-      renderAutoSavePanel();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-      });
-
-      expect(mockToastMessage).toHaveBeenCalledWith(
-        "Translations are still running. You can publish once they finish.",
-      );
-      expect(mockToastError).not.toHaveBeenCalled();
-    });
-
-    it("asks for confirmation on a judge rubric, then publishes with it", async () => {
-      mockVersions = [draft(), live];
-      mockPromoteVersion
-        .mockReturnValueOnce(
-          rejected({
-            status: 409,
-            data: { errorCode: "SKILLS_STORE_JUDGE_RUBRIC_PINNED", message: "pinned" },
-          }),
-        )
-        .mockReturnValueOnce(resolved({ version: 4, previousVersion: 3, failedLanguages: [] }));
-      renderAutoSavePanel();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-      });
-      expect(screen.getByText("This is a judge rubric")).toBeInTheDocument();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "I've bumped it — publish" }));
-      });
-      expect(mockPromoteVersion).toHaveBeenLastCalledWith({
-        id: "1",
-        version: 4,
-        body: { expectedCurrentVersion: 3, confirmJudgeRubricChange: true },
-      });
-    });
-
-    it("rolls back to an earlier version after a confirm", async () => {
-      mockVersions = [live, { ...live, version: 2, status: "history", contentHash: "h2" }];
-      mockPromoteVersion.mockReturnValue(
-        resolved({ version: 2, previousVersion: 3, failedLanguages: [] }),
-      );
-      renderAutoSavePanel();
-
-      fireEvent.click(screen.getByRole("button", { name: "Roll back" }));
-      expect(screen.getByText("Roll back to v2?")).toBeInTheDocument();
-      await act(async () => {
-        fireEvent.click(screen.getAllByRole("button", { name: "Roll back" }).at(-1)!);
-      });
-
-      expect(mockPromoteVersion).toHaveBeenCalledWith({
-        id: "1",
-        version: 2,
-        body: { expectedCurrentVersion: 3, rollback: true },
-      });
-    });
-
-    it("restores the default through the revert endpoint", async () => {
-      mockRevertPrompt.mockReturnValue(resolved(true));
-      renderAutoSavePanel({ ...mockPrompt, defaultPrompt: "Default text" });
-
-      fireEvent.click(screen.getByText("Restore default"));
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
-      });
-
-      expect(mockRevertPrompt).toHaveBeenCalledWith({ id: "1" });
-      expect(mockOnUpdate).not.toHaveBeenCalled();
-    });
-
-    it("asks to confirm a judge rubric's pinned version, then reverts with it", async () => {
-      mockRevertPrompt
-        .mockReturnValueOnce(
-          rejected({
-            status: 409,
-            data: { errorCode: "SKILLS_STORE_JUDGE_RUBRIC_PINNED", message: "pinned" },
-          }),
-        )
-        .mockReturnValueOnce(resolved(true));
-      renderAutoSavePanel({ ...mockPrompt, defaultPrompt: "Default text" });
-
-      fireEvent.click(screen.getByText("Restore default"));
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "I've bumped it — publish" }));
-      });
-
-      expect(mockRevertPrompt).toHaveBeenLastCalledWith({
-        id: "1",
-        confirmJudgeRubricChange: true,
       });
     });
   });

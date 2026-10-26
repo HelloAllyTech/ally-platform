@@ -5,12 +5,6 @@ import { LanguageModule } from 'src/language/language.module';
 import { Prompt } from './entity/prompt.entity';
 import { PromptVersion } from './entity/prompt-version.entity';
 import { PromptTranslation } from './entity/prompt-translation.entity';
-import { SkillsStoreKey } from './entity/skills-store-key.entity';
-import { PromptVersioningService } from './service/prompt-versioning.service';
-import { SkillsStoreService } from './service/skills-store.service';
-import { SkillsStoreKeyService } from './service/skills-store-key.service';
-import { SkillsStoreKeyGuard } from './guard/skills-store-key.guard';
-import { SkillsStoreController } from './controller/skills-store.controller';
 import { PromptsRepository } from './repository/prompt.repository';
 import { PromptVersionRepository } from './repository/prompt-version.repository';
 import { PromptTranslationRepository } from './repository/prompt-translation.repository';
@@ -24,16 +18,11 @@ import { PromptsController } from './controller/prompts.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Prompt,
-      PromptVersion,
-      PromptTranslation,
-      SkillsStoreKey,
-    ]),
+    TypeOrmModule.forFeature([Prompt, PromptVersion, PromptTranslation]),
     AiChatModule,
     LanguageModule,
   ],
-  controllers: [PromptsController, SkillsStoreController],
+  controllers: [PromptsController],
   providers: [
     PromptsRepository,
     PromptVersionRepository,
@@ -44,17 +33,13 @@ import { PromptsController } from './controller/prompts.controller';
     PromptTranslationProviderService,
     PromptTranslationTargetsService,
     PromptTranslationService,
-    PromptVersioningService,
-    SkillsStoreService,
-    SkillsStoreKeyService,
-    SkillsStoreKeyGuard,
   ],
   exports: [
     PromptSharedService,
-    // Skill experiments and Builder's eval write versions through the one
-    // write path (base check, contract, translations, promotion).
+    // Skill experiments apply a winning variant as a new version through the
+    // same path an admin's edit takes (versioning, variable reconcile,
+    // auto-translation), rather than writing prompts_versions themselves.
     PromptsService,
-    PromptVersioningService,
     PromptTranslationRepository,
     PromptTranslationService,
   ],

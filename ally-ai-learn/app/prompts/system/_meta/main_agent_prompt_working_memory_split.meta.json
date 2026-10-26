@@ -1,0 +1,114 @@
+{
+    "name": "Main Agent Prompt #3",
+    "kind": "prompt",
+    "promptType": "main_agent",
+    "hasStates": true,
+    "description": "Main-agent variant driven by the derived client working memory (docs/client-working-memory-design.md). The memory is exposed as one placeholder PER SECTION, so a curator can read the prompt to see what is being fed to the model, and can reorder, relocate or drop an individual section to experiment. Selecting this prompt is the entire opt-in; re-selecting another prompt is the whole rollback. There is no env flag to set as well — the CLIENT_WORKING_MEMORY_ENABLED switch was removed, so pointing a scenario here is sufficient on its own.\n\nThe single-placeholder `{client_working_memory}` form this replaced is still supported by the runtime, and a prompt declaring BOTH forms renders that block and leaves these section headings bare — so do not add it here.\n\nTwo things a reader should not mistake for omissions. {state_x_guidelines} is present and authored by you: the older single-block form swallowed it, this one does not. {retrieved_context} is absent because it is blank in EVERY prompt fleet-wide — RETRIEVED_CONTEXT_DEFER_TO_SUFFIX delivers knowledge sources as a trailing message after the conversation history instead, so adding the placeholder back would render nothing and imply retrieval had broken. {character_profile_text} IS genuinely dropped: recalled backstory arrives a few facts at a time through 'What is on your mind from your own life' rather than as the whole profile every turn.\n\nTHE OTHER HALF. Every {working_memory_*} section below is FILLED by a separate prompt — \"Client Working Memory Updater\" — which reads the newest turns and reports what changed. This prompt only displays what that one records, so a section that reads wrong is usually authored there, not here. That prompt's sidecar carries the field-to-placeholder map, including the three places the two do not line up one-to-one: `affect` lands inside {working_memory_stance} rather than getting a section; the two withheld lists compose into {working_memory_withheld}; and opened/closed threads are deltas against the net set shown by {working_memory_unresolved}. {working_memory_salient} is filled by recall, not by the updater at all.\n\nNote the asymmetry in blast radius before editing either: this prompt is selected per simulation, so an edit here reaches only scenarios pointing at it. The updater is global — one copy, every working-memory session.",
+    "availableVariables": [
+        {
+            "name": "role_instructions",
+            "label": "Role Instructions",
+            "required": true
+        },
+        {
+            "name": "name",
+            "label": "Name",
+            "required": false
+        },
+        {
+            "name": "age",
+            "label": "Age",
+            "required": false
+        },
+        {
+            "name": "gender",
+            "label": "Gender",
+            "required": false
+        },
+        {
+            "name": "current_location",
+            "label": "Current Location",
+            "required": false
+        },
+        {
+            "name": "gender_identity",
+            "label": "Gender Identity",
+            "required": false
+        },
+        {
+            "name": "sexual_orientation",
+            "label": "Sexual Orientation",
+            "required": false
+        },
+        {
+            "name": "profession",
+            "label": "Profession",
+            "required": false
+        },
+        {
+            "name": "language_label",
+            "label": "Output Language Label",
+            "required": true
+        },
+        {
+            "name": "language_code",
+            "label": "Output Language Code",
+            "required": true
+        },
+        {
+            "name": "allowed_fillers",
+            "label": "Allowed Filler Words",
+            "required": false
+        },
+        {
+            "name": "linguistic_samples",
+            "label": "Tone & Style Samples",
+            "required": false
+        },
+        {
+            "name": "language_glossary",
+            "label": "Language Glossary",
+            "required": false
+        },
+        {
+            "name": "state_x_guidelines",
+            "label": "Active State Guidelines",
+            "required": false
+        },
+        {
+            "name": "working_memory_stance",
+            "label": "Working Memory — Where You Are",
+            "required": true
+        },
+        {
+            "name": "working_memory_register",
+            "label": "Working Memory — How You Are Speaking",
+            "required": true
+        },
+        {
+            "name": "working_memory_speech_fragments",
+            "label": "Working Memory — Your Recent Words",
+            "required": true
+        },
+        {
+            "name": "working_memory_withheld",
+            "label": "Working Memory — Not Ready To Talk About",
+            "required": true
+        },
+        {
+            "name": "working_memory_unresolved",
+            "label": "Working Memory — Still Unfinished",
+            "required": true
+        },
+        {
+            "name": "working_memory_disclosed",
+            "label": "Working Memory — Already Told Them",
+            "required": true
+        },
+        {
+            "name": "working_memory_salient",
+            "label": "Working Memory — On Your Mind",
+            "required": true
+        }
+    ]
+}

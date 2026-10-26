@@ -8,7 +8,7 @@ import { LlmModelTier } from '../constants/llm-tier.constants';
 export enum LlmTargetSource {
   /** The call site passed an explicit model — an AI Lab run, a replay. */
   REQUEST = 'request',
-  /** The prompt row's own provider/model, set in Skills Store. */
+  /** The prompt row's own provider/model, set in System Skills. */
   PROMPT = 'prompt',
   /** The platform tier default (LLM_FAST_MODEL / LLM_REASONING_MODEL). */
   TIER = 'tier',
@@ -76,7 +76,7 @@ export interface ResolvedLlmTarget {
  * unwritten table is just a second place a model id could be recorded — the
  * duplication this work exists to remove. The rungs that remain are both
  * pre-existing surfaces: `prompts.provider/model/temperature`, already
- * admin-editable in Skills Store and already loaded on these call paths, and
+ * admin-editable in System Skills and already loaded on these call paths, and
  * two env vars for the tiers.
  *
  * Each layer is skipped when it names nothing, which is what the nullable model

@@ -160,6 +160,7 @@ Git hooks (Husky + lint-staged) auto-run ESLint and Prettier on staged files, pl
 - `libs/ui-shared/README.md` — Shared UI library (Nx-generated).
 - `libs/ui-shared/src/lib/*/*.md` — Component guides: `INFINITE_SCROLL.md`, `GENERIC_TABLE.md`, `RESOURCE_SEARCH.md`.
 - `docs/colima.md` — Colima (Docker Desktop alternative) setup.
+- `docs/prompts-meta.md` — Prompt display names via `.meta.json`.
 - `docs/posthog-implementation-guide.md`, `docs/new-posthog-event-adding-guide.md`, `docs/current-posthog-events-traking-list.md` — PostHog analytics implementation and event tracking.
 - `scripts/README.md` — Helper scripts (`docker-switch.sh`, `i18n-sync.mjs`).
 - `.github/WORKFLOWS.md`, `.github/RELEASE_GUIDE.md` — CI workflows and release process.

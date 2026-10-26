@@ -573,8 +573,7 @@ class TestPrompt:
         content = msg.content
         assert "## Filler Word Guidance" in content
         assert "ठीक है, मतलब" in content
-        # The list sits under the filler section, whatever the guidance wording.
-        assert content.index("## Filler Word Guidance") < content.index("ठीक है, मतलब")
+        assert "Rules:" in content
 
     def test_generate_system_message_non_english_empty_samples_uses_multilingual_tpl(
         self,

@@ -1,0 +1,5 @@
+{
+    "name": "Guardrail Classifier User Prompt",
+    "kind": "prompt",
+    "description": "User-turn prompt presenting the counselor message to the guardrail classifier."
+}

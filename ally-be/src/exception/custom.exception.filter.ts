@@ -138,20 +138,6 @@ export class CustomExceptionFilter implements ExceptionFilter {
     if (retryAfterSeconds !== undefined) {
       body.retryAfterSeconds = retryAfterSeconds;
     }
-    // Structured context a classified failure carries for the client to act
-    // on (e.g. the Skills Store's latest version on a stale write). Only an
-    // object the throw site put under `details` deliberately is passed.
-    if (
-      errorCode &&
-      exception instanceof HttpException &&
-      typeof exception.getResponse() === 'object'
-    ) {
-      const details = (exception.getResponse() as { details?: unknown })
-        .details;
-      if (details && typeof details === 'object') {
-        body.details = details;
-      }
-    }
     if (exception instanceof EntityOperationException) {
       body.entityId = (exception.getResponse() as any).entityId;
     }

@@ -64,7 +64,7 @@ export const skillExperimentsAPI = baseAPI.injectEndpoints({
     applySkillExperiment: builder.mutation<SkillExperimentDetail, string>({
       ...action(id => ApiEndpoints.SKILL_EXPERIMENTS.APPLY(id)),
       /**
-       * Apply writes a new version of the skill's text. The Skills Store list
+       * Apply writes a new version of the skill's text. The System Skills list
        * caches that text, and its PROMPTS tag is not registered on baseAPI, so
        * no invalidation would reach it — an admin opening the skill straight
        * after could auto-save the stale text over the winner. Re-fetch every

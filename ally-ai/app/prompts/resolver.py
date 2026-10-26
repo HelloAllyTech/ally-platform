@@ -1,16 +1,10 @@
 """
 Resolve prompt templates from backend metadata or local .txt files.
-
-ally-be sends every prompt's live Skills Store version (keyed by its full
-``ally_ai_<path>`` code); the local .txt is the default, used only when a prompt
-isn't in the payload. Each render is checked against the prompt's typed
-contract (app/prompts/contracts.py).
 """
 
 import os
 from typing import Any, Dict, Optional
 
-from app.prompts.contracts import missing_required
 from app.prompts.manager import prompt_manager
 from app.utils.logger import get_logger
 
@@ -126,18 +120,11 @@ def _extract_allowed_variables(entry: Any) -> Optional[set[str]]:
     if not isinstance(raw_variables, list):
         return None
 
-    # Entries are bare names (legacy) or `{name, label?, required?}` objects,
-    # which is what ally-be sends today. Reading only strings left the allowed
-    # set empty, so every unknown placeholder rendered as literal text.
-    names: set[str] = set()
-    for value in raw_variables:
-        if isinstance(value, str) and value.strip():
-            names.add(value.strip())
-        elif isinstance(value, dict):
-            name = value.get("name")
-            if isinstance(name, str) and name.strip():
-                names.add(name.strip())
-    return names
+    return {
+        value.strip()
+        for value in raw_variables
+        if isinstance(value, str) and value.strip()
+    }
 
 
 class SafeFormatter(dict):
@@ -170,6 +157,14 @@ def resolve_template(
     Use metadata prompt when present and non-empty.
     Otherwise use local .txt.
     """
+    # HACK: The debrief note is central to the learner experience and rarely
+    #       changed from the dashboard. A stale copy in the backend_prompts
+    #       cache can break the structured-debrief format and show learners
+    #       an old single-block summary. Always take this one from local disk
+    #       to guard against that.
+    if prompt_code == "ally_ai_shared_supervisor_note":
+        return _get_local_template(prompt_code, internal_path=internal_path)
+
     backend_entry = _get_backend_prompt_entry(backend_prompts, prompt_code)
     backend_template = _extract_backend_template(backend_entry)
     if backend_template and backend_template.strip():
@@ -219,23 +214,7 @@ def load_and_format(
         return ""
 
     prompt_code = f"ally_ai_{internal_path.replace('/', '_')}"
-    backend_prompts = prompts
-    if backend_prompts is None:
-        backend_prompts = (
-            prompt_data
-            if isinstance(prompt_data, dict)
-            else (getattr(prompt_data, "prompts", None) if prompt_data else None)
-        )
-    backend_entry = _get_backend_prompt_entry(backend_prompts, prompt_code)
-    not_supplied = missing_required(prompt_code, kwargs)
-    if not_supplied:
-        # The code and the prompt's contract have drifted apart. Loud, but the
-        # prompt still renders.
-        logger.error(
-            "[PROMPT_CONTRACT] %s: required variables not supplied by the code: %s",
-            prompt_code,
-            not_supplied,
-        )
+    backend_entry = _get_backend_prompt_entry(prompts, prompt_code)
     formatter = SafeFormatter(
         **kwargs,
         allowed_variables=_extract_allowed_variables(backend_entry),

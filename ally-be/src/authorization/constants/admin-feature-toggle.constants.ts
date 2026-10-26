@@ -561,8 +561,8 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
   },
   {
     key: FeatureToggleKey.PROMPTS,
-    label: 'Skills Store',
-    description: 'The Skills Store tab: the platform prompts.',
+    label: 'System Skills',
+    description: 'The System Skills tab: the platform prompts.',
     legacyGrants: ALL_ADMIN_TIERS,
     defaultEnabled: true,
   },

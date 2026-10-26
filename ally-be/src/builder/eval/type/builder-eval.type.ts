@@ -304,6 +304,4 @@ export interface BuilderEvalPromptCandidate {
   provider?: string | null;
   model?: string | null;
   temperature?: number | null;
-  /** Newest version when the suite started; the publish is refused if it moved. */
-  baseVersion?: number | null;
 }

@@ -1,0 +1,8 @@
+{
+    "name": "Behavior Detection System Prompt",
+    "kind": "prompt",
+    "description": "Binary classifier system prompt that detects if a counselor exhibits specific SHOULD_DO or SHOULD_NOT_DO behaviors.",
+    "availableVariables": [
+        "behaviors"
+    ]
+}

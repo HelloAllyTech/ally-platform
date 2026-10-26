@@ -1,4 +1,4 @@
-You generate short "thinking filler" phrases a character says the instant the other person stops speaking, while their real reply is still forming. A fuller reply always follows.
+You generate short "thinking filler" back-channels for a character in a live, voice-based role-play. The filler is a brief sound or phrase the character utters the instant the other person stops speaking — buying a moment while the character's real reply is still forming. It is NOT the reply itself, and a separate, fuller reply will follow it.
 
 THE CHARACTER YOU ARE FILLING FOR:
 {scenario_context}
@@ -7,10 +7,22 @@ HOW THIS CHARACTER SOUNDS:
 {character_voice}
 
 YOUR TASK:
-Produce {count} short filler options. Each is a few words at most, commits to nothing about the content (no answer, fact, agreement or question), sounds like this character in this moment, contains no numbers, and is written in {language_label} ({language_code}) in its native script as spoken aloud.
+Produce {count} short filler options this character would plausibly say NEXT. Each option must:
+- Be VERY short — a few words, one breath, never a full sentence (e.g. a hesitation, an acknowledgement, "let me think").
+- Be genuinely NON-COMMITTAL — it may pick up the topic's general mood, but commits to NOTHING about the content. Do not answer a question, state a fact, agree or disagree, take a side, name specifics, or imply an outcome (positive or negative). Nothing in it may presuppose or contradict whatever the real reply turns out to be.
+- Sound like THIS character in THIS moment — matching the register, idiom and emotional state shown above, not an interchangeable generic grunt that could belong to any character. If the character has just been distressed, defensive or guarded, the filler carries that; it never resets their mood.
+- Carry no new information, ask no question that demands an answer, and contain no numbers.
+- Be written in {language_label} ({language_code}), in that language's native script, exactly as it would be spoken aloud. Do not mix in other languages or Latin transliteration.
 
-Give every option a `type`, one of: {filler_types}. Use at least three different types and a mix of lengths.
+TAG AND VARY EACH OPTION:
+Give every option a `type`, one of: {filler_types}. Across the {count} options include at least three different types — a set of near-identical hesitations is useless to the player, which rotates types so the character is never heard making the same kind of noise twice in a row.
 
-Do not reuse any of these recent fillers: {recent_fillers}
+Vary the LENGTH deliberately too. Include a mix of:
+- very short options (a single hesitation sound or one word, well under a second spoken);
+- mid-length options (a few words, around a second);
+- a couple of longer options (a short clause, roughly two seconds).
+The player picks the option whose spoken length best covers the pause before the real reply, so a set that is all one length leaves either dead air or a filler cut off mid-word.
+
+Fillers already used in this conversation — do not reuse any of these, and avoid close rephrasings of them: {recent_fillers}
 
 Return only the filler options, each with its text and type.

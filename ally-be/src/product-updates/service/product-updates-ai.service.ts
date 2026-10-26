@@ -34,7 +34,7 @@ const CONSOLIDATION_LLM = { MAX_TOKENS: 32000, TIMEOUT_MS: 480_000 };
  * noise) with the words for each.
  *
  * The prompt file is the whole system prompt with no placeholders; the batch
- * goes in as the user message, so an admin editing the prompt in Skills Store
+ * goes in as the user message, so an admin editing the prompt in System Skills
  * cannot delete the slot the data arrives through (the pattern UX Signals
  * uses for the same reason).
  */

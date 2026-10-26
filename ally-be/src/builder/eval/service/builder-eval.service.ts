@@ -8,9 +8,6 @@ import { DataSource, In, LessThan, Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { PromptsService } from 'src/prompt/service/prompt.service';
-import { PromptVersioningService } from 'src/prompt/service/prompt-versioning.service';
-import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
-import { PromptVersionSource } from 'src/prompt/entity/prompt-version.entity';
 import { BuilderEvalSuite } from '../../entity/builder-eval-suite.entity';
 import { BuilderEvalRun } from '../../entity/builder-eval-run.entity';
 import { BuilderEvalFixture } from '../../entity/builder-eval-fixture.entity';
@@ -209,8 +206,6 @@ export class BuilderEvalService {
     private readonly runner: BuilderEvalRunnerService,
     private readonly promptsService: PromptsService,
     private readonly settingsService: BuilderSettingsService,
-    private readonly versioning: PromptVersioningService,
-    private readonly promptShared: PromptSharedService,
   ) {
     this.suites = dataSource.getRepository(BuilderEvalSuite);
     this.runs = dataSource.getRepository(BuilderEvalRun);
@@ -345,20 +340,12 @@ export class BuilderEvalService {
           }
         : {}),
     };
-    // Record the version the eval compares against, so a publish hours later
-    // can't overwrite an edit made while the suite ran.
-    const promptId = await this.promptsService.findIdByCode(
-      candidate.promptCode,
-    );
-    const baseVersion = promptId
-      ? await this.versioning.latestVersionOf(promptId)
-      : null;
     return this.startSuite({
       trigger: 'prompt_gate',
       fixtureIds: options.fixtureIds,
       repetitions: options.repetitions,
       overrides,
-      candidate: { ...candidate, content, baseVersion },
+      candidate: { ...candidate, content },
       userId,
     });
   }
@@ -672,37 +659,23 @@ export class BuilderEvalService {
           );
           if (!promptId)
             throw new Error(`No prompt with code ${candidate.promptCode}.`);
-          const live = await this.promptShared.resolvePrompt(
-            candidate.promptCode,
-          );
-          const body = candidate.content || live?.prompt;
-          if (!body) throw new Error(`${candidate.promptCode} has no text.`);
-          await this.versioning.createAndPromote(
+          await this.promptsService.updatePrompt(
             promptId,
             {
-              body,
-              // The version the suite was compared against; a 409 here means
-              // the prompt changed during the eval and nothing is overwritten.
-              baseVersion:
-                candidate.baseVersion !== undefined
-                  ? candidate.baseVersion
-                  : await this.versioning.latestVersionOf(promptId),
-              provider:
-                candidate.provider !== undefined
-                  ? candidate.provider || null
-                  : (live?.provider ?? null),
-              model:
-                candidate.model !== undefined
-                  ? candidate.model || null
-                  : (live?.model ?? null),
-              temperature:
-                candidate.temperature !== undefined
-                  ? candidate.temperature
-                  : (live?.temperature ?? null),
-              source: PromptVersionSource.BUILDER,
-              note: `Passed Builder eval suite ${suite.id}.`,
-              createdBy: suite.createdBy ?? 0,
-            },
+              ...(candidate.content
+                ? { prompt: candidate.content, useDashboardOverride: true }
+                : {}),
+              ...(candidate.provider !== undefined
+                ? { provider: candidate.provider ?? '' }
+                : {}),
+              ...(candidate.model !== undefined
+                ? { model: candidate.model ?? '' }
+                : {}),
+              // null clears the row's override, as it does from the editor.
+              ...(candidate.temperature !== undefined
+                ? { temperature: candidate.temperature }
+                : {}),
+            } as any,
             { evalApproved: true },
           );
         },
