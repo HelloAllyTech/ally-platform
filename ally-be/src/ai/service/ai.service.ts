@@ -112,6 +112,21 @@ function withCorpus(endpoint: string, corpus: KnowledgeCorpus): string {
 
 /** The debrief skills (Skills Store codes); both are connected to auto-improve. */
 const SCENARIO_EVALUATION_PROMPT_CODE = 'ally_ai_scenario_scenario_evaluation';
+
+/** The prompts a live-chat nudge renders in ally-ai. */
+const NUDGE_PROMPT_CODES = ['ally_ai_nudge_nudge'] as const;
+
+/**
+ * The prompts ally-ai's transcription pipeline renders (diarization, the
+ * summary or dictation summary, counselor analysis). Sent on the queue message,
+ * which has a size cap, so only these.
+ */
+export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
+  'ally_ai_audio_diarization',
+  'ally_ai_summary_summary',
+  'ally_ai_summary_dictation_summary',
+  'ally_ai_analysis_counselor_analysis',
+] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
 
@@ -178,6 +193,8 @@ export class AiService {
           latest_message: newMessage,
           chat_history: chat_history,
           //force_nudge: requireNudge,
+          // The nudge prompt's live text from the Skills Store.
+          prompts: await this.getPromptOverrides(NUDGE_PROMPT_CODES),
         },
         true,
       );
@@ -1241,10 +1258,19 @@ export class AiService {
   }
 
   /**
-   * Fetches prompt overrides from DB that have the ALLY_AI_PROMPT_PREFIX.
-   * Maps 'ally_ai_folder_file' -> 'folder/file' for ally-ai consumption.
+   * The live text and settings of ally-ai's prompts, from the Skills Store, in
+   * the shape ally-ai reads (`prompts` on every request). ally-ai runs its own
+   * file only for a prompt missing here, and its files are minimal bases, so
+   * every request to ally-ai must carry this map.
+   *
+   * `codes` limits it to those prompts (a queue message has a size cap);
+   * without it, every `ally_ai_*` prompt is included.
+   *
+   * A failed store read is retried once and then THROWN, never answered with an
+   * empty map: an empty map would silently run the minimal defaults. Callers
+   * already handle a failed ally-ai call, which this becomes.
    */
-  private async getPromptOverrides(): Promise<
+  async getPromptOverrides(codes?: readonly string[]): Promise<
     Record<
       string,
       {
@@ -1259,11 +1285,31 @@ export class AiService {
       }
     >
   > {
+    const read = () =>
+      this.promptSharedService.getPromptsByOptions(
+        codes?.length
+          ? { promptCode: [...codes] }
+          : { promptCodePrefix: ALLY_AI_PROMPT_PREFIX },
+      );
+    let prompts: Awaited<ReturnType<typeof read>>;
     try {
-      const prompts = await this.promptSharedService.getPromptsByOptions({
-        promptCodePrefix: ALLY_AI_PROMPT_PREFIX,
-      });
-
+      prompts = await read();
+    } catch (first) {
+      this.logger.warn(
+        `[PROMPT_DELIVERY] Skills Store read failed, retrying once: ${first?.message}`,
+      );
+      try {
+        prompts = await read();
+      } catch (error) {
+        this.logger.error(
+          `[PROMPT_DELIVERY] Skills Store unreadable; refusing to call ally-ai with its minimal defaults: ${error?.message}`,
+        );
+        throw new Error(
+          `The prompt store could not be read, so ally-ai was not called: ${error?.message}`,
+        );
+      }
+    }
+    {
       const overrides: Record<
         string,
         {
@@ -1309,9 +1355,6 @@ export class AiService {
         overrides[p.promptCode] = entry;
       }
       return overrides;
-    } catch (error) {
-      this.logger.error(`Failed to fetch prompt overrides: ${error.message}`);
-      return {};
     }
   }
 

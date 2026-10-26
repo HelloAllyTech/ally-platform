@@ -742,7 +742,10 @@ class TestScenario:
             assert isinstance(result, PromptData)
             mock_logger.error.assert_called_once()
             error_call = mock_logger.error.call_args[0][0]
-            assert "Error instantiating PromptData" in error_call
+            assert "[PROMPT_DATA]" in error_call
+            # Only the bad field is dropped; the valid ones are kept.
+            assert result.prompts is None
+            assert result.name == "Test"
 
     @pytest.mark.unit
     def test_scenario_create_with_events_mocked(self):

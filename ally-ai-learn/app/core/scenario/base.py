@@ -874,6 +874,7 @@ class Scenario(BaseModel):
             )
             prompt_data_dict = {}
 
+        mapped_data: Dict[str, Any] = {}
         try:
             mapped_data = {
                 "title": prompt_data_dict.get("title") or raw.get("title"),
@@ -1031,8 +1032,30 @@ class Scenario(BaseModel):
                 )
             return prompt_data_obj
         except Exception as e:
-            logger.error(f"Error instantiating PromptData from mapped data: {e}")
-            return PromptData()
+            # One malformed field must not throw away the rest, least of all
+            # the Skills Store prompts: without them every prompt falls back to
+            # the minimal local default. Keep each field that is valid on its
+            # own and drop only the bad ones.
+            kept: Dict[str, Any] = {}
+            dropped = []
+            for key, value in mapped_data.items():
+                try:
+                    PromptData(**{key: value})
+                    kept[key] = value
+                except Exception:  # noqa: BLE001 - field-level salvage
+                    dropped.append(key)
+            logger.error(
+                "[PROMPT_DATA] promptData failed validation (%s); dropped %s, "
+                "kept the other %d fields%s",
+                e,
+                dropped or "nothing it could isolate",
+                len(kept),
+                " including the Skills Store prompts" if kept.get("prompts") else "",
+            )
+            try:
+                return PromptData(**kept)
+            except Exception:  # noqa: BLE001
+                return PromptData()
 
     @staticmethod
     def _normalize_termination_event_data(event_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -99,7 +99,9 @@ The one recipe for adding a prompt to ally-be, ally-ai or ally-ai-learn. Each se
 ally-ai runs the live versions ally-be sends in the request body (`prompts`), and falls back to its own file only when a prompt is missing from it. ally-be's `AiService.getPromptOverrides()` sends every `ally_ai_*` prompt, so a call made through it needs no change in ally-be. Two cases do:
 
 - **A new endpoint:** give its request schema a `prompts: Optional[Dict[str, Any]]` field (copy one in `app/schemas/`), and have ally-be pass `getPromptOverrides()` when it calls it.
-- **A call made outside `AiService`:** it must include your prompt. For example, WhatsApp's `loadPromptOverrides()` sends only its three knowledge prompts, by code.
+- **A call made outside `AiService`'s request helpers, or a queue message:** it must include your prompt. Build the map with `AiService.getPromptOverrides(codes)`, scoped to the codes it renders (the transcription queue message carries `TRANSCRIPTION_PIPELINE_PROMPT_CODES`; WhatsApp sends its three knowledge prompts).
+
+**Never send an empty prompt map.** ally-ai runs its own file for any prompt missing from the map, and those files are minimal bases. `getPromptOverrides` retries a failed store read once and then throws, so the call fails visibly instead of running minimal text; the transcription handler requeues a message it can't get prompts for.
 
 1. **The default.** Create `app/prompts/<folder>/<name>.txt`. Placeholders are `{name}` (Python `str.format`), so a literal brace is doubled: `{{"text": "..."}}`.
 

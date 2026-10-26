@@ -156,6 +156,21 @@ describe('AiService', () => {
       expect(result).toEqual(mockResponse.data);
     });
 
+    it("sends the nudge prompt's live text with the request", async () => {
+      mockPromptSharedService.getPromptsByOptions.mockResolvedValue([
+        { promptCode: 'ally_ai_nudge_nudge', prompt: 'Live nudge.' },
+      ] as any);
+      (mockedAxios as any).mockResolvedValue({ data: { nudge: 'x' } });
+
+      await service.getNudge('New message', mockChatHistory);
+
+      expect(mockPromptSharedService.getPromptsByOptions).toHaveBeenCalledWith({
+        promptCode: ['ally_ai_nudge_nudge'],
+      });
+      const body = (mockedAxios as any).mock.calls[0][0].data;
+      expect(body.prompts.ally_ai_nudge_nudge.prompt).toBe('Live nudge.');
+    });
+
     it('should return early when apiUrl is not configured', async () => {
       const serviceWithoutUrl = new AiService(
         { ai: { ...mockConfig.ai, apiUrl: '' } } as any,
@@ -843,6 +858,30 @@ describe('AiService', () => {
           ),
           timeout: 10_000,
         }),
+      );
+    });
+  });
+
+  describe('getPromptOverrides', () => {
+    it('retries a failed store read once', async () => {
+      mockPromptSharedService.getPromptsByOptions
+        .mockRejectedValueOnce(new Error('blip'))
+        .mockResolvedValueOnce([
+          { promptCode: 'ally_ai_summary_summary', prompt: 'Live.' },
+        ] as any);
+
+      const map = await service.getPromptOverrides();
+
+      expect(map['ally_ai_summary_summary'].prompt).toBe('Live.');
+    });
+
+    it('throws rather than answer with an empty map when the store stays unreadable', async () => {
+      mockPromptSharedService.getPromptsByOptions.mockRejectedValue(
+        new Error('down'),
+      );
+
+      await expect(service.getPromptOverrides()).rejects.toThrow(
+        'The prompt store could not be read',
       );
     });
   });

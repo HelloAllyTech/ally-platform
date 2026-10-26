@@ -26,6 +26,16 @@ from app.schemas.common import ChatMessage
 
 logger = get_logger(__name__)
 
+# The prompts this pipeline renders: diarization, the summary or dictation
+# summary, and counselor analysis. ally-be sends their live text on the queue
+# message; for a message without it, they are fetched from ally-be.
+PIPELINE_PROMPT_CODES = [
+    "ally_ai_audio_diarization",
+    "ally_ai_summary_summary",
+    "ally_ai_summary_dictation_summary",
+    "ally_ai_analysis_counselor_analysis",
+]
+
 
 class TranscriptionServiceProvider(str, Enum):
     """Enumeration of supported transcription providers."""
@@ -173,6 +183,15 @@ class TranscriptionRequestHandler:
             chat_id = request.chat_id
             correlation_id = request.correlation_id or correlation_id
 
+            # The Skills Store's text for this pipeline's prompts. The local
+            # files are minimal bases, so a message that can't get the store's
+            # text goes back to the queue rather than run them.
+            prompts = request.prompts or await self._fetch_pipeline_prompts(
+                chat_id, correlation_id
+            )
+            if not prompts:
+                return False
+
             logger.info(
                 f"Processing transcription request for chat_id: {chat_id} "
                 f"correlation_id={correlation_id}"
@@ -251,6 +270,7 @@ class TranscriptionRequestHandler:
             delivered = await self._process_transcription_result(
                 result_message,
                 session_mode=request.mode,
+                prompts=prompts,
                 correlation_id=correlation_id,
                 stt_provider=stt_provider,
                 stt_attempts=stt_attempts,
@@ -359,6 +379,7 @@ class TranscriptionRequestHandler:
         correlation_id: Optional[str] = None,
         stt_provider: Optional[str] = None,
         stt_attempts: Optional[List[Dict[str, Any]]] = None,
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Process the transcription result and do diarization + summary, then
@@ -407,7 +428,7 @@ class TranscriptionRequestHandler:
         try:
             diarization_result = (
                 await self.text_generation_service.diarize_from_transcription(
-                    transcription=segments_text
+                    transcription=segments_text, prompts=prompts
                 )
             )
         except Exception as e:
@@ -474,7 +495,7 @@ class TranscriptionRequestHandler:
         summary_error = None
         try:
             summary = await self._generate_summary(
-                messages, chat_id, session_mode=session_mode
+                messages, chat_id, session_mode=session_mode, prompts=prompts
             )
             summary_data = (
                 summary.model_dump() if hasattr(summary, "model_dump") else summary
@@ -542,6 +563,7 @@ class TranscriptionRequestHandler:
         messages: List[ChatMessage],
         chat_id: int,
         session_mode: Optional[str] = None,
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Generate summary from diarized messages.
@@ -559,6 +581,7 @@ class TranscriptionRequestHandler:
                 chat_history=messages,
                 keys=None,
                 session_mode=session_mode,
+                prompts=prompts,
             )
 
             return summary
@@ -593,6 +616,35 @@ class TranscriptionRequestHandler:
     # summaries to FAILED under load.
     _DELIVERY_MAX_ATTEMPTS = 4
     _DELIVERY_BACKOFF_SECONDS = 2
+
+    async def _fetch_pipeline_prompts(
+        self, chat_id: Any, correlation_id: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """The pipeline's prompts from ally-be, for a message queued without
+        them. None when they can't be read, so the caller requeues the message."""
+        try:
+            texts = await self.ally_core_service.get_prompts_by_codes(
+                PIPELINE_PROMPT_CODES
+            )
+        except Exception as e:  # noqa: BLE001 - any failure means requeue
+            logger.error(
+                f"[PROMPT_DELIVERY] Could not fetch the pipeline prompts for "
+                f"chat_id={chat_id} correlation_id={correlation_id}; leaving the "
+                f"message for redrive rather than run the minimal defaults: {e}"
+            )
+            return None
+        prompts = {
+            code: {"prompt": text}
+            for code, text in (texts or {}).items()
+            if isinstance(text, str) and text.strip()
+        }
+        missing = [c for c in PIPELINE_PROMPT_CODES if c not in prompts]
+        if missing:
+            logger.error(
+                f"[PROMPT_DELIVERY] ally-be has no live text for {missing}; "
+                f"chat_id={chat_id} correlation_id={correlation_id}"
+            )
+        return prompts or None
 
     async def send_combined_result_to_ally_core(
         self,

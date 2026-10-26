@@ -52,7 +52,7 @@ type PromptsRan = {
   prompt_hashes: Record<string, string>;
 };
 
-const KNOWLEDGE_PROMPT_CODES = [
+export const KNOWLEDGE_PROMPT_CODES = [
   'ally_ai_knowledge_whatsapp_answer',
   'ally_ai_knowledge_translate_query',
   'ally_ai_knowledge_crisis_classify',

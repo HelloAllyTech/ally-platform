@@ -357,13 +357,13 @@ def load_and_format_by_code(
     caller already knows which prompt row to load (e.g. a main-agent
     variant selected per-simulation via Scenarios.metadata.selectedMainPromptCode).
 
-    Resolution order:
-      1. Backend metadata prompt for `prompt_code` (when present and non-empty).
-      2. Local .txt file matching `prompt_code` (best-effort; only works if
-         the code follows the ally_ai_learn_<path>_<stem> convention with no
-         underscores inside path segments — typically NOT the case for variants).
-      3. If both miss and `fallback_internal_path` is provided, resolve that
-         path via the normal load_template() pipeline.
+    Resolution order (store text before any local file: the local files are
+    minimal bases, never the production text):
+      1. The Skills Store text for `prompt_code` (backend metadata).
+      2. The Skills Store text for `fallback_internal_path`'s code, if given.
+      3. A local .txt file matching `prompt_code` (best-effort; only works if
+         the code follows the ally_ai_learn_<path>_<stem> convention).
+      4. The local file for `fallback_internal_path`.
 
     Variants almost always live in backend metadata (useDashboardOverride=true)
     and not as local files, so step 1 covers the common case; step 3 is the
@@ -381,7 +381,31 @@ def load_and_format_by_code(
     Returns:
         Formatted string, or "" if no template can be resolved.
     """
-    template = resolve_template(prompt_code, prompt_data)
+    template = _extract_backend_template(
+        _get_backend_prompt_entry(prompt_data, prompt_code)
+    )
+    if not (template and template.strip()):
+        fallback_code = (
+            f"ally_ai_learn_{fallback_internal_path.replace('/', '_')}"
+            if fallback_internal_path
+            else None
+        )
+        fallback_store = (
+            _extract_backend_template(
+                _get_backend_prompt_entry(prompt_data, fallback_code)
+            )
+            if fallback_code
+            else None
+        )
+        # The fallback's store text beats the variant's local file (step 2
+        # before 3); with neither in the store, the local files as before.
+        template = (
+            None
+            if fallback_store and fallback_store.strip()
+            else resolve_template(prompt_code, prompt_data)
+        )
+    else:
+        template = template.strip()
     used_path_for_logging = prompt_code
     # Track which code's backend_entry the SafeFormatter should consult so
     # `allowed_variables` matches the template actually being rendered. When

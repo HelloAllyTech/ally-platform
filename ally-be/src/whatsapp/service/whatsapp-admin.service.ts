@@ -34,6 +34,7 @@ import { WhatsAppSettingsService } from './whatsapp-settings.service';
 import { WhatsAppTemplateService } from './whatsapp-template.service';
 import { composeReply } from '../util/reply-composer';
 
+import { KNOWLEDGE_PROMPT_CODES } from './whatsapp-inbound.service';
 @Injectable()
 export class WhatsAppAdminService {
   private readonly logger = LoggerService.getInstance(
@@ -368,6 +369,9 @@ export class WhatsAppAdminService {
       similarity_band: retrieval.similarityBand,
       max_answer_chars: settings.maxAnswerChars,
       translate_query: retrieval.translateQuery,
+      // The live prompts, as a worker's question gets them: the preview exists
+      // to check prompt changes, so it must run the Skills Store's text.
+      prompts: await this.aiService.getPromptOverrides(KNOWLEDGE_PROMPT_CODES),
     });
 
     const composed = composeReply({

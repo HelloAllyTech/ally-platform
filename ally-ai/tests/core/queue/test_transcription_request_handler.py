@@ -8,6 +8,7 @@ import pytest
 from app.core.constants import PipelineStage
 from app.core.queue.message_models import MessageType
 from app.core.queue.transcription_request_handler import (
+    PIPELINE_PROMPT_CODES,
     PipelineStageError,
     TranscriptionRequestHandler,
 )
@@ -18,7 +19,12 @@ class TestTranscriptionHandler:
 
     @pytest.fixture
     def mock_ally_core_service(self):
-        return AsyncMock()
+        service = AsyncMock()
+        # A message without prompts gets them from ally-be's store.
+        service.get_prompts_by_codes.return_value = {
+            code: f"store text for {code}" for code in PIPELINE_PROMPT_CODES
+        }
+        return service
 
     @pytest.fixture
     def mock_text_generation_service(self):
@@ -67,6 +73,84 @@ class TestTranscriptionHandler:
         handler._send_error_response.assert_not_awaited()
         # no direct sends here
         mock_ally_core_service.process_transcript.assert_not_awaited()
+
+    # ---------------- prompts from the Skills Store ----------------
+    @staticmethod
+    def _message(**extra):
+        return {
+            "message_type": MessageType.TRANSCRIBE_AND_SUMMARIZE_REQUEST,
+            "audio_url": "http://example.com",
+            "chat_id": 123,
+            "sample_rate": 8000,
+            "timestamp": 1,
+            **extra,
+        }
+
+    @pytest.mark.asyncio
+    async def test_uses_the_prompts_on_the_message(
+        self, handler, mock_ally_core_service
+    ):
+        prompts = {"ally_ai_summary_summary": {"prompt": "Live summary."}}
+        handler.transcription_service.transcribe_audio_from_url = AsyncMock(
+            return_value=(None, "transcribed text")
+        )
+        handler._process_transcription_result = AsyncMock(return_value=True)
+
+        await handler.process_transcription_request(self._message(prompts=prompts))
+
+        assert (
+            handler._process_transcription_result.await_args.kwargs["prompts"]
+            == prompts
+        )
+        mock_ally_core_service.get_prompts_by_codes.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_fetches_the_prompts_for_a_message_without_them(
+        self, handler, mock_ally_core_service
+    ):
+        handler.transcription_service.transcribe_audio_from_url = AsyncMock(
+            return_value=(None, "transcribed text")
+        )
+        handler._process_transcription_result = AsyncMock(return_value=True)
+
+        await handler.process_transcription_request(self._message())
+
+        mock_ally_core_service.get_prompts_by_codes.assert_awaited_once_with(
+            PIPELINE_PROMPT_CODES
+        )
+        prompts = handler._process_transcription_result.await_args.kwargs["prompts"]
+        assert prompts["ally_ai_audio_diarization"] == {
+            "prompt": "store text for ally_ai_audio_diarization"
+        }
+
+    @pytest.mark.asyncio
+    async def test_requeues_rather_than_run_minimal_defaults(
+        self, handler, mock_ally_core_service
+    ):
+        mock_ally_core_service.get_prompts_by_codes.side_effect = Exception("down")
+        handler.transcription_service.transcribe_audio_from_url = AsyncMock()
+        handler._send_error_response = AsyncMock()
+
+        handled = await handler.process_transcription_request(self._message())
+
+        assert handled is False  # left on the queue for redrive
+        handler.transcription_service.transcribe_audio_from_url.assert_not_awaited()
+        handler._send_error_response.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_diarization_and_summary_render_with_the_prompts(self, handler):
+        prompts = {"ally_ai_audio_diarization": {"prompt": "Live."}}
+        handler.text_generation_service.diarize_from_transcription = AsyncMock(
+            side_effect=Exception("stop after diarization")
+        )
+        handler._send_error_response = AsyncMock(return_value=True)
+        result = SimpleNamespace(chat_id=123, segments_text="text", segments=[])
+        try:
+            await handler._process_transcription_result(result, prompts=prompts)
+        except Exception:  # noqa: BLE001 - only the call args matter here
+            pass
+        diarize = handler.text_generation_service.diarize_from_transcription
+        assert diarize.await_args.kwargs["prompts"] == prompts
 
     @pytest.mark.asyncio
     async def test_process_transcription_request_audio_transcribe_failure_sends_error(
@@ -328,6 +412,7 @@ class TestTranscriptionHandler:
             chat_history=messages,
             keys=None,
             session_mode="DICTATION",
+            prompts=None,
         )
 
     @pytest.mark.asyncio
@@ -343,6 +428,7 @@ class TestTranscriptionHandler:
             chat_history=messages,
             keys=None,
             session_mode=None,
+            prompts=None,
         )
 
     @pytest.mark.asyncio

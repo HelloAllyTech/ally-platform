@@ -12,4 +12,8 @@ export interface TranscribeAndSummarizeRequestMessage {
   // callback so a single chat's transcription journey can be traced across
   // ally-be and ally-ai.
   correlation_id?: string;
+  // The live text and settings of the pipeline's prompts, from the Skills
+  // Store (AiService.getPromptOverrides). ally-ai renders diarization and the
+  // summary with these, and falls back to its own minimal files without them.
+  prompts?: Record<string, unknown>;
 }

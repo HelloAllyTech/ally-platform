@@ -80,3 +80,57 @@ def test_helper_paraphrased_renders_the_store_text():
     data = _store("ally_ai_learn_events_helper_paraphrased_system", "STORE SYSTEM")
     system, _ = get_paraphrase_evaluation_prompt("a", "b", prompt_data=data)
     assert system == "STORE SYSTEM"
+
+
+def test_bad_session_data_keeps_the_store_prompts():
+    from app.core.scenario.base import Scenario
+
+    prompts = {"ally_ai_learn_system_main_agent_prompt": {"prompt": "STORE MAIN"}}
+    data = Scenario._build_prompt_data(
+        {
+            "promptData": {
+                "title": "A scenario",
+                # One malformed field: opening statements must be strings.
+                "openingStatements": [None, {"not": "a string"}],
+                "prompts": prompts,
+            }
+        }
+    )
+    assert data.prompts == prompts
+    assert data.title == "A scenario"
+    assert data.opening_statements == []
+
+
+def test_selected_variant_prefers_store_text_over_local_files():
+    from app.prompts.resolver import load_and_format_by_code
+
+    # The selected variant is missing from the store; the main prompt's store
+    # text must win over the variant's (minimal) local file.
+    data = {
+        "prompts": {
+            "ally_ai_learn_system_main_agent_prompt": {"prompt": "STORE MAIN"},
+        }
+    }
+    text = load_and_format_by_code(
+        "ally_ai_learn_system_main_agent_prompt_full",
+        data,
+        fallback_internal_path="system/main_agent_prompt",
+    )
+    assert text == "STORE MAIN"
+
+
+def test_selected_variant_runs_its_store_text_when_present():
+    from app.prompts.resolver import load_and_format_by_code
+
+    data = {
+        "prompts": {
+            "ally_ai_learn_system_main_agent_prompt_full": {"prompt": "STORE FULL"},
+            "ally_ai_learn_system_main_agent_prompt": {"prompt": "STORE MAIN"},
+        }
+    }
+    text = load_and_format_by_code(
+        "ally_ai_learn_system_main_agent_prompt_full",
+        data,
+        fallback_internal_path="system/main_agent_prompt",
+    )
+    assert text == "STORE FULL"
