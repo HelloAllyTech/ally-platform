@@ -199,8 +199,8 @@ class TestHelperParaphrasedEvent:
             ChatMessage(role="counselor", content="I'm fine"),
         ]
 
-        result = await event.detect_event(conversations)
-        assert result is False
+        with pytest.raises(Exception, match="LLM API error"):
+            await event.detect_event(conversations)
 
     @pytest.mark.asyncio
     @patch(
@@ -337,3 +337,26 @@ class TestHelperParaphrasedEvent:
 
         # Should not call LLM for empty messages
         mock_async_openai.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch(
+        "app.core.events.event_types.helper_paraphrased"
+        ".helper_paraphrased_event.settings.OPENAI_API_KEY",
+        None,
+    )
+    async def test_detect_event_raises_value_error_if_api_key_is_not_set(
+        self,
+    ):
+        """Test that a ValueError is raised if OPENAI_API_KEY is not set."""
+        data = HelperParaphrasedData()
+        event = HelperParaphrasedEvent.create(event_id="test_event", data=data)
+
+        conversations = [
+            ChatMessage(role="client", content="Test agent message"),
+            ChatMessage(role="counselor", content="Test counselor message"),
+        ]
+
+        with pytest.raises(
+            ValueError, match="OpenAI requires OPENAI_API_KEY in settings"
+        ):
+            await event.detect_event(conversations)
