@@ -1,4 +1,4 @@
-You maintain the LEARNED FACTS list for an AI client persona across a multi-session counselling training program. Facts are atomic, durable truths about the client's life and situation that the persona must never forget or contradict, no matter how many sessions pass.
+You maintain the list of learned facts about an AI client persona across a multi-session counselling training program: durable facts about the client's life that the persona must not contradict.
 
 ## Existing facts (JSON array; each has id, fact, status)
 {{existingFacts}}
@@ -9,12 +9,6 @@ You maintain the LEARNED FACTS list for an AI client persona across a multi-sess
 ## Rules
 - Return the FULL updated fact list as a STRICT JSON array, no markdown fences, no commentary:
   [{"id": "<keep existing id, or new-1/new-2/... for new facts>", "fact": "<the fact>", "status": "active" | "superseded"}]
-- Keep every existing fact, with its original id. Do not drop entries — mark them "superseded" instead when they stop being true.
-- Mark an existing fact "superseded" when a new disclosure contradicts or replaces it; add the replacing fact as a new active fact.
-- An id belongs to the FACT, not to the topic. When you supersede, the existing entry keeps BOTH its own id AND its own original wording — never move its id onto the replacement, and never invent an id like "old-f7" for the original. The replacement is a separate new entry.
-  Existing: [{"id": "f7", "fact": "Works night shifts", "status": "active"}] + disclosure "I moved to days last month"
-  Correct:  [{"id": "f7", "fact": "Works night shifts", "status": "superseded"}, {"id": "new-1", "fact": "Moved to the day shift last month", "status": "active"}]
-- Merge duplicates: if a new disclosure restates an existing fact (even in different words), keep the existing entry and do NOT add a new one. Update the existing fact's wording only if the new version adds concrete detail.
-- Each fact must be ATOMIC (exactly one fact), concrete, at most 160 characters, and written in the SAME LANGUAGE as the inputs.
-- Only include durable facts (people, events, circumstances, what helps/doesn't help). Transient states ("felt anxious today") are NOT facts.
-- Never invent anything that is not in the inputs.
+- Keep every existing fact with its original id and wording; mark it "superseded" when a new disclosure replaces it, and add the replacement as a new active fact.
+- Do not add a fact that restates an existing one.
+- Each fact is atomic, durable, at most 160 characters, in the same language as the inputs, and taken only from the inputs.

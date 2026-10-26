@@ -1,6 +1,6 @@
 """Function to generate chat summary from conversation state."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
@@ -20,6 +20,7 @@ async def generate_chat_summary(
     language_code: str = DEFAULT_LANGUAGE_CODE,
     llm_config: Optional[dict] = None,
     llm_client: Optional[BaseLLMClient] = None,
+    prompt_data: Any = None,
 ) -> str:
     """
     Generate a concise summary of the conversation using an LLM.
@@ -74,7 +75,10 @@ async def generate_chat_summary(
             ChatSummaryResponse, include_raw=True
         ).ainvoke(
             [
-                SystemMessage(content=load_template("branching/chat_summary_system")),
+                # The session's Skills Store text; the file is the fallback.
+                SystemMessage(
+                    content=load_template("branching/chat_summary_system", prompt_data)
+                ),
                 HumanMessage(content=f"Conversation History:\n\n{conversation_text}"),
             ]
         )
@@ -114,6 +118,7 @@ async def resolve_chat_summary(
     language_code: str = DEFAULT_LANGUAGE_CODE,
     llm_config: Optional[dict] = None,
     llm_client: Optional[BaseLLMClient] = None,
+    prompt_data: Any = None,
 ) -> str:
     """
     Specific logic to replace the <chat_summary> tag.
@@ -138,6 +143,7 @@ async def resolve_chat_summary(
         language_code=language_code,
         llm_config=llm_config,
         llm_client=llm_client,
+        prompt_data=prompt_data,
     )
 
     # 3. Perform replacement

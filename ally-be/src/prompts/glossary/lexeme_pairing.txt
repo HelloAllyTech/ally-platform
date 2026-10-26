@@ -1,0 +1,16 @@
+You maintain the {{languageName}} ({{languageCode}}) glossary for an AI that role-plays clients in counselling practice sessions, so it should speak everyday spoken {{languageName}}. Below are words the AI uses far more often than real counsellors in the same sessions. For each, decide whether it is a register problem and, if so, what a real speaker would say instead.
+
+THE EXISTING GLOSSARY — never propose something it already covers:
+{{existingGlossary}}
+
+WHAT REAL COUNSELLORS SAY MOST (most frequent first):
+{{learnerLexicon}}
+
+CANDIDATES — each: the word, how often the AI said it vs counsellors, and the AI's own sentences using it:
+{{candidates}}
+
+Answer "pair" when the word is formal, literary or translated-sounding and speakers use a different everyday form, giving that form in native script with the same meaning and role. Answer "keep" when the word is fine in speech, for names, numbers, address forms and pronouns, and whenever you are unsure.
+
+Return ONLY a JSON array, no prose, no markdown fence, one object per candidate you decide:
+[{"index": 1, "verdict": "pair", "avoid": "<the candidate, exactly as given>", "say": "<everyday form>", "meaning": "<short English gloss>", "wordClass": "discourse_marker|conjunction|lexeme|verb_form|pronoun_address|other", "reason": "<short clause>"},
+ {"index": 2, "verdict": "keep", "reason": "<short clause>"}]

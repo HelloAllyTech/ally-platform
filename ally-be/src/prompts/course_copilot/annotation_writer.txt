@@ -1,48 +1,29 @@
-You are writing one ANNOTATED TRANSCRIPT exercise for a course on the Ally platform, which trains helpers — volunteer listeners, peer supporters and counsellors — in helping skills. The learner reads a short fictional conversation between a helper and a person seeking help, and marks the helper's lines with behaviour labels. It is a worked example: it shows the behaviours the learner is about to practise, before they have to produce them themselves.
+You write one annotated-transcript exercise for a helper-training course: a short fictional conversation between a helper and a person seeking help, which the learner marks with behaviour labels.
 
-THE COURSE BRIEF (what the trainer told us — authoritative)
+THE COURSE BRIEF
 {{brief_json}}
 
-WHERE THIS EXERCISE SITS (the course outline)
+THE COURSE OUTLINE
 {{course_outline}}
 
-THIS EXERCISE (its plan: purpose and focus)
+THIS EXERCISE
 {{item_json}}
 
-The learning outcomes it serves:
-{{objectives}}
+Learning outcomes: {{objectives}}
+Practice it prepares for: {{next_practice}}
 
-The practice it prepares for: {{next_practice}}
-
-Behaviours the trainer confirmed —
-Helpful:
+Helpful behaviours:
 {{helpful_behaviours}}
-Unhelpful:
+Unhelpful behaviours:
 {{unhelpful_behaviours}}
 
-THE TRANSCRIPT ("units")
-- {{line_count}} lines, one line per speaker turn, in order.
-- Speakers by role: the helper as this audience is called ("Listener", "Counsellor", "Peer supporter") and the person ("Caller", "Client", "Texter"). Give the person a fictional first name in the intro, not in the speaker field.
-- A realistic conversation in this audience's real setting (brief.audience), with a beginning, a turning point and an ending. Real speech: short turns, hesitations, a person who sometimes deflects or tests the helper.
-- The helper is neither perfect nor hopeless. Mix helpful and unhelpful moments — roughly three helpful for every two unhelpful — so labels must be told apart, not applied everywhere. Some helper lines (a greeting, a practical question) deserve no label at all.
-- Everyone is fictional. Difficult material (grief, suicide and self-harm, abuse) is handled plainly and respectfully, without graphic detail, and never describes a method of self-harm. If risk comes up, a good helper responds to it.
-- Write in English unless the brief explicitly asks for written course content in another language.
+Write {{line_count}} lines ("units"), one per speaker turn, with role names as speakers. Mix helpful and unhelpful helper moments. Everyone is fictional; handle difficult material without graphic detail.
 
-LABELS
-- {{label_instruction}}
-- Copy each label's text EXACTLY as written in the behaviour lists above — same words, same order of words. Only when the lists are empty, name the behaviours yourself in two to five words ("Reflects the feeling", "Gives advice too early").
-- At most {{max_labels}} labels. Include at least one helpful and one unhelpful label when both lists have entries.
-- "polarity": "helpful" or "unhelpful".
-- "description": one line saying what the behaviour looks like in words, so a learner can recognise it.
+LABELS: {{label_instruction}} Copy each label's text exactly from the behaviour lists above. At most {{max_labels}} labels, each with "polarity" ("helpful" or "unhelpful") and a one-line "description".
 
-ANSWER KEY ("targets")
-- Each target pairs one line id with one label id. Mostly the helper's lines; a label about noticing something (a missed risk cue, say) may target the person's line that carried the cue.
-- Every label is used by at least one target. Aim for 6-12 targets in all.
-- Mark only what a careful trainer would agree on; leave ambiguous lines unmarked.
-- Every target has a "note" of one or two sentences — the teaching moment: why this line is an example of the label, and what effect it has on the person (or what would have served them better). The note is what the learner reads when the key is revealed, so it is the point of the exercise.
+TARGETS: pair line ids with label ids, each with a one- or two-sentence "note" explaining it. Every label is used at least once.
 
-INTRO
-- "intro": one or two sentences that frame the task and pose the question to hold while reading ("Meera calls after her mother's funeral. Where does the listener move to fixing before Meera feels heard?").
+"intro": one or two sentences framing the task.
 
 OUTPUT
 Return ONLY a JSON object — no code fences, no commentary — in exactly this shape:
@@ -52,4 +33,4 @@ Return ONLY a JSON object — no code fences, no commentary — in exactly this 
   "labels": [{"id": "l1", "text": "…", "description": "…", "polarity": "helpful"}],
   "targets": [{"unitId": "u2", "labelId": "l1", "note": "…"}]
 }
-Ids are short strings you make up ("u1", "l1"); they need only be unique within this exercise and match wherever they are referenced.
+Ids are short strings you make up ("u1", "l1"), unique within this exercise.

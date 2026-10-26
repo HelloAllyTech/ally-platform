@@ -1,8 +1,0 @@
-{
-    "name": "Text Chat Guidance",
-    "kind": "prompt",
-    "promptType": "text_chat_guidance",
-    "hasStates": false,
-    "description": "How the client writes in a text-chat roleplay (typed both ways, no audio). Appended to the persona prompt by generate_response only when the session's interactionMode is TEXT, so it re-frames the voice-oriented main prompt ('how you speak', filler words) as typing. Voice sessions never see it. No template variables.",
-    "availableVariables": []
-}

@@ -5,6 +5,7 @@ import { PromptsRepository } from '../../repository/prompt.repository';
 import { PromptVersionRepository } from '../../repository/prompt-version.repository';
 import { PromptSharedService } from '../prompt-shared.service';
 import { PromptTranslationService } from '../prompt-translation.service';
+import { PromptVersioningService } from '../prompt-versioning.service';
 import { CreatePromptsDto } from '../../dto/create-prompts.dto';
 import { UpdatePromptDto } from '../../dto/update-prompt.dto';
 import { Prompt } from '../../entity/prompt.entity';
@@ -27,6 +28,8 @@ describe('PromptsService', () => {
   let promptsRepository: PromptsRepository;
   let promptVersionRepository: PromptVersionRepository;
   let translatePrompt: jest.Mock;
+  let versioning: Record<string, jest.Mock>;
+  let promptSharedService: { getPromptByCode: jest.Mock };
   /** Raw-SQL escape hatch used by the scenario-usage queries. */
   let dataSourceQuery: jest.Mock;
 
@@ -40,7 +43,7 @@ describe('PromptsService', () => {
     name: 'AI Learning Prompt',
     description: 'A prompt for AI learning',
     currentVersion: 1,
-    useDashboardOverride: false,
+    useDashboardOverride: true,
     isObsolete: false,
     createdAt: new Date('2026-02-09'),
     updatedAt: new Date('2026-02-09'),
@@ -98,7 +101,6 @@ describe('PromptsService', () => {
             findOne: jest.fn(),
             delete: jest.fn(),
             getLatestPromptVersion: jest.fn(),
-            deleteVersionsBefore: jest.fn(),
           },
         },
         {
@@ -117,6 +119,22 @@ describe('PromptsService', () => {
           },
         },
         {
+          provide: PromptVersioningService,
+          useValue: (versioning = {
+            createVersion: jest.fn().mockResolvedValue({
+              version: 4,
+              contentHash: 'h4',
+            }),
+            createAndPromote: jest
+              .fn()
+              .mockResolvedValue({ version: 1, failedLanguages: [] }),
+            promote: jest.fn(),
+            latestVersionOf: jest.fn().mockResolvedValue(3),
+            listVersions: jest.fn(),
+            translateDrafts: jest.fn().mockResolvedValue(undefined),
+          }),
+        },
+        {
           provide: DataSource,
           useValue: mockDataSource,
         },
@@ -131,6 +149,7 @@ describe('PromptsService', () => {
     promptVersionRepository = module.get<PromptVersionRepository>(
       PromptVersionRepository,
     );
+    promptSharedService = module.get(PromptSharedService) as never;
   });
 
   afterEach(() => {
@@ -138,467 +157,129 @@ describe('PromptsService', () => {
   });
 
   describe('createPrompts', () => {
-    it('should create single prompt with initial version', async () => {
-      const createPromptsDto: CreatePromptsDto = {
+    it('creates each prompt with its text live as version 1, through the write path', async () => {
+      const dto: CreatePromptsDto = {
         prompts: [
           {
-            promptCode: 'AI Learn',
-            name: 'AI Learning Prompt',
-            description: 'A prompt for AI learning',
-            prompt: 'This is the prompt content',
-          },
+            promptCode: 'New Prompt',
+            name: 'New',
+            description: 'd',
+            prompt: 'Hello {name}',
+          } as any,
         ],
       };
-
-      const createdPrompt = { ...mockPrompt, id: mockPromptId };
-      (promptsRepository.create as jest.Mock).mockReturnValue(createdPrompt);
-      (promptsRepository.save as jest.Mock)
-        .mockResolvedValueOnce([createdPrompt])
-        .mockResolvedValueOnce([createdPrompt]);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
+      (promptsRepository.create as jest.Mock).mockImplementation((v) => v);
+      (promptsRepository.save as jest.Mock).mockImplementation(async (v) =>
+        v.map((p: any, i: number) => ({ ...p, id: `id-${i}` })),
       );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue([
-        mockPromptVersion,
-      ]);
 
-      const result = await service.createPrompts(createPromptsDto);
+      const [saved] = await service.createPrompts(dto);
 
-      expect(result).toEqual([createdPrompt]);
-      expect(promptsRepository.create).toHaveBeenCalled();
-      expect(promptsRepository.save).toHaveBeenCalledTimes(2);
-      expect(promptVersionRepository.save).toHaveBeenCalled();
-    });
-
-    it('should create multiple prompts with initial versions', async () => {
-      const createPromptsDto: CreatePromptsDto = {
-        prompts: [
-          {
-            promptCode: 'AI Learn',
-            name: 'AI Learning',
-            description: 'AI Learning Prompt',
-            prompt: 'Content 1',
-          },
-          {
-            promptCode: 'Learn Path',
-            name: 'Learning Path',
-            description: 'Learning Path Prompt',
-            prompt: 'Content 2',
-          },
-        ],
-      };
-
-      const prompt1 = { ...mockPrompt, id: mockPromptId };
-      const prompt2 = {
-        ...mockPrompt,
-        id: '323e4567-e89b-12d3-a456-426614174002',
-        promptCode: 'ally_learn_path',
-        name: 'Learning Path',
-        isObsolete: false,
-      };
-
-      (promptsRepository.create as jest.Mock)
-        .mockReturnValueOnce(prompt1)
-        .mockReturnValueOnce(prompt2);
-      (promptsRepository.save as jest.Mock)
-        .mockResolvedValueOnce([prompt1, prompt2])
-        .mockResolvedValueOnce([prompt1, prompt2]);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue([
-        mockPromptVersion,
-        mockPromptVersion,
-      ]);
-
-      const result = await service.createPrompts(createPromptsDto);
-
-      expect(result).toHaveLength(2);
-      expect(promptsRepository.create).toHaveBeenCalledTimes(2);
-      expect(promptVersionRepository.save).toHaveBeenCalled();
-    });
-
-    it('should standardize prompt code during creation', async () => {
-      const createPromptsDto: CreatePromptsDto = {
-        prompts: [
-          {
-            promptCode: 'My AI Learn',
-            name: 'Test',
-            prompt: 'Content',
-          },
-        ],
-      };
-
-      const createdPrompt = {
-        ...mockPrompt,
-        promptCode: 'my_ai_learn',
-      };
-      (promptsRepository.create as jest.Mock).mockReturnValue(createdPrompt);
-      (promptsRepository.save as jest.Mock)
-        .mockResolvedValueOnce([createdPrompt])
-        .mockResolvedValueOnce([createdPrompt]);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue([
-        mockPromptVersion,
-      ]);
-
-      await service.createPrompts(createPromptsDto);
-
-      expect(promptsRepository.create).toHaveBeenCalledWith(
+      expect(versioning.createAndPromote).toHaveBeenCalledWith(
+        'id-0',
         expect.objectContaining({
-          promptCode: expect.stringMatching(/^my_ai_learn/),
+          body: 'Hello {name}',
+          baseVersion: null,
+          createdBy: 123,
         }),
       );
-    });
-
-    it('should set currentVersion to 1 for new prompts', async () => {
-      const createPromptsDto: CreatePromptsDto = {
-        prompts: [
-          {
-            promptCode: 'Test',
-            name: 'Test',
-            prompt: 'Content',
-          },
-        ],
-      };
-
-      const createdPrompt = mockPrompt;
-      (promptsRepository.create as jest.Mock).mockReturnValue(createdPrompt);
-      (promptsRepository.save as jest.Mock)
-        .mockResolvedValueOnce([createdPrompt])
-        .mockResolvedValueOnce([createdPrompt]);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue([
-        mockPromptVersion,
-      ]);
-
-      await service.createPrompts(createPromptsDto);
-
-      // Check that update was called with currentVersion: 1
-      const updateCall = (promptsRepository.save as jest.Mock).mock.calls[1];
-      expect(updateCall[0][0]).toHaveProperty('currentVersion', 1);
-    });
-
-    it('should use ExecutionManager to get userId', async () => {
-      const createPromptsDto: CreatePromptsDto = {
-        prompts: [
-          {
-            promptCode: 'Test',
-            name: 'Test',
-            prompt: 'Content',
-          },
-        ],
-      };
-
-      const createdPrompt = mockPrompt;
-      (promptsRepository.create as jest.Mock).mockReturnValue(createdPrompt);
-      (promptsRepository.save as jest.Mock)
-        .mockResolvedValueOnce([createdPrompt])
-        .mockResolvedValueOnce([createdPrompt]);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue([
-        mockPromptVersion,
-      ]);
-
-      await service.createPrompts(createPromptsDto);
-
-      expect(ExecutionManager.getUserId).toHaveBeenCalled();
+      expect(saved.currentVersion).toBe(1);
     });
   });
 
-  describe('updatePrompt', () => {
-    it('should update prompt successfully', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        name: 'Updated Name',
-        description: 'Updated Description',
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
+  describe('updatePrompt — metadata only', () => {
+    beforeEach(() => {
+      (promptsRepository.findOne as jest.Mock).mockResolvedValue({
+        ...mockPrompt,
+        model: 'gpt-5',
+      });
       (promptsRepository.update as jest.Mock).mockResolvedValue({
         affected: 1,
       });
-
-      const result = await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      expect(result).toBe(true);
-      expect(promptsRepository.findOne).toHaveBeenCalledWith({
-        where: { id: mockPromptId },
-      });
-      expect(promptsRepository.update).toHaveBeenCalled();
+      promptSharedService.getPromptByCode.mockResolvedValue('Live text.');
     });
 
-    it('should throw NotFoundException when prompt not found', async () => {
-      const updatePromptDto: UpdatePromptDto = { name: 'Test' };
-
+    it('throws NotFoundException when the prompt does not exist', async () => {
       (promptsRepository.findOne as jest.Mock).mockResolvedValue(null);
-
       await expect(
-        service.updatePrompt('invalid-id', updatePromptDto),
+        service.updatePrompt(mockPromptId, { name: 'x' }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should only update changed fields', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        name: 'Updated Name',
-        description: 'Updated Description',
-      };
-
-      const currentPrompt = {
-        ...mockPrompt,
-        name: 'Different Name', // different from update
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(currentPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
+    it('updates metadata without touching versions', async () => {
+      await service.updatePrompt(mockPromptId, {
+        name: 'Renamed',
+        description: 'New description',
       });
 
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      // Should include name in update since it changed
-      const updateCall = (promptsRepository.update as jest.Mock).mock.calls[0];
-      expect(updateCall[1]).toHaveProperty('name');
-    });
-
-    it('should standardize promptCode when updating', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        promptCode: 'New Code',
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      const updateCall = (promptsRepository.update as jest.Mock).mock.calls[0];
-      // Verify promptCode was included in the update
-      expect(updateCall[1]).toHaveProperty('promptCode');
-    });
-
-    it('should return false when update affects 0 rows', async () => {
-      const updatePromptDto: UpdatePromptDto = { name: 'Test' };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 0,
-      });
-
-      const result = await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      expect(result).toBe(false);
-    });
-
-    it('should create new version when prompt content changes', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        name: 'Updated Name',
-        prompt: 'New prompt content',
-        useDashboardOverride: true,
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-      (
-        promptVersionRepository.getLatestPromptVersion as jest.Mock
-      ).mockResolvedValue(mockPromptVersion);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue(
-        mockPromptVersion,
-      );
-
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      expect(promptVersionRepository.create).toHaveBeenCalled();
-      expect(promptVersionRepository.save).toHaveBeenCalled();
-    });
-
-    it('should increment version number correctly', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        name: 'Updated Name',
-        prompt: 'New prompt content',
-        useDashboardOverride: true,
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-
-      const latestVersion = { ...mockPromptVersion, version: 2 };
-      (
-        promptVersionRepository.getLatestPromptVersion as jest.Mock
-      ).mockResolvedValue(latestVersion);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue(
-        mockPromptVersion,
-      );
-
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      const versionCall = (promptVersionRepository.create as jest.Mock).mock
-        .calls[0][0];
-      expect(versionCall.version).toBe(3); // 2 + 1
-    });
-
-    it('should not create new version if only updating description without prompt content', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        description: 'Updated description',
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      expect(promptVersionRepository.create).not.toHaveBeenCalled();
-    });
-
-    it('should create new version even if only one word changes in prompt content', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        prompt: 'This is the updated prompt content',
-        useDashboardOverride: true,
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-      (
-        promptVersionRepository.getLatestPromptVersion as jest.Mock
-      ).mockResolvedValue(mockPromptVersion);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue(
-        mockPromptVersion,
-      );
-      (
-        promptVersionRepository.deleteVersionsBefore as jest.Mock
-      ).mockResolvedValue(undefined);
-
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      expect(promptVersionRepository.create).toHaveBeenCalled();
-      expect(promptVersionRepository.save).toHaveBeenCalled();
-    });
-
-    it('should apply version retention limit when creating new version', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        prompt: 'New prompt content',
-        useDashboardOverride: true,
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-      (
-        promptVersionRepository.getLatestPromptVersion as jest.Mock
-      ).mockResolvedValue({ ...mockPromptVersion, version: 5 });
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue(
-        mockPromptVersion,
-      );
-      (
-        promptVersionRepository.deleteVersionsBefore as jest.Mock
-      ).mockResolvedValue(undefined);
-
-      await service.updatePrompt(mockPromptId, updatePromptDto);
-
-      // With retention limit of 5, if latest version is 5 and we create 6,
-      // we should keep versions >= (6 - (5 - 1)) = 2
-      expect(promptVersionRepository.deleteVersionsBefore).toHaveBeenCalledWith(
+      expect(promptsRepository.update).toHaveBeenCalledWith(
         mockPromptId,
-        2,
+        expect.objectContaining({
+          name: 'Renamed',
+          description: 'New description',
+        }),
       );
+      expect(versioning.createVersion).not.toHaveBeenCalled();
     });
 
-    it('should keep version 1 even when retention deletes older versions', async () => {
-      const updatePromptDto: UpdatePromptDto = {
-        prompt: 'New prompt content',
-        useDashboardOverride: true,
-      };
-
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
+    it.each([
+      ['new text', { prompt: 'Different text.' }, 'prompt'],
+      ['a model change', { model: 'gemini-2.5-pro' }, 'model'],
+      ['a code change', { promptCode: 'renamed_code' }, 'promptCode'],
+    ])('refuses %s: that changes through a version', async (_l, dto, field) => {
+      await expect(
+        service.updatePrompt(mockPromptId, dto as UpdatePromptDto),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          errorCode: 'SKILLS_STORE_USE_VERSIONS',
+          details: { fields: [field] },
+        }),
       });
-      (
-        promptVersionRepository.getLatestPromptVersion as jest.Mock
-      ).mockResolvedValue({ ...mockPromptVersion, version: 100 });
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue(
-        mockPromptVersion,
-      );
-      (
-        promptVersionRepository.deleteVersionsBefore as jest.Mock
-      ).mockResolvedValue(undefined);
+      expect(promptsRepository.update).not.toHaveBeenCalled();
+    });
 
-      await service.updatePrompt(mockPromptId, updatePromptDto);
+    it('accepts a form that resends the unchanged live text and model', async () => {
+      await service.updatePrompt(mockPromptId, {
+        description: 'Only this changed',
+        prompt: '  Live text.  ',
+        model: 'gpt-5',
+      });
 
-      // minVersionToKeep should never be less than 1
-      // With version 100 and new version 101, minVersionToKeep = max(1, 101 - 4) = 97
-      const callArgs = (
-        promptVersionRepository.deleteVersionsBefore as jest.Mock
-      ).mock.calls[0];
-      expect(callArgs[1]).toBeGreaterThanOrEqual(1);
+      expect(promptsRepository.update).toHaveBeenCalledWith(
+        mockPromptId,
+        expect.objectContaining({ description: 'Only this changed' }),
+      );
+    });
+  });
+
+  describe('createVersion', () => {
+    it('saves the editor text as a candidate from the base the editor opened', async () => {
+      const result = await service.createVersion(mockPromptId, {
+        prompt: 'Better text.',
+        baseVersion: 3,
+        model: 'gpt-5',
+      });
+
+      expect(versioning.createVersion).toHaveBeenCalledWith(
+        mockPromptId,
+        expect.objectContaining({
+          body: 'Better text.',
+          baseVersion: 3,
+          model: 'gpt-5',
+          source: 'dashboard',
+          createdBy: 123,
+        }),
+      );
+      expect(result).toEqual({
+        version: 4,
+        contentHash: 'h4',
+        status: 'candidate',
+      });
     });
   });
 
   describe('updatePrompt — auto-translation trigger', () => {
-    const enabledMainAgent: Prompt = {
-      ...mockPrompt,
-      promptType: 'main_agent',
-      translationEnabled: true,
-      useDashboardOverride: true,
-    };
-
-    const mockVersionCreate = () => {
-      (promptsRepository.update as jest.Mock).mockResolvedValue({
-        affected: 1,
-      });
-      (
-        promptVersionRepository.getLatestPromptVersion as jest.Mock
-      ).mockResolvedValue(mockPromptVersion);
-      (promptVersionRepository.create as jest.Mock).mockReturnValue(
-        mockPromptVersion,
-      );
-      (promptVersionRepository.save as jest.Mock).mockResolvedValue(
-        mockPromptVersion,
-      );
-    };
-
-    it('fires when an enabled main_agent prompt body changes', async () => {
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(
-        enabledMainAgent,
-      );
-      mockVersionCreate();
-
-      await service.updatePrompt(mockPromptId, { prompt: 'New body' });
-
-      expect(translatePrompt).toHaveBeenCalledWith(mockPromptId);
-    });
-
-    it('fires when translation is just enabled (enable action)', async () => {
+    it('translates the live text when translation is just enabled', async () => {
       (promptsRepository.findOne as jest.Mock).mockResolvedValue({
         ...mockPrompt,
         promptType: 'main_agent',
@@ -611,47 +292,69 @@ describe('PromptsService', () => {
       await service.updatePrompt(mockPromptId, { translationEnabled: true });
 
       expect(translatePrompt).toHaveBeenCalledWith(mockPromptId);
+      // Drafts saved while translation was off are translated too.
+      expect(versioning.translateDrafts).toHaveBeenCalledWith(mockPromptId);
     });
 
-    it('does NOT fire for a disabled prompt even when the body changes', async () => {
+    it('does not translate for a non-translatable promptType', async () => {
       (promptsRepository.findOne as jest.Mock).mockResolvedValue({
         ...mockPrompt,
-        promptType: 'main_agent',
-        translationEnabled: false,
-        useDashboardOverride: true,
+        promptType: 'evaluator',
       });
-      mockVersionCreate();
-
-      await service.updatePrompt(mockPromptId, { prompt: 'New body' });
-
-      expect(translatePrompt).not.toHaveBeenCalled();
-    });
-
-    it('does NOT fire for a non-translatable promptType', async () => {
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue({
-        ...mockPrompt,
-        promptType: 'multilingual',
-        translationEnabled: true,
-        useDashboardOverride: true,
-      });
-      mockVersionCreate();
-
-      await service.updatePrompt(mockPromptId, { prompt: 'New body' });
-
-      expect(translatePrompt).not.toHaveBeenCalled();
-    });
-
-    it('does NOT fire when an enabled prompt is edited without a body change', async () => {
-      (promptsRepository.findOne as jest.Mock).mockResolvedValue(
-        enabledMainAgent,
-      );
       (promptsRepository.update as jest.Mock).mockResolvedValue({
         affected: 1,
       });
 
-      await service.updatePrompt(mockPromptId, { description: 'tweak only' });
+      await service.updatePrompt(mockPromptId, { translationEnabled: true });
 
       expect(translatePrompt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('revertPrompt', () => {
+    it('puts the Git default live as a new version, from the newest version', async () => {
+      (promptsRepository.findOne as jest.Mock).mockResolvedValue({
+        ...mockPrompt,
+        defaultPrompt: 'Default text.',
+        model: 'gpt-5',
+      });
+
+      await service.revertPrompt(mockPromptId);
+
+      expect(versioning.createAndPromote).toHaveBeenCalledWith(
+        mockPromptId,
+        expect.objectContaining({
+          body: 'Default text.',
+          baseVersion: 3,
+          model: 'gpt-5',
+          source: 'revert',
+        }),
+        {},
+      );
+    });
+
+    it('passes the judge-rubric confirmation through', async () => {
+      (promptsRepository.findOne as jest.Mock).mockResolvedValue({
+        ...mockPrompt,
+        defaultPrompt: 'Default text.',
+      });
+
+      await service.revertPrompt(mockPromptId, {
+        confirmJudgeRubricChange: true,
+      });
+
+      expect(versioning.createAndPromote).toHaveBeenCalledWith(
+        mockPromptId,
+        expect.anything(),
+        { confirmJudgeRubricChange: true },
+      );
+    });
+
+    it('refuses when there is no default in Git', async () => {
+      (promptsRepository.findOne as jest.Mock).mockResolvedValue(mockPrompt);
+      await expect(service.revertPrompt(mockPromptId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -816,7 +519,7 @@ describe('PromptsService', () => {
   });
 });
 
-describe('PromptsService.syncPrompts — sidecar default model', () => {
+describe('PromptsService.syncPrompts — contract default model', () => {
   const build = async () => {
     const promptsRepository = {
       findOne: jest.fn(),
@@ -850,13 +553,18 @@ describe('PromptsService.syncPrompts — sidecar default model', () => {
           provide: PromptTranslationService,
           useValue: { translatePrompt: jest.fn() },
         },
+        { provide: PromptVersioningService, useValue: {} },
         {
           provide: DataSource,
           useValue: { transaction: jest.fn(), query: jest.fn() },
         },
       ],
     }).compile();
-    return { service: module.get(PromptsService), promptsRepository };
+    return {
+      service: module.get(PromptsService),
+      promptsRepository,
+      promptVersionRepository,
+    };
   };
 
   const item = {
@@ -895,124 +603,59 @@ describe('PromptsService.syncPrompts — sidecar default model', () => {
     expect(payload).not.toHaveProperty('model');
     expect(payload).not.toHaveProperty('provider');
   });
-});
 
-/**
- * Builder's interviewer and platform rules go live only through the replay
- * eval. Before the gate, a dashboard edit changed every interview the moment
- * the editor autosaved, with no PR and nothing checking it.
- */
-describe('PromptsService — Builder eval gate', () => {
-  const build = async (row: Record<string, any>) => {
-    const promptsRepository = {
-      findOne: jest.fn().mockResolvedValue(row),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
-    };
-    const promptVersionRepository = {
-      getLatestPromptVersion: jest.fn().mockResolvedValue({ version: 3 }),
-      create: jest.fn((values) => values),
-      save: jest.fn(),
-      deleteVersionsBefore: jest.fn(),
-    };
-    const promptSharedService = {
-      getPromptByCode: jest.fn().mockResolvedValue('Live interviewer text.'),
-      getPromptsByOptions: jest.fn(),
-    };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PromptsService,
-        { provide: PromptsRepository, useValue: promptsRepository },
-        { provide: PromptVersionRepository, useValue: promptVersionRepository },
-        { provide: PromptSharedService, useValue: promptSharedService },
-        {
-          provide: PromptTranslationService,
-          useValue: { translatePrompt: jest.fn() },
-        },
-        {
-          provide: DataSource,
-          useValue: {
-            transaction: jest.fn(async (work: any) => work()),
-            query: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
-    return {
-      service: module.get(PromptsService),
-      promptsRepository,
-      promptVersionRepository,
-    };
-  };
-  const interviewer = {
-    id: 'p1',
-    promptCode: 'builder_interviewer_system',
-    useDashboardOverride: true,
-    model: 'gemini-2.5-pro',
-    provider: 'gemini',
-    temperature: undefined,
-  };
+  it("publishes a new prompt's default as live version 1, with its contract", async () => {
+    const { service, promptsRepository, promptVersionRepository } =
+      await build();
+    promptsRepository.findOne.mockResolvedValue(null);
 
-  it.each([
-    ['new text', { prompt: 'A different interviewer.' }],
-    ['a model change', { model: 'gpt-5' }],
-    ['switching the override off', { useDashboardOverride: false }],
-  ])('refuses %s to a gated Builder prompt', async (_label, dto) => {
-    const { service, promptsRepository } = await build(interviewer);
-
-    await expect(service.updatePrompt('p1', dto as any)).rejects.toThrow(
-      /replay eval/,
-    );
-    expect(promptsRepository.update).not.toHaveBeenCalled();
-  });
-
-  it('lets the editor save a description with the unchanged live text', async () => {
-    const { service, promptsRepository } = await build(interviewer);
-
-    await service.updatePrompt('p1', {
-      description: 'Interviews an admin into a PRD.',
-      prompt: '  Live interviewer text.  ',
-      model: 'gemini-2.5-pro',
+    await service.syncPrompts({
+      prompts: [{ ...item, contract: { required: ['x'] } }],
     } as any);
 
-    expect(promptsRepository.update).toHaveBeenCalledWith(
-      'p1',
+    expect(promptsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ contract: { required: ['x'] } }),
+    );
+    expect(promptVersionRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        description: 'Interviews an admin into a PRD.',
+        version: 1,
+        source: 'sync',
+        publishedAt: expect.any(Date),
       }),
     );
   });
 
-  it('publishes a change the eval approved', async () => {
-    const { service, promptVersionRepository } = await build(interviewer);
-
-    await service.updatePrompt(
-      'p1',
-      { prompt: 'A better interviewer.' } as any,
-      { evalApproved: true },
-    );
-
-    expect(promptVersionRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ version: 4, prompt: 'A better interviewer.' }),
-    );
-  });
-
-  it('leaves every other prompt editable as before', async () => {
-    const { service, promptVersionRepository } = await build({
-      ...interviewer,
-      promptCode: 'debrief_chat',
+  it("never touches an existing prompt's live text or its admin-chosen name", async () => {
+    const { service, promptsRepository, promptVersionRepository } =
+      await build();
+    promptsRepository.findOne.mockResolvedValue({
+      id: 'p1',
+      promptCode: item.promptCode,
+      name: 'Renamed in the Skills Store',
+      availableVariables: [{ name: 'a' }],
     });
 
-    await service.updatePrompt('p1', { prompt: 'New debrief chat.' } as any);
+    await service.syncPrompts({ prompts: [item] } as any);
 
-    expect(promptVersionRepository.save).toHaveBeenCalled();
+    expect(promptVersionRepository.save).not.toHaveBeenCalled();
+    const payload = promptsRepository.update.mock.calls[0]?.[1] ?? {};
+    expect(payload).toEqual(
+      expect.objectContaining({ defaultPrompt: item.prompt }),
+    );
+    expect(payload).not.toHaveProperty('name');
+    expect(payload).not.toHaveProperty('availableVariables');
   });
 
-  it('refuses a revert to the file for a gated prompt', async () => {
-    const { service } = await build({
-      ...interviewer,
-      defaultPrompt: 'File text.',
-    });
+  it('skips a failing item and keeps syncing the rest', async () => {
+    const { service, promptsRepository } = await build();
+    promptsRepository.findOne
+      .mockRejectedValueOnce(new Error('duplicate key value'))
+      .mockResolvedValueOnce(null);
 
-    await expect(service.revertPrompt('p1')).rejects.toThrow(/replay eval/);
+    const result = await service.syncPrompts({
+      prompts: [item, { ...item, promptCode: 'product_updates_second' }],
+    } as any);
+
+    expect(result.added).toBe(1);
   });
 });

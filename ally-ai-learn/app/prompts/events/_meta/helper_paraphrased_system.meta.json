@@ -1,5 +1,0 @@
-{
-    "name": "Helper Paraphrased Detector System Prompt",
-    "kind": "prompt",
-    "description": "System prompt instructing the LLM to evaluate whether a counselor's message is a genuine paraphrase of the agent's previous message."
-}

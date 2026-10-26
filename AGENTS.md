@@ -48,13 +48,13 @@ Follow conventional commits style. Check each repo's CONTRIBUTING.md for specifi
 2. **ally-web/mobile**: Add RTK Query endpoint in `src/services/` (web) or `src/services/` (mobile)
 
 ### Adding a new AI capability
-1. **ally-ai**: Add prompt templates in `app/prompts/`, service logic in `app/core/`, endpoint in `app/api/v1/endpoints/`
+1. **ally-ai**: Add the prompt (default `.txt` + contract) per [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md), service logic in `app/core/`, endpoint in `app/api/v1/endpoints/`
 2. **ally-be**: Add integration call in `src/ai/` module
 
 ### Adding a new event type (ally-ai-learn)
 1. Create event class in `app/core/events/event_types/`
 2. Register in `app/core/events/factory.py`
-3. Add prompt templates in `app/prompts/events/`
+3. Add its prompts in `app/prompts/events/`, each with a contract, per [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md)
 4. See `docs/04-event-types-reference.md` for examples
 
 ### Adding a new TTS/STT/LLM provider (ally-ai-learn)
@@ -76,7 +76,7 @@ Add migration file in `app/migrations/` following the `NNN-description.py` patte
 - **Lima VM**: All repos run inside a Lima VM for local development. Commands (npm, poetry, docker, etc.) execute within the VM context.
 - **HIPAA**: This platform handles mental health data. Never log PII/PHI outside of designated audit loggers. Use `phi_logger` in ally-ai.
 - **Multi-tenant**: All ally-be queries must respect tenant isolation. Entities have `tenantId` columns.
-- **Prompt sync**: Prompts in ally-ai can be overridden at runtime via ally-be's prompt management. Use `scripts/sync_prompts.py` to push defaults.
+- **Prompts**: the Skills Store (ally-be) is the source of truth; a `.txt` in a service is only the default and fallback, so editing it changes nothing that runs. Adding a prompt: [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md). Changing one: a new version in the Skills Store or `scripts/prompts/prompts.mjs push`.
 - **LiveKit rooms**: ally-ai-learn agents join LiveKit rooms created by ally-be. Room metadata carries scenario configuration.
 - **SQS in dev**: Use LocalStack (auto-started by docker-compose). Queue URLs differ between local and production.
 - **Weaviate**: Runs alongside ally-ai. Schema changes need migrations. Dev instance via docker-compose.

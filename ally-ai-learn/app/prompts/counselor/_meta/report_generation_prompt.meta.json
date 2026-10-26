@@ -1,5 +1,0 @@
-{
-  "name": "Report Generation",
-  "kind": "prompt",
-  "description": "Wrapper for counselor report generation. Enforces output language by code and optional custom prompt; used when generating reports from the simulation."
-}

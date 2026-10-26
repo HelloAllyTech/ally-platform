@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { createHash } from 'crypto';
 import { Languages } from 'src/language/entity/languages.entity';
 import { SharedLanguageService } from 'src/language/service/shared-language.service';
 import { PromptSharedService } from './prompt-shared.service';
+import { hashPromptBody } from '../util/prompt-contract.util';
 
 /**
  * Helpers that feed the translation trigger (Phase 2) and the runtime freshness
@@ -24,13 +24,9 @@ export class PromptTranslationTargetsService {
 
   /** SHA-256 hex (64 chars, matching `prompt_translations.sourceHash`). */
   hashBody(body: string): string {
-    // Trim before hashing so the store-time hash (from getPromptByCode, which
-    // returns the raw DB/version body) and the serve-time hash (from the
-    // trimmed body shipped in room metadata) agree. Without this, any prompt
-    // body with surrounding whitespace (a trailing newline is common) would
-    // never match at serve time — silently serving English and re-translating
-    // on every session.
-    return createHash('sha256').update(body.trim(), 'utf8').digest('hex');
+    // One hash for writing and looking up translations: delegating keeps the
+    // store-time and serve-time hashes byte-identical (see hashPromptBody).
+    return hashPromptBody(body);
   }
 
   /**

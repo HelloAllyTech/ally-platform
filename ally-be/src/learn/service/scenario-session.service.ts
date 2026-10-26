@@ -125,7 +125,10 @@ import { CaseSessionService } from 'src/case/service/case-session.service';
 import { TrackProgressService } from 'src/track/service/track-progress.service';
 import { TrackMemoryService } from 'src/track/service/track-memory.service';
 import { CommonUtil } from 'src/common/util/common.util';
-import { ScenarioSharedService } from './scenario-shared.service';
+import {
+  ScenarioSharedService,
+  promptRecordFrom,
+} from './scenario-shared.service';
 import { RoomMetadataStoreService } from './room-metadata-store.service';
 import { SessionEventSharedService } from 'src/session-event/service/session-event-shared.service';
 import { ScenarioSessionSkillsResponseDto } from '../dto/scenario-session-skills-response.dto';
@@ -703,13 +706,12 @@ export class ScenarioSessionService {
       });
 
     try {
-      // Best-effort: record which prompt versions drive this session so drift
-      // analytics can attribute behaviour to a prompt-version experiment.
+      // Best-effort: record WHICH main-agent prompt was selected and the
+      // effective language variant. The prompt versions that ran are recorded
+      // from the room metadata below, once it is built.
       // Capture must never block session start.
       try {
-        const promptVersions =
-          await this.scenarioSharedService.getResolvedPromptVersionsForScenarioSession();
-        // Also record WHICH main-agent prompt was selected and the effective
+        // Record WHICH main-agent prompt was selected and the effective
         // language-variant (GENERIC vs MULTILINGUAL) this session actually ran,
         // so drift analytics and session logs can attribute/compare per prompt
         // and per variant (the alphabetical promptVersions pick can't).
@@ -726,7 +728,6 @@ export class ScenarioSessionService {
 
         scenarioSession.metadata = {
           ...(scenarioSession.metadata ?? {}),
-          ...(Object.keys(promptVersions).length > 0 ? { promptVersions } : {}),
           ...(selectedMainPromptCode ? { selectedMainPromptCode } : {}),
           mainPromptVariant,
         };
@@ -776,6 +777,7 @@ export class ScenarioSessionService {
         previousMemory,
         interactionMode,
       });
+      await this.recordPromptsShipped(scenarioSession, roomMetadata);
 
       // Preparing checklist events for simulation room, only if CHECKLIST mode is enabled for scenario
       let checklistEvents: ChecklistItem[] = [];
@@ -3724,6 +3726,40 @@ export class ScenarioSessionService {
     return { eventChecklist: eventChecklistDto };
   }
 
+  /**
+   * Record the prompt versions and hashes a session ran, from the exact map
+   * shipped in its room metadata. Best-effort: never blocks a session.
+   */
+  private async recordPromptsShipped(
+    scenarioSession: { metadata?: Record<string, unknown> | null },
+    roomMetadata: unknown,
+  ): Promise<void> {
+    try {
+      const prompts = (
+        roomMetadata as {
+          scenario?: { promptData?: { prompts?: Record<string, never> } };
+        }
+      )?.scenario?.promptData?.prompts;
+      const record = promptRecordFrom(prompts);
+      if (!Object.keys(record.promptHashes).length) return;
+      scenarioSession.metadata = {
+        ...(scenarioSession.metadata ?? {}),
+        promptVersions: record.promptVersions,
+        promptHashes: record.promptHashes,
+        ...(record.translatedPrompts.length
+          ? { translatedPrompts: record.translatedPrompts }
+          : {}),
+      };
+      await this.scenarioSessionRepository.save(scenarioSession as never);
+    } catch (error) {
+      this.logger.warn(
+        `Recording the prompts a session ran failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
   getStateNames(
     currentState?: boolean,
     stateNames?: StateNames[],
@@ -3990,6 +4026,9 @@ export class ScenarioSessionService {
         : {}),
     };
     await this.scenarioSessionRepository.save(scenarioSession);
+    // V2V runs are the sessions generated to COMPARE prompts, so they record
+    // the versions they ran like any other session.
+    await this.recordPromptsShipped(scenarioSession, roomMetadata);
 
     try {
       // Fetch-pointer metadata when enabled (see startScenarioSession).

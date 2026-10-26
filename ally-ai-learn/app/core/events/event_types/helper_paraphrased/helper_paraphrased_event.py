@@ -41,6 +41,10 @@ class HelperParaphrasedEvent(BaseEvent):
     data: HelperParaphrasedData = HelperParaphrasedData()
     model: str = "gpt-4o-mini"  # Default model for paraphrase evaluation
 
+    #: The session's prompt data (Skills Store text in ``prompts``), so the
+    #: classifier prompts render from the store rather than the local defaults.
+    prompt_data: Optional[object] = None
+
     @classmethod
     def create(
         cls,
@@ -171,7 +175,7 @@ class HelperParaphrasedEvent(BaseEvent):
             client = AsyncOpenAI(api_key=api_key)
 
             system_prompt, user_prompt = get_paraphrase_evaluation_prompt(
-                agent_message, counselor_message
+                agent_message, counselor_message, prompt_data=self.prompt_data
             )
 
             messages = [
