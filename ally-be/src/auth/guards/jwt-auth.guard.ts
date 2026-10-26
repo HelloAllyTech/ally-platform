@@ -29,10 +29,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(err: any, user: any, info: any) {
-    if (info?.name === 'JsonWebTokenError' || info?.message === 'jwt expired') {
-      throw new UnauthorizedException('Token expired');
+    if (info?.name === 'JsonWebTokenError') {
+      if (info.message === 'jwt expired') {
+        throw new UnauthorizedException('Token expired');
+      } else {
+        throw new UnauthorizedException(info.message);
+      }
     }
-
     if (err || !user) {
       throw err || new UnauthorizedException();
     }
