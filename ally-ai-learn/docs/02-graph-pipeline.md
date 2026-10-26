@@ -242,8 +242,12 @@ three places.
 
 An unlocked memory still has to be *selected*. The title selector frames Knowledge Sources as the
 client's own memories, each shown with a short content preview, and asks which the client would
-draw on to answer the counselor's latest message, including indirectly
-(`_MEMORY_FRAMING` / `_MEMORY_RULE` in `knowledge_retrieval.py`). The earlier "directly relevant to
+draw on to answer the counselor's latest message, including indirectly. Its text is two Skills
+Store prompts, `ally_ai_learn_retrieval_memory_selector_system` (memories only) and
+`..._memory_glossary_selector_system` (memories plus language glossary sections), read from the
+session's room metadata, so selecting adds no fetch to the turn; `knowledge_retrieval.py` builds
+only the `{topics_block}` list. The selector's result cache is keyed on the rendered prompt, so a
+newly published version is never answered from an older one. The earlier "directly relevant to
 what is being discussed" wording recalled a family memory on 0/9 family questions with
 gpt-4o-mini. Change that prompt only against
 `tests/integration/test_knowledge_selector_live.py`, which scores the real model on a recorded
