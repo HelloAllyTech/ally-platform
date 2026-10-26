@@ -270,6 +270,29 @@ describe('LlmCompletionService', () => {
       );
       warn.mockRestore();
     });
+
+    it('caches the dead provider to avoid re-calling on a second request', async () => {
+      const { service, streamCalls } = build({
+        providers: {
+          anthropic: { fail: authError },
+          openai: { text: 'saved' },
+        },
+      });
+
+      // First call fails, falls back, and caches the failure.
+      const result1 = await service.complete(request);
+      expect(result1.provider).toBe('openai');
+      expect(streamCalls).toHaveLength(2);
+      expect(streamCalls[0].provider).toBe('anthropic');
+      expect(streamCalls[1].provider).toBe('openai');
+
+      // Second call should go straight to fallback.
+      const result2 = await service.complete(request);
+      expect(result2.provider).toBe('openai');
+      // The Anthropic provider is NOT called again.
+      expect(streamCalls).toHaveLength(3);
+      expect(streamCalls[2].provider).toBe('openai');
+    });
   });
 
   describe('reading the registry row, not just the resolved target', () => {
