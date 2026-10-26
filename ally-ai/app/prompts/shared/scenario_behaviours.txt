@@ -1,13 +1,5 @@
-This specific roleplay scenario has been configured with its own expected
-behaviours, in addition to the fixed skill_coverage standard above. Weigh
-these when writing "positives", "areas_of_growth" and the
-supervisor_note — never when scoring "skill_coverage", which always stays on
-the fixed, comparable standard.
+This scenario also lists its own expected behaviours. Weigh them in the positives, areas of growth and supervisor note, not in skill_coverage, and only when the transcript shows them.
 
 {HELPFUL_BEHAVIOURS_LIST}
 
 {UNHELPFUL_BEHAVIOURS_LIST}
-
-Only credit or flag one of these when the transcript actually shows it — the
-same honesty rule as everywhere else in this evaluation: do not invent or
-assume a behaviour occurred just because this scenario calls for it.
