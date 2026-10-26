@@ -163,7 +163,7 @@ Every resolution logs `code`, `version`, a short hash and the source (`local` / 
 | Default body | Git, `*/prompts/*.txt` | Yes, only to keep up with the contract | A minimal prompt that works with the current code. Creates the prompt on first deploy; last-resort fallback in ally-ai and ally-ai-learn; open-source default. It never overwrites an existing prompt's stored default |
 | Stored default | Store, `prompts.defaultPrompt` | No | **Decided 2026-10-26:** the production text at the cutover (each prompt's current version), or a new prompt's first text. What Revert to default restores, and ally-be's fallback when a prompt has no usable version |
 
-A deploy only creates prompts that don't exist yet; it never changes an existing prompt's live text. Editing a default to improve behaviour is pointless, because production never serves it. Improvements go to the store. The default only changes when the code's contract does.
+A deploy only creates prompts that don't exist yet; it never changes an existing prompt's live text, and it never recreates one the store removed (`REMOVED_PROMPT_CODES`), even when an older build of its service still syncs the file. Editing a default to improve behaviour is pointless, because production never serves it. Improvements go to the store. The default only changes when the code's contract does.
 
 ### Contracts keep code and prompts compatible
 

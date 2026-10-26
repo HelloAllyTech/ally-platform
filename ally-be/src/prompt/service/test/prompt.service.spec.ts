@@ -22,6 +22,8 @@ jest.mock('src/common/execution/execution-manager', () => ({
 
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { DataSource } from 'typeorm';
+import { REMOVED_PROMPT_CODES } from '../../constants/prompt.constants';
+import { UNUSED_PROMPT_CODES } from 'src/database/migrations/1980750000000-RemoveUnusedPrompts';
 
 describe('PromptsService', () => {
   let service: PromptsService;
@@ -655,5 +657,28 @@ describe('PromptsService.syncPrompts — contract default model', () => {
     } as any);
 
     expect(result.added).toBe(1);
+  });
+
+  it('never recreates a prompt the Skills Store removed, from an older build still syncing it', async () => {
+    const { service, promptsRepository, promptVersionRepository } =
+      await build();
+    promptsRepository.findOne.mockResolvedValue(null);
+
+    const result = await service.syncPrompts({
+      prompts: [{ ...item, promptCode: 'roadmap_release_notes' }, item],
+    } as any);
+
+    expect(result).toEqual({ added: 1, updated: 0 });
+    expect(promptsRepository.create).toHaveBeenCalledTimes(1);
+    expect(promptsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ promptCode: item.promptCode }),
+    );
+    expect(promptVersionRepository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses exactly the codes RemoveUnusedPrompts deleted', () => {
+    expect([...REMOVED_PROMPT_CODES].sort()).toEqual(
+      [...UNUSED_PROMPT_CODES].sort(),
+    );
   });
 });

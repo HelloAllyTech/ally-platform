@@ -18,7 +18,10 @@ import { PromptResponse } from '../type/prompt-response.type';
 import { standardizePromptCode } from '../util/prompt-code.util';
 import { parseVariablesFromPrompt } from '../util/parse-variables.util';
 import { reconcileAvailableVariables } from '../util/normalize-available-variable.util';
-import { TRANSLATABLE_PROMPT_TYPES } from '../constants/prompt.constants';
+import {
+  REMOVED_PROMPT_CODES,
+  TRANSLATABLE_PROMPT_TYPES,
+} from '../constants/prompt.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { PromptTranslationService } from './prompt-translation.service';
 import { PromptVersioningService } from './prompt-versioning.service';
@@ -551,6 +554,12 @@ export class PromptsService {
 
     for (const item of syncPromptsDto.prompts) {
       const promptCode = standardizePromptCode(item.promptCode);
+      if (REMOVED_PROMPT_CODES.has(promptCode)) {
+        this.logger.warn(
+          `[PROMPT_SYNC] ignored promptCode=${promptCode}: removed from the Skills Store; an older build of its service is still syncing it`,
+        );
+        continue;
+      }
       try {
         const result = await this.syncOne(promptCode, item);
         if (result === 'added') added++;

@@ -28,10 +28,11 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `prompts_versions` has no foreign key, so versions are deleted explicitly;
  * translations would cascade but are deleted explicitly too, for clarity.
  *
- * `down` restores nothing. The rows' text was never in Git; the history is in
- * the database backups.
+ * `down` restores nothing. The rows' text was never in Git; every row, version
+ * and translation is kept in the snapshot tables `1980150000000` creates.
+ * Sync refuses to recreate these codes (`REMOVED_PROMPT_CODES`).
  */
-const UNUSED_PROMPT_CODES = [
+export const UNUSED_PROMPT_CODES = [
   'ally_ai_learn_trainee_base',
   'ally_ai_learn_trainee_skilled',
   'ally_ai_learn_trainee_poor',
