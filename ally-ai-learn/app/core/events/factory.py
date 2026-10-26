@@ -340,7 +340,6 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=helper_paraphrased_data,
-                embedding_client=embedding_client,
                 **common_fields,
             )
 

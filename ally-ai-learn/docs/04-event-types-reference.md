@@ -16,7 +16,7 @@
 | COMBINATION | Boolean logic over other events | No | Combine multiple event conditions |
 | HELPER_UTTERANCE_LENGTH | Word count check | Yes | Detect overly long or short counselor utterances |
 | HELPER_INTERRUPTED | Interruption detection | Yes | Detect when counselor interrupts the client |
-| HELPER_PARAPHRASED | Paraphrase detection via embeddings | Yes | Detect when counselor paraphrases client speech |
+| HELPER_PARAPHRASED | Paraphrase detection via LLM | Yes | Detect when counselor paraphrases client speech |
 
 ---
 
@@ -292,14 +292,14 @@ No additional data is required. The event detects interruptions from the convers
 
 **Class:** `HelperParaphrasedEvent` (`app/core/events/event_types/helper_paraphrased/helper_paraphrased_event.py`)
 
-**Detection:** Detects when the counselor paraphrases the client's previous utterance. Uses embeddings to compare the counselor's last message with the client's preceding message.
+**Detection:** Detects when the counselor paraphrases the client's previous utterance. Uses an OpenAI LLM to compare the counselor's last message with the client's preceding message.
 
 **Data Schema:**
 ```json
 {}
 ```
 
-No additional data is required. The event uses the embedding client to measure semantic similarity between consecutive messages.
+No additional data is required. The event uses an LLM call to measure semantic similarity between consecutive messages.
 
 **Metadata Example:**
 ```json
