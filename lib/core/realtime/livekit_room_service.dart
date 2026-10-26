@@ -60,11 +60,19 @@ class LiveKitRoomService {
 
   EventsListener<RoomEvent>? _listener;
   final _dataController = StreamController<LiveKitDataMessage>.broadcast();
+  final _activeSpeakersController = StreamController<List<Participant>>.broadcast();
 
   /// Every data-channel message received while connected. A broadcast
   /// stream so more than one consumer (e.g. a checklist handler and a
   /// turn-status handler) can listen independently.
   Stream<LiveKitDataMessage> get dataMessages => _dataController.stream;
+
+  /// Currently-speaking participants, loudest first (always includes the
+  /// local participant when it's speaking) — drives
+  /// `roleplay/presentation/turn_state.dart`'s speaking-based turn
+  /// derivation, mirroring RN's `useAudioLevel`/`ParticipantEvent.
+  /// IsSpeakingChanged`-based tile highlighting.
+  Stream<List<Participant>> get activeSpeakers => _activeSpeakersController.stream;
 
   Future<void> connect({
     required String liveKitServerUrl,
@@ -75,6 +83,9 @@ class LiveKitRoomService {
     _listener = room.createListener()
       ..on<DataReceivedEvent>((event) {
         _dataController.add(LiveKitDataMessage.decode(event.data, event.topic));
+      })
+      ..on<ActiveSpeakersChangedEvent>((event) {
+        _activeSpeakersController.add(event.speakers);
       });
   }
 
@@ -109,6 +120,7 @@ class LiveKitRoomService {
     await _room?.dispose();
     _room = null;
     await _dataController.close();
+    await _activeSpeakersController.close();
   }
 }
 

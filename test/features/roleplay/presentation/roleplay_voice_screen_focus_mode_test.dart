@@ -52,6 +52,10 @@ void main() {
       expect(find.text('Turn focus mode on'), findsOneWidget);
       expect(find.textContaining('Session Duration:'), findsOneWidget);
 
+      // The new participant tiles push this button below this test's 600px
+      // viewport — scroll it into view (the body is a `SingleChildScrollView`).
+      await tester.ensureVisible(find.text('Turn focus mode on'));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.text('Turn focus mode on'));
       await tester.pump();
 

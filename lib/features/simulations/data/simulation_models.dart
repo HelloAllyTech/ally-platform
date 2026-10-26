@@ -34,6 +34,8 @@ class Scenario {
     this.experienceMode,
     this.checklistType,
     this.checklistEvents = const [],
+    this.reminders = const [],
+    this.showScoreMeter = true,
   });
 
   factory Scenario.fromJson(Map<String, dynamic> json) => Scenario(
@@ -63,6 +65,12 @@ class Scenario {
     checklistEvents: (json['checklistEvents'] as List<dynamic>? ?? [])
         .map((e) => ChecklistItem.fromJson(e as Map<String, dynamic>))
         .toList(),
+    reminders: (json['reminders'] as List<dynamic>? ?? []).cast<String>(),
+    // Opt-OUT: visible by default for any ExperienceMode unless the
+    // scenario explicitly sets this `false` — confirmed from RN's own gate
+    // (`isSimulationInProgress && scenario?.showScoreMeter !== false`), not
+    // gated to FEEDBACK mode specifically.
+    showScoreMeter: json['showScoreMeter'] as bool? ?? true,
   );
 
   final int id;
@@ -89,6 +97,18 @@ class Scenario {
   /// `checklist_panel.dart`.
   final String? checklistType;
   final List<ChecklistItem> checklistEvents;
+
+  /// RN's `scenario.reminders: string[]`, rendered as-is in the Reminders
+  /// tab (one plain-text card per entry) — straight from this already-
+  /// fetched object, no separate fetch. RN also has a `remindersEnabled`
+  /// flag whose own doc comment says reminders should only render when
+  /// it's true, but the real screen's `hasReminders` gate never actually
+  /// checks it (confirmed from source) — not modeled here either, to match
+  /// RN's real (if inconsistent) behavior rather than an unenforced intent.
+  final List<String> reminders;
+
+  /// Opt-out: the live score meter shows unless this is explicitly `false`.
+  final bool showScoreMeter;
 
   /// Mirrors RN's `hasChecklist` (`SimulationAssistantScreen.tsx`): a
   /// CHECKLIST-mode scenario with zero checklist-visible events falls back

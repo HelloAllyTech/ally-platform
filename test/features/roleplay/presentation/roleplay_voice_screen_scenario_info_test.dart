@@ -49,12 +49,18 @@ void main() {
 
     expect(find.text('A difficult conversation'), findsNothing);
 
+    // The new participant tiles push this button below this test's 600px
+    // viewport — scroll it into view (the body is a `SingleChildScrollView`).
+    await tester.ensureVisible(find.text('Details'));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('Details'));
     await tester.pump();
 
     expect(find.text('A difficult conversation'), findsOneWidget);
     expect(find.text('Self-harm • Grief'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Details'));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('Details'));
     await tester.pump();
 

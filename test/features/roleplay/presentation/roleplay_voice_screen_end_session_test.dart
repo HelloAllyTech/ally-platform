@@ -48,6 +48,10 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     expect(find.text('End session'), findsOneWidget);
 
+    // The new participant tiles push this button below this test's 600px
+    // viewport — scroll it into view (the body is a `SingleChildScrollView`).
+    await tester.ensureVisible(find.text('End session'));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('End session'));
     await tester.pump();
 

@@ -56,12 +56,20 @@ void main() {
       verify(() => liveKitService.connect(liveKitServerUrl: 'wss://x', accessToken: 'tok')).called(1);
       verify(() => liveKitService.setMicrophoneEnabled(true)).called(1);
 
+      // The new participant tiles push these buttons below this test's
+      // 600px viewport — scroll them into view before tapping (the body is
+      // a `SingleChildScrollView`, so they're reachable, just not visible
+      // at the initial scroll offset).
+      await tester.ensureVisible(find.text('Mute'));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.text('Mute'));
       await tester.pump();
 
       expect(find.text('Unmute'), findsOneWidget);
       verify(() => liveKitService.setMicrophoneEnabled(false)).called(1);
 
+      await tester.ensureVisible(find.text('Disconnect'));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.text('Disconnect'));
       await tester.pump();
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:livekit_client/livekit_client.dart' show Participant;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/localization/translate_ref.dart';
@@ -13,7 +14,11 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
-import 'checklist_panel.dart';
+import 'participant_tile.dart';
+import 'pause_resume_state.dart';
+import 'session_info_tabs.dart';
+import 'session_score_meter.dart';
+import 'turn_state.dart';
 
 /// Mirrors ally-mobile (React Native)'s `SESSION_AUTO_END_MINUTES` fallback
 /// and `parseMaxTimeSec` util — an "HH:MM:SS" string parsed to total
@@ -43,20 +48,24 @@ String _formatDuration(Duration d) {
 /// immediately, matching RN exactly), a focus-mode toggle, and a
 /// scenario-info overlay (title + trigger warnings).
 ///
-/// Also ports the live `SessionChecklist` (see `checklist_panel.dart`),
-/// populated from the agent's `detected_event_ids` LiveKit data-channel
-/// messages via `LiveKitRoomService.dataMessages` — shown only for a
-/// CHECKLIST-mode scenario with at least one checklist event
-/// (`Scenario.hasChecklist`), matching RN's own fallback.
-///
-/// Not ported: pause/resume. RN's pause sends a reliable LiveKit data-channel
-/// message (`room.localParticipant.publishData`) the agent acks over
-/// `RoomEvent.DataReceived`, with an optimistic-UI/revert-on-timeout race —
-/// a genuinely riskier state machine than everything else here, not a
-/// pure-UI gap (the data-channel plumbing it needs now exists, via
-/// [LiveKitRoomService.dataMessages]/`publishData`, but the pause/resume
-/// state machine itself is still its own pass). Deferred to its own pass
-/// (see the full-app audit's reclassification note).
+/// Also ports: the live `SessionChecklist`/Reminders/Description tab bar
+/// (`session_info_tabs.dart`, populated from the agent's
+/// `detected_event_ids` LiveKit data-channel messages); two
+/// [ParticipantTile]s (confirmed audio-only — RN renders no video anywhere
+/// in the app) with a speaking-driven border/pulse and a [TurnIndicator]
+/// -style pill (`turn_state.dart`'s `deriveTurnStates`, fed by `AGENT_STATE`
+/// messages and LiveKit's native `ActiveSpeakersChangedEvent`); a
+/// [SessionScoreMeter] accumulated from each message's `data.score`; and
+/// pause/resume (`pause_resume_state.dart`) — an optimistic toggle with a
+/// 2.5s ack-timeout revert and an authoritative ack-reconciliation guard
+/// that self-heals any client/agent desync, confirmed line-by-line against
+/// RN's `handleTogglePause`/`onDataReceived` ack branch. The paused-time
+/// ledger (`_pausedOffsetMs`/`_pauseStartedAt`) freezes the on-screen
+/// session timer while paused without touching the server's own
+/// authoritative pause billing. `cap-warning` (a server-side max-pause
+/// timeout) reuses the existing `EndingSoonModal`, matching RN exactly;
+/// `cap-ended` is a no-op client-side (the agent's own shutdown triggers
+/// the ordinary disconnect flow).
 class RoleplayVoiceScreen extends ConsumerStatefulWidget {
   const RoleplayVoiceScreen({
     super.key,
@@ -122,9 +131,33 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   // which is exactly how this was found.
   late final LiveKitRoomService _liveKitService;
   StreamSubscription<LiveKitDataMessage>? _dataSubscription;
+  StreamSubscription<List<Participant>>? _activeSpeakersSubscription;
   final Set<String> _detectedEventIds = {};
+  int _score = 0;
+
+  // Turn-taking — mirrors RN's `agentTurnStatus`/`remoteParticipant.
+  // isSpeaking`/`localParticipant.isSpeaking`, fed into `deriveTurnStates`.
+  String? _agentTurnStatus;
+  bool _localSpeaking = false;
+  bool _remoteSpeaking = false;
+  bool _debouncedRemoteSpeaking = false;
+  Timer? _remoteSpeakingDebounceTimer;
+
+  // Pause/resume ledger — see `pause_resume_state.dart`.
+  bool _isPaused = false;
+  Duration _pausedOffsetMs = Duration.zero;
+  DateTime? _pauseStartedAt;
+  Timer? _controlAckTimer;
 
   bool get _showFocusButton => widget.scenario?.experienceMode != 'NONE';
+  bool get _showPauseButton => widget.scenario?.pauseEnabled == true;
+
+  ({TurnState remote, TurnState local}) get _turnStates => deriveTurnStates(
+    isPaused: _isPaused,
+    isThinking: _agentTurnStatus == 'thinking',
+    debouncedRemoteSpeaking: _debouncedRemoteSpeaking,
+    isLocalSpeaking: _localSpeaking,
+  );
 
   @override
   void initState() {
@@ -138,24 +171,172 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       timer.cancel();
     }
     _tickTimer?.cancel();
+    _remoteSpeakingDebounceTimer?.cancel();
+    _controlAckTimer?.cancel();
     _dataSubscription?.cancel();
+    _activeSpeakersSubscription?.cancel();
     _liveKitService.disconnect();
     super.dispose();
   }
 
-  /// Mirrors RN's `onDataReceived` checklist branch
-  /// (`SimulationAssistantScreen.tsx`): a `LiveEventPayload`'s
-  /// `data.detected_event_ids` is merged (dedup'd) into the running set of
-  /// triggered checklist item ids. Other message families on this same
-  /// channel (`AGENT_STATE`, pause/resume acks, ...) are silently ignored
-  /// here, same as RN ignores whichever branch doesn't match.
+  /// Mirrors RN's `onDataReceived` (`SimulationAssistantScreen.tsx`) —
+  /// confirmed from source, same cascading-branch structure: `AGENT_STATE`
+  /// drives turn-taking; `'paused'`/`'resumed'` are authoritative acks
+  /// reconciled via [reconcilePauseAck]; `'cap-warning'` reuses the ordinary
+  /// session-time-limit warning dialog; `'cap-ended'` is a no-op (the
+  /// agent's own shutdown triggers the normal disconnect flow); anything
+  /// else falls through to the live-event payload's `detected_event_ids`
+  /// (checklist) and `score` (score meter) — both on the SAME message, same
+  /// as RN accumulating both from one `LiveEventPayload`.
   void _handleDataMessage(LiveKitDataMessage message) {
-    final data = message.json?['data'];
-    final detectedIds = data is Map<String, dynamic>
-        ? data['detected_event_ids']
-        : null;
-    if (detectedIds is! List) return;
-    setState(() => _detectedEventIds.addAll(detectedIds.cast<String>()));
+    final json = message.json;
+    if (json == null) return;
+    final type = json['type'];
+
+    if (type == 'AGENT_STATE') {
+      final state = json['state'];
+      if (state == 'thinking') {
+        setState(() => _agentTurnStatus = 'thinking');
+      } else if (state == 'done_thinking') {
+        if (_agentTurnStatus != 'speaking') {
+          setState(() => _agentTurnStatus = 'user_turn');
+        }
+      } else if (state == 'speaking') {
+        setState(() => _agentTurnStatus = 'speaking');
+      }
+      return;
+    }
+
+    if (type == SimControl.paused || type == SimControl.resumed) {
+      _controlAckTimer?.cancel();
+      _controlAckTimer = null;
+      final result = reconcilePauseAck(
+        agentPaused: type == SimControl.paused,
+        currentIsPaused: _isPaused,
+        currentPausedOffsetMs: _pausedOffsetMs,
+        currentPauseStartedAt: _pauseStartedAt,
+        now: widget.now(),
+      );
+      if (result != null) {
+        setState(() {
+          _isPaused = result.isPaused;
+          _pausedOffsetMs = result.pausedOffsetMs;
+          _pauseStartedAt = result.pauseStartedAt;
+        });
+        _liveKitService.setMicrophoneEnabled(result.isPaused ? false : _isMicEnabled);
+      }
+      return;
+    }
+
+    if (type == SimControl.capWarning) {
+      setState(() => _showEndingSoon = true);
+      return;
+    }
+    if (type == SimControl.capEnded) return;
+
+    final data = json['data'];
+    if (data is! Map<String, dynamic>) return;
+    final detectedIds = data['detected_event_ids'];
+    if (detectedIds is List) {
+      setState(() => _detectedEventIds.addAll(detectedIds.cast<String>()));
+    }
+    final score = data['score'];
+    if (score is num) {
+      setState(() => _score += score.round());
+    }
+  }
+
+  /// Mirrors LiveKit's own `ActiveSpeakersChangedEvent` → RN's per-tile
+  /// `useAudioLevel`/`isSpeaking`, one native signal standing in for both
+  /// the tile's visual highlight and (via the 1500ms debounce below, for
+  /// the remote participant only) the turn-state label — RN keeps these as
+  /// two separate mechanisms (a 100ms-polled `audioLevel` for the tile,
+  /// `ParticipantEvent.IsSpeakingChanged` debounced for the label); this
+  /// port uses the one SDK-native speaking signal for both, since there's
+  /// no separate polling need once LiveKit already exposes `isSpeaking`.
+  void _handleActiveSpeakers(List<Participant> speakers) {
+    final local = _liveKitService.room.localParticipant;
+    final isLocalSpeaking = local != null && speakers.contains(local);
+    final isRemoteSpeaking = speakers.any((p) => p != local);
+
+    if (isLocalSpeaking != _localSpeaking) {
+      setState(() => _localSpeaking = isLocalSpeaking);
+    }
+    if (isRemoteSpeaking != _remoteSpeaking) {
+      setState(() => _remoteSpeaking = isRemoteSpeaking);
+    }
+
+    // Debounce remote speaking to avoid flicker on natural pauses — matches
+    // RN's own comment and 1500ms value exactly.
+    if (isRemoteSpeaking) {
+      _remoteSpeakingDebounceTimer?.cancel();
+      _remoteSpeakingDebounceTimer = null;
+      if (!_debouncedRemoteSpeaking) setState(() => _debouncedRemoteSpeaking = true);
+    } else {
+      _remoteSpeakingDebounceTimer?.cancel();
+      _remoteSpeakingDebounceTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) setState(() => _debouncedRemoteSpeaking = false);
+      });
+    }
+  }
+
+  /// Direct port of RN's `handleTogglePause` — confirmed from source
+  /// line-by-line, including the optimistic-before-send ordering (the mic
+  /// is really disabled/restored immediately, not after an ack) and the
+  /// [revert] closures `_armControlAck` runs if no ack lands in time.
+  Future<void> _togglePause() async {
+    if (!_isPaused) {
+      final prePauseMicEnabled = _isMicEnabled;
+      void revert() {
+        if (!mounted) return;
+        setState(() {
+          _pauseStartedAt = null;
+          _isPaused = false;
+        });
+        _liveKitService.setMicrophoneEnabled(prePauseMicEnabled);
+      }
+
+      await _liveKitService.setMicrophoneEnabled(false);
+      setState(() {
+        _pauseStartedAt = widget.now();
+        _isPaused = true;
+      });
+      await _liveKitService.publishData({'type': SimControl.pause});
+      _armControlAck(revert);
+    } else {
+      final pausedAt = _pauseStartedAt;
+      final prevOffset = _pausedOffsetMs;
+      void revert() {
+        if (!mounted) return;
+        setState(() {
+          _pausedOffsetMs = prevOffset;
+          _pauseStartedAt = pausedAt ?? widget.now();
+          _isPaused = true;
+        });
+        _liveKitService.setMicrophoneEnabled(false);
+      }
+
+      await _liveKitService.setMicrophoneEnabled(_isMicEnabled);
+      setState(() {
+        if (pausedAt != null) {
+          _pausedOffsetMs = prevOffset + widget.now().difference(pausedAt);
+        }
+        _pauseStartedAt = null;
+        _isPaused = false;
+        _showEndingSoon = false;
+      });
+      await _liveKitService.publishData({'type': SimControl.resume});
+      _armControlAck(revert);
+    }
+  }
+
+  void _armControlAck(VoidCallback revert) {
+    _controlAckTimer?.cancel();
+    _controlAckTimer = Timer(controlAckTimeout, () {
+      _controlAckTimer = null;
+      revert();
+      if (mounted) setState(() => _error = ref.tr('errors.pauseControl'));
+    });
   }
 
   Future<void> _connect() async {
@@ -175,6 +356,9 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       await _liveKitService.setMicrophoneEnabled(true);
       _dataSubscription = _liveKitService.dataMessages.listen(
         _handleDataMessage,
+      );
+      _activeSpeakersSubscription = _liveKitService.activeSpeakers.listen(
+        _handleActiveSpeakers,
       );
       setState(() {
         _isConnected = true;
@@ -218,7 +402,18 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
 
   void _onTick() {
     if (!mounted || _startTime == null) return;
-    final elapsed = widget.now().difference(_startTime!);
+    final rawElapsed = widget.now().difference(_startTime!);
+    // Freezes while paused: `pausedTotal` grows at the same rate `rawElapsed`
+    // does during an ongoing pause, so their difference stops advancing —
+    // mirrors RN's own "paused time is excluded from the displayed timer
+    // and the scenario time limit" comment exactly. This is the CLIENT-side
+    // clock only; billing/leaderboard paused-time is tracked authoritatively
+    // server-side, same as RN.
+    var pausedTotal = _pausedOffsetMs;
+    if (_isPaused && _pauseStartedAt != null) {
+      pausedTotal += widget.now().difference(_pauseStartedAt!);
+    }
+    final elapsed = rawElapsed - pausedTotal;
     final maxTimeSec = _parseMaxTimeSec(widget.scenario?.maxTimeValue);
     setState(() => _elapsed = elapsed);
 
@@ -235,8 +430,12 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
 
   Future<void> _disconnect() async {
     _tickTimer?.cancel();
+    _remoteSpeakingDebounceTimer?.cancel();
+    _controlAckTimer?.cancel();
     _dataSubscription?.cancel();
     _dataSubscription = null;
+    _activeSpeakersSubscription?.cancel();
+    _activeSpeakersSubscription = null;
     await _liveKitService.disconnect();
     setState(() {
       _isConnected = false;
@@ -368,13 +567,32 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SvgPicture.asset(
-                  _isConnected
-                      ? 'assets/icons/micOn.svg'
-                      : 'assets/icons/micOff.svg',
-                  width: 64,
-                  height: 64,
-                ),
+                if (_isConnected)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: ParticipantTile(
+                          key: const ValueKey('participant-tile-remote'),
+                          avatarUrl: widget.scenario?.coverImageUrl,
+                          isSpeaking: _remoteSpeaking,
+                          turnState: _turnStates.remote,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ParticipantTile(
+                          key: const ValueKey('participant-tile-local'),
+                          avatarUrl: null,
+                          isSpeaking: _localSpeaking,
+                          turnState: _turnStates.local,
+                          isMuted: !_isMicEnabled,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  SvgPicture.asset('assets/icons/micOff.svg', width: 64, height: 64),
                 const SizedBox(height: 16),
                 Text(
                   _isConnected
@@ -388,16 +606,19 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                       '${ref.t('simulationPage.sessionDuration')} ${_formatDuration(_elapsed)}',
                     ),
                   ),
-                if (_isConnected &&
-                    !_isFocusMode &&
-                    (widget.scenario?.hasChecklist ?? false))
+                if (_isConnected && (widget.scenario?.showScoreMeter ?? true))
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: ChecklistPanel(
-                      mode: checklistModeFromString(
-                        widget.scenario!.checklistType,
-                      ),
-                      items: widget.scenario!.checklistEvents,
+                    child: SessionScoreMeter(score: _score),
+                  ),
+                if (_isConnected &&
+                    !_isFocusMode &&
+                    widget.scenario != null &&
+                    SessionInfoTabs.hasAnyTab(widget.scenario!))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SessionInfoTabs(
+                      scenario: widget.scenario!,
                       triggeredEventIds: _detectedEventIds,
                     ),
                   ),
@@ -433,6 +654,15 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                     ),
                     onPressed: _toggleMic,
                   ),
+                  if (_showPauseButton) ...[
+                    const SizedBox(height: 12),
+                    AppButton(
+                      key: const ValueKey('pause-resume-button'),
+                      label: ref.t(_isPaused ? 'simulationPage.resume' : 'simulationPage.pause'),
+                      variant: AppButtonVariant.secondary,
+                      onPressed: _togglePause,
+                    ),
+                  ],
                   if (_showFocusButton) ...[
                     const SizedBox(height: 12),
                     AppButton(
