@@ -3,7 +3,7 @@ Helper paraphrased event using OpenAI LLM to detect if counselor
 paraphrased the agent's previous message.
 """
 
-from typing import List, Optional
+from typing import List
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -50,9 +50,6 @@ class HelperParaphrasedEvent(BaseEvent):
         visibility_type=None,
         detection_type: DetectionType = DetectionType.HELPER_PARAPHRASED,
         model: str = "gpt-4o-mini",
-        embedding_client: Optional[
-            object
-        ] = None,  # Kept for backward compatibility but unused
         **kwargs,
     ) -> "HelperParaphrasedEvent":
         """
@@ -64,7 +61,6 @@ class HelperParaphrasedEvent(BaseEvent):
             visibility_type: Visibility type (optional)
             detection_type: Detection type (defaults to HELPER_PARAPHRASED)
             model: OpenAI model name (defaults to "gpt-4o-mini")
-            embedding_client: Deprecated - kept for backward compatibility but unused
             **kwargs: Other BaseEvent fields (score, emoji, show_feedback, etc.)
         """
         inst = cls.model_construct(
@@ -124,16 +120,9 @@ class HelperParaphrasedEvent(BaseEvent):
             return False
 
         # Use OpenAI LLM to evaluate if counselor paraphrased agent
-        try:
-            is_paraphrase = await self._evaluate_paraphrase(
-                last_agent_msg.content, counselor_msg.content
-            )
-        except Exception as e:
-            logger.exception(
-                f"[HELPER_PARAPHRASED] Event '{self.event_id}': "
-                f"Failed to evaluate paraphrase with LLM: {e}"
-            )
-            return False
+        is_paraphrase = await self._evaluate_paraphrase(
+            last_agent_msg.content, counselor_msg.content
+        )
 
         return is_paraphrase
 
@@ -159,49 +148,44 @@ class HelperParaphrasedEvent(BaseEvent):
         if not agent_message.strip() or not counselor_message.strip():
             return False
 
-        try:
-            # Use OpenAI's native client to avoid LiveKit streaming issue
-            # Livekit has known issue where all messages wrapped in
-            # AIMessageChunk will be spoken by the agent
-            # See: https://github.com/livekit/agents/issues/2836
-            # Use same pattern as OpenAILLMClient: api_key or settings.OPENAI_API_KEY
-            api_key = settings.OPENAI_API_KEY
-            if not api_key:
-                raise ValueError("OpenAI requires OPENAI_API_KEY in settings")
-            client = AsyncOpenAI(api_key=api_key)
+        # Use OpenAI's native client to avoid LiveKit streaming issue
+        # Livekit has known issue where all messages wrapped in
+        # AIMessageChunk will be spoken by the agent
+        # See: https://github.com/livekit/agents/issues/2836
+        # Use same pattern as OpenAILLMClient: api_key or settings.OPENAI_API_KEY
+        api_key = settings.OPENAI_API_KEY
+        if not api_key:
+            raise ValueError("OpenAI requires OPENAI_API_KEY in settings")
+        client = AsyncOpenAI(api_key=api_key)
 
-            system_prompt, user_prompt = get_paraphrase_evaluation_prompt(
-                agent_message, counselor_message
-            )
+        system_prompt, user_prompt = get_paraphrase_evaluation_prompt(
+            agent_message, counselor_message
+        )
 
-            messages = [
-                ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
-                ChatCompletionUserMessageParam(content=user_prompt, role="user"),
-            ]
+        messages = [
+            ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
+            ChatCompletionUserMessageParam(content=user_prompt, role="user"),
+        ]
 
-            # Use beta.chat.completions.parse for structured output without streaming
-            # This returns pure structured data that won't be spoken by the agent
-            completion = await client.beta.chat.completions.parse(
-                model=self.model,
-                messages=messages,
-                response_format=ParaphraseResult,
-            )
-            # Recorded as soon as the call returns, before parsing. No
-            # explicit room: this only runs inside a graph node (or a task spawned
-            # from one), where the room context var is set.
-            from app.core.llm_usage.emitter import emit_openai_usage
-            from app.core.llm_usage.tasks import LLMTask
+        # Use beta.chat.completions.parse for structured output without streaming
+        # This returns pure structured data that won't be spoken by the agent
+        completion = await client.beta.chat.completions.parse(
+            model=self.model,
+            messages=messages,
+            response_format=ParaphraseResult,
+        )
+        # Recorded as soon as the call returns, before parsing. No
+        # explicit room: this only runs inside a graph node (or a task spawned
+        # from one), where the room context var is set.
+        from app.core.llm_usage.emitter import emit_openai_usage
+        from app.core.llm_usage.tasks import LLMTask
 
-            emit_openai_usage(
-                completion,
-                task=LLMTask.HELPER_PARAPHRASED.value,
-                model=self.model,
-                provider="openai",
-            )
+        emit_openai_usage(
+            completion,
+            task=LLMTask.HELPER_PARAPHRASED.value,
+            model=self.model,
+            provider="openai",
+        )
 
-            result = completion.choices[0].message.parsed
-            return result.is_paraphrase
-
-        except Exception as e:
-            logger.exception(f"Failed to evaluate paraphrase with LLM: {e}")
-            return False
+        result = completion.choices[0].message.parsed
+        return result.is_paraphrase
