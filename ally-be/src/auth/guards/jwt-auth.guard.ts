@@ -7,7 +7,6 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/auth.metadata';
 import { Observable } from 'rxjs';
-import { JsonWebTokenError } from 'jsonwebtoken';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -30,7 +29,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(err: any, user: any, info: any) {
-    if (info instanceof JsonWebTokenError) {
+    if (info?.name === 'JsonWebTokenError') {
       if (info.message === 'jwt expired') {
         throw new UnauthorizedException('Token expired');
       } else {
