@@ -54,7 +54,7 @@ export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 2;
  * at once across an org is already generous, and a hundred a month is far more
  * characters than an org realistically builds.
  */
-export const CHARACTER_INTERVIEW_MAX_ACTIVE_SESSIONS_PER_TENANT = 5;
+export const CHARACTER_INTERVIEW_MAX_ACTIVE_SESSIONS_PER_TENANT = 10;
 export const CHARACTER_INTERVIEW_MAX_SESSIONS_PER_TENANT_PER_MONTH = 100;
 
 // Prompt registry code (src/prompts/character_interview/interviewer_system.txt).
