@@ -28,16 +28,8 @@ def _prompt_code_to_path(prompt_code: str) -> tuple[str, str]:
 
     # For local lookup, we assume the first part is the subdir and the rest is the
     # path/file
-    file_key, prompt_key = code.split("_", 1)
-    # Convert any remaining underscores back to slashes for the filename part
-    # But wait, PromptManager uses (file_key, prompt_key) as (subdir, filename)
-    # If the file is a/b/c.txt, internal_path is a/b/c, code is ally_ai_a_b_c.
-    # split("_", 1) gives ('a', 'b_c').
-    # We need to find a better way.
-    # The _get_local_template function already handles internal_path directly,
-    # so this function is primarily for cases where only prompt_code is available
-    # and it's expected to be in the format 'subdir_filename'.
-    # For nested paths, internal_path should be preferred.
+    file_key, prompt_key_part = code.split("_", 1)
+    prompt_key = prompt_key_part.replace("_", os.sep)
     return (file_key, prompt_key)
 
 
