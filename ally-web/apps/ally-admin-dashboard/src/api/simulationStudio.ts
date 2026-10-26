@@ -988,6 +988,18 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.PROMPTS],
     }),
 
+    /** Discard a draft (a version that was never live) and its translations. */
+    discardPromptVersion: builder.mutation<
+      { promptId: string; version: number },
+      { id: string; version: number }
+    >({
+      query: ({ id, version }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PROMPT_VERSION(id, version),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.PROMPTS],
+    }),
+
     /** Skills Store keys for the `prompts` CLI (never the keys themselves). */
     getSkillsStoreKeys: builder.query<SkillsStoreKey[], void>({
       query: () => ({
@@ -1801,6 +1813,7 @@ export const {
   useCreatePromptVersionMutation,
   usePromotePromptVersionMutation,
   useTranslatePromptVersionMutation,
+  useDiscardPromptVersionMutation,
   useGetSkillsStoreKeysQuery,
   useCreateSkillsStoreKeyMutation,
   useRevokeSkillsStoreKeyMutation,

@@ -117,6 +117,7 @@ vi.mock("@api", () => ({
   useCreatePromptVersionMutation: () => [mockCreateVersion, { isLoading: false }],
   usePromotePromptVersionMutation: () => [mockPromoteVersion, { isLoading: false }],
   useTranslatePromptVersionMutation: () => [mockTranslateVersion, { isLoading: false }],
+  useDiscardPromptVersionMutation: () => [vi.fn(), { isLoading: false }],
   useGetLanguagesQuery: () => ({
     data: [
       { id: 2, label: "Hindi" },

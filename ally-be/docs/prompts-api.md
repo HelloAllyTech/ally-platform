@@ -69,6 +69,7 @@ Base path: **`/api/v1/prompts`** (admin session) and **`/api/v1/skills-store`**
 | POST | `/prompts/:id/versions` | Bearer (EDIT_PROMPT) | Save text + settings as a draft: `{prompt, baseVersion, provider?, model?, temperature?, note?}`. |
 | POST | `/prompts/:id/versions/:version/promote` | Bearer (EDIT_PROMPT) | Publish: `{expectedCurrentVersion, rollback?, confirmJudgeRubricChange?}` → `{version, previousVersion, failedLanguages}`. |
 | POST | `/prompts/:id/versions/:version/translations` | Bearer (EDIT_PROMPT) | (Re)translate a version, retrying failed languages. |
+| DELETE | `/prompts/:id/versions/:version` | Bearer (EDIT_PROMPT) | Discard a draft (never live) and its translations. `409 SKILLS_STORE_NOT_A_CANDIDATE` for a version that has been live: it stays in the history. |
 | GET | `/prompts/:id/translations?version=N` | Bearer (VIEW_PROMPT) | A version's translations (default: live). |
 | POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the prompt's stored default live as a new version (its production text at the Skills Store cutover, or its first text if created since), translations included. Body `{confirmJudgeRubricChange?}` for judge rubrics. A refused revert leaves no draft behind. |
 | GET | `/prompts/:id/usage` | Bearer (VIEW_PROMPT) | Scenarios referencing this prompt. |

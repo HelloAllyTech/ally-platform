@@ -135,6 +135,8 @@ export const ApiEndpoints = {
       `/v1/prompts/${id}/versions/${version}/promote`,
     TRANSLATE_PROMPT_VERSION: (id: string | number, version: number) =>
       `/v1/prompts/${id}/versions/${version}/translations`,
+    PROMPT_VERSION: (id: string | number, version: number) =>
+      `/v1/prompts/${id}/versions/${version}`,
     SKILLS_STORE_KEYS: "/v1/skills-store/keys",
     SKILLS_STORE_KEY: (id: string) => `/v1/skills-store/keys/${id}`,
     GET_PROMPT_USAGE: (id: string | number) => `/v1/prompts/${id}/usage`,

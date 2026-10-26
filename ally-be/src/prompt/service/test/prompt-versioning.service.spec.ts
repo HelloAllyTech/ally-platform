@@ -539,3 +539,55 @@ describe('PromptVersioningService.translateDrafts', () => {
     expect(translation.translateBody).toHaveBeenCalledWith('p1', 'Draft', 'v4');
   });
 });
+
+describe('PromptVersioningService.discardVersion', () => {
+  const versions = () => [
+    { id: 'v1', version: 1, prompt: 'Old', publishedAt: new Date() },
+    { id: 'v2', version: 2, prompt: 'Live', publishedAt: new Date() },
+    { id: 'v3', version: 3, prompt: 'A draft', publishedAt: null },
+  ];
+
+  it('removes a draft and its translations', async () => {
+    const { service, state, manager } = buildStore({
+      prompt: { currentVersion: 2 },
+      versions: versions(),
+    });
+
+    await expect(service.discardVersion('p1', 3)).resolves.toEqual({
+      promptId: 'p1',
+      version: 3,
+    });
+
+    expect(state.versions.map((v) => v.version)).toEqual([1, 2]);
+    expect(manager.delete).toHaveBeenCalledWith(
+      PromptTranslation,
+      expect.objectContaining({ promptId: 'p1' }),
+    );
+  });
+
+  it('refuses a version that has been live: it stays in the history', async () => {
+    const { service, state } = buildStore({
+      prompt: { currentVersion: 2 },
+      versions: versions(),
+    });
+
+    await expect(service.discardVersion('p1', 1)).rejects.toMatchObject({
+      response: { errorCode: 'SKILLS_STORE_NOT_A_CANDIDATE' },
+    });
+    await expect(service.discardVersion('p1', 2)).rejects.toMatchObject({
+      response: { errorCode: 'SKILLS_STORE_NOT_A_CANDIDATE' },
+    });
+    expect(state.versions).toHaveLength(3);
+  });
+
+  it('answers 404 for a version that does not exist', async () => {
+    const { service } = buildStore({
+      prompt: { currentVersion: 2 },
+      versions: versions(),
+    });
+
+    await expect(service.discardVersion('p1', 9)).rejects.toThrow(
+      'Version 9 not found.',
+    );
+  });
+});

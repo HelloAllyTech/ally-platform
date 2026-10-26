@@ -143,6 +143,21 @@ export class PromptsController {
 
   @ApiOperation({
     summary:
+      'Discard a draft (a version that was never live), with its translations. 409 not_a_candidate for a version that has been live: it stays in the history.',
+  })
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
+  @Delete(':id/versions/:version')
+  discardVersion(
+    @Param('id') id: string,
+    @Param('version', ParseIntPipe) version: number,
+  ) {
+    return this.promptsService.discardVersion(id, version);
+  }
+
+  @ApiOperation({
+    summary:
       "(Re)translate one version's text into every eligible language, retrying failed ones",
   })
   @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {

@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  useDiscardPromptVersionMutation,
   useGetLanguagesQuery,
   usePromotePromptVersionMutation,
   useTranslatePromptVersionMutation,
@@ -12,6 +13,7 @@ import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { PromptVersionSummary, PromptVersionTranslations, SkillsStoreErrorCode } from "@types";
 import { getErrorMessage } from "@utils/errorMessage";
+import { diffLines, placeholdersIn } from "@utils/promptVersionText";
 
 interface Props {
   promptId: string;
@@ -28,6 +30,8 @@ export const skillsStoreErrorCode = (error: unknown): SkillsStoreErrorCode | und
 export const skillsStoreErrorDetails = (error: unknown): Record<string, unknown> =>
   (error as { data?: { details?: Record<string, unknown> } } | null)?.data?.details ?? {};
 
+type BusyAction = "publish" | "retry" | "discard";
+
 const STATUS_STYLES: Record<PromptVersionSummary["status"], string> = {
   live: "bg-green-100 text-green-800",
   candidate: "bg-amber-100 text-amber-800",
@@ -40,15 +44,19 @@ const formatWhen = (iso: string | null) => (iso ? new Date(iso).toLocaleString()
  * A prompt's versions: the live one, drafts waiting to be published (with how
  * their translations are getting on) and earlier ones that can be rolled back
  * to. Every change to a prompt's text or model goes through here — a draft is
- * saved from the editor, then published.
+ * saved from the editor, then published. Each version expands to its full text,
+ * the variables it uses and, for any but the live one, its changes from live.
  */
 const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }) => {
   const strings = en.skillsStore.versions;
   const { data: languages } = useGetLanguagesQuery({});
-  const [promote, { isLoading: isPromoting }] = usePromotePromptVersionMutation();
-  const [translateVersion, { isLoading: isRetrying }] = useTranslatePromptVersionMutation();
-  const [busyVersion, setBusyVersion] = useState<number | null>(null);
+  const [promote] = usePromotePromptVersionMutation();
+  const [translateVersion] = useTranslatePromptVersionMutation();
+  const [discardVersion] = useDiscardPromptVersionMutation();
+  // Which version has a request running, and which action, so only that button says so.
+  const [busy, setBusy] = useState<{ version: number; action: BusyAction } | null>(null);
   const [rollBackTo, setRollBackTo] = useState<number | null>(null);
+  const [discardTarget, setDiscardTarget] = useState<number | null>(null);
   const [rubricConfirmFor, setRubricConfirmFor] = useState<{
     version: number;
     rollback: boolean;
@@ -62,10 +70,11 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
     return (id: number) => map.get(id) ?? `Language ${id}`;
   }, [languages]);
 
-  const liveVersion = versions.find(v => v.status === "live")?.version ?? null;
+  const live = versions.find(v => v.status === "live") ?? null;
+  const liveVersion = live?.version ?? null;
 
   const runPromote = async (version: number, rollback: boolean, confirmJudge = false) => {
-    setBusyVersion(version);
+    setBusy({ version, action: "publish" });
     try {
       const result = await promote({
         id: promptId,
@@ -99,19 +108,35 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
         toast.error(getErrorMessage(error, strings.publishFailed));
       }
     } finally {
-      setBusyVersion(null);
+      setBusy(null);
     }
   };
 
   const retryTranslations = async (version: number) => {
-    setBusyVersion(version);
+    setBusy({ version, action: "retry" });
     try {
       await translateVersion({ id: promptId, version }).unwrap();
       onReload();
     } catch (error) {
       toast.error(getErrorMessage(error, strings.publishFailed));
     } finally {
-      setBusyVersion(null);
+      setBusy(null);
+    }
+  };
+
+  const runDiscard = async (version: number) => {
+    setBusy({ version, action: "discard" });
+    try {
+      await discardVersion({ id: promptId, version }).unwrap();
+      toast.success(strings.discarded(version));
+      onReload();
+    } catch (error) {
+      if ((error as { status?: unknown } | null)?.status !== 403) {
+        toast.error(getErrorMessage(error, strings.discardFailed));
+      }
+      onReload();
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -125,11 +150,13 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
         <VersionRow
           key={v.version}
           version={v}
+          live={live}
           languageLabel={languageLabel}
-          busy={busyVersion === v.version && (isPromoting || isRetrying)}
+          busy={busy?.version === v.version ? busy.action : null}
           onPublish={() => void runPromote(v.version, false)}
           onRetry={() => void retryTranslations(v.version)}
           onRollBack={() => setRollBackTo(v.version)}
+          onDiscard={() => setDiscardTarget(v.version)}
         />
       ))}
 
@@ -147,6 +174,21 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
           },
         }}
         secondaryButton={{ label: strings.cancel, onClick: () => setRollBackTo(null) }}
+      />
+      <ActionConfirmationPopup
+        isOpen={discardTarget != null}
+        onClose={() => setDiscardTarget(null)}
+        title={discardTarget != null ? strings.discardTitle(discardTarget) : ""}
+        description={strings.discardBody}
+        primaryButton={{
+          label: strings.discard,
+          onClick: () => {
+            const target = discardTarget;
+            setDiscardTarget(null);
+            if (target != null) void runDiscard(target);
+          },
+        }}
+        secondaryButton={{ label: strings.cancel, onClick: () => setDiscardTarget(null) }}
       />
       <ActionConfirmationPopup
         isOpen={rubricConfirmFor != null}
@@ -194,15 +236,101 @@ const TranslationSummary: React.FC<{
   );
 };
 
+/** A version's text, its variables and, against the live version, its changes. */
+const VersionDetail: React.FC<{
+  version: PromptVersionSummary;
+  live: PromptVersionSummary | null;
+}> = ({ version: v, live }) => {
+  const strings = en.skillsStore.versions;
+  const [comparing, setComparing] = useState(false);
+  const variables = useMemo(() => placeholdersIn(v.prompt), [v.prompt]);
+  const canCompare = live != null && live.version !== v.version;
+  const diff = useMemo(
+    () => (comparing && live ? diffLines(live.prompt, v.prompt) : null),
+    [comparing, live, v.prompt],
+  );
+  const unchanged = diff?.every(line => line.kind === "same") ?? false;
+
+  return (
+    <div className="flex flex-col gap-2" data-testid={`prompt-version-${v.version}-detail`}>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-typography-700">{strings.variables}</span>
+        {variables.length ? (
+          <div className="flex flex-wrap gap-1">
+            {variables.map(name => (
+              <span
+                key={name}
+                className="px-1.5 py-0.5 rounded bg-neutral-100 text-xs font-mono text-typography-800"
+              >
+                {`{${name}}`}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-typography-500">{strings.noVariables}</span>
+        )}
+      </div>
+      {canCompare && (
+        <button
+          type="button"
+          className="self-start text-xs text-primary-600 hover:underline"
+          onClick={() => setComparing(c => !c)}
+        >
+          {comparing ? strings.showFullText : strings.compareWithLive(live.version)}
+        </button>
+      )}
+      {diff && live ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-typography-600">
+            {unchanged
+              ? strings.noDifferences(live.version)
+              : strings.comparing(v.version, live.version)}
+          </span>
+          <pre
+            className="max-h-80 overflow-auto rounded border border-border-light text-xs font-mono whitespace-pre-wrap break-words"
+            data-testid={`prompt-version-${v.version}-diff`}
+          >
+            {diff.map((line, i) => (
+              <div
+                key={i}
+                className={
+                  line.kind === "added"
+                    ? "bg-green-50 text-green-900 px-2"
+                    : line.kind === "removed"
+                      ? "bg-red-50 text-red-900 line-through px-2"
+                      : "px-2 text-typography-700"
+                }
+              >
+                {(line.kind === "added" ? "+ " : line.kind === "removed" ? "- " : "  ") +
+                  (line.text || " ")}
+              </div>
+            ))}
+          </pre>
+        </div>
+      ) : (
+        <pre
+          className="max-h-80 overflow-auto rounded border border-border-light bg-neutral-50 p-2 text-xs font-mono text-typography-800 whitespace-pre-wrap break-words"
+          data-testid={`prompt-version-${v.version}-text`}
+        >
+          {v.prompt}
+        </pre>
+      )}
+    </div>
+  );
+};
+
 const VersionRow: React.FC<{
   version: PromptVersionSummary;
+  live: PromptVersionSummary | null;
   languageLabel: (id: number) => string;
-  busy: boolean;
+  busy: BusyAction | null;
   onPublish: () => void;
   onRetry: () => void;
   onRollBack: () => void;
-}> = ({ version: v, languageLabel, busy, onPublish, onRetry, onRollBack }) => {
+  onDiscard: () => void;
+}> = ({ version: v, live, languageLabel, busy, onPublish, onRetry, onRollBack, onDiscard }) => {
   const strings = en.skillsStore.versions;
+  const [expanded, setExpanded] = useState(false);
   const label =
     v.status === "live" ? strings.live : v.status === "candidate" ? strings.draft : strings.history;
   const pending = v.translations?.translatable ? v.translations.pending.length : 0;
@@ -226,25 +354,38 @@ const VersionRow: React.FC<{
             {[source, formatWhen(v.publishedAt ?? v.createdAt)].filter(Boolean).join(" · ")}
           </span>
           {v.note && <span className="text-sm text-typography-700 break-words">{v.note}</span>}
+          <button
+            type="button"
+            className="self-start text-xs text-primary-600 hover:underline"
+            aria-expanded={expanded}
+            onClick={() => setExpanded(e => !e)}
+          >
+            {expanded ? strings.hideText : strings.showText}
+          </button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {v.status === "candidate" && failed > 0 && (
-            <Button variant={ButtonVariant.SECONDARY} onClick={onRetry} disabled={busy}>
-              {busy ? strings.retrying : strings.retryTranslations}
+            <Button variant={ButtonVariant.SECONDARY} onClick={onRetry} disabled={!!busy}>
+              {busy === "retry" ? strings.retrying : strings.retryTranslations}
+            </Button>
+          )}
+          {v.status === "candidate" && (
+            <Button variant={ButtonVariant.TEXT} onClick={onDiscard} disabled={!!busy}>
+              {busy === "discard" ? strings.discarding : strings.discard}
             </Button>
           )}
           {v.status === "candidate" && (
             <Button
               variant={ButtonVariant.PRIMARY}
               onClick={onPublish}
-              disabled={busy || pending > 0}
+              disabled={!!busy || pending > 0}
               title={pending > 0 ? strings.translationsRunning : undefined}
             >
-              {busy ? strings.publishing : strings.publish}
+              {busy === "publish" ? strings.publishing : strings.publish}
             </Button>
           )}
           {v.status === "history" && (
-            <Button variant={ButtonVariant.SECONDARY} onClick={onRollBack} disabled={busy}>
+            <Button variant={ButtonVariant.SECONDARY} onClick={onRollBack} disabled={!!busy}>
               {strings.rollBack}
             </Button>
           )}
@@ -253,6 +394,7 @@ const VersionRow: React.FC<{
       {v.translations && v.status !== "history" && (
         <TranslationSummary translations={v.translations} languageLabel={languageLabel} />
       )}
+      {expanded && <VersionDetail version={v} live={live} />}
     </div>
   );
 };

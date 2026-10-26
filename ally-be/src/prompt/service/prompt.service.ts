@@ -250,6 +250,10 @@ export class PromptsService {
     return this.versioning.translateVersion(id, version);
   }
 
+  discardVersion(id: string, version: number) {
+    return this.versioning.discardVersion(id, version);
+  }
+
   listVersions(id: string) {
     return this.versioning.listVersions(id);
   }

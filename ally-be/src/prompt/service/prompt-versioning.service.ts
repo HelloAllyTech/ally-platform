@@ -450,6 +450,47 @@ export class PromptVersioningService {
   }
 
   /** Start (or retry) translating a version's body; used by the editor's retry. */
+  /**
+   * Discard a draft: a version that was never published. One that has been
+   * live is history and stays (roll back to it instead). Its translations go
+   * with it, unless another version has the same text.
+   */
+  async discardVersion(
+    promptId: string,
+    version: number,
+  ): Promise<{ promptId: string; version: number }> {
+    const promptCode = await this.dataSource.transaction(async (manager) => {
+      const prompt = await this.lockPrompt(manager, promptId);
+      const target = await manager.findOne(PromptVersion, {
+        where: { promptId, version },
+      });
+      if (!target) {
+        throw new NotFoundException(`Version ${version} not found.`);
+      }
+      if (target.publishedAt || prompt.currentVersion === version) {
+        throw new ConflictException({
+          statusCode: 409,
+          errorCode: SKILLS_STORE_ERROR.NOT_A_CANDIDATE,
+          message: `Version ${version} has been live, so it stays in the history. Only a draft can be discarded.`,
+        });
+      }
+      await manager.delete(PromptVersion, { id: target.id });
+      const hash = hashPromptBody(target.prompt);
+      const remaining = await manager.find(PromptVersion, {
+        where: { promptId },
+        select: ['id', 'prompt'],
+      });
+      if (!remaining.some((v) => hashPromptBody(v.prompt) === hash)) {
+        await manager.delete(PromptTranslation, { promptId, sourceHash: hash });
+      }
+      return prompt.promptCode;
+    });
+    this.logger.info(
+      `[SKILLS_STORE] ${promptCode}: draft v${version} discarded`,
+    );
+    return { promptId, version };
+  }
+
   async translateVersion(promptId: string, version: number): Promise<void> {
     const target = await this.dataSource.manager.findOne(PromptVersion, {
       where: { promptId, version },

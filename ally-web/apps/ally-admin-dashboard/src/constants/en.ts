@@ -8248,6 +8248,22 @@ export const en = {
       pendingCount: (n: number) => `${n} translating`,
       failedCount: (n: number) => `${n} failed`,
       cancel: "Cancel",
+      showText: "Show text",
+      hideText: "Hide text",
+      variables: "Variables",
+      noVariables: "No variables: the text is used as written.",
+      compareWithLive: (live: number) => `Compare with live v${live}`,
+      showFullText: "Show full text",
+      comparing: (version: number, live: number) =>
+        `Changes in v${version} compared with live v${live}: added lines in green, removed in red.`,
+      noDifferences: (live: number) => `Same text as live v${live}.`,
+      discard: "Discard",
+      discarding: "Discarding…",
+      discardTitle: (version: number) => `Discard draft v${version}?`,
+      discardBody:
+        "The draft and its translations are removed for good. The live version and earlier versions stay as they are.",
+      discarded: (version: number) => `Draft v${version} discarded.`,
+      discardFailed: "Couldn't discard the draft. Refresh and try again.",
       sources: {
         dashboard: "Skills Store",
         cli: "prompts CLI",
