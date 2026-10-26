@@ -44,6 +44,9 @@ export const HELPLINE_COPILOT = {
 export const HELPLINE_PROMPT_CODES = [
   'ally_ai_helpline_risk_classify',
   'ally_ai_helpline_copilot_turn',
+  // Slot values the turn prompt is filled with.
+  'ally_ai_helpline_copilot_nudge_requested',
+  'ally_ai_helpline_copilot_risk_flagged',
 ] as const;
 
 /** `skill_key` values ally-ai may return (contract §9.1). */

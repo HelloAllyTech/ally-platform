@@ -8,15 +8,16 @@ for that window. This wrapper falls over to the next provider on either an
 exception OR an empty result, so one provider's bad patch no longer silently
 costs a summary.
 
-All concrete services (Deepgram / OpenAI / Sarvam) share the same
+All concrete services (Gemini / Deepgram / OpenAI / Sarvam) share the same
 `transcribe_audio_from_url(audio_url, chat_id, sample_rate,
-is_linear16_encoded) -> (chat_id, str)` interface, so this wrapper is a drop-in
-replacement wherever a single service is used today.
+is_linear16_encoded, prompts) -> (chat_id, str)` interface, so this wrapper is a
+drop-in replacement wherever a single service is used today. Only Gemini sends a
+prompt; the others accept the pipeline's prompts and ignore them.
 """
 
 import asyncio
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.transcriptions.utils.exceptions import TranscriptionFailedException
 from app.core.transcriptions.utils.logger import get_logger
@@ -99,6 +100,7 @@ class FallbackTranscriptionService:
         chat_id: int,
         sample_rate: int = 8000,
         is_linear16_encoded: bool = False,
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Tuple[int, str]:
         last_exception: Optional[Exception] = None
         total = len(self.services)
@@ -127,6 +129,7 @@ class FallbackTranscriptionService:
                     chat_id=chat_id,
                     sample_rate=sample_rate,
                     is_linear16_encoded=is_linear16_encoded,
+                    prompts=prompts,
                 )
                 if self.per_provider_timeout_seconds:
                     cid, text = await asyncio.wait_for(
@@ -185,7 +188,7 @@ class FallbackTranscriptionService:
                         provider=name,
                         ok=False,
                         error=f"{type(e).__name__}: {e}",
-                        status_code=status_code
+                        status_code=status_code,
                     )
                 )
                 logger.error(

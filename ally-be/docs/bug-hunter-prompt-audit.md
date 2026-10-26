@@ -42,7 +42,7 @@ that a Gemini-engine prompt never mentions the Task tool.
 | Verifier for fixes | `src/bug-hunter/constants/bug-verify-fix-prompt.ts` | counterpart engine | Protocol, served by `GET pipeline/findings/:id/verify-prompt` (OPP-0779) |
 | Verifier for findings | `src/bug-hunter/constants/bug-verify-findings-prompt.ts` | counterpart engine | Protocol, served by `GET pipeline/runs/:id/verify-findings-prompt` (OPP-0780) |
 | UX signals triage | `src/prompts/ux_signals/triage.txt` | ally-be's own LLM call | One-shot JSON |
-| Notebook curator | `AgentMemoryCuratorService.CURATOR_SYSTEM_PROMPT` | ally-be's own LLM call (fast tier) | One-shot JSON ops |
+| Notebook curator | `src/prompts/agent_memory/curator_system.txt` (`agent_memory_curator_system`) | ally-be's own LLM call (fast tier, or the prompt's model) | One-shot JSON ops |
 
 ## Findings and what changed
 

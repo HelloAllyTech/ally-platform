@@ -71,11 +71,11 @@ export class CreatePromptVersionRequestDto {
 export class RevertPromptRequestDto {
   @ApiPropertyOptional({
     description:
-      "Judge rubrics only: confirms the judge's pinned PROMPT_VERSION was bumped",
+      'Pinned prompts only (judge rubrics, eval instruments, guards): confirms the change was prepared as the refusal described',
   })
   @IsOptional()
   @IsBoolean()
-  confirmJudgeRubricChange?: boolean;
+  confirmPinnedChange?: boolean;
 }
 
 export class PromoteVersionRequestDto {
@@ -98,11 +98,11 @@ export class PromoteVersionRequestDto {
 
   @ApiPropertyOptional({
     description:
-      "Judge rubrics only: confirms the judge's pinned PROMPT_VERSION was bumped",
+      'Pinned prompts only (judge rubrics, eval instruments, guards): confirms the change was prepared as the refusal described',
   })
   @IsOptional()
   @IsBoolean()
-  confirmJudgeRubricChange?: boolean;
+  confirmPinnedChange?: boolean;
 }
 
 export class CreateSkillsStoreKeyDto {

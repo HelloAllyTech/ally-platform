@@ -88,6 +88,7 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
             request.transcript,
             request.goals,
             scenario_session_id=request.scenario_session_id,
+            prompts=request.prompts,
         )
         payload = ActorEvaluationWebhookPayload(
             status="COMPLETED",

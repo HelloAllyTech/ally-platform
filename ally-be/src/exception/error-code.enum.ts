@@ -127,7 +127,7 @@ export enum ErrorCode {
   /** 409. Translations of the version are still running; publish once they settle. Transient. */
   SKILLS_STORE_TRANSLATIONS_PENDING = 'SKILLS_STORE_TRANSLATIONS_PENDING',
   /** 409. A judge rubric: confirm the judge's pinned label was bumped before publishing. */
-  SKILLS_STORE_JUDGE_RUBRIC_PINNED = 'SKILLS_STORE_JUDGE_RUBRIC_PINNED',
+  SKILLS_STORE_PROMPT_PINNED = 'SKILLS_STORE_PROMPT_PINNED',
   /** 409. That version was live before; publishing it again needs an explicit rollback. */
   SKILLS_STORE_NOT_A_CANDIDATE = 'SKILLS_STORE_NOT_A_CANDIDATE',
   /** 400. Text and model settings change through a new version, not a metadata update. */

@@ -5,7 +5,7 @@ Uses OpenAI Whisper for transcription and GPT for summarization.
 
 import asyncio
 import os
-from typing import Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from openai import OpenAI
 
@@ -60,6 +60,8 @@ class OpenAITranscriptionService:
         chat_id: int,
         sample_rate: int = 8000,
         is_linear16_encoded: bool = False,
+        # Shared interface: this provider sends no prompt, so it ignores them.
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Tuple[int, str]:
         """
         Transcribe audio from URL and generate a summary.

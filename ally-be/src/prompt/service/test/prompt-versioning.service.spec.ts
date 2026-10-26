@@ -347,11 +347,25 @@ describe('PromptVersioningService.promote', () => {
 
     await expect(service.promote('p1', 2, 1)).rejects.toMatchObject({
       response: expect.objectContaining({
-        errorCode: 'SKILLS_STORE_JUDGE_RUBRIC_PINNED',
+        errorCode: 'SKILLS_STORE_PROMPT_PINNED',
       }),
     });
-    await service.promote('p1', 2, 1, { confirmJudgeRubricChange: true });
+    await service.promote('p1', 2, 1, { confirmPinnedChange: true });
     expect(state.prompt.currentVersion).toBe(2);
+  });
+
+  it('says why a pinned guard prompt needs confirming', async () => {
+    const { service } = buildStore({
+      prompt: { promptCode: 'builder_prd_review_system', currentVersion: 1 },
+      versions: candidate(),
+    });
+
+    await expect(service.promote('p1', 2, 1)).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_PROMPT_PINNED',
+        details: { reason: 'guard' },
+      }),
+    });
   });
 
   it('refuses to put an earlier published version live again unless rolling back', async () => {
@@ -411,7 +425,7 @@ describe('PromptVersioningService.createAndPromote', () => {
       ),
     ).rejects.toMatchObject({
       response: expect.objectContaining({
-        errorCode: 'SKILLS_STORE_JUDGE_RUBRIC_PINNED',
+        errorCode: 'SKILLS_STORE_PROMPT_PINNED',
       }),
     });
     expect(state.versions).toHaveLength(1);
@@ -419,7 +433,7 @@ describe('PromptVersioningService.createAndPromote', () => {
     const result = await service.createAndPromote(
       'p1',
       input({ baseVersion: 1, source: PromptVersionSource.REVERT }),
-      { confirmJudgeRubricChange: true },
+      { confirmPinnedChange: true },
     );
     expect(result.version).toBe(2);
     expect(state.prompt.currentVersion).toBe(2);

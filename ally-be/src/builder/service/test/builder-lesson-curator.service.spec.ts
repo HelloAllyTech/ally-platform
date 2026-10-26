@@ -77,6 +77,7 @@ describe('BuilderLessonCuratorService', () => {
         acquireLock: jest.fn().mockResolvedValue(true),
         releaseLock: jest.fn().mockResolvedValue(undefined),
       } as any,
+      null as any,
     );
   });
 

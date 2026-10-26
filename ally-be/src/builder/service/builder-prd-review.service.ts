@@ -17,11 +17,16 @@ import {
   BuilderPrdReviewFinding,
 } from '../type/builder-prd.type';
 import {
-  BUILDER_PRD_RECHECK_SYSTEM_PROMPT,
   BUILDER_PRD_REVIEW_MAX_FINDINGS,
   BUILDER_PRD_REVIEW_SECTION_KEYS,
-  BUILDER_PRD_REVIEW_SYSTEM_PROMPT,
 } from '../constants/builder-prd-review-prompt';
+import {
+  BUILDER_PRD_RECHECK_SYSTEM,
+  BUILDER_PRD_REVIEW_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
+import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { BUILDER_AI_TASKS } from '../constants/builder.constants';
 import { BuilderEvidenceLogService } from './builder-evidence-log.service';
 import { BuilderCatalogService } from './builder-catalog.service';
@@ -216,6 +221,11 @@ export class BuilderPrdReviewService {
     private readonly messageRepository: BuilderMessageRepository,
     private readonly evidenceLog: BuilderEvidenceLogService,
     private readonly catalog: BuilderCatalogService,
+    /**
+     * The reviewer's instructions. A failed read falls back to the shipped
+     * default; with no text at all the pass fails like any other failed call.
+     */
+    private readonly prompts: PromptSharedService,
   ) {}
 
   /**
@@ -231,7 +241,8 @@ export class BuilderPrdReviewService {
     const previous = doc.review ?? null;
     let review: BuilderPrdReview;
     try {
-      const [messages, evidence, systems] = await Promise.all([
+      const [template, messages, evidence, systems] = await Promise.all([
+        loadPromptTemplate(this.prompts, BUILDER_PRD_REVIEW_SYSTEM.code),
         this.messageRepository.listBySession(sessionId),
         this.evidenceLog.renderForPrompt(sessionId, 120),
         Promise.resolve(renderSystemsForReview(this.catalog)),
@@ -239,7 +250,11 @@ export class BuilderPrdReviewService {
       const result = await this.llmCompletion.complete({
         taskId: BUILDER_AI_TASKS.PRD_REVIEW,
         task: LlmTask.BUILDER_PRD_REVIEW,
-        system: BUILDER_PRD_REVIEW_SYSTEM_PROMPT,
+        promptCode: BUILDER_PRD_REVIEW_SYSTEM.code,
+        system: renderPrompt(BUILDER_PRD_REVIEW_SYSTEM, template, {
+          sectionKeys: BUILDER_PRD_REVIEW_SECTION_KEYS.join('|'),
+          maxFindings: BUILDER_PRD_REVIEW_MAX_FINDINGS,
+        }),
         maxTokens: REVIEW_MAX_TOKENS,
         jsonMode: true,
         timeoutMs: options.timeoutMs,
@@ -328,11 +343,15 @@ export class BuilderPrdReviewService {
     }
 
     try {
-      const messages = await this.messageRepository.listBySession(sessionId);
+      const [template, messages] = await Promise.all([
+        loadPromptTemplate(this.prompts, BUILDER_PRD_RECHECK_SYSTEM.code),
+        this.messageRepository.listBySession(sessionId),
+      ]);
       const result = await this.llmCompletion.complete({
-        taskId: BUILDER_AI_TASKS.PRD_REVIEW,
+        taskId: BUILDER_AI_TASKS.PRD_RECHECK,
         task: LlmTask.BUILDER_PRD_REVIEW,
-        system: BUILDER_PRD_RECHECK_SYSTEM_PROMPT,
+        promptCode: BUILDER_PRD_RECHECK_SYSTEM.code,
+        system: renderPrompt(BUILDER_PRD_RECHECK_SYSTEM, template, {}),
         maxTokens: REVIEW_MAX_TOKENS,
         jsonMode: true,
         timeoutMs: options.timeoutMs,

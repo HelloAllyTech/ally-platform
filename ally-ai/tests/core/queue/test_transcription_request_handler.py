@@ -109,6 +109,13 @@ class TestTranscriptionHandler:
             handler._process_transcription_result.await_args.kwargs["prompts"]
             == prompts
         )
+        # The transcription step gets them too (Gemini's instruction).
+        assert (
+            handler.transcription_service.transcribe_audio_from_url.await_args.kwargs[
+                "prompts"
+            ]
+            == prompts
+        )
         mock_ally_core_service.get_prompts_by_codes.assert_not_awaited()
 
     @pytest.mark.asyncio

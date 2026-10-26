@@ -235,7 +235,7 @@ export class PromptsService {
     expectedCurrentVersion: number | null,
     options: {
       allowRollback?: boolean;
-      confirmJudgeRubricChange?: boolean;
+      confirmPinnedChange?: boolean;
     } = {},
   ) {
     return this.versioning.promote(
@@ -856,7 +856,7 @@ export class PromptsService {
    */
   async revertPrompt(
     id: string,
-    options: { confirmJudgeRubricChange?: boolean } = {},
+    options: { confirmPinnedChange?: boolean } = {},
   ): Promise<boolean> {
     const prompt = await this.promptsRepository.findOne({ where: { id } });
     if (!prompt) {

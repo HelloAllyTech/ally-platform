@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { AppConfigService } from '../../config/config.service';
+import { AiService } from '../../ai/service/ai.service';
 import { AuditLoggerService } from '../../audit/service/audit-logger.service';
 import { LoggerService } from '../../logger/logger.service';
 import {
@@ -22,6 +23,17 @@ import {
 } from '../util/sql-guard.util';
 import { SchemaCatalogService } from './schema-catalog.service';
 import { SqlExecutorService } from './sql-executor.service';
+
+/**
+ * The Skills Store prompts each ally-ai call renders. Sent with the request so
+ * ally-ai runs their live versions (text and model) rather than its own files.
+ */
+export const ANALYTICS_AGENT_PLAN_PROMPT_CODES = [
+  'ally_ai_analytics_planner',
+] as const;
+export const ANALYTICS_AGENT_ANSWER_PROMPT_CODES = [
+  'ally_ai_analytics_answer',
+] as const;
 
 /** ally-ai's planning response. */
 interface AiPlanResponse {
@@ -81,6 +93,7 @@ export class AnalyticsAgentService {
     private readonly schemaCatalog: SchemaCatalogService,
     private readonly executor: SqlExecutorService,
     private readonly config: AppConfigService,
+    private readonly aiService: AiService,
   ) {}
 
   async ask(
@@ -296,6 +309,11 @@ export class AnalyticsAgentService {
           sql: turn.sql ?? '',
           answer: turn.answer ?? '',
         })),
+        // Throws rather than return an empty map when the store can't be read,
+        // so the question fails visibly instead of running ally-ai's defaults.
+        prompts: await this.aiService.getPromptOverrides(
+          ANALYTICS_AGENT_PLAN_PROMPT_CODES,
+        ),
       },
       {
         headers: { 'x-api-key': outboundApiKey },
@@ -329,6 +347,9 @@ export class AnalyticsAgentService {
           sql: turn.sql ?? '',
           answer: turn.answer ?? '',
         })),
+        prompts: await this.aiService.getPromptOverrides(
+          ANALYTICS_AGENT_ANSWER_PROMPT_CODES,
+        ),
       },
       {
         headers: { 'x-api-key': outboundApiKey },

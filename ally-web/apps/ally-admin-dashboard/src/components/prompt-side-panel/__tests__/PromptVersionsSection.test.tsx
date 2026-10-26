@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PromptVersionsSection from "../PromptVersionsSection";
 import { PromptVersionSummary } from "@types";
 
-const { mockDiscard, mockToastSuccess } = vi.hoisted(() => ({
+const { mockDiscard, mockPromote, mockToastSuccess } = vi.hoisted(() => ({
   mockDiscard: vi.fn(),
+  mockPromote: vi.fn(),
   mockToastSuccess: vi.fn(),
 }));
 
@@ -16,7 +17,7 @@ vi.mock("sonner", () => ({
 
 vi.mock("@api", () => ({
   useGetLanguagesQuery: () => ({ data: [] }),
-  usePromotePromptVersionMutation: () => [vi.fn(), { isLoading: false }],
+  usePromotePromptVersionMutation: () => [mockPromote, { isLoading: false }],
   useTranslatePromptVersionMutation: () => [vi.fn(), { isLoading: false }],
   useDiscardPromptVersionMutation: () => [mockDiscard, { isLoading: false }],
 }));
@@ -24,9 +25,10 @@ vi.mock("@api", () => ({
 vi.mock("@components", () => ({
   // The real constants (labels under test) read cellTypes while loading.
   cellTypes: new Proxy({}, { get: (_target, key) => String(key) }),
-  ActionConfirmationPopup: ({ isOpen, title, primaryButton }: any) =>
+  ActionConfirmationPopup: ({ isOpen, title, description, primaryButton }: any) =>
     isOpen ? (
       <div role="dialog" aria-label={title}>
+        <p>{description}</p>
         <button onClick={primaryButton.onClick}>{`confirm: ${primaryButton.label}`}</button>
       </div>
     ) : null,
@@ -62,6 +64,7 @@ const versions: PromptVersionSummary[] = [
 describe("PromptVersionsSection", () => {
   beforeEach(() => {
     mockDiscard.mockReset();
+    mockPromote.mockReset();
     mockDiscard.mockReturnValue({ unwrap: () => Promise.resolve({ promptId: "p1", version: 3 }) });
   });
 
@@ -126,6 +129,31 @@ describe("PromptVersionsSection", () => {
     expect(screen.queryByText("Publishing…")).toBeNull();
     finish();
     await vi.waitFor(() => expect(screen.getByText("Discard")).toBeTruthy());
+  });
+
+  it("explains why a guard prompt needs confirming, then publishes with the confirmation", async () => {
+    mockPromote
+      .mockReturnValueOnce({
+        unwrap: () =>
+          Promise.reject({
+            status: 409,
+            data: { errorCode: "SKILLS_STORE_PROMPT_PINNED", details: { reason: "guard" } },
+          }),
+      })
+      .mockReturnValueOnce({ unwrap: () => Promise.resolve({ version: 3, previousVersion: 2 }) });
+    renderSection();
+    fireEvent.click(screen.getByText("Publish"));
+
+    expect(await screen.findByRole("dialog", { name: "This prompt is a check" })).toBeTruthy();
+    fireEvent.click(screen.getByText("confirm: It's reviewed — publish"));
+
+    await vi.waitFor(() =>
+      expect(mockPromote).toHaveBeenLastCalledWith({
+        id: "p1",
+        version: 3,
+        body: { expectedCurrentVersion: 2, confirmPinnedChange: true },
+      }),
+    );
   });
 
   it("offers Discard only on drafts", () => {

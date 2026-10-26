@@ -232,6 +232,7 @@ class TestFallbackTranscriptionService:
             chat_id=5,
             sample_rate=16000,
             is_linear16_encoded=True,
+            prompts={"ally_ai_audio_gemini_transcription": {"prompt": "live"}},
         )
 
         kwargs = primary.transcribe_audio_from_url.await_args.kwargs
@@ -239,6 +240,9 @@ class TestFallbackTranscriptionService:
         assert kwargs["chat_id"] == 5
         assert kwargs["sample_rate"] == 16000
         assert kwargs["is_linear16_encoded"] is True
+        assert kwargs["prompts"] == {
+            "ally_ai_audio_gemini_transcription": {"prompt": "live"}
+        }
 
     @pytest.mark.asyncio
     async def test_per_provider_timeout_triggers_failover(self):
@@ -266,9 +270,11 @@ class TestFallbackTranscriptionService:
     @pytest.mark.asyncio
     async def test_trail_records_status_code_on_transcription_failed_exception(self):
         # deepgram fails with TranscriptionFailedException and a 500 status code
-        primary = _service(side_effect=TranscriptionFailedException(
-            message="deepgram returned an empty transcript", status_code=500
-        ))
+        primary = _service(
+            side_effect=TranscriptionFailedException(
+                message="deepgram returned an empty transcript", status_code=500
+            )
+        )
         secondary = _service(return_value=(7, "recovered text"))
         fb = FallbackTranscriptionService(
             [("deepgram", primary), ("sarvam", secondary)]

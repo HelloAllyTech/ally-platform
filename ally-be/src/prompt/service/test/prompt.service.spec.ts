@@ -342,13 +342,13 @@ describe('PromptsService', () => {
       });
 
       await service.revertPrompt(mockPromptId, {
-        confirmJudgeRubricChange: true,
+        confirmPinnedChange: true,
       });
 
       expect(versioning.createAndPromote).toHaveBeenCalledWith(
         mockPromptId,
         expect.anything(),
-        { confirmJudgeRubricChange: true },
+        { confirmPinnedChange: true },
       );
     });
 

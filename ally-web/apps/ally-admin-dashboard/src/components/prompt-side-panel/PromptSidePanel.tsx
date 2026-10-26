@@ -39,6 +39,7 @@ import { useCreatePortal } from "@hooks";
 import {
   Prompt,
   LlmProviderName,
+  PinnedPromptReason,
   PromptVersionSummary,
   SubmitBuilderEvalPromptCandidateRequest,
 } from "@types";
@@ -46,6 +47,7 @@ import { getErrorMessage } from "@utils/errorMessage";
 
 import PromptTranslationsSection from "./PromptTranslationsSection";
 import PromptVersionsSection, {
+  pinnedReason,
   skillsStoreErrorCode,
   skillsStoreErrorDetails,
 } from "./PromptVersionsSection";
@@ -482,7 +484,8 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [showRevertConfirmModal, setShowRevertConfirmModal] = useState(false);
-  const [showRevertRubricConfirm, setShowRevertRubricConfirm] = useState(false);
+  // Set when a revert of a pinned prompt needs confirming, with the reason it is pinned.
+  const [revertPinnedReason, setRevertPinnedReason] = useState<PinnedPromptReason | null>(null);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingBlock, setEditingBlock] = useState<Prompt | null>(null);
 
@@ -1220,23 +1223,23 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   }, []);
 
   const runRevert = useCallback(
-    async (confirmJudgeRubricChange: boolean) => {
+    async (confirmPinnedChange: boolean) => {
       if (!selectedPrompt?.id) return;
       try {
         // The server puts the default text live as a new version (translations
         // included); the current version stays in the history.
         await revertPrompt({
           id: selectedPrompt.id,
-          ...(confirmJudgeRubricChange ? { confirmJudgeRubricChange: true } : {}),
+          ...(confirmPinnedChange ? { confirmPinnedChange: true } : {}),
         }).unwrap();
         toast.success(en.simulation.revertPromptSuccess);
         setShowRevertConfirmModal(false);
         onClose();
       } catch (error) {
         setShowRevertConfirmModal(false);
-        // A judge rubric goes live only once its pinned version is confirmed bumped.
-        if (skillsStoreErrorCode(error) === "SKILLS_STORE_JUDGE_RUBRIC_PINNED") {
-          setShowRevertRubricConfirm(true);
+        // A pinned prompt goes live only once its change is confirmed.
+        if (skillsStoreErrorCode(error) === "SKILLS_STORE_PROMPT_PINNED") {
+          setRevertPinnedReason(pinnedReason(error));
           return;
         }
         toast.error(getErrorMessage(error, en.simulation.revertPromptFailed));
@@ -1716,20 +1719,24 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         }}
       />
       <ActionConfirmationPopup
-        isOpen={showRevertRubricConfirm}
-        onClose={() => setShowRevertRubricConfirm(false)}
-        title={en.skillsStore.versions.judgeRubricTitle}
-        description={en.skillsStore.versions.judgeRubricBody}
+        isOpen={revertPinnedReason != null}
+        onClose={() => setRevertPinnedReason(null)}
+        title={revertPinnedReason ? en.skillsStore.versions.pinned[revertPinnedReason].title : ""}
+        description={
+          revertPinnedReason ? en.skillsStore.versions.pinned[revertPinnedReason].body : ""
+        }
         primaryButton={{
-          label: en.skillsStore.versions.judgeRubricConfirm,
+          label: revertPinnedReason
+            ? en.skillsStore.versions.pinned[revertPinnedReason].confirm
+            : "",
           onClick: () => {
-            setShowRevertRubricConfirm(false);
+            setRevertPinnedReason(null);
             void runRevert(true);
           },
         }}
         secondaryButton={{
           label: "Cancel",
-          onClick: () => setShowRevertRubricConfirm(false),
+          onClick: () => setRevertPinnedReason(null),
         }}
       />
       <ActionConfirmationPopup

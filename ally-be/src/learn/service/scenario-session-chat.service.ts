@@ -33,6 +33,15 @@ import {
   StreamEventType,
 } from '../type/scenario-session-chat.type';
 import { LoggerService } from 'src/logger/logger.service';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+import {
+  loadPromptTemplate,
+  promptModelChoice,
+} from 'src/common/util/prompt-template.util';
+import {
+  DEBRIEF_CHAT_SUMMARY_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
 import {
   DEBRIEF_MIN_SUBSTANTIVE_REPLIES,
   DebriefEngagementEvent,
@@ -53,6 +62,8 @@ export class ScenarioSessionChatService {
     private readonly configService: AppConfigService,
     private readonly scenarioSessionMessageRepo: ScenarioSessionMessagesRepository,
     private readonly eventEmitter: EventEmitter2,
+    /** The history summariser's instructions and, when it names one, its model. */
+    private readonly promptSharedService: PromptSharedService,
   ) {}
 
   /**
@@ -398,10 +409,34 @@ export class ScenarioSessionChatService {
       );
       const overflowAsLlm = this.toLlmMessages(overflowMessages);
 
+      const [template, choice] = await Promise.all([
+        loadPromptTemplate(
+          this.promptSharedService,
+          DEBRIEF_CHAT_SUMMARY_SYSTEM.code,
+        ),
+        promptModelChoice(
+          this.promptSharedService,
+          DEBRIEF_CHAT_SUMMARY_SYSTEM.code,
+        ),
+      ]);
+      // The chat's own model and provider unless the summary prompt's row
+      // names a model, mapped onto the providers this chat can run.
+      const summaryTarget = choice.model
+        ? resolveChatProviderModel(
+            choice.provider,
+            choice.model,
+            this.configService.aiChat.model,
+          )
+        : null;
+
       const newSummary = await this.aiChatService.summarizeMessages({
+        systemPrompt: renderPrompt(DEBRIEF_CHAT_SUMMARY_SYSTEM, template, {}),
         existingSummary: chat.summary ?? null,
         messages: overflowAsLlm,
-        llmConfig: { model: this.configService.aiChat.model },
+        llmConfig: {
+          model: summaryTarget?.model ?? this.configService.aiChat.model,
+        },
+        ...(summaryTarget ? { providerType: summaryTarget.providerType } : {}),
         usage: {
           task: LlmTask.DEBRIEF_CHAT_SUMMARY,
           scenarioSessionId: chat.scenarioSessionId,

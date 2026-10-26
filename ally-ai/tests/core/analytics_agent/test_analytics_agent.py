@@ -2,11 +2,11 @@
 validator, the CSV rendering of result rows, and the two prompt builders. The
 Gemini calls themselves are not exercised here."""
 
-from app.core.analytics_agent.agent import (
-    MAX_CELL_CHARS,
-    rows_to_csv,
-    validate_chart,
-)
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from app.core.analytics_agent.agent import MAX_CELL_CHARS, rows_to_csv, validate_chart
 from app.core.analytics_agent.prompt import (
     AgentTurn,
     build_answer_prompt,
@@ -212,3 +212,100 @@ class TestQueryPlanDefaults:
         plan = QueryPlan()
         assert plan.intent == PlanIntent.CLARIFY
         assert plan.sql == ""
+
+
+class TestStorePromptSettings:
+    """The planner and narrator prompts are Skills Store prompts: the store's
+    model and temperature win when set, and the response names the version."""
+
+    PLANNER = "ally_ai_analytics_planner"
+    ANSWER = "ally_ai_analytics_answer"
+
+    def test_without_a_store_model_runs_gemini_from_settings_at_zero(self):
+        from app.core.analytics_agent.agent import _llm_settings
+
+        provider, model, temperature = _llm_settings(
+            "analytics/planner", {self.PLANNER: {"prompt": "x"}}, "gemini-2.5-pro"
+        )
+        assert (provider, model, temperature) == ("gemini", "gemini-2.5-pro", 0)
+
+    def test_the_store_model_and_temperature_win(self):
+        from app.core.analytics_agent.agent import _llm_settings
+
+        prompts = {
+            self.ANSWER: {
+                "prompt": "x",
+                "provider": "anthropic",
+                "model": "claude-haiku-4-5",
+                "temperature": 0.3,
+            }
+        }
+        assert _llm_settings("analytics/answer", prompts, "gemini-2.5-flash") == (
+            "anthropic",
+            "claude-haiku-4-5",
+            0.3,
+        )
+
+    def test_a_store_model_without_a_provider_leaves_the_provider_to_inference(
+        self,
+    ):
+        from app.core.analytics_agent.agent import _llm_settings
+
+        prompts = {self.PLANNER: {"prompt": "x", "model": "gemini-2.5-flash"}}
+        assert _llm_settings("analytics/planner", prompts, "gemini-2.5-pro") == (
+            None,
+            "gemini-2.5-flash",
+            0,
+        )
+
+    def test_store_version_is_reported_only_when_the_store_text_ran(self):
+        from app.core.analytics_agent.agent import store_prompt_version
+
+        path = "analytics/planner"
+        assert store_prompt_version(path, None) is None
+        assert store_prompt_version(path, {}) is None
+        assert store_prompt_version(path, {self.PLANNER: {"prompt": "x"}}) is None
+        assert (
+            store_prompt_version(path, {self.PLANNER: {"prompt": " ", "version": 3}})
+            is None
+        )
+        assert (
+            store_prompt_version(path, {self.PLANNER: {"prompt": "x", "version": 3}})
+            == "v3"
+        )
+
+
+class TestEndpointsCarryTheStorePrompts:
+    @pytest.mark.asyncio
+    async def test_plan_passes_prompts_and_reports_the_store_version(self):
+        from app.api.v1.endpoints import analytics_agent as endpoint
+
+        prompts = {
+            "ally_ai_analytics_planner": {"prompt": "P {question}", "version": 4}
+        }
+        plan_query = AsyncMock(return_value=(QueryPlan(), "gemini-x"))
+        with patch.object(endpoint, "plan_query", plan_query):
+            response = await endpoint.plan(
+                endpoint.PlanRequest(
+                    question="q", schema_catalog="t", today="d", prompts=prompts
+                )
+            )
+        assert plan_query.await_args.kwargs["prompts"] == prompts
+        assert response.prompt_version == "v4"
+
+    @pytest.mark.asyncio
+    async def test_answer_falls_back_to_the_settings_version_without_store_text(
+        self,
+    ):
+        from app.api.v1.endpoints import analytics_agent as endpoint
+        from app.core.config import settings
+
+        compose_answer = AsyncMock(
+            return_value=(AnswerOutput(answer="42."), "gemini-y")
+        )
+        with patch.object(endpoint, "compose_answer", compose_answer):
+            response = await endpoint.answer(
+                endpoint.AnswerRequest(question="q", sql="s")
+            )
+        assert compose_answer.await_args.kwargs["prompts"] is None
+        assert response.prompt_version == settings.ANALYTICS_AGENT.PROMPT_VERSION

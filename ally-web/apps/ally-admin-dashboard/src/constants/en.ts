@@ -8238,10 +8238,23 @@ export const en = {
       rollBackTitle: (version: number) => `Roll back to v${version}?`,
       rollBackBody:
         "This version goes live again with the model settings it was saved with. The current live version stays in the history.",
-      judgeRubricTitle: "This is a judge rubric",
-      judgeRubricBody:
-        "Judge results are labelled by a version pinned in the code. Before publishing a different rubric, bump that judge's PROMPT_VERSION (and the backlog drainer's target) in the same change, or old and new results get mixed under one label. Publish anyway?",
-      judgeRubricConfirm: "I've bumped it — publish",
+      pinned: {
+        judge_rubric: {
+          title: "This is a judge rubric",
+          body: "Judge results are labelled by a version pinned in the code. Before publishing a different rubric, bump that judge's PROMPT_VERSION (and the backlog drainer's target) in the same change, or old and new results get mixed under one label. Publish anyway?",
+          confirm: "I've bumped it — publish",
+        },
+        measuring_instrument: {
+          title: "This prompt scores other work",
+          body: "It scores Builder's eval runs or the roleplay actor's quality. Scores from before and after this change can't be compared. Publish it, then start a new baseline before comparing results.",
+          confirm: "Publish and rebaseline",
+        },
+        guard: {
+          title: "This prompt is a check",
+          body: "It checks another agent's work, or the server relies on the shape of its answer. Loosening it removes that check. Publish only a change someone has reviewed.",
+          confirm: "It's reviewed — publish",
+        },
+      },
       liveChanged: "The live version changed while you were looking. Reload and try again.",
       empty: "No versions yet.",
       translationStatus: (ready: number, total: number) => `Translations ${ready}/${total} ready`,

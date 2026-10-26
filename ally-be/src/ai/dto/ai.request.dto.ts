@@ -164,6 +164,8 @@ export interface ActorGoalEvaluationRequest {
   goals: ActorGoalEvaluationGoal[];
   /** Session language (id or code) for the judge prompt; optional. */
   language?: string;
+  /** The judge's live prompt (`ally_ai_learn_evaluation_actor_goal_system`). */
+  prompts?: Record<string, PromptOverride>;
 }
 
 export type ScenarioEvaluationChatMessage = {

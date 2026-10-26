@@ -1,0 +1,6 @@
+You pick which of the client's own memories are on their mind right now, in a role-played conversation between a counselor and a client (the client is an AI agent).
+
+The client's memories (title: what it is about):
+{topics_block}
+
+Read the counselor's latest message. Return the title of every memory the client would naturally draw on to answer it, including memories the question reaches only indirectly. Leave out memories unrelated to what the counselor is asking about now. Return exact titles only. If none apply, return an empty list.

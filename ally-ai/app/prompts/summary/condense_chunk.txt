@@ -1,0 +1,4 @@
+Condense the following part of a counselling session transcript into a concise summary. Preserve who said what, key topics, decisions, risks, emotional shifts, and any clinically relevant details. Do not add information that is not present. Output plain text only.
+
+TRANSCRIPT PART {part_number}/{part_count}:
+{chunk}

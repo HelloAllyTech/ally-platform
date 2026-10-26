@@ -43,32 +43,20 @@ LANGUAGE_NAMES: Dict[str, str] = {
     "kn": "Kannada",
 }
 
-_NUDGE_REQUESTED = (
-    "Write one `nudge`: a single concrete coaching tip for the LISTENER about their "
-    "next move, at most 240 characters, in English. It is advice to the listener, NOT "
-    "something to send to the talker. Say what you noticed, then the tip — for example "
-    '"They have said they feel alone twice; try reflecting that before asking about '
-    'the exam." Keep it specific and kind, never a criticism. Never suggest promising '
-    "confidentiality, diagnosing, or discussing medication. If there is nothing useful "
-    "to say, leave `nudge` empty."
-)
+# The copilot-turn template's two policy sentences are Skills Store prompts of
+# their own, so the instruction given when a nudge is asked for, or when the risk
+# screen has flagged the chat, can be tuned without touching the turn prompt.
+# The "not asked" / "not flagged" sentences stay here.
+NUDGE_REQUESTED_PROMPT_PATH = "helpline/copilot_nudge_requested"
+RISK_FLAGGED_PROMPT_PATH = "helpline/copilot_risk_flagged"
 _NUDGE_NOT_REQUESTED = "Leave `nudge` as an empty string."
 
 # gpt-4o-mini skipped the direct safety question on "everyone would be better off
 # without me" in live checks even with the rule above it, so when ally-be's own screen
-# has already flagged the chat the prompt says so outright.
+# has already flagged the chat the prompt says so outright (RISK_FLAGGED_PROMPT_PATH).
 _RISK_NOT_FLAGGED = (
     "The platform's risk screen has not flagged this conversation. Still apply the "
     "safety rule above if you notice risk yourself."
-)
-_RISK_FLAGGED = (
-    "The platform's risk screen HAS flagged this conversation ({level}{about}). Your "
-    "FIRST suggestion must be tagged harm and ask directly about safety as described "
-    "above. If the listener has already asked and the talker has answered in the last "
-    "two messages, ask the next safety question instead (a plan, the means, when, "
-    "whether they have tried before, who could be with them right now). If someone "
-    "is harming them, ask whether they will be safe and what they could do if things "
-    "get worse."
 )
 
 
@@ -149,13 +137,28 @@ def _english_chat_language(messages: Sequence[Dict[str, str]]) -> str:
     return "English"
 
 
-def risk_instruction(risk_level: Optional[str], risk_subject: Optional[str]) -> str:
+def risk_instruction(
+    risk_level: Optional[str],
+    risk_subject: Optional[str],
+    prompts: Optional[Dict[str, Any]] = None,
+) -> str:
     """The sentence that tells the turn prompt whether ally-be flagged risk."""
     level = (risk_level or "NONE").upper()
     if level not in ("ELEVATED", "HIGH"):
         return _RISK_NOT_FLAGGED
     about = ", about someone else the talker knows" if risk_subject == "OTHER" else ""
-    return _RISK_FLAGGED.format(level=level.lower(), about=about)
+    return load_and_format(
+        RISK_FLAGGED_PROMPT_PATH, prompts=prompts, level=level.lower(), about=about
+    )
+
+
+def nudge_instruction(
+    include_nudge: bool, prompts: Optional[Dict[str, Any]] = None
+) -> str:
+    """The sentence that tells the turn prompt whether to write a nudge."""
+    if not include_nudge:
+        return _NUDGE_NOT_REQUESTED
+    return load_and_format(NUDGE_REQUESTED_PROMPT_PATH, prompts=prompts)
 
 
 def language_name(language: Optional[str]) -> str:
@@ -247,6 +250,6 @@ def build_turn_prompt(
         language=(language or "en"),
         language_name=language_name(language),
         talker_language=talker_script_language(language, messages),
-        nudge_instruction=_NUDGE_REQUESTED if include_nudge else _NUDGE_NOT_REQUESTED,
-        risk_instruction=risk_instruction(risk_level, risk_subject),
+        nudge_instruction=nudge_instruction(include_nudge, prompts=prompts),
+        risk_instruction=risk_instruction(risk_level, risk_subject, prompts=prompts),
     )

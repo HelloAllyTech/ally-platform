@@ -19,6 +19,8 @@ import io
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.analytics_agent.prompt import (
+    ANSWER_PROMPT_PATH,
+    PLAN_PROMPT_PATH,
     AgentTurn,
     build_answer_prompt,
     build_plan_prompt,
@@ -31,6 +33,7 @@ from app.core.analytics_agent.schemas import (
 )
 from app.core.config import settings
 from app.core.llm_usage.tasks import LLMTask
+from app.prompts.resolver import get_backend_llm_overrides
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -59,6 +62,44 @@ def rows_to_csv(columns: List[str], rows: List[Dict[str, Any]]) -> str:
     return buf.getvalue().strip()
 
 
+def _llm_settings(
+    internal_path: str,
+    prompts: Optional[Dict[str, Any]],
+    default_model: str,
+) -> Tuple[Optional[str], str, float]:
+    """(provider, model, temperature) for one of the agent's calls.
+
+    The Skills Store's choice for the prompt wins; without one, Gemini on the
+    model from settings at temperature 0. A store model with no provider leaves
+    the provider to be inferred from the model id.
+    """
+    from app.core.llm.dispatch import PROVIDER_GEMINI
+
+    provider, model, temperature = get_backend_llm_overrides(internal_path, prompts)
+    if not provider and not model:
+        provider = PROVIDER_GEMINI
+    # Zero temperature unless the store says otherwise: the same question over
+    # the same schema should produce the same query, or a reader comparing two
+    # answers a minute apart cannot tell a data change from a sampling wobble.
+    return provider, model or default_model, 0 if temperature is None else temperature
+
+
+def store_prompt_version(
+    internal_path: str, prompts: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    """The Skills Store version of the prompt this request rendered, as "v<n>",
+    or None when the request carried no store text for it (the local default
+    ran) or no version number."""
+    entry = (prompts or {}).get(f"ally_ai_{internal_path.replace('/', '_')}")
+    if not isinstance(entry, dict):
+        return None
+    text = entry.get("prompt")
+    version = entry.get("version")
+    if not isinstance(text, str) or not text.strip() or version in (None, ""):
+        return None
+    return f"v{version}"
+
+
 def _format_cell(value: Any) -> str:
     if value is None:
         # Distinguishable from an empty string: a NULL average is "not measured",
@@ -74,6 +115,7 @@ async def plan_query(
     today: str,
     row_limit: int,
     history: Optional[List[AgentTurn]] = None,
+    prompts: Optional[Dict[str, Any]] = None,
 ) -> Tuple[QueryPlan, str]:
     """Step 1: turn the question into one read-only SELECT (or ask/refuse)."""
     prompt = build_plan_prompt(
@@ -82,20 +124,21 @@ async def plan_query(
         today=today,
         row_limit=row_limit,
         history=history,
+        prompts=prompts,
     )
 
-    from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
+    from app.core.llm.dispatch import generate_structured
 
-    # Zero temperature: the same question over the same schema should produce
-    # the same query, or a reader comparing two answers a minute apart cannot
-    # tell a data change from a sampling wobble.
+    provider, model, temperature = _llm_settings(
+        PLAN_PROMPT_PATH, prompts, settings.ANALYTICS_AGENT.PLANNER_MODEL
+    )
     plan, meta = await generate_structured(
         schema=QueryPlan,
         prompt=prompt,
         task=LLMTask.ANALYTICS_AGENT_PLAN.value,
-        provider=PROVIDER_GEMINI,
-        model=settings.ANALYTICS_AGENT.PLANNER_MODEL,
-        temperature=0,
+        provider=provider,
+        model=model,
+        temperature=temperature,
         max_tokens=None,
     )
     if meta.get("fell_back_from"):
@@ -132,6 +175,7 @@ async def compose_answer(
     row_count: int,
     truncated: bool,
     history: Optional[List[AgentTurn]] = None,
+    prompts: Optional[Dict[str, Any]] = None,
 ) -> Tuple[AnswerOutput, str]:
     """Step 2: turn the result set into prose, caveats and a chart spec."""
     prompt = build_answer_prompt(
@@ -142,17 +186,21 @@ async def compose_answer(
         row_count=row_count,
         truncated=truncated,
         history=history,
+        prompts=prompts,
     )
 
-    from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
+    from app.core.llm.dispatch import generate_structured
 
+    provider, model, temperature = _llm_settings(
+        ANSWER_PROMPT_PATH, prompts, settings.ANALYTICS_AGENT.ANSWER_MODEL
+    )
     output, meta = await generate_structured(
         schema=AnswerOutput,
         prompt=prompt,
         task=LLMTask.ANALYTICS_AGENT_ANSWER.value,
-        provider=PROVIDER_GEMINI,
-        model=settings.ANALYTICS_AGENT.ANSWER_MODEL,
-        temperature=0,
+        provider=provider,
+        model=model,
+        temperature=temperature,
         max_tokens=None,
     )
     if meta.get("fell_back_from"):

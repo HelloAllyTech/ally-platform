@@ -117,14 +117,17 @@ const SCENARIO_EVALUATION_PROMPT_CODE = 'ally_ai_scenario_scenario_evaluation';
 const NUDGE_PROMPT_CODES = ['ally_ai_nudge_nudge'] as const;
 
 /**
- * The prompts ally-ai's transcription pipeline renders (diarization, the
- * summary or dictation summary, counselor analysis). Sent on the queue message,
- * which has a size cap, so only these.
+ * The prompts ally-ai's transcription pipeline renders (Gemini transcription,
+ * diarization, the summary or dictation summary and its condense step for long
+ * transcripts, counselor analysis). Sent on the queue message, which has a size
+ * cap, so only these. Must match ally-ai's PIPELINE_PROMPT_CODES.
  */
 export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
+  'ally_ai_audio_gemini_transcription',
   'ally_ai_audio_diarization',
   'ally_ai_summary_summary',
   'ally_ai_summary_dictation_summary',
+  'ally_ai_summary_condense_chunk',
   'ally_ai_analysis_counselor_analysis',
 ] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =

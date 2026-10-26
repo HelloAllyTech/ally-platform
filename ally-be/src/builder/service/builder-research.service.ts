@@ -5,8 +5,15 @@ import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
   AgentLlmProviderFactory,
+  normaliseAgentProvider,
   providerForModel,
 } from 'src/llm-agent/service/agent-llm.factory';
+import {
+  loadPromptTemplate,
+  promptModelChoice,
+} from 'src/common/util/prompt-template.util';
+import { BUILDER_RESEARCH_SYSTEM, renderPrompt } from 'src/prompt/contracts';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { AgentTurnResult } from 'src/llm-agent/type/agent-llm.type';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPrdService } from './builder-prd.service';
@@ -47,6 +54,8 @@ export class BuilderResearchService {
     private readonly toolsService: BuilderInterviewToolsService,
     private readonly llmUsage: LlmUsageService,
     private readonly agentLlmFactory: AgentLlmProviderFactory,
+    /** The pass's instructions and, when it names one, its model. */
+    private readonly prompts: PromptSharedService,
     @Optional()
     private readonly platformContext?: BuilderPlatformContextService,
   ) {}
@@ -54,16 +63,30 @@ export class BuilderResearchService {
   /**
    * Which model runs this pass.
    *
-   * Research is an unattended background pass, so unlike the interview there
-   * is no prompt row to read a preference from — the configured tier is the
-   * whole configuration, and the provider follows from the model id.
+   * The research prompt's row wins when it names a model, the same knob the
+   * interviewer uses; otherwise the configured tier, with the provider
+   * following from the model id.
    *
    * The INTERVIEW tier, not the mechanical one: this pass drives the same
    * tool belt the interview does and writes to the same PRD, and quietly
    * moving it to a cheaper model while migrating the client would have been a
    * behaviour change wearing a refactor's clothes.
    */
-  private resolveModel(): { provider: string; model: string } {
+  private async resolveModel(): Promise<{ provider: string; model: string }> {
+    const choice = await promptModelChoice(
+      this.prompts,
+      BUILDER_RESEARCH_SYSTEM.code,
+    );
+    if (choice.model) {
+      const chosen =
+        normaliseAgentProvider(choice.provider) ??
+        providerForModel(choice.model);
+      if (chosen) return { provider: chosen, model: choice.model };
+      this.logger.warn(
+        `Builder research prompt names model "${choice.model}" with no ` +
+          'provider this service can run; falling back to config.',
+      );
+    }
     const model = this.configService.builder.interviewModel;
     const provider = providerForModel(model);
     if (!provider) {
@@ -102,9 +125,10 @@ export class BuilderResearchService {
       userId,
       session.title,
     );
-    const { provider: providerName, model } = this.resolveModel();
+    const { provider: providerName, model } = await this.resolveModel();
     const provider = this.agentLlmFactory.create(providerName, model);
-    const [context, platformRules, platformMap] = await Promise.all([
+    const [template, context, platformRules, platformMap] = await Promise.all([
+      loadPromptTemplate(this.prompts, BUILDER_RESEARCH_SYSTEM.code),
       this.knowledgeService.buildContextBlock(session.repos ?? undefined),
       this.knowledgeService.platformRules(),
       this.platformContext?.render() ?? Promise.resolve(''),
@@ -120,6 +144,8 @@ export class BuilderResearchService {
     const messages: any[] = [
       { role: 'user', content: this.openingInstruction(mode, doc.draft) },
     ];
+
+    const instructions = renderPrompt(BUILDER_RESEARCH_SYSTEM, template, {});
 
     let iterations = 0;
     let patched = false;
@@ -141,7 +167,7 @@ export class BuilderResearchService {
         system: [
           // Rules beside the instructions: a research pass patches the
           // technical plan, and is held to the same platform as anything else.
-          { text: `${RESEARCH_SYSTEM_PROMPT}\n\n${platformRules}` },
+          { text: `${instructions}\n\n${platformRules}` },
           { text: context, cache: true },
           ...(platformMap.trim() ? [{ text: platformMap, cache: true }] : []),
         ],
@@ -256,41 +282,3 @@ export class BuilderResearchService {
     ].join('\n');
   }
 }
-
-const RESEARCH_SYSTEM_PROMPT = `
-You are Builder's research pass. You read the Ally codebase and write what you
-find into a PRD, using the same tools the interview uses.
-
-Nobody is watching this run. That changes two things: you can afford to read
-properly rather than guessing, and you must not ask questions — there is no one
-to answer, and a question you asked would simply be lost.
-
-## How to work
-
-1. **Read the repo knowledge packs first** (in your context), then use
-   \`github_repo_tree\`, \`github_search_code\` and \`github_read_file\` to
-   confirm the specifics. The packs tell you where to look; only the code tells
-   you what is actually there.
-2. **Check the product library** with \`stacks_search\` when the PRD involves a
-   product judgement — a threshold, a label, an empty or failure state.
-3. **Write with \`update_prd\`** as you go, rather than saving it all for the
-   end. A pass that dies halfway should leave the half it finished.
-
-## What makes this useful
-
-- **Name real things.** "Add a column to \`scenarios.metadata\`" is useful;
-  "update the data model" is not. Every path, symbol and command you write
-  should be one you actually saw.
-- **Say what else breaks.** The most valuable thing you can contribute is the
-  list of existing callers that will need to change — the part an implementer
-  working file by file is worst placed to notice.
-- **Mark what you assumed.** Anything you could not confirm in the code goes in
-  \`assumptions\` as **unconfirmed**. A guess written as a fact is worse than no
-  guess at all, because the next reader cannot tell the difference.
-- **Do not pad.** A short technical plan that is entirely true beats a thorough
-  one that is partly invented. If you could not work something out, say so in
-  the plan.
-
-When there is nothing left worth reading, stop and say briefly what you wrote
-and what you could not determine.
-`.trim();

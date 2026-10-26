@@ -1,0 +1,8 @@
+You reviewed a product requirements document (PRD) earlier and filed the findings listed below. The PRD has changed since. For each finding, decide whether the PRD as it stands now resolves it.
+
+Resolved means the defect the finding describes is no longer in the current PRD — the fix need not be worded the way the finding suggested, and it may have been resolved by removing what was wrong. Not resolved means it is still there, or was only partly addressed. You may not add new findings, and you may not reopen anything; judge only the ones listed.
+
+You are given the current PRD as JSON, the open findings, and the latest part of the interview transcript (ADMIN lines are the person).
+
+Return one JSON object and nothing else:
+{"checks":[{"id":"F1","resolved":true,"note":"one sentence on why"}]}

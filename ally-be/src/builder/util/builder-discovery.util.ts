@@ -1,6 +1,13 @@
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
-import { BUILDER_DISCOVERY_PLAN_SYSTEM_PROMPT } from '../constants/builder-discovery-prompt';
+import {
+  loadPromptTemplate,
+  PromptLookup,
+} from 'src/common/util/prompt-template.util';
+import {
+  BUILDER_DISCOVERY_PLAN_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
 import { BUILDER_AI_TASKS } from '../constants/builder.constants';
 import { BUILDER_REPO_NAMES } from '../constants/builder-repos.constants';
 import {
@@ -173,6 +180,11 @@ export async function planDiscovery(
     title?: string | null;
     opening: string;
     handoff?: string | null;
+    /**
+     * Where the planner's instructions are read (`builder_discovery_plan_system`).
+     * Absent or unreadable, the shipped default runs.
+     */
+    prompts?: PromptLookup | null;
   },
   onError?: (message: string) => void,
 ): Promise<{
@@ -180,10 +192,15 @@ export async function planDiscovery(
   planned: 'model' | 'fallback';
 }> {
   try {
+    const template = await loadPromptTemplate(
+      input.prompts,
+      BUILDER_DISCOVERY_PLAN_SYSTEM.code,
+    );
     const result = await llmCompletion.complete({
       taskId: BUILDER_AI_TASKS.DISCOVERY_PLAN,
       task: LlmTask.BUILDER_DISCOVERY_PLAN,
-      system: BUILDER_DISCOVERY_PLAN_SYSTEM_PROMPT,
+      promptCode: BUILDER_DISCOVERY_PLAN_SYSTEM.code,
+      system: renderPrompt(BUILDER_DISCOVERY_PLAN_SYSTEM, template, {}),
       jsonMode: true,
       maxTokens: PLAN_MAX_TOKENS,
       usageMetadata: { builderSessionId: input.sessionId },

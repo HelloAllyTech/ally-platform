@@ -76,6 +76,7 @@ describe('AgentMemoryCuratorService', () => {
       memoryService as never,
       llm as never,
       redis as never,
+      null as never,
     );
   });
 

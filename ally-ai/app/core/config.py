@@ -248,8 +248,10 @@ class AnalyticsAgentSettings(BaseModel):
 
     PLANNER_MODEL: str = Field("gemini-2.5-pro")
     ANSWER_MODEL: str = Field("gemini-2.5-flash")
-    # Bump when either prompt changes in a way that could move answers; echoed
-    # back to ally-be so a surprising answer can be traced to its instructions.
+    # Echoed back to ally-be so a surprising answer can be traced to its
+    # instructions. The prompts are Skills Store prompts now, and each response
+    # reports the store version that ran ("v<n>"); this is reported only when a
+    # request carried no store text for the prompt (the local default ran).
     PROMPT_VERSION: str = Field("v1")
 
 

@@ -44,13 +44,16 @@ Revert — goes through `PromptVersioningService`:
   moved, and `409 SKILLS_STORE_TRANSLATIONS_PENDING` while any translation of
   the draft is still running. A **failed** translation does not block: the
   result lists it in `failedLanguages`, that language keeps serving English,
-  and it is retried from the editor. Judge rubrics need
-  `confirmJudgeRubricChange` (`409 SKILLS_STORE_JUDGE_RUBRIC_PINNED`): a
-  judge's results are labelled by a version pinned in code, so bump it in the
-  same change. Putting an earlier version live again needs `rollback: true`.
-- **Retention** never deletes the live version or any draft; it keeps the 20
-  published versions below the live one. Sessions record each version's
-  content hash, so the text that ran stays identifiable.
+  and it is retried from the editor. **Pinned prompts** need
+  `confirmPinnedChange` (`409 SKILLS_STORE_PROMPT_PINNED`, `details.reason`):
+  judge rubrics (results are labelled by a version pinned in code, so bump it
+  in the same change), Builder's eval admin and judge (start a new baseline
+  run), and guards such as Builder's PRD reviewer (have the change reviewed).
+  The list is `src/prompt/constants/pinned-prompts.constants.ts`. Putting an
+  earlier version live again needs `rollback: true`.
+- **Every version is kept.** Only a draft that was never live can be
+  discarded. Sessions record each version's content hash, so the text that
+  ran stays identifiable.
 
 ## API overview
 
@@ -67,11 +70,11 @@ Base path: **`/api/v1/prompts`** (admin session) and **`/api/v1/skills-store`**
 | PUT | `/prompts/:id` | Bearer (EDIT_PROMPT) | **Metadata only**: name, description, category, visibility, translation opt-in. Text, model settings or code that differ from live → `400 SKILLS_STORE_USE_VERSIONS`. |
 | GET | `/prompts/:id/versions` | Bearer (VIEW_PROMPT) | Versions newest first: `live`, `candidate` (with translation readiness) and `history`. |
 | POST | `/prompts/:id/versions` | Bearer (EDIT_PROMPT) | Save text + settings as a draft: `{prompt, baseVersion, provider?, model?, temperature?, note?}`. |
-| POST | `/prompts/:id/versions/:version/promote` | Bearer (EDIT_PROMPT) | Publish: `{expectedCurrentVersion, rollback?, confirmJudgeRubricChange?}` → `{version, previousVersion, failedLanguages}`. |
+| POST | `/prompts/:id/versions/:version/promote` | Bearer (EDIT_PROMPT) | Publish: `{expectedCurrentVersion, rollback?, confirmPinnedChange?}` → `{version, previousVersion, failedLanguages}`. |
 | POST | `/prompts/:id/versions/:version/translations` | Bearer (EDIT_PROMPT) | (Re)translate a version, retrying failed languages. |
 | DELETE | `/prompts/:id/versions/:version` | Bearer (EDIT_PROMPT) | Discard a draft (never live) and its translations. `409 SKILLS_STORE_NOT_A_CANDIDATE` for a version that has been live: it stays in the history. |
 | GET | `/prompts/:id/translations?version=N` | Bearer (VIEW_PROMPT) | A version's translations (default: live). |
-| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the prompt's stored default live as a new version (its production text at the Skills Store cutover, or its first text if created since), translations included. Body `{confirmJudgeRubricChange?}` for judge rubrics. A refused revert leaves no draft behind. |
+| POST | `/prompts/:id/revert` | Bearer (EDIT_PROMPT) | Put the prompt's stored default live as a new version (its production text at the Skills Store cutover, or its first text if created since), translations included. Body `{confirmPinnedChange?}` for judge rubrics. A refused revert leaves no draft behind. |
 | GET | `/prompts/:id/usage` | Bearer (VIEW_PROMPT) | Scenarios referencing this prompt. |
 | GET | `/skills-store/export?codes=&candidates=true` | Skills Store key (pull) | Live (and newest/draft) versions with ready translations: what `prompts pull` reads. |
 | GET | `/skills-store/prompts/:code` | Skills Store key (pull) | One prompt's versions. |

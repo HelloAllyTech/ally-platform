@@ -136,7 +136,7 @@ export class PromptsController {
       dto.expectedCurrentVersion,
       {
         allowRollback: dto.rollback === true,
-        confirmJudgeRubricChange: dto.confirmJudgeRubricChange === true,
+        confirmPinnedChange: dto.confirmPinnedChange === true,
       },
     );
   }
@@ -348,7 +348,7 @@ export class PromptsController {
     @Body() dto: RevertPromptRequestDto = {},
   ): Promise<boolean> {
     return this.promptsService.revertPrompt(id, {
-      confirmJudgeRubricChange: dto?.confirmJudgeRubricChange === true,
+      confirmPinnedChange: dto?.confirmPinnedChange === true,
     });
   }
 

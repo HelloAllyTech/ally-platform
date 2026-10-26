@@ -65,10 +65,14 @@ import {
   DEFAULT_OPENAI_SESSION_EVENT_TRANSLATION_PROMPT_TEMPLATE,
   DEFAULT_OPENAI_TEXT_TRANSLATION_PROMPT_TEMPLATE,
   DEFAULT_OPENAI_TOOLTIP_TRANSLATION_PROMPT_TEMPLATE,
-  DEFAULT_OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_TEMPLATE,
   OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_CODE,
 } from 'src/common/constants/openai-translations.constants';
 import { toPromptCode } from 'src/prompt/util/prompt-code.util';
+import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
+import {
+  OPENAI_TRACK_CONTENT_TRANSLATION,
+  renderPrompt,
+} from 'src/prompt/contracts';
 import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmProviderFactory } from 'src/ai-chat/provider/llm-provider.factory';
@@ -744,11 +748,20 @@ IMPORTANT:
       LANGUAGE_NAME_MAP[normalizedCode] ?? targetLanguageCode.trim();
     const toneGuidance = LANGUAGE_TONE_GUIDELINES[normalizedCode] ?? '';
 
-    const promptCode =
-      options?.promptCode ?? OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_CODE;
+    // A caller's own prompt code when it names one; the course-content prompt
+    // otherwise, and whenever that code has no text. The course-content prompt
+    // falls back to its shipped default when the store can't be read, and
+    // throws when it has no text at all — this path never translates on an
+    // empty prompt.
+    const custom = options?.promptCode
+      ? await this.promptSharedService.getPromptByCode(options.promptCode)
+      : null;
     const promptTemplate =
-      (await this.promptSharedService.getPromptByCode(promptCode)) ??
-      DEFAULT_OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_TEMPLATE;
+      custom ??
+      (await loadPromptTemplate(
+        this.promptSharedService,
+        OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_CODE,
+      ));
 
     const batches = this.batchKeyedEntries(
       entries,
@@ -838,13 +851,17 @@ IMPORTANT:
         };
       });
 
-      const prompt = this.renderTemplate(context.promptTemplate, {
-        languageName: context.languageName,
-        toneGuidance: context.toneGuidance,
-        glossary: context.glossary ?? '',
-        blankToken: '{{blankId}}',
-        inputJson: JSON.stringify(payload, null, 2),
-      });
+      const prompt = renderPrompt(
+        OPENAI_TRACK_CONTENT_TRANSLATION,
+        context.promptTemplate,
+        {
+          languageName: context.languageName,
+          toneGuidance: context.toneGuidance,
+          glossary: context.glossary ?? '',
+          blankToken: '{{blankId}}',
+          inputJson: JSON.stringify(payload, null, 2),
+        },
+      );
 
       let parsed: Record<string, unknown>;
       try {

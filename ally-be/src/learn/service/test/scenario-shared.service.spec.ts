@@ -2237,6 +2237,27 @@ describe('ScenarioSharedService', () => {
       });
     });
 
+    // The actor judge's prompt reaches it in the judge's own request; in room
+    // metadata it would only grow the dispatch payload.
+    it('leaves offline-only evaluation prompts out of the session', async () => {
+      promptSharedService.getPromptsByOptions.mockResolvedValue([
+        {
+          promptCode: 'ally_ai_learn_evaluation_actor_goal_system',
+          prompt: 'Judge text',
+        },
+        {
+          promptCode: 'ally_ai_learn_retrieval_memory_selector_system',
+          prompt: 'Selector text',
+        },
+      ]);
+
+      const result = await (service as any).getPromptsForScenarioSession();
+
+      expect(Object.keys(result)).toEqual([
+        'ally_ai_learn_retrieval_memory_selector_system',
+      ]);
+    });
+
     it('should correctly overwrite duplicate promptCodes with the last value', async () => {
       const mockPrompts = [
         {

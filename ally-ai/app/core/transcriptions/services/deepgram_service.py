@@ -5,7 +5,7 @@ Uses Deepgram Nova-3 for transcription and OpenAI GPT for summarization.
 
 import asyncio
 import os
-from typing import Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from deepgram import BufferSource, DeepgramClient, PrerecordedOptions
 from deepgram.clients.listen.v1.rest import Results
@@ -49,6 +49,8 @@ class DeepgramTranscriptionService:
         chat_id: int,
         sample_rate: int = 8000,
         is_linear16_encoded: bool = False,
+        # Shared interface: this provider sends no prompt, so it ignores them.
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Tuple[int, str]:
         """
         Transcribe audio from URL and generate a summary.

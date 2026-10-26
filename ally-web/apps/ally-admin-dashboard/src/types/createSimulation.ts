@@ -825,7 +825,7 @@ export interface CreatePromptVersionResponse {
 export interface PromotePromptVersionRequest {
   expectedCurrentVersion: number | null;
   rollback?: boolean;
-  confirmJudgeRubricChange?: boolean;
+  confirmPinnedChange?: boolean;
 }
 
 export interface PromotePromptVersionResponse {
@@ -839,6 +839,9 @@ export interface PromotePromptVersionResponse {
  * `details` (the repo's ErrorCode convention: `{statusCode, message, error,
  * errorCode, details}`).
  */
+/** Why a prompt's live version changes only with a confirmation (ally-be pinned-prompts.constants). */
+export type PinnedPromptReason = "judge_rubric" | "measuring_instrument" | "guard";
+
 export type SkillsStoreErrorCode =
   /** details: { latestVersion, currentVersion } */
   | "SKILLS_STORE_STALE_BASE"
@@ -846,7 +849,8 @@ export type SkillsStoreErrorCode =
   | "SKILLS_STORE_CONTRACT_VIOLATION"
   /** details: { translatable, ready, failed, pending } */
   | "SKILLS_STORE_TRANSLATIONS_PENDING"
-  | "SKILLS_STORE_JUDGE_RUBRIC_PINNED"
+  /** details: { reason } — see PinnedPromptReason */
+  | "SKILLS_STORE_PROMPT_PINNED"
   | "SKILLS_STORE_NOT_A_CANDIDATE"
   /** details: { fields } */
   | "SKILLS_STORE_USE_VERSIONS";

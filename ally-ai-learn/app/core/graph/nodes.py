@@ -2359,6 +2359,7 @@ async def retrieve_knowledge(
                             knowledge_map,
                             glossary_hints=glossary_hints or None,
                             room_id=_usage_room_id,
+                            prompt_data=scenario.prompt_data,
                         ),
                         timeout=8.0,
                     )
@@ -2407,6 +2408,7 @@ async def retrieve_knowledge(
                 knowledge_map,
                 glossary_hints=glossary_hints or None,
                 room_id=get_room_id(),
+                prompt_data=scenario.prompt_data,
             ),
             timeout=8.0,
         )

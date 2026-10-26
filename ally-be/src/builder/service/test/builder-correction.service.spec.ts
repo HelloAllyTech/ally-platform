@@ -124,6 +124,7 @@ describe('BuilderCorrectionService', () => {
         { complete } as any,
         knowledgeService as any,
         fixtureService as any,
+        null as any,
       );
       return { service, inserted, complete, knowledgeService, fixtureService };
     };
@@ -283,6 +284,7 @@ describe('BuilderCorrectionService', () => {
       {} as any,
       {} as any,
       {} as any,
+      null as any,
     );
 
     const { summary, corrections } = await service.list({});

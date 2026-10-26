@@ -16,6 +16,7 @@ import { ScenarioSessionDetailsRepository } from '../repository/scenario-session
 import { ScenarioSessionDetails } from '../entity/scenario-session-details.entity';
 import {
   ALLY_AI_LEARN_PROMPT_PREFIX,
+  OFFLINE_ONLY_LEARN_PROMPT_PREFIX,
   SCENARIO_SESSION_TRANSLATABLE_FIELDS,
   STT_LLM_PROVIDER_CONFIG,
   SKILL_ICONS_S3_PREFIX,
@@ -1324,6 +1325,12 @@ export class ScenarioSharedService {
       >
     >((acc, prompt) => {
       const content = prompt.prompt?.trim();
+      // Offline judges get their prompt with their own request; shipping it in
+      // room metadata only grows the dispatch payload (which has blown the
+      // agent's join timeout before).
+      if (prompt.promptCode.startsWith(OFFLINE_ONLY_LEARN_PROMPT_PREFIX)) {
+        return acc;
+      }
       if (content) {
         acc[prompt.promptCode] = {
           prompt: content,

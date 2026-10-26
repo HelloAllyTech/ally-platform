@@ -882,11 +882,11 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
     /**
      * Revert prompt to codebase default
      */
-    revertPrompt: builder.mutation<boolean, { id: string; confirmJudgeRubricChange?: boolean }>({
-      query: ({ id, confirmJudgeRubricChange }) => ({
+    revertPrompt: builder.mutation<boolean, { id: string; confirmPinnedChange?: boolean }>({
+      query: ({ id, confirmPinnedChange }) => ({
         url: ApiEndpoints.SIMULATION_STUDIO.REVERT_PROMPT(id),
         method: HttpMethod.POST,
-        body: confirmJudgeRubricChange ? { confirmJudgeRubricChange: true } : {},
+        body: confirmPinnedChange ? { confirmPinnedChange: true } : {},
       }),
       invalidatesTags: [TAG_TYPES.PROMPTS],
     }),

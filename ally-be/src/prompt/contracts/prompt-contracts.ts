@@ -232,6 +232,190 @@ export const BUILDER_PLATFORM_RULES = definePrompt(
   },
 );
 
+/** src/prompts/builder/correction_system.txt */
+export const BUILDER_CORRECTION_SYSTEM = definePrompt(
+  'builder_correction_system',
+  {},
+  {
+    name: 'Builder — Correction Classifier',
+    description:
+      "Reads one exchange from a Builder interview and decides whether the admin's reply corrected Builder, and of what kind (missing capability, stale doc, platform scope, over-asking), drafting the lesson, reuse line, doc fix and eval checklist line it should teach. Runs daily over recent admin replies.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/builder/discovery_plan_system.txt */
+export const BUILDER_DISCOVERY_PLAN_SYSTEM = definePrompt(
+  'builder_discovery_plan_system',
+  {},
+  {
+    name: 'Builder — Discovery Planner',
+    description:
+      "Plans the discovery sweep Builder runs before it first replies to an admin: 8–12 one-to-three-word queries over the platform map, docs, wiki, code search and the AI task registry. The server runs the queries; a failure falls back to queries from the request's own words.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/builder/epic_system.txt */
+export const BUILDER_EPIC_SYSTEM = definePrompt(
+  'builder_epic_system',
+  {},
+  {
+    name: 'Builder — Milestone Planner',
+    description:
+      'Splits a large PRD into an ordered series of milestones, each mergeable on its own, with every requirement in exactly one. Answers with a JSON array; the assignment is validated in code.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/eval_admin_system.txt */
+export const BUILDER_EVAL_ADMIN_SYSTEM = definePrompt(
+  'builder_eval_admin_system',
+  {},
+  {
+    name: 'Builder Eval — Simulated Admin',
+    description:
+      "Plays the admin in a Builder replay eval: answers the sandboxed interviewer from the fixture's recorded admin words and ground-truth checklist, and corrects it wherever the truth contradicts it. Part of the eval's measuring instrument.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/builder/eval_judge_system.txt */
+export const BUILDER_EVAL_JUDGE_SYSTEM = definePrompt(
+  'builder_eval_judge_system',
+  {},
+  {
+    name: 'Builder Eval — Checklist Judge',
+    description:
+      "Scores a Builder replay's final PRD against the fixture's ground-truth checklist, item by item. Scores only; the eval's deterministic gates decide a pass. Part of the eval's measuring instrument.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/builder/exemplar_rank_system.txt */
+export const BUILDER_EXEMPLAR_RANK_SYSTEM = definePrompt(
+  'builder_exemplar_rank_system',
+  {},
+  {
+    name: 'Builder — Past-Build Ranker',
+    description:
+      'Picks which past builds are worth showing an agent starting a new one, by overlap of the work rather than of the words. Answers with a JSON array of ids; a failure falls back to the most recent merged builds.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/exemplar_summary_system.txt */
+export const BUILDER_EXEMPLAR_SUMMARY_SYSTEM = definePrompt(
+  'builder_exemplar_summary_system',
+  {},
+  {
+    name: 'Builder — Past-Build Note',
+    description:
+      'Writes the 120–150 word note about a finished build that later builds are shown: what was asked, the approach, and what happened after it shipped.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/builder/interview_summary_system.txt */
+export const BUILDER_INTERVIEW_SUMMARY_SYSTEM = definePrompt(
+  'builder_interview_summary_system',
+  {},
+  {
+    name: 'Builder — Interview Summariser',
+    description:
+      'Compresses the oldest turns of a long Builder interview into notes the interviewer keeps instead of the full transcript: decisions and reasons, rejected options, stated constraints, open items and unrepaired failures.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/builder/lesson_curator_system.txt */
+export const BUILDER_LESSON_CURATOR_SYSTEM = definePrompt(
+  'builder_lesson_curator_system',
+  {},
+  {
+    name: 'Builder — Lesson Curator',
+    description:
+      "Folds the lessons a finished build wrote into Builder's capped lesson set, one AGREE / EDIT / ADD / REMOVE operation per candidate. Answers with a JSON array of operations; every guardrail is enforced in code.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/outcome_system.txt */
+export const BUILDER_OUTCOME_SYSTEM = definePrompt(
+  'builder_outcome_system',
+  {},
+  {
+    name: 'Builder — Outcome Categoriser',
+    description:
+      'Reads what happened to a finished change — merge, CI, review comments — and returns rework tags, up to three reusable lessons, and the existing lessons that failed to prevent the problem.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/prd_recheck_system.txt */
+export const BUILDER_PRD_RECHECK_SYSTEM = definePrompt(
+  'builder_prd_recheck_system',
+  {},
+  {
+    name: 'Builder — PRD Recheck',
+    description:
+      "The cold PRD reviewer's later passes: judges only the open findings against the changed PRD and can close one but never add one, so the loop converges.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/builder/prd_review_system.txt */
+export const BUILDER_PRD_REVIEW_SYSTEM = definePrompt(
+  'builder_prd_review_system',
+  {
+    // BUILDER_PRD_REVIEW_SECTION_KEYS joined with '|': the keys the parser accepts.
+    sectionKeys: 'optional',
+    // BUILDER_PRD_REVIEW_MAX_FINDINGS: the parser keeps no more than this.
+    maxFindings: 'optional',
+  },
+  {
+    name: 'Builder — PRD Review',
+    description:
+      'The cold reviewer that reads a PRD when it first reads ready, against the evidence log, the transcript and the reusable-systems map, and files contradictions, unsupported claims, unapplied corrections, missed reuse and a missing success metric. Findings block readiness until fixed or dismissed.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/builder/research_system.txt */
+export const BUILDER_RESEARCH_SYSTEM = definePrompt(
+  'builder_research_system',
+  {},
+  {
+    name: 'Builder — Research Pass',
+    description:
+      "System prompt for the unattended research pass that reads the codebase with the interview's tools and writes what it finds into the PRD (a technical plan, or a first draft). The platform rules are appended to it.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+  },
+);
+
 /** src/prompts/character_interview/interviewer_system.txt */
 export const CHARACTER_INTERVIEW_INTERVIEWER_SYSTEM = definePrompt(
   'character_interview_interviewer_system',
@@ -1014,6 +1198,51 @@ export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
     name: 'OpenAI Tooltip Translation Prompt',
     description:
       'Localizes tooltip UI text into natural, concise target-language phrasing while preserving JSON structure, HTML tags, and notranslate spans.',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/agent_memory/curator_system.txt */
+export const AGENT_MEMORY_CURATOR_SYSTEM = definePrompt(
+  'agent_memory_curator_system',
+  {},
+  {
+    name: 'Agent Memory — Notebook Curator',
+    description:
+      "Folds the notes an autonomous agent wrote at the end of a run into its capped notebook, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Bug Hunter today.",
+    category: 'Bug Hunter',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/debrief_chat/summary_system.txt */
+export const DEBRIEF_CHAT_SUMMARY_SYSTEM = definePrompt(
+  'debrief_chat_summary_system',
+  {},
+  {
+    name: 'Debrief Chat — History Summary',
+    description:
+      'Folds older debrief-chat messages into a running third-person summary under 300 words, so the history sent with each reply stays bounded.',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/openai_track/content_translation.txt */
+export const OPENAI_TRACK_CONTENT_TRANSLATION = definePrompt(
+  'openai_track_content_translation',
+  {
+    inputJson: 'required',
+    languageName: 'required',
+    toneGuidance: 'optional',
+    glossary: 'optional',
+    // Rendered into the <blankToken> marker as the literal placeholder text.
+    blankToken: 'optional',
+  },
+  {
+    name: 'Course Content Translation',
+    description:
+      "Localises a course's keyed strings (titles, prose, HTML, fill-blank templates, marking keys, rubrics, speakers) into one language, per-field rules by kind. Answers with a JSON object keyed like the input; placeholders and HTML are validated in code.",
     output: 'structured',
   },
 );

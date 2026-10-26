@@ -111,6 +111,12 @@ replay read. Reaching ready fails it, because that means Builder planned to rebu
 
 A model **judge** scores the checklist. It only scores; it never decides a gate on its own.
 
+The simulated admin and the judge are the `builder_eval_admin_system` and
+`builder_eval_judge_system` prompts in the Skills Store. A replay reads their live text
+directly, not through the sandbox's candidate overrides, so a prompt gate never moves its own
+ruler. The cold reviewer inside the replay (`builder_prd_review_system`,
+`builder_prd_recheck_system`) does read through the overrides, like the interviewer.
+
 The default is three runs per fixture, because the model is not deterministic.
 
 ## Suites and the prompt gate

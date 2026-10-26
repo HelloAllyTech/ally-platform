@@ -76,6 +76,54 @@ class AnalysisCounselorAnalysisInputs(PromptInputs):
     message: str
 
 
+class AnalyticsAnswerInputs(PromptInputs):
+    """`analytics/answer.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_analytics_answer",
+        name="Analytics Agent Answer",
+        description=(
+            "Turns the rows an Analytics Agent query returned into the answer a "
+            "platform administrator reads: the number first, caveats that hold for "
+            "this result, a chart choice and suggested follow-up questions."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    # Earlier turns of the conversation, built in code; empty on a first question.
+    history_block: Optional[str] = None
+    question: str
+    # The result: columns, rows returned (with a truncation note when the rows
+    # are a sample) and the rows as CSV, or "(no rows)". Built in code.
+    result_block: str
+    sql: str
+
+
+class AnalyticsPlannerInputs(PromptInputs):
+    """`analytics/planner.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_analytics_planner",
+        name="Analytics Agent Planner",
+        description=(
+            "Translates an administrator's analytics question into one read-only "
+            "PostgreSQL query over the schema catalogue ally-be allows, or asks a "
+            "clarifying question, or refuses when the data is not there."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    # Earlier turns (question, SQL, answer), built in code; empty on a first
+    # question.
+    history_block: Optional[str] = None
+    question: str
+    row_limit: int
+    schema_catalog: str
+    today: str
+
+
 class AudioDiarizationInputs(PromptInputs):
     """`audio/diarization.txt`."""
 
@@ -88,6 +136,55 @@ class AudioDiarizationInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
     transcription: str
+
+
+class AudioGeminiTranscriptionInputs(PromptInputs):
+    """`audio/gemini_transcription.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_audio_gemini_transcription",
+        name="Gemini Transcription",
+        description=(
+            "Instructs Gemini to transcribe one segment of a recorded counselling "
+            "call verbatim, in the languages spoken, as timestamped utterances for "
+            "the diarization step."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+
+class HelplineCopilotNudgeRequestedInputs(PromptInputs):
+    """`helpline/copilot_nudge_requested.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_helpline_copilot_nudge_requested",
+        name="Helpline Copilot Nudge Instruction",
+        description=(
+            "The sentence inserted into the Helpline Copilot Turn prompt (as "
+            "{nudge_instruction}) when the listener's coaching nudge is due: what a "
+            "good nudge is and what it must never suggest."
+        ),
+    )
+
+
+class HelplineCopilotRiskFlaggedInputs(PromptInputs):
+    """`helpline/copilot_risk_flagged.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_helpline_copilot_risk_flagged",
+        name="Helpline Copilot Risk-Flagged Instruction",
+        description=(
+            "The sentence inserted into the Helpline Copilot Turn prompt (as "
+            "{risk_instruction}) when the platform's risk screen has flagged the "
+            "conversation: the first suggestion must ask directly about safety."
+        ),
+    )
+
+    # ", about someone else the talker knows" when the risk is to another person.
+    about: Optional[str] = None
+    # The flagged level: "elevated" or "high".
+    level: str
 
 
 class HelplineCopilotTurnInputs(PromptInputs):
@@ -316,6 +413,23 @@ class SharedWorkerTypeExperiencedProfessionalInputs(PromptInputs):
 class SharedWorkerTypeLayInputs(PromptInputs):
 
     prompt = PromptInfo(code="ally_ai_shared_worker_type_lay")
+
+
+class SummaryCondenseChunkInputs(PromptInputs):
+    """`summary/condense_chunk.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_summary_condense_chunk",
+        name="Summary Transcript Condense",
+        description=(
+            "Condenses one part of a long session transcript into plain text before "
+            "the session summary runs, so a long session fits the summary prompt."
+        ),
+    )
+
+    chunk: str
+    part_count: Optional[int] = None
+    part_number: Optional[int] = None
 
 
 class SummaryDictationSummaryInputs(PromptInputs):

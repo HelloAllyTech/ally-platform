@@ -12,13 +12,21 @@ inputs: the planner writing SQL must not see result rows, and the narrator
 describing a number must not be able to change the query that produced it.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.core.analytics_agent.agent import compose_answer, plan_query
-from app.core.analytics_agent.prompt import AgentTurn
+from app.core.analytics_agent.agent import (
+    compose_answer,
+    plan_query,
+    store_prompt_version,
+)
+from app.core.analytics_agent.prompt import (
+    ANSWER_PROMPT_PATH,
+    PLAN_PROMPT_PATH,
+    AgentTurn,
+)
 from app.core.analytics_agent.schemas import AnswerOutput, QueryPlan
 from app.core.config import settings
 from app.utils.logger import get_logger
@@ -39,10 +47,15 @@ class PlanRequest(BaseModel):
     today: str
     row_limit: int = 500
     history: List[AgentTurn] = Field(default_factory=list)
+    # The planner prompt's live Skills Store version (text, model, temperature),
+    # keyed by code, as ally-be's AiService.getPromptOverrides builds it.
+    prompts: Optional[Dict[str, Any]] = None
 
 
 class PlanResponse(BaseModel):
     planner_model: str
+    # The Skills Store version of the planner prompt that ran ("v<n>"), or
+    # settings' PROMPT_VERSION when the request carried no store text for it.
     prompt_version: str
     plan: QueryPlan
 
@@ -57,10 +70,13 @@ class AnswerRequest(BaseModel):
     row_count: int = 0
     truncated: bool = False
     history: List[AgentTurn] = Field(default_factory=list)
+    # The narration prompt's live Skills Store version, as for PlanRequest.
+    prompts: Optional[Dict[str, Any]] = None
 
 
 class AnswerResponse(BaseModel):
     answer_model: str
+    # As PlanResponse.prompt_version, for the narration prompt.
     prompt_version: str
     result: AnswerOutput
 
@@ -84,6 +100,7 @@ async def plan(req: PlanRequest) -> PlanResponse:
             today=req.today,
             row_limit=req.row_limit,
             history=req.history,
+            prompts=req.prompts,
         )
     except Exception as e:  # noqa: BLE001 - surface as 500, keep caller decoupled
         logger.error(f"analytics agent planning failed: {e}")
@@ -93,7 +110,8 @@ async def plan(req: PlanRequest) -> PlanResponse:
         )
     return PlanResponse(
         planner_model=planner_model,
-        prompt_version=settings.ANALYTICS_AGENT.PROMPT_VERSION,
+        prompt_version=store_prompt_version(PLAN_PROMPT_PATH, req.prompts)
+        or settings.ANALYTICS_AGENT.PROMPT_VERSION,
         plan=result,
     )
 
@@ -116,6 +134,7 @@ async def answer(req: AnswerRequest) -> AnswerResponse:
             row_count=req.row_count,
             truncated=req.truncated,
             history=req.history,
+            prompts=req.prompts,
         )
     except Exception as e:  # noqa: BLE001 - surface as 500, keep caller decoupled
         logger.error(f"analytics agent narration failed: {e}")
@@ -125,6 +144,7 @@ async def answer(req: AnswerRequest) -> AnswerResponse:
         )
     return AnswerResponse(
         answer_model=answer_model,
-        prompt_version=settings.ANALYTICS_AGENT.PROMPT_VERSION,
+        prompt_version=store_prompt_version(ANSWER_PROMPT_PATH, req.prompts)
+        or settings.ANALYTICS_AGENT.PROMPT_VERSION,
         result=result,
     )

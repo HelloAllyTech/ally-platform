@@ -133,22 +133,21 @@ export class AiChatService {
   /**
    * Produces an incremental summary by folding new messages into an existing summary.
    * Used by the batch summarization strategy to keep chat history bounded.
+   *
+   * `systemPrompt` is the summariser's instructions, loaded by the caller
+   * (`debrief_chat_summary_system` for the debrief chat): this module sits
+   * below PromptModule, which imports it, so it cannot read the Skills Store
+   * itself.
    */
   async summarizeMessages(params: {
+    systemPrompt: string;
     existingSummary: string | null;
     messages: LlmMessage[];
     llmConfig: LlmProviderConfig;
     providerType?: string;
     usage?: ChatUsageAttribution;
   }): Promise<string> {
-    const systemContent = [
-      'You are a conversation summarizer.',
-      'Given the existing summary (if any) and new messages, produce a concise updated summary.',
-      'Capture all key topics, questions asked, decisions made, advice given, and important details.',
-      'Preserve anything from the existing summary that remains relevant.',
-      'Write in third person (e.g. "The user asked about…", "The assistant suggested…").',
-      'Keep the summary under 300 words.',
-    ].join(' ');
+    const systemContent = params.systemPrompt;
 
     const parts: string[] = [];
     if (params.existingSummary) {

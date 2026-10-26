@@ -151,6 +151,30 @@ class CounselorStagnationSteeringInputs(PromptInputs):
     )
 
 
+class EvaluationActorGoalSystemInputs(PromptInputs):
+    """`evaluation/actor_goal_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_learn_evaluation_actor_goal_system",
+        name="Actor Goal Evaluator System Prompt",
+        description=(
+            "LLM-as-a-judge system prompt that scores a real session's roleplay actor "
+            "(the AI character, not the trainee) against each superadmin-configured "
+            "agent test case on a 0-100 scale, marks the test cases the conversation "
+            "gave no occasion to demonstrate as not applicable, and writes a markdown "
+            "report for a training supervisor. Runs after the session ends "
+            "(POST /scenario-session/actor-evaluation); the transcript is sent as the "
+            "user message."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    goals_block: str = Field(
+        title="Agent test cases (one line each: title, category, description)"
+    )
+
+
 class EvaluationEvaluatorSystemInputs(PromptInputs):
     """`evaluation/evaluator_system.txt`."""
 
@@ -434,6 +458,58 @@ class FillerPredictiveFillerInputs(PromptInputs):
     language_label: Optional[str] = None
     recent_fillers: Optional[str] = None
     scenario_context: Optional[str] = None
+
+
+class RetrievalMemorySelectorSystemInputs(PromptInputs):
+    """`retrieval/memory_selector_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_learn_retrieval_memory_selector_system",
+        name="Memory Selector System Prompt",
+        description=(
+            "Picks which of the client's memories (the scenario's Knowledge Sources) "
+            "are on the client's mind for the counselor's latest message; the chosen "
+            "memories' content is added to the persona prompt. Used when the session "
+            "has no language glossary sections; with them, the Memory and Glossary "
+            "Selector runs instead. Runs on the live turn (refreshed every few turns, "
+            "8s timeout) on the scenario's main model; the recent conversation is sent "
+            "as the user message."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    topics_block: str = Field(
+        title="The client's memories (one line each: title: preview)"
+    )
+
+
+class RetrievalMemoryGlossarySelectorSystemInputs(PromptInputs):
+    """`retrieval/memory_glossary_selector_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_learn_retrieval_memory_glossary_selector_system",
+        name="Memory and Glossary Selector System Prompt",
+        description=(
+            "Picks which of the client's memories (the scenario's Knowledge Sources) "
+            "and which language glossary sections the client needs for its next "
+            "reply: memories for what the counselor is asking now, glossary sections "
+            "for the vocabulary the reply is about to need. The chosen entries' "
+            "content is added to the persona prompt. Used instead of the Memory "
+            "Selector when the session has glossary sections. Runs on the live turn "
+            "(refreshed every few turns, 8s timeout) on the scenario's main model; "
+            "the recent conversation is sent as the user message."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    topics_block: str = Field(
+        title=(
+            "Available topics (memories: title: preview; glossary sections: "
+            "[bracketed] title with its when-to-retrieve hint)"
+        )
+    )
 
 
 class SupervisorLiveNoteInputs(PromptInputs):

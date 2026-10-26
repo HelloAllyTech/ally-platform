@@ -11,7 +11,12 @@ import {
 import { ActionConfirmationPopup, Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { PromptVersionSummary, PromptVersionTranslations, SkillsStoreErrorCode } from "@types";
+import {
+  PinnedPromptReason,
+  PromptVersionSummary,
+  PromptVersionTranslations,
+  SkillsStoreErrorCode,
+} from "@types";
 import { getErrorMessage } from "@utils/errorMessage";
 import { diffLines, placeholdersIn } from "@utils/promptVersionText";
 
@@ -29,6 +34,12 @@ export const skillsStoreErrorCode = (error: unknown): SkillsStoreErrorCode | und
 /** The `details` object that rides with a Skills Store error. */
 export const skillsStoreErrorDetails = (error: unknown): Record<string, unknown> =>
   (error as { data?: { details?: Record<string, unknown> } } | null)?.data?.details ?? {};
+
+/** Why a pinned prompt refused to go live; an older server sent no reason, which meant a judge rubric. */
+export const pinnedReason = (error: unknown): PinnedPromptReason => {
+  const reason = skillsStoreErrorDetails(error).reason;
+  return reason === "measuring_instrument" || reason === "guard" ? reason : "judge_rubric";
+};
 
 type BusyAction = "publish" | "retry" | "discard";
 
@@ -57,9 +68,10 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
   const [busy, setBusy] = useState<{ version: number; action: BusyAction } | null>(null);
   const [rollBackTo, setRollBackTo] = useState<number | null>(null);
   const [discardTarget, setDiscardTarget] = useState<number | null>(null);
-  const [rubricConfirmFor, setRubricConfirmFor] = useState<{
+  const [pinnedConfirmFor, setPinnedConfirmFor] = useState<{
     version: number;
     rollback: boolean;
+    reason: PinnedPromptReason;
   } | null>(null);
 
   const languageLabel = useMemo(() => {
@@ -73,7 +85,7 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
   const live = versions.find(v => v.status === "live") ?? null;
   const liveVersion = live?.version ?? null;
 
-  const runPromote = async (version: number, rollback: boolean, confirmJudge = false) => {
+  const runPromote = async (version: number, rollback: boolean, confirmPinned = false) => {
     setBusy({ version, action: "publish" });
     try {
       const result = await promote({
@@ -82,7 +94,7 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
         body: {
           expectedCurrentVersion: liveVersion,
           ...(rollback ? { rollback: true } : {}),
-          ...(confirmJudge ? { confirmJudgeRubricChange: true } : {}),
+          ...(confirmPinned ? { confirmPinnedChange: true } : {}),
         },
       }).unwrap();
       toast.success(strings.published(result.version));
@@ -96,8 +108,8 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
       onReload();
     } catch (error) {
       const code = skillsStoreErrorCode(error);
-      if (code === "SKILLS_STORE_JUDGE_RUBRIC_PINNED") {
-        setRubricConfirmFor({ version, rollback });
+      if (code === "SKILLS_STORE_PROMPT_PINNED") {
+        setPinnedConfirmFor({ version, rollback, reason: pinnedReason(error) });
       } else if (code === "SKILLS_STORE_TRANSLATIONS_PENDING") {
         toast.message(strings.translationsRunning);
         onReload();
@@ -191,19 +203,19 @@ const PromptVersionsSection: React.FC<Props> = ({ promptId, versions, onReload }
         secondaryButton={{ label: strings.cancel, onClick: () => setDiscardTarget(null) }}
       />
       <ActionConfirmationPopup
-        isOpen={rubricConfirmFor != null}
-        onClose={() => setRubricConfirmFor(null)}
-        title={strings.judgeRubricTitle}
-        description={strings.judgeRubricBody}
+        isOpen={pinnedConfirmFor != null}
+        onClose={() => setPinnedConfirmFor(null)}
+        title={pinnedConfirmFor ? strings.pinned[pinnedConfirmFor.reason].title : ""}
+        description={pinnedConfirmFor ? strings.pinned[pinnedConfirmFor.reason].body : ""}
         primaryButton={{
-          label: strings.judgeRubricConfirm,
+          label: pinnedConfirmFor ? strings.pinned[pinnedConfirmFor.reason].confirm : "",
           onClick: () => {
-            const target = rubricConfirmFor;
-            setRubricConfirmFor(null);
+            const target = pinnedConfirmFor;
+            setPinnedConfirmFor(null);
             if (target) void runPromote(target.version, target.rollback, true);
           },
         }}
-        secondaryButton={{ label: strings.cancel, onClick: () => setRubricConfirmFor(null) }}
+        secondaryButton={{ label: strings.cancel, onClick: () => setPinnedConfirmFor(null) }}
       />
     </div>
   );

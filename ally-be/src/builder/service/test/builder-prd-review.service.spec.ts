@@ -183,6 +183,8 @@ describe('BuilderPrdReviewService', () => {
             },
           ],
         } as any,
+        // No store: the reviewer runs on its shipped default.
+        null as any,
       );
     });
 

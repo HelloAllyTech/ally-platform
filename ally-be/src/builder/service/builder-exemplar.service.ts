@@ -3,6 +3,16 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
+import {
+  loadPromptTemplate,
+  promptModelOr,
+} from 'src/common/util/prompt-template.util';
+import {
+  BUILDER_EXEMPLAR_RANK_SYSTEM,
+  BUILDER_EXEMPLAR_SUMMARY_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { BuilderExemplar } from '../entity/builder-exemplar.entity';
 import { BuilderExemplarRepository } from '../repository/builder-knowledge.repository';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
@@ -51,6 +61,8 @@ export class BuilderExemplarService {
     private readonly feedbackRepository: BuilderPrFeedbackRepository,
     private readonly docRepository: BuilderPrdDocRepository,
     private readonly llmCompletion: LlmCompletionService,
+    /** The ranker's and the note writer's instructions and models. */
+    private readonly prompts: PromptSharedService,
   ) {}
 
   /**
@@ -285,16 +297,21 @@ export class BuilderExemplarService {
     limit: number,
   ): Promise<BuilderExemplar[]> {
     try {
+      const [template, target] = await Promise.all([
+        loadPromptTemplate(this.prompts, BUILDER_EXEMPLAR_RANK_SYSTEM.code),
+        promptModelOr(
+          this.prompts,
+          BUILDER_EXEMPLAR_RANK_SYSTEM.code,
+          this.configService.builder.mechanicalModel,
+        ),
+      ]);
       const result = await this.llmCompletion.complete({
         taskId: BUILDER_AI_TASKS.CONTEXT_SELECTION,
         task: LlmTask.BUILDER_CONTEXT_SELECTION,
         maxTokens: 512,
-        model: this.configService.builder.mechanicalModel,
-        system:
-          'You pick which past builds are worth showing an engineer starting a ' +
-          'new one. Relevant means the work overlaps — same subsystem, same ' +
-          'kind of change, same trap — not merely the same words. Reply with ' +
-          'a JSON array of ids, most relevant first, and nothing else.',
+        // The prompt's model when the Skills Store names one, else the mechanical model.
+        ...target,
+        system: renderPrompt(BUILDER_EXEMPLAR_RANK_SYSTEM, template, {}),
         prompt: [
           `## The new work\n${query}`,
           '',
@@ -374,19 +391,22 @@ export class BuilderExemplarService {
   }): Promise<string | null> {
     const prd = facts.prdSnapshot ?? {};
     try {
+      const [template, target] = await Promise.all([
+        loadPromptTemplate(this.prompts, BUILDER_EXEMPLAR_SUMMARY_SYSTEM.code),
+        promptModelOr(
+          this.prompts,
+          BUILDER_EXEMPLAR_SUMMARY_SYSTEM.code,
+          this.configService.builder.mechanicalModel,
+        ),
+      ]);
       const result = await this.llmCompletion.complete({
-        taskId: BUILDER_AI_TASKS.CONTEXT_SELECTION,
+        taskId: BUILDER_AI_TASKS.EXEMPLAR_SUMMARY,
         task: LlmTask.BUILDER_CONTEXT_SELECTION,
         maxTokens: 600,
-        model: this.configService.builder.mechanicalModel,
+        // The prompt's model when the Skills Store names one, else the mechanical model.
+        ...target,
         usageMetadata: { kind: 'exemplar_summary' },
-        system:
-          'You write a 120-150 word note about a finished software build, for ' +
-          'an agent about to attempt something similar. Cover: what was asked, ' +
-          'the approach taken, and what happened after it shipped. Be concrete ' +
-          'about the approach — subsystems, files, techniques. If the work was ' +
-          'rejected or needed rework, say plainly what went wrong; that is the ' +
-          'most useful sentence in the note. Plain prose, no headings.',
+        system: renderPrompt(BUILDER_EXEMPLAR_SUMMARY_SYSTEM, template, {}),
         prompt: [
           `Title: ${facts.title}`,
           `Repos: ${facts.repos?.join(', ') ?? 'unknown'}`,

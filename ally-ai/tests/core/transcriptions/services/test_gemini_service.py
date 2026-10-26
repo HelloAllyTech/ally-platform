@@ -14,6 +14,7 @@ from app.core.transcriptions.services.gemini_service import (
     parse_timestamp,
 )
 from app.core.transcriptions.utils.exceptions import TranscriptionFailedException
+from app.prompts.resolver import load_template
 
 
 class TestParseTimestamp:
@@ -66,13 +67,16 @@ def _service(monkeypatch, generate_results):
         svc = GeminiTranscriptionService(api_key="AIza-test", model="gemini-test")
     results = list(generate_results)
     calls = []
+    settings_seen = []
 
-    async def _generate(path):
+    async def _generate(path, call):
         calls.append(path)
+        settings_seen.append(call)
         return results.pop(0)
 
     svc._generate = _generate
     svc._calls = calls
+    svc._settings_seen = settings_seen
     return svc
 
 
@@ -191,7 +195,7 @@ class TestGeminiTranscriptionService:
     async def test_segment_failure_surfaces_status_code(self, monkeypatch, no_audio_io):
         svc = _service(monkeypatch, [])
 
-        async def _boom(path):
+        async def _boom(path, call):
             raise TranscriptionFailedException("quota", status_code=429)
 
         svc._generate = _boom
@@ -215,7 +219,7 @@ class TestGeminiTranscriptionService:
         )
         svc = _service(monkeypatch, [])
 
-        async def _boom(path):
+        async def _boom(path, call):
             raise RuntimeError("network")
 
         svc._generate = _boom
@@ -223,3 +227,70 @@ class TestGeminiTranscriptionService:
             await svc.transcribe_audio_from_url("http://x", chat_id=1)
         cleanup.assert_awaited_once()
         assert cleanup.await_args.args[0] == ["/tmp/a.wav"]
+
+
+class TestGeminiTranscriptionPrompt:
+    """The instruction is the Skills Store's `ally_ai_audio_gemini_transcription`."""
+
+    CODE = "ally_ai_audio_gemini_transcription"
+
+    # The inline constant this prompt replaced, kept verbatim so the default
+    # file is proven to be the text production ran.
+    LEGACY_PROMPT = (
+        "You are a verbatim transcription engine for a recorded counselling call.\n"
+        "Transcribe everything that is spoken in this audio exactly as it is said, "
+        "in the language or languages actually spoken. Do not translate. Keep "
+        "code-mixed speech as spoken, and write Indian languages in their native "
+        "script.\n"
+        "Split the speech into short utterances at natural pauses or speaker "
+        "changes. For every utterance give its start and end time in seconds from "
+        'the beginning of this audio as decimal numbers (for example "12.40").\n'
+        "Do not add speaker labels, commentary, summaries or anything that was not "
+        "spoken. If there is no intelligible speech, return an empty list of "
+        "segments."
+    )
+
+    def test_default_is_byte_identical_to_the_inline_prompt(self):
+        assert (
+            load_template(gemini_module.TRANSCRIPTION_PROMPT_PATH, prompts={})
+            == self.LEGACY_PROMPT
+        )
+
+    @pytest.mark.asyncio
+    async def test_without_store_text_runs_the_default_on_the_configured_model(
+        self, monkeypatch, no_audio_io
+    ):
+        svc = _service(monkeypatch, [(Transcript(), None)])
+        await svc.transcribe_audio_from_url("http://x", chat_id=1, prompts={})
+        call = svc._settings_seen[0]
+        assert call.prompt == self.LEGACY_PROMPT
+        assert call.model == "gemini-test"
+        assert call.config["temperature"] == 0
+
+    @pytest.mark.asyncio
+    async def test_store_text_model_and_temperature_are_used(
+        self, monkeypatch, no_audio_io
+    ):
+        svc = _service(monkeypatch, [(Transcript(), None)])
+        prompts = {
+            self.CODE: {
+                "prompt": "Live transcription text.",
+                "provider": "google",
+                "model": "gemini-2.5-pro",
+                "temperature": 0.2,
+            }
+        }
+        await svc.transcribe_audio_from_url("http://x", chat_id=1, prompts=prompts)
+        call = svc._settings_seen[0]
+        assert call.prompt == "Live transcription text."
+        assert call.model == "gemini-2.5-pro"
+        assert call.config["temperature"] == 0.2
+
+    @pytest.mark.asyncio
+    async def test_a_non_gemini_store_model_is_ignored(self, monkeypatch, no_audio_io):
+        svc = _service(monkeypatch, [(Transcript(), None)])
+        prompts = {
+            self.CODE: {"prompt": "Live.", "provider": "openai", "model": "gpt-4o"}
+        }
+        await svc.transcribe_audio_from_url("http://x", chat_id=1, prompts=prompts)
+        assert svc._settings_seen[0].model == "gemini-test"

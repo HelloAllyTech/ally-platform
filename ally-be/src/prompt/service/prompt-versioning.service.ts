@@ -28,14 +28,17 @@ import {
 } from 'src/builder/constants/builder-eval-gate.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { ErrorCode } from 'src/exception/error-code.enum';
-import { JUDGE_RUBRIC_PROMPT_CODES } from '../constants/judge-rubric.constants';
+import {
+  PINNED_PROMPTS,
+  PINNED_PROMPT_REFUSAL,
+} from '../constants/pinned-prompts.constants';
 
 /** Error codes a writer can branch on: the response's `errorCode`, with `details`. */
 export const SKILLS_STORE_ERROR = {
   STALE_BASE: ErrorCode.SKILLS_STORE_STALE_BASE,
   CONTRACT_VIOLATION: ErrorCode.SKILLS_STORE_CONTRACT_VIOLATION,
   TRANSLATIONS_PENDING: ErrorCode.SKILLS_STORE_TRANSLATIONS_PENDING,
-  JUDGE_RUBRIC_PINNED: ErrorCode.SKILLS_STORE_JUDGE_RUBRIC_PINNED,
+  PROMPT_PINNED: ErrorCode.SKILLS_STORE_PROMPT_PINNED,
   NOT_A_CANDIDATE: ErrorCode.SKILLS_STORE_NOT_A_CANDIDATE,
 } as const;
 
@@ -204,8 +207,8 @@ export class PromptVersioningService {
       allowRollback?: boolean;
       /** False only for an import, which brings its translations with it. */
       requireTranslations?: boolean;
-      /** Confirms the judge's pinned label was bumped (judge rubrics only). */
-      confirmJudgeRubricChange?: boolean;
+      /** Confirms a pinned prompt's change (see pinned-prompts.constants). */
+      confirmPinnedChange?: boolean;
     } = {},
   ): Promise<PromoteResult> {
     const result = await this.dataSource.transaction(async (manager) => {
@@ -254,11 +257,11 @@ export class PromptVersioningService {
         });
       }
 
-      // A rubric's first live version can't mix with earlier results.
+      // A pinned prompt's first live version has nothing to be compared with.
       if (current !== null) {
-        this.assertJudgeRubricConfirmed(
+        this.assertPinnedChangeConfirmed(
           prompt.promptCode,
-          options.confirmJudgeRubricChange,
+          options.confirmPinnedChange,
         );
       }
 
@@ -324,7 +327,7 @@ export class PromptVersioningService {
     input: CreateVersionInput,
     options: {
       evalApproved?: boolean;
-      confirmJudgeRubricChange?: boolean;
+      confirmPinnedChange?: boolean;
     } = {},
   ): Promise<PromoteResult> {
     // Refuse up front what promote would refuse whatever the text says.
@@ -334,9 +337,9 @@ export class PromptVersioningService {
     });
     if (!prompt) throw new NotFoundException('Prompt not found');
     if (prompt.currentVersion != null) {
-      this.assertJudgeRubricConfirmed(
+      this.assertPinnedChangeConfirmed(
         prompt.promptCode,
-        options.confirmJudgeRubricChange,
+        options.confirmPinnedChange,
       );
     }
 
@@ -591,17 +594,17 @@ export class PromptVersioningService {
     return out;
   }
 
-  private assertJudgeRubricConfirmed(
+  private assertPinnedChangeConfirmed(
     promptCode: string,
     confirmed: boolean | undefined,
   ): void {
-    if (!JUDGE_RUBRIC_PROMPT_CODES.has(promptCode) || confirmed) return;
+    const reason = PINNED_PROMPTS.get(promptCode);
+    if (!reason || confirmed) return;
     throw new ConflictException({
       statusCode: 409,
-      errorCode: SKILLS_STORE_ERROR.JUDGE_RUBRIC_PINNED,
-      message:
-        `${promptCode} is a judge rubric. Its results are labelled by a version pinned in code, ` +
-        'so bump the judge’s PROMPT_VERSION (and the backlog drainer’s target) in the same change, then confirm.',
+      errorCode: SKILLS_STORE_ERROR.PROMPT_PINNED,
+      message: `${promptCode} ${PINNED_PROMPT_REFUSAL[reason]}`,
+      details: { reason },
     });
   }
 

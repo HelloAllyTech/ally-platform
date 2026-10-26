@@ -1464,7 +1464,7 @@ describe("PromptSidePanel Component", () => {
         .mockReturnValueOnce(
           rejected({
             status: 409,
-            data: { errorCode: "SKILLS_STORE_JUDGE_RUBRIC_PINNED", message: "pinned" },
+            data: { errorCode: "SKILLS_STORE_PROMPT_PINNED", message: "pinned" },
           }),
         )
         .mockReturnValueOnce(resolved({ version: 4, previousVersion: 3, failedLanguages: [] }));
@@ -1481,7 +1481,7 @@ describe("PromptSidePanel Component", () => {
       expect(mockPromoteVersion).toHaveBeenLastCalledWith({
         id: "1",
         version: 4,
-        body: { expectedCurrentVersion: 3, confirmJudgeRubricChange: true },
+        body: { expectedCurrentVersion: 3, confirmPinnedChange: true },
       });
     });
 
@@ -1523,7 +1523,7 @@ describe("PromptSidePanel Component", () => {
         .mockReturnValueOnce(
           rejected({
             status: 409,
-            data: { errorCode: "SKILLS_STORE_JUDGE_RUBRIC_PINNED", message: "pinned" },
+            data: { errorCode: "SKILLS_STORE_PROMPT_PINNED", message: "pinned" },
           }),
         )
         .mockReturnValueOnce(resolved(true));
@@ -1539,7 +1539,7 @@ describe("PromptSidePanel Component", () => {
 
       expect(mockRevertPrompt).toHaveBeenLastCalledWith({
         id: "1",
-        confirmJudgeRubricChange: true,
+        confirmPinnedChange: true,
       });
     });
   });

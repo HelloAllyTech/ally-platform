@@ -104,6 +104,7 @@ describe('ScenarioSessionChatService.streamChat — what reaches the model', () 
       config,
       { find: jest.fn() } as any,
       { emit: jest.fn() } as any,
+      null as any,
     );
 
     return { service, saved, sent, streamSpy, provider };

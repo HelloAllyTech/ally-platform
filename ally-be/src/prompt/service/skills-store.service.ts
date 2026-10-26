@@ -354,7 +354,7 @@ export class SkillsStoreService {
         {
           evalApproved: true,
           requireTranslations: false,
-          confirmJudgeRubricChange: true,
+          confirmPinnedChange: true,
         },
       );
       if (!result.created.includes(item.promptCode)) {

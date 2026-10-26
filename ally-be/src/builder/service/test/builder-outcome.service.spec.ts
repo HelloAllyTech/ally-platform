@@ -80,6 +80,7 @@ describe('BuilderOutcomeService', () => {
       knowledgeService,
       curatorService,
       llmCompletion as any,
+      null as any,
     );
   });
 

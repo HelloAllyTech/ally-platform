@@ -19,6 +19,14 @@ import {
 } from 'src/llm-agent/util/agent-provider-error.util';
 import { LoggerService } from 'src/logger/logger.service';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+import {
+  loadPromptTemplate,
+  promptModelOr,
+} from 'src/common/util/prompt-template.util';
+import {
+  BUILDER_INTERVIEW_SUMMARY_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
 import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
@@ -694,6 +702,7 @@ export class BuilderInterviewOrchestratorService {
           title: session.title,
           opening: userContent,
           handoff: handoffContext,
+          prompts: this.promptSharedService,
         },
         (problem) =>
           this.logger.warn(
@@ -2446,21 +2455,25 @@ export class BuilderInterviewOrchestratorService {
       .join('\n\n');
     if (!rendered) return null;
 
+    const [template, target] = await Promise.all([
+      loadPromptTemplate(
+        this.promptSharedService,
+        BUILDER_INTERVIEW_SUMMARY_SYSTEM.code,
+      ),
+      promptModelOr(
+        this.promptSharedService,
+        BUILDER_INTERVIEW_SUMMARY_SYSTEM.code,
+        this.configService.builder.mechanicalModel,
+      ),
+    ]);
     const result = await this.llmCompletion.complete({
       taskId: BUILDER_AI_TASKS.INTERVIEW_SUMMARY,
       task: LlmTask.BUILDER_INTERVIEW_SUMMARY,
-      system:
-        'You compress the earlier part of a requirements interview so it can ' +
-        'be dropped from the replayed transcript without losing what it ' +
-        'settled. Keep: decisions made and the reason for each, options that ' +
-        'were considered and rejected, constraints and preferences the admin ' +
-        'stated, and anything still open — including every failure a [receipt] ' +
-        'line records that no later turn repaired. Drop: pleasantries, restatements, ' +
-        'and anything already written into the PRD — the agent reads that ' +
-        'separately and in full. Write it as notes to yourself, not prose.',
+      system: renderPrompt(BUILDER_INTERVIEW_SUMMARY_SYSTEM, template, {}),
       prompt: rendered,
       maxTokens: 1_500,
-      model: this.configService.builder.mechanicalModel,
+      // The prompt's model when the Skills Store names one, else the mechanical model.
+      ...target,
       usageMetadata: { builderSessionId: session.id, turns: turns.length },
     });
 

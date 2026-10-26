@@ -63,6 +63,7 @@ describe('BuilderEpicService', () => {
       } as any,
       { getRepository: () => repository } as any,
       { complete: jest.fn(async () => ({ text: reply })) } as any,
+      null as any,
     );
   });
 
@@ -270,6 +271,7 @@ describe('BuilderEpicService.ensureRepoMilestones', () => {
       { builder: {} } as any,
       { getRepository: () => repository } as any,
       {} as any,
+      null as any,
     );
   });
 

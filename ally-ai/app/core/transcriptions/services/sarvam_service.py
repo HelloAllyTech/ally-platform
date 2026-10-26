@@ -8,7 +8,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from sarvamai import AsyncSarvamAI
 
@@ -42,6 +42,8 @@ class SarvamTranscriptionService:
         chat_id: int,
         sample_rate: int = 8000,
         is_linear16_encoded: bool = False,
+        # Shared interface: this provider sends no prompt, so it ignores them.
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Tuple[int, str]:
         """
         Transcribe audio from URL using Sarvam AI translation service.

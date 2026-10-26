@@ -1,6 +1,6 @@
 """Request/response models for goal-based actor evaluation of a real session."""
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,12 @@ class ActorEvaluationRequest(BaseModel):
     transcript: List[ActorEvaluationTurn]
     goals: List[ActorEvaluationGoal]
     language: Optional[str] = None
+    # The judge's Skills Store prompt(s), keyed by full code
+    # (``ally_ai_learn_evaluation_actor_goal_system``): ``{prompt,
+    # availableVariables?, version?, contentHash?, provider?, model?,
+    # temperature?}``, the same entry shape as the session metadata's
+    # ``promptData.prompts``. Without it the judge runs its local default.
+    prompts: Optional[Dict[str, Any]] = None
 
 
 class ActorEvaluationResponse(BaseModel):

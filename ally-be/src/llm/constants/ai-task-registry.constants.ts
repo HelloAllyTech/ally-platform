@@ -320,7 +320,9 @@ const AI_LEARN_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.AI_LEARN,
     trigger: 'The agent consults the scenario knowledge base',
     detail:
-      'Structured pick of which knowledge keys are relevant to this turn.',
+      'Structured pick of which knowledge keys are relevant to this turn. Its text is ' +
+      'ally_ai_learn_retrieval_memory_selector_system (or _memory_glossary_selector_system ' +
+      'when the scenario has a glossary); a model set on those prompts is ignored.',
     kind: AiTaskKind.COMPLETION,
     provider: 'resolved',
     defaultModel: "the scenario's main LLM",
@@ -512,6 +514,7 @@ const AI_LEARN_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-4o-mini',
     configuredBy:
       '_EVALUATOR_MODEL (app/core/scenario_report/evaluator.py), shared with report-evaluator',
+    promptOverride: 'ally_ai_learn_evaluation_actor_goal_system',
   },
   {
     id: 'v2v-tester-reply',
@@ -594,6 +597,20 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: ALLY_AI_DEFAULT,
     configuredBy: ALLY_AI_DEFAULT_SOURCE,
+  },
+  {
+    id: 'session-summary-condense',
+    task: LlmTask.SUMMARY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: '...when the transcript is over 8,000 words',
+    detail:
+      'Condenses each chunk before the summary is written. Runs on the summary ' +
+      "prompt's model unless a model is set on its own prompt.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: ALLY_AI_DEFAULT,
+    configuredBy: ALLY_AI_DEFAULT_SOURCE,
+    promptOverride: 'ally_ai_summary_condense_chunk',
   },
   {
     id: 'dynamic-summary',
@@ -908,6 +925,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
     configuredBy: 'ANALYTICS_AGENT__PLANNER_MODEL',
+    promptOverride: 'ally_ai_analytics_planner',
   },
   {
     id: 'analytics-agent-answer',
@@ -920,6 +938,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'ANALYTICS_AGENT__ANSWER_MODEL',
+    promptOverride: 'ally_ai_analytics_answer',
   },
   {
     id: 'whatsapp-answer',
@@ -989,11 +1008,13 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     trigger: 'Uploaded call audio is transcribed',
     detail:
       'Ordered fallback chain; a provider whose key is missing is skipped at startup, so ' +
-      'the default degrades safely.',
+      'the default degrades safely. The prompt applies to the Gemini member only (a ' +
+      'non-Gemini model set on it is ignored).',
     kind: AiTaskKind.TRANSCRIPTION,
     provider: 'multiple',
     defaultModel: 'gemini-2.5-flash → sarvam → openai',
     configuredBy: 'TRANSCRIPTION__PROVIDERS',
+    promptOverride: 'ally_ai_audio_gemini_transcription',
   },
 ];
 
@@ -1284,6 +1305,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'AI_CHAT_OPENAI_MODEL / AI_CHAT_DEFAULT_PROVIDER',
+    promptOverride: 'debrief_chat_summary_system',
     configPath: 'aiChat.model',
   },
   {
@@ -1645,6 +1667,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'agent_memory_curator_system',
   },
   {
     id: 'skill-experiment-judge',
@@ -1724,6 +1747,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
     configuredBy: 'BUILDER_INTERVIEW_MODEL',
+    promptOverride: 'builder_research_system',
     configPath: 'builder.interviewModel',
   },
   {
@@ -1738,6 +1762,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUILDER_MECHANICAL_MODEL',
+    promptOverride: 'builder_interview_summary_system',
     configPath: 'builder.mechanicalModel',
   },
   {
@@ -1751,9 +1776,8 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     detail:
       'A cold reviewer over the PRD, the evidence log, the transcript and the reusable-systems ' +
       'map. The first pass files contradictions, unsupported claims, unapplied corrections, ' +
-      'missed reuse and a missing success metric; later passes (usage metadata.mode=recheck) ' +
-      'only re-read the open findings against the current PRD and can close but never add ' +
-      'one. Findings block readiness until fixed or dismissed with a reason. A reply claiming ' +
+      'missed reuse and a missing success metric; later passes are builder-prd-recheck, ' +
+      'below. Findings block readiness until fixed or dismissed with a reason. A reply claiming ' +
       'ready runs the review the turn end would have run, earlier, so the claim is judged ' +
       'against findings this turn already fixed; it adds a call only when the turn edits again ' +
       'after a claim is sent back (at most two per turn). On the platform ' +
@@ -1764,6 +1788,24 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     tier: LlmModelTier.REASONING,
     configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_prd_review_system',
+  },
+  {
+    id: 'builder-prd-recheck',
+    task: LlmTask.BUILDER_PRD_REVIEW,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: '...and each time the PRD changes with review findings open',
+    detail:
+      "The cold reviewer's later passes (usage metadata.mode=recheck): re-read only the open " +
+      'findings against the current PRD, and can close one but never add one, so the loop ' +
+      'converges. Its own row because it is its own prompt, with its own model in the Skills ' +
+      "Store; recorded under the review's usage label.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    tier: LlmModelTier.REASONING,
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_prd_recheck_system',
   },
   {
     id: 'builder-discovery-plan',
@@ -1782,6 +1824,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-4o-mini',
     tier: LlmModelTier.FAST,
     configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_discovery_plan_system',
   },
   {
     id: 'builder-eval-admin',
@@ -1799,6 +1842,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     tier: LlmModelTier.REASONING,
     configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_eval_admin_system',
   },
   {
     id: 'builder-eval-judge',
@@ -1813,6 +1857,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     tier: LlmModelTier.REASONING,
     configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_eval_judge_system',
   },
   {
     id: 'builder-correction-classify',
@@ -1831,6 +1876,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     tier: LlmModelTier.REASONING,
     configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_correction_system',
   },
   {
     id: 'builder-epic-decomposition',
@@ -1841,6 +1887,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
     configuredBy: 'BUILDER_PLANNER_MODEL',
+    promptOverride: 'builder_epic_system',
     configPath: 'builder.plannerModel',
   },
   {
@@ -1913,6 +1960,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUILDER_MECHANICAL_MODEL',
+    promptOverride: 'builder_lesson_curator_system',
     configPath: 'builder.mechanicalModel',
   },
   {
@@ -1924,6 +1972,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUILDER_MECHANICAL_MODEL',
+    promptOverride: 'builder_outcome_system',
     configPath: 'builder.mechanicalModel',
   },
   {
@@ -1948,6 +1997,25 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUILDER_MECHANICAL_MODEL',
+    promptOverride: 'builder_exemplar_rank_system',
+    configPath: 'builder.mechanicalModel',
+  },
+  {
+    id: 'builder-exemplar-summary',
+    task: LlmTask.BUILDER_CONTEXT_SELECTION,
+    runtime: LlmRuntime.ALLY_BE,
+    // Untiered for the same reason as builder-context-selection above: the
+    // call names `builder.mechanicalModel`, which the prompt's own model beats.
+    trigger: 'A finished build is recorded as an exemplar',
+    detail:
+      'Writes the 120-150 word note later builds are shown about this one. Recorded under ' +
+      'the context-selection usage label (metadata.kind=exemplar_summary); a failure stores ' +
+      'the exemplar without a note.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'BUILDER_MECHANICAL_MODEL',
+    promptOverride: 'builder_exemplar_summary_system',
     configPath: 'builder.mechanicalModel',
   },
   {

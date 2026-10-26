@@ -4,6 +4,12 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
+import {
+  loadPromptTemplate,
+  promptModelOr,
+} from 'src/common/util/prompt-template.util';
+import { BUILDER_EPIC_SYSTEM, renderPrompt } from 'src/prompt/contracts';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { BuilderMilestone } from '../entity/builder-milestone.entity';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPrdDocument } from '../type/builder-prd.type';
@@ -45,6 +51,8 @@ export class BuilderEpicService {
     private readonly configService: AppConfigService,
     dataSource: DataSource,
     private readonly llmCompletion: LlmCompletionService,
+    /** The planner's instructions and, when it names one, its model. */
+    private readonly prompts: PromptSharedService,
   ) {
     this.repository = dataSource.getRepository(BuilderMilestone);
   }
@@ -243,6 +251,14 @@ export class BuilderEpicService {
       )
       .join('\n');
 
+    const [template, target] = await Promise.all([
+      loadPromptTemplate(this.prompts, BUILDER_EPIC_SYSTEM.code),
+      promptModelOr(
+        this.prompts,
+        BUILDER_EPIC_SYSTEM.code,
+        this.configService.builder.plannerModel,
+      ),
+    ]);
     const result = await this.llmCompletion.complete({
       taskId: BUILDER_AI_TASKS.EPIC_DECOMPOSITION,
 
@@ -250,9 +266,10 @@ export class BuilderEpicService {
 
       maxTokens: BUILDER_MAX_TOKENS,
 
-      model: this.configService.builder.plannerModel,
+      // The prompt's model when the Skills Store names one, else the planner model.
+      ...target,
 
-      system: EPIC_SYSTEM_PROMPT,
+      system: renderPrompt(BUILDER_EPIC_SYSTEM, template, {}),
 
       usageMetadata: { requirements: (prd.requirements ?? []).length },
 
@@ -371,45 +388,3 @@ export function parseMilestones(text: string): ProposedMilestone[] {
   }
   return [];
 }
-
-const EPIC_SYSTEM_PROMPT = `
-You split a large product requirements document into an ordered series of
-milestones, each of which a coding agent will build and open as its own pull
-request.
-
-The test of a good milestone is simple: **could this be merged on its own and
-leave the platform in a working, coherent state?** Not "is it a tidy group of
-requirements" — mergeable on its own. A milestone that leaves a half-wired
-feature behind is worse than no split at all, because someone has to review it
-anyway and cannot tell whether it works.
-
-Rules:
-
-- **Every requirement goes in exactly one milestone.** Not two, not none. This
-  is checked, and a violation is rejected.
-- **Order matters and is strictly sequential.** Milestone 2 is built on top of
-  milestone 1's branch, so it may rely on 1's code — but nothing may rely on a
-  later milestone.
-- **Foundations first.** A migration, a new table, a shared type or an API
-  contract belongs in the milestone before whatever consumes it, not beside it.
-- **Prefer few, substantial milestones.** Two or three that each do something
-  is better than six that each do a fragment. If the PRD genuinely is one
-  coherent change, say so with a single milestone.
-- Each milestone gets a title a reviewer would recognise on a pull request,
-  a summary of what it delivers, and technical notes for anything specific to
-  building *this* slice — what it may assume already exists from the earlier
-  ones, and what it must not touch yet.
-
-Output a JSON array, in build order, and nothing else:
-
-\`\`\`json
-[
-  {
-    "title": "Store per-simulation comfort-audio settings",
-    "summary": "The column, the migration and the service read path. Nothing user-facing yet.",
-    "requirementIds": ["R1", "R2"],
-    "technicalNotes": "Migration plus the service; the admin form comes in milestone 2 and will read this."
-  }
-]
-\`\`\`
-`.trim();

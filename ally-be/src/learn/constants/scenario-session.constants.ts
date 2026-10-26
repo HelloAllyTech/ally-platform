@@ -381,6 +381,12 @@ export const ALLY_AI_PROMPT_PREFIX = 'ally_ai_';
 /** Prefix for ally-ai-learn prompts. Fetched dynamically from DB (WHERE promptCode LIKE 'ally_ai_learn_%'). */
 export const ALLY_AI_LEARN_PROMPT_PREFIX = 'ally_ai_learn_';
 
+/**
+ * ally-ai-learn prompts used only by its offline endpoints (the actor judge),
+ * which receive them in their own request: left out of room metadata.
+ */
+export const OFFLINE_ONLY_LEARN_PROMPT_PREFIX = 'ally_ai_learn_evaluation_';
+
 export const SKILL_ICONS_S3_PREFIX = 'skill-icons/';
 
 /**

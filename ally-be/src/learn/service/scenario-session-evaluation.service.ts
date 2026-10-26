@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
 import { AiService } from 'src/ai/service/ai.service';
-import { ActorGoalEvaluationTurn } from 'src/ai/dto/ai.request.dto';
+import {
+  ActorGoalEvaluationTurn,
+  PromptOverride,
+} from 'src/ai/dto/ai.request.dto';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { ScenarioSessions } from '../entity/scenario-sessions.entity';
 import { ScenarioSessionDetailsRepository } from '../repository/scenario-session-details.repository';
 import { ScenarioSessionMessagesRepository } from '../repository/scenario-session-messages.repository';
@@ -37,6 +41,10 @@ const CATCHUP_GRACE_MINUTES = SESSION_SETTLE_GRACE_MINUTES;
  * silently truncated.
  */
 const CATCHUP_BATCH_LIMIT = 50;
+
+/** The actor judge's system prompt in the Skills Store (ally-ai-learn's code). */
+const ACTOR_GOAL_JUDGE_PROMPT_CODE =
+  'ally_ai_learn_evaluation_actor_goal_system';
 
 /**
  * How long the V2V fast path waits after the tester's `end-v2v` webhook before
@@ -77,7 +85,30 @@ export class ScenarioSessionEvaluationService {
     private readonly agentTestCaseService: AgentTestCaseService,
     private readonly aiService: AiService,
     private readonly scenarioSessionRepository: ScenarioSessionRepository,
+    private readonly promptSharedService: PromptSharedService,
   ) {}
+
+  /** The judge's live prompt, keyed by code as ai-learn reads it. */
+  private async judgePrompts(): Promise<Record<string, PromptOverride>> {
+    const rows = await this.promptSharedService.getPromptsForRuntime({
+      promptCode: [ACTOR_GOAL_JUDGE_PROMPT_CODE],
+    });
+    const prompts: Record<string, PromptOverride> = {};
+    for (const row of rows) {
+      const text = row.prompt?.trim();
+      if (!text) continue;
+      prompts[row.promptCode] = {
+        prompt: text,
+        availableVariables: row.availableVariables ?? [],
+        ...(row.provider ? { provider: row.provider } : {}),
+        ...(row.model ? { model: row.model } : {}),
+        ...(typeof row.temperature === 'number'
+          ? { temperature: row.temperature }
+          : {}),
+      };
+    }
+    return prompts;
+  }
 
   /**
    * Catch-up pass for sessions the normal trigger never saw.
@@ -271,6 +302,18 @@ export class ScenarioSessionEvaluationService {
         content: m.content,
       }));
 
+      // The judge's live prompt from the Skills Store. A failed read throws
+      // (caught below) before anything is marked, so the catch-up retries it;
+      // an empty map would make ai-learn run its own default instead.
+      const prompts = await this.judgePrompts();
+      if (!prompts[ACTOR_GOAL_JUDGE_PROMPT_CODE]) {
+        this.logger.warn(
+          `Skipping actor evaluation for ${sessionId}: ` +
+            `${ACTOR_GOAL_JUDGE_PROMPT_CODE} is not in the Skills Store.`,
+        );
+        return false;
+      }
+
       // Mark IN_PROGRESS up-front so the UI can show "evaluating…" and a late
       // webhook can be correlated.
       await this.upsertDetails(scenarioSession, {
@@ -289,6 +332,7 @@ export class ScenarioSessionEvaluationService {
           description: g.description ?? null,
         })),
         language: this.resolveLanguage(scenarioSession),
+        prompts,
       });
 
       this.logger.info(

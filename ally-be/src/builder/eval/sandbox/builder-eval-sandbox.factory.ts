@@ -249,6 +249,9 @@ export class BuilderEvalSandboxFactory {
       stores.messageRepository as any,
       evidenceLog,
       this.catalog,
+      // Through the facade, so a candidate edit to the reviewer's prompt is
+      // tried here the same way as one to the interviewer's.
+      prompts,
     );
     const readiness = new BuilderReadinessService(
       prdService,

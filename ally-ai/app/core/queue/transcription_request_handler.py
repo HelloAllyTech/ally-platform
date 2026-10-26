@@ -25,13 +25,17 @@ from app.schemas.common import ChatMessage
 
 logger = get_logger(__name__)
 
-# The prompts this pipeline renders: diarization, the summary or dictation
-# summary, and counselor analysis. ally-be sends their live text on the queue
-# message; for a message without it, they are fetched from ally-be.
+# The prompts this pipeline renders: Gemini transcription, diarization, the
+# summary or dictation summary (and its condense step for long transcripts), and
+# counselor analysis. ally-be sends their live text on the queue message
+# (TRANSCRIPTION_PIPELINE_PROMPT_CODES); for a message without it, they are
+# fetched from ally-be.
 PIPELINE_PROMPT_CODES = [
+    "ally_ai_audio_gemini_transcription",
     "ally_ai_audio_diarization",
     "ally_ai_summary_summary",
     "ally_ai_summary_dictation_summary",
+    "ally_ai_summary_condense_chunk",
     "ally_ai_analysis_counselor_analysis",
 ]
 
@@ -240,6 +244,7 @@ class TranscriptionRequestHandler:
                         chat_id=request.chat_id,
                         sample_rate=request.sample_rate,
                         is_linear16_encoded=bool(request.is_linear16_encoded),
+                        prompts=prompts,
                     )
                 )
                 # Snapshot synchronously (no await) — safe against concurrent msgs.

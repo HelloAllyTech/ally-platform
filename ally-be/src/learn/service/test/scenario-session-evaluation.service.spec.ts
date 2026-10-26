@@ -4,6 +4,17 @@ import {
 } from '../scenario-session-evaluation.service';
 import { ScenarioSessions } from '../../entity/scenario-sessions.entity';
 
+const JUDGE_ROW = {
+  promptCode: 'ally_ai_learn_evaluation_actor_goal_system',
+  prompt: 'Judge {goals_block}\n',
+  availableVariables: ['goals_block'],
+  model: 'gpt-4.1',
+};
+
+const promptShared = (rows: unknown[] = [JUDGE_ROW]) => ({
+  getPromptsForRuntime: jest.fn().mockResolvedValue(rows),
+});
+
 describe('ScenarioSessionEvaluationService — upsertDetails', () => {
   const session = {
     id: 'sess-1',
@@ -18,6 +29,7 @@ describe('ScenarioSessionEvaluationService — upsertDetails', () => {
       {} as any,
       {} as any,
       {} as any,
+      promptShared() as any,
     );
     return { service, detailsRepo };
   };
@@ -71,14 +83,16 @@ describe('ScenarioSessionEvaluationService — triggerForSession idempotency', (
     const aiService = {
       triggerActorGoalEvaluation: jest.fn().mockResolvedValue(undefined),
     };
+    const promptService = promptShared();
     const service = new ScenarioSessionEvaluationService(
       detailsRepo as any,
       messagesRepo as any,
       testCaseService as any,
       aiService as any,
       {} as any,
+      promptService as any,
     );
-    return { service, aiService, testCaseService };
+    return { service, aiService, testCaseService, detailsRepo, promptService };
   };
 
   // `end-of-session` arrives over SQS and can be redelivered; without this
@@ -114,6 +128,38 @@ describe('ScenarioSessionEvaluationService — triggerForSession idempotency', (
     expect(aiService.triggerActorGoalEvaluation).toHaveBeenCalledTimes(1);
   });
 
+  it('sends the judge its live prompt from the Skills Store', async () => {
+    const { service, aiService, promptService } = make(null);
+
+    await service.triggerForSession(session);
+
+    expect(promptService.getPromptsForRuntime).toHaveBeenCalledWith({
+      promptCode: ['ally_ai_learn_evaluation_actor_goal_system'],
+    });
+    expect(aiService.triggerActorGoalEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompts: {
+          ally_ai_learn_evaluation_actor_goal_system: {
+            prompt: 'Judge {goals_block}',
+            availableVariables: ['goals_block'],
+            model: 'gpt-4.1',
+          },
+        },
+      }),
+    );
+  });
+
+  // ai-learn would otherwise run its own default; leaving the row unmarked
+  // lets the catch-up sweep retry once the prompt exists.
+  it("skips, without marking, when the judge's prompt is not in the store", async () => {
+    const { service, aiService, detailsRepo, promptService } = make(null);
+    promptService.getPromptsForRuntime.mockResolvedValue([]);
+
+    expect(await service.triggerForSession(session)).toBe(false);
+    expect(aiService.triggerActorGoalEvaluation).not.toHaveBeenCalled();
+    expect(detailsRepo.upsert).not.toHaveBeenCalled();
+  });
+
   // The guard must short-circuit before the goal fetch, so a redelivery costs
   // one indexed read rather than the whole trigger path.
   it('short-circuits before fetching agent test cases', async () => {
@@ -138,6 +184,7 @@ describe('ScenarioSessionEvaluationService — applyResult applicability', () =>
       {} as any,
       {} as any,
       {} as any,
+      promptShared() as any,
     );
     return { service, detailsRepo };
   };
@@ -266,6 +313,7 @@ describe('ScenarioSessionEvaluationService — runCatchup', () => {
       testCaseService as any,
       aiService as any,
       sessionRepo as any,
+      promptShared() as any,
     );
     return { service, sessionRepo, aiService };
   };
@@ -361,6 +409,7 @@ describe('ScenarioSessionEvaluationService — scheduleV2VEvaluation', () => {
       testCaseService as any,
       aiService as any,
       sessionRepo as any,
+      promptShared() as any,
     );
     return { service, sessionRepo, aiService };
   };

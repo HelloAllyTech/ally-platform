@@ -20,11 +20,14 @@ import {
   BuilderEvalSandbox,
   BuilderEvalSandboxFactory,
 } from '../sandbox/builder-eval-sandbox.factory';
+import { BUILDER_EVAL_MAX_TURNS } from '../constants/builder-eval-prompts';
+import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
 import {
-  BUILDER_EVAL_ADMIN_SYSTEM_PROMPT,
-  BUILDER_EVAL_JUDGE_SYSTEM_PROMPT,
-  BUILDER_EVAL_MAX_TURNS,
-} from '../constants/builder-eval-prompts';
+  BUILDER_EVAL_ADMIN_SYSTEM,
+  BUILDER_EVAL_JUDGE_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import {
   BuilderEvalChecklistItem,
   BuilderEvalCriticOutcome,
@@ -241,7 +244,15 @@ export class BuilderEvalRunnerService {
     BuilderEvalRunnerService.name,
   );
 
-  constructor(private readonly sandboxFactory: BuilderEvalSandboxFactory) {}
+  constructor(
+    private readonly sandboxFactory: BuilderEvalSandboxFactory,
+    /**
+     * The simulated admin's and the judge's instructions, read live rather
+     * than through the sandbox's facade: they measure the candidate, so a
+     * candidate's overrides must never reach them.
+     */
+    private readonly prompts: PromptSharedService,
+  ) {}
 
   async run(
     fixture: BuilderEvalFixture,
@@ -638,10 +649,15 @@ export class BuilderEvalRunnerService {
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
+        const template = await loadPromptTemplate(
+          this.prompts,
+          BUILDER_EVAL_ADMIN_SYSTEM.code,
+        );
         const result = await sandbox.llmCompletion.complete({
           taskId: BUILDER_AI_TASKS.EVAL_ADMIN,
           task: LlmTask.BUILDER_EVAL,
-          system: BUILDER_EVAL_ADMIN_SYSTEM_PROMPT,
+          promptCode: BUILDER_EVAL_ADMIN_SYSTEM.code,
+          system: renderPrompt(BUILDER_EVAL_ADMIN_SYSTEM, template, {}),
           prompt,
           maxTokens: ADMIN_MAX_TOKENS,
           jsonMode: true,
@@ -674,10 +690,15 @@ export class BuilderEvalRunnerService {
       return { met: 0, total: 0, score: 1, items: [] };
     }
     try {
+      const template = await loadPromptTemplate(
+        this.prompts,
+        BUILDER_EVAL_JUDGE_SYSTEM.code,
+      );
       const result = await sandbox.llmCompletion.complete({
         taskId: BUILDER_AI_TASKS.EVAL_JUDGE,
         task: LlmTask.BUILDER_EVAL,
-        system: BUILDER_EVAL_JUDGE_SYSTEM_PROMPT,
+        promptCode: BUILDER_EVAL_JUDGE_SYSTEM.code,
+        system: renderPrompt(BUILDER_EVAL_JUDGE_SYSTEM, template, {}),
         prompt: [
           '<checklist>',
           JSON.stringify(checklist),

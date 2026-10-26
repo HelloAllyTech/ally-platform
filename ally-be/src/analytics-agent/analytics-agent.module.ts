@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from '../config/config.module';
+import { AiModule } from '../ai/ai.module';
 import { AnalyticsAgentController } from './controller/analytics-agent.controller';
 import { AnalyticsAgentService } from './service/analytics-agent.service';
 import { SchemaCatalogService } from './service/schema-catalog.service';
@@ -19,7 +20,9 @@ import { SqlExecutorService } from './service/sql-executor.service';
  * DataSource and stores nothing. Conversation state lives in the browser.
  */
 @Module({
-  imports: [AppConfigModule],
+  // AiModule for AiService.getPromptOverrides: the planner and narrator
+  // prompts are Skills Store prompts, sent to ally-ai with each call.
+  imports: [AppConfigModule, AiModule],
   controllers: [AnalyticsAgentController],
   providers: [AnalyticsAgentService, SchemaCatalogService, SqlExecutorService],
   // Exported for in-process callers that ask a question on a user's behalf —

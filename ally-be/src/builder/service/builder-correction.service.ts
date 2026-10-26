@@ -4,6 +4,9 @@ import { LoggerService } from 'src/logger/logger.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { parseFirstJsonObject } from 'src/learn/util/autofill-shared.util';
+import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
+import { BUILDER_CORRECTION_SYSTEM, renderPrompt } from 'src/prompt/contracts';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import {
   BUILDER_CORRECTION_CATEGORIES,
   BuilderCorrection,
@@ -32,24 +35,6 @@ const TEXT_MAX = 2000;
 const CLASSIFY_MAX_TOKENS = 3000;
 /** Prefix that marks a fixture the loop made, as opposed to one a person curated. */
 export const AUTO_FIXTURE_PREFIX = 'auto: ';
-
-export const BUILDER_CORRECTION_SYSTEM_PROMPT = `You read one exchange from an interview between Builder — an agent that interviews an admin into a product requirements document for the Ally platform — and the admin. Decide whether the admin's reply CORRECTS Builder: tells it that something it said, assumed, proposed or asked was wrong, already exists, left something out, or was unnecessary.
-
-Answering Builder's question, adding a new requirement, choosing between options, or saying "ok" is NOT a correction. Correcting Builder's facts, its plan, its scope, or its decision to ask at all IS.
-
-When it is a correction, classify it as exactly one of:
-- missing_capability: Builder did not know the platform already has something ("this already exists", "use X instead", "promotion is already built").
-- stale_doc: Builder relied on documentation or knowledge that is wrong or out of date.
-- platform_scope: a platform, app or repo was left out or wrongly included (e.g. mobile missed, the change is in the backend not the web app).
-- over_asking: Builder asked something it could have found itself, or kept asking when it had enough ("you have everything, write it").
-- other: a correction that fits none of these.
-
-Write everything in general terms about the platform. Never name or describe the admin.
-
-Return one JSON object and nothing else:
-{"isCorrection":true,"category":"missing_capability","subject":"what it was about, a few words","detail":"what Builder got wrong, one sentence","lesson":"one sentence a future interview should know, or null","capability":{"name":"…","whatItIs":"…","reuseWhen":"…"} or null (missing_capability only, when the admin named a system),"doc":{"path":"repo:path if known, else null","fix":"what the doc should say"} or null (stale_doc only),"checklistItem":{"text":"the thing itself, e.g. 'Reuses Auto-improve for challengers' or 'A new challenger job'","kind":"must or must_not"} or null}
-
-When it is not a correction: {"isCorrection":false}`;
 
 export interface CorrectionClassification {
   isCorrection: boolean;
@@ -171,6 +156,8 @@ export class BuilderCorrectionService {
     private readonly llmCompletion: LlmCompletionService,
     private readonly knowledgeService: BuilderKnowledgeService,
     private readonly fixtureService: BuilderEvalFixtureService,
+    /** The classifier's instructions: `builder_correction_system`. */
+    private readonly prompts: PromptSharedService,
   ) {
     this.corrections = dataSource.getRepository(BuilderCorrection);
   }
@@ -350,10 +337,15 @@ export class BuilderCorrectionService {
     let classification: CorrectionClassification | null = null;
     let model: string | null = null;
     try {
+      const template = await loadPromptTemplate(
+        this.prompts,
+        BUILDER_CORRECTION_SYSTEM.code,
+      );
       const result = await this.llmCompletion.complete({
         taskId: BUILDER_AI_TASKS.CORRECTION_CLASSIFY,
         task: LlmTask.BUILDER_CORRECTION_CLASSIFY,
-        system: BUILDER_CORRECTION_SYSTEM_PROMPT,
+        promptCode: BUILDER_CORRECTION_SYSTEM.code,
+        system: renderPrompt(BUILDER_CORRECTION_SYSTEM, template, {}),
         prompt: [
           `<request>${clip(message.sessionTitle, 200)}</request>`,
           '<builder>',

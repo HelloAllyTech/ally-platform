@@ -56,6 +56,25 @@ prompt for a long-running agent rather than a one-shot generation. Two things di
   down. Copy that pattern rather than throwing; the agent working slightly worse beats the
   tab not opening.
 
+### Builder's one-shot prompts (`builder/`, `agent_memory/`)
+
+Beside the two agent prompts (`interviewer_system`, `platform_rules`), `builder/` holds the
+system prompts of Builder's one-shot calls: the PRD reviewer and its recheck, the discovery
+planner, the replay eval's simulated admin and judge, the correction classifier, the milestone
+planner, the research pass, the outcome categoriser, the lesson curator, the past-build ranker
+and note writer, and the interview summariser. `agent_memory/curator_system.txt` is the
+notebook curator's. Each `.txt` is the full production text, not a minimal base: these were
+compiled constants until they moved here, and sync seeded the store with exactly that text.
+
+They load through `loadPromptTemplate` (`src/common/util/prompt-template.util.ts`): the
+store's live text, else, when the database can't be read, the shipped `.txt` trimmed as sync
+stores it — never an empty prompt; with no text anywhere it throws into the call's own failure
+path. A call that names a configured model (`builder.mechanicalModel`, `plannerModel`) uses
+`promptModelOr`, so a model picked on the prompt in the Skills Store wins. The PRD reviewer's
+section keys and finding cap are rendered in as `{{sectionKeys}}` / `{{maxFindings}}` from the
+constants its parser uses, so the two cannot drift. The eval's admin and judge read their live
+text directly, never a candidate's overrides: they are the measuring instrument.
+
 ### Copilot field prompts (`agent_builder/`)
 
 `agent_builder/` is a one-shot folder with an extra naming contract: each file's **basename

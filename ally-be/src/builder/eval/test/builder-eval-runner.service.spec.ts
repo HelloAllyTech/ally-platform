@@ -271,7 +271,7 @@ describe('BuilderEvalRunnerService', () => {
       };
       const factory = { create: jest.fn(() => sandbox) };
       return {
-        runner: new BuilderEvalRunnerService(factory as any),
+        runner: new BuilderEvalRunnerService(factory as any, null as any),
         complete,
         factory,
       };
@@ -358,18 +358,21 @@ describe('BuilderEvalRunnerService', () => {
           ? { text: JSON.stringify({ message: 'Thanks.', done: true }) }
           : { text: JSON.stringify({ items: [] }), model: 'gpt-5-mini' },
       );
-      const runner = new BuilderEvalRunnerService({
-        create: jest.fn(() => ({
-          session,
-          stores,
-          orchestrator,
-          prdService: {},
-          readiness: { assess: jest.fn().mockResolvedValue(notReady) },
-          llmCompletion: { complete },
-          passes: [],
-          costUsd: () => 0.1,
-        })),
-      } as any);
+      const runner = new BuilderEvalRunnerService(
+        {
+          create: jest.fn(() => ({
+            session,
+            stores,
+            orchestrator,
+            prdService: {},
+            readiness: { assess: jest.fn().mockResolvedValue(notReady) },
+            llmCompletion: { complete },
+            passes: [],
+            costUsd: () => 0.1,
+          })),
+        } as any,
+        null as any,
+      );
 
       await stores.docRepository.save({
         sessionId: 'session-1',
@@ -488,18 +491,21 @@ describe('BuilderEvalRunnerService', () => {
                 model: 'gpt-5-mini',
               },
         );
-        const runner = new BuilderEvalRunnerService({
-          create: jest.fn(() => ({
-            session,
-            stores,
-            orchestrator,
-            prdService: {},
-            readiness: { assess: jest.fn().mockResolvedValue(grounded) },
-            llmCompletion: { complete },
-            passes: [],
-            costUsd: () => 0.3,
-          })),
-        } as any);
+        const runner = new BuilderEvalRunnerService(
+          {
+            create: jest.fn(() => ({
+              session,
+              stores,
+              orchestrator,
+              prdService: {},
+              readiness: { assess: jest.fn().mockResolvedValue(grounded) },
+              llmCompletion: { complete },
+              passes: [],
+              costUsd: () => 0.3,
+            })),
+          } as any,
+          null as any,
+        );
         return runner.run(
           {
             id: 'f1',
@@ -566,11 +572,14 @@ describe('BuilderEvalRunnerService', () => {
     });
 
     it('reports an errored run rather than throwing', async () => {
-      const runner = new BuilderEvalRunnerService({
-        create: () => {
-          throw new Error('no catalog');
-        },
-      } as any);
+      const runner = new BuilderEvalRunnerService(
+        {
+          create: () => {
+            throw new Error('no catalog');
+          },
+        } as any,
+        null as any,
+      );
 
       const result = await runner.run(
         {

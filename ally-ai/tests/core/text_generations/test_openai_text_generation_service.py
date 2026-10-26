@@ -1911,6 +1911,52 @@ class TestCondenseForSummary:
         assert "alpha" in result  # raw content preserved on fallback
         text_generation_service._invoke_llm.assert_awaited()
 
+    @pytest.mark.asyncio
+    async def test_runs_the_store_text_on_the_summary_client_by_default(
+        self, text_generation_service
+    ):
+        text_generation_service._invoke_llm = AsyncMock(return_value="CONDENSED")
+        summary_client = object()
+        prompts = {
+            "ally_ai_summary_condense_chunk": {
+                "prompt": "LIVE {part_number}/{part_count}: {chunk}"
+            }
+        }
+        transcript = "\n".join("CLIENT: word word word word word" for _ in range(2000))
+
+        await text_generation_service._condense_for_summary(
+            transcript, llm_override=summary_client, prompts=prompts
+        )
+
+        call = text_generation_service._invoke_llm.await_args_list[0]
+        assert call.args[0].startswith("LIVE 1/")
+        assert call.kwargs["llm_override"] is summary_client
+
+    @pytest.mark.asyncio
+    async def test_the_store_model_for_the_condense_prompt_wins(
+        self, text_generation_service
+    ):
+        text_generation_service._invoke_llm = AsyncMock(return_value="CONDENSED")
+        condense_client = object()
+        text_generation_service._client_for = MagicMock(return_value=condense_client)
+        prompts = {
+            "ally_ai_summary_condense_chunk": {
+                "prompt": "LIVE {chunk}",
+                "model": "gpt-4.1-mini",
+            }
+        }
+        transcript = "\n".join("CLIENT: word word word word word" for _ in range(2000))
+
+        await text_generation_service._condense_for_summary(
+            transcript, llm_override=object(), prompts=prompts
+        )
+
+        text_generation_service._client_for.assert_called_once_with(
+            "summary/condense_chunk", prompts
+        )
+        call = text_generation_service._invoke_llm.await_args_list[0]
+        assert call.kwargs["llm_override"] is condense_client
+
 
 class TestSupervisorNoteSections:
     """2026-10-16: some debriefs reached learners as one paragraph because the

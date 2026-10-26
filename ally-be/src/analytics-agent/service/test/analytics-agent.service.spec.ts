@@ -1,6 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import axios from 'axios';
-import { AnalyticsAgentService } from '../analytics-agent.service';
+import {
+  ANALYTICS_AGENT_ANSWER_PROMPT_CODES,
+  ANALYTICS_AGENT_PLAN_PROMPT_CODES,
+  AnalyticsAgentService,
+} from '../analytics-agent.service';
+import { AiService } from '../../../ai/service/ai.service';
 import { SchemaCatalogService } from '../schema-catalog.service';
 import { SqlExecutorService } from '../sql-executor.service';
 import { AGENT_LIMITS } from '../../constants/analytics-agent.constants';
@@ -53,6 +58,13 @@ describe('AnalyticsAgentService', () => {
   let service: AnalyticsAgentService;
   let executor: { run: jest.Mock };
   let catalog: { render: jest.Mock; getCatalog: jest.Mock };
+  let aiService: { getPromptOverrides: jest.Mock };
+
+  /** The store's live prompts for the codes asked for, as AiService builds them. */
+  const storePrompts = (codes: readonly string[]) =>
+    Object.fromEntries(
+      codes.map((code) => [code, { prompt: `live ${code}`, version: 2 }]),
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -81,10 +93,18 @@ describe('AnalyticsAgentService', () => {
         durationMs: 24,
       }),
     };
+    aiService = {
+      getPromptOverrides: jest
+        .fn()
+        .mockImplementation(async (codes: readonly string[]) =>
+          storePrompts(codes),
+        ),
+    };
     service = new AnalyticsAgentService(
       catalog as unknown as SchemaCatalogService,
       executor as unknown as SqlExecutorService,
       { ai: { apiUrl: 'http://ai.test', outboundApiKey: 'k' } } as never,
+      aiService as unknown as AiService,
     );
   });
 
@@ -418,5 +438,54 @@ describe('AnalyticsAgentService', () => {
     expect(result.deniedColumns).toContain('password');
     expect(result.deniedColumns).toContain('email');
     expect(result.rowLimit).toBe(AGENT_LIMITS.ROW_LIMIT);
+  });
+
+  it('sends each call the live Skills Store prompt it renders', async () => {
+    mockedAxios.post
+      .mockResolvedValueOnce(
+        planResponse({
+          intent: 'sql',
+          sql: 'SELECT 1 AS bucket, 2 AS n FROM analytics_agent_scenario_sessions LIMIT 10',
+        }),
+      )
+      .mockResolvedValueOnce(answerResponse());
+
+    await service.ask({ question: 'Sessions per week?' });
+
+    expect(aiService.getPromptOverrides).toHaveBeenCalledWith(
+      ANALYTICS_AGENT_PLAN_PROMPT_CODES,
+    );
+    expect(aiService.getPromptOverrides).toHaveBeenCalledWith(
+      ANALYTICS_AGENT_ANSWER_PROMPT_CODES,
+    );
+    const planBody = mockedAxios.post.mock.calls[0][1] as {
+      prompts: Record<string, unknown>;
+    };
+    const answerBody = mockedAxios.post.mock.calls[1][1] as {
+      prompts: Record<string, unknown>;
+    };
+    expect(planBody.prompts).toEqual({
+      ally_ai_analytics_planner: {
+        prompt: 'live ally_ai_analytics_planner',
+        version: 2,
+      },
+    });
+    expect(answerBody.prompts).toEqual({
+      ally_ai_analytics_answer: {
+        prompt: 'live ally_ai_analytics_answer',
+        version: 2,
+      },
+    });
+  });
+
+  it('does not call ally-ai when the store prompts cannot be read', async () => {
+    aiService.getPromptOverrides.mockRejectedValueOnce(
+      new Error('store unreachable; ally-ai was not called'),
+    );
+
+    await expect(
+      service.ask({ question: 'Sessions per week?' }),
+    ).rejects.toThrow('ally-ai was not called');
+    expect(mockedAxios.post).not.toHaveBeenCalled();
   });
 });

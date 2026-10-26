@@ -80,7 +80,11 @@ Field notes worth reading before you guess:
   `ally_ai_knowledge_whatsapp_answer`, not `whatsapp_answer`); a code that does
   not exist sends an admin looking for a row that is not there. A free-text
   phrase is allowed only where the prompt genuinely varies per invocation, as it
-  does for the autofill calls.
+  does for the autofill calls. A row names one prompt, so a call site that sends
+  two different system prompts gets a row (and a `taskId`) per prompt, sharing the
+  usage label: `builder-prd-review` / `builder-prd-recheck`,
+  `builder-context-selection` / `builder-exemplar-summary`, like
+  `builder-eval-admin` / `builder-eval-judge`.
 - **`hotPath: true`** marks a call inside a live voice turn, where latency is
   user-visible. Set it honestly — it is what someone filters on when a session
   feels slow.

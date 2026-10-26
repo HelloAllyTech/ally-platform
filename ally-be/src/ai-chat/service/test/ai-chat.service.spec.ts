@@ -105,6 +105,7 @@ describe('AiChatService usage recording', () => {
     });
 
     const out = await service.summarizeMessages({
+      systemPrompt: 'Summarise the conversation.',
       existingSummary: null,
       messages: [{ role: 'user', content: 'x' }],
       llmConfig: { model: 'gpt-4o-mini' },

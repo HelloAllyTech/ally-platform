@@ -249,6 +249,8 @@ CHUNK_OVERLAP_WORDS = (
 MAX_SUMMARY_INPUT_WORDS = 8000
 # Word size of each chunk fed to the condense (map) step.
 SUMMARY_CONDENSE_CHUNK_WORDS = 2000
+# The condense (map) step's instruction, a Skills Store prompt.
+CONDENSE_CHUNK_PROMPT_PATH = "summary/condense_chunk"
 
 _TIMESTAMP_REGEX = re.compile(r"\[\d{1,2}:\d{2}(:\d{2})?\]")
 
@@ -805,7 +807,10 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
         return DynamicSummaryNoteResponse(fields=merged)
 
     async def _condense_for_summary(
-        self, chat_history_str: str, llm_override: Optional[Any] = None
+        self,
+        chat_history_str: str,
+        llm_override: Optional[Any] = None,
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Bound the transcript fed to the structured-summary prompt.
@@ -820,6 +825,10 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
 
         A chunk whose condensation fails falls back to a truncated slice of the
         raw chunk, so one flaky LLM call can't sink the whole summary.
+
+        The instruction is the Skills Store's `ally_ai_summary_condense_chunk`.
+        It runs on that prompt's model when the store sets one, else on
+        `llm_override` (the summary prompt's client), as it always has.
         """
         if len(chat_history_str.split()) <= MAX_SUMMARY_INPUT_WORDS:
             return chat_history_str
@@ -831,18 +840,28 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
             len(chunks),
         )
 
+        from app.prompts.resolver import get_backend_llm_overrides
+
+        condense_overrides = get_backend_llm_overrides(
+            CONDENSE_CHUNK_PROMPT_PATH, prompts
+        )
+        condense_client = (
+            self._client_for(CONDENSE_CHUNK_PROMPT_PATH, prompts)
+            if any(value is not None for value in condense_overrides)
+            else llm_override
+        )
+
         async def condense_chunk(chunk: str, index: int) -> str:
-            prompt = (
-                "Condense the following part of a counselling session "
-                "transcript into a concise summary. Preserve who said what, "
-                "key topics, decisions, risks, emotional shifts, and any "
-                "clinically relevant details. Do not add information that is "
-                "not present. Output plain text only.\n\n"
-                f"TRANSCRIPT PART {index + 1}/{len(chunks)}:\n{chunk}"
+            prompt = load_and_format(
+                CONDENSE_CHUNK_PROMPT_PATH,
+                prompts=prompts,
+                part_number=index + 1,
+                part_count=len(chunks),
+                chunk=chunk,
             )
             try:
                 result = await self._invoke_llm(
-                    prompt, task=LLMTask.SUMMARY.value, llm_override=llm_override
+                    prompt, task=LLMTask.SUMMARY.value, llm_override=condense_client
                 )
                 return result if isinstance(result, str) else str(result)
             except Exception as e:
@@ -888,7 +907,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
         # overflow the prompt and fail every time). Metrics below still use the
         # FULL chat_history / chat_history_str.
         summary_input_str = await self._condense_for_summary(
-            chat_history_str, llm_override=summary_client
+            chat_history_str, llm_override=summary_client, prompts=prompts
         )
 
         # Start LLM call and metric calculation in parallel

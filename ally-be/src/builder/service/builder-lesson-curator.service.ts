@@ -4,6 +4,15 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
+import {
+  loadPromptTemplate,
+  promptModelOr,
+} from 'src/common/util/prompt-template.util';
+import {
+  BUILDER_LESSON_CURATOR_SYSTEM,
+  renderPrompt,
+} from 'src/prompt/contracts';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { BuilderLesson } from '../entity/builder-lesson.entity';
 import { BuilderLessonRepository } from '../repository/builder-knowledge.repository';
 import {
@@ -52,6 +61,8 @@ export class BuilderLessonCuratorService {
     private readonly lessonRepository: BuilderLessonRepository,
     private readonly llmCompletion: LlmCompletionService,
     private readonly redisService: RedisService,
+    /** The curator's instructions and, when it names one, its model. */
+    private readonly prompts: PromptSharedService,
   ) {}
 
   /**
@@ -155,12 +166,21 @@ export class BuilderLessonCuratorService {
     candidates: BuilderLesson[],
     active: BuilderLesson[],
   ): Promise<CuratorOperation[]> {
+    const [template, target] = await Promise.all([
+      loadPromptTemplate(this.prompts, BUILDER_LESSON_CURATOR_SYSTEM.code),
+      promptModelOr(
+        this.prompts,
+        BUILDER_LESSON_CURATOR_SYSTEM.code,
+        this.configService.builder.mechanicalModel,
+      ),
+    ]);
     const result = await this.llmCompletion.complete({
       taskId: BUILDER_AI_TASKS.LESSON_CURATION,
       task: LlmTask.BUILDER_LESSON_CURATION,
       maxTokens: BUILDER_MAX_TOKENS,
-      model: this.configService.builder.mechanicalModel,
-      system: CURATOR_SYSTEM_PROMPT,
+      // The prompt's model when the Skills Store names one, else the mechanical model.
+      ...target,
+      system: renderPrompt(BUILDER_LESSON_CURATOR_SYSTEM, template, {}),
       usageMetadata: { candidates: candidates.length, active: active.length },
       prompt: [
         '## Active rules',
@@ -438,43 +458,3 @@ const normaliseOperation = (entry: any): CuratorOperation | null => {
     rewrite: Boolean(entry?.rewrite),
   };
 };
-
-const CURATOR_SYSTEM_PROMPT = `
-You maintain a small library of engineering lessons for a coding agent that
-works on one platform's repos. New lessons arrive as raw bullets written by an
-agent immediately after finishing a build; your job is to fold them into a set
-that stays worth reading.
-
-The set has a hard size cap, so this is a zero-sum edit: every rule that stays
-is one another cannot have. Prefer a short set of specific, checkable rules over
-a long set of vague ones.
-
-For each candidate, emit exactly one operation:
-
-- **AGREE** — a candidate says what an active rule already says. Fold it in.
-  \`{"op":"AGREE","id":"<active rule id>","candidateId":"<candidate id>"}\`
-- **EDIT** — an active rule (or a candidate) is right but imprecise, or the
-  candidate makes it more general. Rewrite it.
-  \`{"op":"EDIT","id":"<id>","lesson":"<new text>","category":"gotcha|convention|estimate|process","tags":["migrations"]}\`
-- **ADD** — genuinely new. Activate the candidate, optionally tightening it.
-  \`{"op":"ADD","id":"<candidate id>","lesson":"<optional tightened text>","tags":[]}\`
-- **REMOVE** — an active rule is stale, wrong, or now subsumed by another.
-  \`{"op":"REMOVE","id":"<id>"}\`
-
-What makes a good rule:
-
-- **Specific and checkable.** "Migrations in ally-be need a CHECK constraint
-  rewritten when an enum widens" is a rule. "Be careful with migrations" is not.
-- **Written for a stranger.** The next reader has no idea which build produced
-  it. Name the repo, the file, the command, the symptom.
-- **About the platform, not the moment.** "The suite was slow today" is noise;
-  "ally-web tests need NX_DAEMON=false or they collide" is a rule.
-
-Merge aggressively. Two rules about the same trap in different words are one
-rule. Prefer AGREE over ADD when in doubt: a count of five on one rule carries
-more signal than five rules.
-
-Do not invent lessons nobody reported. Do not restate a rule you are keeping.
-
-Output: a JSON array of operations, nothing else.
-`.trim();

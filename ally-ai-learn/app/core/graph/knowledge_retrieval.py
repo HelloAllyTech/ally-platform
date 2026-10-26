@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.core.graph.utils import convert_messages_to_chat_messages
 from app.core.logger import get_logger
+from app.prompts.resolver import load_and_format
 
 logger = get_logger(__name__)
 
@@ -231,23 +232,19 @@ def _store_cached_retrieval(cache_key: str, value: str) -> None:
 #: selector, which is off the reply path.
 _PREVIEW_CHARS = 160
 
-#: How the client's memories are framed to the selector. Measured on the
+#: The selector's system prompts, in the Skills Store; their live text comes
+#: from the session's room metadata (``scenario.prompt_data``), so the live turn
+#: makes no extra fetch. Memories only, or memories plus Tier 1 glossary
+#: sections: two prompts, because the two share only the memory framing and
+#: rule, and every other line differs. The memory framing was measured on the
 #: real model (tests/integration/test_knowledge_selector_live.py): the old
 #: "directly relevant to what is being discussed" framing recalled a family
 #: memory on 0/9 family questions — gpt-4o-mini read "family at home" as not
-#: about "Mother's health" — while this framing recalled 9/9 with no false
-#: picks on work-only turns. Previews alone did not move it; the framing did.
-_MEMORY_FRAMING = (
-    "You pick which of the client's own memories are on their mind right now, "
-    "in a role-played conversation between a counselor and a client (the "
-    "client is an AI agent)."
-)
-_MEMORY_RULE = (
-    "Read the counselor's latest message. Return the title of every memory the "
-    "client would naturally draw on to answer it, including memories the "
-    "question reaches only indirectly. Leave out memories unrelated to what the "
-    "counselor is asking about now."
-)
+#: about "Mother's health" — while the current framing recalled 9/9 with no
+#: false picks on work-only turns. Previews alone did not move it; the framing
+#: did. Keep the two prompts' framing in step when editing either.
+_MEMORY_SELECTOR_PROMPT = "retrieval/memory_selector_system"
+_MEMORY_GLOSSARY_SELECTOR_PROMPT = "retrieval/memory_glossary_selector_system"
 
 
 def _preview(content: str) -> str:
@@ -261,11 +258,12 @@ def _build_selector_prompt(
     available_titles: List[str],
     glossary_hints: Optional[Dict[str, str]],
     previews: Optional[Dict[str, str]] = None,
+    prompt_data: Any = None,
 ) -> str:
     """Build the title-selection system prompt.
 
     Scenario Knowledge Sources are the client's MEMORIES, and are framed that
-    way (see `_MEMORY_FRAMING`), each with a short content preview.
+    way (see the prompts above), each with a short content preview.
 
     With glossary sections the prompt also carries a dual-framing instruction
     (LANGUAGE_GLOSSARY_DESIGN.md §5.2): memories are selected for what the
@@ -275,6 +273,11 @@ def _build_selector_prompt(
     the agent into a vocabulary domain unarmed while a false positive only
     spends cap budget. Each glossary section's `retrievalHint` is rendered
     under its title as its trigger description.
+
+    The topic list is built here and passed in as ``topics_block``; the text
+    around it is the session's Skills Store prompt (``prompt_data``), stripped
+    like the store's text so a local default's trailing newline never reaches
+    the model.
     """
     glossary_hints = glossary_hints or {}
     previews = previews or {}
@@ -289,27 +292,15 @@ def _build_selector_prompt(
         lines.append(f"- {title}: {gist}" if gist else f"- {title}")
     topics_block = "\n".join(lines)
 
-    if not glossary_hints:
-        return (
-            f"{_MEMORY_FRAMING}\n\n"
-            f"The client's memories (title: what it is about):\n{topics_block}\n\n"
-            f"{_MEMORY_RULE} Return exact titles only. If none apply, return an "
-            "empty list."
-        )
-
-    return (
-        f"{_MEMORY_FRAMING}\n\n"
-        f"Available topics:\n{topics_block}\n\n"
-        "Two kinds of topics are listed:\n"
-        f"- The client's memories (title: what it is about). {_MEMORY_RULE}\n"
-        "- Language glossary sections (titles in [brackets]): these help the "
-        "client character SPEAK its next reply in its language. Return a "
-        "glossary section when the next reply is likely to enter that "
-        "vocabulary domain, even if it has not been explicitly mentioned yet. "
-        "When the conversation seems to be entering a new topic area, prefer "
-        "including the matching glossary section.\n\n"
-        "Return exact titles only. If none apply, return an empty list."
-    )
+    return load_and_format(
+        (
+            _MEMORY_GLOSSARY_SELECTOR_PROMPT
+            if glossary_hints
+            else _MEMORY_SELECTOR_PROMPT
+        ),
+        prompt_data=prompt_data,
+        topics_block=topics_block,
+    ).strip()
 
 
 async def retrieve_relevant_knowledge(
@@ -318,6 +309,7 @@ async def retrieve_relevant_knowledge(
     knowledge_map: Dict[str, str],
     glossary_hints: Optional[Dict[str, str]] = None,
     room_id: Optional[str] = None,
+    prompt_data: Any = None,
 ) -> str:
     """
     Use the scenario LLM to identify which knowledge-base titles are
@@ -327,6 +319,8 @@ async def retrieve_relevant_knowledge(
     `knowledge_map` may include Tier 1 language-glossary sections (prefixed
     titles); `glossary_hints` maps those titles to their retrieval-trigger
     descriptions and switches the selector to the dual-framing prompt.
+    `prompt_data` is the session's (``scenario.prompt_data``): the selector's
+    system prompt is its Skills Store text.
 
     Returns an empty string when nothing is relevant or on any error.
 
@@ -338,15 +332,25 @@ async def retrieve_relevant_knowledge(
         return ""
 
     try:
+        available_titles = list(knowledge_map.keys())
+
+        previews = {
+            title: _preview(content)
+            for title, content in knowledge_map.items()
+            if not (glossary_hints and title in glossary_hints)
+        }
+        system_prompt = _build_selector_prompt(
+            available_titles, glossary_hints, previews, prompt_data=prompt_data
+        )
+
+        # The prompt text is part of the key: the cache is process-wide, and
+        # sessions started either side of a Skills Store publish run different
+        # text. It also covers the glossary hints, which the prompt lists.
+        prompt_digest = hashlib.md5(system_prompt.encode("utf-8")).hexdigest()
         cache_key = (
             f"{_get_llm_identity(llm_client)}:"
-            f"{_build_cache_key(messages, knowledge_map)}"
+            f"{_build_cache_key(messages, knowledge_map)}:{prompt_digest}"
         )
-        if glossary_hints:
-            hints_digest = hashlib.md5(
-                json.dumps(sorted(glossary_hints.items())).encode("utf-8")
-            ).hexdigest()
-            cache_key = f"{cache_key}:{hints_digest}"
         cached = _get_cached_retrieval(cache_key)
         if cached is not None:
             logger.debug("Knowledge retrieval cache hit")
@@ -357,17 +361,6 @@ async def retrieve_relevant_knowledge(
 
         conversation_text = "\n".join(
             f"{msg.role}: {msg.content}" for msg in chat_messages if msg.content
-        )
-
-        available_titles = list(knowledge_map.keys())
-
-        previews = {
-            title: _preview(content)
-            for title, content in knowledge_map.items()
-            if not (glossary_hints and title in glossary_hints)
-        }
-        system_prompt = _build_selector_prompt(
-            available_titles, glossary_hints, previews
         )
 
         # include_raw because the parsed model alone carries no usage metadata.

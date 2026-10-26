@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AiModule } from 'src/ai/ai.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { PromptModule } from 'src/prompt/prompt.module';
 
 import { AgentMemory } from './entity/agent-memory.entity';
 import { AgentMemoryRepository } from './repository/agent-memory.repository';
@@ -21,7 +22,12 @@ import { AgentMemorySchedulerRegistrationService } from './service/agent-memory-
  * its own surface with its own auth (Bug Hunter's pipeline key and admin JWT).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([AgentMemory]), AiModule, LlmAgentModule],
+  imports: [
+    TypeOrmModule.forFeature([AgentMemory]),
+    AiModule,
+    LlmAgentModule,
+    PromptModule,
+  ],
   providers: [
     AgentMemoryRepository,
     AgentMemoryService,

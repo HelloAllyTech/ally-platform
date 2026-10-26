@@ -17,7 +17,8 @@ smaller than the 24MB the other providers use.
 import asyncio
 import os
 import re
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,7 @@ from app.core.transcriptions.utils.exceptions import TranscriptionFailedExceptio
 from app.core.transcriptions.utils.logger import get_logger
 from app.core.transcriptions.utils.phi_events import PHIEvents
 from app.core.transcriptions.utils.phi_logger import PHILogEvent, phi_logger
+from app.prompts.resolver import get_backend_llm_overrides, load_template
 
 logger = get_logger(__name__)
 
@@ -61,19 +63,19 @@ _MIME_BY_EXTENSION = {
     ".aiff": "audio/aiff",
 }
 
-TRANSCRIPTION_PROMPT = (
-    "You are a verbatim transcription engine for a recorded counselling call.\n"
-    "Transcribe everything that is spoken in this audio exactly as it is said, "
-    "in the language or languages actually spoken. Do not translate. Keep "
-    "code-mixed speech as spoken, and write Indian languages in their native "
-    "script.\n"
-    "Split the speech into short utterances at natural pauses or speaker "
-    "changes. For every utterance give its start and end time in seconds from "
-    'the beginning of this audio as decimal numbers (for example "12.40").\n'
-    "Do not add speaker labels, commentary, summaries or anything that was not "
-    "spoken. If there is no intelligible speech, return an empty list of "
-    "segments."
-)
+# The instruction sent with each audio segment: the Skills Store's
+# `ally_ai_audio_gemini_transcription` (default: app/prompts/audio/).
+TRANSCRIPTION_PROMPT_PATH = "audio/gemini_transcription"
+
+
+@dataclass(frozen=True)
+class _CallSettings:
+    """What one recording's Gemini calls send: the instruction, the model and
+    the generation config. Resolved once per recording from its prompts."""
+
+    prompt: str
+    model: str
+    config: Any
 
 
 class TranscriptSegment(BaseModel):
@@ -199,12 +201,54 @@ class GeminiTranscriptionService:
     async def aclose(self):
         await self._client.aclose()
 
+    def _call_settings(self, prompts: Optional[Dict[str, Any]]) -> _CallSettings:
+        """The instruction, model and config for one recording.
+
+        The model and temperature the Skills Store sets for the prompt win, but
+        only a Gemini model: this service can run nothing else. Without one,
+        the configured transcription model at temperature 0.
+        """
+        prompt = load_template(TRANSCRIPTION_PROMPT_PATH, prompts=prompts)
+        provider, model, temperature = get_backend_llm_overrides(
+            TRANSCRIPTION_PROMPT_PATH, prompts
+        )
+        from app.core.llm.dispatch import (
+            PROVIDER_GEMINI,
+            canonical_provider,
+            infer_provider_from_model,
+        )
+
+        chosen = self._model
+        if model:
+            model_provider = (
+                canonical_provider(provider)
+                if provider
+                else infer_provider_from_model(model)
+            )
+            if model_provider in (PROVIDER_GEMINI, None):
+                chosen = model.strip()
+            else:
+                logger.warning(
+                    "Ignoring the store's non-Gemini model for Gemini "
+                    f"transcription: {provider}/{model}"
+                )
+        config = self._config
+        if temperature is not None:
+            config = self._types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=Transcript,
+                thinking_config=self._types.ThinkingConfig(thinking_budget=0),
+                temperature=temperature,
+            )
+        return _CallSettings(prompt=prompt, model=chosen, config=config)
+
     async def transcribe_audio_from_url(
         self,
         audio_url: str,
         chat_id: int,
         sample_rate: int = 8000,
         is_linear16_encoded: bool = False,
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Tuple[int, str]:
         """
         Transcribe audio from URL into timestamped segments text.
@@ -215,6 +259,8 @@ class GeminiTranscriptionService:
             sample_rate (int): Expected sample rate of the audio (default: 8000)
             is_linear16_encoded (bool): Whether the audio is headerless linear16
                 (s16le) PCM (mobile uploads), which must be decoded as raw PCM.
+            prompts (dict): The pipeline's Skills Store prompts (the queue
+                message's), for the transcription instruction and its model.
 
         Returns:
             Tuple[int, str]: (chat_id, segments_text). An empty string means the
@@ -225,6 +271,7 @@ class GeminiTranscriptionService:
             TranscriptionFailedException: If transcription fails
         """
         segment_paths: List[str] = []
+        call = self._call_settings(prompts)
         try:
             segment_paths = await convert_and_segment_audio_async(
                 audio_url=audio_url,
@@ -252,7 +299,7 @@ class GeminiTranscriptionService:
                 )
             )
 
-            segments = await self._transcribe_segments(segment_paths, chat_id)
+            segments = await self._transcribe_segments(segment_paths, chat_id, call)
             segments_text = format_segments(segments)
 
             if not segments_text:
@@ -271,7 +318,7 @@ class GeminiTranscriptionService:
                         "chat_id": chat_id,
                         "segments_count": len(segments),
                         "segments_text_length": len(segments_text),
-                        "model": self._model,
+                        "model": call.model,
                         "component": "GeminiTranscriptionService",
                         "method": "transcribe_audio_from_url",
                     },
@@ -309,7 +356,7 @@ class GeminiTranscriptionService:
             await self._cleanup_segment_files(segment_paths, chat_id)
 
     async def _transcribe_segments(
-        self, segment_paths: List[str], chat_id: int
+        self, segment_paths: List[str], chat_id: int, call: _CallSettings
     ) -> List[Tuple[float, float, str]]:
         """Transcribe every segment concurrently and stitch them on one clock.
 
@@ -335,6 +382,7 @@ class GeminiTranscriptionService:
                     offsets[index],
                     float(durations[index] or 0.0),
                     chat_id,
+                    call,
                 )
 
         results = await asyncio.gather(
@@ -377,9 +425,10 @@ class GeminiTranscriptionService:
         offset: float,
         duration: float,
         chat_id: int,
+        call: _CallSettings,
     ) -> List[Tuple[float, float, str]]:
-        transcript, usage_metadata = await self._generate(segment_path)
-        _emit_stt_usage(self._model, duration, usage_metadata)
+        transcript, usage_metadata = await self._generate(segment_path, call)
+        _emit_stt_usage(call.model, duration, usage_metadata)
 
         adjusted: List[Tuple[float, float, str]] = []
         dropped = 0
@@ -406,7 +455,7 @@ class GeminiTranscriptionService:
         )
         return adjusted
 
-    async def _generate(self, segment_path: str):
+    async def _generate(self, segment_path: str, call: _CallSettings):
         """One Gemini call for one audio file. Returns (Transcript, usage).
 
         Kept small and side-effect free so tests can replace it.
@@ -418,9 +467,9 @@ class GeminiTranscriptionService:
         try:
             response = await asyncio.wait_for(
                 self._client.aio.models.generate_content(
-                    model=self._model,
-                    contents=[TRANSCRIPTION_PROMPT, audio_part],
-                    config=self._config,
+                    model=call.model,
+                    contents=[call.prompt, audio_part],
+                    config=call.config,
                 ),
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
