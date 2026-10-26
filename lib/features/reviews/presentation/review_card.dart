@@ -11,6 +11,7 @@ import '../data/review_models.dart';
 import 'review_formatting.dart';
 import 'simulation_audio_player.dart';
 import 'simulation_audio_player_controller.dart';
+import 'simulation_details_card.dart';
 
 /// Port of ally-mobile (React Native)'s `ReviewScreen/components/
 /// ReviewCard.tsx` — a bordered card per review, confirmed from source to
@@ -133,12 +134,18 @@ class ReviewCard extends ConsumerWidget {
             ),
           if (!_isScribe) ...[
             if (session?.createdAt != null)
-              _Row(label: ref.t('review.details.dateAndTime'), value: formatReviewDateTime(session!.createdAt!)),
+              ReviewDetailRow(
+                label: ref.t('review.details.dateAndTime'),
+                value: formatReviewDateTime(session!.createdAt!),
+              ),
             if (session?.duration != null)
-              _Row(label: ref.t('review.feedCard.duration'), value: formatReviewDuration(session!.duration)),
+              ReviewDetailRow(
+                label: ref.t('review.feedCard.duration'),
+                value: formatReviewDuration(session!.duration),
+              ),
             const SizedBox(height: 8),
           ],
-          _SimulationDetailsCard(
+          SimulationDetailsCard(
             typeLabel: typeLabel,
             reviewType: reviewType,
             title: _isScribe ? review.scribeSession?.summaryName : review.scenario?.title,
@@ -151,12 +158,12 @@ class ReviewCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (review.scribeSession?.createdAt != null)
-                        _Row(
+                        ReviewDetailRow(
                           label: ref.t('review.details.dateAndTime'),
                           value: formatReviewDateTime(review.scribeSession!.createdAt!),
                         ),
                       if (review.scribeSession?.duration != null)
-                        _Row(
+                        ReviewDetailRow(
                           label: ref.t('review.feedCard.duration'),
                           value: formatReviewDuration(review.scribeSession!.duration),
                         ),
@@ -234,149 +241,3 @@ class ReviewCard extends ConsumerWidget {
   }
 }
 
-/// Port of ally-mobile (React Native)'s `SimulationDetailsCard` — a
-/// bordered, rounded box: a cover image/illustration strip on top, then a
-/// padded body with the type chip, a single-line title, and either a
-/// 2-line-truncated description with a "View more"/"View less" toggle
-/// (simulation reviews) or a caller-supplied widget in that same slot
-/// (scribe reviews' Date&time/Duration rows — see [ReviewCard]'s doc
-/// comment for why). RN only shows the toggle once it measures the text
-/// actually overflowing 2 lines (`onTextLayout`); this always shows it
-/// whenever there's description text, a reasonable simplification since
-/// scenario descriptions are effectively always longer than that in
-/// practice — a short description would show a working but unnecessary
-/// toggle rather than a missing one.
-class _SimulationDetailsCard extends ConsumerStatefulWidget {
-  const _SimulationDetailsCard({
-    required this.typeLabel,
-    required this.reviewType,
-    required this.title,
-    this.coverImageUrl,
-    this.illustrationAsset,
-    this.descriptionText,
-    this.descriptionWidget,
-  });
-
-  final String typeLabel;
-  final ReviewType reviewType;
-  final String? title;
-  final String? coverImageUrl;
-  final String? illustrationAsset;
-  final String? descriptionText;
-  final Widget? descriptionWidget;
-
-  @override
-  ConsumerState<_SimulationDetailsCard> createState() => _SimulationDetailsCardState();
-}
-
-class _SimulationDetailsCardState extends ConsumerState<_SimulationDetailsCard> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasDescriptionText = widget.descriptionText?.isNotEmpty ?? false;
-
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.strokePrimary, width: 0.5),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.coverImageUrl != null)
-            Image.network(
-              widget.coverImageUrl!,
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(height: 180),
-            )
-          else if (widget.illustrationAsset != null)
-            Container(
-              height: 180,
-              width: double.infinity,
-              color: AppColors.surfaceContainerLow,
-              padding: const EdgeInsets.all(24),
-              child: SvgPicture.asset(widget.illustrationAsset!, fit: BoxFit.contain),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ReviewTypeChip(reviewType: widget.reviewType, label: widget.typeLabel),
-                const SizedBox(height: 4),
-                Text(
-                  widget.title?.isNotEmpty == true ? widget.title! : '-',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifMedium,
-                    color: AppColors.highEmphasis,
-                  ),
-                ),
-                if (widget.descriptionWidget != null)
-                  Padding(padding: const EdgeInsets.only(top: 4), child: widget.descriptionWidget!),
-                if (hasDescriptionText) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      widget.descriptionText!,
-                      maxLines: _expanded ? null : 2,
-                      overflow: _expanded ? null : TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, color: AppColors.mediumEmphasis),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        _expanded ? ref.t('common.viewLess') : ref.t('common.viewMore'),
-                        style: const TextStyle(color: AppColors.primary, fontSize: 13),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontFamily: AppFonts.ibmPlexSerifMedium,
-                fontSize: 12,
-                color: AppColors.highEmphasis,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

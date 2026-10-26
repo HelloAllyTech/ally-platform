@@ -164,9 +164,33 @@ class _SimulationFeedbackScreenState
               AppButton(
                 variant: AppButtonVariant.secondary,
                 label: ref.t('postSim.common.shareForReview'),
-                onPressed: () => context.push(
-                  '/share-for-review/${widget.scenarioSessionId}',
-                ),
+                onPressed: () {
+                  // The debrief's own `summary` isn't in scope here (this
+                  // button is a sibling of `_SummarySection`, not inside
+                  // its `.when` callback) — re-reading the same provider
+                  // just returns the already-resolved cached value, no new
+                  // fetch. Only the session's own timing is available this
+                  // way, not the scenario's title/description/cover — see
+                  // ShareForReviewScreen's own doc comment for why that's
+                  // an accepted gap rather than a missing fetch to add.
+                  final summary = ref.read(
+                    simulationSummaryProvider(widget.scenarioSessionId),
+                  ).value;
+                  context.push(
+                    '/share-for-review/${widget.scenarioSessionId}',
+                    extra: (
+                      reviewId: null,
+                      note: null,
+                      contextDateTime: summary?.startedAt,
+                      contextDuration: summary?.endedAt == null
+                          ? null
+                          : DateTime.parse(summary!.endedAt!)
+                              .difference(DateTime.parse(summary.startedAt))
+                              .inSeconds
+                              .toString(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               AppButton(

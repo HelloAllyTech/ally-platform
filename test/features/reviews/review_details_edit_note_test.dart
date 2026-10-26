@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
+import 'package:ally_mobile_flutter/core/routing/app_router.dart' show ShareForReviewArgs;
 import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
 import 'package:ally_mobile_flutter/features/account/data/user_profile.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
@@ -48,11 +49,11 @@ void main() {
           GoRoute(
             path: '/share-for-review/:scenarioSessionId',
             builder: (context, state) {
-              final editArgs = state.extra as ({String reviewId, String note})?;
+              final editArgs = state.extra as ShareForReviewArgs?;
               return ShareForReviewScreen(
                 scenarioSessionId: state.pathParameters['scenarioSessionId']!,
                 reviewId: editArgs?.reviewId,
-                isEditNote: editArgs != null,
+                isEditNote: editArgs?.reviewId != null,
                 initialNote: editArgs?.note,
               );
             },

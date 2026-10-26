@@ -41,6 +41,17 @@ import '../auth/auth_state.dart';
 import '../navigation/app_shell_screen.dart';
 import '../widgets/review_type_chip.dart';
 
+/// `extra` shape for `/share-for-review/:scenarioSessionId` — one record
+/// covers both real callers (edit-note's `reviewId`/`note`, and a fresh
+/// share's session `contextDateTime`/`contextDuration`) since a route's
+/// `extra` is a single `Object?` slot, not per-caller overloads.
+typedef ShareForReviewArgs = ({
+  String? reviewId,
+  String? note,
+  String? contextDateTime,
+  String? contextDuration,
+});
+
 /// The redirect gate's actual decision logic, extracted to a pure top-level
 /// function so it's testable without constructing a real [GoRouterState]
 /// (whose constructor needs a private `RouteConfiguration` not obtainable
@@ -256,16 +267,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/share-for-review/:scenarioSessionId',
         builder: (context, state) {
-          // Edit-note mode (from ReviewDetailsScreen) passes the real
-          // reviewId/note via `extra` instead — the path's
-          // `scenarioSessionId` is a dummy value in that case since editing
-          // only PATCHes the existing review, it never needs the session id.
-          final editArgs = state.extra as ({String reviewId, String note})?;
+          // Edit-note mode (from ReviewDetailsScreen) passes reviewId/note;
+          // the fresh-share flow (from SimulationFeedbackScreen) instead
+          // passes the session's own date/duration as the context card's
+          // data — one combined optional-fields record covers both, since
+          // the path's own `scenarioSessionId` is a dummy value in edit
+          // mode anyway (editing only PATCHes the existing review, it
+          // never needs the session id).
+          final args = state.extra as ShareForReviewArgs?;
           return ShareForReviewScreen(
             scenarioSessionId: state.pathParameters['scenarioSessionId']!,
-            reviewId: editArgs?.reviewId,
-            isEditNote: editArgs != null,
-            initialNote: editArgs?.note,
+            reviewId: args?.reviewId,
+            isEditNote: args?.reviewId != null,
+            initialNote: args?.note,
+            contextDateTime: args?.contextDateTime,
+            contextDuration: args?.contextDuration,
           );
         },
       ),

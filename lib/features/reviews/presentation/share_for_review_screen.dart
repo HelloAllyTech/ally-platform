@@ -1,32 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/emoji_insert_picker.dart';
+import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/reviews_repository.dart';
+import 'review_formatting.dart';
+import 'simulation_details_card.dart';
 
 /// Matches ally-mobile (React Native)'s `useShareScreenLogic`'s
 /// `MAX_NOTE_LENGTH`.
 const _maxNoteLength = 250;
 
-/// Port of ally-mobile (React Native)'s `ShareSimulationScreen` — a note
-/// field + submit, creating a review tied to a completed scenario session
-/// (POST /scenario-session-reviews). When [reviewId] is supplied, this is
-/// instead the real edit-note flow: a different title/button and a PATCH
+/// Port of ally-mobile (React Native)'s `ShareSimulationScreen`/
+/// `ShareCallLogScreen` — a note field + submit, creating a review tied to
+/// a completed scenario session (POST /scenario-session-reviews) or scribe
+/// call. When [reviewId] is supplied, this is instead the real edit-note
+/// flow: a different title/button and a PATCH
 /// `updateReviewStatus(status: IN_REVIEW, note)` call rather than a create,
 /// matching `useShareScreenLogic`'s `handleEditNote`/`screenTitle`/
 /// `buttonLabel` branching exactly.
 ///
-/// Not ported: the session/scenario context card (`SimulationDetailsCard`
-/// — cover media, title, description, date/duration rows) and the
-/// emoji-insert picker — both real further work. No screen in this app
-/// yet navigates here with [reviewId] set (e.g. an edit-note entry point
-/// on ReviewDetailsScreen), so this is infrastructure a future caller can
-/// use once that entry point exists.
+/// The session/scenario context card ([SimulationDetailsCard] — cover
+/// media, title, description, date/duration rows, same shared widget
+/// [ReviewCard] uses) and the emoji-insert picker (RN's
+/// `rn-emoji-keyboard`, scoped down — see [EmojiInsertPicker]'s own doc
+/// comment) are both wired in, but the context fields are all optional:
+/// [contextTitle]/[contextDescription]/[contextCoverImageUrl] aren't
+/// available from this app's one real caller today
+/// (`SimulationFeedbackScreen` only has the session's own timing, not the
+/// scenario's title/description — that would need a separate scenario
+/// fetch this screen doesn't have a reason to add yet), so the card
+/// degrades to just its Date&time/Duration rows when they're absent,
+/// rather than requiring the caller to supply data it doesn't have.
 class ShareForReviewScreen extends ConsumerStatefulWidget {
   const ShareForReviewScreen({
     super.key,
@@ -34,12 +46,32 @@ class ShareForReviewScreen extends ConsumerStatefulWidget {
     this.reviewId,
     this.isEditNote = false,
     this.initialNote,
+    this.isScribe = false,
+    this.contextTitle,
+    this.contextDescription,
+    this.contextCoverImageUrl,
+    this.contextDateTime,
+    this.contextDuration,
   });
 
   final String scenarioSessionId;
   final String? reviewId;
   final bool isEditNote;
   final String? initialNote;
+
+  /// Selects the Scribe vs Simulation chip/illustration on the context
+  /// card — mirrors which of `ShareSimulationScreen`/`ShareCallLogScreen`
+  /// this stands in for.
+  final bool isScribe;
+  final String? contextTitle;
+  final String? contextDescription;
+  final String? contextCoverImageUrl;
+
+  /// ISO 8601 — rendered via [formatReviewDateTime].
+  final String? contextDateTime;
+
+  /// A string of seconds — rendered via [formatReviewDuration].
+  final String? contextDuration;
 
   @override
   ConsumerState<ShareForReviewScreen> createState() =>
@@ -67,6 +99,14 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
   }
 
   void _onNoteChanged() => setState(() {});
+
+  /// RN's `handleEmojiSelected`: appended to the end of the note, not
+  /// inserted at the cursor — and only while still under the character
+  /// limit (a no-op past it, not a truncation).
+  void _insertEmoji(String emoji) {
+    if (_noteController.text.length >= _maxNoteLength) return;
+    _noteController.text += emoji;
+  }
 
   Future<void> _submit() async {
     setState(() {
@@ -112,17 +152,69 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
         : ref.t('common.share');
     final length = _noteController.text.length;
 
+    final hasContext =
+        widget.contextTitle != null ||
+        widget.contextDateTime != null ||
+        widget.contextDuration != null;
+    final reviewType = widget.isScribe ? ReviewType.scribe : ReviewType.simulation;
+    final typeLabel = ref.t('review.feedCard.reviewType', {
+      'reviewType': widget.isScribe ? 'Scribe' : 'Simulation',
+    });
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
             TabScreenHeader(title: screenTitle),
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (hasContext) ...[
+                      if (!widget.isScribe) ...[
+                        if (widget.contextDateTime != null)
+                          ReviewDetailRow(
+                            label: ref.t('review.details.dateAndTime'),
+                            value: formatReviewDateTime(widget.contextDateTime!),
+                          ),
+                        if (widget.contextDuration != null)
+                          ReviewDetailRow(
+                            label: ref.t('review.feedCard.duration'),
+                            value: formatReviewDuration(widget.contextDuration),
+                          ),
+                        const SizedBox(height: 8),
+                      ],
+                      SimulationDetailsCard(
+                        typeLabel: typeLabel,
+                        reviewType: reviewType,
+                        title: widget.contextTitle,
+                        coverImageUrl: widget.isScribe ? null : widget.contextCoverImageUrl,
+                        illustrationAsset: widget.isScribe ? 'assets/icons/scribeReview.svg' : null,
+                        descriptionText: widget.isScribe
+                            ? null
+                            : htmlToPlainText(widget.contextDescription),
+                        descriptionWidget: !widget.isScribe
+                            ? null
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (widget.contextDateTime != null)
+                                    ReviewDetailRow(
+                                      label: ref.t('review.details.dateAndTime'),
+                                      value: formatReviewDateTime(widget.contextDateTime!),
+                                    ),
+                                  if (widget.contextDuration != null)
+                                    ReviewDetailRow(
+                                      label: ref.t('review.feedCard.duration'),
+                                      value: formatReviewDuration(widget.contextDuration),
+                                    ),
+                                ],
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Text(ref.t('review.addNoteCaption')),
                     const SizedBox(height: 12),
                     AppTextField(
@@ -130,13 +222,24 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
                       maxLines: 5,
                       maxLength: _maxNoteLength,
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        '$length/$_maxNoteLength',
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: AppColors.mediumEmphasis),
-                      ),
+                    Row(
+                      children: [
+                        IconButton(
+                          key: const ValueKey('add-emoji-button'),
+                          onPressed: () => EmojiInsertPicker.show(context, onEmojiSelected: _insertEmoji),
+                          icon: SvgPicture.asset(
+                            'assets/icons/smile.svg',
+                            width: 24,
+                            height: 24,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '$length/$_maxNoteLength',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.mediumEmphasis),
+                        ),
+                      ],
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),

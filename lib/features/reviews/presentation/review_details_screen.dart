@@ -131,7 +131,12 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
   void _editNote(ReviewItem review) {
     context.push(
       '/share-for-review/${review.id}',
-      extra: (reviewId: review.id, note: review.note),
+      extra: (
+        reviewId: review.id,
+        note: review.note,
+        contextDateTime: null,
+        contextDuration: null,
+      ),
     );
   }
 
