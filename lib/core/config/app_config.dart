@@ -24,6 +24,14 @@ class AppConfig {
     defaultValue: '/microphone-chat',
   );
 
+  /// Mirrors `env.CLOUD_TELEPHONY_PATH` — the Socket.IO namespace a
+  /// cloud-telephony (Exotel/Ozonetel) conference call connects to, used by
+  /// `ConferenceListeningScreen` instead of [microphoneSocketPath].
+  static const String cloudTelephonyPath = String.fromEnvironment(
+    'CLOUD_TELEPHONY_PATH',
+    defaultValue: '/cloud-telephony-chat',
+  );
+
   /// Mirrors `env.I18N_BASE_URL` — the dynamic translation CDN this app's
   /// real counterpart polls at runtime (manifest.json + per-namespace JSON),
   /// with the bundled locale assets as the offline/zero-delay fallback only.

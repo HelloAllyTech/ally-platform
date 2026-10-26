@@ -167,8 +167,14 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     final hasChatDetails = permissions.contains(UserPermissions.viewChatDetails);
     final hasScenarioDetails = permissions.contains(UserPermissions.viewScenarioSessionDetails);
     final hasTags = permissions.contains(UserPermissions.viewTags);
-    final canStartCall = permissions.contains(UserPermissions.startMicrophoneChat) ||
-        permissions.contains(UserPermissions.startCloudTelephonyChat);
+    // Mirrors RN's `canOfferAnySessionType` (`CallLogScreen.tsx`) exactly:
+    // tapping "Start Session" only ever starts Scribe's microphone
+    // recording (`handleVoiceRecording`) — a cloud-telephony conference call
+    // is never user-initiated (it's the counsellor's real phone ringing),
+    // so `startCloudTelephonyChat` was never part of RN's own gate here.
+    // (RN also ORs in `canCreateNote`, omitted since no note-creation flow
+    // is ported yet.)
+    final canStartCall = permissions.contains(UserPermissions.startMicrophoneChat);
 
     if (hasReal && hasSimulation) {
       _activeTab ??= _LogTab.real;

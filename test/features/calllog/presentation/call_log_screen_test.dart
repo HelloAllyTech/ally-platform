@@ -291,6 +291,32 @@ void main() {
   });
 
   testWidgets(
+    'no FAB for a cloud-telephony-only permission either — "Start Session" only ever starts '
+    'Scribe recording, and a conference call is never user-initiated (matches RN\'s own '
+    'canOfferAnySessionType gate, which never considers cloud-telephony permission)',
+    (tester) async {
+      final repository = _repository();
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.startCloudTelephonyChat,
+            ],
+          ),
+        ],
+      );
+
+      expect(find.byKey(const Key('start-session-fab')), findsNothing);
+    },
+  );
+
+  testWidgets(
     'cancelling the swipe-to-archive confirmation leaves the row in place and never archives',
     (tester) async {
       final repository = _repository(realLogs: [_log()]);

@@ -15,4 +15,14 @@ class SocketEvent {
   static const audioChatEnded = 'AUDIO_CHAT_ENDED';
   static const nudge = 'NUDGE';
   static const scribeStartDiagnostic = 'SCRIBE_START_DIAGNOSTIC';
+
+  /// Server→client: a cloud-telephony (Exotel/Ozonetel) conference call's
+  /// live audio, broadcast for the waveform — see `conference_listening_screen.dart`.
+  static const audioStream = 'AUDIO_STREAM';
+
+  /// Client→server only, from `ConferenceListeningScreen`'s play/pause
+  /// control — mirrors RN's `publishControl`-style usage exactly: it pauses
+  /// AI nudges, not any audio (there is no audio playback in this screen).
+  static const audioChatPaused = 'AUDIO_CHAT_PAUSED';
+  static const audioChatResumed = 'AUDIO_CHAT_RESUMED';
 }

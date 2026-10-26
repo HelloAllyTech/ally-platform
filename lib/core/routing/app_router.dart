@@ -28,6 +28,7 @@ import '../../features/reviews/presentation/review_details_screen.dart';
 import '../../features/reviews/presentation/review_screen.dart';
 import '../../features/reviews/presentation/share_for_review_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
+import '../../features/scribe/presentation/conference_listening_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/simulations/data/simulation_models.dart';
@@ -142,6 +143,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Dev-only: real navigation will carry the actual signed-in
           // user's id once auth/profile screens are ported.
           return const ScribeRecordingScreen(userId: 'dev-user');
+        },
+      ),
+      GoRoute(
+        path: '/conference-listening/:chatId',
+        builder: (context, state) {
+          // Dev-only, same as '/scribe' above — real navigation will carry
+          // the signed-in user's id, and will reach this route via the
+          // active-chat-discovery pass noted on ConferenceListeningScreen's
+          // class doc rather than a manually-typed chatId.
+          return ConferenceListeningScreen(
+            chatId: int.parse(state.pathParameters['chatId']!),
+            userId: 'dev-user',
+          );
         },
       ),
       GoRoute(

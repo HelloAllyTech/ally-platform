@@ -2056,5 +2056,20 @@
     "startRecording": "Start recording",
     "stop": "Stop",
     "testingHint": "Lock the screen or switch apps while recording to verify the foreground service keeps audio chunks flowing — this is the exact failure mode this rewrite exists to fix."
+  },
+  "conferenceListening": {
+    "title": "Conference call (Phase 1)",
+    "connecting": "Connecting to call...",
+    "socketLabel": "Socket",
+    "connected": "connected",
+    "disconnected": "disconnected",
+    "waitingForClient": "Waiting for the client to join",
+    "clientJoined": "Client joined",
+    "audioChunksReceived": "Audio chunks received: {{count}}",
+    "nudgesReceived": "Nudges received: {{count}}",
+    "pause": "Pause nudges",
+    "resume": "Resume nudges",
+    "endSession": "End session",
+    "callEnded": "The call has ended"
   }
 }
