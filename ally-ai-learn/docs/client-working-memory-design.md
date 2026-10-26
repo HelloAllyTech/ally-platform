@@ -62,8 +62,8 @@ Three divergences were left alone on purpose, because they are not renames. `ope
 / `closed_threads` are deltas and `{working_memory_unresolved}` is the net set; the two
 withheld lists are paired positionally into one section; and `{working_memory_salient}` has
 no updater field at all, because recall fills it. Renaming any of those would assert a
-symmetry that does not exist. They are documented in the updater's `_meta` sidecar instead,
-which is what the studio shows a curator. The store's own `stance` keeps its name: it reaches
+symmetry that does not exist. They are documented in the updater's contract (its `PromptInfo`
+description in `app/prompts/contracts.py`), which is what the studio shows a curator. The store's own `stance` keeps its name: it reaches
 ally-be as `final_stance` / `stance_path` on the write-out record and as `stanceFrom` /
 `stanceTo` on the monologue, so renaming it is a cross-service change with already-persisted
 rows behind it, and it buys nothing a prompt reader can see.

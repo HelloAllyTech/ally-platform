@@ -467,8 +467,9 @@ metabolism* — and every gram of that metabolism stays out of the per-turn hot 
 ### 6.1 Seed (per language, once)
 
 1. Admin triggers "Generate draft glossary" for a language.
-2. A `glossary_generation` prompt row (registry, `useDashboardOverride=true`, provider
-   `gemini`, editable in Prompt Management — mirror of `agent_template_translation`) is run
+2. A `glossary_generation` prompt row (registry, provider `gemini`, editable in the Skills
+   Store; its live version is the text, the Git default only when it has none —
+   `useDashboardOverride` is retired — mirror of `agent_template_translation`) is run
    through `PromptTranslationProviderService`-style plumbing (`LlmProviderFactory`).
    Inputs: language + `evalConfig` (script, `targetVariety`, `diglossia`), tone guidelines,
    code-mix preserve words, the three entry-type specs, per-section token budgets.

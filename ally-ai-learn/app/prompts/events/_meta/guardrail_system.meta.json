@@ -1,5 +1,0 @@
-{
-    "name": "Guardrail Classifier System Prompt",
-    "kind": "prompt",
-    "description": "System prompt for detecting if a counselor's utterance violates a guardrail boundary. Responds with structured JSON indicating a violation or not."
-}

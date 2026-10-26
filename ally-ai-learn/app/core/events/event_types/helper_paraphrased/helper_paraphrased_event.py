@@ -3,7 +3,7 @@ Helper paraphrased event using OpenAI LLM to detect if counselor
 paraphrased the agent's previous message.
 """
 
-from typing import List
+from typing import List, Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -40,6 +40,10 @@ class HelperParaphrasedEvent(BaseEvent):
     detection_type: DetectionType = DetectionType.HELPER_PARAPHRASED
     data: HelperParaphrasedData = HelperParaphrasedData()
     model: str = "gpt-4o-mini"  # Default model for paraphrase evaluation
+
+    #: The session's prompt data (Skills Store text in ``prompts``), so the
+    #: classifier prompts render from the store rather than the local defaults.
+    prompt_data: Optional[object] = None
 
     @classmethod
     def create(
@@ -159,7 +163,7 @@ class HelperParaphrasedEvent(BaseEvent):
         client = AsyncOpenAI(api_key=api_key)
 
         system_prompt, user_prompt = get_paraphrase_evaluation_prompt(
-            agent_message, counselor_message
+            agent_message, counselor_message, prompt_data=self.prompt_data
         )
 
         messages = [

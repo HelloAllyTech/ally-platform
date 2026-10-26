@@ -1,3 +1,4 @@
+import { hashPromptBody } from 'src/prompt/util/prompt-contract.util';
 import { In, Not, IsNull } from 'typeorm';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
@@ -1280,44 +1281,18 @@ export class ScenarioSharedService {
   }
 
   /**
-   * Get prompts for scenario session metadata.
-   * Only includes prompts with useDashboardOverride=true (enabled from Dashboard).
-   * ally-ai-learn uses metadata prompts when present; otherwise falls back to local .txt.
+   * Every ally-ai-learn prompt's live text, with its version and content hash,
+   * for a session's room metadata. The Skills Store is the source of truth, so
+   * all of them ship; ai-learn's own files are only a fallback for a prompt the
+   * store doesn't have. The same map is what the session records as having run
+   * (see {@link promptRecordFrom}).
    */
-  /**
-   * Resolve the *versions* of the dashboard-override prompts that drive a
-   * scenario session, as { promptCode: currentVersion }. Stamped onto the
-   * session at start so drift analytics can attribute behaviour to a specific
-   * prompt-version experiment. Best-effort: returns {} on any failure (capture
-   * must never block session start).
-   */
-  async getResolvedPromptVersionsForScenarioSession(): Promise<
-    Record<string, number>
-  > {
-    try {
-      const prompts = await this.promptSharedService.getPromptsByOptions({
-        promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
-        useDashboardOverrideOnly: true,
-      });
-      return (prompts ?? []).reduce<Record<string, number>>((acc, p) => {
-        const version = (p as { currentVersion?: number }).currentVersion;
-        if (version != null) {
-          acc[p.promptCode] = version;
-        }
-        return acc;
-      }, {});
-    } catch {
-      return {};
-    }
-  }
-
   private async getPromptsForScenarioSession(
     languageDetails?: Languages | null,
     variantByLanguage?: Record<string, string> | null,
   ) {
     const prompts = await this.promptSharedService.getPromptsByOptions({
       promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
-      useDashboardOverrideOnly: true,
     });
 
     if (prompts?.length == 0) {
@@ -1339,6 +1314,9 @@ export class ScenarioSharedService {
           provider?: string;
           model?: string;
           temperature?: number;
+          version?: number | null;
+          contentHash?: string;
+          translationHash?: string;
         }
       >
     >((acc, prompt) => {
@@ -1348,6 +1326,9 @@ export class ScenarioSharedService {
           prompt: content,
           availableVariables: prompt.availableVariables || [],
           hasStates: prompt.hasStates ?? false,
+          // What identifies the text that runs: recorded on the session.
+          version: prompt.version ?? null,
+          contentHash: prompt.contentHash,
           // Forward the prompt-level LLM overrides so the voice runtime
           // (ai-learn's get_prompt_llm_overrides) can honor a per-prompt
           // provider/model/temperature. Only include when set so the payload
@@ -1395,6 +1376,7 @@ export class ScenarioSharedService {
         if (!o) continue;
         if (o.body && o.body !== result[code].prompt) {
           result[code].prompt = o.body;
+          result[code].translationHash = hashPromptBody(o.body);
         }
         // Per-language runtime engine override for the served translated body:
         // which model runs the main agent for this language. Only set when a
@@ -1474,4 +1456,41 @@ export class ScenarioSharedService {
       where: { scenarioSessionId },
     });
   }
+}
+
+/**
+ * What a session ran, read from the very prompt map shipped in its room
+ * metadata — never re-queried, so a publish in between can't make the record
+ * disagree with what ran. `promptHashes` holds the English hash, plus the
+ * translated body's hash when a translation was served.
+ */
+export function promptRecordFrom(
+  prompts:
+    | Record<
+        string,
+        {
+          version?: number | null;
+          contentHash?: string;
+          translationHash?: string;
+        }
+      >
+    | null
+    | undefined,
+): {
+  promptVersions: Record<string, number>;
+  promptHashes: Record<string, string>;
+  translatedPrompts: string[];
+} {
+  const promptVersions: Record<string, number> = {};
+  const promptHashes: Record<string, string> = {};
+  const translatedPrompts: string[] = [];
+  for (const [code, entry] of Object.entries(prompts ?? {})) {
+    if (entry.version != null) promptVersions[code] = entry.version;
+    if (entry.contentHash) promptHashes[code] = entry.contentHash;
+    if (entry.translationHash) {
+      promptHashes[`${code}@translation`] = entry.translationHash;
+      translatedPrompts.push(code);
+    }
+  }
+  return { promptVersions, promptHashes, translatedPrompts };
 }

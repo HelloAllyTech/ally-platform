@@ -1,5 +1,0 @@
-{
-    "name": "Binary Classifier System Prompt",
-    "kind": "prompt",
-    "description": "System prompt for binary classification of text against a named class. Includes a guardrail against prompt injection and optional few-shot examples block."
-}

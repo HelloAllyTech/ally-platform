@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
  *  - `<name>`     — `renderTemplate`'s angle-bracket slots.
  *
  * Same three syntaxes `parseVariablesFromPrompt` recognises, so "a variable" means
- * the same thing here as in the System Skills chip list. Double braces are tried
+ * the same thing here as in the Skills Store chip list. Double braces are tried
  * first so `{{x}}` is one token, not `{x}` inside braces.
  */
 const TOKEN_PATTERN =

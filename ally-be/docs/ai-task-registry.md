@@ -72,8 +72,10 @@ Field notes worth reading before you guess:
   `PromptSharedService.getPromptLlmConfig` — the autofill trio, the character
   interview, coaching chat, agent-template translation, the WhatsApp answer.
   **When you set it, `provider` and `defaultModel` on that row are the fallback,
-  not a fixed fact**, and if the prompt row can select models from more than one
-  vendor the row must say `provider: 'resolved'` rather than assert one. Use the
+  not a fixed fact**: record what runs while nobody has picked a model for the
+  prompt (the tier's vendor and model), not `provider: 'resolved'`. The
+  `promptOverride` names where to look for the rest; see the field's comment in
+  `ai-task-registry.constants.ts`. Use the
   exact prompt code (check the `prompts` table — the WhatsApp answer prompt is
   `ally_ai_knowledge_whatsapp_answer`, not `whatsapp_answer`); a code that does
   not exist sends an admin looking for a row that is not there. A free-text

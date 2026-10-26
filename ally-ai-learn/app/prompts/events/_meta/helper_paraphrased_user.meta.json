@@ -1,5 +1,0 @@
-{
-    "name": "Helper Paraphrased Detector User Prompt",
-    "kind": "prompt",
-    "description": "User-turn prompt presenting the agent and counselor messages for paraphrase evaluation."
-}

@@ -272,6 +272,7 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=classifier_data,
+                prompt_data=(metadata or {}).get("promptData"),
                 **common_fields,
             )
 
@@ -340,6 +341,7 @@ def _create_event_by_detection_type(
                 visibility_type=visibility_type,
                 detection_type=detection_type,
                 data=helper_paraphrased_data,
+                prompt_data=(metadata or {}).get("promptData"),
                 **common_fields,
             )
 

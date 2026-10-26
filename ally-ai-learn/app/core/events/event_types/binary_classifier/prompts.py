@@ -1,4 +1,4 @@
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 from app.core.events.event_types.binary_classifier.schemas import (
     BinaryClassifierData,
@@ -34,6 +34,7 @@ def get_binary_classifier_prompt(
     message: str,
     positive_examples: Optional[List[Example]] = None,
     negative_examples: Optional[List[Example]] = None,
+    prompt_data: Any = None,
 ) -> Tuple[str, str]:
     """
     Returns a tuple of (system_prompt, user_prompt) for the Binary Classifier event.
@@ -43,6 +44,7 @@ def get_binary_classifier_prompt(
         message (str): The message to classify.
         positive_examples (Optional[List[Example]]): Examples of positive cases.
         negative_examples (Optional[List[Example]]): Examples of negative cases.
+        prompt_data: The session's prompt data, carrying the Skills Store text.
 
     Returns:
         Tuple[str, str]: A tuple containing (system_prompt, user_prompt).
@@ -51,12 +53,14 @@ def get_binary_classifier_prompt(
 
     system_prompt = load_and_format(
         "events/binary_classifier_system",
+        prompt_data=prompt_data,
         class_name=class_name,
         examples_block=examples_block,
     )
 
     user_prompt = load_and_format(
         "events/binary_classifier_user",
+        prompt_data=prompt_data,
         message=message,
     )
 
@@ -66,6 +70,7 @@ def get_binary_classifier_prompt(
 def get_batch_binary_classifier_prompt(
     items: Sequence[Tuple[str, BinaryClassifierData]],
     message: str,
+    prompt_data: Any = None,
 ) -> Tuple[str, str]:
     """Build (system_prompt, user_prompt) for classifying `message` against
     several binary-classifier classes in a single call.
@@ -84,10 +89,12 @@ def get_batch_binary_classifier_prompt(
 
     system_prompt = load_and_format(
         "events/binary_classifier_batch_system",
+        prompt_data=prompt_data,
         classes_block=classes_block,
     )
     user_prompt = load_and_format(
         "events/binary_classifier_user",
+        prompt_data=prompt_data,
         message=message,
     )
 

@@ -1,5 +1,0 @@
-{
-    "name": "LLM Response Generator System Prompt",
-    "kind": "prompt",
-    "description": "System prompt for the LLM content generation function used to resolve <llm_response> tags inside branching instructions."
-}

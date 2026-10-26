@@ -713,9 +713,8 @@ On each persisted talker TEXT message, off the socket path:
    longer length, 0 = sent as suggested … 1 = rewritten, two decimals), and the SUGGESTION row gets
    `index` added to `metadata.accepted` (a set) off the send path.
 6. **Prompt overrides** for `ally_ai_helpline_risk_classify` / `ally_ai_helpline_copilot_turn` are read
-   from the `prompts` table (cached 60 s) and sent keyed by full code. The prompt *text* is sent only when
-   the row's dashboard override is on — otherwise the row holds a seeded copy that can be older than
-   ally-ai's file; provider / model / temperature are sent whenever set.
+   from the `prompts` table (cached 60 s) and sent keyed by full code: the live text from the Skills
+   Store, with provider / model / temperature when set.
 
 A failure emits `COPILOT_STATUS UNAVAILABLE` and nothing else (no partial output). `ChatDetailDto.copilot`:
 `status` = `OFF` when suggestions, nudges and the classifier are all off, else the last outcome

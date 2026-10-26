@@ -1,53 +1,87 @@
+import logging
 from unittest.mock import patch
 
-from app.prompts.resolver import resolve_template
+from app.prompts import contracts
+from app.prompts.resolver import (
+    _extract_allowed_variables,
+    load_and_format,
+    resolve_template,
+)
 
 
 @patch("app.prompts.resolver.prompt_manager")
-def test_resolve_template_supervisor_note_always_local(mock_prompt_manager):
-    """
-    Verify that the supervisor_note prompt is always loaded from local files,
-    ignoring any backend version.
-    """
+def test_resolve_template_supervisor_note_uses_store_text_when_present(
+    mock_prompt_manager,
+):
+    """The Skills Store is the source of truth for the debrief note too: its
+    live text wins, and the local default is only the fallback."""
     prompt_code = "ally_ai_shared_supervisor_note"
     internal_path = "shared/supervisor_note"
-    local_template = "This is the correct local template."
-    backend_prompts = {
-        prompt_code: "This is a stale backend template.",
+    mock_prompt_manager.get_template.return_value = "Local default."
+
+    result = resolve_template(
+        prompt_code, {prompt_code: "Live store text."}, internal_path=internal_path
+    )
+    assert result == "Live store text."
+
+    assert (
+        resolve_template(prompt_code, backend_prompts=None, internal_path=internal_path)
+        == "Local default."
+    )
+
+
+@patch("app.prompts.resolver.prompt_manager")
+def test_resolve_template_prefers_backend_then_local(mock_prompt_manager):
+    mock_prompt_manager.get_template.return_value = "Local."
+    code = "ally_ai_some_other_prompt"
+    assert (
+        resolve_template(code, {code: "Backend."}, internal_path="some/other_prompt")
+        == "Backend."
+    )
+    assert resolve_template(code, {}, internal_path="some/other_prompt") == "Local."
+
+
+def test_allowed_variables_accept_object_entries():
+    """ally-be sends `{name, label?, required?}` objects; reading only strings
+    left the allowed set empty, so every placeholder rendered as literal text."""
+    entry = {"availableVariables": ["legacy", {"name": "modern", "required": True}]}
+    assert _extract_allowed_variables(entry) == {"legacy", "modern"}
+
+
+def test_load_and_format_fills_object_declared_variables():
+    code = "ally_ai_nudge_nudge"
+    prompts = {
+        code: {
+            "prompt": "Hello {name}, {missing}.",
+            "availableVariables": [{"name": "name"}, {"name": "missing"}],
+        }
     }
-
-    mock_prompt_manager.get_template.return_value = local_template
-
-    # This is the broken case: backend_prompts has a stale version.
-    # The resolver should ignore it and use the local version.
-    result = resolve_template(prompt_code, backend_prompts, internal_path=internal_path)
-    assert result == local_template, (
-        "Expected the local template to be used for supervisor_note, "
-        "even when a backend version is present."
+    assert load_and_format("nudge/nudge", prompts=prompts, name="Asha") == (
+        "Hello Asha, ."
     )
 
-    # This is the working case: no backend_prompts. Should use local.
-    result_no_backend = resolve_template(
-        prompt_code, backend_prompts=None, internal_path=internal_path
-    )
-    assert result_no_backend == local_template, (
-        "Expected the local template to be used for supervisor_note when "
-        "no backend version is present."
+
+def test_load_and_format_reads_the_store_text_from_prompt_data():
+    code = "ally_ai_nudge_nudge"
+
+    class PromptData:
+        prompts = {code: {"prompt": "From the store: {name}."}}
+
+    assert load_and_format("nudge/nudge", PromptData(), name="Asha") == (
+        "From the store: Asha."
     )
 
-    # Verify that other prompts still use the backend version when available.
-    other_prompt_code = "ally_ai_some_other_prompt"
-    other_internal_path = "some/other_prompt"
-    other_local_template = "This is another local template."
-    other_backend_prompts = {
-        other_prompt_code: "This is a backend template for another prompt.",
-    }
-    mock_prompt_manager.get_template.return_value = other_local_template
 
-    result_other = resolve_template(
-        other_prompt_code, other_backend_prompts, internal_path=other_internal_path
-    )
-    assert result_other == other_backend_prompts[other_prompt_code], (
-        "Expected the backend template to be used for prompts other than "
-        "supervisor_note."
-    )
+def test_missing_required_variable_is_logged_but_still_renders(monkeypatch, caplog):
+    code = "ally_ai_nudge_nudge"
+
+    class Required(contracts.PromptInputs):
+        name: str
+
+    monkeypatch.setitem(contracts.PROMPT_CONTRACTS, code, Required)
+    prompts = {code: {"prompt": "Hello {name}."}}
+    with caplog.at_level(logging.ERROR):
+        result = load_and_format("nudge/nudge", prompts=prompts)
+    assert result == "Hello ."
+    assert "[PROMPT_CONTRACT]" in caplog.text
+    assert "name" in caplog.text

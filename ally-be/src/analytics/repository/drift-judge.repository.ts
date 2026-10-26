@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { mainPromptVersion } from '../util/main-prompt-version.util';
 import { DataSource } from 'typeorm';
 import { JudgeAttemptFamily } from '../constants/judge-scheduling.constants';
 import { judgeAttemptGate } from '../util/judge-attempts.util';
@@ -18,6 +19,7 @@ export interface DriftSessionRow {
   language: string;
   persona: string | null;
   prompt_versions: Record<string, unknown> | null;
+  selected_main_prompt_code: string | null;
   occurred_at: Date | null;
   llm_provider: string | null;
   llm_model: string | null;
@@ -153,6 +155,7 @@ export class DriftJudgeRepository {
              COALESCE(l.value, 'en') AS language,
              sc.prompt          AS persona,
              s.metadata->'promptVersions' AS prompt_versions,
+             s.metadata->>'selectedMainPromptCode' AS selected_main_prompt_code,
              s."createdAt"      AS occurred_at,
              (SELECT mode() WITHIN GROUP (ORDER BY m."llmProvider")
                 FROM scenario_session_turn_metrics m
@@ -276,17 +279,6 @@ export class DriftJudgeRepository {
     return { transcript, aiText, userText };
   }
 
-  /** Headline prompt version: prefer the main agent prompt, else any. */
-  private mainPromptVersion(pv: Record<string, unknown> | null): string | null {
-    if (!pv) return null;
-    for (const [code, version] of Object.entries(pv)) {
-      if (code.includes('main_agent') || code.includes('base_role'))
-        return String(version);
-    }
-    const first = Object.values(pv)[0];
-    return first != null ? String(first) : null;
-  }
-
   /**
    * Top up an ALREADY-JUDGED session with the labels the v2 rubric added.
    *
@@ -402,7 +394,10 @@ export class DriftJudgeRepository {
     aiText: Record<number, string>,
     userText: Record<number, string>,
   ): Promise<void> {
-    const promptVersion = this.mainPromptVersion(session.prompt_versions);
+    const promptVersion = mainPromptVersion(
+      session.prompt_versions,
+      session.selected_main_prompt_code,
+    );
     for (const t of perTurn) {
       await this.dataSource.query(
         `INSERT INTO turn_drift_judgment (
