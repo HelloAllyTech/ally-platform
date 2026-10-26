@@ -14,10 +14,7 @@ import {
 import { PromptTranslation } from '../entity/prompt-translation.entity';
 import { PromptTranslationService } from './prompt-translation.service';
 import { PromptSharedService } from './prompt-shared.service';
-import {
-  PROMPT_VERSION_HISTORY_LIMIT,
-  TRANSLATABLE_PROMPT_TYPES,
-} from '../constants/prompt.constants';
+import { TRANSLATABLE_PROMPT_TYPES } from '../constants/prompt.constants';
 import {
   checkContract,
   describeViolation,
@@ -294,7 +291,6 @@ export class PromptVersioningService {
           publishedAt: new Date(),
         });
       }
-      await this.pruneHistory(manager, promptId, target.version);
 
       this.logger.info(
         `[SKILLS_STORE] ${prompt.promptCode}: v${current ?? '-'} -> v${target.version} live` +
@@ -599,42 +595,6 @@ export class PromptVersioningService {
         }`,
       );
     }
-  }
-
-  /**
-   * Keep the live version, every candidate newer than it, and the newest
-   * {@link PROMPT_VERSION_HISTORY_LIMIT} versions below it. Translations of a
-   * pruned body go with it. Sessions record each version's hash, so a pruned
-   * version still identifies the text that ran.
-   */
-  private async pruneHistory(
-    manager: EntityManager,
-    promptId: string,
-    liveVersion: number,
-  ): Promise<void> {
-    const keepFrom = liveVersion - PROMPT_VERSION_HISTORY_LIMIT;
-    if (keepFrom <= 1) return;
-    await manager
-      .createQueryBuilder()
-      .delete()
-      .from(PromptVersion)
-      .where('promptId = :promptId', { promptId })
-      .andWhere('version < :keepFrom', { keepFrom })
-      .execute();
-    // Hash in JS, as translations were keyed, rather than trusting SQL's trim.
-    const kept = await manager.find(PromptVersion, {
-      where: { promptId },
-      select: ['id', 'prompt'],
-    });
-    const keptHashes = kept.map((v) => hashPromptBody(v.prompt));
-    if (!keptHashes.length) return;
-    await manager
-      .createQueryBuilder()
-      .delete()
-      .from(PromptTranslation)
-      .where('promptId = :promptId', { promptId })
-      .andWhere('"sourceHash" NOT IN (:...keptHashes)', { keptHashes })
-      .execute();
   }
 
   private translateInBackground(promptId: string, version: PromptVersion) {

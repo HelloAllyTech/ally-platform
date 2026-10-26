@@ -1,11 +1,4 @@
 /**
- * Published versions kept below the live one. The live version and every
- * candidate are never pruned; sessions record each version's content hash, so
- * the text that ran stays identifiable after its row is gone.
- */
-export const PROMPT_VERSION_HISTORY_LIMIT = 20;
-
-/**
  * Prompt code of the system prompt that translates `main_agent`/`branching`
  * prompt templates into Indian languages (seeded by
  * AddAgentTemplateTranslationPrompt). Its `provider`/`model` select the engine.

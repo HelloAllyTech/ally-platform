@@ -235,7 +235,7 @@ A challenger becomes a candidate version served to a share of traffic, instead o
 
 ### Retention and codes
 
-- Retention never deletes the live version, any candidate, or a version that translations, sessions or judge rows reference. It prunes only unreferenced history beyond the limit.
+- **No version is deleted** (decided 2026-10-26): publishing keeps every earlier version and its translations. The previous system kept only the 5 newest; a retention rule is to be decided after the Skills Store release has been tested. If one returns, it must never delete the live version, any candidate, or a version that translations, sessions or judge rows reference.
 - Prompt codes are stable ids. A rename goes through the store, a deleted Git default doesn't stop a live prompt, and an obsolete prompt stops serving instead of silently falling back.
 - The Builder agent and Bug Hunter are told that prompts are changed with `prompts push`, not by editing files.
 
@@ -417,7 +417,7 @@ Built on branch `feat/skills-store` (one PR, ally-be + ally-web + ally-ai + ally
 | --- | --- | --- |
 | Local services read the pulled `.prompts/` folder | The local store is the working copy: `prompts pull --into-local` / `apply-local` load production's text (and your edits) into local ally-be through an import endpoint enabled only locally | One resolution rule everywhere, no per-service file-reading path |
 | Translations re-keyed per version | Translations are keyed by the English text's hash, so a draft is translated beside the live rows | Same effect with no version column; hashes are what sessions record |
-| Retention protects referenced versions | Keeps the live version, every draft, and 20 published versions below live | Sessions record content hashes, so a pruned version stays identifiable |
+| Retention protects referenced versions | No pruning for now: every version is kept (2026-10-26). A rule is decided after the release is tested | Sessions record content hashes, so a version stays identifiable either way |
 | Judge labels derived from the rubric | Publishing a judge rubric requires confirming its pinned label was bumped | Re-labelling automatically would make the backlog drainer re-judge every session |
 | Experiments' challengers as candidate versions | Apply goes through the write path with a base check and contract; challengers stay in the experiment router | A store version per drafted variant would flood history; tracked as follow-up |
 

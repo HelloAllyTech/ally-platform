@@ -243,6 +243,32 @@ describe('PromptVersioningService.promote', () => {
     expect(state.versions[1].publishedAt).toBeInstanceOf(Date);
   });
 
+  it('keeps every earlier version and its translations when one goes live', async () => {
+    const history = Array.from({ length: 40 }, (_, i) => ({
+      id: `v${i + 1}`,
+      version: i + 1,
+      prompt: `Text ${i + 1}`,
+      publishedAt: new Date(),
+    }));
+    const { service, state, manager } = buildStore({
+      prompt: { currentVersion: 40 },
+      versions: [
+        ...history,
+        { id: 'v41', version: 41, prompt: 'Candidate', publishedAt: null },
+      ],
+    });
+
+    await service.promote('p1', 41, 40);
+
+    expect(state.prompt.currentVersion).toBe(41);
+    expect(state.versions).toHaveLength(41);
+    expect(manager.delete).not.toHaveBeenCalled();
+    const deletes = manager.createQueryBuilder.mock.results
+      .map((r: { value: any }) => r.value)
+      .filter((q: any) => q.entity && q.execute.mock.calls.length);
+    expect(deletes).toHaveLength(0);
+  });
+
   it('refuses when the live version moved since the caller looked', async () => {
     const { service, state } = buildStore({
       prompt: { currentVersion: 1 },
