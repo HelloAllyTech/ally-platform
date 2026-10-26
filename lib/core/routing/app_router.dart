@@ -140,21 +140,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/scribe',
         builder: (context, state) {
-          // Dev-only: real navigation will carry the actual signed-in
-          // user's id once auth/profile screens are ported.
-          return const ScribeRecordingScreen(userId: 'dev-user');
+          final userId = ref.read(currentUserProvider).value?.id.toString() ?? 'dev-user';
+          return ScribeRecordingScreen(userId: userId);
         },
       ),
       GoRoute(
         path: '/conference-listening/:chatId',
         builder: (context, state) {
-          // Dev-only, same as '/scribe' above — real navigation will carry
-          // the signed-in user's id, and will reach this route via the
-          // active-chat-discovery pass noted on ConferenceListeningScreen's
-          // class doc rather than a manually-typed chatId.
+          final userId = ref.read(currentUserProvider).value?.id.toString() ?? 'dev-user';
           return ConferenceListeningScreen(
             chatId: int.parse(state.pathParameters['chatId']!),
-            userId: 'dev-user',
+            userId: userId,
           );
         },
       ),
