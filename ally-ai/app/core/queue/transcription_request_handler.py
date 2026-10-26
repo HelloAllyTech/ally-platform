@@ -3,7 +3,6 @@ import time
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-
 from app.core.ally_core import AllyCoreService
 from app.core.config import settings
 from app.core.constants import PipelineStage
@@ -643,6 +642,12 @@ class TranscriptionRequestHandler:
             logger.error(
                 f"[PROMPT_DELIVERY] ally-be has no live text for {missing}; "
                 f"chat_id={chat_id} correlation_id={correlation_id}"
+            )
+        if prompts:
+            logger.info(
+                f"[PROMPT_DELIVERY] Message carried no prompts; fetched "
+                f"{sorted(prompts)} from ally-be for chat_id={chat_id} "
+                f"correlation_id={correlation_id}"
             )
         return prompts or None
 

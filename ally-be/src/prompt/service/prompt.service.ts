@@ -863,7 +863,7 @@ export class PromptsService {
         model: prompt.model ?? null,
         temperature: prompt.temperature ?? null,
         source: PromptVersionSource.REVERT,
-        note: 'Reverted to the default text in Git.',
+        note: 'Restored the stored default: the production text at the Skills Store cutover (or the first text, for a prompt created since).',
         createdBy: Number(ExecutionManager.getUserId()) || 0,
       },
       options,

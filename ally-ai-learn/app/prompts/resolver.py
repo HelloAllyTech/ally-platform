@@ -345,6 +345,11 @@ def load_and_format(
     return formatted
 
 
+def _store_version(prompt_data: Any, prompt_code: str) -> Any:
+    entry = _get_backend_prompt_entry(prompt_data, prompt_code)
+    return entry.get("version") if isinstance(entry, dict) else None
+
+
 def load_and_format_by_code(
     prompt_code: str,
     prompt_data: Any = None,
@@ -406,6 +411,12 @@ def load_and_format_by_code(
         )
     else:
         template = template.strip()
+        logger.info(
+            "[PROMPT_SOURCE] %s: using store v%s, len=%d",
+            prompt_code,
+            _store_version(prompt_data, prompt_code),
+            len(template),
+        )
     used_path_for_logging = prompt_code
     # Track which code's backend_entry the SafeFormatter should consult so
     # `allowed_variables` matches the template actually being rendered. When
