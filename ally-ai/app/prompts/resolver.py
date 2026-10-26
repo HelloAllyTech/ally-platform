@@ -173,9 +173,23 @@ def resolve_template(
     backend_entry = _get_backend_prompt_entry(backend_prompts, prompt_code)
     backend_template = _extract_backend_template(backend_entry)
     if backend_template and backend_template.strip():
+        logger.info(
+            "[PROMPT_SOURCE] %s: using store v%s, len=%d",
+            prompt_code,
+            (backend_entry.get("version") if isinstance(backend_entry, dict) else None),
+            len(backend_template.strip()),
+        )
         return backend_template.strip()
 
+    # The local file is a minimal default, so running it is worth seeing in the
+    # logs: the request didn't carry this prompt's live text.
     local_template = _get_local_template(prompt_code, internal_path=internal_path)
+    logger.warning(
+        "[PROMPT_SOURCE] %s: using fallback (local default; not in the request's "
+        "store prompts), len=%d",
+        prompt_code,
+        len(local_template),
+    )
     return local_template
 
 
