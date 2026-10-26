@@ -171,7 +171,6 @@ class BranchingInstruction:
         llm_config: Optional[Dict[str, Any]] = None,
         language_code: str = "en-US",
         llm_client: Optional["BaseLLMClient"] = None,
-        prompt_data: Any = None,
     ) -> None:
         """
         Lazily substitute llm_response tags in the branching instruction.
@@ -212,8 +211,6 @@ class BranchingInstruction:
                     "language_code": language_code,
                     "llm_config": llm_config,
                 }
-                if prompt_data is not None:
-                    call_kwargs["prompt_data"] = prompt_data
                 if llm_client is not None:
                     call_kwargs["llm_client"] = llm_client
                 llm_response = await generate_llm_response(**call_kwargs)
@@ -233,7 +230,6 @@ class BranchingInstruction:
         language_code: str = DEFAULT_LANGUAGE_CODE,
         llm_config: Optional[dict] = None,
         llm_client: Optional["BaseLLMClient"] = None,
-        prompt_data: Any = None,
     ) -> str:
         """
         Returns the content with dynamic placeholders resolved against the chat history.
@@ -256,8 +252,6 @@ class BranchingInstruction:
             }
             if llm_client is not None:
                 call_kwargs["llm_client"] = llm_client
-            if prompt_data is not None:
-                call_kwargs["prompt_data"] = prompt_data
             resolved_content = await resolve_chat_summary(**call_kwargs)
 
         return resolved_content

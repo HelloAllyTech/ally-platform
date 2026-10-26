@@ -1,0 +1,5 @@
+{
+    "name": "Anti-Repetition Guidance",
+    "kind": "prompt",
+    "description": "Permanent guidance appended to the counselor system prompt in report mode, instructing it to avoid repeating phrases and move the conversation forward."
+}

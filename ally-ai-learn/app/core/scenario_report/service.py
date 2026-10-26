@@ -10,7 +10,7 @@ import asyncio
 import random
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -113,19 +113,13 @@ def request_cancel(report_id: str) -> bool:
 
 
 # --------------- Anti-stagnation prompt fragments ---------------
-# Skills Store prompts. Resolved per report from the session's prompts (the
-# store's live text), not once at import from the local defaults — an import-
-# time read froze the file text for the life of the process and ignored every
-# edit made in the store.
-_ANTI_REPETITION_GUIDANCE_PATH = "counselor/anti_repetition_guidance"
-_CONVERSATION_GOAL_REMINDER_PATH = "counselor/conversation_goal_reminder"
-_STAGNATION_STEERING_PATH = "counselor/stagnation_steering"
-
-
-def _fragment(internal_path: str, backend_prompts: Any = None) -> str:
-    """A prompt fragment's live text (local default only as a fallback)."""
-    return (load_template(internal_path, backend_prompts) or "").strip()
-
+# Loaded from .txt so they can be edited via the dashboard override system.
+# strip() removes any trailing newline from the file.
+_ANTI_REPETITION_GUIDANCE = load_template("counselor/anti_repetition_guidance").strip()
+_CONVERSATION_GOAL_REMINDER = load_template(
+    "counselor/conversation_goal_reminder"
+).strip()
+_STAGNATION_STEERING = load_template("counselor/stagnation_steering").strip()
 
 _REPETITION_JACCARD_THRESHOLD = 0.5
 _REPETITION_LOOKBACK = 3
@@ -239,9 +233,6 @@ class ScenarioReportService:
 
     def __init__(self, request: ScenarioReportRequest) -> None:
         self._request = request
-        # The session's Skills Store prompts (promptData.prompts), set once the
-        # scenario is loaded; fragments resolve against them.
-        self._report_prompts: Any = None
         # In-conversation termination event (e.g. client said something
         # that triggered a TerminationEvent rule). Causes the run loop to
         # exit gracefully and the evaluator to still run — the resulting
@@ -484,9 +475,7 @@ class ScenarioReportService:
         system_content = base_system_content
 
         if self._detect_repetition_loop(full_messages):
-            system_content += "\n\n" + _fragment(
-                _STAGNATION_STEERING_PATH, self._report_prompts
-            )
+            system_content += "\n\n" + _STAGNATION_STEERING
             logger.debug(
                 "Repetition loop detected — injecting stagnation steering "
                 "(report_id=%s)",
@@ -657,13 +646,12 @@ class ScenarioReportService:
             )
             self._record_transcript(opening, "CLIENT")
 
-            self._report_prompts = (
-                scenario.prompt_data.prompts if scenario.prompt_data else None
-            )
             counselor_system_prompt = self._build_counselor_prompt(
                 language_code=req.language,
                 custom_prompt=req.prompt,
-                backend_prompts=self._report_prompts,
+                backend_prompts=(
+                    scenario.prompt_data.prompts if scenario.prompt_data else None
+                ),
             )
 
             # Anti-repetition guidance and goal reminder are baked into the
@@ -672,9 +660,9 @@ class ScenarioReportService:
             counselor_base_prompt = (
                 counselor_system_prompt
                 + "\n\n"
-                + _fragment(_ANTI_REPETITION_GUIDANCE_PATH, self._report_prompts)
+                + _ANTI_REPETITION_GUIDANCE
                 + "\n\n"
-                + _fragment(_CONVERSATION_GOAL_REMINDER_PATH, self._report_prompts)
+                + _CONVERSATION_GOAL_REMINDER
             )
 
             counselor_messages = [

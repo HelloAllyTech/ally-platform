@@ -1,0 +1,27 @@
+{
+    "name": "Client Working Memory Updater (writes what Main Agent Prompt #3 reads)",
+    "kind": "prompt",
+    "description": "The WRITER half of the client working memory. It never speaks to anyone: it reads the newest turns and reports what changed in the client's inner state as structured fields, which are validated, committed to the store, and rendered into the actor's prompt by Main Agent Prompt #3 (the READER half). Read the two together — this one fills the sections that one displays.\n\nGLOBAL, unlike Prompt #3. Prompt #3 is chosen per simulation, so editing it affects only scenarios pointing at it. There is no per-scenario selection for this prompt: every session with working memory engaged uses this one copy.\n\nWHERE EACH FIELD COMES OUT IN PROMPT #3\n  register          -> {working_memory_register}\n  speech_fragments  -> {working_memory_speech_fragments}\n  disclosed         -> {working_memory_disclosed}\n  affect            -> appended to {working_memory_stance}, not a section of its own\n  withheld_topics + withheld_deflections -> composed into the one {working_memory_withheld} section, paired positionally\n  opened_threads + closed_threads        -> applied as deltas to the one {working_memory_unresolved} section, which shows the net still-open set\n\ndelivery -> not rendered to the actor; it becomes the delivery plan for how the NEXT reply starts: a pause, a catalog filler, and the interim (a few holding words, played piece by piece while the reply is being prepared). The actor is told the interim's exact words so its reply carries on from them. This is the ONLY place the interim is written: scenarios without working memory get fillers and pauses, never an interim. {opener_catalog} lists the filler ids this session can play.\n\nTHREE ASYMMETRIES, ALL DELIBERATE — do not read them as omissions\n  appraisal is never rendered to the actor at all. It is the private reason behind the affect, kept for telemetry and debugging, and deliberately not an instruction.\n  retrieve_cues is not rendered either. It drives recall against the character corpus, and what recall selects is what surfaces as {working_memory_salient}.\n  {working_memory_salient} therefore has NO field here to fill. Nothing you write in this prompt populates it.\n\nThe stages in {state_ladder} and the stage in {current_state} are the scenario author's own states — the same ones Prompt #3 renders through {state_x_guidelines}. They are supplied as data; this prompt never paraphrases them. Whether the client is ready to disclose something is the author's decision, expressed in those states, and never this prompt's.\n\nThe field names above are the contract with `ProposedUpdate` in app/core/working_memory/proposal.py, enforced by a test — renaming one here without renaming it there fails the build rather than silently returning an empty field.",
+    "availableVariables": [
+        {
+            "name": "language_label",
+            "label": "Conversation Language Label",
+            "required": true
+        },
+        {
+            "name": "state_ladder",
+            "label": "Authored States, In Order (with the author's guidelines)",
+            "required": true
+        },
+        {
+            "name": "current_state",
+            "label": "Currently Resolved State",
+            "required": true
+        },
+        {
+            "name": "opener_catalog",
+            "label": "Opener Catalog For This Session (id, kind, words)",
+            "required": true
+        }
+    ]
+}

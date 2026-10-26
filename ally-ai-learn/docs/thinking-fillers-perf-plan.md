@@ -306,7 +306,7 @@ interruption. Needs Stacks and a PM before it goes past an experiment.
 - Demote `FILLER_MIN/MAX_DELAY_MS` to documented fallbacks.
 - Update `docs/05-tts-providers.md` (clip isolation), `docs/architecture.md`, and the wiki
   repo page (`app/worker.py` is watched by `.docs-map.yml`; the PR carries a `Wiki-PR:`
-  trailer). Update the `filler/predictive_filler` prompt's contract (its variables in `app/prompts/contracts.py`).
+  trailer). Update the `filler/predictive_filler` prompt's `.meta.json` variable list.
 - ally-web: `fillerDecision` and `postFillerSilenceMs` on the voice-latency tab.
 
 ## 8. Success criteria

@@ -289,9 +289,9 @@ export const ROADMAP_DUPLICATES = {
 /**
  * Prompt codes resolved through PromptSharedService. Files live at
  * src/prompts/roadmap/<name>.txt and are synced into the `prompts` table at boot by
- * PromptsSyncService, which derives the code as `<subdir>_<filename>`. They are then edited
- * as versions in the Skills Store, so admins get runtime editability without a bespoke
- * settings table.
+ * PromptsSyncService, which derives the code as `<subdir>_<filename>`. Editing them in the
+ * Prompt Management dashboard sets useDashboardOverride and creates a version row, so
+ * admins get runtime editability without a bespoke settings table.
  */
 export const ROADMAP_PROMPT_CODES = {
   CLASSIFY_GOAL: 'roadmap_classify_goal',

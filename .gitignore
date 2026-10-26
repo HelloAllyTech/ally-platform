@@ -18,6 +18,3 @@
 .env
 *.env.local
 docker.env
-
-# Skills Store working copy pulled by the prompts CLI: real prompt text, never committed.
-/.prompts/

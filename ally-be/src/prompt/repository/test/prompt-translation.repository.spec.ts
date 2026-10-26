@@ -45,59 +45,53 @@ describe('PromptTranslationRepository', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  describe('findForBody', () => {
-    it('queries the row for one English body by (promptId, languageId, sourceHash)', async () => {
+  describe('findByPromptAndLanguage', () => {
+    it('queries the single live row by (promptId, languageId)', async () => {
       const findOne = jest
         .spyOn(repository, 'findOne')
         .mockResolvedValue(mockTranslation);
 
-      const result = await repository.findForBody(
+      const result = await repository.findByPromptAndLanguage(
         mockPromptId,
         mockLanguageId,
-        'abc123',
       );
 
       expect(result).toEqual(mockTranslation);
       expect(findOne).toHaveBeenCalledWith({
-        where: {
-          promptId: mockPromptId,
-          languageId: mockLanguageId,
-          sourceHash: 'abc123',
-        },
+        where: { promptId: mockPromptId, languageId: mockLanguageId },
       });
     });
 
-    it('returns null when that body has no translation', async () => {
+    it('returns null when no translation exists', async () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue(null);
 
-      const result = await repository.findForBody(
+      const result = await repository.findByPromptAndLanguage(
         mockPromptId,
         mockLanguageId,
-        'abc123',
       );
 
       expect(result).toBeNull();
     });
   });
 
-  describe('findAllForBody', () => {
-    it("lists every language's translation of one body ordered by languageId", async () => {
+  describe('findAllForPrompt', () => {
+    it('lists all languages for a prompt ordered by languageId', async () => {
       const find = jest
         .spyOn(repository, 'find')
         .mockResolvedValue([mockTranslation]);
 
-      const result = await repository.findAllForBody(mockPromptId, 'abc123');
+      const result = await repository.findAllForPrompt(mockPromptId);
 
       expect(result).toEqual([mockTranslation]);
       expect(find).toHaveBeenCalledWith({
-        where: { promptId: mockPromptId, sourceHash: 'abc123' },
+        where: { promptId: mockPromptId },
         order: { languageId: 'ASC' },
       });
     });
   });
 
   describe('upsertTranslation', () => {
-    it('upserts on the (promptId, languageId, sourceHash) conflict key', async () => {
+    it('upserts on the (promptId, languageId) conflict key', async () => {
       const upsert = jest
         .spyOn(repository, 'upsert')
         .mockResolvedValue({} as any);
@@ -118,14 +112,14 @@ describe('PromptTranslationRepository', () => {
           status: PromptTranslationStatus.READY,
         }),
         expect.objectContaining({
-          conflictPaths: ['promptId', 'languageId', 'sourceHash'],
+          conflictPaths: ['promptId', 'languageId'],
         }),
       );
     });
   });
 
   describe('markStatus', () => {
-    it('updates status and error for the row of one body', async () => {
+    it('updates status and error for the row', async () => {
       const update = jest
         .spyOn(repository, 'update')
         .mockResolvedValue({} as any);
@@ -133,17 +127,12 @@ describe('PromptTranslationRepository', () => {
       await repository.markStatus(
         mockPromptId,
         mockLanguageId,
-        'abc123',
         PromptTranslationStatus.FAILED,
         'gemini timeout',
       );
 
       expect(update).toHaveBeenCalledWith(
-        {
-          promptId: mockPromptId,
-          languageId: mockLanguageId,
-          sourceHash: 'abc123',
-        },
+        { promptId: mockPromptId, languageId: mockLanguageId },
         { status: PromptTranslationStatus.FAILED, error: 'gemini timeout' },
       );
     });

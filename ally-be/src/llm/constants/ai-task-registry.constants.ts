@@ -45,7 +45,7 @@ import { LlmRuntime } from './llm-model-registry.constants';
  *   explicit call argument -> prompt row -> platform tier -> compiled-in floor
  *
  * reusing surfaces that already existed: `prompts.provider/model/temperature`
- * (admin-editable in Skills Store) and two env vars.
+ * (admin-editable in System Skills) and two env vars.
  *
  * So `AiTaskService` no longer reads a config path for tiered rows. It asks
  * `LlmTargetResolverService` what will actually serve the task, which is what
@@ -1481,7 +1481,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'update, onto an open one, or as noise, and writes its public and team text. The only ' +
       'model output that reaches the public changelog, so the reply is validated field by ' +
       'field and anything unverifiable goes back to the queue. JSON mode. The prompt row ' +
-      'starts on openai/gpt-5 (the defaultModel in its contract): side by side on real journal ' +
+      'starts on openai/gpt-5 (its _meta sidecar default): side by side on real journal ' +
       'weeks the tier default wrote noticeably more jargon into public text. The tier model ' +
       'below is the fallback if the prompt model fails.',
     kind: AiTaskKind.COMPLETION,

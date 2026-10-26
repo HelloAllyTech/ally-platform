@@ -1,4 +1,3 @@
-import { contentHash } from '../../util/placeholder-lock.util';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { SkillExperimentService } from '../skill-experiment.service';
 import {
@@ -54,25 +53,15 @@ function harness(experiment: Record<string, unknown> | null, prompt = PROMPT) {
     logEvent: jest.fn(),
   };
   const router = { invalidate: jest.fn() };
-  const versioning = {
-    createAndPromote: jest.fn(async () => ({
-      version: 5,
-      failedLanguages: [],
-    })),
-    latestVersionOf: jest.fn(async () => 4),
-  };
-  const prompts = {
-    findOneBy: jest.fn(async () => prompt),
-    findOne: jest.fn(async () => ({ ...prompt, model: 'gpt-5' })),
-    find: jest.fn(),
-  };
+  const promptsService = { updatePrompt: jest.fn(async () => true) };
+  const prompts = { findOneBy: jest.fn(async () => prompt), find: jest.fn() };
   const service = new SkillExperimentService(
     state,
     router as any,
-    versioning as any,
+    promptsService as any,
     prompts as any,
   );
-  return { service, state, router, versioning };
+  return { service, state, router, promptsService };
 }
 
 describe('SkillExperimentService', () => {
@@ -177,11 +166,10 @@ describe('SkillExperimentService', () => {
       );
     });
 
-    it('stops the experiment, then writes the winner as a new live version from the newest one', async () => {
-      const { service, state, versioning } = harness({
+    it('stops the experiment, then writes the winner as a new skill version', async () => {
+      const { service, state, promptsService } = harness({
         status: SkillExperimentStatus.PAUSED,
         championVariantId: 'v-2',
-        baseContentHash: contentHash('Grade {{answer}}'),
       });
       state.variants.findOneBy.mockResolvedValue({
         id: 'v-2',
@@ -195,23 +183,18 @@ describe('SkillExperimentService', () => {
         order.push('stop');
         return true;
       });
-      versioning.createAndPromote.mockImplementation(async () => {
+      promptsService.updatePrompt.mockImplementation(async () => {
         order.push('write');
-        return { version: 5, failedLanguages: [] };
+        return true;
       });
 
       await service.apply('prompt-1');
 
       expect(order).toEqual(['stop', 'write']);
-      expect(versioning.createAndPromote).toHaveBeenCalledWith(
-        'prompt-1',
-        expect.objectContaining({
-          body: 'Better {{answer}}',
-          baseVersion: 4,
-          source: 'experiment',
-          model: 'gpt-5',
-        }),
-      );
+      expect(promptsService.updatePrompt).toHaveBeenCalledWith('prompt-1', {
+        prompt: 'Better {{answer}}',
+        useDashboardOverride: true,
+      });
       expect(state.logEvent).toHaveBeenCalledWith(
         'exp-1',
         SkillExperimentEventType.APPLIED,
@@ -219,23 +202,6 @@ describe('SkillExperimentService', () => {
         expect.objectContaining({ actorId: 42 }),
       );
     });
-  });
-
-  it('refuses to apply when the skill was edited after the experiment started', async () => {
-    const { service, state, versioning } = harness({
-      status: SkillExperimentStatus.PAUSED,
-      championVariantId: 'v-2',
-      baseContentHash: contentHash('An older text'),
-    });
-    state.variants.findOneBy.mockResolvedValue({
-      id: 'v-2',
-      label: 'V2',
-      isOriginal: false,
-      content: 'Better {{answer}}',
-    });
-
-    await expect(service.apply('prompt-1')).rejects.toThrow(/edited after/);
-    expect(versioning.createAndPromote).not.toHaveBeenCalled();
   });
 
   it('resume resets the per-run budget', async () => {

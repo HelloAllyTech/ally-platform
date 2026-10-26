@@ -1,0 +1,5 @@
+{
+    "name": "Back-channel Prompt",
+    "kind": "prompt",
+    "description": "System prompt used once at session start to generate short listener back-channels ('mm-hmm', a soft 'yeah') that the character utters WHILE the learner is still speaking on a long turn — a human listening signal, distinct from the post-turn thinking filler. Generates them in the scenario's language/native script. Editable under System Skills. Variables: {scenario_context}, {language_label}, {language_code}, {count}."
+}

@@ -48,7 +48,7 @@ export interface BuilderCapability {
 export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   {
     id: 'auto-improve',
-    name: 'Auto-improve (Skills Store → Auto-improve tab)',
+    name: 'Auto-improve (System Skills → Auto-improve tab)',
     whatItIs:
       'Tests revised versions of a System Skill prompt on live traffic: a designer model drafts ' +
       'challengers, a router splits calls between champion and challenger, an LLM judge scores ' +
@@ -82,32 +82,18 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'system-skills',
-    name: 'Skills Store (prompt registry)',
+    name: 'System Skills (prompt registry)',
     whatItIs:
-      'Every prompt the platform runs, by code, as versions: the live text plus its model, ' +
-      'provider and temperature. The Skills Store is the source of truth for prompt text. ' +
-      "src/prompts holds only each prompt's default, which creates the prompt on its first " +
-      'deploy; its contract (the variables the code supplies) lives in src/prompt/contracts.',
+      'Every prompt the platform runs, by code, with its text, dashboard override and per-prompt ' +
+      'model, provider and temperature. Prompts live as files in src/prompts and sync into the ' +
+      'prompts table at boot; a dashboard edit with the override on serves the saved version.',
     reuseWhen:
-      'A feature needs a new prompt (add a default file AND its contract in the same PR), wants ' +
-      'admins to edit a prompt without a deploy, or needs a per-prompt model choice. To change an ' +
-      "existing prompt's text, propose a new version in the Skills Store (or `prompts push`); " +
-      'editing its default file changes nothing in production. Do not hard-code prompt text.',
-    modules: [
-      'ally-be:src/prompt',
-      'ally-be:src/prompt/contracts',
-      'ally-be:src/prompts',
-    ],
+      'A feature needs a new prompt, wants admins to edit a prompt without a deploy, or needs a ' +
+      'per-prompt model choice. Do not hard-code prompt text in a service.',
+    modules: ['ally-be:src/prompt', 'ally-be:src/prompts'],
     docs: ['ally-be:docs/prompts-folder.md', 'ally-be:docs/prompts-api.md'],
     adminRoute: '/manage-prompts',
-    keywords: [
-      'prompt',
-      'skills store',
-      'system skill',
-      'skill',
-      'prompt text',
-      'template',
-    ],
+    keywords: ['prompt', 'system skill', 'skill', 'prompt text', 'template'],
   },
   {
     id: 'ai-task-registry',

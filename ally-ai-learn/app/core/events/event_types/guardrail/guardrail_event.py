@@ -100,10 +100,6 @@ class GuardrailEvent(BaseEvent):
     coherence_normal_instruction: Optional[object] = None
     coherence_escalation_instruction: Optional[object] = None
 
-    #: The session's prompt data (Skills Store text in ``prompts``), so the
-    #: classifier prompts render from the store rather than the local defaults.
-    prompt_data: Optional[object] = None
-
     # Shared client cache per base_url
     _CLIENTS: ClassVar[dict] = {}
 
@@ -326,12 +322,10 @@ class GuardrailEvent(BaseEvent):
                 # uses recent conversation context and few-shot examples.
                 system_prompt = load_and_format(
                     "events/coherence_guardrail_system",
-                    prompt_data=self.prompt_data,
                     helper_dialogue=self.data.helper_dialogue,
                 )
                 user_prompt = load_and_format(
                     "events/coherence_guardrail_user",
-                    prompt_data=self.prompt_data,
                     counselor_message=text,
                     conversation_context=conversation_context
                     or "(no prior conversation)",
@@ -340,12 +334,10 @@ class GuardrailEvent(BaseEvent):
                 # Category guardrails: shared classifier (unchanged behavior).
                 system_prompt = load_and_format(
                     "events/guardrail_system",
-                    prompt_data=self.prompt_data,
                     helper_dialogue=self.data.helper_dialogue,
                 )
                 user_prompt = load_and_format(
                     "events/guardrail_user",
-                    prompt_data=self.prompt_data,
                     counselor_message=text,
                 )
 

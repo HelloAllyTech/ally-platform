@@ -1,4 +1,4 @@
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Injectable } from '@nestjs/common';
 import {
   PromptTranslation,
@@ -26,89 +26,50 @@ export class PromptTranslationRepository extends Repository<PromptTranslation> {
   }
 
   /**
-   * For each prompt code + the hash of the English body about to ship, return
-   * the prompt with the translation of THAT body for one language (null
-   * translation columns when there is none). Every requested code returns a
-   * row, carrying `translationEnabled`/`promptType` for gating + self-heal.
+   * For a set of prompt codes + one language, return each prompt with its
+   * translation state (LEFT JOIN, so a code with no translation still returns a
+   * row carrying `translationEnabled`/`promptType` for gating + self-heal).
    */
   async getRuntimeRows(
-    hashByCode: Record<string, string>,
+    promptCodes: string[],
     languageId: number,
   ): Promise<RuntimeTranslationRow[]> {
-    const promptCodes = Object.keys(hashByCode);
     if (!promptCodes.length) return [];
-    const prompts = await this.manager
+    return this.manager
       .createQueryBuilder(Prompt, 'p')
+      .leftJoin(
+        PromptTranslation,
+        'pt',
+        'pt."promptId" = p.id AND pt."languageId" = :languageId',
+        { languageId },
+      )
       .where('p."promptCode" IN (:...promptCodes)', { promptCodes })
-      .select(['p.id', 'p.promptCode', 'p.translationEnabled', 'p.promptType'])
-      .getMany();
-    if (!prompts.length) return [];
-    const translations = await this.find({
-      where: {
-        promptId: In(prompts.map((p) => p.id)),
-        languageId,
-        sourceHash: In([...new Set(Object.values(hashByCode))]),
-      },
-    });
-    return prompts.map((p) => {
-      const t = translations.find(
-        (row) =>
-          row.promptId === p.id && row.sourceHash === hashByCode[p.promptCode],
-      );
-      return {
-        promptCode: p.promptCode,
-        promptId: p.id,
-        translationEnabled: !!p.translationEnabled,
-        promptType: p.promptType ?? null,
-        translatedPrompt: t?.translatedPrompt ?? null,
-        sourceHash: t?.sourceHash ?? null,
-        status: t?.status ?? null,
-        runtimeProvider: t?.runtimeProvider ?? null,
-        runtimeModel: t?.runtimeModel ?? null,
-      };
-    });
+      .select('p."promptCode"', 'promptCode')
+      .addSelect('p.id', 'promptId')
+      .addSelect('p."translationEnabled"', 'translationEnabled')
+      .addSelect('p."promptType"', 'promptType')
+      .addSelect('pt."translatedPrompt"', 'translatedPrompt')
+      .addSelect('pt."sourceHash"', 'sourceHash')
+      .addSelect('pt.status', 'status')
+      .addSelect('pt."runtimeProvider"', 'runtimeProvider')
+      .addSelect('pt."runtimeModel"', 'runtimeModel')
+      .getRawMany<RuntimeTranslationRow>();
   }
 
-  /** The translation of one English body (by hash) for one language. */
-  findForBody(
+  findByPromptAndLanguage(
     promptId: string,
     languageId: number,
-    sourceHash: string,
   ): Promise<PromptTranslation | null> {
-    return this.findOne({ where: { promptId, languageId, sourceHash } });
+    return this.findOne({ where: { promptId, languageId } });
   }
 
-  /** Every language's translation of one English body. */
-  findAllForBody(
-    promptId: string,
-    sourceHash: string,
-  ): Promise<PromptTranslation[]> {
-    return this.find({
-      where: { promptId, sourceHash },
-      order: { languageId: 'ASC' },
-    });
-  }
-
-  /** The runtime model last set for a language, carried onto a new body's row. */
-  async latestRuntimeModel(
-    promptId: string,
-    languageId: number,
-  ): Promise<{ runtimeProvider?: string; runtimeModel?: string } | null> {
-    const row = await this.findOne({
-      where: { promptId, languageId },
-      order: { updatedAt: 'DESC' },
-      select: ['id', 'runtimeProvider', 'runtimeModel'],
-    });
-    if (!row?.runtimeModel && !row?.runtimeProvider) return null;
-    return {
-      runtimeProvider: row.runtimeProvider ?? undefined,
-      runtimeModel: row.runtimeModel ?? undefined,
-    };
+  findAllForPrompt(promptId: string): Promise<PromptTranslation[]> {
+    return this.find({ where: { promptId }, order: { languageId: 'ASC' } });
   }
 
   /**
-   * Insert or update the row for one (prompt, language, English body). Only
-   * the provided fields are written.
+   * Insert or update the single live row for (promptId, languageId). Only the
+   * provided fields are written; `promptId`/`languageId` form the conflict key.
    */
   async upsertTranslation(
     input: Partial<PromptTranslation> &
@@ -118,7 +79,7 @@ export class PromptTranslationRepository extends Repository<PromptTranslation> {
       >,
   ): Promise<void> {
     await this.upsert(input, {
-      conflictPaths: ['promptId', 'languageId', 'sourceHash'],
+      conflictPaths: ['promptId', 'languageId'],
       skipUpdateIfNoValuesChanged: true,
     });
   }
@@ -126,18 +87,16 @@ export class PromptTranslationRepository extends Repository<PromptTranslation> {
   async markStatus(
     promptId: string,
     languageId: number,
-    sourceHash: string,
     status: PromptTranslationStatus,
     error?: string,
   ): Promise<void> {
-    await this.update({ promptId, languageId, sourceHash }, { status, error });
+    await this.update({ promptId, languageId }, { status, error });
   }
 
   /**
    * Set (or clear, with null) the runtime provider/model for one (prompt,
    * language) — the model that runs the main agent when this translated body is
-   * served. Applies to every body's row for that language, live and candidate.
-   * No-op when nothing has been translated yet.
+   * served. No-op when the row doesn't exist yet (nothing translated).
    */
   async setRuntimeModel(
     promptId: string,

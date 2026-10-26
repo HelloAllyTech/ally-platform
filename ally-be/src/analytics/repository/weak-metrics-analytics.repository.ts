@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { mainPromptVersionSql } from '../util/main-prompt-version.util';
 import { DataSource } from 'typeorm';
 import {
   excludeTestTenants,
@@ -71,8 +70,32 @@ export interface JudgePin {
   judgePromptVersion: string;
 }
 
-// A session's main-agent prompt version: see main-prompt-version.util, which
-// the judge repositories use for the same value so both kinds of series agree.
+/**
+ * A session's main-agent prompt version, read from
+ * `scenario_sessions.metadata->'promptVersions'` — a map of prompt code to
+ * version, since a session renders several prompts.
+ *
+ * This MIRRORS `mainPromptVersion()` in drift-judge.repository.ts, which stamps
+ * the same value onto every judgment row: prefer the main-agent/base-role
+ * prompt, else fall back to whichever entry comes first. The two must agree,
+ * because a judge-derived series filters on the stored column while a
+ * transcript-derived one filters through this expression, and a reader
+ * comparing them across one filter selection would otherwise be comparing
+ * different populations.
+ *
+ * The fallback branch is the one place they can disagree: "first entry" is
+ * insertion order in JS and key order in `jsonb_each` (length, then bytewise).
+ * It only bites for a session whose map has no main-agent key at all, which is
+ * why the preferred branch is tried first rather than relying on ordering.
+ */
+function mainPromptVersionSql(sessionAlias: string): string {
+  const entries = `jsonb_each_text(${sessionAlias}.metadata->'promptVersions')`;
+  return `COALESCE(
+    (SELECT value FROM ${entries} AS pv(key, value)
+      WHERE pv.key LIKE '%main_agent%' OR pv.key LIKE '%base_role%' LIMIT 1),
+    (SELECT value FROM ${entries} AS pv(key, value) LIMIT 1)
+  )`;
+}
 
 /**
  * Languages whose script is NOT Latin — the only ones where "wrong regional

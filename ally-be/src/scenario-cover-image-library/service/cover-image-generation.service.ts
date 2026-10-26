@@ -26,8 +26,8 @@ import {
 } from '../dto/generate-cover-image.dto';
 
 /**
- * Managed prompt template (default in src/prompts/cover_image_generation.txt,
- * live text edited in the Skills Store). Available
+ * Managed prompt template (src/prompts/cover_image_generation.txt, editable
+ * via Prompt Management once useDashboardOverride is enabled). Available
  * placeholders: {{title}}, {{description}}, {{styleHints}} plus the scenario
  * persona fields {{name}}, {{age}}, {{gender}}, {{profession}},
  * {{currentLocation}}. Unused placeholders render as empty strings.

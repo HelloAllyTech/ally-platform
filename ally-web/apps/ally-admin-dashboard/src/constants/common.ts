@@ -130,13 +130,6 @@ export const ApiEndpoints = {
     UPDATE_PROMPT: (id: string | number) => `/v1/prompts/${id}`,
     DUPLICATE_PROMPT: (id: string | number) => `/v1/prompts/${id}/duplicate`,
     REVERT_PROMPT: (id: string | number) => `/v1/prompts/${id}/revert`,
-    PROMPT_VERSIONS: (id: string | number) => `/v1/prompts/${id}/versions`,
-    PROMOTE_PROMPT_VERSION: (id: string | number, version: number) =>
-      `/v1/prompts/${id}/versions/${version}/promote`,
-    TRANSLATE_PROMPT_VERSION: (id: string | number, version: number) =>
-      `/v1/prompts/${id}/versions/${version}/translations`,
-    SKILLS_STORE_KEYS: "/v1/skills-store/keys",
-    SKILLS_STORE_KEY: (id: string) => `/v1/skills-store/keys/${id}`,
     GET_PROMPT_USAGE: (id: string | number) => `/v1/prompts/${id}/usage`,
     GET_PROMPT_TRANSLATIONS: (id: string | number) => `/v1/prompts/${id}/translations`,
     RETRANSLATE_PROMPT: (id: string | number) => `/v1/prompts/${id}/translations`,
@@ -1187,7 +1180,7 @@ export const TAG_TYPES = {
   // Text helpline org settings. Also registered in baseApi.ts's `tagTypes` — an
   // unregistered tag is silently ignored and its invalidation never fires.
   HELPLINE_ADMIN_SETTINGS: "helplineAdminSettings",
-  // Skill experiments (auto-improve on Skills Store). Also registered in
+  // Skill experiments (auto-improve on System Skills). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's

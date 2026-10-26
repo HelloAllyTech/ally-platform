@@ -68,6 +68,7 @@ import {
 } from '../dto/ai.request.dto';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
+import { isConnectedSkill } from '../../skill-experiment/constants/skill-experiment.constants';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import {
   ALLY_AI_PROMPT_PREFIX,
@@ -110,7 +111,7 @@ function withCorpus(endpoint: string, corpus: KnowledgeCorpus): string {
   return `${endpoint}${separator}corpus=${encodeURIComponent(corpus)}`;
 }
 
-/** The debrief skills (Skills Store codes); both are connected to auto-improve. */
+/** The debrief skills (System Skills codes); both are connected to auto-improve. */
 const SCENARIO_EVALUATION_PROMPT_CODE = 'ally_ai_scenario_scenario_evaluation';
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
@@ -1262,6 +1263,7 @@ export class AiService {
     try {
       const prompts = await this.promptSharedService.getPromptsByOptions({
         promptCodePrefix: ALLY_AI_PROMPT_PREFIX,
+        useDashboardOverrideOnly: true,
       });
 
       const overrides: Record<
@@ -1301,12 +1303,17 @@ export class AiService {
           ...(p.model ? { model: p.model } : {}),
           ...(p.temperature != null ? { temperature: p.temperature } : {}),
         };
-        // ally-ai looks prompts up by their full code (`ally_ai_<dir>_<file>`).
-        // The slash-mapped key is kept for older ally-ai builds during a
-        // rolling deploy. Every prompt's live text is sent: the Skills Store is
-        // the source of truth.
         overrides[mappedKey] = entry;
-        overrides[p.promptCode] = entry;
+        // ally-ai looks prompts up by their full code (`ally_ai_<dir>_<file>`),
+        // never by the slash-mapped key above, so an override sent only under
+        // that key does not reach it. Skills connected to auto-improve are also
+        // sent under the key ally-ai reads, so a winning variant applied from
+        // an experiment actually runs. Deliberately not widened to every
+        // ally-ai skill here: that would switch on every stale dashboard edit
+        // at once — see docs/skill-experiments.md.
+        if (isConnectedSkill(p.promptCode)) {
+          overrides[p.promptCode] = entry;
+        }
       }
       return overrides;
     } catch (error) {

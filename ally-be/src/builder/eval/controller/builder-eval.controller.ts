@@ -52,7 +52,7 @@ export class BuilderEvalController {
   ) {}
 
   @Get('gated-prompts')
-  // Read only by the Skills Store tab's prompt side panel.
+  // Read only by the System Skills tab's prompt side panel.
   @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
     permissions: [PERMISSIONS.EDIT_PROMPT],
   })

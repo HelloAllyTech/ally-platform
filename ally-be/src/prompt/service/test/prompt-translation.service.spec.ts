@@ -27,7 +27,7 @@ describe('PromptTranslationService.translateOne', () => {
   let markStatus: jest.Mock;
   let promptFindOne: jest.Mock;
   let findTranslationSources: jest.Mock;
-  let findForBody: jest.Mock;
+  let findByPromptAndLanguage: jest.Mock;
   let getEligibleTargetLanguages: jest.Mock;
   let getRuntimeRows: jest.Mock;
 
@@ -46,7 +46,7 @@ describe('PromptTranslationService.translateOne', () => {
       translationEnabled: true,
     });
     findTranslationSources = jest.fn().mockResolvedValue([]);
-    findForBody = jest.fn().mockResolvedValue(null);
+    findByPromptAndLanguage = jest.fn().mockResolvedValue(null);
     getEligibleTargetLanguages = jest.fn().mockResolvedValue([]);
     getRuntimeRows = jest.fn().mockResolvedValue([]);
     getPromptByCode = jest.fn().mockResolvedValue(englishBody);
@@ -75,10 +75,7 @@ describe('PromptTranslationService.translateOne', () => {
         },
         {
           provide: PromptVersionRepository,
-          useValue: {
-            getLatestPromptVersion,
-            findOne: jest.fn().mockResolvedValue({ id: 'v-1' }),
-          },
+          useValue: { getLatestPromptVersion },
         },
         {
           provide: PromptTranslationRepository,
@@ -86,9 +83,8 @@ describe('PromptTranslationService.translateOne', () => {
             upsertTranslation,
             update,
             markStatus,
-            findForBody,
+            findByPromptAndLanguage,
             getRuntimeRows,
-            latestRuntimeModel: jest.fn().mockResolvedValue(null),
           },
         },
         {
@@ -133,7 +129,7 @@ describe('PromptTranslationService.translateOne', () => {
       }),
     );
     expect(update).toHaveBeenCalledWith(
-      { promptId, languageId, sourceHash: `hash:${englishBody.length}` },
+      { promptId, languageId },
       expect.objectContaining({
         status: PromptTranslationStatus.READY,
         translatedPrompt: 'आप {name} हैं, एक नर्स। [laughs]',
@@ -173,7 +169,6 @@ describe('PromptTranslationService.translateOne', () => {
     expect(markStatus).toHaveBeenCalledWith(
       promptId,
       languageId,
-      `hash:${englishBody.length}`,
       PromptTranslationStatus.FAILED,
       expect.stringContaining('{name}'),
     );
@@ -245,7 +240,7 @@ describe('PromptTranslationService.translateOne', () => {
 
     it('translates every eligible language when none are fresh', async () => {
       getEligibleTargetLanguages.mockResolvedValue(langs);
-      findForBody.mockResolvedValue(null);
+      findByPromptAndLanguage.mockResolvedValue(null);
       const spy = jest.spyOn(service, 'translateOne').mockResolvedValue({
         status: PromptTranslationStatus.READY,
         provider: 'gemini',
@@ -258,18 +253,17 @@ describe('PromptTranslationService.translateOne', () => {
       expect(result.translated).toBe(2);
       expect(result.skipped).toBe(0);
       expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(promptId, 2, expect.anything());
-      expect(spy).toHaveBeenCalledWith(promptId, 6, expect.anything());
+      expect(spy).toHaveBeenCalledWith(promptId, 2);
+      expect(spy).toHaveBeenCalledWith(promptId, 6);
     });
 
     it('skips a language already fresh by sourceHash and translates the stale one', async () => {
       getEligibleTargetLanguages.mockResolvedValue(langs);
       getPromptByCode.mockResolvedValue('BODY'); // hashBody -> 'hash:4'
-      // Rows are looked up per English body now: only hi has one for 'BODY'.
-      findForBody.mockImplementation((_p: string, lid: number) =>
+      findByPromptAndLanguage.mockImplementation((_p: string, lid: number) =>
         lid === 2
           ? { status: PromptTranslationStatus.READY, sourceHash: 'hash:4' }
-          : null,
+          : { status: PromptTranslationStatus.READY, sourceHash: 'stale' },
       );
       const spy = jest.spyOn(service, 'translateOne').mockResolvedValue({
         status: PromptTranslationStatus.READY,
@@ -283,12 +277,12 @@ describe('PromptTranslationService.translateOne', () => {
       expect(result.skipped).toBe(1); // hi fresh
       expect(result.translated).toBe(1); // ta stale
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(promptId, 6, expect.anything());
+      expect(spy).toHaveBeenCalledWith(promptId, 6);
     });
 
     it('counts a language as failed when translateOne returns FAILED', async () => {
       getEligibleTargetLanguages.mockResolvedValue([langs[0]]);
-      findForBody.mockResolvedValue(null);
+      findByPromptAndLanguage.mockResolvedValue(null);
       jest.spyOn(service, 'translateOne').mockResolvedValue({
         status: PromptTranslationStatus.FAILED,
         provider: 'gemini',
@@ -301,52 +295,6 @@ describe('PromptTranslationService.translateOne', () => {
 
       expect(result.failed).toBe(1);
       expect(result.translated).toBe(0);
-    });
-
-    it('records a failed row when translateOne throws, so the language is not left pending', async () => {
-      getEligibleTargetLanguages.mockResolvedValue([langs[0]]);
-      getPromptByCode.mockResolvedValue('BODY'); // hashBody -> 'hash:4'
-      findForBody.mockResolvedValue(null);
-      jest
-        .spyOn(service, 'translateOne')
-        .mockRejectedValue(new Error('translation prompt is not configured'));
-
-      const result = await service.translatePrompt(promptId);
-
-      expect(result.failed).toBe(1);
-      expect(upsertTranslation).toHaveBeenCalledWith(
-        expect.objectContaining({
-          promptId,
-          languageId: 2,
-          sourceHash: 'hash:4',
-          status: PromptTranslationStatus.FAILED,
-          error: 'translation prompt is not configured',
-        }),
-      );
-    });
-
-    it('translates the languages concurrently', async () => {
-      getEligibleTargetLanguages.mockResolvedValue(langs);
-      findForBody.mockResolvedValue(null);
-      let inFlight = 0;
-      let maxInFlight = 0;
-      jest.spyOn(service, 'translateOne').mockImplementation(async () => {
-        inFlight++;
-        maxInFlight = Math.max(maxInFlight, inFlight);
-        await new Promise((r) => setTimeout(r, 5));
-        inFlight--;
-        return {
-          status: PromptTranslationStatus.READY,
-          provider: 'gemini',
-          model: 'gemini-2.5-pro',
-          attempts: 1,
-        };
-      });
-
-      const result = await service.translatePrompt(promptId);
-
-      expect(result.translated).toBe(2);
-      expect(maxInFlight).toBe(2);
     });
   });
 

@@ -1,6 +1,6 @@
 # Prompts folder (src/prompts)
 
-Prompt default files (`.txt`) in `src/prompts/` are synced to the Skills Store on startup. This doc covers naming, structure and the folder conventions. **To add a prompt, follow [adding-a-prompt.md](./adding-a-prompt.md)** — the one recipe for all three services.
+Prompt template files (`.txt`) in `src/prompts/` are synced to the database on startup. This doc covers naming, structure, optional meta JSON, and how to add a new prompt.
 
 ## Naming Standards
 
@@ -26,22 +26,30 @@ Prompt default files (`.txt`) in `src/prompts/` are synced to the Skills Store o
 ```
 src/prompts/
 ├── openai_simulation/
+│   ├── _meta/                    # optional: .meta.json for name/description
+│   │   └── character_profile_text.meta.json
 │   ├── character_profile_text.txt
 │   ├── challenge_description.txt
 │   └── ...
 ├── openai_translation/
+│   ├── _meta/
+│   │   └── guardrail_translation.meta.json
 │   ├── code_mixed_system.txt
 │   ├── speech_reexpression_user.txt
 │   └── ...
 ├── builder/
+│   ├── _meta/
+│   │   └── interviewer_system.meta.json
 │   └── interviewer_system.txt
+├── ux_signals/
+│   ├── _meta/
+│   │   └── triage.meta.json
+│   └── triage.txt
 └── product_updates/
+    ├── _meta/
+    │   └── consolidate.meta.json
     └── consolidate.txt
 ```
-
-Each `.txt` has one contract in `src/prompt/contracts/prompt-contracts.ts`: its variables, how the
-code reads the answer, and its Skills Store name, description and category. There are no
-sidecar files.
 
 ### Agent system prompts
 
@@ -49,7 +57,7 @@ A folder like `builder/` (or `character_interview/`, `course_copilot/`) holds th
 prompt for a long-running agent rather than a one-shot generation. Two things differ:
 
 - It is read by code through `PromptSharedService.getPromptByCode('<folder>_<file>')`, not
-  picked by a human in the Admin Dashboard — so the contract's name and description are for
+  picked by a human in the Admin Dashboard — so the `_meta` name and description are for
   whoever later goes looking for it, not for a chooser.
 - The service must **degrade to a hardcoded fallback when the row is missing**, because a
   prompt that has not been synced to the database yet would otherwise take the whole agent
@@ -136,11 +144,10 @@ If a prompt has to derive an id, expect it to guess wrong.
 
 **A tool the deployed prompt has never heard of must be harmless.** `search_corpus` was added
 to the tool belt in the same change as the grounding guidance that tells the model when to use
-it — but production serves the prompt's live version in the Skills Store, so only the tool
-ships with the deploy. An unused tool is inert, which is why this is safe; the reverse is not.
-Guidance that reaches the model without the tool existing would produce calls to a tool that
-isn't there. **Add the tool first, then publish the guidance as a new version in the Skills
-Store.**
+it — but if the production prompt row is dashboard-overridden, only the tool ships. An unused
+tool is inert, which is why this is safe; the reverse is not. Guidance that reaches the model
+without the tool existing would produce calls to a tool that isn't there. **Add the tool first,
+then the guidance, and treat the dashboard override as the thing that actually ships.**
 
 ### Course Copilot (`course_copilot/`)
 
@@ -172,52 +179,46 @@ One agent prompt and eleven one-shot specialist prompts, all under the "Course C
   answers in code (one repair pass) — the same check that blocks saving notes that leak one.
 - Like `character_interview/`, each specialist's output shape is **also validated in code**
   (`src/course-copilot/service/specialists/*` normalise ids and shapes, then run the track
-  validator). The same rule applies: the live text is in the Skills Store and changes on its own
-  schedule, so a changed output shape needs the normaliser to accept the old one too.
+  validator). The same rule applies: if a prompt may be dashboard-overridden, a changed output
+  shape needs the normaliser to accept the old one too.
 
-### Defaults in Git, live text in the Skills Store
+### Which prompts the dashboard actually drives
 
-The Skills Store is the source of truth for prompt text: every runtime serves a prompt's
-**live version**. A `.txt` in this folder is the prompt's **default**:
+`useDashboardOverride` decides whether a row's `prompts_versions` content ships or the
+`.txt` in this folder does. It defaults to **false**, and the failure that causes is
+silent in the studio rather than in the runtime: an admin edits a prompt, sees a new
+version saved, and the next run uses the file. No error, no warning, and the edit is
+inert.
 
-- it **creates** the prompt the first time it deploys (live as version 1);
-- it is the **fallback** a service uses if the store can't be reached;
-- it is what **Revert** puts back live, as a new version;
-- it is the open-source default for anyone running Ally without our store.
+As of 2026-09-25 this one is **override: true**, so the studio is what ships and
+editing its `.txt` here does not:
 
-After the first deploy, **editing the `.txt` changes nothing in production** — sync never
-touches an existing prompt's live text. Change a prompt by saving and publishing a new version
-in the Skills Store, or with the `prompts` CLI (`scripts/prompts/prompts.mjs`, see
-[prompts-api.md](./prompts-api.md)). CI (`scripts/prompts/check-prompts.mjs`) fails a PR that
-edits an existing default without changing its contract, unless it carries the
-`prompt-default-refresh` label.
+| Prompt                       | File                             |
+| ---------------------------- | -------------------------------- |
+| `builder_interviewer_system` | `builder/interviewer_system.txt` |
 
-### Contracts: the variables the code supplies
+(`builder_coder_guidance` and `builder_finalise_guidance` were switched at the same time.
+Their files are gone with Builder's runner build, which was their only reader; any stored
+rows for them are unused.)
 
-Each prompt's contract is declared **in code**, next to the code that fills it:
-`src/prompt/contracts/prompt-contracts.ts` here (`definePrompt`), and
-`app/prompts/contracts.py` in ally-ai and ally-ai-learn (one Pydantic model per prompt). How to
-write one: [adding-a-prompt.md](./adding-a-prompt.md). A
-variable is `required` when the code always supplies it and the text depends on it; anything
-else is optional. Contracts start **open** (undeclared variables allowed); close one once its
-list is complete and the store refuses unknown variables too.
+Turning the flag on is not a one-line change, because the two copies drift apart while it
+is off and nothing reconciles them. When these were switched, the stored version of
+`builder_interviewer_system` was a 5,960-character snapshot against a 11,320-character
+file, and `builder_coder_guidance` held _different_ advice from its file rather than older
+advice — the file carrying Ally's traps (guarded paths, merged migrations), the stored
+version carrying general discipline (never invent a requirement, match the surrounding
+code). Flipping the flag without looking would have silently picked one and dropped the
+other.
 
-A contract's `output` says how the code reads the answer: `'json'` when it parses free text as
-JSON (CI's structured-default check makes one cheap model call to confirm the default still
-answers in JSON; a `_system`/`_user` pair is sent as one call), `'structured'` when the provider
-enforces the shape (`jsonMode`, `response_format`, `with_structured_output`), so the text needn't.
-
-From the contract: the call site's inputs are type-checked (`renderPrompt`); sync sends the contract to the store,
-which refuses a version that drops a required variable; each service's test suite checks its
-defaults satisfy their contracts; and the release check
-(`scripts/prompts/release-check.mjs`) checks production's live text against the new code's
-contracts before a deploy. When a code change needs a new variable, add it as optional,
-publish a version that uses it, then make it required — so no live text ever breaks.
+**So: read both, merge by hand, write the merged text and the flag in the same request,
+and update the `.txt` to match.** The update endpoint only commits a new version when
+content and `useDashboardOverride: true` arrive together, which is what keeps the live
+prompt from passing through a wrong state on the way.
 
 **Since 2026-10-21 the prompt editor cannot change Builder's prompts directly.**
 `builder_interviewer_system` and `builder_platform_rules` are gated by Builder's replay eval
 (`src/builder/constants/builder-eval-gate.constants.ts`): `PUT /prompts/:id` and the revert
-refuse any new version of their text or model settings with a 409. A change goes
+refuse any change to their text, override flag or model settings with a 409. A change goes
 to `POST /v1/builder/eval/prompt-candidates` instead, which replays the eval fixtures with the
 candidate, compares against the live settings, and publishes it through the same update path
 only if nothing got measurably worse. Renaming or re-describing them still works. How the
@@ -336,29 +337,52 @@ Prompts that a _runner_ fetches over HTTP mid-run (Builder's build protocol) are
 folder at all — they are TypeScript builders under `src/<domain>/constants/`, because they are
 assembled per run from live state rather than being static text.
 
-## Display name, description and model (in the contract)
+## Meta JSON (optional)
 
-What used to live in `_meta/*.meta.json` sidecars is part of the contract now (`PromptDetails` in
-`src/prompt/contracts/define-prompt.ts`): `name`, `description`, `category`, `runtimes`, and
-`defaultModel: { provider, model }`. Without them, sync derives the name, description and
-category from the path (via `formatLabel`).
+You can override the **display name** and **description** shown in the Admin Dashboard by adding a `.meta.json` file in a dedicated `_meta` folder next to your prompts. This keeps the prompt directory uncluttered (only `.txt` files at the top level).
 
-- **When sync runs** (app startup or `POST /api/v1/prompts/sync`) it writes `description`,
-  `category` and `runtimes` on every deploy, and `name` only when it creates the prompt: a rename
-  in the Skills Store is an admin's choice and stays.
-- **`defaultModel`** sets the model a prompt **starts on** when sync creates it — e.g.
-  `product_updates_consolidate` starts on `openai` / `gpt-5`, because its output is public copy
-  and the reasoning-tier default wrote too much jargon in side-by-side runs. Sync never applies it
-  to a prompt that already exists: from then on the model belongs to the prompt's versions in the
-  Skills Store. Prefer this to naming a model at the call site — the prompt is the layer the AI
-  Tasks screen reads, so the screen keeps showing what actually runs. The registry row's
-  `provider`/`defaultModel` still describe the tier fallback, which the completion service retries
-  on if the prompt's model fails.
+**Location:** For each prompt file `subdir/<stem>.txt`, add:
+
+```
+subdir/_meta/<stem>.meta.json
+```
+
+**Schema:** JSON object with optional `name`, `description`, and `category` (strings). If a key is missing or empty, the sync falls back to the path-derived value (via `formatLabel`).
+
+**Example:** For `openai_translation/guardrail_translation.txt`, create `openai_translation/_meta/guardrail_translation.meta.json`: <!-- docs-path-lint: ignore -->
+
+```json
+{
+  "name": "Guardrail Translation",
+  "description": "Localizes conversational guardrails for role-play into natural spoken language. Preserves JSON structure and Markdown.",
+  "category": "Translation"
+}
+```
+
+**Default model (new rows only):** `defaultProvider` and `defaultModel` set the model a prompt's row
+**starts on** when sync creates it — e.g. `product_updates/_meta/consolidate.meta.json` starts on
+`openai` / `gpt-5`, because its output is public copy and the reasoning-tier default wrote too much
+jargon in side-by-side runs. Sync never applies them to a row that already exists: from then on the
+model is an admin's choice in System Skills, and a redeploy must not undo it. Prefer this to naming a
+model at the call site — the prompt row is the layer the AI Tasks screen reads, so the screen keeps
+showing what actually runs. The registry row's `provider`/`defaultModel` still describe the tier
+fallback, which the completion service retries on if the prompt's model fails.
+
+- **When sync runs** (app startup or POST `/api/v1/prompts/sync`), the service reads each prompt's `.meta.json` if present and uses it for `name` and `description` in the database.
+- **Dashboard:** The Admin Dashboard (ally-web) displays these names and descriptions. Editing name/description in the dashboard is overwritten on the next sync; prompt **content** is not (dashboard edits are stored in versions).
 
 ## Adding a New Prompt
 
-See [adding-a-prompt.md](./adding-a-prompt.md): the default, the contract, the call site, the
-registry row and the checks to run, for ally-be, ally-ai and ally-ai-learn.
+1. Create a `.txt` file under the right subdir with a **descriptive** name
+2. Restart the app — `PromptsSyncService` will sync on startup (name/description derived from path)
+3. In code, use `toPromptCode(subdir, filename)` when fetching the prompt:
+   ```ts
+   import { toPromptCode } from 'src/prompt/util/prompt-code.util';
+   const prompt = await promptSharedService.getPromptByCode(
+     toPromptCode('openai_simulation', 'my_new_prompt'),
+   );
+   ```
+4. Optionally add `subdir/_meta/<stem>.meta.json` for a custom name/description (see [Meta JSON](#meta-json-optional) above).
 
 ## See also
 

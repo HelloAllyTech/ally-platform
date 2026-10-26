@@ -5,7 +5,7 @@ on real traffic, against a rubric an admin wrote. It is off for every skill unti
 on, and it can only run on skills whose call site reports what they produced ("connected" skills).
 
 Code: `src/skill-experiment/`. Tables: [DATA_SCHEMA.md §3.18](../DATA_SCHEMA.md). Admin UI:
-Skills Store → **Experiments** tab (ally-web).
+System Skills → **Experiments** tab (ally-web).
 
 ## The loop
 
@@ -29,7 +29,7 @@ off ──start──▶ baseline ──enough outputs judged──▶ testing �
 3. **Paused.** The loop stops when the champion's mean reaches `targetScore`, the run has used
    `maxVariants`, `maxConsecutiveLosses` challengers lose in a row, or the designer fails three
    rounds running. **The champion then serves 100% of traffic** until an admin acts.
-4. **Admin actions.** _Apply_ writes the champion to the skill as a new Skills Store version and
+4. **Admin actions.** _Apply_ writes the champion to the skill as a new System Skills version and
    turns the experiment off. _Resume_ continues with a fresh variant budget. _Turn off_ sends
    every request back to the skill's own text at once.
 
@@ -57,7 +57,7 @@ keep serving their current split, but nothing is judged or drafted.
 - **The judge is blind.** It sees the rubric, the input, the output and the _original_ instructions
   — never which variant produced the output, and never the variant's text, so a challenger that
   lowered its own bar is still graded against the original job.
-- **An admin's edit wins.** If the skill text changes in Skills Store while a run is live, the
+- **An admin's edit wins.** If the skill text changes in System Skills while a run is live, the
   next tick restarts the run from the new text.
 - **The rubric and judge are fixed for a run.** Changing either is refused while a run is live,
   because scores from a different rubric or judge are not comparable.
@@ -67,7 +67,7 @@ keep serving their current split, but nothing is judged or drafted.
 
 ## The judge and the designer
 
-Both are Skills Store, editable in the admin like any other: `skill_experiment_judge` and
+Both are System Skills, editable in the admin like any other: `skill_experiment_judge` and
 `skill_experiment_designer` (`src/prompts/skill_experiment/`). Their data arrives as a separate
 JSON message, so the files have no placeholders. Both are AI-task-registry rows
 (`skill-experiment-judge` with `neverFallback`, `skill-experiment-designer`) and meter to
@@ -141,10 +141,19 @@ do not get it.
 Skills in the live voice agent (ally-ai-learn) are not connectable this way yet: their text ships
 once per session in the room metadata, and their "output" is a whole conversation.
 
-## ally-ai override keys
+## Known gap: ally-ai override keys
 
-`AiService.getPromptOverrides` sends every ally-ai prompt's live text under its full code
-(`ally_ai_<dir>_<file>`), which is how ally-ai looks prompts up, plus the legacy slash-mapped
-key for older builds. So any Skills Store version of an ally-ai skill — an experiment's applied
-winner included — reaches ally-ai. Apply goes through the one write path: it is refused if the
-skill was edited after the experiment started.
+`AiService.getPromptOverrides` sends ally-ai's dashboard overrides under a slash-mapped key
+(`ally_ai_summary_summary` → `summary/summary`), but ally-ai looks prompts up by their full code. So
+a System Skills edit to an ally-ai skill does not reach ally-ai today. Connected skills are also sent
+under their full code, which is what makes an experiment's variants — and an applied winner —
+actually run. Widening that to every ally-ai skill would switch on every dashboard edit that has
+silently not applied, all at once. Audit them first:
+
+```sql
+SELECT p."promptCode", p."currentVersion", (pv.prompt IS DISTINCT FROM p."defaultPrompt") AS differs
+  FROM prompts p
+  LEFT JOIN prompts_versions pv ON pv."promptId" = p.id AND pv.version = p."currentVersion"
+ WHERE p."promptCode" LIKE 'ally_ai\_%' AND p."promptCode" NOT LIKE 'ally_ai_learn\_%'
+   AND p."useDashboardOverride" = true;
+```

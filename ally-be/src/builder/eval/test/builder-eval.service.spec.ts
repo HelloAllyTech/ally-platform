@@ -211,10 +211,8 @@ describe('BuilderEvalService', () => {
         dataSource as any,
         fixtures as any,
         { run: jest.fn() } as any,
-        { findIdByCode: jest.fn().mockResolvedValue('prompt-1') } as any,
-        { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
-        { latestVersionOf: jest.fn().mockResolvedValue(6) } as any,
         {} as any,
+        { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
       );
       // The background execution is not under test here.
       jest.spyOn(service as any, 'execute').mockResolvedValue(undefined);
@@ -271,8 +269,6 @@ describe('BuilderEvalService', () => {
           candidate: expect.objectContaining({
             content: 'New interviewer.',
             model: 'gpt-5',
-            // The version the eval compares against, checked again at publish.
-            baseVersion: 6,
           }),
         }),
       );
@@ -305,21 +301,10 @@ describe('BuilderEvalService', () => {
     });
   });
 
-  it('publishes a passed candidate through the one write path, based on the version it was compared against', async () => {
+  it('publishes a passed candidate through the prompts service, marked eval-approved', async () => {
     const promptsService = {
       findIdByCode: jest.fn().mockResolvedValue('prompt-1'),
-    };
-    const versioning = {
-      createAndPromote: jest.fn().mockResolvedValue({ version: 4 }),
-      latestVersionOf: jest.fn().mockResolvedValue(3),
-    };
-    const promptShared = {
-      resolvePrompt: jest.fn().mockResolvedValue({
-        prompt: 'Old interviewer.',
-        provider: 'anthropic',
-        model: 'claude-x',
-        temperature: 0.2,
-      }),
+      updatePrompt: jest.fn().mockResolvedValue(true),
     };
     const suites = { update: jest.fn() };
     const service = new BuilderEvalService(
@@ -328,8 +313,6 @@ describe('BuilderEvalService', () => {
       {} as any,
       promptsService as any,
       { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
-      versioning as any,
-      promptShared as any,
     );
 
     await (service as any).publish({
@@ -338,20 +321,12 @@ describe('BuilderEvalService', () => {
       candidate: {
         promptCode: 'builder_interviewer_system',
         content: 'New interviewer.',
-        baseVersion: 2,
       },
     });
 
-    expect(versioning.createAndPromote).toHaveBeenCalledWith(
+    expect(promptsService.updatePrompt).toHaveBeenCalledWith(
       'prompt-1',
-      expect.objectContaining({
-        body: 'New interviewer.',
-        baseVersion: 2,
-        provider: 'anthropic',
-        model: 'claude-x',
-        temperature: 0.2,
-        createdBy: 7,
-      }),
+      { prompt: 'New interviewer.', useDashboardOverride: true },
       { evalApproved: true },
     );
     expect(suites.update).toHaveBeenCalledWith(
@@ -360,19 +335,10 @@ describe('BuilderEvalService', () => {
     );
   });
 
-  it('publishes a cleared temperature as a cleared override, keeping the live text', async () => {
+  it('publishes a cleared temperature as a cleared override', async () => {
     const promptsService = {
       findIdByCode: jest.fn().mockResolvedValue('prompt-1'),
-    };
-    const versioning = {
-      createAndPromote: jest.fn().mockResolvedValue({ version: 2 }),
-      latestVersionOf: jest.fn().mockResolvedValue(1),
-    };
-    const promptShared = {
-      resolvePrompt: jest.fn().mockResolvedValue({
-        prompt: 'Live interviewer.',
-        temperature: 0.7,
-      }),
+      updatePrompt: jest.fn().mockResolvedValue(true),
     };
     const service = new BuilderEvalService(
       { getRepository: () => ({ update: jest.fn() }) } as any,
@@ -380,8 +346,6 @@ describe('BuilderEvalService', () => {
       {} as any,
       promptsService as any,
       { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
-      versioning as any,
-      promptShared as any,
     );
 
     await (service as any).publish({
@@ -393,13 +357,9 @@ describe('BuilderEvalService', () => {
       },
     });
 
-    expect(versioning.createAndPromote).toHaveBeenCalledWith(
+    expect(promptsService.updatePrompt).toHaveBeenCalledWith(
       'prompt-1',
-      expect.objectContaining({
-        body: 'Live interviewer.',
-        temperature: null,
-        baseVersion: 1,
-      }),
+      { temperature: null },
       { evalApproved: true },
     );
   });
@@ -423,8 +383,6 @@ describe('BuilderEvalService', () => {
         {} as any,
         {} as any,
         { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
-        { latestVersionOf: jest.fn().mockResolvedValue(null) } as any,
-        {} as any,
       );
       const startSuite = jest
         .spyOn(service, 'startSuite')
@@ -579,8 +537,6 @@ describe('BuilderEvalService — resuming a suite a deploy cut off', () => {
       { run: jest.fn() } as any,
       {} as any,
       { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
-      { latestVersionOf: jest.fn().mockResolvedValue(null) } as any,
-      {} as any,
     );
     const execute = jest
       .spyOn(service as any, 'execute')
@@ -655,8 +611,6 @@ describe('BuilderEvalService — cancelling a suite', () => {
       {} as any,
       {} as any,
       {} as any,
-      { latestVersionOf: jest.fn().mockResolvedValue(null) } as any,
-      {} as any,
     );
     return { service, suites, runs };
   };
@@ -710,8 +664,6 @@ describe('BuilderEvalService — cancelling a suite', () => {
       runner as any,
       {} as any,
       {} as any,
-      { latestVersionOf: jest.fn().mockResolvedValue(null) } as any,
-      {} as any,
     );
 
     await (service as any).runQueued({ id: 'suite-1', createdBy: 7 }, [
@@ -722,8 +674,7 @@ describe('BuilderEvalService — cancelling a suite', () => {
   });
 
   it('never completes or publishes a suite that was cancelled meanwhile', async () => {
-    const promptsService = { findIdByCode: jest.fn() };
-    const versioning = { createAndPromote: jest.fn() };
+    const promptsService = { findIdByCode: jest.fn(), updatePrompt: jest.fn() };
     const suites = {
       findOneOrFail: jest.fn().mockResolvedValue({
         id: 'gate-1',
@@ -742,8 +693,6 @@ describe('BuilderEvalService — cancelling a suite', () => {
       {} as any,
       promptsService as any,
       {} as any,
-      versioning as any,
-      {} as any,
     );
     jest.spyOn(service as any, 'runQueued').mockResolvedValue(undefined);
 
@@ -754,7 +703,7 @@ describe('BuilderEvalService — cancelling a suite', () => {
       { id: 'gate-1', status: 'running' },
       expect.objectContaining({ status: 'completed' }),
     );
-    expect(versioning.createAndPromote).not.toHaveBeenCalled();
+    expect(promptsService.updatePrompt).not.toHaveBeenCalled();
   });
 
   it("puts the reason a fresh baseline ran on the gate's verdict", async () => {
@@ -773,8 +722,6 @@ describe('BuilderEvalService — cancelling a suite', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
-      { latestVersionOf: jest.fn().mockResolvedValue(null) } as any,
       {} as any,
     );
     jest.spyOn(service as any, 'runQueued').mockResolvedValue(undefined);

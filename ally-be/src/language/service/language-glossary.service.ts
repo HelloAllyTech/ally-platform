@@ -1909,9 +1909,8 @@ export class LanguageGlossaryService {
       );
     }
 
-    // The live version is the text; the default from Git only when there is none.
     let body: string | null | undefined = row.defaultPrompt;
-    if (row.currentVersion) {
+    if (row.useDashboardOverride && row.currentVersion) {
       const version = await this.promptVersionRepository.findOne({
         where: { promptId: row.id, version: row.currentVersion },
       });
@@ -1924,7 +1923,6 @@ export class LanguageGlossaryService {
     const defaults = this.configService.promptTranslation;
     return {
       systemPrompt: body,
-      // The row mirrors the live version's settings on every promotion.
       engine: {
         provider: row.provider || defaults.defaultProvider,
         model: row.model || defaults.defaultModel,

@@ -100,8 +100,7 @@ This node resolves branching instructions that guide the LLM response. Steps:
 Returns `next_instruction`, `feedback_to_send`, and `advancing_behaviour_ids`.
 
 The two substitution calls record their tokens to `llm_usage` as `branching_instruction` and
-`branching_chat_summary`. Both render their prompts from the scenario's `prompt_data` (the
-session's Skills Store text), falling back to the local defaults only when there is no scenario.
+`branching_chat_summary`.
 
 ## Node 3a: generate_response
 

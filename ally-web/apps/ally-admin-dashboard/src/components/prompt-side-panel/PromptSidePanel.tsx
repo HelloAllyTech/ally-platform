@@ -10,11 +10,6 @@ import {
   useGetLlmModelsQuery,
   useGetBuilderEvalGatedPromptsQuery,
   useSubmitBuilderEvalPromptCandidateMutation,
-  useGetPromptVersionsQuery,
-  useLazyGetPromptVersionsQuery,
-  useCreatePromptVersionMutation,
-  usePromotePromptVersionMutation,
-  useRevertPromptMutation,
 } from "@api";
 import {
   Refresh,
@@ -36,19 +31,10 @@ import {
   ROUTES,
 } from "@constants";
 import { useCreatePortal } from "@hooks";
-import {
-  Prompt,
-  LlmProviderName,
-  PromptVersionSummary,
-  SubmitBuilderEvalPromptCandidateRequest,
-} from "@types";
+import { Prompt, LlmProviderName, SubmitBuilderEvalPromptCandidateRequest } from "@types";
 import { getErrorMessage } from "@utils/errorMessage";
 
 import PromptTranslationsSection from "./PromptTranslationsSection";
-import PromptVersionsSection, {
-  skillsStoreErrorCode,
-  skillsStoreErrorDetails,
-} from "./PromptVersionsSection";
 import { SkillExperimentNotice } from "./SkillExperimentNotice";
 import {
   getAvailableVariableName,
@@ -73,15 +59,8 @@ const TRANSLATABLE_PROMPT_TYPES = new Set(["main_agent", "branching"]);
  */
 const HIDDEN_PLACEHOLDERS = new Set<string>(["language_characteristics"]);
 
-/**
- * Idle time after the last METADATA edit (name, description, visibility, the
- * translation opt-in) before it is persisted. Text and model settings are never
- * autosaved: they are saved as a new version on purpose, then published.
- */
+/** Idle time after the last edit before an auto-save is persisted. */
 const AUTO_SAVE_DEBOUNCE_MS = 700;
-
-/** Poll cadence for the versions list while a draft is still translating. */
-const VERSIONS_POLL_MS = 4000;
 
 /**
  * One id for the "this prompt goes through the eval" refusal, so however many
@@ -95,18 +74,14 @@ interface PromptSidePanelProps {
   allPrompts: Prompt[];
   isOpen: boolean;
   onClose: () => void;
+  onUpdate: (prompt: Prompt) => void;
   /**
-   * Kept for callers that still pass it; the panel no longer writes through it.
-   * Text, blocks and Restore default all go through the version endpoints.
-   */
-  onUpdate?: (prompt: Prompt) => void;
-  /**
-   * Silent persistence path used by the panel's metadata auto-save. It MUST NOT
-   * toast or close: the panel drives a debounced save on every metadata edit
-   * and reflects the result in its own inline status indicator. The payload
-   * never carries text or model settings (those change through versions).
-   * Implementations should let errors propagate (throw / reject) so the panel
-   * can surface a "couldn't save" state.
+   * Silent persistence path used by the panel's auto-save. Unlike `onUpdate`
+   * (which toasts and closes the panel — kept for the block editor and the
+   * revert-to-default action), this MUST NOT toast or close: the panel drives
+   * a debounced save on every edit and reflects the result in its own inline
+   * status indicator. Implementations should let errors propagate (throw /
+   * reject) so the panel can surface a "couldn't save" state.
    */
   onAutoSave?: (prompt: Prompt) => Promise<void>;
   /**
@@ -453,7 +428,7 @@ const BlockEditorPopup: React.FC<{
           </Button>
           <Button
             variant={ButtonVariant.PRIMARY}
-            onClick={() => onSave({ ...block, prompt: text })}
+            onClick={() => onSave({ ...block, prompt: text, useDashboardOverride: true })}
           >
             Save Block
           </Button>
@@ -468,6 +443,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   allPrompts,
   isOpen,
   onClose,
+  onUpdate,
   onAutoSave,
   onDuplicate,
   onDelete,
@@ -477,12 +453,12 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     description: "",
     promptCode: "",
     prompt: "",
+    useDashboardOverride: false,
   });
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [showRevertConfirmModal, setShowRevertConfirmModal] = useState(false);
-  const [showRevertRubricConfirm, setShowRevertRubricConfirm] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingBlock, setEditingBlock] = useState<Prompt | null>(null);
 
@@ -499,36 +475,6 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   const [submitCandidate, { isLoading: isSubmittingCandidate }] =
     useSubmitBuilderEvalPromptCandidateMutation();
   const [refusedPromptId, setRefusedPromptId] = useState<string | null>(null);
-
-  // ── Versions ─────────────────────────────────────────────────────────────
-  // The editor edits from the NEWEST version (a draft if there is one, else
-  // the live one) and saves on top of it: `editorBase` is that version, and
-  // its number is the base the server checks the save against, so a version
-  // someone else saved meanwhile is never overwritten unseen.
-  const [versionsPollMs, setVersionsPollMs] = useState(0);
-  const {
-    data: versions,
-    refetch: refetchVersions,
-    isFetching: isFetchingVersions,
-  } = useGetPromptVersionsQuery(selectedPrompt?.id ?? "", {
-    skip: !isOpen || !selectedPrompt?.id,
-    pollingInterval: versionsPollMs,
-  });
-  const [fetchVersions] = useLazyGetPromptVersionsQuery();
-  const [createVersion, { isLoading: isSavingVersion }] = useCreatePromptVersionMutation();
-  const [promoteVersion] = usePromotePromptVersionMutation();
-  const [revertPrompt] = useRevertPromptMutation();
-  const [editorBase, setEditorBase] = useState<PromptVersionSummary | null>(null);
-  const [versionNote, setVersionNote] = useState("");
-  const [versionError, setVersionError] = useState<
-    { kind: "stale"; latest: number | null } | { kind: "contract"; missing: string[] } | null
-  >(null);
-  useEffect(() => {
-    const translating = (versions ?? []).some(
-      v => v.status !== "history" && (v.translations?.pending.length ?? 0) > 0,
-    );
-    setVersionsPollMs(translating ? VERSIONS_POLL_MS : 0);
-  }, [versions]);
   const isGated =
     Boolean(selectedPrompt?.promptCode) &&
     ((Array.isArray(gatedPromptCodes) &&
@@ -555,16 +501,25 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     };
   }, []);
 
-  // The metadata fields this panel autosaves — used both for change detection
-  // and as the shape the parent persists. Text and model settings are not part
-  // of it: they are saved as a version (or, for a gated prompt, staged for the
-  // eval), so an edit to them is never an unsaved metadata change.
+  // Only the fields this panel can edit — used both for change detection and
+  // as the shape the parent persists. Model/temperature are normalized so a
+  // no-op reselect of the same value doesn't register as a change.
+  //
+  // For a gated prompt the text and model settings are not part of what
+  // autosaves (they are staged for the eval instead), so they are left out of
+  // the serialization: an edit to them is not an unsaved change.
   const serializeEditable = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    (d: Partial<Prompt>, _gated: boolean) =>
+    (d: Partial<Prompt>, gated: boolean) =>
       JSON.stringify({
         name: d.name ?? "",
         description: d.description ?? "",
+        ...(gated
+          ? {}
+          : {
+              prompt: d.prompt ?? "",
+              model: d.model ?? "",
+              temperature: typeof d.temperature === "number" ? d.temperature : null,
+            }),
         translationEnabled: !!d.translationEnabled,
         // Normalized to a boolean so undefined (pre-flag rows) and true — both
         // meaning "visible" — don't read as a change and trigger a no-op save.
@@ -605,43 +560,12 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     [getBlockByCode],
   );
 
-  // A block's text changes like any prompt's: a new version on top of its
-  // newest one, then published (blocks are not translated, so it goes live at
-  // once). A conflict or a contract break is reported, and nothing is lost —
-  // the editor stays open.
   const handleBlockUpdate = useCallback(
     async (blockData: Prompt) => {
-      if (!blockData.id) return;
-      try {
-        const blockVersions = await fetchVersions(blockData.id).unwrap();
-        const live = blockVersions.find(v => v.status === "live");
-        const created = await createVersion({
-          id: blockData.id,
-          body: {
-            prompt: blockData.prompt,
-            baseVersion: blockVersions[0]?.version ?? null,
-            provider: live?.provider ?? null,
-            model: live?.model ?? null,
-            temperature: live?.temperature ?? null,
-          },
-        }).unwrap();
-        await promoteVersion({
-          id: blockData.id,
-          version: created.version,
-          body: { expectedCurrentVersion: live?.version ?? null },
-        }).unwrap();
-        toast.success(en.skillsStore.versions.published(created.version));
-        setEditingBlock(null);
-      } catch (error) {
-        const code = skillsStoreErrorCode(error);
-        toast.error(
-          code === "SKILLS_STORE_STALE_BASE"
-            ? en.skillsStore.versions.staleBase(null)
-            : getErrorMessage(error, en.skillsStore.versions.saveFailed),
-        );
-      }
+      onUpdate(blockData);
+      setEditingBlock(null);
     },
-    [fetchVersions, createVersion, promoteVersion],
+    [onUpdate],
   );
 
   const handleFieldChange = useCallback((field: keyof Prompt, value: any) => {
@@ -746,39 +670,13 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         description: "",
         promptCode: "",
         prompt: "",
+        useDashboardOverride: false,
       };
       setFormData(empty);
       lastSavedRef.current = snapshotOf(empty);
     }
     setSaveState("saved");
-    setEditorBase(null);
-    setVersionNote("");
-    setVersionError(null);
   }, [selectedPrompt, snapshotOf]);
-
-  // Once the versions load, edit from the newest one. If it is a draft, its
-  // text and model replace the live values in the editor — unless the admin
-  // has already started typing, which is never overwritten.
-  useEffect(() => {
-    if (editorBase || !versions?.length || !selectedPrompt?.id) return;
-    const newest = versions[0];
-    setEditorBase(newest);
-    if (newest.status === "candidate") {
-      setFormData(previous => {
-        const untouched =
-          (previous.prompt ?? "") === (selectedPrompt.prompt ?? "") &&
-          (previous.model ?? "") === (selectedPrompt.model ?? "");
-        if (!untouched) return previous;
-        return {
-          ...previous,
-          prompt: newest.prompt,
-          model: newest.model ?? undefined,
-          provider: newest.provider ?? undefined,
-          temperature: newest.temperature ?? undefined,
-        };
-      });
-    }
-  }, [versions, editorBase, selectedPrompt]);
 
   // Live parse the current textarea content for `{name}` placeholders.
   // Mirrors the regex used server-side in parseVariablesFromPrompt; the
@@ -880,44 +778,101 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     );
   }, [selectedPrompt?.usesBlocks, selectedPrompt?.availableVariables]);
 
-  // Assemble the persisted METADATA payload from the current form. Returns null
-  // when a required field is missing (auto-save then simply waits). Text, model
-  // settings and the retired override flag are never sent: the server refuses a
-  // metadata save that would change them, because they change through versions.
+  // Assemble the persisted payload from the current form. Returns null when a
+  // required field is missing (auto-save then simply waits). Mirrors what the
+  // old explicit Save button sent — including auto-enabling the dashboard
+  // override the moment an admin edits.
   const buildPayload = useCallback((): Prompt | null => {
     const promptCode = selectedPrompt?.promptCode ?? formData.promptCode ?? "";
     if (!formData.name || !formData.description || !promptCode) return null;
+    if (isGated) {
+      // The prompt's metadata only. The text, the override flag and the model
+      // settings are left out altogether, so the server cannot read the save as
+      // a behaviour change (it refuses those with a 409): they reach the prompt
+      // through the eval, or not at all.
+      return {
+        name: formData.name || "",
+        description: formData.description || "",
+        promptCode,
+        promptType: formData.promptType ?? selectedPrompt?.promptType,
+        translationEnabled:
+          formData.translationEnabled ?? selectedPrompt?.translationEnabled ?? false,
+        visibleInStudio: (formData.visibleInStudio ?? selectedPrompt?.visibleInStudio) !== false,
+        ...(selectedPrompt?.id && {
+          id: selectedPrompt.id,
+          createdAt: selectedPrompt.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      } as unknown as Prompt;
+    }
+    if (!formData.prompt) return null;
+    // Did the body itself change, or is this a metadata-only save (a rename, a
+    // model pick, the studio-visibility switch)?
+    //
+    // The backend versions the prompt whenever the payload carries `prompt` and
+    // useDashboardOverride is true — it does not compare the text — so sending
+    // an unchanged body mints a duplicate version on every metadata edit. That
+    // burns through PROMPT_VERSION_RETENTION_LIMIT and can evict real content
+    // history. Worse, unconditionally asserting useDashboardOverride=true would
+    // silently move a file-backed prompt onto its DB copy just because someone
+    // flipped a switch. So on a metadata-only save we omit the body and leave
+    // the override flag exactly as it was.
+    const bodyChanged = (formData.prompt ?? "") !== (selectedPrompt?.prompt ?? "");
     return {
       name: formData.name || "",
       description: formData.description || "",
+      promptCode,
+      ...(bodyChanged
+        ? {
+            prompt: formData.prompt || "",
+            useDashboardOverride: true, // Automatically enable override when saved
+          }
+        : { useDashboardOverride: selectedPrompt?.useDashboardOverride ?? false }),
       // Preserve promptType (role tag, immutable after creation in this UI).
       // hasStates is intentionally NOT in the payload — it's set at create
       // time by either the file-sync (meta JSON) or the duplicate endpoint,
       // and prompt management edits should not flip it.
       promptType: formData.promptType ?? selectedPrompt?.promptType,
       // Opt-in translation flag. Toggling it triggers the same auto-save as any
-      // metadata edit; enabling it kicks off an initial translation server-side.
+      // edit; enabling it kicks off an initial translation server-side.
       translationEnabled:
         formData.translationEnabled ?? selectedPrompt?.translationEnabled ?? false,
       // Studio-picker visibility. Never sent as undefined — a prompt whose row
       // predates the flag must round-trip as visible rather than as "unset",
       // which the DTO would drop and leave the switch looking un-persisted.
       visibleInStudio: (formData.visibleInStudio ?? selectedPrompt?.visibleInStudio) !== false,
+      // Prompt-level LLM overrides. Empty model / non-numeric temperature are
+      // sent as explicit clears ("" / null) so the runtime falls back to the
+      // code/language default. Provider is derived from the model. Temperature
+      // is cleared for models that reject a custom one (e.g. gpt-5).
+      provider: formData.model ? (resolveProvider(formData.model) ?? "") : "",
+      model: formData.model ?? "",
+      temperature:
+        selectedModelSupportsTemperature && typeof formData.temperature === "number"
+          ? formData.temperature
+          : null,
       ...(selectedPrompt?.id && {
         id: selectedPrompt.id,
         createdAt: selectedPrompt.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }),
     } as unknown as Prompt;
-  }, [formData, selectedPrompt]);
+  }, [formData, selectedPrompt, resolveProvider, selectedModelSupportsTemperature, isGated]);
 
   // Required-field gate — the same rule the old Save button enforced.
   const isFormValid = useMemo(() => {
     const promptCode = selectedPrompt?.promptCode ?? formData.promptCode;
-    // Text is saved as a version, not autosaved, so an emptied editor does not
-    // block saving a name.
-    return !!(formData.name && formData.description && promptCode);
-  }, [formData.name, formData.description, formData.promptCode, selectedPrompt?.promptCode]);
+    // A gated prompt's text is staged, not saved, so an emptied editor does not
+    // block saving its name.
+    return !!(formData.name && formData.description && promptCode && (isGated || formData.prompt));
+  }, [
+    formData.name,
+    formData.description,
+    formData.promptCode,
+    formData.prompt,
+    selectedPrompt?.promptCode,
+    isGated,
+  ]);
 
   // Serialized editable state vs the last-persisted baseline → is there an
   // unsaved edit right now?
@@ -999,112 +954,22 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     }
   }, [selectedPrompt?.id, onAutoSave, isFormValid, serializeEditable, isGated]);
 
-  // Unsaved text or model edits: what differs from the version the editor works
-  // from (the newest one; the live row until the versions load). For a gated
-  // prompt these are staged for the eval; for every other prompt they are saved
-  // with "Save as new version". Editing back to the base clears them.
-  const baseText = editorBase?.prompt ?? selectedPrompt?.prompt ?? "";
-  const baseModel = editorBase ? (editorBase.model ?? "") : (selectedPrompt?.model ?? "");
-  const baseTemperature = editorBase
-    ? editorBase.temperature
-    : typeof selectedPrompt?.temperature === "number"
-      ? selectedPrompt.temperature
-      : null;
-  const stagedText = (formData.prompt ?? "") !== baseText;
-  const stagedModel = (formData.model ?? "") !== baseModel;
+  // What a gated prompt has staged: edits to the text or the model settings that
+  // are not live and will not be saved by typing. Compared with the saved row,
+  // so editing back to what is live clears it.
+  const stagedText = isGated && (formData.prompt ?? "") !== (selectedPrompt?.prompt ?? "");
+  const stagedModel = isGated && (formData.model ?? "") !== (selectedPrompt?.model ?? "");
   const nextTemperature =
     selectedModelSupportsTemperature && typeof formData.temperature === "number"
       ? formData.temperature
       : null;
-  const stagedTemperature = nextTemperature !== (baseTemperature ?? null);
+  const savedTemperature =
+    typeof selectedPrompt?.temperature === "number" ? selectedPrompt.temperature : null;
+  const stagedTemperature = isGated && nextTemperature !== savedTemperature;
   const hasStagedChange = stagedText || stagedModel || stagedTemperature;
   // A candidate with emptied text would publish a blank prompt; the server trims
   // it away and reads the rest as a model-only change, which is not what was typed.
   const candidateTextBlank = stagedText && !(formData.prompt ?? "").trim();
-
-  // Save the editor's text and model settings as a new draft version, on top
-  // of the version the editor works from. Never goes live by itself.
-  const handleSaveVersion = useCallback(async () => {
-    if (!selectedPrompt?.id || isGated || !hasStagedChange) return;
-    if (!(formData.prompt ?? "").trim()) return;
-    const strings = en.skillsStore.versions;
-    setVersionError(null);
-    try {
-      const created = await createVersion({
-        id: selectedPrompt.id,
-        body: {
-          prompt: formData.prompt ?? "",
-          baseVersion: editorBase?.version ?? versions?.[0]?.version ?? null,
-          provider: formData.model ? (resolveProvider(formData.model) ?? null) : null,
-          model: formData.model || null,
-          temperature: nextTemperature,
-          note: versionNote.trim() || null,
-        },
-      }).unwrap();
-      toast.success(strings.saved(created.version));
-      setVersionNote("");
-      // The new draft is now the base, so the editor reads as saved.
-      setEditorBase({
-        version: created.version,
-        status: "candidate",
-        prompt: formData.prompt ?? "",
-        provider: formData.model ? (resolveProvider(formData.model) ?? null) : null,
-        model: formData.model || null,
-        temperature: nextTemperature,
-        contentHash: created.contentHash,
-        source: "dashboard",
-        note: versionNote.trim() || null,
-        createdBy: null,
-        createdAt: new Date().toISOString(),
-        publishedAt: null,
-      });
-      void refetchVersions();
-    } catch (error) {
-      const code = skillsStoreErrorCode(error);
-      const data = skillsStoreErrorDetails(error);
-      if (code === "SKILLS_STORE_STALE_BASE") {
-        setVersionError({
-          kind: "stale",
-          latest: typeof data.latestVersion === "number" ? data.latestVersion : null,
-        });
-      } else if (code === "SKILLS_STORE_CONTRACT_VIOLATION") {
-        setVersionError({
-          kind: "contract",
-          missing: (data.missing as string[]) ?? [],
-        });
-      } else if ((error as { status?: unknown } | null)?.status === 409) {
-        // Builder's eval gate: this prompt goes live only through the eval.
-        if (selectedPrompt.id) setRefusedPromptId(selectedPrompt.id);
-        toast.error(getErrorMessage(error, en.builder.eval.promptGate.blocked), {
-          id: GATE_REFUSAL_TOAST_ID,
-        });
-      } else if ((error as { status?: unknown } | null)?.status !== 403) {
-        toast.error(getErrorMessage(error, strings.saveFailed));
-      }
-    }
-  }, [
-    selectedPrompt?.id,
-    isGated,
-    hasStagedChange,
-    formData.prompt,
-    formData.model,
-    editorBase,
-    versions,
-    resolveProvider,
-    nextTemperature,
-    versionNote,
-    createVersion,
-    refetchVersions,
-  ]);
-
-  // After a conflict: take the newest version as the base again. The admin's
-  // unsaved text stays in the editor, so they can copy it across.
-  const handleReloadVersions = useCallback(async () => {
-    setVersionError(null);
-    const result = await refetchVersions();
-    const newest = result.data?.[0];
-    if (newest) setEditorBase(newest);
-  }, [refetchVersions]);
 
   const handleSubmitCandidate = useCallback(async () => {
     if (!selectedPrompt?.promptCode || !isGated || !hasStagedChange || candidateTextBlank) return;
@@ -1219,33 +1084,21 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     setShowRevertConfirmModal(true);
   }, []);
 
-  const runRevert = useCallback(
-    async (confirmJudgeRubricChange: boolean) => {
-      if (!selectedPrompt?.id) return;
-      try {
-        // The server puts the default text live as a new version (translations
-        // included); the current version stays in the history.
-        await revertPrompt({
-          id: selectedPrompt.id,
-          ...(confirmJudgeRubricChange ? { confirmJudgeRubricChange: true } : {}),
-        }).unwrap();
-        toast.success(en.simulation.revertPromptSuccess);
-        setShowRevertConfirmModal(false);
-        onClose();
-      } catch (error) {
-        setShowRevertConfirmModal(false);
-        // A judge rubric goes live only once its pinned version is confirmed bumped.
-        if (skillsStoreErrorCode(error) === "SKILLS_STORE_JUDGE_RUBRIC_PINNED") {
-          setShowRevertRubricConfirm(true);
-          return;
-        }
-        toast.error(getErrorMessage(error, en.simulation.revertPromptFailed));
-      }
-    },
-    [selectedPrompt, revertPrompt, onClose],
-  );
-
-  const handleRevertConfirm = useCallback(() => runRevert(false), [runRevert]);
+  const handleRevertConfirm = useCallback(async () => {
+    if (!selectedPrompt?.id) return;
+    try {
+      // Revert should also disable the dashboard override to "fall back" to codebase
+      await onUpdate({
+        ...selectedPrompt,
+        useDashboardOverride: false,
+      });
+      toast.success(en.simulation.revertPromptSuccess);
+      setShowRevertConfirmModal(false);
+      onClose();
+    } catch {
+      toast.error(en.simulation.revertPromptFailed);
+    }
+  }, [selectedPrompt, onUpdate, onClose]);
 
   const handleRevertCancel = useCallback(() => {
     setShowRevertConfirmModal(false);
@@ -1253,14 +1106,14 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac) in the prompt text saves
-      // it as a new draft version — the explicit save, from the keyboard.
+      // Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac) forces an immediate save
+      // instead of waiting out the debounce.
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
         event.preventDefault();
-        void handleSaveVersion();
+        flushSave();
       }
     },
-    [handleSaveVersion],
+    [flushSave],
   );
 
   if (!isOpen || !selectedPrompt) return null;
@@ -1285,7 +1138,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
               state={saveState}
               isDirty={isDirty}
               isValid={isFormValid}
-              staged={isGated && hasStagedChange}
+              staged={hasStagedChange}
               onRetry={flushSave}
             />
           </div>
@@ -1323,7 +1176,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
             )}
             {/* A revert is a behaviour change like any other, and the server refuses it for a
                 gated prompt, so the button is not offered. */}
-            {Boolean(selectedPrompt?.defaultPrompt) && !isGated && (
+            {Boolean(selectedPrompt?.useDashboardOverride) && !isGated && (
               <button
                 onClick={handleRevertClick}
                 className="flex items-center gap-1.5 pl-2 pr-1 h-9 text-typography-600 hover:text-neutral-800 transition-colors"
@@ -1535,77 +1388,6 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
               </div>
             </Field>
 
-            {!isGated && (
-              <div
-                className="border-l-4 border-border-dark bg-secondary-50 p-4 flex flex-col gap-3"
-                data-testid="prompt-save-version"
-              >
-                <p className="text-sm text-typography-700">
-                  {hasStagedChange
-                    ? en.skillsStore.versions.unsavedChanges
-                    : en.skillsStore.versions.noChanges}
-                </p>
-                {versionError?.kind === "stale" && (
-                  <div role="alert" className="flex flex-col gap-2 text-sm text-destructive-500">
-                    <span>{en.skillsStore.versions.staleBase(versionError.latest)}</span>
-                    <button
-                      type="button"
-                      onClick={() => void handleReloadVersions()}
-                      className="self-start underline text-primary-600"
-                    >
-                      {en.skillsStore.versions.reload}
-                    </button>
-                  </div>
-                )}
-                {versionError?.kind === "contract" && (
-                  <div role="alert" className="flex flex-col gap-1 text-sm text-destructive-500">
-                    <span>{en.skillsStore.versions.contractViolation}</span>
-                    {versionError.missing.length > 0 && (
-                      <span>{en.skillsStore.versions.contractMissing(versionError.missing)}</span>
-                    )}
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="text"
-                    value={versionNote}
-                    onChange={event => setVersionNote(event.target.value)}
-                    placeholder={en.skillsStore.versions.notePlaceholder}
-                    aria-label={en.skillsStore.versions.notePlaceholder}
-                    className={CARBON_FIELD + " flex-1 min-w-[200px]"}
-                    disabled={!hasStagedChange}
-                  />
-                  <Button
-                    variant={ButtonVariant.PRIMARY}
-                    onClick={() => void handleSaveVersion()}
-                    disabled={
-                      !hasStagedChange || !(formData.prompt ?? "").trim() || isSavingVersion
-                    }
-                  >
-                    {isSavingVersion
-                      ? en.skillsStore.versions.saving
-                      : en.skillsStore.versions.saveAsVersion}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {selectedPrompt?.id && (
-              <Field label={en.skillsStore.versions.title}>
-                {versions ? (
-                  <PromptVersionsSection
-                    promptId={selectedPrompt.id}
-                    versions={versions}
-                    onReload={() => void refetchVersions()}
-                  />
-                ) : (
-                  <span className="text-sm text-typography-500">
-                    {isFetchingVersions ? en.common.loading : en.skillsStore.versions.empty}
-                  </span>
-                )}
-              </Field>
-            )}
-
             {(availableVariables.length > 0 || unusedVariables.length > 0) && (
               <Field label="Available variables">
                 {/*
@@ -1691,7 +1473,6 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
                       formData.translationEnabled ?? selectedPrompt.translationEnabled ?? false
                     }
                     onToggleEnabled={value => handleFieldChange("translationEnabled", value)}
-                    version={editorBase?.version}
                   />
                 </Field>
               )}
@@ -1713,23 +1494,6 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         secondaryButton={{
           label: "Cancel",
           onClick: handleRevertCancel,
-        }}
-      />
-      <ActionConfirmationPopup
-        isOpen={showRevertRubricConfirm}
-        onClose={() => setShowRevertRubricConfirm(false)}
-        title={en.skillsStore.versions.judgeRubricTitle}
-        description={en.skillsStore.versions.judgeRubricBody}
-        primaryButton={{
-          label: en.skillsStore.versions.judgeRubricConfirm,
-          onClick: () => {
-            setShowRevertRubricConfirm(false);
-            void runRevert(true);
-          },
-        }}
-        secondaryButton={{
-          label: "Cancel",
-          onClick: () => setShowRevertRubricConfirm(false),
         }}
       />
       <ActionConfirmationPopup

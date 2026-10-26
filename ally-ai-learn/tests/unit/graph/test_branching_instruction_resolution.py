@@ -136,7 +136,7 @@ class TestResolveBranchingEdgeCases:
         )
 
         # Mock resolve_llm_responses to raise an exception
-        async def mock_resolve_with_error(llm_config, language_code, **kwargs):
+        async def mock_resolve_with_error(llm_config, language_code):
             raise Exception("LLM API failed")
 
         instruction.resolve_llm_responses = mock_resolve_with_error
