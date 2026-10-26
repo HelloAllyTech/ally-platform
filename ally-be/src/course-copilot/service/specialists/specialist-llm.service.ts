@@ -132,7 +132,7 @@ export function buildSpecialistPrompt(
     prompt +=
       '\n\n---\nYour previous output was rejected for these reasons:\n' +
       request.repairErrors.map((error) => `- ${error}`).join('\n') +
-      '\nProduce the whole object again, fixed.';
+      '\nProduce the whole object again, fixed. As before, return ONLY a JSON object.';
   }
 
   return prompt;
