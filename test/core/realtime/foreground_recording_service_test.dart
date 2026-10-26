@@ -4,44 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ally_mobile_flutter/core/realtime/foreground_recording_service.dart';
 
-/// Records every `startService`/`stopService` call and tracks a simple
-/// "is the service running" flag, backing `FlutterForegroundTaskPlatform`
-/// — flutter_foreground_task's own swappable platform-interface seam
-/// (same mechanism its real Android/iOS implementations register through),
-/// which is what makes this file's service-lifecycle guard logic testable
-/// at all without a real Android foreground service.
-class _FakeForegroundTaskPlatform extends FlutterForegroundTaskPlatform {
-  bool running = false;
-  final List<({String title, String text, List<ForegroundServiceTypes>? types})> startCalls = [];
-  int stopCallCount = 0;
-
-  @override
-  Future<bool> get isRunningService async => running;
-
-  @override
-  Future<void> startService({
-    required AndroidNotificationOptions androidNotificationOptions,
-    required IOSNotificationOptions iosNotificationOptions,
-    required ForegroundTaskOptions foregroundTaskOptions,
-    int? serviceId,
-    List<ForegroundServiceTypes>? serviceTypes,
-    required String notificationTitle,
-    required String notificationText,
-    NotificationIcon? notificationIcon,
-    List<NotificationButton>? notificationButtons,
-    String? notificationInitialRoute,
-    Function? callback,
-  }) async {
-    startCalls.add((title: notificationTitle, text: notificationText, types: serviceTypes));
-    running = true;
-  }
-
-  @override
-  Future<void> stopService() async {
-    stopCallCount++;
-    running = false;
-  }
-}
+import '../../support/fake_foreground_task_platform.dart';
 
 // This file is the one genuinely Android-specific candidate in the batch
 // that turned out to have real, directly testable logic: `start()`/`stop()`
@@ -58,10 +21,10 @@ class _FakeForegroundTaskPlatform extends FlutterForegroundTaskPlatform {
 // of this — that's the real native behavior this class exists to drive,
 // and no test running on the Dart VM can observe it.
 void main() {
-  late _FakeForegroundTaskPlatform fakePlatform;
+  late FakeForegroundTaskPlatform fakePlatform;
 
   setUp(() {
-    fakePlatform = _FakeForegroundTaskPlatform();
+    fakePlatform = FakeForegroundTaskPlatform();
     FlutterForegroundTaskPlatform.instance = fakePlatform;
   });
 

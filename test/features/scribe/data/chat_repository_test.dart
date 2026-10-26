@@ -74,4 +74,35 @@ void main() {
       verify(() => dio.post<void>('/chats/42/end')).called(1);
     });
   });
+
+  group('addFeedback', () {
+    test('POSTs the rating to /chats/messages/:messageId/feedback', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/chats/messages/7/feedback',
+          data: {'rating': 1},
+        ),
+      ).thenAnswer((_) async => _response({'feedbackId': 99, 'rating': 1}));
+
+      final feedback = await repository.addFeedback(7, 1);
+
+      expect(feedback.feedbackId, 99);
+      expect(feedback.rating, 1);
+    });
+  });
+
+  group('updateFeedback', () {
+    test('PATCHes the rating to /chats/messages/feedback/:feedbackId', () async {
+      when(
+        () => dio.patch<Map<String, dynamic>>(
+          '/chats/messages/feedback/99',
+          data: {'rating': 0},
+        ),
+      ).thenAnswer((_) async => _response({'feedbackId': 99, 'rating': 0}));
+
+      final feedback = await repository.updateFeedback(99, 0);
+
+      expect(feedback.rating, 0);
+    });
+  });
 }
