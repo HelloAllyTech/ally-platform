@@ -14,6 +14,10 @@ from app.prompts.resolver import load_template
 logger = get_logger(__name__)
 
 
+class LLMResponse(BaseModel):
+    content: str
+
+
 async def generate_llm_response(
     content: str,
     language_code: str = DEFAULT_LANGUAGE_CODE,
@@ -58,9 +62,6 @@ async def generate_llm_response(
         llm_instance = llm_client.llm_instance
 
         logger.debug(f"Generating LLM response for content: {content[:100]}...")
-
-        class LLMResponse(BaseModel):
-            content: str
 
         system_message = SystemMessage(
             content=load_template("branching/llm_response_system")
