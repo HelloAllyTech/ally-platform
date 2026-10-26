@@ -1,8 +1,4 @@
-
-import logging
 from unittest.mock import MagicMock, patch
-
-import pytest
 from pydantic import ValidationError
 
 from app.core.constants import DetectionType
@@ -45,7 +41,6 @@ def test_create_event_by_detection_type_handles_time_event_validation_error(
     assert isinstance(call_args[2], ValidationError)
 
 
-
 @patch("app.core.events.factory.get_logger")
 def test_build_events_from_metadata_with_invalid_score_data(mock_get_logger):
     """
@@ -74,7 +69,7 @@ def test_build_events_from_metadata_with_invalid_score_data(mock_get_logger):
 
     # Assert
     assert len(events) == 0
-    
+
     # Check that a warning was logged about the skipped event
     log_calls = mock_logger.warning.call_args_list
 
@@ -99,6 +94,3 @@ def test_build_events_from_metadata_with_invalid_score_data(mock_get_logger):
             found_skipped_log = True
             break
     assert found_skipped_log, "A summary ''skipped'' message should have been logged."
-
-
-
