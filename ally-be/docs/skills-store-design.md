@@ -427,6 +427,14 @@ Verified locally: migration on the local DB (29 file-served prompts published, a
 
 **Deploy order (required).** Deploy **ally-be first**, then the admin dashboard, then ally-ai and ally-ai-learn. ally-be's migrations snapshot the prompt tables (`1980150000000`), make what production runs today each prompt's live version and stored default, and only then does sync run (it never overwrites an existing prompt's text or default). The ally-ai and ally-ai-learn release workflows enforce the order: a `require-skills-store` job blocks their deploy until production ally-be serves the Skills Store. Before deploying, run `scripts/prompts/migration-preview.sql` read-only against production: it lists the file-backed prompts whose served file text gets published as a new version, and any row with no usable version. No prompt's running text changes.
 
+**Rolling back (rehearsed 2026-10-26 on a copy of production prompt data).** Go in reverse deploy order. Nothing is lost at any step, and every prompt keeps serving the same text.
+
+1. ally-ai and ally-ai-learn back to their previous images. They run as they do today behind the new ally-be: it sends every prompt, every override flag is on, and their local files hold the same text as the store. An old build's startup sync changes nothing, and it can't recreate a removed prompt (`REMOVED_PROMPT_CODES`).
+2. The admin dashboard.
+3. ally-be: run `scripts/prompts/rollback-prepare.sql` first, then deploy the previous image (no `down` migrations). Without the script every translation write fails, because the old upsert needs a unique index on prompt and language. The script archives any extra translation rows and adds that index. The old build serves each prompt's current version, and its sync puts the pre-cutover defaults back on the 18 dashboard-overridden prompts.
+
+To return to the Skills Store, run `scripts/prompts/roll-forward-after-rollback.sql` with the time the rollback started, then deploy in the normal order. It drops the index, restores the archived translations, marks the versions saved during the rollback as published, and makes each stored default the live text again.
+
 **After deploying:** Revert to default restores the production text from the cutover (the stored default), never the minimal Git base; the Git files only seed new prompts and are the last-resort fallback inside ally-ai and ally-ai-learn; a fresh local stack needs `prompts pull --into-local` to run on production's text.
 
 ## Open questions
