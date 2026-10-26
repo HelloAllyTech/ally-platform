@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../features/notifications/data/notifications_repository.dart';
 import '../../features/reviews/data/reviews_repository.dart';
@@ -8,6 +7,7 @@ import '../permissions/permissions_repository.dart';
 import '../push/push_notification_service.dart';
 import 'app_bottom_tab_bar.dart';
 import 'app_drawer.dart';
+import 'drawer_menu_button.dart';
 import 'tab_config.dart';
 
 /// Port of ally-mobile (React Native)'s `DrawerNavigator` + `TabNavigator`
@@ -73,21 +73,16 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
                     bottom: false,
                     child: IndexedStack(
                       index: currentIndex,
-                      children: [for (final tab in visibleTabs) tab.screenBuilder(context)],
-                    ),
-                  ),
-                // RN's `useTabScreenHeader`: `showHamburger: isFirstTab` —
-                // the drawer-menu icon only ever appears on the first
-                // visible tab, not on every tab's screen.
-                if (currentIndex == 0)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: SafeArea(
-                      child: IconButton(
-                        icon: SvgPicture.asset('assets/icons/drawerMenu.svg', width: 24, height: 24),
-                        onPressed: () => Scaffold.of(context).openDrawer(),
-                      ),
+                      children: [
+                        // RN's `useTabScreenHeader`: `showHamburger:
+                        // isFirstTab` — only the first visible tab's header
+                        // carries the drawer-menu button.
+                        for (final (i, tab) in visibleTabs.indexed)
+                          DrawerMenuScope(
+                            onOpenDrawer: i == 0 ? Scaffold.of(context).openDrawer : null,
+                            child: tab.screenBuilder(context),
+                          ),
+                      ],
                     ),
                   ),
                 if (visibleTabs.isNotEmpty)

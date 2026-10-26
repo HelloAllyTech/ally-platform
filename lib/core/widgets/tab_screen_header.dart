@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../features/progress/presentation/progress_header_widget.dart';
+import '../navigation/drawer_menu_button.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import 'info_tooltip_icon.dart';
@@ -48,6 +49,10 @@ class TabScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A caller's own leading control (e.g. a back arrow) takes the slot;
+    // otherwise the first tab's header carries the drawer menu, as in RN.
+    final leading = this.leading ??
+        (DrawerMenuScope.showsMenu(context) ? const DrawerMenuButton() : null);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       margin: const EdgeInsets.only(top: 16),

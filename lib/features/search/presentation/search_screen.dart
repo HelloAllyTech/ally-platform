@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/drawer_menu_button.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../data/search_repository.dart';
@@ -312,9 +313,21 @@ class _LogoHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final logo = SvgPicture.asset('assets/icons/allyLogo.svg', height: 32);
     return Column(
       children: [
-        SvgPicture.asset('assets/icons/allyLogo.svg', height: 32),
+        // RN's `SearchHeader` also takes `showHamburger` — the logo stays
+        // centred, with the button pinned left, when Search is the first tab.
+        if (DrawerMenuScope.showsMenu(context))
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              logo,
+              const Align(alignment: Alignment.centerLeft, child: DrawerMenuButton()),
+            ],
+          )
+        else
+          logo,
         if (showDescription) ...[
           const SizedBox(height: 10),
           Text(

@@ -74,13 +74,19 @@ class AuthController extends Notifier<AuthState> {
   /// Settings kept rendering the multi-paragraph "RequestOptions.
   /// validateStatus..." dump even once the toast was showing), since
   /// nothing was actually removing it from the propagated error.
+  ///
+  /// No snackbar when nobody was signed in: there was no session to expire,
+  /// and the login screen showing "Your session has expired" on a fresh
+  /// install reads as a bug (it was one — see `currentUserProvider`).
   Future<String> sessionExpired() async {
+    final wasAuthenticated = state.isAuthenticated;
     await _tokenStorage.clear();
     state = const AuthState(isAuthenticated: false);
 
     final message =
         ref.read(localizationControllerProvider).value?.t('auth.sessionExpired') ??
         'auth.sessionExpired';
+    if (!wasAuthenticated) return message;
     rootScaffoldMessengerKey.currentState
       ?..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
