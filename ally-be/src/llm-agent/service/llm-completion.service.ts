@@ -109,6 +109,7 @@ const isRetryableProviderFailure = (error: any): boolean => {
 @Injectable()
 export class LlmCompletionService {
   private readonly logger = new Logger(LlmCompletionService.name);
+  private readonly deadProviders = new Map<string, Date>();
 
   constructor(
     private readonly resolver: LlmTargetResolverService,
@@ -117,13 +118,7 @@ export class LlmCompletionService {
   ) {}
 
   async complete(request: LlmCompletionRequest): Promise<LlmCompletionResult> {
-    // Read from the registry row, not passed in: the AI Tasks screen shows the
-    // same values, and two sources would eventually disagree. Both fields come
-    // from one lookup — fetching them separately is how `neverFallback` got
-    // left out, which let a preview pass for a model that does not exist.
     const { tier, neverFallback } = callConfigForAiTask(request.taskId, {
-      // A caller that names a model has made the choice a tier would have
-      // made, so a config-selected row needs no tier to be callable.
       modelIsExplicit: Boolean(request.model),
     });
 
@@ -137,6 +132,12 @@ export class LlmCompletionService {
       temperature: request.temperature,
     });
 
+    const now = new Date();
+    const deadUntil = this.deadProviders.get(target.provider);
+    if (deadUntil && now < deadUntil) {
+      return this.fallback(request, target, 'provider is cached as dead');
+    }
+
     try {
       return await this.run(request, target);
     } catch (error) {
@@ -145,35 +146,57 @@ export class LlmCompletionService {
         throw error;
       }
 
-      const reason = (error as Error)?.message ?? String(error);
-      let logMessage =
-        `[LLM-FALLBACK] ${request.taskId}: ${target.provider}/${target.model} ` +
-        `failed (${reason}); retrying on ${fallback.provider}/${fallback.model}`;
-
-      // On a provider-auth failure for Anthropic, add an actionable hint. This
-      // is a recurring operational issue (an expired key is present but invalid)
-      // and the default message does not point the operator at the root cause.
-      if (
-        target.provider === 'anthropic' &&
-        (reason.includes('key') || [401, 403].includes((error as any)?.status))
-      ) {
-        logMessage +=
-          ' - SUGGESTION: The Anthropic API key may be invalid or expired. ' +
-          'Please check the ANTHROPIC_API_KEY environment variable.';
+      const status = (error as any)?.status;
+      if (status === 401 || status === 403) {
+        // Five minutes. A lapsed key is an operational issue, and this cooldown
+        // exists only to stop one such key from flooding the logs.
+        const reenableAt = new Date(now.getTime() + 5 * 60 * 1000);
+        this.deadProviders.set(target.provider, reenableAt);
       }
 
-      this.logger.warn(logMessage);
-
-      const result = await this.run(request, fallback);
-      return {
-        ...result,
-        fellBackFrom: {
-          provider: target.provider,
-          model: target.model,
-          reason,
-        },
-      };
+      return this.fallback(
+        request,
+        target,
+        (error as Error)?.message ?? String(error),
+      );
     }
+  }
+
+  private async fallback(
+    request: LlmCompletionRequest,
+    target: ResolvedLlmTarget,
+    reason: string,
+  ): Promise<LlmCompletionResult> {
+    const fallback = this.fallbackTarget(target);
+    if (!fallback) {
+      // Create an error that looks like what the caller would have got from the
+      // provider, so its own retry logic can decide what to do.
+      const error = new Error(reason);
+      (error as any).status = 503;
+      throw error;
+    }
+
+    let logMessage =
+      `[LLM-FALLBACK] ${request.taskId}: ${target.provider}/${target.model} ` +
+      `failed (${reason}); retrying on ${fallback.provider}/${fallback.model}`;
+
+    if (target.provider === 'anthropic' && reason.includes('key')) {
+      logMessage +=
+        ' - SUGGESTION: The Anthropic API key may be invalid or expired. ' +
+        'Please check the ANTHROPIC_API_KEY environment variable.';
+    }
+
+    this.logger.warn(logMessage);
+
+    const result = await this.run(request, fallback);
+    return {
+      ...result,
+      fellBackFrom: {
+        provider: target.provider,
+        model: target.model,
+        reason,
+      },
+    };
   }
 
   /**
