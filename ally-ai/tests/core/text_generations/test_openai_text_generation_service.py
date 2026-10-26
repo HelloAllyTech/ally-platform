@@ -1168,6 +1168,77 @@ class TestOpenAITextGenerationService:
                 )
 
     @pytest.mark.asyncio
+    async def test_invoke_llm_handles_raw_usage_data(self, text_generation_service):
+        """Test that _invoke_llm correctly handles raw usage data from the LLM and
+        passes it to the usage emitter.
+        """
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "Test response"
+        mock_response.response_metadata = {
+            "token_usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30,
+            }
+        }
+        mock_client.ainvoke = AsyncMock(return_value=mock_response)
+        text_generation_service.model = mock_client
+
+        with patch("app.core.llm_usage.emitter.emit_llm_usage") as mock_emit:
+            await text_generation_service._invoke_llm("Test prompt", task="test_task")
+
+            mock_emit.assert_called_once()
+            usage = mock_emit.call_args.kwargs["usage"]
+            assert usage is not None
+            assert usage == (10, 20, 30)
+
+    @pytest.mark.asyncio
+    async def test_invoke_llm_handles_usage_metadata(self, text_generation_service):
+        """Test that _invoke_llm correctly handles usage_metadata from the LLM
+        response.
+        """
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "Test response"
+        mock_response.usage_metadata = {
+            "input_tokens": 15,
+            "output_tokens": 25,
+            "total_tokens": 40,
+        }
+        mock_client.ainvoke = AsyncMock(return_value=mock_response)
+        text_generation_service.model = mock_client
+
+        with patch("app.core.llm_usage.emitter.emit_llm_usage") as mock_emit:
+            await text_generation_service._invoke_llm("Test prompt", task="test_task")
+
+            mock_emit.assert_called_once()
+            usage = mock_emit.call_args.kwargs["usage"]
+            assert usage is not None
+            assert usage == (15, 25, 40)
+
+    @pytest.mark.asyncio
+    async def test_invoke_llm_handles_parsing_failure(self, text_generation_service):
+        """Test that _invoke_llm raises LLMInvocationFailedException on a parsing
+        failure from a structured output call.
+        """
+        mock_client = MagicMock()
+        # Simulate a parsing error. LangChain might raise a variety of errors
+        # if the LLM output does not conform to the schema. A generic Exception
+        # is a good stand-in.
+        mock_client.with_structured_output.return_value.ainvoke = AsyncMock(
+            side_effect=Exception("Could not parse JSON")
+        )
+        text_generation_service.model = mock_client
+
+        with pytest.raises(LLMInvocationFailedException) as exc_info:
+            await text_generation_service._invoke_llm(
+                "Test prompt", output_class=StructuredSummaryNote
+            )
+
+        assert "LLM invocation failed: Exception" in str(exc_info.value)
+
+    @pytest.mark.asyncio
     async def test_invoke_llm_length_finish_reason_error(
         self, text_generation_service, mock_client
     ):
