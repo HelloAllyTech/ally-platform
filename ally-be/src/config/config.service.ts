@@ -884,13 +884,10 @@ export class AppConfigService {
    */
   get roadmapCopilot() {
     return {
-      model: this.configService.get<string>(
-        'ROADMAP_COPILOT_MODEL',
-        'claude-sonnet-5-5',
-      ),
+      model: this.configService.get<string>('ROADMAP_COPILOT_MODEL', 'gpt-5'),
       fallbackModel: this.configService.get<string>(
         'ROADMAP_COPILOT_FALLBACK_MODEL',
-        'gpt-5',
+        'gemini-2.5-pro',
       ),
     };
   }
