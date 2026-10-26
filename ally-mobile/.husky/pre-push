@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+echo "🔍 Running documentation path linting..."
+node scripts/docs-path-lint.mjs
