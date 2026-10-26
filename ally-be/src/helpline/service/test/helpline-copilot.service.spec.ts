@@ -511,6 +511,39 @@ describe('HelplineCopilotService — risk classifier', () => {
     expect(request.language).toBe('hi');
   });
 
+  it('keeps the last good prompts when a later store read fails', async () => {
+    const { service, deps } = build();
+    deps.prompts.getPromptsByOptions.mockResolvedValueOnce([
+      { promptCode: 'ally_ai_helpline_risk_classify', prompt: 'Live risk.' },
+    ]);
+    const chat = { id: CHAT_ID, tenantId: TENANT.id } as never;
+    await service.classify(chat, talkerMessage(5), settings());
+
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now + 10 * 60_000);
+    deps.prompts.getPromptsByOptions.mockRejectedValueOnce(new Error('down'));
+    await service.classify(chat, talkerMessage(6), settings());
+    clock.mockRestore();
+
+    const second = deps.ai.classifyHelplineRisk.mock.calls[1][0] as {
+      prompts: Record<string, { prompt: string }>;
+    };
+    expect(second.prompts.ally_ai_helpline_risk_classify.prompt).toBe(
+      'Live risk.',
+    );
+  });
+
+  it('never calls the classifier with an empty prompt map when nothing is cached', async () => {
+    const { service, deps } = build();
+    deps.prompts.getPromptsByOptions.mockRejectedValueOnce(new Error('down'));
+    await service.classify(
+      { id: CHAT_ID, tenantId: TENANT.id } as never,
+      talkerMessage(5),
+      settings(),
+    );
+    expect(deps.ai.classifyHelplineRisk).not.toHaveBeenCalled();
+  });
+
   it('skipped entirely when the org turns the classifier off', async () => {
     const { service, deps } = build({
       settings: settings({ riskClassifier: false }),

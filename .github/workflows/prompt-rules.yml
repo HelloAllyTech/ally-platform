@@ -1,0 +1,80 @@
+name: Prompt rules
+
+# Prompt text lives in the Skills Store; Git holds each prompt's default, and
+# its contract lives in code (ally-be src/prompt/contracts/, ally-ai and
+# ally-ai-learn app/prompts/contracts.py), where each service's own tests check
+# its defaults against it. This checks the repo-wide rules: the pulled working
+# copy (.prompts/) is never committed, migrations don't write prompt text, and
+# a default changes only together with its service's contracts (or under the
+# `prompt-default-refresh` label).
+#
+# See ally-be/docs/prompts-folder.md
+
+on:
+  pull_request:
+    # labeled/unlabeled so adding `prompt-default-refresh` re-runs the check.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - "ally-be/src/prompts/**"
+      - "ally-ai/app/prompts/**"
+      - "ally-ai-learn/app/prompts/**"
+      - "ally-be/src/database/migrations/**"
+      - ".prompts/**"
+      - "scripts/prompts/**"
+      - "ally-be/src/prompt/contracts/**"
+      - "ally-ai/app/prompts/contracts.py"
+      - "ally-ai-learn/app/prompts/contracts.py"
+      - ".github/workflows/prompt-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the default-change check can diff against the base.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Prompt rules
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'master' }}
+          # A PR that deliberately refreshes an open-source default carries
+          # this label; otherwise editing a default without its contract fails.
+          PROMPT_DEFAULT_REFRESH: ${{ contains(github.event.pull_request.labels.*.name, 'prompt-default-refresh') }}
+        run: node scripts/prompts/check-prompts.mjs
+
+  structured-defaults:
+    # One cheap model call per structured prompt (contract `output: json`):
+    # does its DEFAULT still make the model answer in JSON? Runs only when the
+    # PROMPT_CHECK_OPENAI_KEY secret is set.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENAI_API_KEY: ${{ secrets.PROMPT_CHECK_OPENAI_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dump the contracts from code
+        if: env.OPENAI_API_KEY != ''
+        run: |
+          pip install --quiet "pydantic>=2,<3"
+          (cd ally-be && npm ci --ignore-scripts --no-audit --no-fund \
+            && npx ts-node --transpile-only scripts/prompt-contracts-json.ts) > /tmp/be.json
+          (cd ally-ai && python -m app.prompts.contracts) > /tmp/ai.json
+          (cd ally-ai-learn && python -m app.prompts.contracts) > /tmp/learn.json
+      - name: Structured defaults answer in JSON
+        if: env.OPENAI_API_KEY != ''
+        run: |
+          node scripts/prompts/check-structured-defaults.mjs \
+            --contracts /tmp/be.json --contracts /tmp/ai.json --contracts /tmp/learn.json

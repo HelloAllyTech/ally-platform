@@ -31,6 +31,11 @@ import {
 import { PromptTranslation } from '../entity/prompt-translation.entity';
 import { SetTranslationRuntimeModelDto } from '../dto/set-translation-runtime-model.dto';
 import { UpdatePromptDto } from '../dto/update-prompt.dto';
+import {
+  CreatePromptVersionRequestDto,
+  PromoteVersionRequestDto,
+  RevertPromptRequestDto,
+} from '../dto/skills-store.dto';
 import { CreatePromptsDto } from '../dto/create-prompts.dto';
 import { SyncPromptsDto } from '../dto/sync-prompts.dto';
 import { SortOrder } from 'src/user/enum/user.enum';
@@ -65,14 +70,91 @@ export class PromptsController {
   }
 
   @ApiOperation({
-    summary: 'List stored translations for a prompt (read-only, per language)',
+    summary:
+      "List a version's translations (read-only, per language). Defaults to the live version.",
   })
   @AuthPermissions([PERMISSIONS.VIEW_PROMPT])
   @Get(':id/translations')
   async listPromptTranslations(
     @Param('id') id: string,
+    @Query('version') version?: string,
   ): Promise<PromptTranslation[]> {
+    if (version) {
+      const body = await this.promptsService.getVersionBody(
+        id,
+        Number(version),
+      );
+      if (body === null) return [];
+      return this.promptTranslationService.listTranslations(id, body);
+    }
     return this.promptTranslationService.listTranslations(id);
+  }
+
+  // ===== VERSION ENDPOINTS (the one write path for text and model settings) =====
+
+  @ApiOperation({
+    summary:
+      'A prompt’s versions, newest first: live, candidates (with translation readiness) and history',
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_PROMPT])
+  @Get(':id/versions')
+  listVersions(@Param('id') id: string) {
+    return this.promptsService.listVersions(id);
+  }
+
+  @ApiOperation({
+    summary:
+      'Save text and model settings as a new candidate version. 409 stale_base if a newer version exists; 422 contract_violation if it breaks the contract.',
+  })
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
+  @Post(':id/versions')
+  createVersion(
+    @Param('id') id: string,
+    @Body() dto: CreatePromptVersionRequestDto,
+  ) {
+    return this.promptsService.createVersion(id, dto);
+  }
+
+  @ApiOperation({
+    summary:
+      'Put a version live. 409 stale_base if the live version changed; 409 translations_pending while translations run. Failed translations are reported and keep English.',
+  })
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
+  @Post(':id/versions/:version/promote')
+  promoteVersion(
+    @Param('id') id: string,
+    @Param('version', ParseIntPipe) version: number,
+    @Body() dto: PromoteVersionRequestDto,
+  ) {
+    return this.promptsService.promoteVersion(
+      id,
+      version,
+      dto.expectedCurrentVersion,
+      {
+        allowRollback: dto.rollback === true,
+        confirmJudgeRubricChange: dto.confirmJudgeRubricChange === true,
+      },
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      "(Re)translate one version's text into every eligible language, retrying failed ones",
+  })
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
+  @Post(':id/versions/:version/translations')
+  async translateVersion(
+    @Param('id') id: string,
+    @Param('version', ParseIntPipe) version: number,
+  ): Promise<{ ok: true }> {
+    await this.promptsService.translateVersion(id, version);
+    return { ok: true };
   }
 
   @ApiOperation({
@@ -210,7 +292,7 @@ export class PromptsController {
 
   @ApiOperation({
     summary:
-      'Sync prompts from folder/codebase (add-only, update defaultPrompt)',
+      'Sync prompts from the codebase: creates new prompts from their defaults; updates contract and metadata only',
     description:
       'Accepts x-api-key for deployment scripts (e.g. ally-ai-learn sync).',
   })
@@ -223,7 +305,10 @@ export class PromptsController {
     return this.promptsService.syncPrompts(syncPromptsDto);
   }
 
-  @ApiOperation({ summary: 'Update a prompt' })
+  @ApiOperation({
+    summary:
+      'Update prompt metadata (name, description, visibility, translation opt-in). Text and model settings change through versions.',
+  })
   @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
     permissions: [PERMISSIONS.EDIT_PROMPT],
   })
@@ -235,13 +320,21 @@ export class PromptsController {
     return this.promptsService.updatePrompt(id, updatePromptDto);
   }
 
-  @ApiOperation({ summary: 'Revert prompt to codebase default' })
+  @ApiOperation({
+    summary:
+      'Revert to the default text in Git: a new version put live, translations included',
+  })
   @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
     permissions: [PERMISSIONS.EDIT_PROMPT],
   })
   @Post(':id/revert')
-  async revertPrompt(@Param('id') id: string): Promise<boolean> {
-    return this.promptsService.revertPrompt(id);
+  async revertPrompt(
+    @Param('id') id: string,
+    @Body() dto: RevertPromptRequestDto = {},
+  ): Promise<boolean> {
+    return this.promptsService.revertPrompt(id, {
+      confirmJudgeRubricChange: dto?.confirmJudgeRubricChange === true,
+    });
   }
 
   @ApiOperation({

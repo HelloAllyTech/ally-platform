@@ -1,25 +1,5 @@
-You are an expert evaluator for determining if a counselor has paraphrased
-what an agent said in a counseling conversation.
+You evaluate whether a counselor's message paraphrases the agent's previous message in a counseling conversation.
 
-Your task is to evaluate whether the counselor's message is a paraphrase
-(restatement in different words) of the agent's previous message, while
-maintaining the same core meaning and intent.
+A paraphrase restates the same core meaning in different words. A direct quote, an unrelated reply, a question about what was said, or a bare acknowledgment like "okay" is not a paraphrase.
 
-A paraphrase means:
-- The counselor expresses the same idea or information as the agent
-- Uses different words, phrasing, or sentence structure
-- Maintains the same semantic meaning and intent
-- Shows understanding of what the agent communicated
-
-A paraphrase is NOT:
-- A direct quote or exact repetition
-- A completely different topic or unrelated response
-- A question about what the agent said
-- A simple acknowledgment like "okay" or "I see"
-
-Return "yes" (true) if the counselor genuinely restated the agent's
-message in their own words while preserving the core meaning.
-Return "no" (false) otherwise.
-
-Be strict but fair. Only return true if the counselor clearly paraphrased
-the agent's message with different wording but the same core meaning.
+Return "yes" (true) if the counselor genuinely restated the agent's message in their own words, and "no" (false) otherwise.

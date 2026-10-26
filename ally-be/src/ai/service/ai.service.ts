@@ -68,7 +68,6 @@ import {
 } from '../dto/ai.request.dto';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
-import { isConnectedSkill } from '../../skill-experiment/constants/skill-experiment.constants';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import {
   ALLY_AI_PROMPT_PREFIX,
@@ -111,8 +110,23 @@ function withCorpus(endpoint: string, corpus: KnowledgeCorpus): string {
   return `${endpoint}${separator}corpus=${encodeURIComponent(corpus)}`;
 }
 
-/** The debrief skills (System Skills codes); both are connected to auto-improve. */
+/** The debrief skills (Skills Store codes); both are connected to auto-improve. */
 const SCENARIO_EVALUATION_PROMPT_CODE = 'ally_ai_scenario_scenario_evaluation';
+
+/** The prompts a live-chat nudge renders in ally-ai. */
+const NUDGE_PROMPT_CODES = ['ally_ai_nudge_nudge'] as const;
+
+/**
+ * The prompts ally-ai's transcription pipeline renders (diarization, the
+ * summary or dictation summary, counselor analysis). Sent on the queue message,
+ * which has a size cap, so only these.
+ */
+export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
+  'ally_ai_audio_diarization',
+  'ally_ai_summary_summary',
+  'ally_ai_summary_dictation_summary',
+  'ally_ai_analysis_counselor_analysis',
+] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
 
@@ -179,6 +193,8 @@ export class AiService {
           latest_message: newMessage,
           chat_history: chat_history,
           //force_nudge: requireNudge,
+          // The nudge prompt's live text from the Skills Store.
+          prompts: await this.getPromptOverrides(NUDGE_PROMPT_CODES),
         },
         true,
       );
@@ -1242,10 +1258,21 @@ export class AiService {
   }
 
   /**
-   * Fetches prompt overrides from DB that have the ALLY_AI_PROMPT_PREFIX.
-   * Maps 'ally_ai_folder_file' -> 'folder/file' for ally-ai consumption.
+   * The live text and settings of ally-ai's prompts, from the Skills Store, in
+   * the shape ally-ai reads (`prompts` on every request). ally-ai runs its own
+   * file only for a prompt missing here, and its files are minimal bases, so
+   * every request to ally-ai must carry this map.
+   *
+   * `codes` limits it to those prompts (a queue message has a size cap);
+   * without it, every `ally_ai_*` prompt is included.
+   *
+   * A failed store read is retried, then answered from the last rows read
+   * successfully (`PromptSharedService.getPromptsForRuntime`). With nothing
+   * cached for the request it is THROWN, never answered with an empty map: an
+   * empty map would silently run the minimal defaults. Callers already handle
+   * a failed ally-ai call, which this becomes.
    */
-  private async getPromptOverrides(): Promise<
+  async getPromptOverrides(codes?: readonly string[]): Promise<
     Record<
       string,
       {
@@ -1260,12 +1287,19 @@ export class AiService {
       }
     >
   > {
+    let prompts: Awaited<
+      ReturnType<PromptSharedService['getPromptsForRuntime']>
+    >;
     try {
-      const prompts = await this.promptSharedService.getPromptsByOptions({
-        promptCodePrefix: ALLY_AI_PROMPT_PREFIX,
-        useDashboardOverrideOnly: true,
-      });
-
+      prompts = await this.promptSharedService.getPromptsForRuntime(
+        codes?.length
+          ? { promptCode: [...codes] }
+          : { promptCodePrefix: ALLY_AI_PROMPT_PREFIX },
+      );
+    } catch (error) {
+      throw new Error(`${error?.message}; ally-ai was not called`);
+    }
+    {
       const overrides: Record<
         string,
         {
@@ -1303,22 +1337,14 @@ export class AiService {
           ...(p.model ? { model: p.model } : {}),
           ...(p.temperature != null ? { temperature: p.temperature } : {}),
         };
+        // ally-ai looks prompts up by their full code (`ally_ai_<dir>_<file>`).
+        // The slash-mapped key is kept for older ally-ai builds during a
+        // rolling deploy. Every prompt's live text is sent: the Skills Store is
+        // the source of truth.
         overrides[mappedKey] = entry;
-        // ally-ai looks prompts up by their full code (`ally_ai_<dir>_<file>`),
-        // never by the slash-mapped key above, so an override sent only under
-        // that key does not reach it. Skills connected to auto-improve are also
-        // sent under the key ally-ai reads, so a winning variant applied from
-        // an experiment actually runs. Deliberately not widened to every
-        // ally-ai skill here: that would switch on every stale dashboard edit
-        // at once — see docs/skill-experiments.md.
-        if (isConnectedSkill(p.promptCode)) {
-          overrides[p.promptCode] = entry;
-        }
+        overrides[p.promptCode] = entry;
       }
       return overrides;
-    } catch (error) {
-      this.logger.error(`Failed to fetch prompt overrides: ${error.message}`);
-      return {};
     }
   }
 

@@ -471,6 +471,12 @@ describe('ScenarioService', () => {
             // Defaults: no prompt found → validateStatesPairing short-circuits.
             // Individual tests can override via spy if they need a hasStates row.
             getPromptsByOptions: jest.fn().mockResolvedValue([]),
+            getPromptsForRuntime: jest.fn(function (
+              this: any,
+              selector: unknown,
+            ) {
+              return this.getPromptsByOptions(selector);
+            }),
             getPromptByCode: jest.fn().mockResolvedValue(null),
             // No prompt-level LLM override by default; autofill resolution falls
             // back to the request/config model.

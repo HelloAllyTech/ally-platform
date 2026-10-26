@@ -54,6 +54,9 @@ describe('AiService', () => {
     };
     mockPromptSharedService = {
       getPromptsByOptions: jest.fn().mockResolvedValue([]),
+      getPromptsForRuntime: jest.fn(function (this: any, selector: unknown) {
+        return this.getPromptsByOptions(selector);
+      }),
     } as any;
     // No experiment is live unless a test says otherwise.
     mockSkillExperiments = {
@@ -154,6 +157,21 @@ describe('AiService', () => {
 
       expect(mockedAxios).toHaveBeenCalled();
       expect(result).toEqual(mockResponse.data);
+    });
+
+    it("sends the nudge prompt's live text with the request", async () => {
+      mockPromptSharedService.getPromptsByOptions.mockResolvedValue([
+        { promptCode: 'ally_ai_nudge_nudge', prompt: 'Live nudge.' },
+      ] as any);
+      (mockedAxios as any).mockResolvedValue({ data: { nudge: 'x' } });
+
+      await service.getNudge('New message', mockChatHistory);
+
+      expect(mockPromptSharedService.getPromptsByOptions).toHaveBeenCalledWith({
+        promptCode: ['ally_ai_nudge_nudge'],
+      });
+      const body = (mockedAxios as any).mock.calls[0][0].data;
+      expect(body.prompts.ally_ai_nudge_nudge.prompt).toBe('Live nudge.');
     });
 
     it('should return early when apiUrl is not configured', async () => {
@@ -428,8 +446,8 @@ describe('AiService', () => {
     });
   });
 
-  describe('getPromptOverrides key for connected skills', () => {
-    it('sends a connected skill under its full code as well as the legacy key, and leaves others alone', async () => {
+  describe('getPromptOverrides keys', () => {
+    it('sends every ally-ai prompt under the full code ally-ai reads, plus the legacy key', async () => {
       mockPromptSharedService.getPromptsByOptions.mockResolvedValue([
         { promptCode: 'ally_ai_scenario_scenario_evaluation', prompt: 'A' },
         { promptCode: 'ally_ai_summary_summary', prompt: 'B' },
@@ -442,7 +460,9 @@ describe('AiService', () => {
       );
       expect(overrides['scenario/scenario/evaluation'].prompt).toBe('A');
       expect(overrides['summary/summary'].prompt).toBe('B');
-      expect(overrides['ally_ai_summary_summary']).toBeUndefined();
+      // Not only connected skills: the Skills Store is the source of truth
+      // for every prompt, so every live version must reach ally-ai.
+      expect(overrides['ally_ai_summary_summary'].prompt).toBe('B');
     });
   });
 
@@ -841,6 +861,33 @@ describe('AiService', () => {
           ),
           timeout: 10_000,
         }),
+      );
+    });
+  });
+
+  describe('getPromptOverrides', () => {
+    it('asks the store for exactly the codes the request needs', async () => {
+      mockPromptSharedService.getPromptsByOptions.mockResolvedValueOnce([
+        { promptCode: 'ally_ai_summary_summary', prompt: 'Live.' },
+      ] as any);
+
+      const map = await service.getPromptOverrides(['ally_ai_summary_summary']);
+
+      expect(mockPromptSharedService.getPromptsForRuntime).toHaveBeenCalledWith(
+        {
+          promptCode: ['ally_ai_summary_summary'],
+        },
+      );
+      expect(map['ally_ai_summary_summary'].prompt).toBe('Live.');
+    });
+
+    it('throws rather than answer with an empty map when the store has nothing to give', async () => {
+      mockPromptSharedService.getPromptsByOptions.mockRejectedValue(
+        new Error('The prompt store could not be read: down'),
+      );
+
+      await expect(service.getPromptOverrides()).rejects.toThrow(
+        'ally-ai was not called',
       );
     });
   });

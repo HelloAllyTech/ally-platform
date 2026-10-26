@@ -514,44 +514,50 @@ export class HelplineCopilotService
 
   /**
    * Prompt overrides keyed by full code, as ally-ai's helpline service reads
-   * them (cached 60 s). The prompt TEXT is sent only when an admin switched the
-   * row to its dashboard override: otherwise the row holds a seeded copy that
-   * can be older than ally-ai's own file, and sending it would silently undo a
-   * prompt fix. Provider / model / temperature are sent whenever set.
+   * them (cached 60 s). The Skills Store is the source of truth, so the live
+   * text is always sent, with its model settings when set.
+   *
+   * A failed store read is never cached and never answered with an empty map,
+   * which would run ally-ai's minimal defaults: the last good map is kept, and
+   * with none yet the error is thrown (the copilot call fails visibly).
    */
   private async promptOverrides(): Promise<HelplinePromptOverrides> {
     if (this.promptCache && this.promptCache.expires > Date.now()) {
       return this.promptCache.value;
     }
-    let value: HelplinePromptOverrides = {};
+    let rows: Awaited<ReturnType<PromptSharedService['getPromptsByOptions']>>;
     try {
-      const rows = await this.promptShared.getPromptsByOptions({
+      rows = await this.promptShared.getPromptsByOptions({
         promptCode: [...HELPLINE_PROMPT_CODES],
       });
-      value = (rows ?? []).reduce<HelplinePromptOverrides>((acc, row) => {
-        const entry: HelplinePromptOverrides[string] = {};
-        const dashboard =
-          (row as { useDashboardOverride?: boolean }).useDashboardOverride ===
-          true;
-        if (dashboard && row.prompt?.trim()) {
-          entry.prompt = row.prompt.trim();
-          if (row.availableVariables) {
-            entry.availableVariables = row.availableVariables;
-          }
-        }
-        if (row.provider) entry.provider = row.provider;
-        if (row.model) entry.model = row.model;
-        if (typeof row.temperature === 'number') {
-          entry.temperature = row.temperature;
-        }
-        if (Object.keys(entry).length) acc[row.promptCode] = entry;
-        return acc;
-      }, {});
     } catch (error) {
-      this.logger.warn(
-        `Helpline prompt overrides unavailable; ally-ai defaults apply: ${(error as Error).message}`,
+      if (this.promptCache) {
+        this.logger.warn(
+          `[PROMPT_DELIVERY] Helpline prompts unreadable; keeping the last good copy: ${(error as Error).message}`,
+        );
+        return this.promptCache.value;
+      }
+      this.logger.error(
+        `[PROMPT_DELIVERY] Helpline prompts unreadable and none cached; not calling ally-ai with its minimal defaults: ${(error as Error).message}`,
       );
+      throw error;
     }
+    const value = (rows ?? []).reduce<HelplinePromptOverrides>((acc, row) => {
+      const entry: HelplinePromptOverrides[string] = {};
+      if (row.prompt?.trim()) {
+        entry.prompt = row.prompt.trim();
+        if (row.availableVariables) {
+          entry.availableVariables = row.availableVariables;
+        }
+      }
+      if (row.provider) entry.provider = row.provider;
+      if (row.model) entry.model = row.model;
+      if (typeof row.temperature === 'number') {
+        entry.temperature = row.temperature;
+      }
+      if (Object.keys(entry).length) acc[row.promptCode] = entry;
+      return acc;
+    }, {});
     this.promptCache = {
       value,
       expires: Date.now() + HELPLINE_COPILOT.PROMPT_CACHE_MS,

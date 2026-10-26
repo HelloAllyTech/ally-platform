@@ -3,10 +3,11 @@ Resolve prompt templates from backend metadata or local .txt files.
 
 Logic:
 - When backend_prompts (from scenario metadata) has a prompt for the code and
-  it's non-empty: use it.
-- Otherwise: use local .txt from app/prompts/.
-- ally-be only includes prompts with useDashboardOverride=true in metadata,
-  so "enabled from Dashboard" prompts override local; others always use local.
+  it's non-empty: use it. ally-be ships every prompt's live Skills Store
+  version, so this is the normal path.
+- Otherwise: use the local .txt default from app/prompts/ (fallback).
+- Each prompt's typed contract (app/prompts/contracts.py) is checked at render:
+  a required variable the code didn't pass is logged as [PROMPT_CONTRACT].
 
 Prompt codes use ally_ai_learn_ prefix: ally_ai_learn_subdir_filename
 (e.g. ally_ai_learn_system_base_role_instruction).
@@ -16,6 +17,7 @@ Local lookup strips the prefix and uses subdir/filename from app/prompts/.
 from typing import Any, Optional
 
 from app.core.logger import get_logger
+from app.prompts.contracts import missing_required, required_variables
 from app.prompts.manager import prompt_manager
 
 logger = get_logger(__name__)
@@ -51,6 +53,11 @@ def _get_local_template(prompt_code: str) -> str:
 
 def _get_backend_prompts(prompt_data: Any) -> Optional[dict]:
     if isinstance(prompt_data, dict):
+        # A whole promptData dict ({..., "prompts": {code: entry}}) or the
+        # prompts map itself ({code: entry}): accept both.
+        nested = prompt_data.get("prompts")
+        if isinstance(nested, dict):
+            return nested
         return prompt_data
 
     if hasattr(prompt_data, "prompts"):
@@ -162,6 +169,28 @@ def _check_required_variables_present(
     return missing
 
 
+def _report_contract(prompt_code: str, kwargs: dict) -> None:
+    """Check a render against the prompt's typed contract, loudly but safely.
+
+    A variable the contract (app/prompts/contracts.py) marks required that the
+    calling code did not pass at all means the code and the prompt have drifted
+    apart: logged at ERROR as ``[PROMPT_CONTRACT]`` so it alerts, while the
+    prompt still renders (a live voice session must not die on it). A required
+    variable that was passed but is empty is normal mid-session (nothing
+    disclosed yet) and is only noted by ``_check_required_variables_present``.
+    """
+    not_supplied = missing_required(prompt_code, kwargs)
+    if not_supplied:
+        logger.error(
+            "[PROMPT_CONTRACT] %s: required variables not supplied by the code: %s",
+            prompt_code,
+            not_supplied,
+        )
+    supplied_required = set(required_variables(prompt_code)) - set(not_supplied)
+    if supplied_required:
+        _check_required_variables_present(prompt_code, supplied_required, kwargs)
+
+
 class SafeFormatter(dict):
     """
     Custom dictionary for str.format_map that records missing keys and
@@ -197,9 +226,9 @@ def resolve_template(
     """
     Resolve a prompt template.
 
-    Use metadata prompt when present and non-empty
-    (ally-be only sends prompts with useDashboardOverride=true).
-    Otherwise use local .txt.
+    The Skills Store's live text, shipped in the session metadata, is the
+    source of truth (ally-be sends every prompt). The local .txt default is a
+    fallback for a prompt the metadata doesn't carry.
 
     Args:
         prompt_code: Prefixed code (e.g. ally_ai_learn_system_base_role_instruction)
@@ -213,9 +242,9 @@ def resolve_template(
     backend_template = _extract_backend_template(backend_entry)
     if backend_template and backend_template.strip():
         logger.info(
-            "[PROMPT_SOURCE] %s: using METADATA (ally-be, dashboard enabled), "
-            "len=%d, preview=%s",
+            "[PROMPT_SOURCE] %s: using store v%s, len=%d, preview=%s",
             prompt_code,
+            (backend_entry.get("version") if isinstance(backend_entry, dict) else None),
             len(backend_template),
             (
                 (backend_template[:120] + "...")
@@ -230,7 +259,8 @@ def resolve_template(
         logger.error(f"Local template empty for {prompt_code}, cannot resolve")
         return ""
     logger.info(
-        "[PROMPT_SOURCE] %s: using LOCAL (no metadata override), len=%d, preview=%s",
+        "[PROMPT_SOURCE] %s: using fallback (local default; not in the session's "
+        "store prompts), len=%d, preview=%s",
         prompt_code,
         len(local_template),
         (local_template[:120] + "...") if len(local_template) > 120 else local_template,
@@ -289,6 +319,7 @@ def load_and_format(
     # file but the code hasn't been updated to provide it yet).
     prompt_code = f"ally_ai_learn_{internal_path.replace('/', '_')}"
     backend_entry = _get_backend_prompt_entry(prompt_data, prompt_code)
+    _report_contract(prompt_code, kwargs)
     formatter = SafeFormatter(
         **kwargs,
         allowed_variables=_extract_allowed_variables(backend_entry),
@@ -314,6 +345,11 @@ def load_and_format(
     return formatted
 
 
+def _store_version(prompt_data: Any, prompt_code: str) -> Any:
+    entry = _get_backend_prompt_entry(prompt_data, prompt_code)
+    return entry.get("version") if isinstance(entry, dict) else None
+
+
 def load_and_format_by_code(
     prompt_code: str,
     prompt_data: Any = None,
@@ -326,15 +362,15 @@ def load_and_format_by_code(
     caller already knows which prompt row to load (e.g. a main-agent
     variant selected per-simulation via Scenarios.metadata.selectedMainPromptCode).
 
-    Resolution order:
-      1. Backend metadata prompt for `prompt_code` (when present and non-empty).
-      2. Local .txt file matching `prompt_code` (best-effort; only works if
-         the code follows the ally_ai_learn_<path>_<stem> convention with no
-         underscores inside path segments — typically NOT the case for variants).
-      3. If both miss and `fallback_internal_path` is provided, resolve that
-         path via the normal load_template() pipeline.
+    Resolution order (store text before any local file: the local files are
+    minimal bases, never the production text):
+      1. The Skills Store text for `prompt_code` (backend metadata).
+      2. The Skills Store text for `fallback_internal_path`'s code, if given.
+      3. A local .txt file matching `prompt_code` (best-effort; only works if
+         the code follows the ally_ai_learn_<path>_<stem> convention).
+      4. The local file for `fallback_internal_path`.
 
-    Variants almost always live in backend metadata (useDashboardOverride=true)
+    Variants almost always live in the Skills Store (shipped in the metadata)
     and not as local files, so step 1 covers the common case; step 3 is the
     safety net when a stale selectedMainPromptCode points at a deleted/missing
     variant.
@@ -350,7 +386,37 @@ def load_and_format_by_code(
     Returns:
         Formatted string, or "" if no template can be resolved.
     """
-    template = resolve_template(prompt_code, prompt_data)
+    template = _extract_backend_template(
+        _get_backend_prompt_entry(prompt_data, prompt_code)
+    )
+    if not (template and template.strip()):
+        fallback_code = (
+            f"ally_ai_learn_{fallback_internal_path.replace('/', '_')}"
+            if fallback_internal_path
+            else None
+        )
+        fallback_store = (
+            _extract_backend_template(
+                _get_backend_prompt_entry(prompt_data, fallback_code)
+            )
+            if fallback_code
+            else None
+        )
+        # The fallback's store text beats the variant's local file (step 2
+        # before 3); with neither in the store, the local files as before.
+        template = (
+            None
+            if fallback_store and fallback_store.strip()
+            else resolve_template(prompt_code, prompt_data)
+        )
+    else:
+        template = template.strip()
+        logger.info(
+            "[PROMPT_SOURCE] %s: using store v%s, len=%d",
+            prompt_code,
+            _store_version(prompt_data, prompt_code),
+            len(template),
+        )
     used_path_for_logging = prompt_code
     # Track which code's backend_entry the SafeFormatter should consult so
     # `allowed_variables` matches the template actually being rendered. When
@@ -364,11 +430,12 @@ def load_and_format_by_code(
         template = load_template(fallback_internal_path, prompt_data)
         used_path_for_logging = f"{prompt_code} (fell back to {fallback_internal_path})"
         if template:
-            logger.warning(
-                "[PROMPT_SOURCE] %s: variant code did not resolve; falling back "
-                "to %s",
+            # The selected variant is not what runs, and the session still
+            # records it as selected: loud, so it alerts.
+            logger.error(
+                "[PROMPT_FALLBACK] selected %s did not resolve; running %s instead",
                 prompt_code,
-                fallback_internal_path,
+                f"ally_ai_learn_{fallback_internal_path.replace('/', '_')}",
             )
             effective_prompt_code = (
                 f"ally_ai_learn_{fallback_internal_path.replace('/', '_')}"
@@ -378,6 +445,7 @@ def load_and_format_by_code(
         return ""
 
     backend_entry = _get_backend_prompt_entry(prompt_data, effective_prompt_code)
+    _report_contract(effective_prompt_code, kwargs)
     formatter = SafeFormatter(
         **kwargs,
         allowed_variables=_extract_allowed_variables(backend_entry),

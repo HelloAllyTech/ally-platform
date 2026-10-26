@@ -104,7 +104,7 @@ export function isConnectedSkill(promptCode: string): boolean {
   return Object.prototype.hasOwnProperty.call(CONNECTED_SKILLS, promptCode);
 }
 
-/** The judge's and designer's own prompts (System Skills, `src/prompts/skill_experiment/`). */
+/** The judge's and designer's own prompts (Skills Store, `src/prompts/skill_experiment/`). */
 export const SKILL_EXPERIMENT_PROMPT_CODES = {
   JUDGE: 'skill_experiment_judge',
   DESIGNER: 'skill_experiment_designer',

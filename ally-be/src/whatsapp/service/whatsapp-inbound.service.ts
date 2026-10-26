@@ -46,7 +46,13 @@ const OPT_IN_WORDS = new Set(['start', 'subscribe', 'resume']);
  * Derived from the file paths in ally-ai (`knowledge/whatsapp_answer` →
  * `ally_ai_knowledge_whatsapp_answer`), which is the convention its resolver uses.
  */
-const KNOWLEDGE_PROMPT_CODES = [
+/** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
+type PromptsRan = {
+  prompt_versions: Record<string, number | null>;
+  prompt_hashes: Record<string, string>;
+};
+
+export const KNOWLEDGE_PROMPT_CODES = [
   'ally_ai_knowledge_whatsapp_answer',
   'ally_ai_knowledge_translate_query',
   'ally_ai_knowledge_crisis_classify',
@@ -459,7 +465,7 @@ export class WhatsAppInboundService {
   ): Promise<void> {
     if (settings.crisisClassifierEnabled) {
       try {
-        const prompts = await this.loadPromptOverrides();
+        const { prompts, ran } = await this.loadPromptOverrides();
         const crisis = await this.aiService.checkWhatsAppCrisis({
           message: question,
           prompts,
@@ -476,6 +482,7 @@ export class WhatsAppInboundService {
             ),
             WaHandledBy.CRISIS,
             startedAt,
+            { retrievalMeta: { ...ran } },
           );
 
           this.eventEmitter.emit('exception', {
@@ -526,7 +533,7 @@ export class WhatsAppInboundService {
     startedAt: number,
   ): Promise<void> {
     const history = await this.recentHistory(conversation.id);
-    const prompts = await this.loadPromptOverrides();
+    const { prompts, ran } = await this.loadPromptOverrides();
 
     // The answer and the crisis classifier run CONCURRENTLY, not in sequence.
     //
@@ -582,6 +589,7 @@ export class WhatsAppInboundService {
         ),
         WaHandledBy.CRISIS,
         startedAt,
+        { retrievalMeta: { ...ran } },
       );
 
       this.eventEmitter.emit('exception', {
@@ -719,6 +727,7 @@ export class WhatsAppInboundService {
           provider: answer.provider,
           model: answer.model,
           prompt_version: answer.prompt_version,
+          ...ran,
         },
         language: answer.language,
       },
@@ -758,34 +767,49 @@ export class WhatsAppInboundService {
    * Scoped by prompt-code prefix so this sends only the knowledge prompts, not every ally-ai prompt
    * in the database — the payload rides on every single question.
    *
-   * `useDashboardOverrideOnly` is deliberately NOT set, unlike the scenario-session loader. There the
-   * flag means "only send prompts an admin has explicitly taken over"; here the model and temperature
-   * are the point, and an admin who picks Claude without rewriting the prompt text must still have
-   * that choice reach ally-ai. Rows with empty text are dropped below so ally-ai falls back to its
-   * own file default for the wording while still honouring the selected model.
+   * The live text and its model settings are both sent: the Skills Store is the source of truth.
+   * Rows with empty text are dropped below so ally-ai falls back to its own file default for the
+   * wording while still honouring the selected model.
+   *
+   * Also returns which store version of each prompt was sent, recorded on the reply so "which
+   * prompt answered this?" has an answer after the text is republished. ally-ai runs the text it
+   * is sent and its file default otherwise, so a code missing from `ran` ran that default.
    */
-  private async loadPromptOverrides(): Promise<Record<string, unknown>> {
+  private async loadPromptOverrides(): Promise<{
+    prompts: Record<string, unknown>;
+    ran: PromptsRan;
+  }> {
+    const ran: PromptsRan = { prompt_versions: {}, prompt_hashes: {} };
     try {
       const rows = await this.promptSharedService.getPromptsByOptions({
         promptCode: KNOWLEDGE_PROMPT_CODES,
       });
 
-      return (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {
-        const entry: Record<string, unknown> = {};
-        const content = row.prompt?.trim();
-        if (content) entry.prompt = content;
-        if (row.provider) entry.provider = row.provider;
-        if (row.model) entry.model = row.model;
-        if (typeof row.temperature === 'number') {
-          entry.temperature = row.temperature;
-        }
-        if (row.availableVariables) {
-          entry.availableVariables = row.availableVariables;
-        }
-        // An entry with nothing in it would override nothing but still ship a key; skip it.
-        if (Object.keys(entry).length) acc[row.promptCode] = entry;
-        return acc;
-      }, {});
+      const prompts = (rows ?? []).reduce<Record<string, unknown>>(
+        (acc, row) => {
+          const entry: Record<string, unknown> = {};
+          const content = row.prompt?.trim();
+          if (content) {
+            entry.prompt = content;
+            ran.prompt_versions[row.promptCode] = row.version ?? null;
+            if (row.contentHash)
+              ran.prompt_hashes[row.promptCode] = row.contentHash;
+          }
+          if (row.provider) entry.provider = row.provider;
+          if (row.model) entry.model = row.model;
+          if (typeof row.temperature === 'number') {
+            entry.temperature = row.temperature;
+          }
+          if (row.availableVariables) {
+            entry.availableVariables = row.availableVariables;
+          }
+          // An entry with nothing in it would override nothing but still ship a key; skip it.
+          if (Object.keys(entry).length) acc[row.promptCode] = entry;
+          return acc;
+        },
+        {},
+      );
+      return { prompts, ran };
     } catch (error) {
       // Falls back to ally-ai's own file defaults, which are sane. Not worth failing a worker's
       // question over.
@@ -794,7 +818,7 @@ export class WhatsAppInboundService {
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
-      return {};
+      return { prompts: {}, ran };
     }
   }
 

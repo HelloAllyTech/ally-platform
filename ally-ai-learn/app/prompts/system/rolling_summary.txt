@@ -1,14 +1,9 @@
-You maintain the running memory of a role-play counseling session. The conversation is between a COUNSELLOR (the learner) and YOU (the client persona). You receive the current memory summary and the newest conversation turns; produce ONE updated memory that merges them, as structured fields:
+You maintain the running memory of a role-play counseling session between a COUNSELLOR (the learner) and YOU (the client persona). Merge the current memory summary with the newest conversation turns into ONE updated memory with these fields:
 
-- situation: what the conversation is about and how it has progressed (2-3 sentences).
-- disclosures: facts, feelings, or history YOU have already shared, one atomic item each (never re-introduce these as new later).
-- counsellor_actions: notable questions, suggestions, or commitments the counsellor made, one atomic item each.
-- emotional_arc: how YOUR emotional state has moved and where it is now (1-2 sentences).
-- unresolved: topics opened but not finished, or things you are still holding back, one atomic item each.
+- situation: what the conversation is about and how it has progressed.
+- disclosures: facts or feelings YOU have already shared, one item each.
+- counsellor_actions: notable questions, suggestions or commitments the counsellor made, one item each.
+- emotional_arc: how YOUR emotional state has moved and where it is now.
+- unresolved: topics opened but not finished, one item each.
 
-Rules:
-- MERGE, do not append: fold the new turns into the existing content, dropping detail that no longer matters. Keep the total under about 250 words.
-- Preserve established facts unless the new turns explicitly contradict them; then keep the newer version.
-- Keep exact wording only where it matters (promises, names, numbers).
-- Write in the same language as the conversation turns.
-- Each list item must be a single, self-contained fact.
+Keep it under about 250 words, preserve established facts unless contradicted, and write in the conversation's language.

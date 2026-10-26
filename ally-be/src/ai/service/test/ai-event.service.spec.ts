@@ -6,6 +6,15 @@ import { AppConfigService } from '../../../config/config.service';
 import { LoggerService } from '../../../logger/logger.service';
 import { ChatSummaryStatus } from '../../../chat/entity/chat.entity';
 import { TranscribeAndSummarizeRequestMessage } from '../../dto/transcribe-and-summarize-request.model';
+import { AiService, TRANSCRIPTION_PIPELINE_PROMPT_CODES } from '../ai.service';
+
+const PIPELINE_PROMPTS = {
+  ally_ai_audio_diarization: { prompt: 'Diarize.' },
+  'audio/diarization': { prompt: 'Diarize.' },
+};
+const mockAiService = {
+  getPromptOverrides: jest.fn(),
+};
 
 describe('AiEventService', () => {
   let service: AiEventService;
@@ -39,6 +48,7 @@ describe('AiEventService', () => {
     } as any;
 
     jest.spyOn(LoggerService, 'getInstance').mockReturnValue(mockLogger);
+    mockAiService.getPromptOverrides.mockResolvedValue(PIPELINE_PROMPTS);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,6 +65,7 @@ describe('AiEventService', () => {
           provide: AppConfigService,
           useValue: mockConfigService,
         },
+        { provide: AiService, useValue: mockAiService },
       ],
     }).compile();
 
@@ -78,6 +89,42 @@ describe('AiEventService', () => {
   });
 
   describe('publishTranscribeAudioEvent', () => {
+    it("carries the pipeline's Skills Store prompts on the message", async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+      });
+
+      expect(mockAiService.getPromptOverrides).toHaveBeenCalledWith(
+        TRANSCRIPTION_PIPELINE_PROMPT_CODES,
+      );
+      expect(sqsService.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ prompts: PIPELINE_PROMPTS }),
+      );
+    });
+
+    it('queues nothing when the prompt store cannot be read', async () => {
+      mockAiService.getPromptOverrides.mockRejectedValueOnce(
+        new Error('store down'),
+      );
+
+      await expect(
+        service.publishTranscribeAudioEvent({
+          message_type: 'transcribe_and_summarize_request',
+          timestamp: 1,
+          chat_id: 7,
+          audio_url: 's3://x',
+        }),
+      ).rejects.toThrow('store down');
+      expect(sqsService.sendMessage).not.toHaveBeenCalled();
+    });
+
     const mockEvent: TranscribeAndSummarizeRequestMessage = {
       message_type: 'transcribe_request',
       timestamp: Date.now(),
@@ -113,13 +160,18 @@ describe('AiEventService', () => {
     });
 
     it('should handle empty queue URL gracefully', async () => {
-      const serviceWithEmptyUrl = new AiEventService(sqsService, chatService, {
-        sqs: {
-          transcription: {
-            requestQueueUrl: '',
+      const serviceWithEmptyUrl = new AiEventService(
+        sqsService,
+        chatService,
+        {
+          sqs: {
+            transcription: {
+              requestQueueUrl: '',
+            },
           },
-        },
-      } as any);
+        } as any,
+        mockAiService as any,
+      );
 
       sqsService.sendMessage.mockResolvedValue(undefined);
       chatService.updateChat.mockResolvedValue({} as any);
@@ -136,11 +188,16 @@ describe('AiEventService', () => {
     });
 
     it('should handle missing queue URL gracefully', async () => {
-      const serviceWithoutUrl = new AiEventService(sqsService, chatService, {
-        sqs: {
-          transcription: {},
-        },
-      } as any);
+      const serviceWithoutUrl = new AiEventService(
+        sqsService,
+        chatService,
+        {
+          sqs: {
+            transcription: {},
+          },
+        } as any,
+        mockAiService as any,
+      );
 
       sqsService.sendMessage.mockResolvedValue(undefined);
       chatService.updateChat.mockResolvedValue({} as any);
@@ -340,6 +397,7 @@ describe('AiEventService', () => {
         sqsService,
         chatService,
         minimalConfigService as any,
+        mockAiService as any,
       );
 
       const mockEvent: TranscribeAndSummarizeRequestMessage = {
@@ -377,6 +435,7 @@ describe('AiEventService', () => {
         sqsService,
         chatService,
         nullConfigService as any,
+        mockAiService as any,
       );
 
       const mockEvent: TranscribeAndSummarizeRequestMessage = {

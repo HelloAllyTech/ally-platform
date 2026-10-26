@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -42,6 +42,10 @@ class TranscribeAndSummarizeRequestMessage(BaseQueueMessage):
     # raw PCM, so this flag tells the converter to decode it directly as raw
     # rather than relying on container detection.
     is_linear16_encoded: Optional[bool] = None
+    # The pipeline's prompts from the Skills Store (ally-be attaches them).
+    # Optional only for messages queued before ally-be sent them: the handler
+    # fetches the prompts for those instead of running its minimal defaults.
+    prompts: Optional[Dict[str, Any]] = None
 
 
 class TranscriptionResultMessage(BaseQueueMessage):

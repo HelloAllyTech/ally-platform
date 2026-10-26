@@ -183,7 +183,7 @@ describe("PromptManagement Component", () => {
       </Provider>,
     );
 
-    expect(screen.getByText("System Skills")).toBeInTheDocument();
+    expect(screen.getByText("Skills Store")).toBeInTheDocument();
   });
 
   it("should render the list toolbar with search", () => {

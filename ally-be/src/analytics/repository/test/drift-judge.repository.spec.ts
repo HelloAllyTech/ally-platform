@@ -18,6 +18,7 @@ describe('DriftJudgeRepository.upsertJudgments', () => {
     scenario_version_id: 'ver-abc',
     language: 'en',
     persona: null,
+    selected_main_prompt_code: null,
     prompt_versions: { ally_ai_main_agent_default: 3 },
     occurred_at: new Date('2026-01-01T00:00:00Z'),
     llm_provider: 'openai',

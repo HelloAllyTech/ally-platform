@@ -125,7 +125,7 @@ Everything here is best-effort by construction: any failure loses that layer for
 - `app/core/scoring/score_keeper.py` — `ScoreKeeper` tracks behavior-instruction scores.
 - `app/core/scenario_report/` — N-turn text simulation and report generation with webhook delivery back to ally-be.
 
-**Prompts** (`app/prompts/`) — `manager.py` (template loading), `resolver.py` (backend override resolution via `promptData.prompts`); role subdirectories for director, counselor, trainee, judge, actor, events, etc.
+**Prompts** (`app/prompts/`) — the Skills Store in ally-be holds every prompt's live text and ships all of them in the session metadata (`promptData.prompts`). `resolver.py` renders that text and falls back to the local `.txt` default only for a prompt the metadata lacks. `contracts.py` declares each prompt's contract, and `manager.py` loads the defaults. Default folders: system, events, branching, counselor, evaluation, filler, supervisor. The worker logs `[PROMPT_SOURCE]` for each prompt and `[working-memory] ENGAGED` / `NOT ENGAGED` for each session.
 
 ## Integration Points
 

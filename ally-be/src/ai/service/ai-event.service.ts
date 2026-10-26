@@ -6,6 +6,7 @@ import { ChatService } from '../../chat/service/chat.service';
 import { ChatSummaryStatus } from '../../chat/entity/chat.entity';
 import { TranscribeAndSummarizeRequestMessage } from '../dto/transcribe-and-summarize-request.model';
 import { AppConfigService } from 'src/config/config.service';
+import { AiService, TRANSCRIPTION_PIPELINE_PROMPT_CODES } from './ai.service';
 
 @Injectable()
 export class AiEventService {
@@ -16,6 +17,7 @@ export class AiEventService {
     @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
     private readonly configService: AppConfigService,
+    private readonly aiService: AiService,
   ) {}
 
   async publishTranscribeAudioEvent(
@@ -25,12 +27,17 @@ export class AiEventService {
     // the SQS message. ally-ai echoes it back on the result callback, so a
     // single chat's transcription can be grepped end-to-end across services.
     const correlationId = event.correlation_id ?? randomUUID();
-    const message: TranscribeAndSummarizeRequestMessage = {
-      ...event,
-      correlation_id: correlationId,
-    };
 
     try {
+      // The pipeline's prompts from the Skills Store ride on the message:
+      // ally-ai runs its own (minimal) file for any prompt missing here.
+      const message: TranscribeAndSummarizeRequestMessage = {
+        ...event,
+        correlation_id: correlationId,
+        prompts: await this.aiService.getPromptOverrides(
+          TRANSCRIPTION_PIPELINE_PROMPT_CODES,
+        ),
+      };
       const requestQueueUrl =
         this.configService.sqs.transcription.requestQueueUrl || '';
 

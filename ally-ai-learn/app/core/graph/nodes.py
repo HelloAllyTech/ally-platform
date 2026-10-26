@@ -828,6 +828,7 @@ async def resolve_branching_instruction(
                     language_code = DEFAULT_LANGUAGE_CODE
                     llm_config_for_branching = None
                     branching_llm_client = None
+                    scenario = None
                     if config and "configurable" in config:
                         scenario = config["configurable"].get("scenario")
                         if scenario and hasattr(scenario, "language_config"):
@@ -880,6 +881,8 @@ async def resolve_branching_instruction(
                             resolve_kwargs = {
                                 "llm_config": llm_config_for_branching,
                                 "language_code": language_code,
+                                # The session's Skills Store prompts.
+                                "prompt_data": getattr(scenario, "prompt_data", None),
                             }
                             if branching_llm_client is not None:
                                 resolve_kwargs["llm_client"] = branching_llm_client
@@ -900,6 +903,7 @@ async def resolve_branching_instruction(
                         "messages": state.messages,
                         "llm_config": llm_config_for_branching,
                         "language_code": language_code,
+                        "prompt_data": getattr(scenario, "prompt_data", None),
                     }
                     if branching_llm_client is not None:
                         dynamic_kwargs["llm_client"] = branching_llm_client

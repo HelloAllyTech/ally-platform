@@ -17,6 +17,29 @@ export interface AvailableVariable {
 
 export type AvailableVariableEntry = string | AvailableVariable;
 
+/**
+ * The code's contract with a prompt, declared in code (`definePrompt` in ally-be,
+ * a Pydantic model in ally-ai and ally-ai-learn) and written by sync as JSON. The store refuses a version that breaks it, so a code change
+ * and the live text can't drift apart silently.
+ */
+export interface PromptContract {
+  /** Every placeholder the code supplies. A body may use only these. Null = undeclared. */
+  variables?: string[] | null;
+  /** Placeholders a body must contain. */
+  required?: string[];
+  /** Text the runtime appends after rendering (audio-tag guidance, glossary). */
+  fragments?: string[];
+  /** Bumped on a breaking change; the release check compares live versions against it. */
+  contractVersion?: number;
+  /**
+   * How the code reads the model's answer. `'json'`: it parses free text as
+   * JSON, so the text itself must ask for JSON (CI checks the default does).
+   * `'structured'`: the provider enforces JSON or a schema (response_format,
+   * structured output), so the text need not.
+   */
+  output?: 'json' | 'structured';
+}
+
 @Entity('prompts')
 @Index('uq_prompts_name_idx', ['name'], { unique: true })
 @Index('uq_prompts_code_idx', ['promptCode'], { unique: true })
@@ -50,8 +73,7 @@ export class Prompt extends BaseWithoutTenantEntity {
    * NULL means undeclared, and undeclared keeps the conservative intersection.
    * That is deliberate: every prompt that existed before this column is NULL,
    * so nothing changes for any of them until someone says otherwise. Declared
-   * in the prompt's `.meta.json` sidecar, beside the name that already lives
-   * there.
+   * in the prompt's contract (`runtimes`), beside its name.
    */
   @Column({ type: 'jsonb', nullable: true })
   runtimes?: string[];
@@ -62,8 +84,17 @@ export class Prompt extends BaseWithoutTenantEntity {
   @Column({ type: 'text', nullable: true })
   defaultPrompt?: string;
 
-  @Column({ type: 'boolean', default: false })
+  /**
+   * Retired. The Skills Store is the source of truth: every prompt serves its
+   * live version. Kept (always true) only so readers on an older build still
+   * resolve the store during a rolling deploy.
+   */
+  @Column({ type: 'boolean', default: true })
   useDashboardOverride!: boolean;
+
+  /** See {@link PromptContract}. Null until sync writes the code's contract. */
+  @Column({ type: 'jsonb', nullable: true })
+  contract?: PromptContract | null;
 
   @Column({ type: 'boolean', default: false })
   isObsolete!: boolean;

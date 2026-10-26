@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { mainPromptVersion } from '../util/main-prompt-version.util';
 import { DataSource } from 'typeorm';
 import { countableSessionPredicate } from '../util/session-eligibility.util';
 
@@ -21,6 +22,7 @@ export interface FillerSessionRow {
   language_label: string | null;
   persona: string | null;
   prompt_versions: Record<string, unknown> | null;
+  selected_main_prompt_code: string | null;
   occurred_at: Date | null;
   llm_provider: string | null;
   llm_model: string | null;
@@ -117,6 +119,7 @@ export class FillerJudgeRepository {
              l.label AS language_label,
              sc."promptData"->>'description' AS persona,
              s.metadata->'promptVersions' AS prompt_versions,
+             s.metadata->>'selectedMainPromptCode' AS selected_main_prompt_code,
              s."createdAt" AS occurred_at,
              s.metadata->>'llmProvider' AS llm_provider,
              s.metadata->>'llmModel' AS llm_model,
@@ -263,17 +266,6 @@ export class FillerJudgeRepository {
     return observations;
   }
 
-  /** Headline prompt version: prefer the main agent prompt, else any. */
-  private mainPromptVersion(pv: Record<string, unknown> | null): string | null {
-    if (!pv) return null;
-    for (const [code, version] of Object.entries(pv)) {
-      if (code.includes('main_agent') || code.includes('base_role'))
-        return String(version);
-    }
-    const first = Object.values(pv)[0];
-    return first != null ? String(first) : null;
-  }
-
   /**
    * Persist one judge run: the session denominator row plus its findings.
    *
@@ -287,7 +279,10 @@ export class FillerJudgeRepository {
     judgeModel: string,
     judgePromptVersion: string,
   ): Promise<void> {
-    const promptVersion = this.mainPromptVersion(session.prompt_versions);
+    const promptVersion = mainPromptVersion(
+      session.prompt_versions,
+      session.selected_main_prompt_code,
+    );
     const repeatedFillers = result.per_filler.filter(
       (f) => f.repeated_within_window,
     ).length;

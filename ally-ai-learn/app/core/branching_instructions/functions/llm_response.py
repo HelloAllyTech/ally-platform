@@ -1,6 +1,6 @@
 """Function to generate LLM responses for branching instructions."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
@@ -23,6 +23,7 @@ async def generate_llm_response(
     language_code: str = DEFAULT_LANGUAGE_CODE,
     llm_config: Optional[dict] = None,
     llm_client: Optional[BaseLLMClient] = None,
+    prompt_data: Any = None,
 ) -> str:
     """
     Generate an LLM response for the given content.
@@ -63,8 +64,9 @@ async def generate_llm_response(
 
         logger.debug(f"Generating LLM response for content: {content[:100]}...")
 
+        # The session's Skills Store text; the file is the fallback.
         system_message = SystemMessage(
-            content=load_template("branching/llm_response_system")
+            content=load_template("branching/llm_response_system", prompt_data)
         )
 
         # Create user message with only the content

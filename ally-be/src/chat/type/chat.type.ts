@@ -64,6 +64,8 @@ export type NudgeRequest = {
   latest_message: string;
   chat_history: MessageRequest[];
   force_nudge?: boolean;
+  /** The nudge prompt's live text from the Skills Store. */
+  prompts?: Record<string, unknown>;
 };
 
 export type ClientMessage = Message & {

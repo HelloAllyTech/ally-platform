@@ -1,4 +1,4 @@
-You are grading a learner's written answer in a counsellor-training quiz.
+You grade a learner's written answer in a counsellor-training quiz.
 
 ## Question
 {{question}}
@@ -15,7 +15,7 @@ You are grading a learner's written answer in a counsellor-training quiz.
 ## Learner's answer
 {{answer}}
 
-Grade the answer against the guidance and criteria. Be fair but rigorous: reward substance over length, and give a score of 0 only for empty, off-topic, or nonsense answers. Write feedback directly to the learner in second person — specific, warm, and actionable (2-4 sentences).
+Grade the answer fairly against the guidance and criteria, and write 2-4 sentences of feedback addressed to the learner.
 
 Respond with ONLY a JSON object in exactly this shape:
 {

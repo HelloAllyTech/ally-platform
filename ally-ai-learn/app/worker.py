@@ -748,9 +748,8 @@ class AgentWorker:
                 _why = (
                     "the selected main-agent prompt declares neither "
                     "{client_working_memory} nor any working_memory_* section "
-                    "placeholder — if it should, check the prompt "
-                    "has useDashboardOverride=true, or ally-be will not ship "
-                    "it to the worker at all"
+                    "placeholder — if it should, add them to the prompt's "
+                    "live version in the Skills Store"
                 )
             logger.info(
                 "[working-memory] NOT ENGAGED room=%s — %s",
