@@ -361,6 +361,28 @@ function localApiKey() {
   return line ? line.slice('API_KEY='.length).trim().replace(/^["']|["']$/g, '') : null;
 }
 
+/** Under ally-be's 1 MB request limit, with room for the export's other fields. */
+const IMPORT_BATCH_BYTES = 600_000;
+
+/** Split items into batches whose JSON stays under `maxBytes` (one oversize item goes alone). */
+function batchesOf(items, maxBytes) {
+  const batches = [];
+  let batch = [];
+  let size = 0;
+  for (const item of items) {
+    const bytes = Buffer.byteLength(JSON.stringify(item));
+    if (batch.length && size + bytes > maxBytes) {
+      batches.push(batch);
+      batch = [];
+      size = 0;
+    }
+    batch.push(item);
+    size += bytes;
+  }
+  if (batch.length) batches.push(batch);
+  return batches;
+}
+
 /**
  * Serve the working copy from the LOCAL store: the last export (production's
  * live text, translations included) with your edited files laid over it.
@@ -391,16 +413,25 @@ async function applyLocal(args) {
   const key = localApiKey();
   if (!key) fail('No local API key: set ALLY_BE_API_KEY or API_KEY in ally-be/.env.');
   const local = { name: 'local', url: process.env.SKILLS_STORE_LOCAL_URL || REMOTES.local };
-  const res = await call(local, 'POST', '/skills-store/import', { ...exported, prompts }, { 'x-api-key': key });
-  if (!res.ok) fail(`apply-local failed (${res.status}): ${res.data?.message}`);
+  // ally-be accepts at most 1 MB per request, and production's prompts with
+  // their translations already exceed it, so they go in batches. Import
+  // handles each prompt on its own, so a batch never affects the others.
+  const totals = { updated: 0, created: 0, unchanged: 0 };
+  const failed = [];
+  for (const batch of batchesOf(prompts, IMPORT_BATCH_BYTES)) {
+    const res = await call(local, 'POST', '/skills-store/import', { ...exported, prompts: batch }, { 'x-api-key': key });
+    if (!res.ok) fail(`apply-local failed (${res.status}): ${res.data?.message}`);
+    for (const k of Object.keys(totals)) totals[k] += res.data[k].length;
+    failed.push(...(res.data.failed ?? []));
+  }
   const edited = prompts.filter((p) => p.edited).map((p) => p.promptCode);
   console.log(
-    `Local store now serves ${prompts.length} prompt(s): ${res.data.updated.length} updated, ` +
-      `${res.data.created.length} created, ${res.data.unchanged.length} unchanged.` +
+    `Local store now serves ${prompts.length} prompt(s): ${totals.updated} updated, ` +
+      `${totals.created} created, ${totals.unchanged} unchanged.` +
       (edited.length ? ` Your edits are live locally for: ${edited.join(', ')}.` : ''),
   );
-  for (const f of res.data.failed ?? []) console.log(`  not imported: ${f.promptCode}: ${f.error}`);
-  if (res.data.failed?.length) process.exitCode = 1;
+  for (const f of failed) console.log(`  not imported: ${f.promptCode}: ${f.error}`);
+  if (failed.length) process.exitCode = 1;
   if (edited.length)
     console.log(
       '  Edited prompts serve English locally until translated: their translations were made from the old text.',
