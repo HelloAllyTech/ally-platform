@@ -675,7 +675,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     // Which models this prompt can actually run.
     //
     // When the prompt DECLARES its runtimes (`runtimes` on the row, from its
-    // .meta.json sidecar), offer every model all of those runtimes can
+    // contract in code), offer every model all of those runtimes can
     // execute. Builder's interviewer prompt is read by ally-be alone, which
     // runs Anthropic perfectly well.
     //

@@ -841,7 +841,7 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
 
     /**
      * Duplicate an existing prompt to start a new variant. Returns the new
-     * Prompt row with useDashboardOverride=true and an initial v1 version
+     * Prompt row with an initial live v1 version
      * cloned from the source. Caller typically navigates to the new id.
      */
     duplicatePrompt: builder.mutation<Prompt, string>({

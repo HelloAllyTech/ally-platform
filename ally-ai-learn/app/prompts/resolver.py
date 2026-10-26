@@ -370,7 +370,7 @@ def load_and_format_by_code(
          the code follows the ally_ai_learn_<path>_<stem> convention).
       4. The local file for `fallback_internal_path`.
 
-    Variants almost always live in backend metadata (useDashboardOverride=true)
+    Variants almost always live in the Skills Store (shipped in the metadata)
     and not as local files, so step 1 covers the common case; step 3 is the
     safety net when a stale selectedMainPromptCode points at a deleted/missing
     variant.

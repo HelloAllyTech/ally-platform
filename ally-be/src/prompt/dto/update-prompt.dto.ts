@@ -37,7 +37,7 @@ export class UpdatePromptDto {
 
   @ApiProperty({
     description:
-      'When true, use prompt from dashboard (DB). When false, use prompt from folder.',
+      'Retired and ignored: every prompt serves its live Skills Store version. Kept so older clients that still send it are not refused.',
     required: false,
   })
   @IsOptional()

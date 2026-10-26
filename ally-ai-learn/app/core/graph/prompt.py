@@ -764,8 +764,8 @@ def _build_behavior_prompt(
 
     # Route through the variant resolver when the simulation has picked a
     # specific main-agent prompt; otherwise use the default. Variants
-    # typically live in backend metadata (useDashboardOverride=true) since
-    # they are authored in prompt management, not as local files. The
+    # live in the Skills Store (ally-be ships every prompt in the session
+    # metadata) and usually have no local file. The
     # fallback path keeps stale/missing codes from breaking the run.
     selected_code = getattr(prompt_data, "selected_main_prompt_code", None)
     if selected_code:

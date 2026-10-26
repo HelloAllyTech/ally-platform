@@ -224,7 +224,7 @@ Standards: ESLint + Prettier enforced, Husky git hooks (`prepare: husky`), `.pre
 - `TESTING.md` — Docker-based testing guide (services, env, writing unit/e2e tests, CI example).
 - `DOCKER_TESTING_SETUP.md` — Docker testing infrastructure setup details.
 - `docs/README.md` — index of the `docs/` folder.
-- `docs/prompts-folder.md` — `src/prompts/` prompt folder conventions: naming, structure, optional `.meta.json`, adding prompts. The product-side rules for what a prompt-backed feature must do — validated classification, provenance, human review before anything is stored — come from Stacks at planning time ([Planning with the Stacks MCP](../contributing/planning-with-stacks.md)); the deprecated [AI-Product Patterns](../product/ai-product-patterns.md) page records how Ally settled them.
+- `docs/prompts-folder.md` — `src/prompts/` prompt folder conventions: naming, structure, each prompt's contract in code, adding prompts. The product-side rules for what a prompt-backed feature must do — validated classification, provenance, human review before anything is stored — come from Stacks at planning time ([Planning with the Stacks MCP](../contributing/planning-with-stacks.md)); the deprecated [AI-Product Patterns](../product/ai-product-patterns.md) page records how Ally settled them.
 - `docs/prompts-api.md` — Prompts API: dashboard exposure, sync endpoint, auth, runtime resolution.
 - `docs/dynamic-i18n.md` — dynamic internationalization documentation.
 - `src/prompts/README.md`, `src/prompt/README.md` — module-level prompt documentation.
