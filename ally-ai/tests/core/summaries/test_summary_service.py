@@ -414,3 +414,50 @@ class TestSummaryService:
 
         call_args = mock_text_generation_service.generate_scenario_evaluation.call_args
         assert call_args[1]["usage_task"] is None
+
+    @pytest.mark.asyncio
+    async def test_generate_summary_and_tags_with_raw_llm_usage(
+        self, summary_service, mock_text_generation_service, sample_chat_messages
+    ):
+        """Test that raw LLM usage data in the response is handled gracefully."""
+        # Setup mocks
+        expected_response = SummaryNoteAndTagsResponse(
+            session_summary="Test summary",
+            tags=[Tag(tag="anxiety", positivity_rating=2)],
+            call_quality=85,
+            llm_usage={
+                "completion_tokens": 50,
+                "prompt_tokens": 10,
+                "total_tokens": 60,
+            },
+        )
+        mock_text_generation_service.generate_summary_notes.return_value = (
+            expected_response
+        )
+
+        # Execute
+        result = await summary_service.generate_summary_and_tags(sample_chat_messages)
+
+        # Assert
+        assert result.session_summary == expected_response.session_summary
+        assert result.tags == expected_response.tags
+        assert result.call_quality == expected_response.call_quality
+        # Verify that the llm_usage is present but not part of the core data
+        assert not hasattr(result, "llm_usage")
+
+    @pytest.mark.asyncio
+    async def test_generate_summary_and_tags_parsing_error(
+        self, summary_service, mock_text_generation_service, sample_chat_messages
+    ):
+        """Test summary generation with a generic parsing error."""
+        # Setup mocks
+        mock_text_generation_service.generate_summary_notes.side_effect = Exception(
+            "A generic parsing error occurred"
+        )
+
+        # Execute and assert
+        with pytest.raises(SummarizationFailedException) as exc_info:
+            await summary_service.generate_summary_and_tags(sample_chat_messages)
+
+        assert "Failed to generate the summary" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, Exception)
