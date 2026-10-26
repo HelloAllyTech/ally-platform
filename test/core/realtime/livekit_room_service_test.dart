@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ally_mobile_flutter/core/realtime/livekit_room_service.dart';
@@ -39,6 +41,50 @@ void main() {
       await service.dispose();
 
       expect(service.isConnected, isFalse);
+    });
+  });
+
+  group('LiveKitDataMessage.decode', () {
+    test('decodes a valid JSON object payload, preserving the topic', () {
+      final raw = utf8.encode(jsonEncode({'type': 'AGENT_STATE', 'state': 'thinking'}));
+
+      final message = LiveKitDataMessage.decode(raw, 'events');
+
+      expect(message.topic, 'events');
+      expect(message.json, {'type': 'AGENT_STATE', 'state': 'thinking'});
+      expect(message.raw, raw);
+    });
+
+    test('decodes a nested checklist feedback payload', () {
+      final raw = utf8.encode(
+        jsonEncode({
+          'data': {
+            'detected_event_ids': ['evt-1', 'evt-2'],
+          },
+        }),
+      );
+
+      final message = LiveKitDataMessage.decode(raw, null);
+
+      expect(message.topic, isNull);
+      expect(
+        (message.json?['data'] as Map<String, dynamic>)['detected_event_ids'],
+        ['evt-1', 'evt-2'],
+      );
+    });
+
+    test('json is null for malformed bytes, instead of throwing', () {
+      final message = LiveKitDataMessage.decode(utf8.encode('not json'), 'events');
+
+      expect(message.json, isNull);
+    });
+
+    test('json is null for valid JSON that is not an object (e.g. a bare string)', () {
+      final raw = utf8.encode(jsonEncode('just a string'));
+
+      final message = LiveKitDataMessage.decode(raw, null);
+
+      expect(message.json, isNull);
     });
   });
 }

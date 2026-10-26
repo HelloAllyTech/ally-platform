@@ -32,6 +32,8 @@ class Scenario {
     this.maxTimeValue,
     this.pauseEnabled = false,
     this.experienceMode,
+    this.checklistType,
+    this.checklistEvents = const [],
   });
 
   factory Scenario.fromJson(Map<String, dynamic> json) => Scenario(
@@ -57,6 +59,10 @@ class Scenario {
     // as RN's own `scenario?.pauseEnabled === true` check.
     pauseEnabled: json['pauseEnabled'] as bool? ?? false,
     experienceMode: json['experienceMode'] as String?,
+    checklistType: json['checklistType'] as String?,
+    checklistEvents: (json['checklistEvents'] as List<dynamic>? ?? [])
+        .map((e) => ChecklistItem.fromJson(e as Map<String, dynamic>))
+        .toList(),
   );
 
   final int id;
@@ -78,6 +84,44 @@ class Scenario {
   /// to gate the live roleplay screen's focus-mode button
   /// (`showFocusButton = !isNoneMode`).
   final String? experienceMode;
+
+  /// RN's `ChecklistType` ('OFF'/'GUIDED'/'UNGUIDED'/'LIST') — see
+  /// `checklist_panel.dart`.
+  final String? checklistType;
+  final List<ChecklistItem> checklistEvents;
+
+  /// Mirrors RN's `hasChecklist` (`SimulationAssistantScreen.tsx`): a
+  /// CHECKLIST-mode scenario with zero checklist-visible events falls back
+  /// to the plain layout rather than showing an empty panel.
+  bool get hasChecklist => experienceMode == 'CHECKLIST' && checklistEvents.isNotEmpty;
+}
+
+/// Mirrors RN's `ChecklistItem` (`src/types/simulations.ts`) — a single
+/// live-call checklist target, checked off in real time as its [id] appears
+/// in a LiveKit `detected_event_ids` data-channel message (see
+/// `roleplay_voice_screen.dart`).
+class ChecklistItem {
+  ChecklistItem({
+    required this.id,
+    required this.name,
+    this.rank,
+    this.score,
+    this.message,
+  });
+
+  factory ChecklistItem.fromJson(Map<String, dynamic> json) => ChecklistItem(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    rank: (json['rank'] as num?)?.toInt(),
+    score: (json['score'] as num?)?.toInt(),
+    message: json['message'] as String?,
+  );
+
+  final String id;
+  final String name;
+  final int? rank;
+  final int? score;
+  final String? message;
 }
 
 /// LiveKit connection pair returned by starting a session — the same shape

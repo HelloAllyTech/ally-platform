@@ -13,6 +13,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
+import 'checklist_panel.dart';
 
 /// Mirrors ally-mobile (React Native)'s `SESSION_AUTO_END_MINUTES` fallback
 /// and `parseMaxTimeSec` util — an "HH:MM:SS" string parsed to total
@@ -42,11 +43,19 @@ String _formatDuration(Duration d) {
 /// immediately, matching RN exactly), a focus-mode toggle, and a
 /// scenario-info overlay (title + trigger warnings).
 ///
+/// Also ports the live `SessionChecklist` (see `checklist_panel.dart`),
+/// populated from the agent's `detected_event_ids` LiveKit data-channel
+/// messages via `LiveKitRoomService.dataMessages` — shown only for a
+/// CHECKLIST-mode scenario with at least one checklist event
+/// (`Scenario.hasChecklist`), matching RN's own fallback.
+///
 /// Not ported: pause/resume. RN's pause sends a reliable LiveKit data-channel
 /// message (`room.localParticipant.publishData`) the agent acks over
 /// `RoomEvent.DataReceived`, with an optimistic-UI/revert-on-timeout race —
-/// real new LiveKit wrapper plumbing and a genuinely riskier state machine
-/// than everything else here, not a pure-UI gap. Deferred to its own pass
+/// a genuinely riskier state machine than everything else here, not a
+/// pure-UI gap (the data-channel plumbing it needs now exists, via
+/// [LiveKitRoomService.dataMessages]/`publishData`, but the pause/resume
+/// state machine itself is still its own pass). Deferred to its own pass
 /// (see the full-app audit's reclassification note).
 class RoleplayVoiceScreen extends ConsumerStatefulWidget {
   const RoleplayVoiceScreen({
@@ -112,6 +121,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   // screen in a widget test (see roleplay_voice_screen_dispose_test.dart),
   // which is exactly how this was found.
   late final LiveKitRoomService _liveKitService;
+  StreamSubscription<LiveKitDataMessage>? _dataSubscription;
+  final Set<String> _detectedEventIds = {};
 
   bool get _showFocusButton => widget.scenario?.experienceMode != 'NONE';
 
@@ -127,8 +138,24 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       timer.cancel();
     }
     _tickTimer?.cancel();
+    _dataSubscription?.cancel();
     _liveKitService.disconnect();
     super.dispose();
+  }
+
+  /// Mirrors RN's `onDataReceived` checklist branch
+  /// (`SimulationAssistantScreen.tsx`): a `LiveEventPayload`'s
+  /// `data.detected_event_ids` is merged (dedup'd) into the running set of
+  /// triggered checklist item ids. Other message families on this same
+  /// channel (`AGENT_STATE`, pause/resume acks, ...) are silently ignored
+  /// here, same as RN ignores whichever branch doesn't match.
+  void _handleDataMessage(LiveKitDataMessage message) {
+    final data = message.json?['data'];
+    final detectedIds = data is Map<String, dynamic>
+        ? data['detected_event_ids']
+        : null;
+    if (detectedIds is! List) return;
+    setState(() => _detectedEventIds.addAll(detectedIds.cast<String>()));
   }
 
   Future<void> _connect() async {
@@ -146,6 +173,9 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         accessToken: widget.accessToken,
       );
       await _liveKitService.setMicrophoneEnabled(true);
+      _dataSubscription = _liveKitService.dataMessages.listen(
+        _handleDataMessage,
+      );
       setState(() {
         _isConnected = true;
         _isMicEnabled = true;
@@ -192,7 +222,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     final maxTimeSec = _parseMaxTimeSec(widget.scenario?.maxTimeValue);
     setState(() => _elapsed = elapsed);
 
-    if (maxTimeSec - elapsed.inSeconds <= _warningThresholdSeconds && !_hasWarned) {
+    if (maxTimeSec - elapsed.inSeconds <= _warningThresholdSeconds &&
+        !_hasWarned) {
       _hasWarned = true;
       setState(() => _showEndingSoon = true);
     }
@@ -204,6 +235,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
 
   Future<void> _disconnect() async {
     _tickTimer?.cancel();
+    _dataSubscription?.cancel();
+    _dataSubscription = null;
     await _liveKitService.disconnect();
     setState(() {
       _isConnected = false;
@@ -233,7 +266,9 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     if (sessionId == null) return;
     setState(() => _isEnding = true);
     try {
-      await ref.read(simulationsRepositoryProvider).endScenarioSession(sessionId);
+      await ref
+          .read(simulationsRepositoryProvider)
+          .endScenarioSession(sessionId);
       await _disconnect();
       if (mounted) context.pushReplacement('/simulations/feedback/$sessionId');
     } catch (e) {
@@ -284,7 +319,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
               ),
             if (_showEndingSoon && _isConnected)
               _ConfirmOverlay(
-                title: '${ref.t('simulationPage.warningDialog.titleNormal')} '
+                title:
+                    '${ref.t('simulationPage.warningDialog.titleNormal')} '
                     '${ref.t('simulationPage.warningDialog.titleItalic')}',
                 description: ref.t('simulationPage.warningDialog.content'),
                 primaryLabel: ref.t('common.continue'),
@@ -297,7 +333,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
               ),
             if (_showEndConfirmation)
               _ConfirmOverlay(
-                title: '${ref.t('listeningScreen.end')}${ref.t('common.simulation')}',
+                title:
+                    '${ref.t('listeningScreen.end')}${ref.t('common.simulation')}',
                 description: ref.t('simulationPage.endDialog.content'),
                 primaryLabel: ref.t('common.cancel'),
                 onPrimary: () => setState(() => _showEndConfirmation = false),
@@ -317,83 +354,126 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   }
 
   Widget _buildBody() {
-    return Center(
-      child: Padding(
+    // The checklist panel makes this body taller than a typical phone
+    // viewport can show without scrolling — `LayoutBuilder` +
+    // `ConstrainedBox(minHeight: ...)` keeps the original vertical-centering
+    // look when content is short (no checklist, or not yet connected) while
+    // letting it scroll instead of overflowing once it isn't.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              _isConnected ? 'assets/icons/micOn.svg' : 'assets/icons/micOff.svg',
-              width: 64,
-              height: 64,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _isConnected
-                  ? ref.t('roleplayVoice.connectedToRoom')
-                  : ref.t('roleplayVoice.notConnected'),
-            ),
-            if (_isConnected && !_isFocusMode)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  '${ref.t('simulationPage.sessionDuration')} ${_formatDuration(_elapsed)}',
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(
+                  _isConnected
+                      ? 'assets/icons/micOn.svg'
+                      : 'assets/icons/micOff.svg',
+                  width: 64,
+                  height: 64,
                 ),
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
-              ),
-            const SizedBox(height: 24),
-            if (!_isConnected)
-              AppButton(label: ref.t('roleplayVoice.connect'), onPressed: _connect)
-            else ...[
-              AppButton(
-                label: _isMicEnabled
-                    ? ref.t('simulationPage.mute')
-                    : ref.t('simulationPage.unmute'),
-                iconLeft: SvgPicture.asset(
-                  _isMicEnabled ? 'assets/icons/mic.svg' : 'assets/icons/micOff.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                const SizedBox(height: 16),
+                Text(
+                  _isConnected
+                      ? ref.t('roleplayVoice.connectedToRoom')
+                      : ref.t('roleplayVoice.notConnected'),
                 ),
-                onPressed: _toggleMic,
-              ),
-              if (_showFocusButton) ...[
-                const SizedBox(height: 12),
-                AppButton(
-                  label: ref.t(_isFocusMode ? 'listeningScreen.focused' : 'listeningScreen.focus'),
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () => setState(() => _isFocusMode = !_isFocusMode),
-                ),
+                if (_isConnected && !_isFocusMode)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '${ref.t('simulationPage.sessionDuration')} ${_formatDuration(_elapsed)}',
+                    ),
+                  ),
+                if (_isConnected &&
+                    !_isFocusMode &&
+                    (widget.scenario?.hasChecklist ?? false))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: ChecklistPanel(
+                      mode: checklistModeFromString(
+                        widget.scenario!.checklistType,
+                      ),
+                      items: widget.scenario!.checklistEvents,
+                      triggeredEventIds: _detectedEventIds,
+                    ),
+                  ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.red400),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                if (!_isConnected)
+                  AppButton(
+                    label: ref.t('roleplayVoice.connect'),
+                    onPressed: _connect,
+                  )
+                else ...[
+                  AppButton(
+                    label: _isMicEnabled
+                        ? ref.t('simulationPage.mute')
+                        : ref.t('simulationPage.unmute'),
+                    iconLeft: SvgPicture.asset(
+                      _isMicEnabled
+                          ? 'assets/icons/mic.svg'
+                          : 'assets/icons/micOff.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    onPressed: _toggleMic,
+                  ),
+                  if (_showFocusButton) ...[
+                    const SizedBox(height: 12),
+                    AppButton(
+                      label: ref.t(
+                        _isFocusMode
+                            ? 'listeningScreen.focused'
+                            : 'listeningScreen.focus',
+                      ),
+                      variant: AppButtonVariant.secondary,
+                      onPressed: () =>
+                          setState(() => _isFocusMode = !_isFocusMode),
+                    ),
+                  ],
+                  if ((widget.scenario?.title ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    AppButton(
+                      label: ref.t('common.details'),
+                      variant: AppButtonVariant.secondary,
+                      onPressed: () => setState(
+                        () => _showScenarioInfo = !_showScenarioInfo,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  if (widget.scenarioSessionId != null)
+                    AppButton(
+                      label: ref.t('simulationPage.endSession'),
+                      variant: AppButtonVariant.destructive,
+                      isLoading: _isEnding,
+                      onPressed: _endSession,
+                    )
+                  else
+                    AppButton(
+                      label: ref.t('roleplayVoice.disconnect'),
+                      variant: AppButtonVariant.secondary,
+                      onPressed: _disconnect,
+                    ),
+                ],
               ],
-              if ((widget.scenario?.title ?? '').isNotEmpty) ...[
-                const SizedBox(height: 12),
-                AppButton(
-                  label: ref.t('common.details'),
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () => setState(() => _showScenarioInfo = !_showScenarioInfo),
-                ),
-              ],
-              const SizedBox(height: 12),
-              if (widget.scenarioSessionId != null)
-                AppButton(
-                  label: ref.t('simulationPage.endSession'),
-                  variant: AppButtonVariant.destructive,
-                  isLoading: _isEnding,
-                  onPressed: _endSession,
-                )
-              else
-                AppButton(
-                  label: ref.t('roleplayVoice.disconnect'),
-                  variant: AppButtonVariant.secondary,
-                  onPressed: _disconnect,
-                ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );
@@ -427,7 +507,11 @@ class _CountdownOverlay extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   '$step',
-                  style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -539,7 +623,10 @@ class _ScenarioInfoPanel extends ConsumerWidget {
             scenario.title,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           if (scenario.triggerWarnings.isNotEmpty)
             Padding(
