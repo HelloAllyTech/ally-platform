@@ -288,7 +288,7 @@ def _create_event_by_detection_type(
 
             try:
                 utterance_length_data = UtteranceLengthData(**raw_data)
-            except ValidationError as e:
+            except (ValidationError, ValueError) as e:
                 log.warning(
                     "Event '%s' (HELPER_UTTERANCE_LENGTH) invalid data: %s", event_id, e
                 )
