@@ -1,26 +1,50 @@
-"""Typed input contracts for this service's prompts.
+"""Typed contracts for this service's prompts: one model per default .txt.
 
-One model per prompt, keyed by its full prompt code. A model's fields are
-the variables the code supplies to that prompt; a field without a default
-is REQUIRED: the prompt text must contain it and the code must pass it.
+Each model declares the prompt's code and how it shows up in the Skills
+Store (`prompt = PromptInfo(...)`), and its fields are the variables the code
+supplies. A field without a default is REQUIRED: the prompt text must contain
+it and the code must pass it. `Field(title=...)` is the label the Skills
+Store shows for a variable. Declaring the class is the whole registration:
+`PROMPT_CONTRACTS` collects every subclass of `PromptInputs`.
 
-- Sync sends each prompt's `contract_payload` to the Skills Store, which
-  refuses a new version that drops a required variable (or, for a closed
-  contract, uses one the code doesn't supply).
+- Sync sends each prompt's `contract_payload`, details and labelled
+  variables to the Skills Store, which refuses a new version that drops a
+  required variable (or, for a closed contract, uses one the code doesn't
+  supply).
 - The resolver logs `[PROMPT_CONTRACT]` at ERROR when the code renders a
   prompt without a required variable.
-- tests/unit/test_prompt_contracts.py checks every default .txt against
-  its model.
+- The contract tests check every default .txt against its model, and that
+  every default has one.
 
-Contracts start OPEN (`extra="allow"`): undeclared variables are
-accepted. Close one with `model_config = ConfigDict(extra="forbid")`
-once its field list is known to be complete. Bump `contract_version` on
-a breaking change.
+Contracts start OPEN (`extra="allow"`): undeclared variables are accepted.
+Close one with `model_config = ConfigDict(extra="forbid")` once its field
+list is known to be complete. Bump `contract_version` on a breaking change.
+Recipe: the "Adding a new prompt" section of this service's prompt docs.
 """
 
+from dataclasses import dataclass
 from typing import ClassVar, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict
+
+
+@dataclass(frozen=True)
+class PromptInfo:
+    """A prompt's code and how it shows up in the Skills Store.
+
+    Only `code` is required. Without the rest, sync derives the name,
+    description and category from the file's path. Sync writes the
+    description and category on every deploy; the name only when the prompt
+    is created (a rename in the Skills Store is an admin's to make).
+    """
+
+    code: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    # Studio wiring for agent prompts (e.g. "main_agent"); most prompts omit it.
+    prompt_type: Optional[str] = None
+    has_states: Optional[bool] = None
 
 
 class PromptInputs(BaseModel):
@@ -28,6 +52,7 @@ class PromptInputs(BaseModel):
 
     model_config = ConfigDict(extra="allow", protected_namespaces=())
 
+    prompt: ClassVar[PromptInfo]
     contract_version: ClassVar[int] = 1
     # Text the runtime appends after templating, outside the template.
     fragments: ClassVar[list[str]] = []
@@ -38,9 +63,13 @@ class PromptInputs(BaseModel):
 
 
 class AnalysisCounselorAnalysisInputs(PromptInputs):
-    """ally_ai_analysis_counselor_analysis — Counselor Analysis
-    (`analysis/counselor_analysis.txt`).
-    """
+    """`analysis/counselor_analysis.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_analysis_counselor_analysis",
+        name="Counselor Analysis",
+        description="Analyzes counselor's performance and clinical competencies.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -48,7 +77,13 @@ class AnalysisCounselorAnalysisInputs(PromptInputs):
 
 
 class AudioDiarizationInputs(PromptInputs):
-    """ally_ai_audio_diarization — Diarization (`audio/diarization.txt`)."""
+    """`audio/diarization.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_audio_diarization",
+        name="Diarization",
+        description="Identifies distinct speakers in audio transcriptions.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -56,9 +91,18 @@ class AudioDiarizationInputs(PromptInputs):
 
 
 class HelplineCopilotTurnInputs(PromptInputs):
-    """
-    ally_ai_helpline_copilot_turn — Helpline Copilot Turn (`helpline/copilot_turn.txt`).
-    """
+    """`helpline/copilot_turn.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_helpline_copilot_turn",
+        name="Helpline Copilot Turn",
+        description=(
+            "Drafts two or three tentative, validating reply options for the helpline "
+            "listener to edit after each talker message, tags each with a helping "
+            "skill, names the conversation stage, and optionally gives the listener one"
+            " coaching nudge. Staff-only: the listener decides what is sent."
+        ),
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -70,9 +114,19 @@ class HelplineCopilotTurnInputs(PromptInputs):
 
 
 class HelplineRiskClassifyInputs(PromptInputs):
-    """ally_ai_helpline_risk_classify — Helpline Risk Classifier
-    (`helpline/risk_classify.txt`).
-    """
+    """`helpline/risk_classify.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_helpline_risk_classify",
+        name="Helpline Risk Classifier",
+        description=(
+            "Reads each message a person sends on the text helpline and decides whether"
+            " it signals risk of suicide, self-harm or serious harm (to them, from "
+            "others, or to someone they describe), so the listener and supervisors are "
+            "alerted. Written for a person in distress, not a worker; biased towards "
+            "false positives on purpose."
+        ),
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -82,9 +136,17 @@ class HelplineRiskClassifyInputs(PromptInputs):
 
 
 class KnowledgeCrisisClassifyInputs(PromptInputs):
-    """ally_ai_knowledge_crisis_classify — WhatsApp Crisis Classifier
-    (`knowledge/crisis_classify.txt`).
-    """
+    """`knowledge/crisis_classify.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_knowledge_crisis_classify",
+        name="WhatsApp Crisis Classifier",
+        description=(
+            "Decides whether an inbound WhatsApp message is about a crisis happening "
+            "now, so the bot points to a supervisor or crisis line instead of answering"
+            " a reference question. Biased towards false positives on purpose."
+        ),
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -92,9 +154,17 @@ class KnowledgeCrisisClassifyInputs(PromptInputs):
 
 
 class KnowledgeTranslateQueryInputs(PromptInputs):
-    """ally_ai_knowledge_translate_query — WhatsApp Knowledge Query Translation
-    (`knowledge/translate_query.txt`).
-    """
+    """`knowledge/translate_query.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_knowledge_translate_query",
+        name="WhatsApp Knowledge Query Translation",
+        description=(
+            "Detects the language of an inbound WhatsApp question and restates it in "
+            "English for embedding, so a non-English question retrieves against the "
+            "English corpus."
+        ),
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -102,9 +172,17 @@ class KnowledgeTranslateQueryInputs(PromptInputs):
 
 
 class KnowledgeWhatsappAnswerInputs(PromptInputs):
-    """ally_ai_knowledge_whatsapp_answer — WhatsApp Knowledge Answer
-    (`knowledge/whatsapp_answer.txt`).
-    """
+    """`knowledge/whatsapp_answer.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_knowledge_whatsapp_answer",
+        name="WhatsApp Knowledge Answer",
+        description=(
+            "Answers a mental healthcare worker's WhatsApp question using only the "
+            "retrieved corpus passages, in the worker's own language, or declines when "
+            "the corpus does not cover it."
+        ),
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -115,9 +193,13 @@ class KnowledgeWhatsappAnswerInputs(PromptInputs):
 
 
 class NotesContentEnhanceInputs(PromptInputs):
-    """
-    ally_ai_notes_content_enhance — Content Enhancement (`notes/content_enhance.txt`).
-    """
+    """`notes/content_enhance.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_notes_content_enhance",
+        name="Content Enhancement",
+        description="Enhances the provided summary or content.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -125,7 +207,13 @@ class NotesContentEnhanceInputs(PromptInputs):
 
 
 class NudgeNudgeInputs(PromptInputs):
-    """ally_ai_nudge_nudge — Generate Nudge (`nudge/nudge.txt`)."""
+    """`nudge/nudge.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_nudge_nudge",
+        name="Generate Nudge",
+        description="Generates a nudge to guide the counselor during the session.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -135,9 +223,13 @@ class NudgeNudgeInputs(PromptInputs):
 
 
 class ScenarioScenarioEvaluationInputs(PromptInputs):
-    """ally_ai_scenario_scenario_evaluation — Scenario Evaluation
-    (`scenario/scenario_evaluation.txt`).
-    """
+    """`scenario/scenario_evaluation.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scenario_scenario_evaluation",
+        name="Scenario Evaluation",
+        description="Evaluates the scenario performance.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -148,10 +240,13 @@ class ScenarioScenarioEvaluationInputs(PromptInputs):
 
 
 class ScenarioScenarioEvaluationWithMemoryInputs(PromptInputs):
-    """
-    ally_ai_scenario_scenario_evaluation_with_memory — Scenario Evaluation with Memory
-    (`scenario/scenario_evaluation_with_memory.txt`).
-    """
+    """`scenario/scenario_evaluation_with_memory.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scenario_scenario_evaluation_with_memory",
+        name="Scenario Evaluation with Memory",
+        description="Evaluates scenario performance while considering session memory.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -164,25 +259,30 @@ class ScenarioScenarioEvaluationWithMemoryInputs(PromptInputs):
 
 
 class SharedScenarioBehavioursInputs(PromptInputs):
-    """ally_ai_shared_scenario_behaviours — scenario behaviours
-    (`shared/scenario_behaviours.txt`).
-    """
+    """`shared/scenario_behaviours.txt`."""
+
+    prompt = PromptInfo(code="ally_ai_shared_scenario_behaviours")
 
     HELPFUL_BEHAVIOURS_LIST: Optional[str] = None
     UNHELPFUL_BEHAVIOURS_LIST: Optional[str] = None
 
 
 class SharedSkillCoverageInputs(PromptInputs):
-    """ally_ai_shared_skill_coverage — Skill Coverage (`shared/skill_coverage.txt`)."""
+    """`shared/skill_coverage.txt`."""
 
-    pass
+    prompt = PromptInfo(
+        code="ally_ai_shared_skill_coverage",
+        name="Skill Coverage",
+        description=(
+            "Calculates the coverage of specific skills demonstrated in the "
+            "conversation."
+        ),
+    )
 
 
 class SharedSupervisorNoteInputs(PromptInputs):
-    """ally_ai_shared_supervisor_note — supervisor note.
 
-    `shared/supervisor_note.txt`
-    """
+    prompt = PromptInfo(code="ally_ai_shared_supervisor_note")
 
     LEARNER_NAME: Optional[str] = None
     LIVE_NOTES: Optional[str] = None
@@ -191,9 +291,9 @@ class SharedSupervisorNoteInputs(PromptInputs):
 
 
 class SharedSupervisorNoteRepairInputs(PromptInputs):
-    """ally_ai_shared_supervisor_note_repair — supervisor note repair
-    (`shared/supervisor_note_repair.txt`).
-    """
+    """`shared/supervisor_note_repair.txt`."""
+
+    prompt = PromptInfo(code="ally_ai_shared_supervisor_note_repair")
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -202,34 +302,33 @@ class SharedSupervisorNoteRepairInputs(PromptInputs):
 
 
 class SharedWorkerTypeEarlyProfessionalInputs(PromptInputs):
-    """ally_ai_shared_worker_type_early_professional — worker type early professional
-    (`shared/worker_type_early_professional.txt`).
-    """
+    """`shared/worker_type_early_professional.txt`."""
 
-    pass
+    prompt = PromptInfo(code="ally_ai_shared_worker_type_early_professional")
 
 
 class SharedWorkerTypeExperiencedProfessionalInputs(PromptInputs):
-    """ally_ai_shared_worker_type_experienced_professional — worker type experienced
-    professional (`shared/worker_type_experienced_professional.txt`).
-    """
+    """`shared/worker_type_experienced_professional.txt`."""
 
-    pass
+    prompt = PromptInfo(code="ally_ai_shared_worker_type_experienced_professional")
 
 
 class SharedWorkerTypeLayInputs(PromptInputs):
-    """ally_ai_shared_worker_type_lay — worker type lay.
 
-    `shared/worker_type_lay.txt`
-    """
-
-    pass
+    prompt = PromptInfo(code="ally_ai_shared_worker_type_lay")
 
 
 class SummaryDictationSummaryInputs(PromptInputs):
-    """ally_ai_summary_dictation_summary — Dictation Session Summary
-    (`summary/dictation_summary.txt`).
-    """
+    """`summary/dictation_summary.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_summary_dictation_summary",
+        name="Dictation Session Summary",
+        description=(
+            "Generates a session summary for dictation mode (same structure as scribe "
+            "for now)."
+        ),
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -237,9 +336,13 @@ class SummaryDictationSummaryInputs(PromptInputs):
 
 
 class SummaryDynamicSummaryInputs(PromptInputs):
-    """
-    ally_ai_summary_dynamic_summary — Dynamic Summary (`summary/dynamic_summary.txt`).
-    """
+    """`summary/dynamic_summary.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_summary_dynamic_summary",
+        name="Dynamic Summary",
+        description="Generates a summary based on specific dynamic keys.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -248,7 +351,13 @@ class SummaryDynamicSummaryInputs(PromptInputs):
 
 
 class SummarySummaryInputs(PromptInputs):
-    """ally_ai_summary_summary — Session Summary (`summary/summary.txt`)."""
+    """`summary/summary.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_summary_summary",
+        name="Session Summary",
+        description="Generates a standard session summary.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -256,9 +365,13 @@ class SummarySummaryInputs(PromptInputs):
 
 
 class TagsPositivityRatingInputs(PromptInputs):
-    """
-    ally_ai_tags_positivity_rating — Positivity Rating (`tags/positivity_rating.txt`).
-    """
+    """`tags/positivity_rating.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_tags_positivity_rating",
+        name="Positivity Rating",
+        description="Rates the positivity of tags or statements.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
@@ -266,38 +379,36 @@ class TagsPositivityRatingInputs(PromptInputs):
 
 
 class UserIdentifyUserInputs(PromptInputs):
-    """ally_ai_user_identify_user — Identify User (`user/identify_user.txt`)."""
+    """`user/identify_user.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_user_identify_user",
+        name="Identify User",
+        description="Identifies the speaker/user from the conversation context.",
+    )
 
     output_format: ClassVar[Optional[str]] = "structured"
 
     conversations: str
 
 
-PROMPT_CONTRACTS: dict[str, type[PromptInputs]] = {
-    "ally_ai_analysis_counselor_analysis": AnalysisCounselorAnalysisInputs,
-    "ally_ai_audio_diarization": AudioDiarizationInputs,
-    "ally_ai_helpline_copilot_turn": HelplineCopilotTurnInputs,
-    "ally_ai_helpline_risk_classify": HelplineRiskClassifyInputs,
-    "ally_ai_knowledge_crisis_classify": KnowledgeCrisisClassifyInputs,
-    "ally_ai_knowledge_translate_query": KnowledgeTranslateQueryInputs,
-    "ally_ai_knowledge_whatsapp_answer": KnowledgeWhatsappAnswerInputs,
-    "ally_ai_notes_content_enhance": NotesContentEnhanceInputs,
-    "ally_ai_nudge_nudge": NudgeNudgeInputs,
-    "ally_ai_scenario_scenario_evaluation": ScenarioScenarioEvaluationInputs,
-    "ally_ai_scenario_scenario_evaluation_with_memory": ScenarioScenarioEvaluationWithMemoryInputs,  # noqa: E501
-    "ally_ai_shared_scenario_behaviours": SharedScenarioBehavioursInputs,
-    "ally_ai_shared_skill_coverage": SharedSkillCoverageInputs,
-    "ally_ai_shared_supervisor_note": SharedSupervisorNoteInputs,
-    "ally_ai_shared_supervisor_note_repair": SharedSupervisorNoteRepairInputs,
-    "ally_ai_shared_worker_type_early_professional": SharedWorkerTypeEarlyProfessionalInputs,  # noqa: E501
-    "ally_ai_shared_worker_type_experienced_professional": SharedWorkerTypeExperiencedProfessionalInputs,  # noqa: E501
-    "ally_ai_shared_worker_type_lay": SharedWorkerTypeLayInputs,
-    "ally_ai_summary_dictation_summary": SummaryDictationSummaryInputs,
-    "ally_ai_summary_dynamic_summary": SummaryDynamicSummaryInputs,
-    "ally_ai_summary_summary": SummarySummaryInputs,
-    "ally_ai_tags_positivity_rating": TagsPositivityRatingInputs,
-    "ally_ai_user_identify_user": UserIdentifyUserInputs,
-}
+def _collect_contracts() -> dict[str, type[PromptInputs]]:
+    """Every PromptInputs subclass that declares a prompt, keyed by its code."""
+    found: dict[str, type[PromptInputs]] = {}
+    pending = list(PromptInputs.__subclasses__())
+    while pending:
+        model = pending.pop()
+        pending.extend(model.__subclasses__())
+        info = model.__dict__.get("prompt")
+        if not isinstance(info, PromptInfo):
+            continue
+        if info.code in found:
+            raise ValueError(f"Prompt contract {info.code!r} is declared twice")
+        found[info.code] = model
+    return found
+
+
+PROMPT_CONTRACTS: dict[str, type[PromptInputs]] = _collect_contracts()
 
 
 def _names(model: type[PromptInputs], *, required_only: bool) -> list[str]:
@@ -338,6 +449,21 @@ def contract_payload(prompt_code: str) -> Optional[dict]:
 def missing_required(prompt_code: str, supplied: Mapping[str, object]) -> list[str]:
     """Required variables the caller did not pass at all."""
     return [name for name in required_variables(prompt_code) if name not in supplied]
+
+
+def available_variables(prompt_code: str) -> list[dict]:
+    """The contract's variables as the Skills Store lists them for editors:
+    `{name, required}`, plus `label` where the field has a title."""
+    model = PROMPT_CONTRACTS.get(prompt_code)
+    if model is None:
+        return []
+    out = []
+    for name, field in sorted(model.model_fields.items()):
+        entry: dict = {"name": field.alias or name, "required": field.is_required()}
+        if field.title:
+            entry["label"] = field.title
+        out.append(entry)
+    return out
 
 
 def all_contract_payloads() -> dict[str, Optional[dict]]:

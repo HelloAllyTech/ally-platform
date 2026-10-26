@@ -3,9 +3,9 @@
 Sync ally-ai-learn prompts to ally-be via POST /prompts/sync.
 
 Scans app/prompts/**/*.txt, derives promptCode from path with ally_ai_learn_
-prefix (subdir/filename.txt -> ally_ai_learn_subdir_filename). Name/description
-are derived from path; optional overrides from subdir/_meta/<stem>.meta.json
-(with "name" and/or "description" keys) are applied when present.
+prefix (subdir/filename.txt -> ally_ai_learn_subdir_filename). Each prompt's
+name, description, category, labelled variables and contract come from its
+model in app/prompts/contracts.py; the path fills whatever it leaves out.
 
 Uses CORE_SERVICE_BASE_URL and CORE_SERVICE_API_KEY.
 
@@ -15,7 +15,6 @@ Run during deployment or manually:
 """
 
 import argparse
-import json
 import re
 import sys
 from pathlib import Path
@@ -27,13 +26,19 @@ import httpx  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.logger import get_logger  # noqa: E402
-from app.prompts.contracts import contract_payload  # noqa: E402
+from app.prompts.contracts import (  # noqa: E402
+    PROMPT_CONTRACTS,
+    available_variables,
+    contract_payload,
+)
 
 logger = get_logger(__name__)
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "app" / "prompts"
 SYNC_ENDPOINT = "/api/v1/prompts/sync"
 PROMPT_CODE_PREFIX = "ally_ai_learn_"
+# Every prompt this service syncs is a whole prompt (not a reusable block).
+PROMPT_KIND = "prompt"
 
 
 # Placeholders that the runtime substitutes from non-author-facing
@@ -79,8 +84,8 @@ def merge_available_variables(*variable_lists) -> list:
     """Merge variable lists, accepting either string names or
     ``{name, label?, required?}`` objects.
 
-    Auto-parsed placeholders from prompt text arrive as strings; richer meta
-    JSON entries arrive as objects. The merge is by ``name`` — when both a
+    Auto-parsed placeholders from prompt text arrive as strings; the contract's
+    variables arrive as objects. The merge is by ``name`` — when both a
     string and an object reference the same name, the object's metadata
     (label / required / etc.) is preserved.
 
@@ -107,7 +112,7 @@ def merge_available_variables(*variable_lists) -> list:
                         continue
                     # First write wins for any metadata key; auto-parsed
                     # strings (which have no metadata) never overwrite the
-                    # meta JSON's labels / required flags.
+                    # contract's labels / required flags.
                     existing.setdefault(key, val)
                 by_name[name] = existing
     return [by_name[name] for name in sorted(by_name)]
@@ -121,40 +126,6 @@ def format_label(text: str) -> str:
     if not text:
         return ""
     return " ".join(word.capitalize() for word in text.replace("_", " ").split())
-
-
-def load_meta(txt_file: Path) -> dict | None:
-    """
-    Load name, description, category, kind, promptType, hasStates,
-    uses_blocks and availableVariables from _meta/<stem>.meta.json.
-    """
-    meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
-    if not meta_path.exists():
-        return None
-    try:
-        data = json.loads(meta_path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return None
-        out = {}
-        if isinstance(data.get("name"), str) and data["name"].strip():
-            out["name"] = data["name"].strip()
-        if isinstance(data.get("description"), str) and data["description"].strip():
-            out["description"] = data["description"].strip()
-        if isinstance(data.get("category"), str) and data["category"].strip():
-            out["category"] = data["category"].strip()
-        if isinstance(data.get("kind"), str) and data["kind"].strip():
-            out["kind"] = data["kind"].strip()
-        if isinstance(data.get("promptType"), str) and data["promptType"].strip():
-            out["promptType"] = data["promptType"].strip()
-        if isinstance(data.get("hasStates"), bool):
-            out["hasStates"] = data["hasStates"]
-        if isinstance(data.get("uses_blocks"), list):
-            out["uses_blocks"] = data["uses_blocks"]
-        if isinstance(data.get("availableVariables"), list):
-            out["availableVariables"] = data["availableVariables"]
-        return out if out else None
-    except (json.JSONDecodeError, OSError):
-        return None
 
 
 def scan_prompts() -> list[dict]:
@@ -187,67 +158,39 @@ def scan_prompts() -> list[dict]:
                 name = formatted_filename
                 description = formatted_filename
 
-            meta = load_meta(txt_file)
-            if meta:
-                if meta.get("name") is not None:
-                    name = meta["name"]
-                if meta.get("description") is not None:
-                    description = meta["description"]
-            category = (
-                meta.get("category")
-                if meta and meta.get("category") is not None
-                else formatted_category
-            )
+            model = PROMPT_CONTRACTS.get(prompt_code)
+            info = model.prompt if model else None
+            if info and info.name:
+                name = info.name
+            if info and info.description:
+                description = info.description
+            category = info.category if info and info.category else formatted_category
 
             content = txt_file.read_text(encoding="utf-8")
-            # Resolve usesBlocks to fully-qualified prompt codes. ALWAYS
-            # include the field (defaulting to []) so the BE upsert can
-            # explicitly clear stale entries when a meta JSON drops a
-            # block reference — TypeORM's .update() treats `undefined`
-            # as "don't change", so omitting the field would leave old
-            # uses_blocks values pinned in the DB forever even after
-            # they were removed from the meta JSON.
-            uses_blocks_codes: list[str] = []
-            if meta and meta.get("uses_blocks"):
-                # block name -> ally_ai_learn_subdir_blockname.
-                # Note: only handles blocks in same dir as the prompt for now.
-                # e.g. system/competency_block.txt ->
-                # ally_ai_learn_system_competency_block.
-                # prompt: system/full_prompt -> item rel.parent: system.
-                subdir_prefix = (
-                    str(rel.parent).replace("/", "_") if str(rel.parent) != "." else ""
-                )
-                for b in meta["uses_blocks"]:
-                    if subdir_prefix:
-                        uses_blocks_codes.append(
-                            f"{PROMPT_CODE_PREFIX}{subdir_prefix}_{b}"
-                        )
-                    else:
-                        uses_blocks_codes.append(f"{PROMPT_CODE_PREFIX}{b}")
-
             item = {
                 "promptCode": prompt_code,
                 "name": name,
                 "description": description,
                 "category": category,
                 "prompt": content,
+                # Placeholders in the text, plus the contract's variables with
+                # their labels and required flags (the contract wins on a name).
                 "availableVariables": merge_available_variables(
+                    available_variables(prompt_code),
                     parse_variables_from_prompt(content),
-                    meta.get("availableVariables", []) if meta else [],
                 ),
-                "usesBlocks": uses_blocks_codes,
-                # The typed contract from app/prompts/contracts.py: the Skills
-                # Store refuses a version that drops a required variable.
+                # Always sent, so the store clears a stale value: TypeORM's
+                # update() treats `undefined` as "don't change".
+                "usesBlocks": [],
+                "kind": PROMPT_KIND,
+                # The typed contract: the Skills Store refuses a version that
+                # drops a required variable.
                 "contract": contract_payload(prompt_code),
             }
-
-            if meta:
-                if meta.get("kind"):
-                    item["kind"] = meta["kind"]
-                if meta.get("promptType"):
-                    item["promptType"] = meta["promptType"]
-                if "hasStates" in meta:
-                    item["hasStates"] = meta["hasStates"]
+            if info and info.prompt_type:
+                item["promptType"] = info.prompt_type
+            if info and info.has_states is not None:
+                item["hasStates"] = info.has_states
 
             items.append(item)
         except Exception as e:

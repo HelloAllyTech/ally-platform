@@ -9,13 +9,17 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 import pytest
+from pydantic import Field
 
 from app.prompts.contracts import (
     PROMPT_CONTRACTS,
+    PromptInfo,
     PromptInputs,
     all_contract_payloads,
+    available_variables,
     contract_payload,
     is_closed,
     missing_required,
@@ -42,7 +46,40 @@ DEFAULTS = _defaults()
 
 
 def test_every_prompt_has_a_contract_and_every_contract_a_prompt():
-    assert sorted(PROMPT_CONTRACTS) == sorted(DEFAULTS)
+    no_contract = sorted(set(DEFAULTS) - set(PROMPT_CONTRACTS))
+    no_default = sorted(set(PROMPT_CONTRACTS) - set(DEFAULTS))
+    assert not no_contract, (
+        f"Defaults with no contract: {no_contract}. Add a PromptInputs subclass with "
+        "`prompt = PromptInfo(code=...)` to app/prompts/contracts.py "
+        "(recipe: ally-be/docs/adding-a-prompt.md)."
+    )
+    assert not no_default, (
+        f"Contracts with no default .txt: {no_default}. Check the code matches the "
+        "file's path under app/prompts/."
+    )
+
+
+def test_every_contract_is_registered_under_its_own_code():
+    for code, model in PROMPT_CONTRACTS.items():
+        assert isinstance(model.prompt, PromptInfo)
+        assert model.prompt.code == code
+
+
+def test_available_variables_carry_required_flags_and_labels():
+    class _Labelled(PromptInputs):
+        prompt = PromptInfo(code="test_labelled_prompt")
+
+        message: str = Field(title="Learner message")
+        tone: Optional[str] = None
+
+    try:
+        PROMPT_CONTRACTS["test_labelled_prompt"] = _Labelled
+        assert available_variables("test_labelled_prompt") == [
+            {"name": "message", "required": True, "label": "Learner message"},
+            {"name": "tone", "required": False},
+        ]
+    finally:
+        PROMPT_CONTRACTS.pop("test_labelled_prompt", None)
 
 
 @pytest.mark.parametrize("code", sorted(DEFAULTS))

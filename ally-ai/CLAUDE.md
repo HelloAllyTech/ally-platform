@@ -46,11 +46,11 @@ something Ally-specific.
 
 | Task | Read first |
 |---|---|
-| Adding an AI capability | Prompt in `app/prompts/`, logic in `app/core/`, endpoint in `app/api/v1/endpoints/` — **then register the call**, see the next row |
+| Adding an AI capability | Prompt in `app/prompts/` with its contract ([recipe](../ally-be/docs/adding-a-prompt.md#ally-ai)), logic in `app/core/`, endpoint in `app/api/v1/endpoints/` — **then register the call**, see the next row |
 | **Adding, removing or re-pointing an AI/LLM call** | Add its row to ally-be's AI task registry (`ally-be/src/llm/constants/ai-task-registry.constants.ts`) in the same change — it is the platform-wide map of what calls a model and which model serves it, and it feeds the admin **AI Tasks** tab. Recipe: [`ally-be/docs/ai-task-registry.md`](https://github.com/HelloAllyTech/ally-be/blob/master/docs/ai-task-registry.md) |
 | Changing a Weaviate collection | `app/core/vector_db/constants.py`, then add `app/migrations/NNN-description.py` |
 | Anything touching stored data | [`ally-be/DATA_SCHEMA.md`](https://github.com/HelloAllyTech/ally-be/blob/main/DATA_SCHEMA.md) — the cross-store map; this repo owns its vector half |
-| Editing prompts | The live text is in the Skills Store; `app/prompts/` holds defaults and `app/prompts/contracts.py` the contracts — see the gotcha below |
+| Adding or editing prompts | Adding: [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md#ally-ai). The live text is in the Skills Store; `app/prompts/` holds defaults and `app/prompts/contracts.py` the contracts — see the gotcha below |
 | Transcription / queue work | `app/core/queue/transcription_request_sqs_worker.py` |
 | Language-quality evaluation | [`docs/language-eval-judge-schema.md`](docs/language-eval-judge-schema.md) and [`docs/drift-metrics-spec.md`](docs/drift-metrics-spec.md); platform context in the [wiki](https://tech.helloally.ai/#/wiki/platform/language-quality-eval.md) |
 | Releasing | [`.github/RELEASE_GUIDE.md`](.github/RELEASE_GUIDE.md) |
@@ -64,7 +64,7 @@ something Ally-specific.
   served at `/helpline/risk` and `/helpline/turn`); `safety.py` filters every generated
   suggestion. Staff-only output: nothing here is ever shown to a talker.
 - `app/api/v1/endpoints/` — HTTP surface. Entry: `app/main.py`.
-- `app/prompts/` — file-based, loaded dynamically.
+- `app/prompts/` — each prompt's default `.txt`, and `contracts.py` with its contract.
 - `app/migrations/` — Weaviate schema migrations, `NNN-description.py`.
 - Pattern: abstract base classes per service, FastAPI DI, Pydantic settings.
 

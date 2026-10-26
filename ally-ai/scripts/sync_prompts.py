@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import re
 import sys
@@ -11,7 +10,7 @@ import httpx
 # the path so the prompt contracts import.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.prompts.contracts import contract_payload  # noqa: E402
+from app.prompts.contracts import PROMPT_CONTRACTS, contract_payload  # noqa: E402
 
 # Configuration
 PROMPT_DIR = Path("app/prompts")
@@ -58,27 +57,23 @@ def scan_prompts():
         prompt_code = f"{PROMPT_CODE_PREFIX}{internal_path.replace('/', '_')}"
         content = txt_file.read_text(encoding="utf-8").strip()
 
-        # Look for optional name/description from same dir's _meta/<stem>.meta.json
-        meta_path = txt_file.parent / "_meta" / f"{txt_file.stem}.meta.json"
-        meta = {}
-        if meta_path.exists():
-            try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except Exception as e:
-                print(f"Error reading meta for {txt_file}: {e}")
+        # Name, description and category come from the prompt's contract
+        # (app/prompts/contracts.py); the path fills whatever it leaves out.
+        model = PROMPT_CONTRACTS.get(prompt_code)
+        info = model.prompt if model else None
 
         item = {
             "promptCode": prompt_code,
             "prompt": content,
-            "name": meta.get(
-                "name",
+            "name": (info and info.name)
+            or (
                 f"AI: {folder_name.capitalize()} - "
-                f"{name.replace('_', ' ').capitalize()}",
+                f"{name.replace('_', ' ').capitalize()}"
             ),
-            "description": meta.get(
-                "description", f"Generated from ally-ai: {rel_path}"
-            ),
-            "category": meta.get("category", folder_name.replace("_", " ").title()),
+            "description": (info and info.description)
+            or f"Generated from ally-ai: {rel_path}",
+            "category": (info and info.category)
+            or folder_name.replace("_", " ").title(),
             "availableVariables": parse_variables_from_prompt(content),
         }
         # The Skills Store is the source of truth: a sidecar no longer decides

@@ -150,4 +150,5 @@ keep running on it" line — the switch warns, it never blocks.
 
 - [Skills Store design](./skills-store-design.md) — why the store is the single source of truth, the decisions, and how it was built
 
-- [Prompts folder (naming, structure, meta JSON)](./prompts-folder.md)
+- [Adding a prompt (default + contract, all three services)](./adding-a-prompt.md)
+- [Prompts folder (naming, structure)](./prompts-folder.md)

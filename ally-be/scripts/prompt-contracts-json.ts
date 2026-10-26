@@ -6,8 +6,7 @@
  *
  *   npx ts-node --transpile-only scripts/prompt-contracts-json.ts > contracts.json
  */
-import { PROMPT_CONTRACTS } from '../src/prompt/contracts/prompt-contracts';
-import { toStoreContract } from '../src/prompt/contracts/define-prompt';
+import { PROMPT_CONTRACTS, toStoreContract } from '../src/prompt/contracts';
 
 process.stdout.write(
   JSON.stringify(

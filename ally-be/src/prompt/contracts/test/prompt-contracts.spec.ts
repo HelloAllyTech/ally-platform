@@ -1,10 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PROMPT_CONTRACTS } from '../prompt-contracts';
+import { PROMPT_CONTRACTS } from '..';
 import {
+  collectContracts,
   definePrompt,
   missingInputs,
   PromptInputs,
+  renderPrompt,
   toStoreContract,
 } from '../define-prompt';
 import { checkContract } from '../../util/prompt-contract.util';
@@ -18,7 +20,7 @@ function defaults(): Array<{ code: string; file: string; text: string }> {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name !== '_meta') walk(full);
+        walk(full);
       } else if (entry.name.endsWith('.txt')) {
         const rel = path.relative(PROMPTS_DIR, full).replace(/\.txt$/, '');
         out.push({
@@ -84,5 +86,55 @@ describe('definePrompt', () => {
   it('names required inputs a call site left out', () => {
     expect(missingInputs(GREETING, { mood: 'x' })).toEqual(['name']);
     expect(missingInputs(GREETING, { name: 'A' })).toEqual([]);
+  });
+  it('keeps the Skills Store details apart from the contract', () => {
+    const NAMED = definePrompt(
+      'named',
+      { text: 'required' },
+      {
+        name: 'Named',
+        description: 'A prompt with details.',
+        runtimes: ['ally-be'],
+        output: 'structured',
+      },
+    );
+    expect(NAMED.details).toEqual({
+      name: 'Named',
+      description: 'A prompt with details.',
+      runtimes: ['ally-be'],
+    });
+    expect(toStoreContract(NAMED)).toEqual({
+      variables: null,
+      required: ['text'],
+      contractVersion: 1,
+      output: 'structured',
+    });
+  });
+
+  it('renders typed inputs, leaving null and undefined blank', () => {
+    expect(
+      renderPrompt(GREETING, 'Hi {{name}}, you seem {{mood}}.', {
+        name: 'Asha',
+        mood: null,
+      }),
+    ).toBe('Hi Asha, you seem .');
+    // @ts-expect-error — `nmae` is not a variable of the contract.
+    renderPrompt(GREETING, '{{name}}', { name: 'A', nmae: 'typo' });
+  });
+});
+
+describe('collectContracts', () => {
+  it('collects every exported definition by code, ignoring other exports', () => {
+    const a = definePrompt('a', {});
+    const b = definePrompt('b', {});
+    expect(
+      Object.keys(collectContracts({ a, b, helper: () => 1, n: 3 })),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('refuses a code declared twice', () => {
+    expect(() =>
+      collectContracts({ a: definePrompt('a', {}), b: definePrompt('a', {}) }),
+    ).toThrow('declared twice');
   });
 });

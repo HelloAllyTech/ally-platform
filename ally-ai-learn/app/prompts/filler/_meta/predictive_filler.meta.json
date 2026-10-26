@@ -1,5 +1,0 @@
-{
-    "name": "Predictive Filler Prompt",
-    "kind": "prompt",
-    "description": "System prompt for LLM-generated thinking fillers \u2014 the short back-channels a character utters the instant the learner stops, masking the real reply's latency. Used at three moments: once at session start from the character alone (so a filler exists before the first turn), after each exchange from the conversation so far, and mid-utterance from the learner's partial transcript (the only path whose output has seen the current turn). Asks for typed, length-varied options: playback rotates types so the same kind of noise never repeats, and picks a length that covers the predicted pause. Editable under System Skills. Variables: {scenario_context}, {character_voice}, {language_label}, {language_code}, {count}, {filler_types}, {recent_fillers}."
-}

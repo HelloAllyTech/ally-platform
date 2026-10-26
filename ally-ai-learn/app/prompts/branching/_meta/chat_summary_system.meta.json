@@ -1,5 +1,0 @@
-{
-    "name": "Chat Summary System Prompt",
-    "kind": "prompt",
-    "description": "System prompt for the clinical supervisor role that generates a 2-3 sentence summary of a counselling role-play session, used to resolve <chat_summary> tags in branching instructions."
-}

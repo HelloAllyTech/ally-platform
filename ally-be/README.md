@@ -365,7 +365,7 @@ The platform supports multiple authentication methods:
 | `GET /api/analytics/*`                | Analytics dashboards      |
 | `GET /api/tenant-analytics/*`         | Tenant-specific analytics |
 
-**Prompts API (dashboard and sync):** See [docs/prompts-api.md](docs/prompts-api.md). Prompt folder (naming, meta JSON): [docs/prompts-folder.md](docs/prompts-folder.md).
+**Prompts API (dashboard and sync):** See [docs/prompts-api.md](docs/prompts-api.md). Prompt folder (naming, structure): [docs/prompts-folder.md](docs/prompts-folder.md). Adding a prompt: [docs/adding-a-prompt.md](docs/adding-a-prompt.md).
 
 ## ✨ Key Features
 

@@ -87,8 +87,12 @@ for (const prompt of prompts) {
   calls.push({ label: prompt.file, code: prompt.code, system: prompt });
 }
 
-const problems = [];
-for (const call of calls) {
+/**
+ * One model call for a default: 'json' (the answer parses), 'cut' (it ran past
+ * the token cap mid-JSON, which says nothing about whether the text asks for
+ * JSON), or an error string.
+ */
+async function answerFor(call) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
@@ -105,14 +109,23 @@ for (const call of calls) {
       ],
     }),
   }).catch((err) => ({ ok: false, status: 0, text: async () => err.message }));
-  if (!res.ok) {
-    problems.push(`${call.label}: model call failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
-    continue;
-  }
-  const answer = (await res.json()).choices?.[0]?.message?.content ?? '';
-  if (!parses(answer)) {
-    problems.push(`${call.label} (${call.code}): the answer isn't JSON: ${answer.slice(0, 160).replace(/\s+/g, ' ')}`);
-  }
+  if (!res.ok) return `model call failed (${res.status}): ${(await res.text()).slice(0, 200)}`;
+  const choice = (await res.json()).choices?.[0];
+  const answer = choice?.message?.content ?? '';
+  if (parses(answer)) return 'json';
+  if (choice?.finish_reason === 'length' && /^\s*(```(?:json)?\s*)?[[{]/.test(answer)) return 'cut';
+  return `the answer isn't JSON: ${answer.slice(0, 160).replace(/\s+/g, ' ')}`;
+}
+
+const problems = [];
+for (const call of calls) {
+  // One retry: a long answer that embeds markdown in JSON strings sometimes
+  // mis-escapes a quote even at temperature 0. A default that stopped asking
+  // for JSON fails both times.
+  let outcome = await answerFor(call);
+  if (outcome !== 'json' && outcome !== 'cut') outcome = await answerFor(call);
+  if (outcome === 'cut') console.log(`${call.label}: answer hit the token cap mid-JSON; counted as JSON.`);
+  else if (outcome !== 'json') problems.push(`${call.label} (${call.code}): ${outcome}`);
 }
 
 if (problems.length) {

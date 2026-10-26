@@ -159,7 +159,7 @@ Every resolution logs `code`, `version`, a short hash and the source (`local` / 
 | --- | --- | --- | --- |
 | Latest version | Store (`prompts_versions`) | Yes: dashboard or `prompts push` | The only real text. What production serves |
 | Working copy | Your laptop, `.prompts/` (gitignored) | Yes, locally | Pulled from the store; edit and test, then push |
-| Contract | Git, `_meta/<code>.meta.json` | Yes, in the same PR as the code change | The variables code supplies, the output shape it parses, a contract version |
+| Contract | Git, in code: `definePrompt` (ally-be), a Pydantic model (ally-ai, ally-ai-learn) | Yes, in the same PR as the code change | The variables code supplies, the output shape it parses, a contract version |
 | Default body | Git, `*/prompts/*.txt` | Yes, only to keep up with the contract | A minimal prompt that works with the current code. Creates the prompt on first deploy; fallback; open-source default; `defaultPrompt` for Revert to default |
 
 A deploy only creates prompts that don't exist yet; it never changes an existing prompt's live text. Editing a default to improve behaviour is pointless, because production never serves it. Improvements go to the store. The default only changes when the code's contract does.
@@ -352,7 +352,7 @@ Four phases, each shippable on its own. Phase 0 must land first: until every ser
 ### Phase 2: contracts and defaults
 
 - Sync creates prompts that don't exist yet and refreshes metadata; it no longer refreshes the body of an existing prompt, and no longer overwrites a dashboard `name`.
-- Add `variables` (required/optional), `output`, appended `fragments` and `contractVersion` to every `.meta.json`, starting from today's `availableVariables`. Same format across ally-be, ally-ai and ally-ai-learn, so the two sync scripts stop disagreeing on meta fields.
+- Declare each prompt's contract in code: `variables` (required/optional), `output`, appended `fragments`, `contractVersion`, and the Skills Store details (name, description, category, labelled variables) that the `.meta.json` sidecars used to hold. Built as typed declarations; the sidecars are gone.
 - Cut each default down to a minimal, publishable body that satisfies its contract. Only after the store holds the full text (Phase 0).
 - CI check 1: render every default against its contract.
 - Store check 2: reject pushes and dashboard saves that break the deployed contract.

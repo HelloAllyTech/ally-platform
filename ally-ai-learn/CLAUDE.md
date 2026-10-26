@@ -46,6 +46,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Scenario behaviour or persona | [`docs/09-scenario-engine.md`](docs/09-scenario-engine.md) |
 | Branching instructions / guardrails | [`docs/10-branching-instructions.md`](docs/10-branching-instructions.md) |
 | Session ending unexpectedly | [`docs/13-event-termination.md`](docs/13-event-termination.md) |
+| Adding a prompt | [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md#ally-ai-learn) — default `.txt` + contract in `app/prompts/contracts.py` |
 | Prompts | [`docs/12-prompts-system.md`](docs/12-prompts-system.md) |
 | Queues and cross-service messaging | [`docs/11-queue-messaging.md`](docs/11-queue-messaging.md) |
 | Running it locally | [`docs/LOCAL_DEV.md`](docs/LOCAL_DEV.md) — and read the first gotcha below |
@@ -60,7 +61,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 - `app/core/events/` — event definitions and dispatch. `app/core/livekit/` — room and track plumbing.
 - `app/core/branching_instructions/` — runtime guardrails injected into the prompt.
 - `app/tts/`, `app/stt/`, `app/llms/` — one adapter per provider.
-- `app/prompts/` — prompt templates. `app/api/` — the HTTP surface (`app/main.py`).
+- `app/prompts/` — prompt defaults and `contracts.py`. `app/api/` — the HTTP surface (`app/main.py`).
 - `tests/unit/` — fast tests; run them before pushing.
 
 ## Gotchas that change what you write
@@ -100,8 +101,8 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 make install                                        # deps
 python -m app.download_files                        # required once, before first run
 make test                                           # pytest
-make lint                                           # ruff
-make fix                                            # format, then lint --fix
+make lint                                           # flake8, isort --check, black --check
+make fix                                            # isort + black
 docker compose -f docker-compose.local.yml up       # local stack
 ```
 

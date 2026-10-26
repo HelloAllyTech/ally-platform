@@ -71,7 +71,6 @@ ally-web/
 │   └── ui-shared/                       # Shared components, utilities, feature flags, logger
 ├── docs/
 │   ├── colima.md                        # Colima Docker alternative setup guide
-│   └── prompts-meta.md                  # Prompt display names via .meta.json
 ├── scripts/
 │   ├── docker-switch.sh                 # Switch between Docker Desktop and Colima
 │   └── i18n-sync.mjs                    # Internationalisation sync script
@@ -332,7 +331,7 @@ For issues, questions, or contributions:
 - Open an issue on GitHub
 - Contact the development team
 - **Colima Setup**: See [docs/colima.md](docs/colima.md)
-- **Prompt display names (meta JSON)**: See [docs/prompts-meta.md](docs/prompts-meta.md)
+- **Prompt display names**: set in each prompt's contract; see [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md)
 - **Scripts**: See [scripts/README.md](scripts/README.md)
 
 ---

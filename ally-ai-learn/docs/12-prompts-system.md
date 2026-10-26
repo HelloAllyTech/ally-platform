@@ -1,6 +1,6 @@
 # Prompts System
 
-**Purpose.** This document describes the prompt template system: how templates are loaded, how backend overrides work, and the path-based prompt codes.
+**Purpose.** This document describes the prompt template system: how templates are loaded and resolved, the path-based prompt codes, and the contracts. **To add a prompt, follow [Adding a prompt](../../ally-be/docs/adding-a-prompt.md#ally-ai-learn)** — the one recipe for all three services.
 
 ---
 
@@ -33,22 +33,27 @@ app/prompts/<subdir>/<name>.txt  →  load_template() / load_and_format()
 
 | Function | Use when | Returns |
 |----------|----------|---------|
-| `load_template(prompt_code, backend_prompts=None)` | Caller will format the template manually | Raw template string, or `""` |
-| `load_and_format(prompt_code, backend_prompts=None, **kwargs)` | You have all format kwargs ready (e.g. `language_code`, `custom_prompt`) | Formatted string, or `""` |
+| `load_template(internal_path, prompt_data=None)` | Caller will format the template manually | Raw template string, or `""` |
+| `load_and_format(internal_path, prompt_data=None, **kwargs)` | You have all format kwargs ready (e.g. `language_code`, `custom_prompt`) | Formatted string, or `""` |
 
-**Variable format.** Templates use Python `str.format()` placeholders: `{var_name}`. Example: `{language_code}`, `{custom_prompt}`, `{persona_context}`.
+`internal_path` is the file's path under `app/prompts/` without `.txt`, e.g. `"events/guardrail_system"`; `prompt_data` is the session's prompt data (`scenario.prompt_data`), which carries the Skills Store's live versions.
+
+**Variable format.** Templates use Python `str.format()` placeholders: `{var_name}`. Example: `{language_code}`, `{custom_prompt}`, `{persona_context}`. A literal brace is doubled: an example JSON answer in a template is written `{{"label": "..."}}`.
 
 ## Directory Structure
 
 ```
 app/prompts/
+├── contracts.py            # one contract per prompt: code, Skills Store details, variables
 ├── manager.py              # PromptManager singleton, loads .txt files
-├── resolver.py             # resolve_template(), path-based lookup
-├── system/                 # System prompts for simulation
-│   ├── base_role_instruction.txt
-│   └── multilingual_instructions.txt
-└── counselor/
-    └── report_generation_prompt.txt
+├── resolver.py             # load_template(), load_and_format(), path-based lookup
+├── branching/              # branching-instruction LLM calls
+├── counselor/              # report, steering and reminder prompts
+├── evaluation/             # transcript evaluator
+├── events/                 # detectors and guardrails (system/user pairs)
+├── filler/                 # backchannel, interim reply, predictive fillers
+├── supervisor/             # live supervisor note
+└── system/                 # main agent prompts and the guidance appended to them
 ```
 
 ## Prompt Codes (Prefixed, Path-Based)
@@ -57,8 +62,7 @@ Prompt codes use `ally_ai_learn_` prefix: `subdir/filename.txt` → `ally_ai_lea
 
 | Prompt Code | Local Template | Used By |
 |-------------|----------------|---------|
-| `ally_ai_learn_system_base_role_instruction` | `system/base_role_instruction` | System prompt |
-| `ally_ai_learn_system_multilingual_instructions` | `system/multilingual_instructions` | Language samples for non-English |
+| `ally_ai_learn_system_main_agent_prompt_working_memory_split` | `system/main_agent_prompt_working_memory_split` | Main agent prompt #3 (the scenario's selected main prompt) |
 | `ally_ai_learn_counselor_report_generation_prompt` | `counselor/report_generation_prompt` | Report generation |
 | `ally_ai_learn_system_text_chat_guidance` | `system/text_chat_guidance` | Appended to the persona prompt in text-chat sessions only ([Text-Chat Roleplays](text-chat.md)) |
 
@@ -68,9 +72,9 @@ For non-English scenarios (`language_code` not starting with `"en"`), the system
 
 **File:** `app/core/graph/prompt.py:_get_language_block()`, `_get_language_sample_block()`
 
-## Dashboard Override
+## The Skills Store and contracts
 
-The Skills Store (ally-be) is the source of truth for prompt text: every `ally_ai_learn_*` prompt's live version is sent in the session metadata, and the session records exactly that map (`metadata.promptVersions` / `promptHashes`). The `.txt` files here are defaults: they create a new prompt on its first deploy and are the fallback if the metadata lacks one. Each prompt's contract — the variables the code supplies, and which are required — is declared in `app/prompts/contracts.py`; the resolver logs `[PROMPT_CONTRACT]` at ERROR when a required one isn't supplied, and `[PROMPT_FALLBACK]` when a selected variant doesn't resolve. Change a prompt's text with a new version in the Skills Store or `scripts/prompts/prompts.mjs push`, not by editing its file.
+The Skills Store (ally-be) is the source of truth for prompt text: every `ally_ai_learn_*` prompt's live version is sent in the session metadata, and the session records exactly that map (`metadata.promptVersions` / `promptHashes`). The `.txt` files here are defaults: they create a new prompt on its first deploy and are the fallback if the metadata lacks one. Each prompt's contract — its code, its Skills Store name, description and labelled variables, which variables the code supplies and which are required — is declared in `app/prompts/contracts.py` (one `PromptInputs` subclass per prompt; declaring it registers it); the resolver logs `[PROMPT_CONTRACT]` at ERROR when a required one isn't supplied, and `[PROMPT_FALLBACK]` when a selected variant doesn't resolve. Change a prompt's text with a new version in the Skills Store or `scripts/prompts/prompts.mjs push`, not by editing its file.
 
 ## Sync to ally-be
 
@@ -80,6 +84,8 @@ The Skills Store (ally-be) is the source of truth for prompt text: every `ally_a
 poetry run python scripts/sync_prompts.py
 poetry run python scripts/sync_prompts.py --dry-run
 ```
+
+Both need the service's full environment (`.env`), because the script loads the app's settings; without it, `--dry-run` fails on settings validation.
 
 ## Configuration
 
@@ -93,6 +99,7 @@ poetry run python scripts/sync_prompts.py --dry-run
 
 ## Key Source Files
 
+- `app/prompts/contracts.py` -- the prompt contracts (`PromptInfo`, `PromptInputs`, `PROMPT_CONTRACTS`)
 - `app/prompts/manager.py` -- `PromptManager`, template loading
 - `app/prompts/resolver.py` -- `load_template()`, `load_and_format()`, `resolve_template()`, path-based lookup
 - `app/core/graph/prompt.py` -- `generate_system_message()`, `_get_language_block()`, `_get_language_sample_block()`

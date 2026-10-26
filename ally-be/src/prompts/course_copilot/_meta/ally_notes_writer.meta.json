@@ -1,6 +1,0 @@
-{
-  "name": "Course Copilot — Ally Notes Writer",
-  "description": "Drafts a course's notes for Ally, the AI guide (who the learners are, where the course is emotionally heavy and how to pace it, the ideas it returns to), plus per-item pacing tension overrides where the type-based default is wrong. Never sees answer keys and must never hint at one; the draft is checked against the course's correct answers in code. Called when an admin clicks Draft with Copilot in the builder's Ally notes; nothing is saved server-side. JSON mode.",
-  "category": "Course Copilot",
-  "runtimes": ["ally-be"]
-}
