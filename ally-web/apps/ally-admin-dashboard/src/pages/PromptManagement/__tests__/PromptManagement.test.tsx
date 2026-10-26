@@ -527,4 +527,72 @@ describe("PromptManagement Component", () => {
       expect(screen.getByTestId("prompt-side-panel")).toBeInTheDocument();
     });
   });
+
+  it("should not send behavioral fields on prompt update", async () => {
+    const store = createMockStore();
+    const updateMutation = vi.fn().mockResolvedValue({ unwrap: () => Promise.resolve(true) });
+    mockUpdatePromptMutation.mockReturnValue([updateMutation, { isLoading: false }]);
+
+    // This prompt contains the fields that should be stripped
+    const behavioralPrompt: Prompt = {
+      id: "behavioral-1",
+      name: "Behavioral Prompt",
+      description: "A prompt with behavioral fields",
+      category: "Simulation",
+      promptCode: "behavioral_prompt_1",
+      prompt: "This is the actual prompt text that should be stripped.",
+      provider: "openai",
+      model: "gpt-4",
+      temperature: 0.5,
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    };
+
+    mockGetPromptsQuery.mockReturnValue({
+      data: [behavioralPrompt],
+      isFetching: false,
+    });
+
+    render(
+      <Provider store={store}>
+        <PromptManagement />
+      </Provider>,
+    );
+
+    // Wait for the prompt to be rendered in the table
+    await waitFor(() => {
+      const row = screen.getByTestId("table-row-0");
+      expect(within(row).getByText("Behavioral Prompt")).toBeInTheDocument();
+    });
+
+    // Open the side panel
+    const tableRow = screen.getByTestId("table-row-0");
+    fireEvent.click(tableRow);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("prompt-side-panel")).toBeInTheDocument();
+    });
+
+    // Trigger the update (the mock panel will just pass the selected prompt back)
+    const saveButton = screen.getByTestId("side-panel-save");
+    fireEvent.click(saveButton);
+
+    // Wait for the mutation to have been called
+    await waitFor(() => {
+      expect(updateMutation).toHaveBeenCalledTimes(1);
+    });
+
+    // Assert that the payload sent to the mutation does not contain behavioral fields
+    const payload = updateMutation.mock.calls[0][0];
+    expect(payload.id).toBe("behavioral-1");
+    expect(payload.prompt).not.toHaveProperty("prompt");
+    expect(payload.prompt).not.toHaveProperty("provider");
+    expect(payload.prompt).not.toHaveProperty("model");
+    expect(payload.prompt).not.toHaveProperty("temperature");
+
+    // Assert that other fields are still present
+    expect(payload.prompt).toHaveProperty("name");
+    expect(payload.prompt.name).toBe("Updated Prompt"); // From the mock component
+    expect(payload.prompt).toHaveProperty("description");
+  });
 });

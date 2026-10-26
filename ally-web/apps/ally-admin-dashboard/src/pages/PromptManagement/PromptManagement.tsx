@@ -240,7 +240,8 @@ export const PromptManagement: React.FC<PromptManagementProps> = ({ header }) =>
     if (!promptData.id) return;
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, createdAt, updatedAt, ...rest } = promptData;
+      const { id, createdAt, updatedAt, prompt, provider, model, temperature, ...rest } =
+        promptData;
       await updatePrompt({
         id: promptData.id,
         prompt: rest,
@@ -270,7 +271,7 @@ export const PromptManagement: React.FC<PromptManagementProps> = ({ header }) =>
   const handlePromptAutoSave = async (promptData: Prompt) => {
     if (!promptData.id) return;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id, createdAt, updatedAt, ...rest } = promptData;
+    const { id, createdAt, updatedAt, prompt, provider, model, temperature, ...rest } = promptData;
     await updatePrompt({
       id: promptData.id,
       prompt: rest,

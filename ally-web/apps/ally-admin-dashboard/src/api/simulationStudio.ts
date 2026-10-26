@@ -869,7 +869,7 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
      */
     updatePrompt: builder.mutation<
       Prompt,
-      { id: string; prompt: Omit<Prompt, "id" | "createdAt" | "updatedAt"> }
+      { id: string; prompt: Partial<Omit<Prompt, "id" | "createdAt" | "updatedAt">> }
     >({
       query: ({ id, prompt: body }) => ({
         url: ApiEndpoints.SIMULATION_STUDIO.UPDATE_PROMPT(id),
