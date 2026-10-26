@@ -4,14 +4,14 @@
 --
 --   psql "$DATABASE_URL" -f scripts/prompts/migration-preview.sql
 --
--- The rule (1980200000000-SkillsStoreVersioning): every prompt's current
--- version in the store stays live. 1980150000000 snapshots the prompt tables
--- first, so nothing below is lost.
+-- The rule (1980200000000-SkillsStoreVersioning): what production runs today
+-- becomes each prompt's live version, so no prompt's running text changes.
+-- 1980150000000 snapshots the prompt tables first, so nothing below is lost.
 --
--- 1. Prompts whose RUNNING text changes: the override was off, so services ran
---    the file text (`defaultPrompt`), and the current version differs from it.
---    After the deploy they run the current version.
-SELECT 'runs current version instead of file' AS action,
+-- 1. Prompts whose override was off, so services ran the file text
+--    (`defaultPrompt`), and whose current version differs from it: the file
+--    text is published as a new live version; the old version stays in history.
+SELECT 'publish served file text as new version' AS action,
        p."promptCode",
        'v' || p."currentVersion" AS current_version,
        live."createdAt" AS current_saved_at,
@@ -25,8 +25,8 @@ SELECT 'runs current version instead of file' AS action,
    AND btrim(live.prompt) <> btrim(COALESCE(p."defaultPrompt", ''))
  ORDER BY p."promptCode";
 
--- 2. Prompts with no usable current version: their default text is published
---    so they have one.
+-- 2. Prompts with no usable current version: their default text (what they
+--    were serving) is published so they have one.
 SELECT 'publish default (no usable version)' AS action,
        p."promptCode",
        length(p."defaultPrompt") AS default_chars

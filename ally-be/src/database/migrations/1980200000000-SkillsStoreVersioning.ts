@@ -12,15 +12,17 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *    `.meta.json` sidecars.
  * 3. Translations are kept per English body (`sourceHash`), so a candidate can
  *    be translated before it goes live without disturbing the live rows.
- * 4. `useDashboardOverride` is retired. Every prompt keeps its current version
- *    in the store as its live version, whatever the flag said: the store, not
- *    the file, is the source of truth. Only a row with no usable current
- *    version (missing or blank) gets its `defaultPrompt` published, so it has
- *    one. Then every row is marked overridden, so any reader still checking the
- *    flag already behaves as "serve the store". (1980150000000 snapshots the
- *    tables first, so the file text a non-overridden row was serving is kept.)
- * 5. Each prompt's stored default (`defaultPrompt`) becomes its current
- *    version's text: production's text is the baseline that Revert restores and
+ * 4. `useDashboardOverride` is retired, and what production runs today becomes
+ *    each prompt's live version (decided 2026-10-26). An overridden row was
+ *    serving its current version, which stays live. A non-overridden row was
+ *    serving its file text (`defaultPrompt`, synced from that file), not its
+ *    current version: where the two differ, the file text is published as a new
+ *    version and put live, and the old version stays in history. A row with no
+ *    usable current version gets `defaultPrompt` published too. Then every row
+ *    is marked overridden, so any reader still checking the flag already
+ *    behaves as "serve the store". (1980150000000 snapshots the tables first.)
+ * 5. Each prompt's stored default (`defaultPrompt`) becomes its live version's
+ *    text: production's text is the baseline that Revert restores and
  *    ally-be falls back to. From here on sync writes a Git default only when it
  *    creates a prompt; the files in Git are minimal bases, never the
  *    production text.
@@ -28,7 +30,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *    CLI, stored hashed.
  *
  * Idempotent: every DDL uses IF [NOT] EXISTS and the publish step only touches
- * rows with no usable current version.
+ * rows whose live text still differs from what they were serving.
  */
 export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
   name = 'SkillsStoreVersioning1980200000000';
@@ -72,13 +74,13 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
          AND pv."publishedAt" IS NULL
     `);
 
-    // Retire the override flag. Each row's current version stays live: that is
-    // the version the Skills Store shows, and it is the truth from here on.
-    // Only a row with no usable current version (none, a pointer past its last
-    // version, or blank text) gets `defaultPrompt` published, because sync is
-    // about to replace that column with the new Git default and the row would
-    // otherwise have nothing to serve. The inserted version is put live in the
-    // same statement, and a re-run touches nothing.
+    // Retire the override flag: what each row was serving becomes its live
+    // version. A non-overridden row was serving `defaultPrompt` (its synced file
+    // text), so that is published where the live version differs; a row with
+    // no usable current version (none, a pointer past its last version, or
+    // blank text) was serving `defaultPrompt` too. An overridden row with live
+    // text keeps it. The inserted version is put live in the same statement,
+    // and a re-run touches nothing.
     await queryRunner.query(`
       WITH published AS (
         INSERT INTO "prompts_versions"
@@ -89,14 +91,19 @@ export class SkillsStoreVersioning1980200000000 implements MigrationInterface {
                p."defaultPrompt", 0, 0,
                p."provider", p."model", p."temperature",
                'migration',
-               'Published the default text: the prompt had no usable current version when the Skills Store became the source of truth.',
+               'Published the text production was serving when the Skills Store became the source of truth.',
                NOW()
           FROM "prompts" p
           LEFT JOIN "prompts_versions" live
             ON live."promptId" = p.id AND live."version" = p."currentVersion"
          WHERE p."defaultPrompt" IS NOT NULL
            AND btrim(p."defaultPrompt") <> ''
-           AND (live.id IS NULL OR btrim(COALESCE(live."prompt", '')) = '')
+           AND (
+             live.id IS NULL
+             OR btrim(COALESCE(live."prompt", '')) = ''
+             OR (p."useDashboardOverride" = false
+                 AND btrim(live."prompt") <> btrim(p."defaultPrompt"))
+           )
         RETURNING "promptId", "version"
       )
       UPDATE "prompts" p

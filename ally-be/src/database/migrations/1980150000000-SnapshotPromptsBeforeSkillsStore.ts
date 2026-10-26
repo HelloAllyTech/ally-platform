@@ -27,9 +27,7 @@ const SNAPSHOTS: Array<[source: string, snapshot: string]> = [
   ['prompt_translations', 'prompt_translations_snapshot_pre_skills_store'],
 ];
 
-export class SnapshotPromptsBeforeSkillsStore1980150000000
-  implements MigrationInterface
-{
+export class SnapshotPromptsBeforeSkillsStore1980150000000 implements MigrationInterface {
   name = 'SnapshotPromptsBeforeSkillsStore1980150000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
