@@ -92,7 +92,11 @@ describe('SpecialistLlmService', () => {
     expect(prompt).toContain('- Question 2 has no prompt.');
     expect(prompt).toContain('- Question 4 needs an explanation.');
     expect(
-      prompt.trim().endsWith('Produce the whole object again, fixed.'),
+      prompt
+        .trim()
+        .endsWith(
+          'Produce the whole object again, fixed. As before, return ONLY a JSON object.',
+        ),
     ).toBe(true);
     expect(llm.complete.mock.calls[0][0].usageMetadata.repairPass).toBe(true);
   });
