@@ -130,6 +130,35 @@ class SummaryService:
                 "Failed to generate the summary. Please try again later."
             ) from e
 
+        except Exception as e:
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            # Log error
+            await phi_logger.log(
+                PHILogEvent(
+                    chat_id=str(chat_id) if chat_id else None,
+                    audit_id=None,  # Will be set by caller
+                    event_type=PHIEvents.SYSTEM_ERROR,
+                    details={
+                        "error": "An unexpected error occurred during summary "
+                        f"generation: {type(e).__name__}",
+                        "component": "SummaryService",
+                        "method": "generate_summary_and_tags",
+                        "exception_type": type(e).__name__,
+                        "chat_history_count": len(chat_history),
+                        "processing_time_ms": processing_time_ms,
+                    },
+                )
+            )
+
+            logger.exception(
+                "An unexpected error occurred during summary generation: %s",
+                type(e).__name__,
+            )
+            raise SummarizationFailedException(
+                "Failed to generate the summary. Please try again later."
+            ) from e
+
     async def enhance_content(
         self,
         content: str,
