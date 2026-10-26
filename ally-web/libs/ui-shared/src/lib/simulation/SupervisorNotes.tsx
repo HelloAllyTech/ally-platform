@@ -11,7 +11,7 @@ const DEFAULT_EMPTY_STATE =
   "Your supervisor is listening — notes appear here when there's something useful.";
 const DEFAULT_AI_LABEL = "AI-generated";
 const DEFAULT_AI_TOOLTIP =
-  "Ally is an AI supervisor. It's listening live and sending these notes automatically — not a person.";
+  "These are AI suggestions from Ally. It's listening live and sending these notes automatically — not a person.";
 
 /**
  * The live feed of coaching hints the AI supervisor sends during a session.
