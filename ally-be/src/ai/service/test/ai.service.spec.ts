@@ -868,7 +868,12 @@ describe('AiService', () => {
   describe('getPromptOverrides', () => {
     it('asks the store for exactly the codes the request needs', async () => {
       mockPromptSharedService.getPromptsByOptions.mockResolvedValueOnce([
-        { promptCode: 'ally_ai_summary_summary', prompt: 'Live.' },
+        {
+          promptCode: 'ally_ai_summary_summary',
+          prompt: 'Live.',
+          version: 4,
+          contentHash: 'abc123',
+        },
       ] as any);
 
       const map = await service.getPromptOverrides(['ally_ai_summary_summary']);
@@ -878,7 +883,13 @@ describe('AiService', () => {
           promptCode: ['ally_ai_summary_summary'],
         },
       );
-      expect(map['ally_ai_summary_summary'].prompt).toBe('Live.');
+      expect(map['ally_ai_summary_summary']).toEqual(
+        expect.objectContaining({
+          prompt: 'Live.',
+          version: 4,
+          contentHash: 'abc123',
+        }),
+      );
     });
 
     it('throws rather than answer with an empty map when the store has nothing to give', async () => {

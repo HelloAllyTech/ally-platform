@@ -4,6 +4,7 @@ import { DataSource, ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { AnalyticsBucket } from './platform-analytics.repository';
 import { excludeTestTenants } from '../util/test-tenant.util';
 import { resolveSqlBucket } from '../util/analytics-window.util';
+import { mainPromptCodeSql } from '../util/main-prompt-version.util';
 
 /** Shared filters for conversation-drift analytics queries. */
 export interface DriftFilters {
@@ -197,16 +198,7 @@ export class DriftAnalyticsRepository {
                    || ' · ' || COALESCE(NULLIF(s.metadata->>'mainPromptVariant', ''), 'GENERIC') AS label
             FROM scenario_sessions s
             CROSS JOIN LATERAL (
-              SELECT COALESCE(
-                       NULLIF(s.metadata->>'selectedMainPromptCode', ''),
-                       (SELECT k
-                          FROM jsonb_object_keys(
-                                 CASE WHEN jsonb_typeof(s.metadata->'promptVersions') = 'object'
-                                      THEN s.metadata->'promptVersions' ELSE '{}'::jsonb END) k
-                         WHERE k ILIKE '%main_agent%' OR k ILIKE '%base_role%'
-                         ORDER BY k
-                         LIMIT 1)
-                     ) AS code
+              SELECT ${mainPromptCodeSql('s')} AS code
             ) mc
             JOIN prompts pr ON pr."promptCode" = mc.code)`,
         'pinfo',

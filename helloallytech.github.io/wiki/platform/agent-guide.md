@@ -31,7 +31,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Stack**: FastAPI / Python 3.12 / Poetry / Weaviate / LangChain / OpenAI
 - **Entry**: `ally-ai/app/main.py`
 - **Key services**: `app/core/conversations/`, `summaries/`, `text_generations/`, `reference_documents/`, `transcriptions/`, `queue/`
-- **Prompts**: `app/prompts/` (file-based, dynamically loaded)
+- **Prompts**: `app/prompts/` holds each prompt's default `.txt` and `contracts.py`; the live text comes from ally-be's Skills Store with every request
 - **Vector DB**: Weaviate collections in `ally-ai/app/core/vector_db/constants.py`; schema migrations in `app/migrations/`
 - **Background worker**: SQS transcription worker in `ally-ai/app/core/queue/transcription_request_sqs_worker.py`
 - **Key patterns**: Abstract base classes for services, FastAPI dependency injection, Pydantic settings, HIPAA audit logging
@@ -42,7 +42,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Graph pipeline**: `app/core/graph/` (LangGraph: process_events → resolve_branching → generate_response/detect_behaviors → apply_voice → send_feedback)
 - **Event system**: `app/core/events/` — one package per event type (SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER, TIME, SCORE, COMBINATION, HELPER_*); the authoritative list is `ally-ai-learn/docs/04-event-types-reference.md`, current count in [Platform Stats](stats.md)
 - **Provider factories**: `ally-ai-learn/app/tts/factory.py`, `ally-ai-learn/app/stt/factory.py`, `ally-ai-learn/app/llms/factory.py`
-- **Prompts**: `app/prompts/` (system, branching, prosody, events); extensive numbered `docs/`, indexed by intent in `ally-ai-learn/docs/readme.md`
+- **Prompts**: `app/prompts/` holds defaults and contracts (system, branching, events, …); the live text comes from the Skills Store in the session metadata; extensive numbered `docs/`, indexed by intent in `ally-ai-learn/docs/readme.md`
 - **Key patterns**: Factory pattern for providers, LiveKit agent lifecycle (configure/initialize/start), event orchestration with eligibility constraints
 
 ### [ally-web](../repos/ally-web.md) — Web Frontend Monorepo
@@ -86,7 +86,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 **Adding a new API endpoint** — ally-be: controller + service + DTOs in the relevant `src/` module; ally-web/mobile: add an RTK Query endpoint in `src/services/`.
 
-**Adding a new AI capability** — ally-ai: prompt templates in `app/prompts/`, service logic in `app/core/`, endpoint in `app/api/v1/endpoints/`; ally-be: integration call in `src/ai/`.
+**Adding a new AI capability** — ally-ai: a default prompt plus its contract in `app/prompts/` ([recipe](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/adding-a-prompt.md)), service logic in `app/core/`, endpoint in `app/api/v1/endpoints/`; ally-be: integration call in `src/ai/`.
 
 **Adding a new event type (ally-ai-learn)** — create the event class in `app/core/events/event_types/`, register in `ally-ai-learn/app/core/events/factory.py`, add prompts in `app/prompts/events/` (see `ally-ai-learn/docs/04-event-types-reference.md`).
 
@@ -101,7 +101,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Lima/Colima VM**: local dev commonly runs Docker inside a Lima/Colima VM on macOS; commands execute within the VM context.
 - **HIPAA**: never log PII/PHI outside designated audit loggers. Use `phi_logger` in ally-ai.
 - **Multi-tenant**: all ally-be queries must respect tenant isolation; entities have `tenantId` columns.
-- **Prompt sync**: prompts in ally-ai can be overridden at runtime via ally-be's prompt management; `ally-ai/scripts/sync_prompts.py` pushes defaults.
+- **Prompts live in the Skills Store** (ally-be), not in the `.txt` files: editing a default changes nothing that runs. To change a prompt, pull, edit and push a draft with `scripts/prompts/prompts.mjs`, which needs a Skills Store key the developer creates once in the admin dashboard (Skills Store → Keys) and loads as `SKILLS_STORE_PROD_KEY`. An agent without that key asks the developer for it and never creates one. Setup: [Working on prompts from a laptop](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop).
 - **LiveKit rooms**: ally-ai-learn agents join rooms created by ally-be; room metadata carries scenario configuration.
 - **SQS in dev**: use LocalStack (auto-started by docker-compose). Queue URLs differ between local and production.
 - **Node versions**: ally-be requires Node 24; ally-web requires Node 22. **Python**: both AI repos require 3.12+.

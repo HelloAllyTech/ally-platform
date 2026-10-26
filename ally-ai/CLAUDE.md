@@ -50,7 +50,7 @@ something Ally-specific.
 | **Adding, removing or re-pointing an AI/LLM call** | Add its row to ally-be's AI task registry (`ally-be/src/llm/constants/ai-task-registry.constants.ts`) in the same change — it is the platform-wide map of what calls a model and which model serves it, and it feeds the admin **AI Tasks** tab. Recipe: [`ally-be/docs/ai-task-registry.md`](../ally-be/docs/ai-task-registry.md) |
 | Changing a Weaviate collection | `app/core/vector_db/constants.py`, then add `app/migrations/NNN-description.py` |
 | Anything touching stored data | [`ally-be/DATA_SCHEMA.md`](../ally-be/DATA_SCHEMA.md) — the cross-store map; this repo owns its vector half |
-| Adding or editing prompts | Adding: [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md#ally-ai). The live text is in the Skills Store; `app/prompts/` holds defaults and `app/prompts/contracts.py` the contracts — see the gotcha below |
+| Adding or editing prompts | Adding: [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md#ally-ai). The live text is in the Skills Store; `app/prompts/` holds defaults and `app/prompts/contracts.py` the contracts — see the gotcha below. Editing: the `prompts` CLI with a Skills Store key ([set up once](../ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop)) |
 | Transcription / queue work | `app/core/queue/transcription_request_sqs_worker.py` |
 | Language-quality evaluation | [`docs/language-eval-judge-schema.md`](docs/language-eval-judge-schema.md) and [`docs/drift-metrics-spec.md`](docs/drift-metrics-spec.md); platform context in the [wiki](https://tech.helloally.ai/#/wiki/platform/language-quality-eval.md) |
 | Releasing | [`.github/RELEASE_GUIDE.md`](.github/RELEASE_GUIDE.md) |

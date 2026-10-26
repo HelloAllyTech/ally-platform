@@ -47,7 +47,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Branching instructions / guardrails | [`docs/10-branching-instructions.md`](docs/10-branching-instructions.md) |
 | Session ending unexpectedly | [`docs/13-event-termination.md`](docs/13-event-termination.md) |
 | Adding a prompt | [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md#ally-ai-learn) — default `.txt` + contract in `app/prompts/contracts.py` |
-| Prompts | [`docs/12-prompts-system.md`](docs/12-prompts-system.md) |
+| Prompts | [`docs/12-prompts-system.md`](docs/12-prompts-system.md). Live text is in the Skills Store; editing one is the `prompts` CLI with a Skills Store key ([set up once](../ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop)) |
 | Queues and cross-service messaging | [`docs/11-queue-messaging.md`](docs/11-queue-messaging.md) |
 | Running it locally | [`docs/LOCAL_DEV.md`](docs/LOCAL_DEV.md) — and read the first gotcha below |
 | The Ally guide's voice worker (`guide-` rooms) | [`docs/guide-voice-worker.md`](docs/guide-voice-worker.md) — speech only; every reply comes from ally-be |
