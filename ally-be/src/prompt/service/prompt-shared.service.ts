@@ -66,18 +66,26 @@ export class PromptSharedService {
         rows = await read();
       } catch (error) {
         const cached = this.cachedRowsFor(selector);
-        if (!cached) {
+        if (cached) {
+          this.logger.warn(
+            `[PROMPT_DELIVERY] Skills Store unreadable; serving the last ${cached.length} prompts read successfully: ${error?.message}`,
+          );
+          return cached;
+        }
+
+        try {
+          this.logger.warn(
+            `[PROMPT_DELIVERY] Skills Store unreadable and nothing cached; attempting to serve defaults: ${error?.message}`,
+          );
+          rows = await this.getPromptsDefaultsForRuntime(selector);
+        } catch (fallbackError) {
           this.logger.error(
-            `[PROMPT_DELIVERY] Skills Store unreadable and nothing cached for this request: ${error?.message}`,
+            `[PROMPT_DELIVERY] Skills Store unreadable and defaults also failed: ${fallbackError?.message}`,
           );
           throw new Error(
-            `The prompt store could not be read: ${error?.message}`,
+            `The prompt store could not be read, and defaults could not be served: ${fallbackError?.message}`,
           );
         }
-        this.logger.warn(
-          `[PROMPT_DELIVERY] Skills Store unreadable; serving the last ${cached.length} prompts read successfully: ${error?.message}`,
-        );
-        return cached;
       }
     }
     for (const row of rows) this.lastGoodRows.set(row.promptCode, row);
@@ -350,5 +358,46 @@ export class PromptSharedService {
     }
 
     return rows;
+  }
+
+  private async getPromptsDefaultsForRuntime(
+    options: PromptSearchOptions,
+  ): Promise<Array<PromptsWithPromptCode>> {
+    const query = this.promptsRepository
+      .createQueryBuilder('prompt')
+      .select([
+        'prompt.defaultPrompt AS prompt',
+        'prompt.promptCode AS "promptCode"',
+      ])
+      .addSelect('prompt.availableVariables', 'availableVariables')
+      .addSelect('prompt.hasStates', 'hasStates')
+      .addSelect('prompt.provider', 'provider')
+      .addSelect('prompt.model', 'model')
+      .addSelect('prompt.temperature', 'temperature');
+
+    if (options.promptCode && options.promptCode.length > 0) {
+      query.andWhere('prompt.promptCode IN (:...promptCodes)', {
+        promptCodes: options.promptCode,
+      });
+    }
+    if (options.promptCodePrefix) {
+      query.andWhere('prompt.promptCode LIKE :prefix', {
+        prefix: `${options.promptCodePrefix}%`,
+      });
+    }
+
+    const rows = await query.getRawMany<PromptsWithPromptCode>();
+
+    for (const row of rows) {
+      const rawTemp = row.temperature as unknown;
+      row.temperature =
+        rawTemp === null || rawTemp === undefined || rawTemp === ''
+          ? undefined
+          : parseFloat(rawTemp as string);
+      row.version = null;
+      row.contentHash = row.prompt ? hashPromptBody(row.prompt) : undefined;
+    }
+
+    return rows.filter((row) => row.prompt?.trim());
   }
 }

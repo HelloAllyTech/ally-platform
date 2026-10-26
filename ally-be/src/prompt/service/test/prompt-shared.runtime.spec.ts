@@ -2,9 +2,24 @@ import { PromptSharedService } from '../prompt-shared.service';
 
 describe('PromptSharedService.getPromptsForRuntime', () => {
   const build = () => {
-    const service = new PromptSharedService({} as any);
+    const mockQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    };
+    const promptsRepository = {
+      createQueryBuilder: jest.fn(() => mockQueryBuilder),
+    } as any;
+    const service = new PromptSharedService(promptsRepository);
     const read = jest.spyOn(service, 'getPromptsByOptions');
-    return { service, read };
+    const readDefaults = jest.spyOn(
+      service as any,
+      'getPromptsDefaultsForRuntime',
+    );
+    return { service, read, readDefaults, mockQueryBuilder };
   };
   const row = (promptCode: string, prompt = `live ${promptCode}`) =>
     ({ promptCode, prompt }) as any;
@@ -58,30 +73,38 @@ describe('PromptSharedService.getPromptsForRuntime', () => {
   });
 
   it('refuses when the cache does not cover the whole request', async () => {
-    const { service, read } = build();
+    const { service, read, readDefaults } = build();
     read.mockResolvedValueOnce([row('ally_ai_summary_summary')]);
     await service.getPromptsForRuntime({
       promptCode: ['ally_ai_summary_summary'],
     });
     read.mockRejectedValue(new Error('statement timeout'));
+    readDefaults.mockRejectedValue(new Error('defaults failed'));
 
     await expect(
       service.getPromptsForRuntime({
         promptCode: ['ally_ai_summary_summary', 'ally_ai_audio_diarization'],
       }),
-    ).rejects.toThrow('The prompt store could not be read');
+    ).rejects.toThrow(
+      'The prompt store could not be read, and defaults could not be served: defaults failed',
+    );
     // Some codes read is not the whole prefix.
     await expect(
       service.getPromptsForRuntime({ promptCodePrefix: 'ally_ai_' }),
-    ).rejects.toThrow('The prompt store could not be read');
+    ).rejects.toThrow(
+      'The prompt store could not be read, and defaults could not be served: defaults failed',
+    );
   });
 
-  it('refuses with nothing cached', async () => {
-    const { service, read } = build();
+  it('refuses with nothing cached and defaults fail', async () => {
+    const { service, read, readDefaults } = build();
     read.mockRejectedValue(new Error('down'));
+    readDefaults.mockRejectedValue(new Error('also down'));
 
     await expect(
       service.getPromptsForRuntime({ promptCodePrefix: 'ally_ai_learn_' }),
-    ).rejects.toThrow('The prompt store could not be read');
+    ).rejects.toThrow(
+      'The prompt store could not be read, and defaults could not be served: also down',
+    );
   });
 });
