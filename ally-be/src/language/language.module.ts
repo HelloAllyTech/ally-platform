@@ -1,8 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiChatModule } from 'src/ai-chat/ai-chat.module';
-import { Prompt } from 'src/prompt/entity/prompt.entity';
-import { PromptVersion } from 'src/prompt/entity/prompt-version.entity';
+import { PromptModule } from 'src/prompt/prompt.module';
 import { LanguageErrorAnnotation } from 'src/learn/entity/language-error-annotation.entity';
 import { Languages } from './entity/languages.entity';
 import { LanguageGlossarySection } from './entity/language-glossary-section.entity';
@@ -30,9 +29,6 @@ import { VarietyProfileService } from './service/variety-profile.service';
 import { UserModule } from 'src/user/user.module';
 @Module({
   imports: [
-    // Prompt/PromptVersion are registered directly (not via PromptModule, which
-    // imports LanguageModule — a cycle) so the glossary seed job can resolve
-    // the `glossary_generation` registry prompt row.
     TypeOrmModule.forFeature([
       Languages,
       LanguageGlossarySection,
@@ -40,10 +36,9 @@ import { UserModule } from 'src/user/user.module';
       LanguageVarietyProfile,
       VarietyProfileAttachment,
       GlossaryConsolidationBatch,
-      Prompt,
-      PromptVersion,
       LanguageErrorAnnotation,
     ]),
+    forwardRef(() => PromptModule),
     AiChatModule,
     forwardRef(() => UserModule),
   ],

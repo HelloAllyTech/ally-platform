@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiChatModule } from 'src/ai-chat/ai-chat.module';
 import { LanguageModule } from 'src/language/language.module';
@@ -20,7 +20,7 @@ import { PromptsController } from './controller/prompts.controller';
   imports: [
     TypeOrmModule.forFeature([Prompt, PromptVersion, PromptTranslation]),
     AiChatModule,
-    LanguageModule,
+    forwardRef(() => LanguageModule),
   ],
   controllers: [PromptsController],
   providers: [

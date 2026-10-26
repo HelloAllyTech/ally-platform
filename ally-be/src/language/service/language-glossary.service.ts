@@ -10,8 +10,7 @@ import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { LlmProviderFactory } from 'src/ai-chat/provider/llm-provider.factory';
 import { excludeTestTenants } from 'src/analytics/util/test-tenant.util';
 import { AppConfigService } from 'src/config/config.service';
-import { Prompt } from 'src/prompt/entity/prompt.entity';
-import { PromptVersion } from 'src/prompt/entity/prompt-version.entity';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { LanguageErrorAnnotation } from 'src/learn/entity/language-error-annotation.entity';
 import {
   GLOSSARY_CONSOLIDATION_ANNOTATION_LIMIT,
@@ -177,10 +176,6 @@ export class LanguageGlossaryService {
   constructor(
     private readonly glossaryRepository: LanguageGlossaryRepository,
     private readonly languagesRepository: LanguagesRepository,
-    @InjectRepository(Prompt)
-    private readonly promptRepository: Repository<Prompt>,
-    @InjectRepository(PromptVersion)
-    private readonly promptVersionRepository: Repository<PromptVersion>,
     @InjectRepository(LanguageErrorAnnotation)
     private readonly annotationRepository: Repository<LanguageErrorAnnotation>,
     @InjectRepository(GlossaryConsolidationBatch)
@@ -191,6 +186,7 @@ export class LanguageGlossaryService {
     private readonly profileRepository: Repository<LanguageVarietyProfile>,
     private readonly llmProviderFactory: LlmProviderFactory,
     private readonly configService: AppConfigService,
+    private readonly promptSharedService: PromptSharedService,
   ) {}
 
   async listSections(languageId: number): Promise<GlossaryListResponse> {
@@ -1900,22 +1896,18 @@ export class LanguageGlossaryService {
    * the judge tuple in one place on the analytics side.
    */
   async resolvePromptByCode(promptCode: string) {
-    const row = await this.promptRepository.findOne({
-      where: { promptCode },
+    const rows = await this.promptSharedService.getPromptsByOptions({
+      promptCode: [promptCode],
     });
+    const row = rows?.[0];
+
     if (!row) {
       throw new NotFoundException(
         `Prompt '${promptCode}' not found — run migrations`,
       );
     }
 
-    let body: string | null | undefined = row.defaultPrompt;
-    if (row.useDashboardOverride && row.currentVersion) {
-      const version = await this.promptVersionRepository.findOne({
-        where: { promptId: row.id, version: row.currentVersion },
-      });
-      body = version?.prompt ?? body;
-    }
+    const body = row.prompt;
     if (!body) {
       throw new NotFoundException(`Prompt '${promptCode}' has no body`);
     }

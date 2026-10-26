@@ -30,7 +30,6 @@ describe('LanguageGlossaryService', () => {
   let service: LanguageGlossaryService;
   let glossaryRepository: any;
   let languagesRepository: any;
-  let promptRepository: any;
   let promptVersionRepository: any;
   let annotationRepository: any;
   let annotationQb: any;
@@ -40,6 +39,7 @@ describe('LanguageGlossaryService', () => {
   let profileRepository: any;
   let llmProviderFactory: any;
   let getCompletion: jest.Mock;
+  let promptSharedService: any;
 
   beforeEach(() => {
     glossaryRepository = {
@@ -50,17 +50,6 @@ describe('LanguageGlossaryService', () => {
       save: jest.fn(async (v: any) => v),
     };
     languagesRepository = { findOne: jest.fn().mockResolvedValue(tamil) };
-    promptRepository = {
-      findOne: jest.fn().mockResolvedValue({
-        id: 'p1',
-        promptCode: 'glossary_generation',
-        useDashboardOverride: true,
-        currentVersion: 2,
-        provider: 'gemini',
-        model: 'gemini-2.5-pro',
-        temperature: null,
-      }),
-    };
     promptVersionRepository = {
       findOne: jest
         .fn()
@@ -115,6 +104,34 @@ describe('LanguageGlossaryService', () => {
     llmProviderFactory = {
       getProvider: jest.fn().mockReturnValue({ getCompletion }),
     };
+    promptSharedService = {
+      getPromptsByOptions: jest
+        .fn()
+        .mockImplementation(async ({ promptCode }) => {
+          if (promptCode[0] === 'glossary_generation') {
+            return [
+              {
+                prompt: 'Generate for {{languageName}}',
+                provider: 'gemini',
+                model: 'gemini-2.5-pro',
+                temperature: null,
+              },
+            ];
+          }
+          if (promptCode[0] === 'glossary_consolidation') {
+            return [
+              {
+                prompt:
+                  'Existing glossary:\n{{existingGlossary}}\nConsolidate annotations: {{annotations}}',
+                provider: 'gemini',
+                model: 'gemini-2.5-pro',
+                temperature: 0.2,
+              },
+            ];
+          }
+          return [];
+        }),
+    };
     const configService = {
       promptTranslation: {
         defaultProvider: 'gemini',
@@ -126,14 +143,13 @@ describe('LanguageGlossaryService', () => {
     service = new LanguageGlossaryService(
       glossaryRepository,
       languagesRepository,
-      promptRepository,
-      promptVersionRepository,
       annotationRepository,
       batchRepository,
       attachmentRepository,
       profileRepository,
       llmProviderFactory,
       configService as any,
+      promptSharedService,
     );
   });
 
@@ -224,6 +240,43 @@ describe('LanguageGlossaryService', () => {
       );
       const saved = await service.archiveSection(6, 'core_style');
       expect(saved.status).toBe(GlossarySectionStatus.ARCHIVED);
+    });
+  });
+
+  describe('resolvePromptByCode', () => {
+    it('should use PromptSharedService to resolve prompt', async () => {
+      const promptCode = 'test_prompt';
+      const promptData = {
+        prompt: 'This is a test prompt.',
+        provider: 'test-provider',
+        model: 'test-model',
+        temperature: 0.5,
+      };
+
+      promptSharedService.getPromptsByOptions.mockResolvedValue([promptData]);
+
+      const result = await service.resolvePromptByCode(promptCode);
+
+      expect(promptSharedService.getPromptsByOptions).toHaveBeenCalledWith({
+        promptCode: [promptCode],
+      });
+      expect(result).toEqual({
+        systemPrompt: promptData.prompt,
+        engine: {
+          provider: promptData.provider,
+          model: promptData.model,
+          temperature: promptData.temperature,
+          maxTokens: 8192,
+        },
+      });
+    });
+
+    it('should throw NotFoundException if prompt is not found', async () => {
+      const promptCode = 'non_existent_prompt';
+      promptSharedService.getPromptsByOptions.mockResolvedValue([]);
+      await expect(service.resolvePromptByCode(promptCode)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
