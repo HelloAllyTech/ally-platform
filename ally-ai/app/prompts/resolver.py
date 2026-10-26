@@ -53,6 +53,14 @@ def _get_local_template(prompt_code: str, internal_path: Optional[str] = None) -
     file_key, prompt_key = _prompt_code_to_path(prompt_code)
     if not file_key or not prompt_key:
         return ""
+    # A code can't tell a nested path from a filename with underscores:
+    # ally_ai_summary_dictation_summary is summary/dictation_summary.txt, not
+    # summary/dictation/summary.txt. Every ally-ai prompt is <category>/<name>.txt
+    # today, so the flat file wins when it exists; the nested reading is for a
+    # prompt that really lives deeper.
+    flat_key = prompt_key.replace(os.sep, "_")
+    if (prompt_manager.base_dir / file_key / f"{flat_key}.txt").exists():
+        return prompt_manager.get_template(file_key, flat_key) or ""
     return prompt_manager.get_template(file_key, prompt_key) or ""
 
 
