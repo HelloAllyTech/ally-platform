@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PromptsRepository } from '../repository/prompt.repository';
@@ -26,7 +26,79 @@ export class PromptSharedService {
     { value: ResolvedPrompt | null; expires: number }
   >();
 
+  private readonly logger = new Logger(PromptSharedService.name);
+
+  /**
+   * The last prompt rows read for another service, by code, and the prefixes
+   * read in full. See {@link getPromptsForRuntime}.
+   */
+  private readonly lastGoodRows = new Map<string, PromptsWithPromptCode>();
+  private readonly completePrefixes = new Set<string>();
+
   constructor(private readonly promptsRepository: PromptsRepository) {}
+
+  /**
+   * The prompts another service is about to run, for a request or a session
+   * (ally-ai's request map, ally-ai-learn's session metadata). Those services
+   * keep only minimal defaults, so they must never be sent an empty or partial
+   * set.
+   *
+   * A failed read is retried once. If that fails too (a saturated database
+   * timing one query out while the rest of ally-be works), the last rows read
+   * successfully are returned: the text production was serving moments ago.
+   * The cache stands in only when it covers the whole request — every code
+   * asked for, or a prefix read in full since this process started — and
+   * otherwise the error is thrown, so the caller refuses rather than run the
+   * defaults.
+   */
+  async getPromptsForRuntime(
+    selector: { promptCode: string[] } | { promptCodePrefix: string },
+  ): Promise<PromptsWithPromptCode[]> {
+    const read = () => this.getPromptsByOptions(selector);
+    let rows: PromptsWithPromptCode[];
+    try {
+      rows = await read();
+    } catch (first) {
+      this.logger.warn(
+        `[PROMPT_DELIVERY] Skills Store read failed, retrying once: ${first?.message}`,
+      );
+      try {
+        rows = await read();
+      } catch (error) {
+        const cached = this.cachedRowsFor(selector);
+        if (!cached) {
+          this.logger.error(
+            `[PROMPT_DELIVERY] Skills Store unreadable and nothing cached for this request: ${error?.message}`,
+          );
+          throw new Error(
+            `The prompt store could not be read: ${error?.message}`,
+          );
+        }
+        this.logger.warn(
+          `[PROMPT_DELIVERY] Skills Store unreadable; serving the last ${cached.length} prompts read successfully: ${error?.message}`,
+        );
+        return cached;
+      }
+    }
+    for (const row of rows) this.lastGoodRows.set(row.promptCode, row);
+    if ('promptCodePrefix' in selector) {
+      this.completePrefixes.add(selector.promptCodePrefix);
+    }
+    return rows;
+  }
+
+  private cachedRowsFor(
+    selector: { promptCode: string[] } | { promptCodePrefix: string },
+  ): PromptsWithPromptCode[] | null {
+    if ('promptCode' in selector) {
+      const rows = selector.promptCode.map((c) => this.lastGoodRows.get(c));
+      return rows.every(Boolean) ? (rows as PromptsWithPromptCode[]) : null;
+    }
+    if (!this.completePrefixes.has(selector.promptCodePrefix)) return null;
+    return [...this.lastGoodRows.values()].filter((row) =>
+      row.promptCode.startsWith(selector.promptCodePrefix),
+    );
+  }
 
   private get cacheTtlMs(): number {
     const raw = Number(process.env.PROMPT_CACHE_TTL_MS);

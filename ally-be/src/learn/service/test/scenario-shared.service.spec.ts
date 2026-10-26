@@ -102,6 +102,9 @@ describe('ScenarioSharedService', () => {
 
     const mockPromptSharedService = {
       getPromptsByOptions: jest.fn().mockResolvedValue([]),
+      getPromptsForRuntime: jest.fn(function (this: any, selector: unknown) {
+        return this.getPromptsByOptions(selector);
+      }),
     };
 
     const mockPromptTranslationService = {

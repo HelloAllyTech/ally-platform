@@ -54,6 +54,9 @@ describe('AiService', () => {
     };
     mockPromptSharedService = {
       getPromptsByOptions: jest.fn().mockResolvedValue([]),
+      getPromptsForRuntime: jest.fn(function (this: any, selector: unknown) {
+        return this.getPromptsByOptions(selector);
+      }),
     } as any;
     // No experiment is live unless a test says otherwise.
     mockSkillExperiments = {
@@ -863,25 +866,28 @@ describe('AiService', () => {
   });
 
   describe('getPromptOverrides', () => {
-    it('retries a failed store read once', async () => {
-      mockPromptSharedService.getPromptsByOptions
-        .mockRejectedValueOnce(new Error('blip'))
-        .mockResolvedValueOnce([
-          { promptCode: 'ally_ai_summary_summary', prompt: 'Live.' },
-        ] as any);
+    it('asks the store for exactly the codes the request needs', async () => {
+      mockPromptSharedService.getPromptsByOptions.mockResolvedValueOnce([
+        { promptCode: 'ally_ai_summary_summary', prompt: 'Live.' },
+      ] as any);
 
-      const map = await service.getPromptOverrides();
+      const map = await service.getPromptOverrides(['ally_ai_summary_summary']);
 
+      expect(mockPromptSharedService.getPromptsForRuntime).toHaveBeenCalledWith(
+        {
+          promptCode: ['ally_ai_summary_summary'],
+        },
+      );
       expect(map['ally_ai_summary_summary'].prompt).toBe('Live.');
     });
 
-    it('throws rather than answer with an empty map when the store stays unreadable', async () => {
+    it('throws rather than answer with an empty map when the store has nothing to give', async () => {
       mockPromptSharedService.getPromptsByOptions.mockRejectedValue(
-        new Error('down'),
+        new Error('The prompt store could not be read: down'),
       );
 
       await expect(service.getPromptOverrides()).rejects.toThrow(
-        'The prompt store could not be read',
+        'ally-ai was not called',
       );
     });
   });

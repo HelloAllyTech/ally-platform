@@ -1291,7 +1291,10 @@ export class ScenarioSharedService {
     languageDetails?: Languages | null,
     variantByLanguage?: Record<string, string> | null,
   ) {
-    const prompts = await this.promptSharedService.getPromptsByOptions({
+    // Retried, then served from the last good read if the store stops
+    // answering; throws (the session doesn't start) only with nothing cached,
+    // since ai-learn's own files are minimal bases.
+    const prompts = await this.promptSharedService.getPromptsForRuntime({
       promptCodePrefix: ALLY_AI_LEARN_PROMPT_PREFIX,
     });
 

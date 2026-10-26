@@ -101,7 +101,12 @@ ally-ai runs the live versions ally-be sends in the request body (`prompts`), an
 - **A new endpoint:** give its request schema a `prompts: Optional[Dict[str, Any]]` field (copy one in `app/schemas/`), and have ally-be pass `getPromptOverrides()` when it calls it.
 - **A call made outside `AiService`'s request helpers, or a queue message:** it must include your prompt. Build the map with `AiService.getPromptOverrides(codes)`, scoped to the codes it renders (the transcription queue message carries `TRANSCRIPTION_PIPELINE_PROMPT_CODES`; WhatsApp sends its three knowledge prompts).
 
-**Never send an empty prompt map.** ally-ai runs its own file for any prompt missing from the map, and those files are minimal bases. `getPromptOverrides` retries a failed store read once and then throws, so the call fails visibly instead of running minimal text; the transcription handler requeues a message it can't get prompts for.
+**Never send an empty prompt map.** ally-ai runs its own file for any prompt missing from the map, and those files are minimal bases. Read the prompts with `getPromptOverrides` (ally-ai) or `PromptSharedService.getPromptsForRuntime` (ally-ai-learn's session metadata, or any other service):
+- A failed store read is retried once.
+- If it fails again, the last rows read successfully in this process are served. That is production's text from moments before, so a slow or briefly unreachable database doesn't fail a counsellor's request or a session.
+- With nothing cached for the request, it throws, so the call fails visibly instead of running minimal text.
+
+ally-ai's transcription handler does the same for a message queued without prompts: it uses the last pipeline prompts it received when ally-be can't be reached, and requeues the message only when it has none.
 
 1. **The default.** Create `app/prompts/<folder>/<name>.txt`. Placeholders are `{name}` (Python `str.format`), so a literal brace is doubled: `{{"text": "..."}}`.
 

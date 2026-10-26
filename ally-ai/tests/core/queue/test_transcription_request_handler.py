@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.core.constants import PipelineStage
+from app.core.queue import transcription_request_handler as handler_module
 from app.core.queue.message_models import MessageType
 from app.core.queue.transcription_request_handler import (
     PIPELINE_PROMPT_CODES,
@@ -16,6 +17,12 @@ from app.core.queue.transcription_request_handler import (
 
 class TestTranscriptionHandler:
     """Class-based tests for TranscriptionHandler."""
+
+    @pytest.fixture(autouse=True)
+    def empty_prompt_cache(self):
+        handler_module._last_good_pipeline_prompts.clear()
+        yield
+        handler_module._last_good_pipeline_prompts.clear()
 
     @pytest.fixture
     def mock_ally_core_service(self):
@@ -136,6 +143,26 @@ class TestTranscriptionHandler:
         assert handled is False  # left on the queue for redrive
         handler.transcription_service.transcribe_audio_from_url.assert_not_awaited()
         handler._send_error_response.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_uses_the_last_prompts_received_when_ally_be_is_unreachable(
+        self, handler, mock_ally_core_service
+    ):
+        received = {code: {"prompt": f"live {code}"} for code in PIPELINE_PROMPT_CODES}
+        handler.transcription_service.transcribe_audio_from_url = AsyncMock(
+            return_value=(None, "transcribed text")
+        )
+        handler._process_transcription_result = AsyncMock(return_value=True)
+        await handler.process_transcription_request(self._message(prompts=received))
+        mock_ally_core_service.get_prompts_by_codes.side_effect = Exception("down")
+
+        handled = await handler.process_transcription_request(self._message())
+
+        assert handled is True
+        assert (
+            handler._process_transcription_result.await_args.kwargs["prompts"]
+            == received
+        )
 
     @pytest.mark.asyncio
     async def test_diarization_and_summary_render_with_the_prompts(self, handler):

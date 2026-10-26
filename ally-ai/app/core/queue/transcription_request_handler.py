@@ -35,6 +35,19 @@ PIPELINE_PROMPT_CODES = [
     "ally_ai_analysis_counselor_analysis",
 ]
 
+# The last text of each pipeline prompt this process received, from a queue
+# message or a fetch. A message without prompts uses it when ally-be can't be
+# reached, rather than wait a visibility timeout: it is the text production was
+# serving moments ago, and the local files are minimal bases.
+_last_good_pipeline_prompts: Dict[str, Any] = {}
+
+
+def _remember_pipeline_prompts(prompts: Optional[Dict[str, Any]]) -> None:
+    for code, entry in (prompts or {}).items():
+        text = entry.get("prompt") if isinstance(entry, dict) else entry
+        if code in PIPELINE_PROMPT_CODES and isinstance(text, str) and text.strip():
+            _last_good_pipeline_prompts[code] = entry
+
 
 class TranscriptionServiceProvider(str, Enum):
     """Enumeration of supported transcription providers."""
@@ -190,6 +203,7 @@ class TranscriptionRequestHandler:
             )
             if not prompts:
                 return False
+            _remember_pipeline_prompts(prompts)
 
             logger.info(
                 f"Processing transcription request for chat_id: {chat_id} "
@@ -620,16 +634,26 @@ class TranscriptionRequestHandler:
         self, chat_id: Any, correlation_id: Optional[str]
     ) -> Optional[Dict[str, Any]]:
         """The pipeline's prompts from ally-be, for a message queued without
-        them. None when they can't be read, so the caller requeues the message."""
+        them; when ally-be can't be reached, the last ones this process
+        received. None when neither is available, so the caller requeues the
+        message."""
         try:
             texts = await self.ally_core_service.get_prompts_by_codes(
                 PIPELINE_PROMPT_CODES
             )
         except Exception as e:  # noqa: BLE001 - any failure means requeue
+            if all(c in _last_good_pipeline_prompts for c in PIPELINE_PROMPT_CODES):
+                logger.warning(
+                    f"[PROMPT_DELIVERY] Could not fetch the pipeline prompts for "
+                    f"chat_id={chat_id} correlation_id={correlation_id}; using "
+                    f"the last ones this process received: {e}"
+                )
+                return dict(_last_good_pipeline_prompts)
             logger.error(
                 f"[PROMPT_DELIVERY] Could not fetch the pipeline prompts for "
-                f"chat_id={chat_id} correlation_id={correlation_id}; leaving the "
-                f"message for redrive rather than run the minimal defaults: {e}"
+                f"chat_id={chat_id} correlation_id={correlation_id} and none are "
+                f"cached; leaving the message for redrive rather than run the "
+                f"minimal defaults: {e}"
             )
             return None
         prompts = {

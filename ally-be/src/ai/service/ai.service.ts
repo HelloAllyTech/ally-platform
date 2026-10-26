@@ -1266,9 +1266,11 @@ export class AiService {
    * `codes` limits it to those prompts (a queue message has a size cap);
    * without it, every `ally_ai_*` prompt is included.
    *
-   * A failed store read is retried once and then THROWN, never answered with an
-   * empty map: an empty map would silently run the minimal defaults. Callers
-   * already handle a failed ally-ai call, which this becomes.
+   * A failed store read is retried, then answered from the last rows read
+   * successfully (`PromptSharedService.getPromptsForRuntime`). With nothing
+   * cached for the request it is THROWN, never answered with an empty map: an
+   * empty map would silently run the minimal defaults. Callers already handle
+   * a failed ally-ai call, which this becomes.
    */
   async getPromptOverrides(codes?: readonly string[]): Promise<
     Record<
@@ -1285,29 +1287,17 @@ export class AiService {
       }
     >
   > {
-    const read = () =>
-      this.promptSharedService.getPromptsByOptions(
+    let prompts: Awaited<
+      ReturnType<PromptSharedService['getPromptsForRuntime']>
+    >;
+    try {
+      prompts = await this.promptSharedService.getPromptsForRuntime(
         codes?.length
           ? { promptCode: [...codes] }
           : { promptCodePrefix: ALLY_AI_PROMPT_PREFIX },
       );
-    let prompts: Awaited<ReturnType<typeof read>>;
-    try {
-      prompts = await read();
-    } catch (first) {
-      this.logger.warn(
-        `[PROMPT_DELIVERY] Skills Store read failed, retrying once: ${first?.message}`,
-      );
-      try {
-        prompts = await read();
-      } catch (error) {
-        this.logger.error(
-          `[PROMPT_DELIVERY] Skills Store unreadable; refusing to call ally-ai with its minimal defaults: ${error?.message}`,
-        );
-        throw new Error(
-          `The prompt store could not be read, so ally-ai was not called: ${error?.message}`,
-        );
-      }
+    } catch (error) {
+      throw new Error(`${error?.message}; ally-ai was not called`);
     }
     {
       const overrides: Record<
