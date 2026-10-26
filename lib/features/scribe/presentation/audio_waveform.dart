@@ -82,6 +82,39 @@ List<double> pcmBytesToAmplitudes(
   return amplitudes;
 }
 
+/// Direct port of RN's `exotelAudioDataToAmplitudes` — the waveform math
+/// for a cloud-telephony (Exotel/Ozonetel) conference call's `AUDIO_STREAM`
+/// socket payload, used by `ConferenceListeningScreen` instead of
+/// [pcmBytesToAmplitudes]. Confirmed a genuinely different function, not a
+/// parameter variant: raw unsigned 8-bit byte averages normalized by /255,
+/// no WAV-header handling, no signed-16-bit PCM decode, no global-max
+/// rescale, and no platform gain — the server sends a simpler, raw byte
+/// stream shape than the local PCM16 microphone capture does.
+List<double> exotelBytesToAmplitudes(Uint8List bytes, {required int numBars}) {
+  if (bytes.isEmpty || numBars <= 0) {
+    return List.filled(numBars.clamp(0, numBars), 0.0);
+  }
+
+  final samplesPerBar = (bytes.length / numBars).floor().clamp(1, bytes.length);
+  final amplitudes = <double>[];
+
+  for (var i = 0; i < numBars; i++) {
+    var sum = 0;
+    var count = 0;
+    for (var j = 0; j < samplesPerBar; j++) {
+      final idx = i * samplesPerBar + j;
+      if (idx < bytes.length) {
+        sum += bytes[idx];
+        count++;
+      }
+    }
+    final avg = count > 0 ? sum / count : 0;
+    amplitudes.add(avg / 255);
+  }
+
+  return amplitudes;
+}
+
 /// Flat, silent bar row — shown while paused, mirroring RN's
 /// `SILENT_AMPLITUDES`.
 List<double> silentAmplitudes(int numBars) => List.filled(numBars, 0.02);

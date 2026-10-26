@@ -83,4 +83,37 @@ void main() {
       expect(silentAmplitudes(4), [0.02, 0.02, 0.02, 0.02]);
     });
   });
+
+  group('exotelBytesToAmplitudes', () {
+    test('averages raw unsigned bytes and normalizes by /255, no rescale/gain/floor', () {
+      final bytes = Uint8List.fromList(List.filled(100, 128));
+
+      final amplitudes = exotelBytesToAmplitudes(bytes, numBars: 10);
+
+      expect(amplitudes, hasLength(10));
+      expect(amplitudes, everyElement(closeTo(128 / 255, 1e-9)));
+    });
+
+    test('silence (all-zero bytes) is exactly 0.0, not floored like the PCM16 function', () {
+      final silence = Uint8List(100);
+
+      final amplitudes = exotelBytesToAmplitudes(silence, numBars: 10);
+
+      expect(amplitudes, everyElement(0.0));
+    });
+
+    test('max bytes (255) normalize to exactly 1.0', () {
+      final loud = Uint8List.fromList(List.filled(100, 255));
+
+      final amplitudes = exotelBytesToAmplitudes(loud, numBars: 10);
+
+      expect(amplitudes, everyElement(1.0));
+    });
+
+    test('empty input returns a zeroed row instead of crashing', () {
+      final amplitudes = exotelBytesToAmplitudes(Uint8List(0), numBars: 5);
+
+      expect(amplitudes, everyElement(0.0));
+    });
+  });
 }

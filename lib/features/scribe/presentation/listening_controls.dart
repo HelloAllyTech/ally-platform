@@ -25,6 +25,8 @@ class ListeningControls extends ConsumerWidget {
     this.showMuteTooltip = false,
     this.onDismissMuteTooltip,
     this.isEnding = false,
+    this.showPauseResumeButton = true,
+    this.showEndSessionButton = true,
   });
 
   final bool isCallPaused;
@@ -36,6 +38,15 @@ class ListeningControls extends ConsumerWidget {
   final bool showMuteTooltip;
   final VoidCallback? onDismissMuteTooltip;
   final bool isEnding;
+
+  /// Both default `true` (Scribe's real usage) — `ConferenceListeningScreen`
+  /// sets both `false`: RN's own `showPauseResumeButton={false}`/
+  /// `showEndSessionButton={false}` configuration, confirmed from source.
+  /// A conference call can't be paused or ended from this screen in RN
+  /// either — it ends only when the carrier call itself ends and the
+  /// backend pushes `CHAT_ENDED`.
+  final bool showPauseResumeButton;
+  final bool showEndSessionButton;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,14 +89,17 @@ class ListeningControls extends ConsumerWidget {
               ),
             ),
           ),
-        AppButton(
-          key: const ValueKey('pause-resume-button'),
-          label: ref.t(
-            isCallPaused ? 'listeningScreen.resumeTranscription' : 'listeningScreen.pauseTranscription',
+        if (showPauseResumeButton)
+          AppButton(
+            key: const ValueKey('pause-resume-button'),
+            label: ref.t(
+              isCallPaused
+                  ? 'listeningScreen.resumeTranscription'
+                  : 'listeningScreen.pauseTranscription',
+            ),
+            variant: isCallPaused ? AppButtonVariant.primary : AppButtonVariant.secondary,
+            onPressed: onPauseResumePress,
           ),
-          variant: isCallPaused ? AppButtonVariant.primary : AppButtonVariant.secondary,
-          onPressed: onPauseResumePress,
-        ),
         if (showFocusModeButton) ...[
           const SizedBox(height: 8),
           AppButton(
@@ -95,14 +109,16 @@ class ListeningControls extends ConsumerWidget {
             onPressed: onFocusModeButtonPress,
           ),
         ],
-        const SizedBox(height: 8),
-        AppButton(
-          key: const ValueKey('end-session-button'),
-          label: ref.t('listeningScreen.endSession'),
-          variant: AppButtonVariant.destructive,
-          isLoading: isEnding,
-          onPressed: onCallEndPress,
-        ),
+        if (showEndSessionButton) ...[
+          const SizedBox(height: 8),
+          AppButton(
+            key: const ValueKey('end-session-button'),
+            label: ref.t('listeningScreen.endSession'),
+            variant: AppButtonVariant.destructive,
+            isLoading: isEnding,
+            onPressed: onCallEndPress,
+          ),
+        ],
         const SizedBox(height: 12),
         Row(
           mainAxisSize: MainAxisSize.min,
