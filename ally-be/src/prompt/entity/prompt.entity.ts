@@ -18,8 +18,8 @@ export interface AvailableVariable {
 export type AvailableVariableEntry = string | AvailableVariable;
 
 /**
- * The code's contract with a prompt, declared in its `.meta.json` sidecar and
- * written by sync. The store refuses a version that breaks it, so a code change
+ * The code's contract with a prompt, declared in code (`definePrompt` in ally-be,
+ * a Pydantic model in ally-ai and ally-ai-learn) and written by sync as JSON. The store refuses a version that breaks it, so a code change
  * and the live text can't drift apart silently.
  */
 export interface PromptContract {
@@ -73,8 +73,7 @@ export class Prompt extends BaseWithoutTenantEntity {
    * NULL means undeclared, and undeclared keeps the conservative intersection.
    * That is deliberate: every prompt that existed before this column is NULL,
    * so nothing changes for any of them until someone says otherwise. Declared
-   * in the prompt's `.meta.json` sidecar, beside the name that already lives
-   * there.
+   * in the prompt's contract (`runtimes`), beside its name.
    */
   @Column({ type: 'jsonb', nullable: true })
   runtimes?: string[];
@@ -93,7 +92,7 @@ export class Prompt extends BaseWithoutTenantEntity {
   @Column({ type: 'boolean', default: true })
   useDashboardOverride!: boolean;
 
-  /** See {@link PromptContract}. Null until sync writes the sidecar's contract. */
+  /** See {@link PromptContract}. Null until sync writes the code's contract. */
   @Column({ type: 'jsonb', nullable: true })
   contract?: PromptContract | null;
 

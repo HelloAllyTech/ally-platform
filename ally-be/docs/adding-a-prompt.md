@@ -37,6 +37,8 @@ The one recipe for adding a prompt to ally-be, ally-ai or ally-ai-learn. Each se
    {{text}}
    ```
 
+   An optional variable renders as empty when the code doesn't supply it, so either write the text to read well without it or have the call site pass a default (as step 3 does with `tone ?? 'neutral'`).
+
 2. **The contract.** Add an export to `src/prompt/contracts/prompt-contracts.ts`. Exporting it is the whole registration; `PROMPT_CONTRACTS` collects every export.
 
    ```ts
@@ -67,22 +69,27 @@ The one recipe for adding a prompt to ally-be, ally-ai or ally-ai-learn. Each se
      taskId: 'feedback-tone-rewrite',
      task: LlmTask.FEEDBACK_TONE_REWRITE,
      promptCode: FEEDBACK_TONE_REWRITE.code,
-     system: renderPrompt(FEEDBACK_TONE_REWRITE, template, { text, tone }),
+     system: renderPrompt(FEEDBACK_TONE_REWRITE, template, { text, tone: tone ?? 'neutral' }),
      prompt: 'Rewrite it now.',
      maxTokens: 800,
      jsonMode: true,
    });
    ```
 
-   Inject `PromptSharedService` (import `PromptModule`) and `LlmCompletionService` (import `LlmAgentModule`) in your module. Use `resolvePrompt(code)` instead of `getPromptByCode` when you need the text *and* its model settings from one lookup.
+   Inject `PromptSharedService` (`src/prompt/service/prompt-shared.service`) and `LlmCompletionService` (`src/llm-agent/service/llm-completion.service`), and add `PromptModule` (`src/prompt/prompt.module`) and `LlmAgentModule` (`src/llm-agent/llm-agent.module`) to your module's `imports`. Use `resolvePrompt(code)` instead of `getPromptByCode` when you need the text *and* its model settings from one lookup.
 
-4. **The registry row**, if it calls a model: add a value to `LlmTask` (`src/learn/enum/llm-task.enum.ts`) and a row to `src/llm/constants/ai-task-registry.constants.ts` with `promptOverride: 'feedback_tone_rewrite'`. Copy a neighbouring row with a `tier` (`LlmModelTier.FAST` for cheap calls).
+4. **The registry row**, if it calls a model: add a value to `LlmTask` (`src/learn/enum/llm-task.enum.ts`; nothing else needs it) and a row to `src/llm/constants/ai-task-registry.constants.ts`. Copy a neighbouring row with a `tier` (`LlmModelTier.FAST` for cheap calls), and set:
+   - `id`: the `taskId` your call site passes (`'feedback-tone-rewrite'`);
+   - `promptOverride`: your prompt's code, exactly (`'feedback_tone_rewrite'`);
+   - `provider` and `defaultModel`: the **fallback**, i.e. what runs while nobody has picked a model for the prompt in the Skills Store (the tier's vendor and model, e.g. `'openai'` / `'gpt-4o-mini'`), not `'resolved'`. `promptOverride` names where to look for the rest.
 
 5. **Run the checks.**
 
    ```bash
-   npx jest src/prompt/contracts src/llm   # contract coverage + your default satisfies it; registry guards
-   node ../scripts/prompts/check-prompts.mjs   # repo rules (from ally-be/)
+   npx jest src/prompt/contracts src/llm         # contract coverage + your default satisfies it; registry guards
+   npx tsc --noEmit -p tsconfig.json             # renderPrompt's inputs are type-checked here
+   npx eslint --fix <the files you changed>      # prettier formatting is enforced by lint
+   node ../scripts/prompts/check-prompts.mjs     # repo rules (from ally-be/)
    ```
 
    On the next start, sync creates the prompt in your local store with its name, description and contract.
@@ -113,26 +120,30 @@ ally-ai runs the live versions ally-be sends in the request body (`prompts`), an
        tone: Optional[str] = None  # optional
    ```
 
-3. **The call site.** Render it with the request's prompts, and read the model the Skills Store chose for it:
+3. **The call site.** Always pass the request's `prompts`: without them the call silently runs the local default, and `tests/core/test_prompts_render_from_store.py` fails. In `OpenAITextGenerationService`, follow `generate_nudge`: render with the store's text, use the client for the model the Skills Store chose, and label the usage.
 
    ```python
-   from app.prompts.resolver import get_backend_llm_overrides, load_and_format
-
-   system = load_and_format("feedback/tone_rewrite", prompts=request.prompts, text=text, tone=tone)
-   provider, model, temperature = get_backend_llm_overrides("feedback/tone_rewrite", request.prompts)
+   template = load_template("feedback/tone_rewrite", prompts=prompts)
+   answer = await self._invoke_llm(
+       template.format(text=text, tone=tone or "neutral"),
+       ToneRewrite,  # the Pydantic answer model: structured output
+       task=LLMTask.FEEDBACK_TONE_REWRITE.value,
+       llm_override=self._client_for("feedback/tone_rewrite", prompts),
+   )
    ```
 
-   Then add the registry row in ally-be (see the rule above).
+   Outside that service, `load_and_format(path, prompts=prompts, **variables)` renders and `get_backend_llm_overrides(path, prompts)` returns the `(provider, model, temperature)` the Skills Store chose. Add the usage label to `LLMTask` in `app/core/llm_usage/tasks.py` **and** to ally-be's `LlmTask` (the same string; it is a cross-repo contract), then add the registry row in ally-be (see the rule above).
 
 4. **Run the checks.**
 
    ```bash
-   poetry run pytest tests/core/test_prompt_contracts.py tests/core/test_sync_prompts_contract.py
+   poetry run pytest tests/core/test_prompt_contracts.py tests/core/test_sync_prompts_contract.py tests/core/test_prompts_render_from_store.py
+   make lint
    ```
 
 ## ally-ai-learn
 
-ally-ai-learn reads every `ally_ai_learn_*` prompt's live version from the session's room metadata (`prompt_data`). A new prompt needs no change in ally-be.
+ally-ai-learn reads every `ally_ai_learn_*` prompt's live version from the session's room metadata: the `promptData` object, which carries a `prompts` map. A new prompt needs no change in ally-be, but every render must be handed that object, or it silently runs the local default.
 
 1. **The default.** Create `app/prompts/<folder>/<name>.txt`. Placeholders are `{name}`; double a literal brace, as in ally-ai.
 
@@ -147,7 +158,7 @@ ally-ai-learn reads every `ally_ai_learn_*` prompt's live version from the sessi
            name="Tone check (system)",
            description="Classifies the tone of a learner's message.",
        )
-       output_format: ClassVar[Optional[str]] = "structured"
+       output_format: ClassVar[Optional[str]] = "structured"  # only if the code parses the answer
 
        message: str = Field(title="Learner message")
    ```
@@ -157,15 +168,31 @@ ally-ai-learn reads every `ally_ai_learn_*` prompt's live version from the sessi
    ```python
    from app.prompts.resolver import load_and_format
 
-   system = load_and_format("events/tone_check_system", prompt_data=scenario.prompt_data, message=text)
+   system = load_and_format("events/tone_check_system", prompt_data=prompt_data, message=text)
    ```
 
-   Then add the registry row in ally-be (see the rule above). Latency matters on the voice path: keep model calls off the turn's critical path where you can.
+   Where `prompt_data` comes from:
+   - **In a graph node or anything holding the scenario:** `scenario.prompt_data`.
+   - **In an event detector:** give the event a `prompt_data: Optional[object] = None` field and have `app/core/events/factory.py` pass `prompt_data=(metadata or {}).get("promptData")` when it creates the event. `BinaryClassifierEvent` and `HelperParaphrasedEvent` show the pattern.
+
+   `tests/unit/test_prompts_render_from_store.py` fails on any render call that doesn't pass it.
+
+   **If it calls a model**, record the usage right after the call, with a label from `LLMTask` in `app/core/llm_usage/tasks.py`:
+
+   ```python
+   from app.core.llm_usage.emitter import emit_openai_usage
+   from app.core.llm_usage.tasks import LLMTask
+
+   emit_openai_usage(completion, task=LLMTask.TONE_CHECK.value, model=model, provider="openai")
+   ```
+
+   Add the same string to ally-be's `LlmTask` (a cross-repo contract), then add the registry row in ally-be (see the rule above). Latency matters on the voice path: keep model calls off the turn's critical path where you can.
 
 4. **Run the checks.**
 
    ```bash
-   poetry run pytest tests/unit/test_prompt_contracts.py tests/unit/test_sync_prompts_contract.py
+   poetry run pytest tests/unit/test_prompt_contracts.py tests/unit/test_sync_prompts_contract.py tests/unit/test_prompts_render_from_store.py
+   make lint
    ```
 
 ## What CI checks
@@ -173,6 +200,7 @@ ally-ai-learn reads every `ally_ai_learn_*` prompt's live version from the sessi
 | Check | Fails when |
 |---|---|
 | Contract tests (each service) | a default has no contract, a contract has no default, a default drops a required variable, or a closed contract's default uses an unknown one |
+| Render-from-store guards (ally-ai, ally-ai-learn) | a render call doesn't pass the request's `prompts` / the session's `prompt_data`, so it would ignore the Skills Store |
 | `scripts/prompts/check-prompts.mjs` | `.prompts/` is committed, a migration writes prompt text into `prompts_versions`, or an existing default changes without its contract file (or the `prompt-default-refresh` label) |
 | `scripts/prompts/check-structured-defaults.mjs` | an `output: 'json'` default no longer makes a model answer in parseable JSON (runs when the `PROMPT_CHECK_OPENAI_KEY` secret is set; locally it skips without `OPENAI_API_KEY`) |
 | AI task registry guards (ally-be jest) | a model call has no registry row |

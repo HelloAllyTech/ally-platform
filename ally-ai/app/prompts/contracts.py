@@ -19,7 +19,7 @@ Store shows for a variable. Declaring the class is the whole registration:
 Contracts start OPEN (`extra="allow"`): undeclared variables are accepted.
 Close one with `model_config = ConfigDict(extra="forbid")` once its field
 list is known to be complete. Bump `contract_version` on a breaking change.
-Recipe: the "Adding a new prompt" section of this service's prompt docs.
+Recipe: ally-be/docs/adding-a-prompt.md (one section per service).
 """
 
 from dataclasses import dataclass

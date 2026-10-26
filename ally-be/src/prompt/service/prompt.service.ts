@@ -646,7 +646,7 @@ export class PromptsService {
         usesBlocks: item.usesBlocks,
         runtimes: item.runtimes,
         contract: item.contract ?? null,
-        // A sidecar's default model applies to the new row only: once the row
+        // A contract's default model applies to the new row only: once the row
         // exists, model settings belong to its versions.
         ...(item.defaultModel
           ? { provider: item.defaultProvider, model: item.defaultModel }

@@ -519,7 +519,7 @@ describe('PromptsService', () => {
   });
 });
 
-describe('PromptsService.syncPrompts — sidecar default model', () => {
+describe('PromptsService.syncPrompts — contract default model', () => {
   const build = async () => {
     const promptsRepository = {
       findOne: jest.fn(),

@@ -22,7 +22,7 @@ import { renderTemplate } from '../../learn/util/autofill-shared.util';
  *
  * The same idea as a template engine's declared inputs (LangChain's
  * `input_variables`, DSPy signatures, BAML function parameters), in this
- * repo's idiom. Recipe: docs/prompts-folder.md, "Adding a new prompt".
+ * repo's idiom. Recipe: docs/adding-a-prompt.md.
  */
 export type VariableRule = 'required' | 'optional';
 

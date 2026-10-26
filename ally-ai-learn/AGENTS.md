@@ -42,7 +42,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Voice, accent or language quality | [`docs/05-tts-providers.md`](docs/05-tts-providers.md) |
 | Mishearing, gibberish, transcript drift | [`docs/06-stt-providers.md`](docs/06-stt-providers.md) |
 | Model choice, cost or response latency | [`docs/07-llm-providers.md`](docs/07-llm-providers.md) |
-| **Adding, removing or re-pointing an AI/LLM call** | Add its row to ally-be's AI task registry (`ally-be/src/llm/constants/ai-task-registry.constants.ts`) in the same change — it is the platform-wide map of what calls a model and which model serves it, and it feeds the admin **AI Tasks** tab. Recipe: [`ally-be/docs/ai-task-registry.md`](https://github.com/HelloAllyTech/ally-be/blob/master/docs/ai-task-registry.md) |
+| **Adding, removing or re-pointing an AI/LLM call** | Add its row to ally-be's AI task registry (`ally-be/src/llm/constants/ai-task-registry.constants.ts`) in the same change — it is the platform-wide map of what calls a model and which model serves it, and it feeds the admin **AI Tasks** tab. Recipe: [`ally-be/docs/ai-task-registry.md`](../ally-be/docs/ai-task-registry.md) |
 | Scenario behaviour or persona | [`docs/09-scenario-engine.md`](docs/09-scenario-engine.md) |
 | Branching instructions / guardrails | [`docs/10-branching-instructions.md`](docs/10-branching-instructions.md) |
 | Session ending unexpectedly | [`docs/13-event-termination.md`](docs/13-event-termination.md) |

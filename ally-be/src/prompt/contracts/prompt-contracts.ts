@@ -11,8 +11,7 @@ import { definePrompt } from './define-prompt';
  * depends on it; anything else is `'optional'`. Contracts are open (undeclared
  * variables allowed) until `open: false`. `name`, `description`, `category`,
  * `runtimes` and `defaultModel` are how the prompt shows up in the Skills
- * Store; see `PromptDetails`. Recipe: docs/prompts-folder.md, "Adding a new
- * prompt".
+ * Store; see `PromptDetails`. Recipe: docs/adding-a-prompt.md.
  */
 
 /** src/prompts/agent_builder/allowed_filler_words.txt */
