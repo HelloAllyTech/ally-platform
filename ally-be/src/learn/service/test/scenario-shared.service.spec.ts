@@ -2249,11 +2249,23 @@ describe('ScenarioSharedService', () => {
           promptCode: 'ally_ai_learn_retrieval_memory_selector_system',
           prompt: 'Selector text',
         },
+        // The scenario-report judge shares the folder but reads its prompt
+        // from the session's metadata, so it (and its variants) must ship.
+        {
+          promptCode: 'ally_ai_learn_evaluation_evaluator_system',
+          prompt: 'Report judge text',
+        },
+        {
+          promptCode: 'ally_ai_learn_evaluation_evaluator_system_copy_ab12',
+          prompt: 'Report judge variant',
+        },
       ]);
 
       const result = await (service as any).getPromptsForScenarioSession();
 
-      expect(Object.keys(result)).toEqual([
+      expect(Object.keys(result).sort()).toEqual([
+        'ally_ai_learn_evaluation_evaluator_system',
+        'ally_ai_learn_evaluation_evaluator_system_copy_ab12',
         'ally_ai_learn_retrieval_memory_selector_system',
       ]);
     });

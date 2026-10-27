@@ -382,10 +382,15 @@ export const ALLY_AI_PROMPT_PREFIX = 'ally_ai_';
 export const ALLY_AI_LEARN_PROMPT_PREFIX = 'ally_ai_learn_';
 
 /**
- * ally-ai-learn prompts used only by its offline endpoints (the actor judge),
- * which receive them in their own request: left out of room metadata.
+ * ally-ai-learn prompts used only by an offline endpoint that receives them in
+ * its own request (the actor-goal judge): left out of room metadata. Exact
+ * codes, never a prefix: the scenario-report judge
+ * (`ally_ai_learn_evaluation_evaluator_system` and its `_copy_` variants)
+ * shares the folder but still reads its prompt from the session's metadata.
  */
-export const OFFLINE_ONLY_LEARN_PROMPT_PREFIX = 'ally_ai_learn_evaluation_';
+export const OFFLINE_ONLY_LEARN_PROMPT_CODES: ReadonlySet<string> = new Set([
+  'ally_ai_learn_evaluation_actor_goal_system',
+]);
 
 export const SKILL_ICONS_S3_PREFIX = 'skill-icons/';
 
