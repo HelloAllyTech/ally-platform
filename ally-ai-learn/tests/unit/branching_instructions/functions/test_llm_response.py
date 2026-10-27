@@ -13,6 +13,10 @@ from app.core.branching_instructions.functions.llm_response import (
 )
 from app.llms.base import BaseLLMClient
 
+CREATE_LLM_CLIENT_PATH = (
+    "app.core.branching_instructions.functions.llm_response.create_llm_client"
+)
+
 
 @pytest.mark.asyncio
 class TestGenerateLLMResponse:
@@ -32,12 +36,13 @@ class TestGenerateLLMResponse:
         mock_llm_client = MagicMock(spec=BaseLLMClient)
         mock_llm_client.llm_instance = mock_llm_instance
 
-        with patch(
-            "app.core.branching_instructions.functions.llm_response.create_llm_client",
-            return_value=mock_llm_client,
-        ) as mock_create_client, patch(
-            "app.core.llm_usage.emitter.emit_langchain_usage"
-        ) as mock_emit_usage:
+        with (
+            patch(
+                CREATE_LLM_CLIENT_PATH,
+                return_value=mock_llm_client,
+            ) as mock_create_client,
+            patch("app.core.llm_usage.emitter.emit_langchain_usage") as mock_emit_usage,
+        ):
             result = await generate_llm_response("Test content")
 
         assert result == "Test response"
@@ -58,11 +63,10 @@ class TestGenerateLLMResponse:
         mock_llm_client = MagicMock(spec=BaseLLMClient)
         mock_llm_client.llm_instance = mock_llm_instance
 
-        with patch(
-            "app.core.branching_instructions.functions.llm_response.create_llm_client"
-        ) as mock_create_client, patch(
-            "app.core.llm_usage.emitter.emit_langchain_usage"
-        ) as mock_emit_usage:
+        with (
+            patch(CREATE_LLM_CLIENT_PATH) as mock_create_client,
+            patch("app.core.llm_usage.emitter.emit_langchain_usage") as mock_emit_usage,
+        ):
             result = await generate_llm_response(
                 "Test content", llm_client=mock_llm_client
             )
@@ -86,12 +90,13 @@ class TestGenerateLLMResponse:
         mock_llm_client = MagicMock(spec=BaseLLMClient)
         mock_llm_client.llm_instance = mock_llm_instance
 
-        with patch(
-            "app.core.branching_instructions.functions.llm_response.create_llm_client",
-            return_value=mock_llm_client,
-        ), patch(
-            "app.core.llm_usage.emitter.emit_langchain_usage"
-        ) as mock_emit_usage:
+        with (
+            patch(
+                CREATE_LLM_CLIENT_PATH,
+                return_value=mock_llm_client,
+            ),
+            patch("app.core.llm_usage.emitter.emit_langchain_usage") as mock_emit_usage,
+        ):
             await generate_llm_response("Test content")
 
         mock_emit_usage.assert_called_once()
@@ -112,10 +117,13 @@ class TestGenerateLLMResponse:
         mock_llm_client = MagicMock(spec=BaseLLMClient)
         mock_llm_client.llm_instance = mock_llm_instance
 
-        with patch(
-            "app.core.branching_instructions.functions.llm_response.create_llm_client",
-            return_value=mock_llm_client,
-        ), pytest.raises(ValueError) as excinfo:
+        with (
+            patch(
+                CREATE_LLM_CLIENT_PATH,
+                return_value=mock_llm_client,
+            ),
+            pytest.raises(ValueError) as excinfo,
+        ):
             await generate_llm_response("Test content")
 
         assert "unparseable llm_response output" in str(excinfo.value)
@@ -130,7 +138,7 @@ class TestGenerateLLMResponse:
         mock_llm_client.llm_instance = mock_llm_instance
 
         with patch(
-            "app.core.branching_instructions.functions.llm_response.create_llm_client",
+            CREATE_LLM_CLIENT_PATH,
             return_value=mock_llm_client,
         ) as mock_create_client:
             result = await generate_llm_response("Test content")
