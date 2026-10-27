@@ -31,7 +31,7 @@ describe('AgentLlmProviderFactory', () => {
       const loggerWarnSpy = jest
         .spyOn(Logger.prototype, 'warn')
         .mockImplementation();
-      const { factory } = build({ anthropicKey: 'sk-anthropic-123' });
+      const { factory } = build({ anthropicKey: 'FAKE-ANTHROPIC-KEY' });
 
       factory.create(AgentLlmProviderName.ANTHROPIC, 'claude-3-haiku-20240307');
 
