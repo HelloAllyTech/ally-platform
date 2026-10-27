@@ -331,6 +331,22 @@ export class PromptSharedService {
       }
     >();
 
+    if (options.promptCode) {
+      const found = new Set(rows.map((r) => r.promptCode));
+      for (const code of options.promptCode) {
+        if (found.has(code)) continue;
+        const fromFile = await this.readFromFolder(code);
+        if (fromFile) {
+          rows.push({
+            promptCode: code,
+            prompt: fromFile,
+            version: null,
+            contentHash: hashPromptBody(fromFile),
+          });
+        }
+      }
+    }
+
     for (const row of rows) {
       // Raw query returns the numeric `temperature` column as a string; coerce
       // to a number so the runtime payload carries a real number (or undefined).
