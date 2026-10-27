@@ -13,8 +13,8 @@ import 'start_item_payload.dart';
 /// provider after a mutation instead, which is the Riverpod-idiomatic
 /// equivalent for the mutations this phase actually needs.
 ///
-/// Scope: ARTICLE, VIDEO, QUIZ (all 8 question types), JOURNAL, and GAME
-/// items end-to-end.
+/// Scope: ARTICLE, VIDEO, QUIZ (all 8 question types), JOURNAL, GAME,
+/// BRANCHING_SCENARIO, and BUCKET_SORT items end-to-end.
 class CoursesRepository {
   CoursesRepository(this._dio);
 
@@ -173,6 +173,39 @@ class CoursesRepository {
       data: {'score': score},
     );
     return (response.data?['bestScore'] as num?)?.toInt() ?? score;
+  }
+
+  /// Submits the finished path of a branching-scenario run; the server owns
+  /// scoring and is the only truth (the whole graph ships client-side and
+  /// is walked locally, but nothing is scored until this call).
+  Future<BranchingResult> recordBranchingResult({
+    required String itemId,
+    required List<String> path,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/branching-result',
+      data: {'path': path},
+    );
+    return BranchingResult.fromJson(response.data!);
+  }
+
+  /// One placement in a bucket sort. The server holds the key; the response
+  /// is that item's verdict, the right bucket and the author's explanation.
+  Future<BucketSortPlacementResult> placeBucketSortItem({
+    required String itemId,
+    required String sortItemId,
+    required String bucketId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/bucket-sort/place',
+      data: {'sortItemId': sortItemId, 'bucketId': bucketId},
+    );
+    return BucketSortPlacementResult.fromJson(response.data!);
+  }
+
+  /// Another round of a finished bucket sort.
+  Future<void> restartBucketSort(String itemId) async {
+    await _dio.post<void>('/learn/tracks/items/$itemId/bucket-sort/restart');
   }
 }
 

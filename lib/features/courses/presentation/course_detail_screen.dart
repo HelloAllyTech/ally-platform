@@ -28,13 +28,18 @@ IconData _iconForType(TrackItemType type) {
       return Icons.edit_note_outlined;
     case TrackItemType.game:
       return Icons.videogame_asset_outlined;
+    case TrackItemType.branchingScenario:
+      return Icons.call_split_outlined;
+    case TrackItemType.bucketSort:
+      return Icons.move_to_inbox_outlined;
     case TrackItemType.unknown:
       return Icons.help_outline;
   }
 }
 
 /// Track detail — sections + items, with entry into each item. ARTICLE,
-/// VIDEO, QUIZ, JOURNAL, and GAME items open the real ported player;
+/// VIDEO, QUIZ, JOURNAL, GAME, BRANCHING_SCENARIO, and BUCKET_SORT items
+/// open the real ported player;
 /// ROLEPLAY/CASE route through the existing Simulations/Cases screens
 /// instead (not wired from here yet), shown as not-yet-available rather
 /// than a broken tap.

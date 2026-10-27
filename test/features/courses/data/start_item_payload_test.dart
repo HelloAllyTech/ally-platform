@@ -277,5 +277,341 @@ void main() {
       expect(payload.videoSource, isNull);
       expect(payload.gameKey, 'ignore-source');
     });
+
+    test('parses a BRANCHING_SCENARIO payload', () {
+      final payload = StartItemPayload.fromJson({
+        'trackItemProgressId': 'prog-7',
+        'type': 'BRANCHING_SCENARIO',
+        'intro': 'A tough conversation awaits.',
+        'startNodeId': 'n1',
+        'nodes': [
+          {
+            'id': 'n1',
+            'text': 'They look upset.',
+            'choices': [
+              {'id': 'c1', 'text': 'Ask what happened', 'nextNodeId': 'n2'},
+            ],
+          },
+          {
+            'id': 'n2',
+            'text': 'They open up.',
+            'outcome': 'POSITIVE',
+            'score': 90,
+            'takeaway': 'Listening helps.',
+          },
+        ],
+        'passScore': 70,
+        'maxAttempts': 3,
+        'attemptsUsed': 1,
+        'bestScore': 80,
+        'completed': true,
+        'endingsReached': ['n2'],
+        'exhausted': false,
+        'nextRoundAt': null,
+        'recap': [],
+      });
+
+      expect(payload.type, 'BRANCHING_SCENARIO');
+      expect(payload.branchingIntro, 'A tough conversation awaits.');
+      expect(payload.branchingStartNodeId, 'n1');
+      expect(payload.branchingNodes, hasLength(2));
+      expect(payload.branchingNodes![0].isEnding, isFalse);
+      expect(payload.branchingNodes![1].isEnding, isTrue);
+      expect(payload.branchingNodes![1].outcome, BranchingOutcome.positive);
+      expect(payload.branchingPassScore, 70);
+      expect(payload.branchingMaxAttempts, 3);
+      expect(payload.branchingAttemptsUsed, 1);
+      expect(payload.branchingBestScore, 80);
+      expect(payload.branchingCompleted, isTrue);
+      expect(payload.branchingEndingsReached, ['n2']);
+      expect(payload.branchingExhausted, isFalse);
+      expect(payload.branchingNextRoundAt, isNull);
+      expect(payload.branchingRecap, isEmpty);
+      // Not gated to this type.
+      expect(payload.gameKey, isNull);
+      expect(payload.bucketSortBuckets, isNull);
+    });
+
+    test('BRANCHING_SCENARIO payload defaults attemptsUsed/completed/exhausted/endingsReached/recap when absent', () {
+      final payload = StartItemPayload.fromJson({
+        'trackItemProgressId': 'prog-7b',
+        'type': 'BRANCHING_SCENARIO',
+        'intro': null,
+        'startNodeId': 'n1',
+        'nodes': [
+          {'id': 'n1', 'text': 'Scene one.'},
+        ],
+        'passScore': null,
+        'maxAttempts': null,
+      });
+
+      expect(payload.branchingAttemptsUsed, 0);
+      expect(payload.branchingCompleted, isFalse);
+      expect(payload.branchingExhausted, isFalse);
+      expect(payload.branchingEndingsReached, isEmpty);
+      expect(payload.branchingRecap, isEmpty);
+    });
+
+    test('parses a BUCKET_SORT payload, stripping no answer key', () {
+      final payload = StartItemPayload.fromJson({
+        'trackItemProgressId': 'prog-8',
+        'type': 'BUCKET_SORT',
+        'bucketSort': {
+          'intro': 'Sort these into the right buckets.',
+          'buckets': [
+            {'id': 'b1', 'label': 'Healthy', 'description': 'Good coping'},
+            {'id': 'b2', 'label': 'Unhealthy'},
+          ],
+          'items': [
+            {'id': 'i1', 'text': 'Deep breathing'},
+            {'id': 'i2', 'text': 'Avoidance'},
+          ],
+          'answered': {
+            'i2': {
+              'correct': false,
+              'placedBucketId': 'b1',
+              'correctBucketId': 'b2',
+              'explanation': 'Avoidance delays processing.',
+            },
+          },
+        },
+        'rounds': 2,
+        'bestFirstTryPct': 75,
+      });
+
+      expect(payload.type, 'BUCKET_SORT');
+      expect(payload.bucketSortIntro, 'Sort these into the right buckets.');
+      expect(payload.bucketSortBuckets, hasLength(2));
+      expect(payload.bucketSortBuckets![0].description, 'Good coping');
+      expect(payload.bucketSortBuckets![1].description, isNull);
+      expect(payload.bucketSortItems, hasLength(2));
+      expect(payload.bucketSortAnswered, hasLength(1));
+      expect(payload.bucketSortAnswered!['i2']!.correct, isFalse);
+      expect(payload.bucketSortAnswered!['i2']!.correctBucketId, 'b2');
+      expect(payload.bucketSortRounds, 2);
+      expect(payload.bucketSortBestFirstTryPct, 75);
+      // Not gated to this type.
+      expect(payload.branchingNodes, isNull);
+    });
+
+    test('BUCKET_SORT payload defaults answered/rounds when absent', () {
+      final payload = StartItemPayload.fromJson({
+        'trackItemProgressId': 'prog-8b',
+        'type': 'BUCKET_SORT',
+        'bucketSort': {
+          'buckets': [
+            {'id': 'b1', 'label': 'Healthy'},
+          ],
+          'items': [
+            {'id': 'i1', 'text': 'Deep breathing'},
+          ],
+        },
+        'bestFirstTryPct': null,
+      });
+
+      expect(payload.bucketSortIntro, isNull);
+      expect(payload.bucketSortAnswered, isEmpty);
+      expect(payload.bucketSortRounds, 0);
+      expect(payload.bucketSortBestFirstTryPct, isNull);
+    });
+  });
+
+  group('BranchingNode.fromJson', () {
+    test('a node with choices is not an ending', () {
+      final node = BranchingNode.fromJson({
+        'id': 'n1',
+        'title': 'The call',
+        'text': 'Your client seems distressed.',
+        'image': {'url': 'https://cdn.example.com/a.png', 'alt': 'A scene'},
+        'choices': [
+          {'id': 'c1', 'text': 'Reassure them', 'nextNodeId': 'n2'},
+        ],
+      });
+
+      expect(node.title, 'The call');
+      expect(node.image!.url, 'https://cdn.example.com/a.png');
+      expect(node.image!.alt, 'A scene');
+      expect(node.choices, hasLength(1));
+      expect(node.isEnding, isFalse);
+      expect(node.outcome, isNull);
+    });
+
+    test('a node with no choices is an ending, and an empty choices list also counts', () {
+      final noChoicesKey = BranchingNode.fromJson({'id': 'n2', 'text': 'The end.'});
+      final emptyChoices = BranchingNode.fromJson({
+        'id': 'n3',
+        'text': 'Also the end.',
+        'choices': <Map<String, dynamic>>[],
+      });
+
+      expect(noChoicesKey.isEnding, isTrue);
+      expect(emptyChoices.isEnding, isTrue);
+    });
+
+    test('an unrecognized outcome string parses as null', () {
+      final node = BranchingNode.fromJson({
+        'id': 'n4',
+        'text': 'End.',
+        'outcome': 'SOMETHING_ELSE',
+      });
+      expect(node.outcome, isNull);
+    });
+  });
+
+  group('BranchingResult.fromJson', () {
+    test('parses every field', () {
+      final result = BranchingResult.fromJson({
+        'endingNodeId': 'n2',
+        'score': 90,
+        'passScore': 70,
+        'passed': true,
+        'attemptsUsed': 1,
+        'maxAttempts': 3,
+        'attemptsLeft': 2,
+        'bestScore': 90,
+        'endingsReached': ['n2'],
+        'itemCompleted': true,
+        'completion': {
+          'completed': true,
+          'sectionCompleted': false,
+          'trackCompleted': false,
+        },
+        'exhausted': false,
+        'nextRoundAt': null,
+        'recap': [],
+      });
+
+      expect(result.endingNodeId, 'n2');
+      expect(result.score, 90);
+      expect(result.passed, isTrue);
+      expect(result.attemptsLeft, 2);
+      expect(result.itemCompleted, isTrue);
+      expect(result.completion, isNotNull);
+      expect(result.exhausted, isFalse);
+    });
+
+    test('defaults passed/attemptsUsed/itemCompleted/exhausted/endingsReached/recap when absent', () {
+      final result = BranchingResult.fromJson({
+        'endingNodeId': 'n1',
+        'score': 20,
+        'passScore': null,
+        'attemptsLeft': null,
+        'bestScore': null,
+        'nextRoundAt': null,
+      });
+
+      expect(result.passed, isFalse);
+      expect(result.attemptsUsed, 0);
+      expect(result.attemptsLeft, isNull);
+      expect(result.itemCompleted, isFalse);
+      expect(result.exhausted, isFalse);
+      expect(result.endingsReached, isEmpty);
+      expect(result.completion, isNull);
+      expect(result.recap, isEmpty);
+    });
+
+    test('a spent round carries a non-empty recap', () {
+      final result = BranchingResult.fromJson({
+        'endingNodeId': 'n3',
+        'score': 40,
+        'passScore': 70,
+        'passed': false,
+        'attemptsUsed': 3,
+        'maxAttempts': 3,
+        'attemptsLeft': 0,
+        'endingsReached': ['n2', 'n3'],
+        'itemCompleted': false,
+        'exhausted': true,
+        'nextRoundAt': '2026-11-01T00:00:00Z',
+        'recap': [
+          {'endingNodeId': 'n2', 'score': 90, 'at': '2026-10-30T00:00:00Z'},
+          {'endingNodeId': 'n3', 'score': 40, 'at': '2026-10-30T01:00:00Z'},
+        ],
+      });
+
+      expect(result.exhausted, isTrue);
+      expect(result.nextRoundAt, '2026-11-01T00:00:00Z');
+      expect(result.recap, hasLength(2));
+      expect(result.recap[0].score, 90);
+    });
+  });
+
+  group('BucketSortFeedback.fromJson', () {
+    test('parses a correct placement with no explanation', () {
+      final feedback = BucketSortFeedback.fromJson({
+        'correct': true,
+        'placedBucketId': 'b1',
+        'correctBucketId': 'b1',
+      });
+
+      expect(feedback.correct, isTrue);
+      expect(feedback.placedBucketId, 'b1');
+      expect(feedback.correctBucketId, 'b1');
+      expect(feedback.explanation, isNull);
+    });
+
+    test('parses an incorrect placement with an explanation', () {
+      final feedback = BucketSortFeedback.fromJson({
+        'correct': false,
+        'placedBucketId': 'b1',
+        'correctBucketId': 'b2',
+        'explanation': 'This avoids rather than copes.',
+      });
+
+      expect(feedback.correct, isFalse);
+      expect(feedback.correctBucketId, 'b2');
+      expect(feedback.explanation, 'This avoids rather than copes.');
+    });
+  });
+
+  group('BucketSortPlacementResult.fromJson', () {
+    test('parses every field, including the inherited feedback fields', () {
+      final result = BucketSortPlacementResult.fromJson({
+        'sortItemId': 'i1',
+        'correct': true,
+        'placedBucketId': 'b1',
+        'correctBucketId': 'b1',
+        'explanation': null,
+        'placedCount': 2,
+        'totalCount': 4,
+        'finished': false,
+        'firstTryPct': null,
+        'itemCompleted': false,
+        'completion': null,
+      });
+
+      expect(result.sortItemId, 'i1');
+      expect(result.correct, isTrue);
+      expect(result.placedCount, 2);
+      expect(result.totalCount, 4);
+      expect(result.finished, isFalse);
+      expect(result.firstTryPct, isNull);
+      expect(result.itemCompleted, isFalse);
+      expect(result.completion, isNull);
+    });
+
+    test('the last placement carries firstTryPct, itemCompleted and completion', () {
+      final result = BucketSortPlacementResult.fromJson({
+        'sortItemId': 'i4',
+        'correct': true,
+        'placedBucketId': 'b2',
+        'correctBucketId': 'b2',
+        'placedCount': 4,
+        'totalCount': 4,
+        'finished': true,
+        'firstTryPct': 75,
+        'itemCompleted': true,
+        'completion': {
+          'completed': true,
+          'sectionCompleted': true,
+          'trackCompleted': false,
+        },
+      });
+
+      expect(result.finished, isTrue);
+      expect(result.firstTryPct, 75);
+      expect(result.itemCompleted, isTrue);
+      expect(result.completion!.sectionCompleted, isTrue);
+    });
   });
 }

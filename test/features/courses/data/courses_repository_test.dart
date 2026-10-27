@@ -449,4 +449,107 @@ void main() {
       },
     );
   });
+
+  group('recordBranchingResult', () {
+    test('POSTs the finished path and parses the server-scored result', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/branching-result',
+          data: {
+            'path': ['c1', 'c2'],
+          },
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'endingNodeId': 'n3',
+          'score': 90,
+          'passScore': 70,
+          'passed': true,
+          'attemptsUsed': 1,
+          'maxAttempts': 3,
+          'attemptsLeft': 2,
+          'bestScore': 90,
+          'endingsReached': ['n3'],
+          'itemCompleted': true,
+          'completion': {
+            'completed': true,
+            'sectionCompleted': false,
+            'trackCompleted': false,
+          },
+          'exhausted': false,
+          'nextRoundAt': null,
+          'recap': [],
+        }),
+      );
+
+      final result = await repository.recordBranchingResult(
+        itemId: 'item-1',
+        path: ['c1', 'c2'],
+      );
+
+      expect(result, isA<BranchingResult>());
+      expect(result.endingNodeId, 'n3');
+      expect(result.score, 90);
+      expect(result.passed, isTrue);
+      expect(result.completion, isNotNull);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/branching-result',
+          data: {
+            'path': ['c1', 'c2'],
+          },
+        ),
+      ).called(1);
+    });
+  });
+
+  group('placeBucketSortItem', () {
+    test('POSTs the sortItemId/bucketId and parses the placement verdict', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/bucket-sort/place',
+          data: {'sortItemId': 'i1', 'bucketId': 'b1'},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'sortItemId': 'i1',
+          'correct': true,
+          'placedBucketId': 'b1',
+          'correctBucketId': 'b1',
+          'placedCount': 1,
+          'totalCount': 4,
+          'finished': false,
+          'itemCompleted': false,
+        }),
+      );
+
+      final result = await repository.placeBucketSortItem(
+        itemId: 'item-1',
+        sortItemId: 'i1',
+        bucketId: 'b1',
+      );
+
+      expect(result, isA<BucketSortPlacementResult>());
+      expect(result.correct, isTrue);
+      expect(result.placedCount, 1);
+      expect(result.totalCount, 4);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/bucket-sort/place',
+          data: {'sortItemId': 'i1', 'bucketId': 'b1'},
+        ),
+      ).called(1);
+    });
+  });
+
+  group('restartBucketSort', () {
+    test('POSTs /learn/tracks/items/{id}/bucket-sort/restart', () async {
+      when(() => dio.post<void>('/learn/tracks/items/item-1/bucket-sort/restart'))
+          .thenAnswer((_) async => _response<void>(null));
+
+      await repository.restartBucketSort('item-1');
+
+      verify(() => dio.post<void>('/learn/tracks/items/item-1/bucket-sort/restart')).called(1);
+    });
+  });
 }

@@ -10,6 +10,8 @@ enum TrackItemType {
   video,
   journal,
   game,
+  branchingScenario,
+  bucketSort,
   unknown,
 }
 
@@ -29,6 +31,10 @@ TrackItemType trackItemTypeFromString(String? value) {
       return TrackItemType.journal;
     case 'GAME':
       return TrackItemType.game;
+    case 'BRANCHING_SCENARIO':
+      return TrackItemType.branchingScenario;
+    case 'BUCKET_SORT':
+      return TrackItemType.bucketSort;
     default:
       return TrackItemType.unknown;
   }
@@ -377,4 +383,6 @@ bool isPlayableTrackItemType(TrackItemType type) =>
     type == TrackItemType.video ||
     type == TrackItemType.quiz ||
     type == TrackItemType.journal ||
-    type == TrackItemType.game;
+    type == TrackItemType.game ||
+    type == TrackItemType.branchingScenario ||
+    type == TrackItemType.bucketSort;

@@ -18,6 +18,8 @@ import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/start_item_payload.dart';
+import 'branching/branching_scenario_player.dart';
+import 'bucket_sort/bucket_sort_player.dart';
 import 'celebration_modal.dart';
 import 'game/game_player.dart';
 import 'journal/journal_player.dart';
@@ -26,12 +28,13 @@ import 'video/video_item_player.dart';
 
 /// Full port of ally-mobile (React Native)'s `CourseItemPlayerScreen`
 /// (~9,700 lines across its real component tree) for ARTICLE, VIDEO, QUIZ,
-/// JOURNAL, and GAME item types — real `startTrackItem` content (not a
-/// stub), inline article questions, video interjections, the complete
-/// 8-question-type quiz engine, debounced journal autosave, and the same
-/// HTML5 game bundles the RN and web apps embed. ROLEPLAY/CASE route
-/// elsewhere via the existing Simulations/Cases screens, same as the RN
-/// app.
+/// JOURNAL, GAME, BRANCHING_SCENARIO, and BUCKET_SORT item types — real
+/// `startTrackItem` content (not a stub), inline article questions, video
+/// interjections, the complete 8-question-type quiz engine, debounced
+/// journal autosave, the same HTML5 game bundles the RN and web apps embed,
+/// a locally-walked branching-scenario story graph, and a tap-to-place
+/// bucket-sort game. ROLEPLAY/CASE route elsewhere via the existing
+/// Simulations/Cases screens, same as the RN app.
 ///
 /// In-player Prev/Next navigation and the per-section progress rail (RN's
 /// `useTrackPlayerNavigation` + `PlayerTopBar`/`SegmentedProgressRail`/
@@ -55,10 +58,9 @@ import 'video/video_item_player.dart';
 /// render and this falls back to the old single-item `TabScreenHeader`
 /// shell, rather than blocking the item itself on a second network call.
 ///
-/// Not ported from the same RN feature area (separate, larger follow-ups):
-/// the BRANCHING_SCENARIO and BUCKET_SORT item types, and the in-player
-/// discussion thread (`hasDiscussion`-gated, its own CRUD+moderation
-/// system, unrelated to the Review screens' comments).
+/// Not ported from the same RN feature area (separate, larger follow-up):
+/// the in-player discussion thread (`hasDiscussion`-gated, its own
+/// CRUD+moderation system, unrelated to the Review screens' comments).
 class CourseItemPlayerScreen extends ConsumerStatefulWidget {
   const CourseItemPlayerScreen({super.key, required this.trackId, required this.item});
 
@@ -171,6 +173,21 @@ class _CourseItemPlayerScreenState
   void _goToItem(String itemId) {
     setState(() => _currentItemId = itemId);
     _start();
+  }
+
+  /// Mirrors RN's `goNextOrOverview`: advance to the next item in the
+  /// flattened track if there is one, otherwise leave for the overview.
+  /// Used by players (branching, bucket sort) whose own "Continue" button
+  /// plays the same role as the bottom nav's "Next"/"Finish".
+  void _goNextOrOverview() {
+    final detail = ref.read(trackDetailProvider(widget.trackId)).value;
+    final flat = detail == null ? null : _flattenTrackItems(detail);
+    final currentIndex = flat?.indexWhere((f) => f.item.id == _currentItemId) ?? -1;
+    if (flat != null && currentIndex != -1 && currentIndex < flat.length - 1) {
+      _goToItem(flat[currentIndex + 1].item.id);
+    } else {
+      _exitToOverview();
+    }
   }
 
   void _exitToOverview() {
@@ -313,6 +330,25 @@ class _CourseItemPlayerScreenState
           payload: payload,
           itemId: _currentItemId,
           onCompleted: _handleCompletion,
+        );
+      case 'BRANCHING_SCENARIO':
+        return BranchingScenarioPlayer(
+          // Two scenarios back to back must not share a run.
+          key: key,
+          payload: payload,
+          itemId: _currentItemId,
+          onCompleted: _handleCompletion,
+          onRequestNext: _goNextOrOverview,
+          onBack: _exitToOverview,
+        );
+      case 'BUCKET_SORT':
+        return BucketSortPlayer(
+          // Two sorts back to back must not share a round.
+          key: key,
+          payload: payload,
+          itemId: _currentItemId,
+          onCompleted: _handleCompletion,
+          onRequestNext: _goNextOrOverview,
         );
       default:
         return Center(child: Text(ref.t('courses.player.unsupportedTitle')));
