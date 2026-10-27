@@ -122,6 +122,10 @@ void main() {
 
     await tester.tap(find.widgetWithText(AppButton, 'Start'));
     await tester.pumpAndSettle();
+    // Tapping Start opens the preview modal first; its own Start Simulation
+    // button is what actually starts the session.
+    await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+    await tester.pumpAndSettle();
 
     verify(
       () => repository.startScenarioSession(

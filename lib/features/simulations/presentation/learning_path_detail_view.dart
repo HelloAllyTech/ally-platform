@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/simulation_models.dart';
+import 'simulation_details_modal.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
 /// mobile (React Native)'s `useLearningPathDetails` hook backs both with
@@ -18,6 +19,10 @@ import '../data/simulation_models.dart';
 /// screen's `nextSimulation`), and the scenario list with per-status
 /// affordances — locked (disabled), completed (view-feedback action),
 /// unlocked (tap to start that specific scenario, not just the next one).
+/// Both the top button and a row tap go through the same
+/// [SimulationDetailsModal] preview before actually starting, matching RN's
+/// own `setSelectedSimulation` being shared by `handleStartPath` and
+/// `handleSimulationPress`.
 ///
 /// Not ported: the active-simulation-conflict modal and 429-rate-limit
 /// retry modal (`useStartSimulation`'s `showActiveSimulationModal`/
@@ -60,49 +65,28 @@ class _LearningPathDetailViewState
   bool get _isCompleted => widget.details.completedAt != null;
 
   Future<void> _startScenario(PathScenario scenario) async {
-    // RN's SimulationDetailsModal shows a language dropdown (gated on
-    // `availableLanguages.length > 0`, same field this screen's own
-    // PathScenario model already carries) before starting — the full
-    // preview/notification modal pair it's embedded in is bigger, separate
-    // work (see this view's own "not ported" doc comment), but the language
-    // choice itself is cheap to offer directly via a plain picker dialog.
-    int? languageId;
-    final languages = scenario.availableLanguages;
-    if (languages != null && languages.isNotEmpty) {
-      final selected = await _pickLanguage(languages);
-      if (selected == null) return; // user cancelled
-      languageId = selected.languageId;
-    }
-
+    // RN creates the path/case session (if one doesn't exist yet) BEFORE
+    // opening the preview modal, not after confirming inside it — matches
+    // `handleStartPath`/`handleSimulationPress` both calling `createSession`
+    // ahead of `setSelectedSimulation`.
     setState(() {
       _isStarting = true;
       _error = null;
     });
     try {
       await widget.onEnsureSession();
-      await widget.onStartScenario(scenario, languageId: languageId);
     } catch (e) {
       setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
+      return;
     } finally {
       if (mounted) setState(() => _isStarting = false);
     }
-  }
+    if (!mounted) return;
 
-  Future<SimulationLanguageOption?> _pickLanguage(
-    List<SimulationLanguageOption> languages,
-  ) {
-    return showDialog<SimulationLanguageOption>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(ref.tr('nav.language.label')),
-        children: [
-          for (final language in languages)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(context).pop(language),
-              child: Text(language.label),
-            ),
-        ],
-      ),
+    await SimulationDetailsModal.show(
+      context,
+      scenario: scenario,
+      onStart: (languageId) => widget.onStartScenario(scenario, languageId: languageId),
     );
   }
 

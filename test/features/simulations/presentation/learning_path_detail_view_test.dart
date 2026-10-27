@@ -130,40 +130,49 @@ void main() {
       expect(button.isDisabled, isTrue);
     });
 
-    testWidgets('tapping it calls onEnsureSession then onStartScenario with the next scenario', (
-      tester,
-    ) async {
-      final calls = <String>[];
-      final details = _details(
-        scenarios: [
-          _scenario(id: 's1', scenarioId: 1, order: 1),
-          _scenario(id: 's2', scenarioId: 2, order: 2),
-        ],
-      );
+    testWidgets(
+      'tapping it calls onEnsureSession then opens the preview modal, which calls '
+      'onStartScenario for the next scenario once Start Simulation is tapped',
+      (tester) async {
+        final calls = <String>[];
+        final details = _details(
+          scenarios: [
+            _scenario(id: 's1', scenarioId: 1, order: 1),
+            _scenario(id: 's2', scenarioId: 2, order: 2),
+          ],
+        );
 
-      await _pump(
-        tester,
-        LearningPathDetailView(
-          details: details,
-          onEnsureSession: () async {
-            calls.add('ensure');
-          },
-          onStartScenario: (scenario, {languageId}) async {
-            calls.add('start:${scenario.id}');
-          },
-          onViewFeedback: (_) async {},
-        ),
-      );
+        await _pump(
+          tester,
+          LearningPathDetailView(
+            details: details,
+            onEnsureSession: () async {
+              calls.add('ensure');
+            },
+            onStartScenario: (scenario, {languageId}) async {
+              calls.add('start:${scenario.id}');
+            },
+            onViewFeedback: (_) async {},
+          ),
+        );
 
-      await tester.tap(find.widgetWithText(AppButton, 'Start'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(AppButton, 'Start'));
+        await tester.pumpAndSettle();
 
-      expect(calls, ['ensure', 'start:s1']);
-    });
+        expect(calls, ['ensure'], reason: 'the preview modal is open; not started yet');
+        expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+        await tester.pumpAndSettle();
+
+        expect(calls, ['ensure', 'start:s1']);
+        expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing, reason: 'modal closed');
+      },
+    );
 
     testWidgets(
-      'when the next scenario has availableLanguages, prompts for one before starting, '
-      'and passes the chosen languageId through',
+      'when the next scenario has availableLanguages, the preview modal offers a picker '
+      'defaulting to the first option, and passes the chosen languageId through',
       (tester) async {
         int? capturedLanguageId;
         final details = _details(
@@ -195,55 +204,83 @@ void main() {
         await tester.tap(find.widgetWithText(AppButton, 'Start'));
         await tester.pumpAndSettle();
 
-        expect(find.text('English'), findsOneWidget, reason: 'the picker dialog is showing');
-        expect(find.text('Hindi'), findsOneWidget);
-        expect(capturedLanguageId, isNull, reason: 'not started until a language is chosen');
+        // Defaults to the first available language.
+        expect(find.text('English'), findsOneWidget);
 
-        await tester.tap(find.text('Hindi'));
+        await tester.tap(find.byKey(const Key('simulation-details-modal-language')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Hindi').last);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
         await tester.pumpAndSettle();
 
         expect(capturedLanguageId, 2);
       },
     );
 
-    testWidgets(
-      'cancelling the language picker (tapping outside the dialog) does not start the scenario',
-      (tester) async {
-        var startCalls = 0;
-        final details = _details(
-          scenarios: [
-            _scenario(
-              id: 's1',
-              scenarioId: 1,
-              order: 1,
-              availableLanguages: [
-                {'language_id': 1, 'label': 'English', 'active': true},
-              ],
-            ),
-          ],
-        );
-
-        await _pump(
-          tester,
-          LearningPathDetailView(
-            details: details,
-            onEnsureSession: () async {},
-            onStartScenario: (scenario, {languageId}) async => startCalls++,
-            onViewFeedback: (_) async {},
+    testWidgets('closing the preview modal (the X button) does not start the scenario', (
+      tester,
+    ) async {
+      var startCalls = 0;
+      final details = _details(
+        scenarios: [
+          _scenario(
+            id: 's1',
+            scenarioId: 1,
+            order: 1,
+            availableLanguages: [
+              {'language_id': 1, 'label': 'English', 'active': true},
+            ],
           ),
-        );
+        ],
+      );
 
-        await tester.tap(find.widgetWithText(AppButton, 'Start'));
-        await tester.pumpAndSettle();
-        expect(find.text('English'), findsOneWidget);
+      await _pump(
+        tester,
+        LearningPathDetailView(
+          details: details,
+          onEnsureSession: () async {},
+          onStartScenario: (scenario, {languageId}) async => startCalls++,
+          onViewFeedback: (_) async {},
+        ),
+      );
 
-        // Dismiss by tapping the scrim, same as a hardware-back/outside-tap.
-        await tester.tapAt(const Offset(10, 10));
-        await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(AppButton, 'Start'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget);
 
-        expect(startCalls, 0);
-      },
-    );
+      await tester.tap(find.byKey(const Key('simulation-details-modal-close')));
+      await tester.pumpAndSettle();
+
+      expect(startCalls, 0);
+      expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
+    });
+
+    testWidgets('a start failure shows the error inline inside the modal and keeps it open', (
+      tester,
+    ) async {
+      final details = _details(scenarios: [_scenario(id: 's1', scenarioId: 1, order: 1)]);
+
+      await _pump(
+        tester,
+        LearningPathDetailView(
+          details: details,
+          onEnsureSession: () async {},
+          onStartScenario: (scenario, {languageId}) async => throw Exception('network down'),
+          onViewFeedback: (_) async {},
+        ),
+      );
+
+      await tester.tap(find.widgetWithText(AppButton, 'Start'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget, reason: 'stays open');
+      expect(find.textContaining('network down'), findsOneWidget);
+    });
   });
 
   group('per-row status rendering', () {
@@ -333,6 +370,10 @@ void main() {
       );
 
       await tester.tap(find.text('Scenario 2'));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty, reason: 'the preview modal is open; not started yet');
+
+      await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
       await tester.pumpAndSettle();
 
       expect(calls, ['s2']);

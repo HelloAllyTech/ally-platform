@@ -271,6 +271,8 @@ class PathScenario {
     required this.title,
     required this.description,
     required this.coverImageUrl,
+    this.coverVideoUrl,
+    this.triggerWarnings = const [],
     required this.sessionId,
     required this.status,
     required this.availableLanguages,
@@ -283,6 +285,10 @@ class PathScenario {
     title: json['title'] as String?,
     description: json['description'] as String?,
     coverImageUrl: json['coverImageUrl'] as String?,
+    coverVideoUrl: json['coverVideoUrl'] as String?,
+    triggerWarnings: (json['triggerWarnings'] as List<dynamic>? ?? [])
+        .map((e) => (e as Map<String, dynamic>)['name'] as String)
+        .toList(),
     sessionId: json['sessionId'] as String?,
     status: _sessionItemStatusFromString(json['status'] as String?),
     availableLanguages: (json['availableLanguages'] as List<dynamic>?)
@@ -298,6 +304,13 @@ class PathScenario {
   final String? title;
   final String? description;
   final String? coverImageUrl;
+
+  /// Carried through but not rendered — matches `SimulationDetailsScreen`'s
+  /// own documented scope line: no video-preview widget exists in this app
+  /// yet, only the full course-item video player, so the pre-start preview
+  /// falls back to [coverImageUrl] the same way that screen does.
+  final String? coverVideoUrl;
+  final List<String> triggerWarnings;
   final String? sessionId;
   final SessionItemStatus status;
   final List<SimulationLanguageOption>? availableLanguages;
