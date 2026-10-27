@@ -9,6 +9,66 @@ import { CharacterInterviewMessageRole } from '../../enum/character-interview.en
  * The loop is provider-agnostic, so these drive the neutral stream protocol
  * (`text_delta`s then one `final`) rather than any SDK's own event shape.
  */
+describe('CharacterInterviewOrchestratorService — model resolution', () => {
+  it('falls back to a known-good model when the prompt has no model and the environment fallback is unresolvable', async () => {
+    const createLlmProvider = jest.fn().mockReturnValue({
+      name: 'anthropic',
+      stream: async function* () {
+        yield {
+          type: 'final',
+          message: {
+            content: [{ type: 'text', text: 'Hello' }],
+            stopReason: 'end_turn',
+            usage: {},
+          },
+        };
+      },
+    });
+
+    const service = new CharacterInterviewOrchestratorService(
+      {
+        anthropic: { apiKey: 'test-key' },
+        characterInterview: {
+          model: 'claude-test',
+          provider: 'anthropic',
+        },
+      } as any,
+      {
+        getPromptByCode: jest.fn().mockResolvedValue('SYSTEM'),
+        // No model config from prompt
+        getPromptLlmConfig: jest.fn().mockResolvedValue({}),
+      } as any,
+      {
+        getSession: jest
+          .fn()
+          .mockResolvedValue({ id: 'sess-1', status: 'in_progress' }),
+      } as any,
+      {
+        getToolDefinitions: jest.fn().mockReturnValue([]),
+      } as any,
+      {
+        listBySession: jest.fn().mockResolvedValue([]),
+        appendMessage: jest.fn().mockResolvedValue({ seq: 1 }),
+      } as any,
+      { record: jest.fn() } as any,
+      { create: createLlmProvider } as any,
+    );
+
+    const frames: any[] = [];
+    for await (const frame of service.streamTurn(
+      'sess-1',
+      { message: 'Start' } as any,
+      1,
+    )) {
+      frames.push(frame);
+    }
+
+    const error = frames.find((frame) => frame.event === 'error');
+    expect(error).toBeUndefined();
+    expect(createLlmProvider).toHaveBeenCalledWith('anthropic', 'claude-test');
+  });
+});
+
 describe('CharacterInterviewOrchestratorService — truncated turns', () => {
   const MAX_ITERATIONS = 8;
 
