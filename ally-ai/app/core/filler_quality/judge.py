@@ -183,9 +183,9 @@ async def judge_session(
 ) -> Tuple[FillerJudgmentResult, str]:
     """Judge every filler played in one session.
 
-    ``rubric`` is the static instruction block sourced from prompt management
-    (FILLER_JUDGE_PROMPT_CODE); callers should fetch it once and pass it in.
-    Falls back to the inline DEFAULT_FILLER_RUBRIC when None.
+    ``rubric`` is the static instruction block: ally-be reads its live version
+    from the Skills Store and sends it in the request body (``rubric``). Falls
+    back to the inline DEFAULT_FILLER_RUBRIC when None.
 
     A session that played no fillers is not an error and costs no LLM call — it
     is the normal state of a fast session, and the caller needs to be able to

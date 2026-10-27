@@ -22,8 +22,8 @@ class PromptManager:
         Retrieves a prompt template from the filesystem.
         Uses LRU cache to avoid frequent disk I/O.
         Note: Because of lru_cache, templates will NOT hot-reload if changed
-        on disk while the server is running. You must call clear_cache()
-        or restart the server to see changes.
+        on disk while the server is running. Restart the server to see
+        changes.
         """
         file_path = self.base_dir / file_key / f"{prompt_key}.txt"
 
@@ -36,10 +36,6 @@ class PromptManager:
         except Exception as e:
             logger.error(f"Error reading prompt template at {file_path}: {e}")
             return ""
-
-    def clear_cache(self):
-        """Clears the template cache."""
-        self.get_template.cache_clear()
 
 
 # Singleton instance

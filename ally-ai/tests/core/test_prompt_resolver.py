@@ -61,17 +61,6 @@ def test_load_and_format_fills_object_declared_variables():
     )
 
 
-def test_load_and_format_reads_the_store_text_from_prompt_data():
-    code = "ally_ai_nudge_nudge"
-
-    class PromptData:
-        prompts = {code: {"prompt": "From the store: {name}."}}
-
-    assert load_and_format("nudge/nudge", PromptData(), name="Asha") == (
-        "From the store: Asha."
-    )
-
-
 def test_missing_required_variable_is_logged_but_still_renders(monkeypatch, caplog):
     code = "ally_ai_nudge_nudge"
 
@@ -91,7 +80,12 @@ def test_missing_required_variable_is_logged_but_still_renders(monkeypatch, capl
 def test_logs_the_store_version_it_renders(mock_prompt_manager, caplog):
     prompts = {"ally_ai_nudge_nudge": {"prompt": "From the store.", "version": 7}}
     with caplog.at_level(logging.INFO):
-        assert resolve_template("ally_ai_nudge_nudge", prompts) == "From the store."
+        assert (
+            resolve_template(
+                "ally_ai_nudge_nudge", prompts, internal_path="nudge/nudge"
+            )
+            == "From the store."
+        )
     assert "[PROMPT_SOURCE] ally_ai_nudge_nudge: using store v7, len=15" in (
         caplog.text
     )

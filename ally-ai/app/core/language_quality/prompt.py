@@ -20,10 +20,6 @@ from pydantic import BaseModel, Field
 # identically for both judges.
 from app.core.drift.prompt import TranscriptTurn  # noqa: F401  (re-exported)
 
-# Prompt-management code for the judge rubric. The judge fetches the current
-# version from ally-be and falls back to DEFAULT_JUDGE_RUBRIC if unavailable.
-LANGUAGE_JUDGE_PROMPT_CODE = "language_quality_judge_rubric"
-
 
 class LanguageEvalParams(BaseModel):
     """Per-language eval config (from ally-be languages.evalConfig; all

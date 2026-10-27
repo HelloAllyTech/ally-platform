@@ -21,10 +21,6 @@ from pydantic import BaseModel, Field
 
 from app.core.filler_quality.schemas import FillerObservation
 
-# Prompt-management code for the judge rubric. The judge fetches the current
-# version from ally-be and falls back to DEFAULT_FILLER_RUBRIC if unavailable.
-FILLER_JUDGE_PROMPT_CODE = "filler_quality_judge_rubric"
-
 
 class FillerStyleParams(BaseModel):
     """What the character was configured to sound like.

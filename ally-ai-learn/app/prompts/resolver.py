@@ -10,7 +10,7 @@ Logic:
   a required variable the code didn't pass is logged as [PROMPT_CONTRACT].
 
 Prompt codes use ally_ai_learn_ prefix: ally_ai_learn_subdir_filename
-(e.g. ally_ai_learn_system_base_role_instruction).
+(e.g. ally_ai_learn_system_main_agent_prompt).
 Local lookup strips the prefix and uses subdir/filename from app/prompts/.
 """
 
@@ -31,7 +31,7 @@ def _prompt_code_to_path(prompt_code: str) -> tuple[str, str]:
 
     Strips ally_ai_learn_ prefix, then converts path-based remainder to
     folder structure.
-    E.g. ally_ai_learn_system_base_role_instruction -> (system, base_role_instruction)
+    E.g. ally_ai_learn_system_main_agent_prompt -> (system, main_agent_prompt)
     """
     code = prompt_code
     if code.startswith(PROMPT_CODE_PREFIX):
@@ -109,33 +109,6 @@ def _extract_allowed_variables(entry: Any) -> Optional[set[str]]:
             if isinstance(name, str) and name.strip():
                 names.add(name.strip())
     return names
-
-
-def _extract_required_variables(entry: Any) -> set[str]:
-    """Names of variables marked `required: true` on a backend prompt entry.
-
-    Used by the runtime to enforce mandatoriness — the corresponding
-    kwarg value must be a non-empty string when the prompt is rendered.
-    Bare-string entries (legacy schema) are never required since they
-    carry no metadata.
-    """
-    if not isinstance(entry, dict):
-        return set()
-
-    raw_variables = entry.get("availableVariables")
-    if not isinstance(raw_variables, list):
-        return set()
-
-    required: set[str] = set()
-    for value in raw_variables:
-        if not isinstance(value, dict):
-            continue
-        if not value.get("required"):
-            continue
-        name = value.get("name")
-        if isinstance(name, str) and name.strip():
-            required.add(name.strip())
-    return required
 
 
 def _check_required_variables_present(
@@ -231,7 +204,7 @@ def resolve_template(
     fallback for a prompt the metadata doesn't carry.
 
     Args:
-        prompt_code: Prefixed code (e.g. ally_ai_learn_system_base_role_instruction)
+        prompt_code: Prefixed code (e.g. ally_ai_learn_system_main_agent_prompt)
         prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
             dict, or None
 
@@ -279,7 +252,7 @@ def load_template(
     Use load_and_format() when you have format kwargs ready.
 
     Args:
-        internal_path: Local path (e.g. 'system/base_role_instruction')
+        internal_path: Local path (e.g. 'system/main_agent_prompt')
         prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
             dict, or None
 
@@ -301,7 +274,7 @@ def load_and_format(
     Single entry point for resolve + fallback + safe format.
 
     Args:
-        internal_path: Local path (e.g. 'system/full_prompt')
+        internal_path: Local path (e.g. 'system/main_agent_prompt')
         prompt_data: A PromptData object (has .prompts), or a raw backend_prompts
             dict, or None
         **kwargs: Passed to template.format_map(SafeFormatter(**kwargs)).

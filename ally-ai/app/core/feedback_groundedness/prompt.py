@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from typing import List, Optional, TypedDict
 
-# Prompt-management code for this rubric; the registry version is
-# authoritative and the inline default below is the fallback.
-GROUNDEDNESS_JUDGE_PROMPT_CODE = "feedback_groundedness_rubric"
-
 
 class TranscriptTurn(TypedDict, total=False):
     role: str  # "client" (AI) | "counselor" (human)

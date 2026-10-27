@@ -76,8 +76,6 @@ def _scenario_stub():
             "agent_goal": None,
             "custom_fields": None,
             "response_length": None,
-            "agent_dialogues": None,
-            "prompt": None,
             "previous_memory": None,
             "competency": None,
             "language_dialogue_samples": None,

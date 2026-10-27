@@ -3,14 +3,16 @@
 Each model declares the prompt's code and how it shows up in the Skills
 Store (`prompt = PromptInfo(...)`), and its fields are the variables the code
 supplies. A field without a default is REQUIRED: the prompt text must contain
-it and the code must pass it. `Field(title=...)` is the label the Skills
-Store shows for a variable. Declaring the class is the whole registration:
+it and the code must pass it. Declaring the class is the whole registration:
 `PROMPT_CONTRACTS` collects every subclass of `PromptInputs`.
 
-- Sync sends each prompt's `contract_payload`, details and labelled
-  variables to the Skills Store, which refuses a new version that drops a
+- Sync (scripts/sync_prompts.py) sends each prompt's `contract_payload` and
+  details, with `availableVariables` as the bare placeholder names parsed
+  from the .txt by regex. The Skills Store refuses a new version that drops a
   required variable (or, for a closed contract, uses one the code doesn't
-  supply).
+  supply). `available_variables()` (`{name, required, label?}` per field,
+  label from `Field(title=...)`) is not sent by sync; it exists for parity
+  with ally-ai-learn's contracts module.
 - The resolver logs `[PROMPT_CONTRACT]` at ERROR when the code renders a
   prompt without a required variable.
 - The contract tests check every default .txt against its model, and that

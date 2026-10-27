@@ -20,7 +20,8 @@ class AllyCoreService:
         ally-be's prompt management (GET /api/v1/prompts/by-codes).
 
         Returns a {promptCode: text} map; codes with no/empty content are simply
-        absent. Used by the drift judge to source its rubric from the registry.
+        absent. Used by the transcription pipeline as its fallback when a queue
+        message doesn't carry the pipeline's prompts.
         """
         if not codes:
             return {}

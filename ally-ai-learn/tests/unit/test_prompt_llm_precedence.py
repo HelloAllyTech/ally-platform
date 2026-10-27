@@ -14,7 +14,6 @@ from app.core.agent.factory import (
     build_llm_client_for_prompt,
     configure_llm_client,
     get_prompt_llm_overrides,
-    resolve_call_site_llm_client,
 )
 from app.llms.factory import infer_provider_from_model
 
@@ -178,34 +177,3 @@ class TestConfigureLlmClientPrecedence:
         assert result is fallback
         # The surviving call carries no model override (safe default).
         assert mock_create.call_args.kwargs.get("model") is None
-
-
-class TestResolveCallSiteLlmClient:
-    """Auxiliary call sites reuse the shared client unless the prompt overrides."""
-
-    @pytest.mark.unit
-    def test_no_override_returns_default_client(self):
-        sc = _scenario(prompts={})
-        default = Mock(name="default_client")
-        result = resolve_call_site_llm_client(sc, "p", default_client=default)
-        assert result is default  # identical client, zero behaviour change
-
-    @pytest.mark.unit
-    @patch("app.core.agent.factory.create_llm_client")
-    def test_override_builds_new_client(self, mock_create):
-        built = Mock(name="built_client")
-        mock_create.return_value = built
-        sc = _scenario(prompts={"p": {"model": "gpt-4o-mini", "temperature": 0.5}})
-        default = Mock(name="default_client")
-        result = resolve_call_site_llm_client(sc, "p", default_client=default)
-        assert result is built
-        assert mock_create.call_args.kwargs["model"] == "gpt-4o-mini"
-        assert mock_create.call_args.kwargs["temperature"] == 0.5
-
-    @pytest.mark.unit
-    @patch("app.core.agent.factory.create_llm_client", side_effect=RuntimeError("boom"))
-    def test_falls_back_to_default_on_error(self, _mock_create):
-        sc = _scenario(prompts={"p": {"model": "gpt-4o"}})
-        default = Mock(name="default_client")
-        # A failure building the override must not break the call site.
-        assert resolve_call_site_llm_client(sc, "p", default_client=default) is default

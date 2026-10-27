@@ -96,8 +96,6 @@ class PromptData(BaseModel):
     custom_fields: Optional[List[Dict[str, Any]]] = Field(
         default_factory=list, description="Dynamic custom fields"
     )
-    prompt: Optional[str] = Field(default=None)
-    agent_dialogues: Optional[List[str]] = Field(default=None)
     previous_memory: Optional[str] = Field(
         default=None,
         description="Summary from previous session for continuity",
@@ -105,7 +103,7 @@ class PromptData(BaseModel):
     prompts: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Editable prompt templates from backend (promptData.prompts). "
-        "Keys: ally_ai_learn_system_base_role_instruction, etc. Values may be "
+        "Keys: ally_ai_learn_system_main_agent_prompt, etc. Values may be "
         "raw strings or objects with prompt metadata like "
         "{prompt: str, availableVariables: string[]}.",
     )
@@ -901,9 +899,6 @@ class Scenario(BaseModel):
                 "context": prompt_data_dict.get("context"),
                 "opening_statements": prompt_data_dict.get("openingStatements") or [],
                 "custom_fields": prompt_data_dict.get("customFields"),
-                # Legacy: backend may send at scenario.prompt or promptData.prompt
-                "prompt": prompt_data_dict.get("prompt") or raw.get("prompt"),
-                "agent_dialogues": prompt_data_dict.get("agentDialogues"),
                 "previous_memory": prompt_data_dict.get("previousMemory", None),
                 "prompts": prompt_data_dict.get("prompts"),
                 "competency": prompt_data_dict.get("competency", None),

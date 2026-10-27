@@ -13,12 +13,10 @@ every turn.
 
 from typing import List, Optional, Sequence
 
-#: Prompt-management code, so the rubric can be corrected without a deploy. See the
-#: note in ally-be's repository about the pinned version: an override changes what
-#: the labels mean while every row still says v1, so bump PROMPT_VERSION alongside
-#: any change of definition.
-RECALL_QUALITY_JUDGE_PROMPT_CODE = "recall_quality_rubric"
-
+#: Fallback for the rubric ally-be sends from the Skills Store. See the note in
+#: ally-be's repository about the pinned version: an override changes what the
+#: labels mean while every row still says v1, so bump PROMPT_VERSION alongside any
+#: change of definition.
 DEFAULT_JUDGE_RUBRIC = """You are auditing one turn of a counselling roleplay.
 
 The CLIENT is played by an AI actor with a pool of backstory facts about itself. On

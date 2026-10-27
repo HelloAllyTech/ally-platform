@@ -66,14 +66,14 @@ The app is a FastAPI application (`app/main.py`) whose lifespan initializes the 
 - `llm_usage/`, `execution_manager.py`, `drift`, `round_trip` — supporting services. The `llm_usage` message ally-be prices carries `completion_tokens` as every token billed at the output rate (Gemini's thinking tokens folded in), an optional `cached_tokens` that is a *subset* of `prompt_tokens` for OpenAI and Gemini rather than an addition to it, and an optional `metadata` breakdown (e.g. `thoughts_tokens`) that is informational only.
 - `phi_events.py`, `phi_logger.py` — PHI-aware event logging for HIPAA handling
 
-**Prompts** (`app/prompts/`): file-based templates organized by concern — `analysis`, `audio`, `notes`, `nudge`, `scenario`, `simulation`, `summary`, `tags`, `user`, `shared` — with a `manager.py` and `resolver.py`. Prompts are synced to the backend (see Makefile / Local Setup).
+**Prompts** (`app/prompts/`): file-based templates organized by concern — `analysis`, `analytics`, `audio`, `helpline`, `knowledge`, `notes`, `nudge`, `scenario`, `shared`, `summary`, `tags`, `user` — with a `manager.py`, `resolver.py` and `contracts.py` (one typed contract per prompt). Prompts are synced to the backend (see Makefile / Local Setup).
 
 **Schemas** (`app/schemas/`): Pydantic models — `common.py` (e.g. `ChatMessage`), `conversation.py`, `summary.py`, `reference_document.py`, `health.py`.
 
 ## Integration Points
 
 **ally-be (ally-core) via REST** — `app/core/ally_core/` wraps an `httpx.AsyncClient` pointed at `ALLY_CORE__ENDPOINT` (default `http://localhost:8001`), authenticated with `x-api-key`. Observed calls include:
-- `GET /api/v1/prompts/by-codes` — fetch current prompt text by code (used by the drift judge to source its rubric)
+- `GET /api/v1/prompts/by-codes` — fetch current prompt text by code (the transcription pipeline's fallback when a queue message doesn't carry its prompts; judge rubrics such as drift's arrive in the request body instead)
 - `process_transcript` — pushes processed transcript results back to the backend
 
 **SQS queues (AWS, LocalStack for local)** — configured via `QUEUE__*` env vars:

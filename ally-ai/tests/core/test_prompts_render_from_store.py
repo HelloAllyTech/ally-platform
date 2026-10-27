@@ -27,7 +27,7 @@ def _calls_without_prompts() -> list[str]:
             if name not in RENDERERS:
                 continue
             passes = len(node.args) >= 2 or any(
-                kw.arg in ("prompts", "prompt_data") for kw in node.keywords
+                kw.arg == "prompts" for kw in node.keywords
             )
             if not passes:
                 found.append(f"{path.relative_to(APP_DIR.parent)}:{node.lineno}")

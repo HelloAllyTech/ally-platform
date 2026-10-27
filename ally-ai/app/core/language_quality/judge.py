@@ -147,9 +147,9 @@ async def judge_session(
 ) -> Tuple[LanguageJudgmentResult, str]:
     """Run the language-quality judge over one whole session transcript.
 
-    `rubric` is the static instruction block sourced from prompt management
-    (LANGUAGE_JUDGE_PROMPT_CODE); callers should fetch it once and pass it in.
-    Falls back to the inline DEFAULT_JUDGE_RUBRIC when None.
+    `rubric` is the static instruction block: ally-be reads its live version
+    from the Skills Store and sends it in the request body (`rubric`). Falls
+    back to the inline DEFAULT_JUDGE_RUBRIC when None.
 
     `scenario_session_id` is attribution only: it rides onto the call's
     llm_usage row so the judge's cost lands on the session it judged.

@@ -535,18 +535,9 @@ class AgentWorker:
         # Log prompt metadata for debugging dashboard edits
         prompts = getattr(self.scenario.prompt_data, "prompts", None)
         if prompts:
-            default_key = "ally_ai_learn_system_base_role_instruction"
-            default_prompt = prompts.get(default_key, "")
             logger.info(
-                "[METADATA_PROMPTS] scenario has prompt_data.prompts with keys=%s, "
-                "base_role_instruction len=%s, preview=%s",
+                "[METADATA_PROMPTS] scenario has prompt_data.prompts with keys=%s",
                 list(prompts.keys())[:15],
-                len(default_prompt),
-                (
-                    (default_prompt[:150] + "...")
-                    if len(default_prompt) > 150
-                    else default_prompt
-                ),
             )
         else:
             logger.info("[METADATA_PROMPTS] scenario has no prompt_data.prompts")

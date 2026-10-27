@@ -9,10 +9,6 @@ from __future__ import annotations
 
 from typing import List, Optional, TypedDict
 
-# Prompt-management code for this rubric; the registry version is
-# authoritative and the inline default below is the fallback.
-RAG_QUALITY_JUDGE_PROMPT_CODE = "rag_quality_rubric"
-
 
 class JudgedPassage(TypedDict, total=False):
     chunk_id: str

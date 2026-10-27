@@ -38,18 +38,6 @@ def _coerce_block_value(value: Any) -> str:
     return str(value).strip()
 
 
-def _optional_field_line(prompt_text: str, value: Any) -> str:
-    normalized = _coerce_block_value(value)
-    if not normalized:
-        return ""
-    # Instead of technical labels, create a prose-like narrative flow
-    # Handle both sentence-starts and continuation-labels
-    content = f"{prompt_text.strip()} {normalized}"
-    if not content.endswith((".", "!", "?")):
-        content += "."
-    return content + " "
-
-
 def _format_allowed_fillers_for_prompt(fillers: Optional[List[str]]) -> str:
     """Human-readable list for the {allowed_fillers} placeholder.
 
@@ -1106,24 +1094,3 @@ def generate_system_message(
     if defer_retrieved_context:
         return msg, _build_retrieved_context_message(effective_retrieved_context)
     return _append_retrieved_context(msg, effective_retrieved_context), None
-
-
-def generate_prompt_content(
-    prompt_data: PromptData,
-    next_instruction: Optional[str] = None,
-    language_code: Optional[str] = None,
-    behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
-    current_state: Optional[SimulationStateInstruction] = None,
-    retrieved_context: Optional[str] = None,
-    current_score: Optional[int] = None,
-) -> str:
-    system_message, _ = generate_system_message(
-        prompt_data=prompt_data,
-        next_instruction=next_instruction,
-        language_code=language_code,
-        behavior_instructions=behavior_instructions,
-        current_state=current_state,
-        retrieved_context=retrieved_context,
-        current_score=current_score,
-    )
-    return system_message.content

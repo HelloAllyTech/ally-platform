@@ -107,10 +107,9 @@ async def judge_session(
 ) -> Tuple[DriftJudgmentResult, str]:
     """Run the drift judge over one whole session transcript.
 
-    `rubric` is the static instruction block sourced from prompt management
-    (DRIFT_JUDGE_PROMPT_CODE); callers should fetch it once (e.g. via
-    AllyCoreService.get_prompts_by_codes) and pass it in to avoid re-fetching
-    per session. Falls back to the inline DEFAULT_JUDGE_RUBRIC when None.
+    `rubric` is the static instruction block: ally-be reads its live version
+    from the Skills Store and sends it in the request body (`rubric`). Falls
+    back to the inline DEFAULT_JUDGE_RUBRIC when None.
 
     `scenario_session_id` is attribution only: it rides onto the call's
     llm_usage row so the judge's cost lands on the session it judged.

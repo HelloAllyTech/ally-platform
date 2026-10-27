@@ -27,7 +27,7 @@ class PromptManager:
         """Loads all .txt prompt files from the prompts directory.
 
         Expects structure: <file_key>/<prompt_key>.txt
-        e.g. system/base_role_instruction.txt under app/prompts/
+        e.g. system/main_agent_prompt.txt under app/prompts/
         """
         self._prompts = {}
         if not self.templates_dir.exists():

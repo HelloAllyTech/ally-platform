@@ -110,7 +110,7 @@ session's Skills Store text), falling back to the local defaults only when there
 This node generates the AI client response. Steps:
 
 1. **Merge feedback** -- if no branching feedback was selected, fall back to highest-score non-branching event feedback
-2. **Build system message** -- `generate_system_message()` creates the system prompt from scenario `PromptData` and the resolved `next_instruction`
+2. **Build system message** -- `generate_system_message()` creates the system prompt from scenario `PromptData` and the resolved `next_instruction` (the only entry point: the old `generate_prompt_content()` wrapper is gone)
 3. **Get LLM client** -- from config or create dynamically
 4. **Generate response** -- `llm_instance.ainvoke(messages)` with system message prepended
 5. **Clear state** -- reset `branching_and_feedback_data`, `non_branching_feedback_data`, `next_instruction`, and `feedback_to_send`

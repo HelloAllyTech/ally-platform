@@ -16,52 +16,14 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-PROMPT_CODE_PREFIX = "ally_ai_"
 
-
-def _prompt_code_to_path(prompt_code: str) -> tuple[str, str]:
-    """
-    Parse prompt_code into (file_key, prompt_key) for local lookup.
-    E.g. ally_ai_nudge_nudge -> (nudge, nudge)
-    E.g. ally_ai_a_b_c -> (a, b/c)
-    """
-    code = prompt_code
-    if code.startswith(PROMPT_CODE_PREFIX):
-        code = code[len(PROMPT_CODE_PREFIX) :]
-    if "_" not in code:
-        logger.warning(f"Invalid prompt code (no subdir): {prompt_code}")
-        return ("", "")
-
-    # For local lookup, we assume the first part is the subdir and the rest is the
-    # path/file
-    file_key, prompt_key_part = code.split("_", 1)
-    prompt_key = prompt_key_part.replace("_", os.sep)
-    return (file_key, prompt_key)
-
-
-def _get_local_template(prompt_code: str, internal_path: Optional[str] = None) -> str:
-    """Get template from local prompts folder using path-based prompt_code."""
-    if internal_path:
-        # If we have internal_path, use it directly to avoid lossy string splitting
-        if "/" in internal_path:
-            file_key, prompt_key = internal_path.split("/", 1)
-            return (
-                prompt_manager.get_template(file_key, prompt_key.replace("/", os.sep))
-                or ""
-            )
-
-    file_key, prompt_key = _prompt_code_to_path(prompt_code)
-    if not file_key or not prompt_key:
+def _get_local_template(internal_path: str) -> str:
+    """Read the local default .txt for a prompt by its path (<category>/<name>)."""
+    if "/" not in internal_path:
+        logger.warning(f"Invalid prompt path (no category): {internal_path}")
         return ""
-    # A code can't tell a nested path from a filename with underscores:
-    # ally_ai_summary_dictation_summary is summary/dictation_summary.txt, not
-    # summary/dictation/summary.txt. Every ally-ai prompt is <category>/<name>.txt
-    # today, so the flat file wins when it exists; the nested reading is for a
-    # prompt that really lives deeper.
-    flat_key = prompt_key.replace(os.sep, "_")
-    if (prompt_manager.base_dir / file_key / f"{flat_key}.txt").exists():
-        return prompt_manager.get_template(file_key, flat_key) or ""
-    return prompt_manager.get_template(file_key, prompt_key) or ""
+    file_key, prompt_key = internal_path.split("/", 1)
+    return prompt_manager.get_template(file_key, prompt_key.replace("/", os.sep)) or ""
 
 
 def _get_backend_prompt_entry(
@@ -163,7 +125,8 @@ class SafeFormatter(dict):
 def resolve_template(
     prompt_code: str,
     backend_prompts: Optional[Dict[str, Any]] = None,
-    internal_path: Optional[str] = None,
+    *,
+    internal_path: str,
 ) -> str:
     """
     Resolve a prompt template.
@@ -183,7 +146,7 @@ def resolve_template(
 
     # The local file is a minimal default, so running it is worth seeing in the
     # logs: the request didn't carry this prompt's live text.
-    local_template = _get_local_template(prompt_code, internal_path=internal_path)
+    local_template = _get_local_template(internal_path)
     logger.warning(
         "[PROMPT_SOURCE] %s: using fallback (local default; not in the request's "
         "store prompts), len=%d",
@@ -195,52 +158,29 @@ def resolve_template(
 
 def load_template(
     internal_path: str,
-    prompt_data: Any = None,
     prompts: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Resolve template with fallback to local.
     """
     prompt_code = f"ally_ai_{internal_path.replace('/', '_')}"
-
-    # Use 'prompts' if passed directly as keyword, otherwise look into prompt_data
-    backend_prompts = prompts
-    if backend_prompts is None:
-        if isinstance(prompt_data, dict):
-            backend_prompts = prompt_data
-        else:
-            backend_prompts = (
-                getattr(prompt_data, "prompts", None) if prompt_data else None
-            )
-
-    return (
-        resolve_template(prompt_code, backend_prompts, internal_path=internal_path)
-        or ""
-    )
+    return resolve_template(prompt_code, prompts, internal_path=internal_path) or ""
 
 
 def load_and_format(
     internal_path: str,
-    prompt_data: Any = None,
     prompts: Optional[Dict[str, Any]] = None,
     **kwargs,
 ) -> str:
     """
     Load template and format with allowlist-aware safe substitution.
     """
-    template = load_template(internal_path, prompt_data=prompt_data, prompts=prompts)
+    template = load_template(internal_path, prompts=prompts)
     if not template:
         return ""
 
     prompt_code = f"ally_ai_{internal_path.replace('/', '_')}"
-    backend_prompts = prompts
-    if backend_prompts is None:
-        backend_prompts = (
-            prompt_data
-            if isinstance(prompt_data, dict)
-            else (getattr(prompt_data, "prompts", None) if prompt_data else None)
-        )
-    backend_entry = _get_backend_prompt_entry(backend_prompts, prompt_code)
+    backend_entry = _get_backend_prompt_entry(prompts, prompt_code)
     not_supplied = missing_required(prompt_code, kwargs)
     if not_supplied:
         # The code and the prompt's contract have drifted apart. Loud, but the

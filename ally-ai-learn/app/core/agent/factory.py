@@ -351,43 +351,6 @@ def build_llm_client_for_prompt(
     )
 
 
-def resolve_call_site_llm_client(
-    scenario: Scenario,
-    prompt_code: Optional[str],
-    *,
-    default_client: BaseLLMClient,
-    base_llm_config: Optional[Dict[str, Any]] = None,
-    language_code: str = DEFAULT_LANGUAGE_CODE,
-) -> BaseLLMClient:
-    """Return a per-prompt LLM client for an auxiliary call site.
-
-    When the prompt/skill at ``prompt_code`` carries a model or temperature
-    override, build a dedicated client honoring it; otherwise return the shared
-    ``default_client`` unchanged (no extra client built, no behaviour change).
-    This lets every call site honor a prompt-level override while keeping the
-    common no-override path identical to today.
-    """
-    provider, model, temperature = get_prompt_llm_overrides(
-        getattr(scenario, "prompt_data", None), prompt_code
-    )
-    if provider is None and model is None and temperature is None:
-        return default_client
-    try:
-        return build_llm_client_for_prompt(
-            scenario,
-            prompt_code,
-            base_llm_config=base_llm_config,
-            language_code=language_code,
-        )
-    except Exception as e:  # never break a call site over an override
-        logger.warning(
-            "[LLM] prompt=%s override failed (%s); using default client",
-            prompt_code,
-            e,
-        )
-        return default_client
-
-
 def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
     """
     Configure the main roleplay-agent LLM client from scenario metadata.

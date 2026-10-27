@@ -54,12 +54,10 @@ Defines the simulated client persona:
 | `session_behavior_guidelines` | No | Behavioral rules for this session |
 | `agent_goal` | No | What the AI should try to accomplish |
 | `custom_fields` | No | Dynamic key-value pairs |
-| `prompt` | No | Custom prompt override |
 | `response_length` | No | `VERY_BRIEF`, `BRIEF`, `MEDIUM`, or `ELABORATE` |
-| `agent_dialogues` | No | Pre-scripted dialogue options |
 | `language_dialogue_samples` | No | Sample utterances for linguistic style; when present for non-English, injected into prompt |
 | `previous_memory` | No | Summary from a previous session |
-| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_system_base_role_instruction`, etc.) |
+| `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_system_main_agent_prompt`, etc.) |
 | `competency` | No | Counseling competency being trained; shapes the simulation |
 
 ### ScenarioVoice and VoiceConfig
@@ -153,9 +151,7 @@ Steps:
 | `promptData.openingStatements` | `opening_statements` |
 | `promptData.agentGoal` | `agent_goal` |
 | `promptData.customFields` | `custom_fields` |
-| `promptData.prompt` | `prompt` |
 | `promptData.responseLength` | `response_length` |
-| `promptData.agentDialogues` | `agent_dialogues` |
 | `promptData.previousMemory` | `previous_memory` |
 | `promptData.prompts` | `prompts` |
 | `promptData.competency` | `competency` |

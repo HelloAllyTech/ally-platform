@@ -329,19 +329,3 @@ class TestRetrievedContextDeferredToSuffix:
         assert omitted[0].content == explicit_false[0].content
         assert omitted[1] is None
         assert explicit_false[1] is None
-
-
-class TestGeneratePromptContentUnpacking:
-    """generate_prompt_content must keep returning a plain str even though
-    generate_system_message's own return type changed to a tuple."""
-
-    def test_returns_plain_string(self):
-        from app.core.graph.prompt import generate_prompt_content
-
-        content = generate_prompt_content(
-            prompt_data=_pd(),
-            behavior_instructions=[],
-            retrieved_context="**topic:** stress management",
-        )
-        assert isinstance(content, str)
-        assert "stress management" in content

@@ -13,11 +13,6 @@ from __future__ import annotations
 
 from typing import List, Optional, TypedDict
 
-# Prompt-management code for the judge rubric (seeded by the
-# AddDriftJudgePrompt migration). The judge fetches the current version from
-# ally-be and falls back to DEFAULT_JUDGE_RUBRIC below if the fetch fails.
-DRIFT_JUDGE_PROMPT_CODE = "drift_judge_conversation_rubric"
-
 
 class TranscriptTurn(TypedDict, total=False):
     role: str  # "client" (AI) | "counselor" (human)

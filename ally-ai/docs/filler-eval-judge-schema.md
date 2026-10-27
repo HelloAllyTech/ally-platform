@@ -2,7 +2,7 @@
 
 **Status:** v1. Changes to the enums once judging is live = new `judge_prompt_version` (and re-judging for comparability).
 **Companion docs:** `language-eval-judge-schema.md` (the judge this one is modelled on), and `ally-ai-learn/docs/thinking-fillers-perf-plan.md` (why the metrics exist).
-**Implementation:** `ally-ai/app/core/filler_quality/{schemas,prompt,judge}.py` + endpoint `POST /api/v1/filler-quality/judge`. Rubric text lives in prompt management as `filler_quality_judge_rubric` (versioned; inline fallback in `prompt.py`).
+**Implementation:** `ally-ai/app/core/filler_quality/{schemas,prompt,judge}.py` + endpoint `POST /api/v1/filler-quality/judge`. Rubric text lives in the Skills Store as `filler_quality_judge_rubric` (a pinned prompt, seeded from ally-be `src/prompts/filler_quality_judge/rubric.txt`); ally-be reads its live version once per backfill job and sends it as `rubric`, and `DEFAULT_FILLER_RUBRIC` in `prompt.py` is the fallback when none arrives.
 
 ---
 
