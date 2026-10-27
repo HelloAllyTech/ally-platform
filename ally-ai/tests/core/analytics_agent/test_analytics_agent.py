@@ -155,9 +155,12 @@ class TestBuildPlanPrompt:
         assert "250" in prompt
 
     def test_states_the_read_only_single_statement_rule(self):
+        # The default (a minimal base) keeps the rules ally-be's guard enforces;
+        # the tuned wording lives in the Skills Store.
         prompt = build_plan_prompt("q", schema_catalog="t", today="d", row_limit=10)
-        assert "Exactly ONE statement" in prompt
-        assert "Read-only" in prompt
+        assert "ONE read-only PostgreSQL query" in prompt
+        assert "single SELECT" in prompt
+        assert "no semicolons or comments" in prompt
 
     def test_history_is_included_oldest_first_for_follow_ups(self):
         prompt = build_plan_prompt(

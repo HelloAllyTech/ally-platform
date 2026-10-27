@@ -50,16 +50,15 @@ class TestApplicabilityPrompt:
     def test_prompt_separates_opportunity_from_performance(self):
         prompt = build_actor_goal_system_prompt([_goal("Build rapport")])
 
-        assert "NOT\nAPPLICABLE" in prompt or "NOT APPLICABLE" in prompt
-        assert "handled badly IS applicable" in prompt
-        assert "When in doubt, treat the goal as applicable." in prompt
+        assert "no occasion to demonstrate it" in prompt
+        assert "handled badly is applicable and scores low" in prompt
 
     def test_prompt_asks_for_not_applicable_key(self):
         prompt = build_actor_goal_system_prompt([_goal("Build rapport")])
 
         assert '"not_applicable"' in prompt
         # Every goal stays in metrics so Roleplay Logs can still show it.
-        assert "including any you mark not applicable" in prompt
+        assert "Include every goal." in prompt
 
 
 class TestEvaluateActorGoals:

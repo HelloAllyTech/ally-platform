@@ -280,7 +280,10 @@ class TestGlossaryDualFramingSelector:
         )
         assert "the client's own memories" in prompt
         assert "- school memories: Bullied in 8th grade" in prompt
-        assert "reaches only indirectly" in prompt
+        # The default keeps the memories framing; the tuned wording that took
+        # recall from 0/9 to 9/9 lives in the Skills Store and is checked by
+        # tests/integration/test_knowledge_selector_live.py.
+        assert "would draw on to answer the counselor's latest message" in prompt
         assert "glossary" not in prompt.lower()
 
     def test_glossary_titles_get_their_hint_not_a_preview(self):
@@ -308,8 +311,7 @@ class TestGlossaryDualFramingSelector:
         )
         assert f"- {self.GLOSSARY_TITLE}" in prompt
         assert f"when to retrieve: {self.HINT}" in prompt
-        assert "SPEAK its next reply" in prompt
-        assert "prefer" in prompt
+        assert "likely to enter that vocabulary, even before it is mentioned" in prompt
 
     @pytest.mark.asyncio
     async def test_glossary_section_retrieved_with_hint_in_prompt(self):
@@ -326,7 +328,7 @@ class TestGlossaryDualFramingSelector:
         assert 'worry: say "டென்ஷன்"' in result
         system_prompt = client.structured.captured_messages[0].content
         assert f"when to retrieve: {self.HINT}" in system_prompt
-        assert "SPEAK its next reply" in system_prompt
+        assert "likely to enter that vocabulary" in system_prompt
 
     @pytest.mark.asyncio
     async def test_cache_key_accounts_for_glossary_hints(self):
