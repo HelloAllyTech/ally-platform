@@ -241,7 +241,7 @@ A challenger becomes a candidate version served to a share of traffic, instead o
 
 ### Local development: pull, edit, push
 
-One CLI, `prompts`, at the monorepo root, backed by two new ally-be endpoints (`GET /api/v1/prompts/export` and `POST /api/v1/prompts/:code/versions`) and protected by per-developer API keys.
+One CLI, `prompts`, at the monorepo root, backed by two new ally-be endpoints (`GET /api/v1/skills-store/export` and `POST /api/v1/skills-store/prompts/:code/versions`) and protected by per-developer API keys.
 
 | Command | What it does |
 | --- | --- |
@@ -339,7 +339,7 @@ Four phases, each shippable on its own. Phase 0 must land first: until every ser
 
 ### Phase 1: pull and push CLI
 
-- `GET /api/v1/prompts/export` and `POST /api/v1/prompts/:code/versions` with a base-version check (`409 stale base`). The dashboard save gets the same check.
+- `GET /api/v1/skills-store/export` and `POST /api/v1/skills-store/prompts/:code/versions` with a base-version check (`409 stale base`). The dashboard save gets the same check.
 - Skills Store keys, generated and revoked in the admin dashboard by anyone with Skills Store access, with separate pull and push scopes.
 - The `prompts` CLI: `pull`, `status`, `diff`, `push`, with a three-way merge on a stale base.
 - `prompts push` waits for translations and reports each language as ready or failed; `prompts status` lists stale and failed translations.

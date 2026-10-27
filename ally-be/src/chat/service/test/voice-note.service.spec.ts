@@ -9,6 +9,7 @@ import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { SettingsService } from 'src/settings/service/settings.service';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { LoggerService } from 'src/logger/logger.service';
+import * as promptTemplateUtil from 'src/common/util/prompt-template.util';
 
 const mockTranscriptionsCreate = jest.fn();
 const mockMessagesCreate = jest.fn();
@@ -182,6 +183,42 @@ describe('VoiceNoteService', () => {
       await expect(
         service.generateFromAudio(audio, fields),
       ).rejects.toBeInstanceOf(VoiceNoteExtractionFailedException);
+    });
+
+    it('uses the shipped default prompt when the store has no text', async () => {
+      (service as any).promptSharedService.getPromptByCode.mockResolvedValue(
+        null,
+      );
+      mockMessagesCreate.mockResolvedValue({
+        content: [{ type: 'text', text: '{}' }],
+      });
+
+      await service.generateFromAudio(audio, fields);
+
+      const request = mockMessagesCreate.mock.calls[0][0];
+      expect(request.system).toContain('session-note fields');
+      expect(request.messages[0].content).toContain(
+        'caller described trouble sleeping',
+      );
+    });
+
+    it('fails extraction, keeping the transcript, when a prompt has no text anywhere', async () => {
+      const load = jest
+        .spyOn(promptTemplateUtil, 'loadPromptTemplate')
+        .mockRejectedValue(new Error('Prompt "x" has no text'));
+      try {
+        await expect(
+          service.generateFromAudio(audio, fields),
+        ).rejects.toMatchObject({
+          response: {
+            errorCode: ErrorCode.VOICE_NOTE_EXTRACTION_FAILED,
+            transcript: 'caller described trouble sleeping',
+          },
+        });
+        expect(mockMessagesCreate).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
     });
 
     it('still succeeds normally when extraction works', async () => {

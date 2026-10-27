@@ -121,16 +121,6 @@ export const BUILDER_EVAL_RESUME_TASK = 'builder-eval-resume';
 
 /** Stacks retrieval defaults — small on purpose; hits are compact. */
 export const BUILDER_STACKS_DEFAULT_RESULTS = 4;
-export const BUILDER_STACKS_MAX_RESULTS = 10;
-
-/**
- * Deadline on one Stacks call.
- *
- * A retrieval is one round trip to a Vercel function that embeds the query and
- * ranks a small corpus. Twenty seconds is generous for that and still short
- * enough that a wedged library costs the turn a pause rather than the turn.
- */
-export const BUILDER_STACKS_TIMEOUT_MS = 20_000;
 
 /**
  * Per-tenant session caps, mirroring the character-interview rationale: bound
@@ -330,7 +320,6 @@ export const BUILDER_AI_TASKS = {
 } as const;
 
 // Prompt registry code (src/prompts/builder/interviewer_system.txt).
-export const BUILDER_PROMPT_DIR = 'builder';
 export const BUILDER_PROMPTS = {
   INTERVIEWER_SYSTEM: 'builder_interviewer_system',
   /**

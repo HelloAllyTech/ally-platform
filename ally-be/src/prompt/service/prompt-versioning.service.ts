@@ -439,20 +439,6 @@ export class PromptVersioningService {
     for (const draft of drafts) this.translateInBackground(promptId, draft);
   }
 
-  async getReadiness(
-    promptId: string,
-    version: number,
-  ): Promise<TranslationReadiness> {
-    const manager = this.dataSource.manager;
-    const prompt = await manager.findOne(Prompt, { where: { id: promptId } });
-    const target = await manager.findOne(PromptVersion, {
-      where: { promptId, version },
-    });
-    if (!prompt || !target) throw new NotFoundException('Version not found');
-    return this.readinessWith(manager, prompt, target);
-  }
-
-  /** Start (or retry) translating a version's body; used by the editor's retry. */
   /**
    * Discard a draft: a version that was never published. One that has been
    * live is history and stays (roll back to it instead). Its translations go
@@ -494,6 +480,7 @@ export class PromptVersioningService {
     return { promptId, version };
   }
 
+  /** Start (or retry) translating a version's body; used by the editor's retry. */
   async translateVersion(promptId: string, version: number): Promise<void> {
     const target = await this.dataSource.manager.findOne(PromptVersion, {
       where: { promptId, version },
@@ -505,14 +492,6 @@ export class PromptVersioningService {
       target.id,
       { retryFailed: true },
     );
-  }
-
-  async currentVersionOf(promptId: string): Promise<number | null> {
-    const row = await this.dataSource.manager.findOne(Prompt, {
-      where: { id: promptId },
-      select: ['id', 'currentVersion'],
-    });
-    return row?.currentVersion ?? null;
   }
 
   async latestVersionOf(promptId: string): Promise<number | null> {

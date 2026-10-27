@@ -58,15 +58,7 @@ export interface KeyedTranslationOptions {
   onBatch?: (translated: number, total: number) => void;
 }
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
-import {
-  DEFAULT_OPENAI_TRANSLATION_SYSTEM_PROMPT_TEMPLATE,
-  DEFAULT_OPENAI_TRANSLATION_USER_PROMPT_TEMPLATE,
-  DEFAULT_OPENAI_BEHAVIOR_INSTRUCTION_TRANSLATION_PROMPT_TEMPLATE,
-  DEFAULT_OPENAI_SESSION_EVENT_TRANSLATION_PROMPT_TEMPLATE,
-  DEFAULT_OPENAI_TEXT_TRANSLATION_PROMPT_TEMPLATE,
-  DEFAULT_OPENAI_TOOLTIP_TRANSLATION_PROMPT_TEMPLATE,
-  OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_CODE,
-} from 'src/common/constants/openai-translations.constants';
+import { OPENAI_TRACK_CONTENT_TRANSLATION_PROMPT_CODE } from 'src/common/constants/openai-translations.constants';
 import { toPromptCode } from 'src/prompt/util/prompt-code.util';
 import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
 import {
@@ -135,21 +127,9 @@ export class OpenAITranslationsService {
     'openai_translation',
     'speech_reexpression_user',
   );
-  private readonly BEHAVIOR_INSTRUCTION_PROMPT_CODE = toPromptCode(
-    'openai_translation',
-    'learn_behavior_instruction',
-  );
-  private readonly SESSION_EVENT_PROMPT_CODE = toPromptCode(
-    'openai_translation',
-    'session_event',
-  );
   private readonly TEXT_TRANSLATION_PROMPT_CODE = toPromptCode(
     'openai_translation',
     'general_text_translation',
-  );
-  private readonly TOOLTIP_TRANSLATION_PROMPT_CODE = toPromptCode(
-    'openai_translation',
-    'tooltip_translation',
   );
 
   private renderTemplate(
@@ -167,11 +147,11 @@ export class OpenAITranslationsService {
   /* ------------------------------------------------------------------
    * Build system prompt for natural code-mixed language generation
    * ------------------------------------------------------------------ */
-  private async buildSystemPrompt(
+  private buildSystemPrompt(
+    template: string,
     targetLanguageCode: string,
     scenarioContext?: any,
-    overrideTemplate?: string,
-  ): Promise<string> {
+  ): string {
     const normalizedCode = this.resolveBaseLanguageCode(targetLanguageCode);
     const languageName =
       LANGUAGE_NAME_MAP[normalizedCode] ?? targetLanguageCode;
@@ -241,76 +221,35 @@ IMPORTANT:
       }
     }
 
-    const dbTemplate =
-      overrideTemplate ??
-      (await this.promptSharedService.getPromptByCode(this.SYSTEM_PROMPT_CODE));
-
-    if (dbTemplate) {
-      const preserveWordsString =
-        preserveWords.length > 0
-          ? preserveWords.join(', ')
-          : 'technical terms, app names, proper nouns';
-
-      const filled = this.renderTemplate(dbTemplate, {
-        languageName,
-        fullContext,
-        toneGuidance,
-        preserveWords: preserveWordsString,
-      });
-      return filled;
-    }
-
-    // Fallback to static prompt if DB template not found — use constants
     const preserveWordsString =
       preserveWords.length > 0
         ? preserveWords.join(', ')
         : 'technical terms, app names, proper nouns';
 
-    return this.renderTemplate(
-      DEFAULT_OPENAI_TRANSLATION_SYSTEM_PROMPT_TEMPLATE,
-      {
-        languageName,
-        fullContext,
-        toneGuidance,
-        preserveWords: preserveWordsString,
-      },
-    );
+    return this.renderTemplate(template, {
+      languageName,
+      fullContext,
+      toneGuidance,
+      preserveWords: preserveWordsString,
+    });
   }
 
   /* ------------------------------------------------------------------
    * Build user prompt for JSON speech re-expression
    * ------------------------------------------------------------------ */
-  private async buildUserPrompt(
+  private buildUserPrompt(
+    template: string,
     sourceObject: any,
     targetLanguageCode: string,
-    overrideTemplate?: string,
-  ): Promise<string> {
+  ): string {
     const normalizedCode = this.resolveBaseLanguageCode(targetLanguageCode);
     const languageName =
       LANGUAGE_NAME_MAP[normalizedCode] ?? targetLanguageCode;
 
-    const dbTemplate =
-      overrideTemplate ??
-      (await this.promptSharedService.getPromptByCode(this.USER_PROMPT_CODE));
-
-    const inputJson = JSON.stringify(sourceObject, null, 2);
-
-    if (dbTemplate) {
-      const filled = this.renderTemplate(dbTemplate, {
-        languageName,
-        inputJson,
-      });
-      return filled;
-    }
-
-    // Fallback to static prompt if DB template not found — use constants
-    return this.renderTemplate(
-      DEFAULT_OPENAI_TRANSLATION_USER_PROMPT_TEMPLATE,
-      {
-        languageName,
-        inputJson,
-      },
-    );
+    return this.renderTemplate(template, {
+      languageName,
+      inputJson: JSON.stringify(sourceObject, null, 2),
+    });
   }
 
   /* ------------------------------------------------------------------
@@ -455,13 +394,15 @@ IMPORTANT:
     const translatedResult: Record<string, any> = {};
     const total = targetLanguages.length;
 
-    // Loop through each language and translate
-    // Fetch templates once to avoid repeated DB calls
-    const systemTemplate = await this.promptSharedService.getPromptByCode(
+    // Fetch templates once, before the language loop. Store text, else the
+    // shipped default; when a prompt has neither this throws, and the caller's
+    // failure path runs rather than a translation with no instructions.
+    const systemTemplate = await loadPromptTemplate(
+      this.promptSharedService,
       this.SYSTEM_PROMPT_CODE,
     );
-
-    const userTemplate = await this.promptSharedService.getPromptByCode(
+    const userTemplate = await loadPromptTemplate(
+      this.promptSharedService,
       this.USER_PROMPT_CODE,
     );
 
@@ -475,16 +416,16 @@ IMPORTANT:
           total,
         });
 
-        const systemPrompt = await this.buildSystemPrompt(
+        const systemPrompt = this.buildSystemPrompt(
+          systemTemplate,
           language,
           translationConsiderableData,
-          systemTemplate ?? undefined,
         );
 
-        const userPrompt = await this.buildUserPrompt(
+        const userPrompt = this.buildUserPrompt(
+          userTemplate,
           sourceObject,
           language,
-          userTemplate ?? undefined,
         );
 
         const translations = await this.fetchTranslations(
@@ -557,18 +498,24 @@ IMPORTANT:
     };
   }
 
-  private getFallbackPromptTemplate(promptCode: string): string | undefined {
-    const fallbackPromptMap: Record<string, string> = {
-      [this.BEHAVIOR_INSTRUCTION_PROMPT_CODE]:
-        DEFAULT_OPENAI_BEHAVIOR_INSTRUCTION_TRANSLATION_PROMPT_TEMPLATE,
-      [this.SESSION_EVENT_PROMPT_CODE]:
-        DEFAULT_OPENAI_SESSION_EVENT_TRANSLATION_PROMPT_TEMPLATE,
-      [this.TEXT_TRANSLATION_PROMPT_CODE]:
-        DEFAULT_OPENAI_TEXT_TRANSLATION_PROMPT_TEMPLATE,
-      [this.TOOLTIP_TRANSLATION_PROMPT_CODE]:
-        DEFAULT_OPENAI_TOOLTIP_TRANSLATION_PROMPT_TEMPLATE,
-    };
-    return fallbackPromptMap[promptCode];
+  /**
+   * A translation prompt's text (store, else shipped default), or null — with
+   * the reason logged — when it has none anywhere, so the caller can take its
+   * own "no prompt" path instead of calling the model without instructions.
+   */
+  private async loadTranslationPrompt(
+    promptCode: string,
+  ): Promise<string | null> {
+    try {
+      return await loadPromptTemplate(this.promptSharedService, promptCode);
+    } catch (error) {
+      this.logger.error(
+        `[OpenAITranslationsService] ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   /* ------------------------------------------------------------------
@@ -616,14 +563,9 @@ IMPORTANT:
     const languageName =
       LANGUAGE_NAME_MAP[normalizedCode] ?? targetLanguageCode;
 
-    const dbTemplate = await this.promptSharedService.getPromptByCode(
+    const promptTemplate = await this.loadTranslationPrompt(
       this.TEXT_TRANSLATION_PROMPT_CODE,
     );
-    const fallbackTemplate = this.getFallbackPromptTemplate(
-      this.TEXT_TRANSLATION_PROMPT_CODE,
-    );
-    const promptTemplate = dbTemplate ?? fallbackTemplate;
-
     if (!promptTemplate) {
       this.logger.warn(
         `[OpenAITranslationsService] Missing prompt for text translation, returning original`,
@@ -661,18 +603,11 @@ IMPORTANT:
 
     const translatedResult: Record<string, any> = {};
 
-    const promptFromDb =
-      await this.promptSharedService.getPromptByCode(promptCode);
-
-    const fallbackPrompt = this.getFallbackPromptTemplate(promptCode);
-
-    const promptTemplate = promptFromDb ?? fallbackPrompt;
-
+    const promptTemplate = await this.loadTranslationPrompt(promptCode);
     if (!promptTemplate) {
       this.logger.warn(
-        `[OpenAITranslationsService] Missing prompt for code ${promptCode}, translations may be suboptimal`,
+        `[OpenAITranslationsService] Missing prompt for code ${promptCode}, skipping translation`,
       );
-
       return {};
     }
 

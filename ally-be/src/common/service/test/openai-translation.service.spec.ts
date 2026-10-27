@@ -1,7 +1,7 @@
 import { OpenAITranslationsService } from '../openai-translation.service';
 import { AppConfigService } from 'src/config/config.service';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
-import { toPromptCode } from 'src/prompt/util/prompt-code.util';
+import * as promptTemplateUtil from 'src/common/util/prompt-template.util';
 
 // Every completion goes through the provider factory; tests swap the
 // provider's getCompletion via `completionMock`.
@@ -313,6 +313,33 @@ describe('OpenAITranslationsService', () => {
       );
       expect(result.hi.title).toBe('Hello');
     });
+    it('uses the shipped default when the store has no text', async () => {
+      const service = createService({
+        getPromptByCode: jest.fn().mockResolvedValue(null),
+      });
+      const spy = jest
+        .spyOn(service as any, 'fetchTranslations')
+        .mockResolvedValue([JSON.stringify({ title: 'ok' })]);
+      await service.translateScenarioData(sourceObject, ['hi'], null);
+      const [, , systemPrompt, userPrompt] = spy.mock.calls[0] as string[];
+      expect(systemPrompt).toContain('natural, spoken Hindi');
+      expect(userPrompt).toContain('"title": "Hello"');
+    });
+    it('throws, without calling the model, when a prompt has no text anywhere', async () => {
+      const load = jest
+        .spyOn(promptTemplateUtil, 'loadPromptTemplate')
+        .mockRejectedValue(new Error('Prompt "x" has no text'));
+      try {
+        const service = createService({});
+        const spy = jest.spyOn(service as any, 'fetchTranslations');
+        await expect(
+          service.translateScenarioData(sourceObject, ['hi'], null),
+        ).rejects.toThrow('has no text');
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
+    });
   });
 
   describe('translateObjectToLanguages', () => {
@@ -433,85 +460,74 @@ describe('OpenAITranslationsService', () => {
       expect(out).toBe('No placeholders here.');
     });
 
-    it('buildUserPrompt uses override and includes inputJson', async () => {
+    it('buildUserPrompt fills languageName and inputJson', () => {
       const service = createService({});
       const tpl = 'USR {{languageName}} {{inputJson}}';
-      const out = await (service as any).buildUserPrompt(
+      const out = (service as any).buildUserPrompt(
+        tpl,
         { title: 'Hello' },
         'hi-IN',
-        tpl,
       );
       expect(out).toContain('USR');
       expect(out).toContain('Hindi');
       expect(out).toContain('"title": "Hello"');
     });
 
-    it('buildUserPrompt uses DB template when available', async () => {
-      const getPromptByCode = jest
-        .fn()
-        .mockResolvedValueOnce('USR {{languageName}} {{inputJson}}');
-      const service = createService({ getPromptByCode });
-      const out = await (service as any).buildUserPrompt(
-        { title: 'Hello' },
-        'hi-IN',
-      );
-      expect(getPromptByCode).toHaveBeenCalledTimes(1);
-      expect(out).toContain('Hindi');
-      expect(out).toContain('"title": "Hello"');
-    });
-
-    it('buildUserPrompt falls back to default when DB returns null', async () => {
-      const getPromptByCode = jest.fn().mockResolvedValueOnce(null);
-      const service = createService({ getPromptByCode });
-      const out = await (service as any).buildUserPrompt(
-        { title: 'Hello' },
-        'hi-IN',
-      );
-      expect(getPromptByCode).toHaveBeenCalledTimes(1);
-      expect(out).toContain('Hindi');
-      expect(out).toContain('"title": "Hello"');
-    });
-
-    it('buildSystemPrompt uses override and substitutes variables', async () => {
+    it('buildSystemPrompt substitutes variables', () => {
       const service = createService({});
       const tpl = 'SYS {{languageName}} {{toneGuidance}} {{preserveWords}}';
-      const out = await (service as any).buildSystemPrompt(
-        'hi-IN',
-        scenario,
-        tpl,
-      );
+      const out = (service as any).buildSystemPrompt(tpl, 'hi-IN', scenario);
       expect(out).toContain('SYS');
-      expect(out).toContain('Hindi');
-    });
-
-    it('buildSystemPrompt uses DB template when available', async () => {
-      const getPromptByCode = jest
-        .fn()
-        .mockResolvedValueOnce(
-          'SYS {{languageName}} {{toneGuidance}} {{preserveWords}}',
-        );
-      const service = createService({ getPromptByCode });
-      const out = await (service as any).buildSystemPrompt('hi-IN', scenario);
-      expect(getPromptByCode).toHaveBeenCalledTimes(1);
-      expect(out).toContain('Hindi');
-    });
-
-    it('buildSystemPrompt falls back to default when DB returns null', async () => {
-      const getPromptByCode = jest.fn().mockResolvedValueOnce(null);
-      const service = createService({ getPromptByCode });
-      const out = await (service as any).buildSystemPrompt('hi-IN', scenario);
-      expect(getPromptByCode).toHaveBeenCalledTimes(1);
       expect(out).toContain('Hindi');
     });
   });
 
-  describe('getFallbackPromptTemplate', () => {
-    it('returns fallback prompt template', () => {
-      const service = createService({});
-      const out = (service as any).getFallbackPromptTemplate(
-        toPromptCode('openai_translation', 'session_event'),
+  describe('prompt with no text in the store', () => {
+    it('falls back to the shipped default', async () => {
+      completionMock = jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ title: 'नमस्ते' }));
+      const service = createService({
+        getPromptByCode: jest.fn().mockResolvedValue(null),
+      });
+      const result = await service.translateObjectToLanguages(
+        sourceObject,
+        ['hi'],
+        'openai_translation_session_event',
       );
-      expect(out).toContain('{{languageName}}');
+      expect(result.hi.title).toBe('नमस्ते');
+      const [messages] = completionMock.mock.calls[0];
+      expect(messages[0].content).toContain('session events');
+    });
+
+    it('skips the model call when the prompt has no text anywhere', async () => {
+      completionMock = jest.fn();
+      const service = createService({
+        getPromptByCode: jest.fn().mockResolvedValue(null),
+      });
+      const result = await service.translateObjectToLanguages(
+        sourceObject,
+        ['hi'],
+        'no_such_prompt',
+      );
+      expect(result).toEqual({});
+      expect(completionMock).not.toHaveBeenCalled();
+    });
+
+    it('translateText returns the original text when the prompt has no text anywhere', async () => {
+      const load = jest
+        .spyOn(promptTemplateUtil, 'loadPromptTemplate')
+        .mockRejectedValue(new Error('no text'));
+      try {
+        completionMock = jest.fn();
+        const service = createService({});
+        await expect(service.translateText('Hello', 'hi')).resolves.toBe(
+          'Hello',
+        );
+        expect(completionMock).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
     });
   });
 });

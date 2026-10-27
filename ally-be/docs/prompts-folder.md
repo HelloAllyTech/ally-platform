@@ -51,10 +51,12 @@ prompt for a long-running agent rather than a one-shot generation. Two things di
 - It is read by code through `PromptSharedService.getPromptByCode('<folder>_<file>')`, not
   picked by a human in the Admin Dashboard — so the contract's name and description are for
   whoever later goes looking for it, not for a chooser.
-- The service must **degrade to a hardcoded fallback when the row is missing**, because a
-  prompt that has not been synced to the database yet would otherwise take the whole agent
-  down. Copy that pattern rather than throwing; the agent working slightly worse beats the
-  tab not opening.
+- Load it with `loadPromptTemplate` (`src/common/util/prompt-template.util.ts`), not a
+  hardcoded copy of the text. `getPromptByCode` already falls back to the shipped `.txt`
+  when the store has no row; `loadPromptTemplate` also uses that shipped default when the
+  database can't be read, so the agent keeps working, and throws only when the prompt has
+  no text anywhere — the caller's failure path runs instead of a model call with no
+  instructions.
 
 ### Builder's one-shot prompts (`builder/`, `agent_memory/`)
 

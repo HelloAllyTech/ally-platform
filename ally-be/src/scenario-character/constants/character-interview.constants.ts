@@ -58,7 +58,6 @@ export const CHARACTER_INTERVIEW_MAX_ACTIVE_SESSIONS_PER_TENANT = 10;
 export const CHARACTER_INTERVIEW_MAX_SESSIONS_PER_TENANT_PER_MONTH = 100;
 
 // Prompt registry code (src/prompts/character_interview/interviewer_system.txt).
-export const CHARACTER_INTERVIEW_PROMPT_DIR = 'character_interview';
 export const CHARACTER_INTERVIEW_PROMPTS = {
   INTERVIEWER_SYSTEM: 'character_interview_interviewer_system',
 } as const;

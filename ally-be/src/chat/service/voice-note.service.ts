@@ -17,6 +17,7 @@ import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.servi
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { SettingsService } from 'src/settings/service/settings.service';
 import { toPromptCode } from 'src/prompt/util/prompt-code.util';
+import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
 import {
   GenerateNoteFromAudioResponseDto,
   VoiceNoteFieldSpec,
@@ -65,8 +66,10 @@ const VALID_FIELD_TYPES: ReadonlySet<VoiceNoteFieldType> = new Set([
   'boolean',
 ]);
 
-// Prompt codes for the (superadmin-editable) extraction templates. These map to
-// src/prompts/scribe_voice_note/*.txt and surface in Admin > Prompt Management.
+// Prompt codes for the (superadmin-editable) extraction templates. Their shipped
+// defaults are src/prompts/scribe_voice_note/*.txt; the live text is edited in
+// the Skills Store. The user template's {{transcript}} and {{fields}} runtime
+// variables are filled by renderTemplate before the call.
 const SYSTEM_PROMPT_CODE = toPromptCode(
   'scribe_voice_note',
   'field_extraction_system',
@@ -75,49 +78,6 @@ const USER_PROMPT_CODE = toPromptCode(
   'scribe_voice_note',
   'field_extraction_user',
 );
-
-// Fallbacks used when the prompt hasn't been synced to the DB yet (e.g. a fresh
-// deploy before PromptsSyncService has run). These MUST stay in sync with the
-// .txt files under src/prompts/scribe_voice_note/ — those files are the editable
-// source of truth. The user template's {{transcript}} and {{fields}} runtime
-// variables are filled by renderTemplate before the call.
-const DEFAULT_SYSTEM_PROMPT = [
-  'You extract structured counselling session-note fields from a transcript',
-  "of a counsellor's spoken dictation about a session.",
-  '',
-  'You are given the transcript and a JSON list of target fields. Each field',
-  'has an "id", a human-readable "label", a "type", and optionally an',
-  '"options" list (allowed choices) and a "hint".',
-  '',
-  'Return ONLY a single JSON object mapping field id → value, containing an',
-  'entry for every field you can confidently fill from the transcript.',
-  '',
-  'Rules:',
-  '- Only include a field when the transcript clearly supports a value. Omit',
-  '  any field with no basis — never guess or invent information.',
-  '- Be especially careful with clinical fields (risk, self-harm, suicidal',
-  '  ideation, trauma, abuse, diagnosis, medication): fill them ONLY when the',
-  '  counsellor explicitly states them.',
-  '- For "select" and "boolean" fields, the value MUST be exactly one of the',
-  '  provided options (verbatim). For "multiselect", return a comma-separated',
-  '  list drawn only from the provided options.',
-  '- For "multiline" write clear, concise prose; short newline-separated',
-  '  points are fine. For "text" keep it short. For "number" return digits',
-  '  only. For "date" return the date in a clear form.',
-  '- Do not add commentary, markdown, or fields that were not requested.',
-  '',
-  'Output must be a single JSON object and nothing else.',
-].join('\n');
-
-const DEFAULT_USER_PROMPT_TEMPLATE = [
-  'TRANSCRIPT:',
-  '"""',
-  '{{transcript}}',
-  '"""',
-  '',
-  'FIELDS:',
-  '{{fields}}',
-].join('\n');
 
 /**
  * Turns a counsellor's spoken dictation into structured scribe-note field
@@ -318,20 +278,22 @@ export class VoiceNoteService {
   }
 
   /**
-   * The system prompt is a superadmin-editable template
-   * (src/prompts/scribe_voice_note/field_extraction_system.txt, editable in
-   * Admin > Prompt Management). Falls back to the bundled default if the prompt
-   * hasn't been synced to the DB yet.
+   * The system prompt: its live text in the Skills Store, else the shipped
+   * default (src/prompts/scribe_voice_note/field_extraction_system.txt). With
+   * neither this throws, and the caller reports an extraction failure (keeping
+   * the transcript) instead of calling the model with no instructions.
    */
   private async buildSystemPrompt(): Promise<string> {
-    const template =
-      await this.promptSharedService.getPromptByCode(SYSTEM_PROMPT_CODE);
-    return template?.trim() || DEFAULT_SYSTEM_PROMPT;
+    return (
+      await loadPromptTemplate(this.promptSharedService, SYSTEM_PROMPT_CODE)
+    ).trim();
   }
 
   /**
    * The user prompt is a superadmin-editable template
-   * (src/prompts/scribe_voice_note/field_extraction_user.txt) carrying two
+   * (Skills Store text, else the shipped
+   * src/prompts/scribe_voice_note/field_extraction_user.txt; throws with
+   * neither) carrying two
    * runtime variables — `{{transcript}}` (the dictation transcript) and
    * `{{fields}}` (the JSON array of target fields) — which are substituted here.
    */
@@ -348,10 +310,9 @@ export class VoiceNoteService {
         ...(f.hint ? { hint: f.hint } : {}),
       })),
     );
-    const template =
-      (
-        await this.promptSharedService.getPromptByCode(USER_PROMPT_CODE)
-      )?.trim() || DEFAULT_USER_PROMPT_TEMPLATE;
+    const template = (
+      await loadPromptTemplate(this.promptSharedService, USER_PROMPT_CODE)
+    ).trim();
     return this.renderTemplate(template, { transcript, fields: fieldsJson });
   }
 
