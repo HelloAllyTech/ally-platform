@@ -181,24 +181,51 @@ export class ScenarioCharacterService {
     dto: ScenarioCharacterRequestDto,
   ): Promise<ScenarioCharacter> {
     const userId = ExecutionManager.getUserId();
-    if (!userId) {
-      throw new UnauthorizedException();
+
+    this.logger.debug(
+      `User ${userId} attempting to create a character with name: ${dto.name}`,
+    );
+
+    try {
+      if (!userId) {
+        throw new UnauthorizedException();
+      }
+
+      // A tenant admin's character is stamped with their tenant and is only ever
+
+      // visible inside it. A platform admin's stays NULL — Ally-owned/global.
+
+      const scope = await this.accessService.resolveScope();
+
+      await this.validateCharacterVoices(dto.voices);
+
+      const scenarioCharacter = this.scenarioCharacterRepository.create({
+        ...this.withoutLegacyKeys(dto),
+
+        tenantId: scope.tenantId,
+
+        createdBy: Number(userId),
+
+        updatedBy: Number(userId),
+      });
+
+      const res =
+        await this.scenarioCharacterRepository.save(scenarioCharacter);
+
+      this.logger.info(
+        `User ${userId} successfully created a character with name: ${dto.name}`,
+      );
+
+      return res;
+    } catch (err) {
+      this.logger.error(
+        `User ${userId} failed to create a character with name: ${dto.name}`,
+
+        err,
+      );
+
+      throw err;
     }
-
-    // A tenant admin's character is stamped with their tenant and is only ever
-    // visible inside it. A platform admin's stays NULL — Ally-owned/global.
-    const scope = await this.accessService.resolveScope();
-
-    await this.validateCharacterVoices(dto.voices);
-
-    const scenarioCharacter = this.scenarioCharacterRepository.create({
-      ...this.withoutLegacyKeys(dto),
-      tenantId: scope.tenantId,
-      createdBy: Number(userId),
-      updatedBy: Number(userId),
-    });
-
-    return await this.scenarioCharacterRepository.save(scenarioCharacter);
   }
 
   async getScenarioCharacterById(id: string): Promise<ScenarioCharacter> {
