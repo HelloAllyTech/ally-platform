@@ -196,13 +196,36 @@ export class PromptSharedService {
       ? row.defaultPrompt
       : await this.readFromFolder(promptCode);
     if (!fallback) return null;
+
+    // If the main query found a row, even one with no live version, its
+    // settings are what we use with the fallback text. When it found nothing,
+    // the prompt might still have a row, just with no text at all — look it
+    // up so a file-only prompt can still carry database settings.
+    const settingsRow =
+      row ??
+      (await this.promptsRepository.findOne({
+        where: { promptCode },
+        select: {
+          provider: true,
+          model: true,
+          temperature: true,
+        },
+      }));
+
     return {
       promptCode,
       prompt: fallback,
       version: null,
       contentHash: hashPromptBody(fallback),
       source: 'default',
-      ...(row ? settings(row) : {}),
+      ...(settingsRow
+        ? settings({
+            ...settingsRow,
+            rowProvider: settingsRow.provider,
+            rowModel: settingsRow.model,
+            rowTemperature: settingsRow.temperature,
+          })
+        : {}),
     };
   }
 
