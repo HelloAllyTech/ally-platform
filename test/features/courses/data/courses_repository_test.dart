@@ -552,4 +552,56 @@ void main() {
       verify(() => dio.post<void>('/learn/tracks/items/item-1/bucket-sort/restart')).called(1);
     });
   });
+
+  group('getNextTrackItem', () {
+    test('GETs /learn/tracks/{id}/next-item and parses a found item', () async {
+      when(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/next-item')).thenAnswer(
+        (_) async => _response({
+          'trackCompleted': false,
+          'nextItem': {
+            'id': 'item-9',
+            'type': 'ARTICLE',
+            'order': 2,
+            'title': 'Next up',
+            'status': 'UNLOCKED',
+            'sectionId': 's1',
+            'sectionTitle': 'Advanced',
+          },
+        }),
+      );
+
+      final result = await repository.getNextTrackItem('track-1');
+
+      expect(result.trackCompleted, isFalse);
+      expect(result.nextItem, isNotNull);
+      expect(result.nextItem!.id, 'item-9');
+      expect(result.nextItem!.sectionId, 's1');
+      expect(result.nextItem!.sectionTitle, 'Advanced');
+      verify(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/next-item')).called(1);
+    });
+
+    test('a completed track has trackCompleted true and no nextItem', () async {
+      when(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/next-item'))
+          .thenAnswer((_) async => _response({'trackCompleted': true, 'nextItem': null}));
+
+      final result = await repository.getNextTrackItem('track-1');
+
+      expect(result.trackCompleted, isTrue);
+      expect(result.nextItem, isNull);
+    });
+  });
+
+  group('setTrackLanguage', () {
+    test('PUTs /learn/tracks/{id}/language with the chosen languageCode', () async {
+      when(
+        () => dio.put<void>('/learn/tracks/track-1/language', data: {'languageCode': 'hi'}),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.setTrackLanguage(trackId: 'track-1', languageCode: 'hi');
+
+      verify(
+        () => dio.put<void>('/learn/tracks/track-1/language', data: {'languageCode': 'hi'}),
+      ).called(1);
+    });
+  });
 }

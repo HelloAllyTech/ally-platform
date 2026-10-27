@@ -49,9 +49,10 @@ import 'video/video_item_player.dart';
 /// (server status OR an in-session `_justCompleted` set, so a freshly
 /// completed item doesn't need a track refetch to unlock forward
 /// navigation) — never on a server "what's next" call; RN's real
-/// `next-item` endpoint only powers the Start/Continue entry points
-/// elsewhere (`nextUnlockedItem` in `course_models.dart`), confirmed by
-/// checking every real caller of that endpoint.
+/// `next-item` endpoint (`CoursesRepository.getNextTrackItem`) only powers
+/// the Start/Continue entry points elsewhere (`CourseDetailScreen`'s
+/// Start/Continue button, `CourseProgressScreen`'s Continue/PracticeNudge
+/// actions), confirmed by checking every real caller of that endpoint.
 ///
 /// If `trackDetailProvider` hasn't resolved yet (or errors — e.g. in tests
 /// that don't stub `getLearnTrackDetail`), the nav chrome simply doesn't

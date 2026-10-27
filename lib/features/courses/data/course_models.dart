@@ -182,6 +182,8 @@ class TrackDetail {
     required this.enrolled,
     required this.trackEnrollmentId,
     required this.sections,
+    this.languageCode,
+    this.availableLanguages = const [],
   });
 
   factory TrackDetail.fromJson(Map<String, dynamic> json) => TrackDetail(
@@ -197,6 +199,13 @@ class TrackDetail {
     sections: (json['sections'] as List<dynamic>? ?? [])
         .map((e) => TrackSection.fromJson(e as Map<String, dynamic>))
         .toList(),
+    // Optional on purpose, same released-build reason as RN's own comment
+    // on these two fields: an older backend omits them, and the screen
+    // then simply shows no language row.
+    languageCode: json['languageCode'] as String?,
+    availableLanguages: (json['availableLanguages'] as List<dynamic>? ?? [])
+        .map((e) => TrackLanguageOption.fromJson(e as Map<String, dynamic>))
+        .toList(),
   );
 
   final String id;
@@ -209,6 +218,8 @@ class TrackDetail {
   final bool enrolled;
   final String? trackEnrollmentId;
   final List<TrackSection> sections;
+  final String? languageCode;
+  final List<TrackLanguageOption> availableLanguages;
 }
 
 /// Mirrors RN's `SkillFeedbackClassification` — how one skill category's
@@ -358,20 +369,90 @@ class TrackProgressDashboard {
   final List<TrackRoleplaySessionFeedback> roleplaySessions;
 }
 
-/// Mirrors RN's `handleStartOrContinue`/`useLazyGetNextTrackItemQuery`'s
-/// `nextItem`: the first unlocked (startable) item across all sections, in
-/// order. No such endpoint exists in this app's backend client yet, so this
-/// is computed client-side from an already-fetched `TrackDetail` instead of
-/// adding a new repository call for it — shared by `CourseDetailScreen`'s
-/// Start/Continue button and `CourseProgressScreen`'s Continue/PracticeNudge
-/// actions, which both need the exact same "what's next" answer.
-TrackDetailItem? nextUnlockedItem(TrackDetail detail) {
-  for (final section in detail.sections) {
-    for (final item in section.items) {
-      if (item.status == TrackItemStatus.unlocked) return item;
-    }
+/// Mirrors RN's `NextTrackItem` — a [TrackDetailItem] plus which section it
+/// lives in, as returned by `GET /learn/tracks/:trackId/next-item`.
+class NextTrackItem extends TrackDetailItem {
+  NextTrackItem({
+    required super.id,
+    required super.type,
+    required super.order,
+    required super.title,
+    required super.description,
+    required super.status,
+    required super.score,
+    required super.maxWatchedPct,
+    required this.sectionId,
+    required this.sectionTitle,
+  });
+
+  factory NextTrackItem.fromJson(Map<String, dynamic> json) {
+    final item = TrackDetailItem.fromJson(json);
+    return NextTrackItem(
+      id: item.id,
+      type: item.type,
+      order: item.order,
+      title: item.title,
+      description: item.description,
+      status: item.status,
+      score: item.score,
+      maxWatchedPct: item.maxWatchedPct,
+      sectionId: json['sectionId'] as String,
+      sectionTitle: json['sectionTitle'] as String,
+    );
   }
-  return null;
+
+  final String sectionId;
+  final String sectionTitle;
+}
+
+/// Mirrors RN's `GetNextTrackItemResponse` — the response of
+/// `GET /learn/tracks/:trackId/next-item`, the real backend source of
+/// truth for "what should Start/Continue open next" (server-side rules —
+/// e.g. section gating, retry cooldowns — that a client-side scan of
+/// already-fetched item statuses can't fully replicate).
+class GetNextTrackItemResponse {
+  GetNextTrackItemResponse({required this.trackCompleted, required this.nextItem});
+
+  factory GetNextTrackItemResponse.fromJson(Map<String, dynamic> json) =>
+      GetNextTrackItemResponse(
+        trackCompleted: json['trackCompleted'] as bool? ?? false,
+        nextItem: json['nextItem'] != null
+            ? NextTrackItem.fromJson(json['nextItem'] as Map<String, dynamic>)
+            : null,
+      );
+
+  final bool trackCompleted;
+  final NextTrackItem? nextItem;
+}
+
+/// Mirrors RN's `TrackLanguageOption` — one language this course is
+/// published in, as offered by `CourseLanguageSheet`.
+class TrackLanguageOption {
+  TrackLanguageOption({
+    required this.languageId,
+    required this.languageCode,
+    required this.label,
+    required this.isSource,
+  });
+
+  factory TrackLanguageOption.fromJson(Map<String, dynamic> json) =>
+      TrackLanguageOption(
+        languageId: (json['languageId'] as num).toInt(),
+        languageCode: json['languageCode'] as String,
+        label: json['label'] as String,
+        isSource: json['isSource'] as bool? ?? false,
+      );
+
+  final int languageId;
+  final String languageCode;
+
+  /// The backend's own display name — shown only for [isSource] (the
+  /// authored language), since every other option prefers the app's own
+  /// endonym label (see `getCourseLanguageLabel` in
+  /// `course_detail_screen.dart`) for a consistent look with the app-wide
+  /// language picker.
+  final String label;
+  final bool isSource;
 }
 
 /// ROLEPLAY/CASE items route through the existing Simulations/Cases screens

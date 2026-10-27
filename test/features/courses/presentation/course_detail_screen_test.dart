@@ -45,6 +45,8 @@ TrackDetail _detail({
   String? coverImageUrl,
   int completedItems = 0,
   bool enrolled = true,
+  String? languageCode,
+  List<TrackLanguageOption> availableLanguages = const [],
 }) =>
     TrackDetail(
       id: trackId,
@@ -57,6 +59,8 @@ TrackDetail _detail({
       enrolled: enrolled,
       trackEnrollmentId: 'e1',
       sections: [TrackSection(id: 's1', title: 'Section 1', order: 0, items: items)],
+      languageCode: languageCode,
+      availableLanguages: availableLanguages,
     );
 
 void main() {
@@ -300,6 +304,23 @@ void main() {
       ),
     );
     when(() => repository.enrollTrack('t1')).thenAnswer((_) async {});
+    when(() => repository.getNextTrackItem('t1')).thenAnswer(
+      (_) async => GetNextTrackItemResponse(
+        trackCompleted: false,
+        nextItem: NextTrackItem(
+          id: 'i1',
+          type: TrackItemType.article,
+          order: 0,
+          title: 'Open item',
+          description: null,
+          status: TrackItemStatus.unlocked,
+          score: null,
+          maxWatchedPct: null,
+          sectionId: 's1',
+          sectionTitle: 'Section 1',
+        ),
+      ),
+    );
 
     final router = GoRouter(
       routes: [
@@ -324,6 +345,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.enrollTrack('t1')).called(1);
+    verify(() => repository.getNextTrackItem('t1')).called(1);
     expect(find.text('item:i1'), findsOneWidget);
   });
 
@@ -353,5 +375,101 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.getLearnTrackDetail('t1')).called(1);
+  });
+
+  testWidgets('no language row for a single-language course', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [],
+        languageCode: 'en',
+        availableLanguages: [
+          TrackLanguageOption(languageId: 1, languageCode: 'en', label: 'English', isSource: true),
+        ],
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.byKey(const Key('course-language-change')), findsNothing);
+  });
+
+  testWidgets('a bilingual course shows the language row with the current language', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [],
+        languageCode: 'hi',
+        availableLanguages: [
+          TrackLanguageOption(languageId: 1, languageCode: 'en', label: 'English', isSource: true),
+          TrackLanguageOption(languageId: 2, languageCode: 'hi', label: 'Hindi', isSource: false),
+        ],
+      ),
+    );
+
+    await pump(tester);
+
+    // The label-selection logic itself (endonym vs. backend label) is
+    // covered directly by `getCourseLanguageLabel`'s own unit tests — this
+    // just confirms the row renders at all for a 2+-language course. (A
+    // `find.text` assertion on the resolved "Reading in हिंदी" copy would
+    // depend on `ref.t()` having actually resolved translations, which
+    // `pump_app.dart` documents can silently fail for a non-first `pumpApp`
+    // call in the same test file.)
+    expect(find.byKey(const Key('course-language-change')), findsOneWidget);
+  });
+
+  testWidgets('tapping Change opens the language sheet, and picking a new language switches it', (
+    tester,
+  ) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [],
+        languageCode: 'en',
+        availableLanguages: [
+          TrackLanguageOption(languageId: 1, languageCode: 'en', label: 'English', isSource: true),
+          TrackLanguageOption(languageId: 2, languageCode: 'hi', label: 'Hindi', isSource: false),
+        ],
+      ),
+    );
+    when(() => repository.setTrackLanguage(trackId: 't1', languageCode: 'hi')).thenAnswer((_) async {});
+
+    await pump(tester);
+
+    await tester.tap(find.byKey(const Key('course-language-change')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('course-language-option-hi')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('course-language-option-hi')));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.setTrackLanguage(trackId: 't1', languageCode: 'hi')).called(1);
+    // The sheet closes and the track re-fetches.
+    expect(find.byKey(const Key('course-language-option-hi')), findsNothing);
+    verify(() => repository.getLearnTrackDetail('t1')).called(2);
+  });
+
+  testWidgets('tapping the already-selected language just closes the sheet, with no API call', (
+    tester,
+  ) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [],
+        languageCode: 'en',
+        availableLanguages: [
+          TrackLanguageOption(languageId: 1, languageCode: 'en', label: 'English', isSource: true),
+          TrackLanguageOption(languageId: 2, languageCode: 'hi', label: 'Hindi', isSource: false),
+        ],
+      ),
+    );
+
+    await pump(tester);
+
+    await tester.tap(find.byKey(const Key('course-language-change')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('course-language-option-en')));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repository.setTrackLanguage(trackId: any(named: 'trackId'), languageCode: any(named: 'languageCode')));
+    expect(find.byKey(const Key('course-language-option-en')), findsNothing);
   });
 }

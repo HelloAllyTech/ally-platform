@@ -35,6 +35,34 @@ class CoursesRepository {
     return TrackDetail.fromJson(response.data!);
   }
 
+  /// The real "what should Start/Continue open next" source of truth —
+  /// server-side rules (section gating, retry cooldowns) that a client-side
+  /// scan of an already-fetched `TrackDetail`'s item statuses can't fully
+  /// replicate. Mirrors ally-mobile (React Native)'s
+  /// `useLazyGetNextTrackItemQuery` (`GET /learn/tracks/:trackId/next-item`).
+  Future<GetNextTrackItemResponse> getNextTrackItem(String trackId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/tracks/$trackId/next-item',
+    );
+    return GetNextTrackItemResponse.fromJson(response.data!);
+  }
+
+  /// Switches which language this course is read in for the current
+  /// learner — mirrors ally-mobile (React Native)'s `useSetTrackLanguage
+  /// Mutation` (`PUT /learn/tracks/:trackId/language`). The whole track
+  /// cache changes with it (every title, prompt and option in the detail
+  /// and next-item payloads), so callers should re-fetch
+  /// `getLearnTrackDetail` after this resolves.
+  Future<void> setTrackLanguage({
+    required String trackId,
+    required String languageCode,
+  }) async {
+    await _dio.put<void>(
+      '/learn/tracks/$trackId/language',
+      data: {'languageCode': languageCode},
+    );
+  }
+
   Future<TrackProgressDashboard> getLearnTrackProgress(String trackId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/learn/tracks/$trackId/progress',

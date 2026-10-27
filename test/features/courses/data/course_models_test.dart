@@ -200,6 +200,88 @@ void main() {
       expect(detail.enrolled, false);
       expect(detail.trackEnrollmentId, isNull);
       expect(detail.sections, isEmpty);
+      // Optional on purpose — an older backend simply omits these.
+      expect(detail.languageCode, isNull);
+      expect(detail.availableLanguages, isEmpty);
+    });
+
+    test('parses languageCode and availableLanguages when present', () {
+      final detail = TrackDetail.fromJson({
+        'id': 'track-3',
+        'title': 'Bilingual track',
+        'languageCode': 'hi',
+        'availableLanguages': [
+          {'languageId': 1, 'languageCode': 'en', 'label': 'English', 'isSource': true},
+          {'languageId': 2, 'languageCode': 'hi', 'label': 'Hindi', 'isSource': false},
+        ],
+      });
+
+      expect(detail.languageCode, 'hi');
+      expect(detail.availableLanguages, hasLength(2));
+      expect(detail.availableLanguages[0].isSource, isTrue);
+      expect(detail.availableLanguages[1].languageCode, 'hi');
+    });
+  });
+
+  group('TrackLanguageOption.fromJson', () {
+    test('parses every field, defaulting isSource to false', () {
+      final option = TrackLanguageOption.fromJson({
+        'languageId': 2,
+        'languageCode': 'hi',
+        'label': 'Hindi',
+      });
+
+      expect(option.languageId, 2);
+      expect(option.languageCode, 'hi');
+      expect(option.label, 'Hindi');
+      expect(option.isSource, isFalse);
+    });
+  });
+
+  group('NextTrackItem.fromJson', () {
+    test('parses the base item fields plus sectionId/sectionTitle', () {
+      final item = NextTrackItem.fromJson({
+        'id': 'item-9',
+        'type': 'VIDEO',
+        'order': 3,
+        'title': 'Next up',
+        'status': 'UNLOCKED',
+        'sectionId': 'sec-2',
+        'sectionTitle': 'Week 2',
+      });
+
+      expect(item.id, 'item-9');
+      expect(item.type, TrackItemType.video);
+      expect(item.sectionId, 'sec-2');
+      expect(item.sectionTitle, 'Week 2');
+    });
+  });
+
+  group('GetNextTrackItemResponse.fromJson', () {
+    test('parses a found next item', () {
+      final response = GetNextTrackItemResponse.fromJson({
+        'trackCompleted': false,
+        'nextItem': {
+          'id': 'item-1',
+          'type': 'ARTICLE',
+          'order': 1,
+          'title': 'Intro',
+          'status': 'UNLOCKED',
+          'sectionId': 'sec-1',
+          'sectionTitle': 'Week 1',
+        },
+      });
+
+      expect(response.trackCompleted, isFalse);
+      expect(response.nextItem, isNotNull);
+      expect(response.nextItem!.id, 'item-1');
+    });
+
+    test('a completed track has no nextItem, and defaults trackCompleted to false when absent', () {
+      final response = GetNextTrackItemResponse.fromJson({'nextItem': null});
+
+      expect(response.trackCompleted, isFalse);
+      expect(response.nextItem, isNull);
     });
   });
 

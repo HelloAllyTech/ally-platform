@@ -11,6 +11,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
+import 'course_language_sheet.dart';
 
 IconData _iconForType(TrackItemType type) {
   switch (type) {
@@ -79,8 +80,13 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         await ref.read(coursesRepositoryProvider).enrollTrack(detail.id);
         ref.invalidate(trackDetailProvider(detail.id));
       }
-      final next = nextUnlockedItem(detail);
-      if (next != null && mounted) _openItem(next);
+      // The real "what's next" source of truth — mirrors RN's
+      // `handleStartOrContinue`'s `getNextItem({trackId})` call, not a
+      // client-side scan of this (possibly now-stale) `detail`.
+      final result = await ref.read(coursesRepositoryProvider).getNextTrackItem(detail.id);
+      final next = result.nextItem;
+      if (result.trackCompleted || next == null) return;
+      if (mounted) _openItem(next);
     } catch (e) {
       setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
     } finally {
@@ -114,16 +120,58 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
     );
   }
 
+  /// Shown only when the course is actually published in more than one
+  /// language — a single-language course should not carry a control whose
+  /// only option is the one already selected. `null` means no row at all.
+  Widget? _buildLanguageRow(TrackDetail detail) {
+    final options = detail.availableLanguages;
+    if (options.length < 2) return null;
+    TrackLanguageOption? current;
+    for (final option in options) {
+      if (option.languageCode == detail.languageCode) {
+        current = option;
+        break;
+      }
+    }
+    final label = current != null && current.isSource
+        ? current.label
+        : getCourseLanguageLabel(detail.languageCode ?? 'en');
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            ref.t('courses.language.readingIn', {'language': label}),
+            style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+          ),
+        ),
+        TextButton(
+          key: const Key('course-language-change'),
+          onPressed: () => CourseLanguageSheet.show(
+            context,
+            trackId: detail.id,
+            options: options,
+            currentLanguageCode: detail.languageCode ?? 'en',
+          ),
+          child: Text(ref.t('courses.language.change')),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBody(BuildContext context, TrackDetail detail) {
     final isCompleted =
         detail.totalItems > 0 && detail.completedItems >= detail.totalItems;
     final showProgress = detail.completedItems > 0 && detail.totalItems > 0;
+    final languageRow = _buildLanguageRow(detail);
 
     return RefreshIndicator(
       onRefresh: () => ref.refresh(trackDetailProvider(widget.trackId).future),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (languageRow != null) ...[languageRow, const SizedBox(height: 12)],
           if (detail.coverImageUrl != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),

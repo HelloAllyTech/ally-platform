@@ -34,16 +34,18 @@ class _CourseProgressScreenState extends ConsumerState<CourseProgressScreen> {
   /// Mirrors RN's `handleContinuePress`: reaching this screen at all means
   /// the learner is already enrolled (the endpoint 403s otherwise), so
   /// unlike `CourseDetailScreen`'s Start/Continue there's no enroll branch
-  /// here — just resolve and open the next unlocked item.
+  /// here — just resolve and open the real "what's next" answer (the
+  /// server-side source of truth, not a client-side scan of this screen's
+  /// already-fetched item statuses).
   Future<void> _handleContinuePress() async {
     setState(() {
       _isContinuing = true;
       _error = null;
     });
     try {
-      final detail = await ref.read(trackDetailProvider(widget.trackId).future);
-      final next = nextUnlockedItem(detail);
-      if (next == null || !mounted) return;
+      final result = await ref.read(coursesRepositoryProvider).getNextTrackItem(widget.trackId);
+      final next = result.nextItem;
+      if (result.trackCompleted || next == null || !mounted) return;
       if (isPlayableTrackItemType(next.type)) {
         context.push(
           '/courses/item/${next.id}',

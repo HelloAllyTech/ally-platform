@@ -333,6 +333,23 @@ void main() {
         ],
       ),
     );
+    when(() => repository.getNextTrackItem('t1')).thenAnswer(
+      (_) async => GetNextTrackItemResponse(
+        trackCompleted: false,
+        nextItem: NextTrackItem(
+          id: 'item-9',
+          type: TrackItemType.article,
+          order: 1,
+          title: 'Next up',
+          description: null,
+          status: TrackItemStatus.unlocked,
+          score: null,
+          maxWatchedPct: null,
+          sectionId: 's1',
+          sectionTitle: 'Advanced',
+        ),
+      ),
+    );
 
     await pumpRouterApp(
       tester,
@@ -353,6 +370,7 @@ void main() {
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
+    verify(() => repository.getNextTrackItem('t1')).called(1);
     expect(find.text('ITEM:item-9'), findsOneWidget);
   });
 }
