@@ -13,9 +13,7 @@ from app.core.events.event_types.binary_classifier.prompts import (
     get_batch_binary_classifier_prompt,
     get_binary_classifier_prompt,
 )
-from app.core.events.event_types.binary_classifier.schemas import (
-    BinaryClassifierData,
-)
+from app.core.events.event_types.binary_classifier.schemas import BinaryClassifierData
 from app.core.events.event_types.helper_paraphrased.prompts import (
     get_paraphrase_evaluation_prompt,
 )
