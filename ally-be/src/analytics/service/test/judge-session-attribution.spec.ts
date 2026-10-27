@@ -234,6 +234,7 @@ describe('judge requests carry the session they judge', () => {
         .fn()
         .mockResolvedValue([{ turn_index: 1, text: 'Hmm, let me think.' }]),
       persistJudgment: jest.fn().mockResolvedValue(undefined),
+      fetchRubric: jest.fn().mockResolvedValue('Filler rubric v2'),
     };
     const service = new FillerJudgeService(
       repo as never,
@@ -254,6 +255,9 @@ describe('judge requests carry the session they judge', () => {
     const [url, body] = post.mock.calls[1];
     expect(url).toBe('http://ai/api/v1/filler-quality/judge');
     expect(body.scenario_session_id).toBe('sess-42');
+    // The rubric's live version from the Skills Store, read once per job.
+    expect(body.rubric).toBe('Filler rubric v2');
+    expect(repo.fetchRubric).toHaveBeenCalledTimes(1);
     expect(repo.persistJudgment).toHaveBeenCalled();
   });
 });

@@ -86,6 +86,20 @@ export interface FillerJudgeAiResult {
 export class FillerJudgeRepository {
   constructor(private readonly dataSource: DataSource) {}
 
+  /** The rubric's live version in the Skills Store; null falls back to ally-ai's inline default. */
+  async fetchRubric(): Promise<string | null> {
+    const rows = await this.dataSource.query(
+      `SELECT pv.prompt
+         FROM prompts p
+         JOIN prompts_versions pv
+           ON pv."promptId" = p.id AND pv.version = p."currentVersion"
+        WHERE p."promptCode" = $1
+        LIMIT 1`,
+      [FILLER_JUDGE_PROMPT_CODE],
+    );
+    return rows?.[0]?.prompt ?? null;
+  }
+
   /**
    * Sessions worth judging: countable sessions that actually PLAYED a filler.
    *

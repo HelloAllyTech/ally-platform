@@ -115,6 +115,9 @@ export class FillerJudgeService {
   ): Promise<void> {
     try {
       const { judgeModel, judgePromptVersion } = await this.probeJudgeVersion();
+      // The rubric's live version, read once per job so every session in it is
+      // judged by the same text.
+      const rubric = await this.repo.fetchRubric();
       const sessions = await this.repo.selectSessions({
         ...opts,
         judgeModel,
@@ -140,7 +143,7 @@ export class FillerJudgeService {
             await this.saveJob(job);
             return;
           }
-          const judged = await this.judgeViaAi(observations, s);
+          const judged = await this.judgeViaAi(observations, s, rubric);
           await this.repo.persistJudgment(
             s,
             judged.result,
@@ -205,6 +208,7 @@ export class FillerJudgeService {
   private async judgeViaAi(
     observations: FillerObservation[],
     s: FillerSessionRow,
+    rubric: string | null,
   ): Promise<JudgeResult> {
     const { apiUrl, outboundApiKey } = this.config.ai;
     // Held inside the GLOBAL judge slot: the ceiling has to span every
@@ -228,6 +232,8 @@ export class FillerJudgeService {
           // never delivery cost). An older ally-ai ignores the field. Not on
           // the version probe above, which makes no model call.
           scenario_session_id: s.id,
+          // Null means no live version: ally-ai then runs its inline default.
+          rubric,
         },
         {
           headers: { 'x-api-key': outboundApiKey },

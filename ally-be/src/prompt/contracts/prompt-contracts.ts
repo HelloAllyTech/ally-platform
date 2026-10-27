@@ -1174,6 +1174,58 @@ export const GLOSSARY_LEXEME_PAIRING = definePrompt(
   },
 );
 
+/** src/prompts/feedback_groundedness/rubric.txt */
+export const FEEDBACK_GROUNDEDNESS_RUBRIC = definePrompt(
+  'feedback_groundedness_rubric',
+  {},
+  {
+    name: 'Feedback Groundedness Judge Rubric',
+    description:
+      "Static rubric for the feedback-groundedness judge: is each claim in a learner's feedback supported by the transcript? The judge composes the transcript and the claims around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/filler_quality_judge/rubric.txt */
+export const FILLER_QUALITY_JUDGE_RUBRIC = definePrompt(
+  'filler_quality_judge_rubric',
+  {},
+  {
+    name: 'Filler Quality Judge Rubric',
+    description:
+      'Static rubric for the filler-quality judge (see filler-eval-judge-schema.md). The judge composes the language, style exemplars, allowed fillers, persona and each filler around this text.',
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/rag_quality/rubric.txt */
+export const RAG_QUALITY_RUBRIC = definePrompt(
+  'rag_quality_rubric',
+  {},
+  {
+    name: 'Knowledge Retrieval Quality Judge Rubric',
+    description:
+      "Static rubric for the retrieval-quality judge: were the passages retrieved for a query relevant? The judge composes the corpus's purpose, the query, the similarity floor and the passages around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/recall_quality/rubric.txt */
+export const RECALL_QUALITY_RUBRIC = definePrompt(
+  'recall_quality_rubric',
+  {},
+  {
+    name: 'Memory Recall Quality Judge Rubric',
+    description:
+      "Static rubric for the recall-quality judge: did the client's reply use the memories it should have? The judge composes the counsellor and client turns and the facts around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/language_quality_judge/rubric.txt */
 export const LANGUAGE_QUALITY_JUDGE_RUBRIC = definePrompt(
   'language_quality_judge_rubric',

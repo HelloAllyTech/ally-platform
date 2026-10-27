@@ -62,8 +62,7 @@ who had it in mind would answer differently from one who did not.
 
 Also list in `unused_selected` any recalled fact the turn gave no occasion for.
 One or two is normal. A turn where all five went unused, repeatedly, says the cap
-is larger than the conversation can use.
-"""
+is larger than the conversation can use."""
 
 
 def _format_facts(facts: Sequence[dict], label: str) -> str:
