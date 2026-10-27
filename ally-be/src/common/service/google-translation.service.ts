@@ -18,7 +18,14 @@ export class GoogleTranslationsService {
     this.projectId =
       this.configService.googleCloudTranslationConfig.projectId || '';
 
-    this.translationClient = new TranslationServiceClient();
+    if (process.env.NODE_ENV === 'test') {
+      this.translationClient = new TranslationServiceClient({
+        credentials: { client_email: 'test@test.com', private_key: 'test' },
+        projectId: 'test',
+      });
+    } else {
+      this.translationClient = new TranslationServiceClient();
+    }
   }
 
   /* ------------------------------------------------------------------
