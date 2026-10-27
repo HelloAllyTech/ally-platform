@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +14,8 @@ void main() {
     String description = 'Are you sure?',
     String? actionButtonText = 'Logout',
     VoidCallback? onActionPressed,
+    String? secondaryButtonText,
+    Future<bool> Function()? onSecondaryPressed,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -24,6 +28,8 @@ void main() {
               description: description,
               actionButtonText: actionButtonText,
               onActionPressed: onActionPressed,
+              secondaryButtonText: secondaryButtonText,
+              onSecondaryPressed: onSecondaryPressed,
             ),
             child: const Text('open'),
           ),
@@ -74,5 +80,76 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Are you sure?'), findsOneWidget, reason: 'still showing');
+  });
+
+  // Packed into one `testWidgets` deliberately: separate `testWidgets`, each
+  // calling `pumpShow`/`pumpWidget` independently, risk nothing here (no
+  // `pumpApp`/translations involved), but keeping the secondary-button
+  // lifecycle as sequential steps in one flow matches how the button's own
+  // open -> loading -> (stay open | close) states actually unfold, and keeps
+  // the `_isSecondaryLoading` internal state assertions easy to reason about
+  // in order.
+  testWidgets(
+    'the secondary button shows its own loading state, disables both buttons, '
+    'stays open on failure and closes on success',
+    (tester) async {
+      final completer = Completer<bool>();
+      var secondaryTapped = 0;
+      await pumpShow(
+        tester,
+        onActionPressed: () {},
+        secondaryButtonText: 'Create Note',
+        onSecondaryPressed: () {
+          secondaryTapped++;
+          return completer.future;
+        },
+      );
+
+      // `widgetWithText` can't be relied on once a button starts loading —
+      // `AppButton` swaps its label for a spinner — so every lookup below
+      // finds both buttons by type/position (primary first, secondary
+      // second, matching render order) instead.
+      List<AppButton> buttons() => tester.widgetList<AppButton>(find.byType(AppButton)).toList();
+
+      expect(buttons(), hasLength(2));
+
+      await tester.tap(find.byType(AppButton).last);
+      await tester.pump();
+
+      // Still showing, in flight: both buttons disabled while the secondary
+      // button's own future hasn't settled yet.
+      expect(find.text('Are you sure?'), findsOneWidget);
+      var current = buttons();
+      expect(current[0].isDisabled, isTrue, reason: 'primary disabled while secondary is in flight');
+      expect(current[1].isLoading, isTrue);
+      expect(current[1].isDisabled, isTrue);
+
+      // A second tap while in flight must not call the callback again.
+      await tester.tap(find.byType(AppButton).last, warnIfMissed: false);
+      await tester.pump();
+      expect(secondaryTapped, 1);
+
+      // Resolving false (failure) must leave the sheet open, no longer
+      // loading, and ready to retry.
+      completer.complete(false);
+      await tester.pumpAndSettle();
+      expect(find.text('Are you sure?'), findsOneWidget, reason: 'stayed open after failure');
+      current = buttons();
+      expect(current[1].isLoading, isFalse);
+    },
+  );
+
+  testWidgets('a secondary press resolving true closes the dialog', (tester) async {
+    await pumpShow(
+      tester,
+      onActionPressed: () {},
+      secondaryButtonText: 'Create Note',
+      onSecondaryPressed: () async => true,
+    );
+
+    await tester.tap(find.widgetWithText(AppButton, 'Create Note'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Are you sure?'), findsNothing);
   });
 }

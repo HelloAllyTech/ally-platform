@@ -8,7 +8,9 @@ import 'package:permission_handler_platform_interface/permission_handler_platfor
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
+import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
 
@@ -277,6 +279,137 @@ void main() {
       await tester.tap(find.text('Open Settings'));
       await tester.pumpAndSettle();
       expect(fakePlatform.openedSettings, isTrue);
+    },
+  );
+
+  testWidgets(
+    'Create Note is offered alongside Start Scribe Mode for a counsellor with the tenant toggle on, '
+    'and the FAB stays offered even without startMicrophoneChat as long as Create Note is on offer',
+    (tester) async {
+      final repository = _repository();
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.viewCallLogs, UserPermissions.counselorAccess],
+          ),
+          scribeNoteCreationEnabledProvider.overrideWith((ref) async => true),
+        ],
+      );
+
+      expect(
+        find.byKey(const Key('start-session-fab')),
+        findsOneWidget,
+        reason: 'offered on Create Note alone, with no startMicrophoneChat permission at all',
+      );
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Start Scribe Mode'), findsNothing, reason: 'no startMicrophoneChat permission');
+      expect(find.text('Start Dictation Mode'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tapping Create Note creates the note, closes the sheet, then opens its summary',
+    (tester) async {
+      final repository = _repository();
+      when(() => repository.createNote()).thenAnswer((_) async => (chatId: 55, name: 'CALL-55-2026-10-27'));
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.counselorAccess,
+              UserPermissions.startMicrophoneChat,
+            ],
+          ),
+          scribeNoteCreationEnabledProvider.overrideWith((ref) async => true),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Dictation Mode'));
+      await tester.pumpAndSettle();
+
+      verify(() => repository.createNote()).called(1);
+      expect(find.textContaining('By starting, you confirm'), findsNothing, reason: 'sheet closed');
+      expect(find.text('Summary for 55'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a failed Create Note leaves the sheet open and shows an error toast instead of navigating',
+    (tester) async {
+      final repository = _repository();
+      when(() => repository.createNote()).thenThrow(Exception('network down'));
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        // `_createNote`'s failure path shows its toast via the app-wide
+        // `rootScaffoldMessengerKey`, not a context-local ScaffoldMessenger
+        // (see that key's own doc comment on why) — this harness needs to be
+        // wired to that exact global key for the snackbar to show up here.
+        scaffoldMessengerKey: rootScaffoldMessengerKey,
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.viewCallLogs, UserPermissions.counselorAccess],
+          ),
+          scribeNoteCreationEnabledProvider.overrideWith((ref) async => true),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Dictation Mode'));
+      await tester.pumpAndSettle();
+
+      verify(() => repository.createNote()).called(1);
+      expect(find.text('Start Dictation Mode'), findsOneWidget, reason: 'sheet stayed open');
+      expect(find.text("Couldn't create the note. Please try again."), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Create Note is not offered for a counsellor when the tenant toggle is off',
+    (tester) async {
+      final repository = _repository();
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.counselorAccess,
+              UserPermissions.startMicrophoneChat,
+            ],
+          ),
+          scribeNoteCreationEnabledProvider.overrideWith((ref) async => false),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Start Scribe Mode'), findsOneWidget);
+      expect(find.text('Start Dictation Mode'), findsNothing);
     },
   );
 

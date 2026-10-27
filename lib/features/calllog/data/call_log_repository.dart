@@ -473,6 +473,19 @@ class CallLogRepository {
     );
   }
 
+  /// Mirrors RN's `scribeNoteApi.ts` `createNote` mutation: creates an empty
+  /// manual scribe note (a DICTATION chat with no audio) so the counsellor
+  /// can fill it in on `CallSummaryScreen` by typing or dictating, instead of
+  /// recording a live call. The backend enforces the per-tenant
+  /// `scribe-note-creation-enabled` toggle and `COUNSELOR_ACCESS` itself
+  /// (403 otherwise) — this app also gates the option that calls this before
+  /// offering it, same as RN's `canCreateNote` (see `call_log_screen.dart`).
+  Future<({int chatId, String name})> createNote() async {
+    final response = await _dio.post<Map<String, dynamic>>('/chats/note');
+    final data = response.data ?? {};
+    return (chatId: data['chatId'] as int, name: data['name'] as String? ?? '');
+  }
+
   Future<List<ChatMessage>> getChatMessages(int chatId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/chats/$chatId/messages',

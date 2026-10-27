@@ -627,6 +627,30 @@ void main() {
     });
   });
 
+  group('createNote', () {
+    test('POSTs /chats/note with no body and parses the created note', () async {
+      when(() => dio.post<Map<String, dynamic>>('/chats/note')).thenAnswer(
+        (_) async => _response({'chatId': 42, 'name': 'CALL-42-2026-10-27'}),
+      );
+
+      final result = await repository.createNote();
+
+      expect(result.chatId, 42);
+      expect(result.name, 'CALL-42-2026-10-27');
+      verify(() => dio.post<Map<String, dynamic>>('/chats/note')).called(1);
+    });
+
+    test('defaults name to empty when absent', () async {
+      when(() => dio.post<Map<String, dynamic>>('/chats/note'))
+          .thenAnswer((_) async => _response({'chatId': 7}));
+
+      final result = await repository.createNote();
+
+      expect(result.chatId, 7);
+      expect(result.name, '');
+    });
+  });
+
   group('addSummaryFeedback', () {
     test('POSTs rating and nested feedback.issues/comment', () async {
       when(() => dio.post<void>(

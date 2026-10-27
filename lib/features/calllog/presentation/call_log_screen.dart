@@ -8,11 +8,13 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/illustrated_modal.dart';
+import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/call_log_repository.dart';
@@ -70,10 +72,18 @@ enum _LogTab { real, simulation }
 /// page 0 — see `call_log_repository.dart`'s `PaginatedCallLogsController`/
 /// `SimulationLogsController`.
 ///
-/// Not ported: the real `StartSessionModal`'s "Create Note" manual-note
-/// path (no note-creation flow — the `createNote` mutation, and a
-/// CallSummaryScreen mode for a session with no existing call-log entry
-/// yet — exists in this app). The filter sheet
+/// The "Create Note" manual-note option (`canCreateNote` in RN: counsellor
+/// permission + the per-tenant `scribe-note-creation-enabled` toggle) sits
+/// alongside Start Scribe Mode in the same sheet when offered, reusing
+/// `IllustratedModal`'s secondary-button slot — RN's own `StartSessionModal`
+/// renders it as a second `Button` in the same sheet, so this does too
+/// rather than inventing a separate dialog. Creating a note is a plain
+/// `POST /chats/note` (empty, no fields) that the backend immediately marks
+/// `summaryStatus: SUCCESS` with no AI summary (a manual note has nothing to
+/// generate), which `CallSummaryScreen`'s existing `isManualNote` check
+/// already renders as an editable form rather than a "processing" screen —
+/// so opening it after creation needs no new screen, only the navigation.
+/// The filter sheet
 /// (`CallLogFilterSheet`) is ported for the built-in filters only — RN's
 /// dynamic, tenant-configured custom-field filters need a
 /// `CustomFieldDefinition` catalog client this app doesn't have yet.
@@ -89,16 +99,74 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   bool _isViewingArchive = false;
   bool _isStartingScribe = false;
 
-  void _showStartSessionModal() {
-    IllustratedModal.show(
+  /// Mirrors RN's `StartSessionModal`: Start Scribe Mode is offered as the
+  /// primary button whenever `canStartCall`, and Create Note is offered as a
+  /// secondary button whenever `canCreateNote` — RN renders both, either, or
+  /// (if neither) nothing at all in the same sheet, never two sheets.
+  ///
+  /// The create-note case needs "close the sheet, then navigate" (matching
+  /// RN's `handleCreateNote`, and `_startScribeSession`'s own documented
+  /// load-bearing ordering for the same reason) — but navigating with this
+  /// screen's own `context` while the dialog route (always pushed on the
+  /// root navigator by `showDialog`, regardless of any nested shell
+  /// navigator this screen itself may live under) is still closing is the
+  /// wrong order and the wrong navigator to assume are the same one. So the
+  /// push below waits on `IllustratedModal.show`'s own returned future,
+  /// which only completes once the dialog has actually popped *itself* (via
+  /// its own context, always on the right navigator) — not on `_createNote`
+  /// finishing, which only decides whether that pop should happen at all.
+  Future<void> _showStartSessionModal({required bool canStartCall, required bool canCreateNote}) async {
+    CallLogItem? createdNote;
+    await IllustratedModal.show(
       context,
       titleMain: ref.t('calls.dialog.startSession.titleNormal'),
       titleItalic: ref.t('calls.dialog.startSession.titleItalic'),
       description: ref.t('calls.dialog.startSession.footer'),
-      actionButtonText: ref.t('calls.dialog.startSession.startScribeMode'),
+      actionButtonText: canStartCall ? ref.t('calls.dialog.startSession.startScribeMode') : null,
       actionButtonVariant: AppButtonVariant.primary,
-      onActionPressed: _startScribeSession,
+      onActionPressed: canStartCall ? _startScribeSession : null,
+      secondaryButtonText: canCreateNote ? ref.t('calls.dialog.startSession.startDictationMode') : null,
+      onSecondaryPressed: canCreateNote
+          ? () async {
+              createdNote = await _createNote();
+              return createdNote != null;
+            }
+          : null,
     );
+    if (createdNote != null && mounted) {
+      context.push('/call-log/${createdNote!.id}', extra: createdNote);
+    }
+  }
+
+  /// Mirrors RN's `handleCreateNote`'s `createNote().unwrap()` call: creates
+  /// an empty manual note and returns a stand-in `CallLogItem` for it (the
+  /// `/call-log/:id` route needs the row's own data as `extra`, since it
+  /// isn't fetched by id alone) using the exact `startedAt`/`endedAt`/
+  /// `status` the backend's `createNote` sets on the chat itself
+  /// (`ChatStatus.ENDED`, both timestamps equal to the creation instant —
+  /// see `ally-be`'s `ChatService.createNote`), so what's shown matches what
+  /// a subsequent call-log list refresh would show for the same row. `null`
+  /// means the sheet should stay open; a toast already explains why, same as
+  /// RN never calling `setShowStartSession(false)` in `handleCreateNote`'s
+  /// catch.
+  Future<CallLogItem?> _createNote() async {
+    try {
+      final result = await ref.read(callLogRepositoryProvider).createNote();
+      final now = DateTime.now().toUtc().toIso8601String();
+      return CallLogItem(
+        id: result.chatId,
+        startedAt: now,
+        endedAt: now,
+        status: 'ENDED',
+        sessionName: result.name,
+        score: null,
+      );
+    } catch (_) {
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(ref.t('calls.createNote.error'))),
+      );
+      return null;
+    }
   }
 
   /// A second tap while the first is still resolving must not start a
@@ -179,9 +247,19 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     // recording (`handleVoiceRecording`) — a cloud-telephony conference call
     // is never user-initiated (it's the counsellor's real phone ringing),
     // so `startCloudTelephonyChat` was never part of RN's own gate here.
-    // (RN also ORs in `canCreateNote`, omitted since no note-creation flow
-    // is ported yet.)
+    // (RN's own `hasMicrophoneChatType`/tenant `enabledChatTypes` gate is a
+    // separate, not-yet-ported backlog item — see
+    // flutter-whole-app-status-2026-10-26.md item 6 — so this is permission
+    // only for now, same as before.)
     final canStartCall = permissions.contains(UserPermissions.startMicrophoneChat);
+    // Manual scribe notes: counsellor permission + the per-tenant toggle —
+    // mirrors RN's `canCreateNote` (`useScribeNoteCreationEnabled`), which
+    // skips the settings request entirely for a non-counsellor rather than
+    // firing one the backend would reject; watching the provider only in
+    // that branch reproduces the same skip here.
+    final isCounselor = permissions.contains(UserPermissions.counselorAccess);
+    final canCreateNote = isCounselor && (ref.watch(scribeNoteCreationEnabledProvider).value ?? false);
+    final canOfferAnySessionType = canStartCall || canCreateNote;
 
     if (hasReal && hasSimulation) {
       _activeTab ??= _LogTab.real;
@@ -269,11 +347,16 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
               ),
             ],
           ),
-          if (canStartCall)
+          if (canOfferAnySessionType)
             Positioned(
               right: 20,
               bottom: 30,
-              child: _StartSessionFab(onPressed: _showStartSessionModal),
+              child: _StartSessionFab(
+                onPressed: () => _showStartSessionModal(
+                  canStartCall: canStartCall,
+                  canCreateNote: canCreateNote,
+                ),
+              ),
             ),
         ],
       ),
