@@ -53,5 +53,12 @@ describe('JwtAuthGuard', () => {
         new UnauthorizedException('invalid token'),
       );
     });
+
+    it('should throw UnauthorizedException with the error message for generic errors', () => {
+      const info = new Error('Some other error');
+      expect(() => guard.handleRequest(null, null, info)).toThrow(
+        new UnauthorizedException('Some other error'),
+      );
+    });
   });
 });
