@@ -16,7 +16,7 @@
  */
 
 const PLACEHOLDER_RE = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
-const AUDIO_TAG_RE = /\[([a-z][a-z0-9 _-]*)\]/g;
+const AUDIO_TAG_RE = /\[([a-zA-Z][a-zA-Z0-9 _-]*)\]/g;
 
 export interface TokenDiff {
   /** Tokens present in source but missing (or under-represented) in output. */
@@ -49,16 +49,26 @@ function matchAllTokens(text: string, re: RegExp): string[] {
   return tokens;
 }
 
-function toCounts(tokens: string[]): Map<string, number> {
+function toCounts(
+  tokens: string[],
+  caseInsensitive = false,
+): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const t of tokens) counts.set(t, (counts.get(t) ?? 0) + 1);
+  for (const t of tokens) {
+    const key = caseInsensitive ? t.toLowerCase() : t;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
   return counts;
 }
 
 /** Multiset difference: how `output` deviates from `source`. */
-function diffMultiset(source: string[], output: string[]): TokenDiff {
-  const src = toCounts(source);
-  const out = toCounts(output);
+function diffMultiset(
+  source: string[],
+  output: string[],
+  caseInsensitive = false,
+): TokenDiff {
+  const src = toCounts(source, caseInsensitive);
+  const out = toCounts(output, caseInsensitive);
   const missing: string[] = [];
   const added: string[] = [];
 
@@ -90,6 +100,7 @@ export function validateTranslationTokens(
   const audioTags = diffMultiset(
     extractAudioTags(source),
     extractAudioTags(output),
+    true,
   );
 
   const ok =

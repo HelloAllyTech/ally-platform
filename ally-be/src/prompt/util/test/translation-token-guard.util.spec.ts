@@ -26,12 +26,6 @@ describe('translation-token-guard', () => {
         '[sigh]',
       ]);
     });
-
-    it('ignores capitalized bracket text (headings / markdown links)', () => {
-      expect(extractAudioTags('See [Section 2] and [Click here](url)')).toEqual(
-        [],
-      );
-    });
   });
 
   describe('validateTranslationTokens', () => {
@@ -89,6 +83,12 @@ describe('translation-token-guard', () => {
         source: 'ok [laughs]',
         output: 'ठीक है',
         ok: false,
+      },
+      {
+        name: 'casing differences in audio tags pass',
+        source: 'Say hi [laughs] then [sigh].',
+        output: 'Say hi [Laughs] then [Sigh].',
+        ok: true,
       },
     ];
 
