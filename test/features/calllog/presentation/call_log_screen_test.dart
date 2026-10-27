@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -55,9 +57,11 @@ MockCallLogRepository _repository({
   List<SimulationLogItem> simulationLogs = const [],
 }) {
   final repository = MockCallLogRepository();
-  when(() => repository.getCallLogs(archive: false)).thenAnswer((_) async => realLogs);
-  when(() => repository.getCallLogs(archive: true)).thenAnswer((_) async => archivedLogs);
-  when(() => repository.getSimulationLogs()).thenAnswer((_) async => simulationLogs);
+  when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false))
+      .thenAnswer((_) async => realLogs);
+  when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: true))
+      .thenAnswer((_) async => archivedLogs);
+  when(() => repository.getSimulationLogs(limit: kCallLogPageSize)).thenAnswer((_) async => simulationLogs);
   return repository;
 }
 
@@ -351,4 +355,82 @@ void main() {
       expect(find.text('Walk-in #1'), findsOneWidget, reason: 'row is still there, not dismissed');
     },
   );
+
+  testWidgets('scrolling near the bottom of the real-logs list loads the next page and appends it', (
+    tester,
+  ) async {
+    final repository = MockCallLogRepository();
+    final page1 = List.generate(kCallLogPageSize, (i) => _log(id: i + 1));
+    final page2 = [
+      CallLogItem(
+        id: 100,
+        startedAt: '2026-01-01T10:00:00Z',
+        endedAt: '2026-01-01T10:10:00Z',
+        status: 'SUCCESS',
+        sessionName: null,
+        score: null,
+      ),
+    ];
+    when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false)).thenAnswer((_) async => page1);
+    when(() => repository.getCallLogs(limit: kCallLogPageSize, offset: kCallLogPageSize, archive: false))
+        .thenAnswer((_) async => page2);
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: _routes(),
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith(
+          (ref) async => [UserPermissions.viewCallLogs, UserPermissions.viewChatDetails],
+        ),
+      ],
+    );
+
+    expect(find.text('Session #100'), findsNothing, reason: 'page 2 not loaded yet');
+
+    // A single large drag pins the scroll position near the (pre-append)
+    // bottom, which crosses the near-bottom `loadMore` threshold; appending
+    // page 2 then grows `maxScrollExtent` again, so a further drag is
+    // needed to actually scroll the new last row into view —
+    // `dragUntilVisible` handles both in one go.
+    await tester.dragUntilVisible(
+      find.text('Session #100'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    verify(() => repository.getCallLogs(limit: kCallLogPageSize, offset: kCallLogPageSize, archive: false))
+        .called(1);
+  });
+
+  testWidgets('pull-to-refresh re-fetches the real-logs list from page 0', (tester) async {
+    final repository = _repository(realLogs: [_log()]);
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: _routes(),
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith(
+          (ref) async => [UserPermissions.viewCallLogs, UserPermissions.viewChatDetails],
+        ),
+      ],
+    );
+
+    verify(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false)).called(1);
+
+    // Don't await `show()` directly — its returned future only resolves once
+    // the indicator's dismiss animation plays out, which needs pumped
+    // frames to advance; awaiting it inline stalls forever under fake async
+    // (same gotcha `leaderboard_screen_test.dart` documents for the same
+    // `RefreshIndicator` pattern).
+    unawaited(tester.state<RefreshIndicatorState>(find.byType(RefreshIndicator)).show());
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    verify(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false)).called(1);
+  });
 }

@@ -21,7 +21,7 @@ void main() {
     'picking a Status chip and tapping Apply refetches with that filter and shows the active-count badge',
     (tester) async {
       final repository = MockCallLogRepository();
-      when(() => repository.getCallLogs(archive: false, filter: any(named: 'filter')))
+      when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: any(named: 'filter')))
           .thenAnswer((_) async => []);
 
       await pumpRouterApp(
@@ -40,7 +40,7 @@ void main() {
 
       // Only the first call (the default, empty filter) has happened so far.
       verify(
-        () => repository.getCallLogs(archive: false, filter: const CallLogFilterState()),
+        () => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: const CallLogFilterState()),
       ).called(1);
 
       await tester.tap(find.byIcon(Icons.filter_list));
@@ -53,6 +53,7 @@ void main() {
 
       verify(
         () => repository.getCallLogs(
+          limit: kCallLogPageSize,
           archive: false,
           filter: const CallLogFilterState(statuses: ['SUCCESS']),
         ),
@@ -63,7 +64,7 @@ void main() {
 
   testWidgets('Clear resets the draft before Apply, and the badge disappears', (tester) async {
     final repository = MockCallLogRepository();
-    when(() => repository.getCallLogs(archive: false, filter: any(named: 'filter')))
+    when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: any(named: 'filter')))
         .thenAnswer((_) async => []);
 
     await pumpRouterApp(
@@ -94,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(
-      () => repository.getCallLogs(archive: false, filter: const CallLogFilterState()),
+      () => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: const CallLogFilterState()),
     ).called(2); // the initial fetch, then the Clear-triggered refetch.
     expect(find.text('1'), findsNothing);
   });

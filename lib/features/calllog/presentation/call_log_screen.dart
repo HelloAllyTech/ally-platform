@@ -61,7 +61,14 @@ enum _LogTab { real, simulation }
 /// RN's own 30s bound so a native permission call that never settles can't
 /// silently freeze the tap forever — and only then pushes into Scribe
 /// recording. A denial opens the same microphone-settings alert the
-/// simulation screens already use.
+/// simulation screens already use. Each of the three lists (real,
+/// archived, and simulation logs) paginates exactly like RN's own
+/// `handleLoadMore`/`ITEMS_PER_PAGE` (`CallLogScreen.tsx`): a page of
+/// [kCallLogPageSize], infinite-scroll-loaded as the list nears its bottom,
+/// `hasMore` inferred from a page coming back shorter than that size (no
+/// separate total-count endpoint), plus pull-to-refresh resetting back to
+/// page 0 — see `call_log_repository.dart`'s `PaginatedCallLogsController`/
+/// `SimulationLogsController`.
 ///
 /// Not ported: the real `StartSessionModal`'s "Create Note" manual-note
 /// path (no note-creation flow — the `createNote` mutation, and a
@@ -248,13 +255,13 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                     ? Center(child: Text(ref.t('calls.fallback.callEmptyTitle')))
                     : _isViewingArchive
                         ? _RealLogsList(
-                            provider: archivedCallLogsProvider,
+                            provider: archivedCallLogsControllerProvider,
                             canViewDetails: hasChatDetails,
                             canArchive: false,
                           )
                         : _activeTab == _LogTab.real
                             ? _RealLogsList(
-                                provider: realCallLogsProvider,
+                                provider: realCallLogsControllerProvider,
                                 canViewDetails: hasChatDetails,
                                 canArchive: hasArchive,
                               )
@@ -340,6 +347,74 @@ class _StartSessionFab extends StatelessWidget {
   }
 }
 
+/// Infinite-scroll + pull-to-refresh mechanics shared by [_RealLogsList] and
+/// [_SimulationLogsList] — mirrors ally-mobile (React Native)'s `FlatList`
+/// `onEndReached`/`onEndReachedThreshold={0.5}` (approximated here as "within
+/// 200 logical pixels of the bottom", the same threshold
+/// `leaderboard_screen.dart`'s own port of the same RN pattern uses) plus its
+/// `ListFooterComponent` spinner while a next page is loading.
+class _InfiniteScrollListView<T> extends StatefulWidget {
+  const _InfiniteScrollListView({
+    required this.page,
+    required this.onLoadMore,
+    required this.onRefresh,
+    required this.itemBuilder,
+  });
+
+  final PaginatedLogs<T> page;
+  final VoidCallback onLoadMore;
+  final Future<void> Function() onRefresh;
+  final Widget Function(BuildContext context, T item) itemBuilder;
+
+  @override
+  State<_InfiniteScrollListView<T>> createState() => _InfiniteScrollListViewState<T>();
+}
+
+class _InfiniteScrollListViewState<T> extends State<_InfiniteScrollListView<T>> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      widget.onLoadMore();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.page.items;
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      child: ListView.separated(
+        controller: _scrollController,
+        itemCount: items.length + (widget.page.isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          if (index >= items.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return widget.itemBuilder(context, items[index]);
+        },
+      ),
+    );
+  }
+}
+
 class _RealLogsList extends ConsumerWidget {
   const _RealLogsList({
     required this.provider,
@@ -347,26 +422,26 @@ class _RealLogsList extends ConsumerWidget {
     required this.canArchive,
   });
 
-  final FutureProvider<List<CallLogItem>> provider;
+  final AsyncNotifierProvider<PaginatedCallLogsController, PaginatedLogs<CallLogItem>> provider;
   final bool canViewDetails;
   final bool canArchive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(provider);
+    final pageAsync = ref.watch(provider);
 
-    return logsAsync.when(
+    return pageAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
-      data: (logs) {
-        if (logs.isEmpty) {
+      data: (page) {
+        if (page.items.isEmpty) {
           return Center(child: Text(ref.t('calls.fallback.callEmptyTitle')));
         }
-        return ListView.separated(
-          itemCount: logs.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final log = logs[index];
+        return _InfiniteScrollListView<CallLogItem>(
+          page: page,
+          onLoadMore: () => ref.read(provider.notifier).loadMore(),
+          onRefresh: () => ref.refresh(provider.future),
+          itemBuilder: (context, log) {
             final row = CallLogRow(
               title: log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id}),
               status: chatSummaryStatusFromString(log.status),
@@ -433,20 +508,20 @@ class _SimulationLogsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(simulationLogsProvider);
+    final pageAsync = ref.watch(simulationLogsControllerProvider);
 
-    return logsAsync.when(
+    return pageAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
-      data: (logs) {
-        if (logs.isEmpty) {
+      data: (page) {
+        if (page.items.isEmpty) {
           return Center(child: Text(ref.t('calls.fallback.simEmptyTitle')));
         }
-        return ListView.separated(
-          itemCount: logs.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final log = logs[index];
+        return _InfiniteScrollListView<SimulationLogItem>(
+          page: page,
+          onLoadMore: () => ref.read(simulationLogsControllerProvider.notifier).loadMore(),
+          onRefresh: () => ref.refresh(simulationLogsControllerProvider.future),
+          itemBuilder: (context, log) {
             // RN's `logTitle` fallback chain (summaryName/sessionName/chatId)
             // never resolves for a simulation row — none of those fields
             // exist on a scenario session — so the title row always falls

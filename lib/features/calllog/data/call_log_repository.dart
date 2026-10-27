@@ -492,8 +492,9 @@ final callLogRepositoryProvider = Provider<CallLogRepository>((ref) {
 /// `StateProvider` (removed along with `StateNotifier`) — a one-field
 /// `Notifier` is the idiomatic replacement, same pattern as
 /// `leaderboard_repository.dart`'s `LeaderboardWindowController`.
-/// `realCallLogsProvider`/`archivedCallLogsProvider` (both `watch` it)
-/// automatically refetch when a new filter is applied.
+/// `RealCallLogsController`/`ArchivedCallLogsController` (both `watch` it)
+/// automatically refetch — and reset back to page 0 — when a new filter is
+/// applied.
 class CallLogFilterController extends Notifier<CallLogFilterState> {
   @override
   CallLogFilterState build() => const CallLogFilterState();
@@ -508,25 +509,171 @@ final callLogFilterProvider =
   CallLogFilterController.new,
 );
 
-final realCallLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
-  final filter = ref.watch(callLogFilterProvider);
-  return ref.watch(callLogRepositoryProvider).getCallLogs(filter: filter);
-});
-
-final archivedCallLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
-  final filter = ref.watch(callLogFilterProvider);
-  return ref
-      .watch(callLogRepositoryProvider)
-      .getCallLogs(archive: true, filter: filter);
-});
-
 final callLogTagOptionsProvider = FutureProvider<List<String>>((ref) {
   return ref.watch(callLogRepositoryProvider).getAllTags();
 });
 
-final simulationLogsProvider = FutureProvider<List<SimulationLogItem>>((ref) {
-  return ref.watch(callLogRepositoryProvider).getSimulationLogs();
-});
+/// Matches ally-mobile (React Native)'s own `ITEMS_PER_PAGE`
+/// (`CallLogScreen.tsx`) — the page size for all three of this screen's
+/// paginated lists (real, archived, and simulation logs).
+const kCallLogPageSize = 10;
+
+/// One page of accumulated results for an infinite-scroll list. `hasMore`
+/// mirrors RN's own signal exactly: a page that comes back shorter than
+/// [kCallLogPageSize] means there's nothing left to fetch — there's no
+/// separate `totalCount` from either backend list endpoint to check
+/// against instead.
+class PaginatedLogs<T> {
+  PaginatedLogs({required this.items, required this.hasMore, this.isLoadingMore = false});
+
+  final List<T> items;
+  final bool hasMore;
+  final bool isLoadingMore;
+
+  PaginatedLogs<T> copyWith({bool? isLoadingMore}) =>
+      PaginatedLogs(items: items, hasMore: hasMore, isLoadingMore: isLoadingMore ?? this.isLoadingMore);
+}
+
+/// Common shape for [RealCallLogsController]/[ArchivedCallLogsController] —
+/// pulled out purely so both can share one provider *type*
+/// (`AsyncNotifierProvider<PaginatedCallLogsController, ...>`), letting
+/// `call_log_screen.dart`'s `_RealLogsList` take either one through a single
+/// constructor field, the same way it previously took either of two
+/// identically-typed `FutureProvider`s.
+abstract class PaginatedCallLogsController extends AsyncNotifier<PaginatedLogs<CallLogItem>> {
+  Future<void> loadMore();
+}
+
+/// Mirrors ally-mobile (React Native)'s `handleLoadMore`/`fetchInitialRealLogs`
+/// accumulate-by-offset pagination for the real (non-archived) call-log list.
+/// Rebuilding when `callLogFilterProvider` changes naturally resets the
+/// accumulated list (a fresh `AsyncNotifier` state) back to page 0 — the
+/// same effect RN gets from `useFocusEffect` re-running when its filter
+/// params change.
+class RealCallLogsController extends PaginatedCallLogsController {
+  @override
+  Future<PaginatedLogs<CallLogItem>> build() async {
+    final filter = ref.watch(callLogFilterProvider);
+    final items = await ref
+        .watch(callLogRepositoryProvider)
+        .getCallLogs(limit: kCallLogPageSize, filter: filter);
+    return PaginatedLogs(items: items, hasMore: items.length == kCallLogPageSize);
+  }
+
+  @override
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+    try {
+      final filter = ref.read(callLogFilterProvider);
+      final newItems = await ref
+          .read(callLogRepositoryProvider)
+          .getCallLogs(limit: kCallLogPageSize, offset: current.items.length, filter: filter);
+      state = AsyncData(
+        PaginatedLogs(
+          items: [...current.items, ...newItems],
+          hasMore: newItems.length == kCallLogPageSize,
+        ),
+      );
+    } catch (_) {
+      // Stays retryable — the next scroll-to-bottom triggers another attempt.
+      state = AsyncData(current.copyWith(isLoadingMore: false));
+    }
+  }
+}
+
+final realCallLogsControllerProvider =
+    AsyncNotifierProvider<PaginatedCallLogsController, PaginatedLogs<CallLogItem>>(
+  RealCallLogsController.new,
+);
+
+/// Same pagination shape as [RealCallLogsController], for the Archives view
+/// (`archive: true`) — a genuinely separate accumulated list/offset from the
+/// real-logs one above, matching RN's own separate
+/// `archivedRealLogsOffset`/`allArchivedRealLogs`/`hasMoreArchivedRealLogs`
+/// state trio.
+class ArchivedCallLogsController extends PaginatedCallLogsController {
+  @override
+  Future<PaginatedLogs<CallLogItem>> build() async {
+    final filter = ref.watch(callLogFilterProvider);
+    final items = await ref
+        .watch(callLogRepositoryProvider)
+        .getCallLogs(limit: kCallLogPageSize, archive: true, filter: filter);
+    return PaginatedLogs(items: items, hasMore: items.length == kCallLogPageSize);
+  }
+
+  @override
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+    try {
+      final filter = ref.read(callLogFilterProvider);
+      final newItems = await ref
+          .read(callLogRepositoryProvider)
+          .getCallLogs(
+            limit: kCallLogPageSize,
+            offset: current.items.length,
+            archive: true,
+            filter: filter,
+          );
+      state = AsyncData(
+        PaginatedLogs(
+          items: [...current.items, ...newItems],
+          hasMore: newItems.length == kCallLogPageSize,
+        ),
+      );
+    } catch (_) {
+      state = AsyncData(current.copyWith(isLoadingMore: false));
+    }
+  }
+}
+
+final archivedCallLogsControllerProvider =
+    AsyncNotifierProvider<PaginatedCallLogsController, PaginatedLogs<CallLogItem>>(
+  ArchivedCallLogsController.new,
+);
+
+/// Same pagination shape again, for the Role Play (simulation-session) list
+/// — a distinct endpoint with no filter sheet of its own (RN's filter
+/// button/sheet only ever applies to the real call-log tabs, see
+/// `call_log_screen.dart`'s class doc), so this one has nothing to
+/// `ref.watch` that would reset it besides its own `loadMore` offset.
+class SimulationLogsController extends AsyncNotifier<PaginatedLogs<SimulationLogItem>> {
+  @override
+  Future<PaginatedLogs<SimulationLogItem>> build() async {
+    final items = await ref.watch(callLogRepositoryProvider).getSimulationLogs(limit: kCallLogPageSize);
+    return PaginatedLogs(items: items, hasMore: items.length == kCallLogPageSize);
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+    try {
+      final newItems = await ref
+          .read(callLogRepositoryProvider)
+          .getSimulationLogs(limit: kCallLogPageSize, offset: current.items.length);
+      state = AsyncData(
+        PaginatedLogs(
+          items: [...current.items, ...newItems],
+          hasMore: newItems.length == kCallLogPageSize,
+        ),
+      );
+    } catch (_) {
+      state = AsyncData(current.copyWith(isLoadingMore: false));
+    }
+  }
+}
+
+final simulationLogsControllerProvider =
+    AsyncNotifierProvider<SimulationLogsController, PaginatedLogs<SimulationLogItem>>(
+  SimulationLogsController.new,
+);
 
 final callSummaryProvider = FutureProvider.family<CallSummaryDetails, int>((
   ref,
