@@ -242,13 +242,11 @@ export class LlmCompletionService {
       system: request.system ?? '',
       messages: this.toMessages(request),
       maxTokens: request.maxTokens,
+      timeoutMs: request.timeoutMs ?? 60_000,
       ...(target.temperature !== undefined
         ? { temperature: target.temperature }
         : {}),
       ...(request.jsonMode ? { jsonMode: true } : {}),
-      ...(request.timeoutMs !== undefined
-        ? { timeoutMs: request.timeoutMs }
-        : {}),
     });
 
     let text = '';
