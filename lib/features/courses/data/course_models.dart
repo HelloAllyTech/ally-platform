@@ -123,6 +123,7 @@ class TrackDetailItem {
     required this.status,
     required this.score,
     required this.maxWatchedPct,
+    this.hasDiscussion = false,
   });
 
   factory TrackDetailItem.fromJson(Map<String, dynamic> json) =>
@@ -135,6 +136,7 @@ class TrackDetailItem {
         status: trackItemStatusFromString(json['status'] as String?),
         score: (json['score'] as num?)?.toDouble(),
         maxWatchedPct: (json['maxWatchedPct'] as num?)?.toDouble(),
+        hasDiscussion: json['hasDiscussion'] as bool? ?? false,
       );
 
   final String id;
@@ -145,6 +147,7 @@ class TrackDetailItem {
   final TrackItemStatus status;
   final double? score;
   final double? maxWatchedPct;
+  final bool hasDiscussion;
 }
 
 class TrackSection {

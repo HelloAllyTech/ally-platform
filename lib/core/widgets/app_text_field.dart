@@ -27,11 +27,13 @@ class AppTextField extends StatelessWidget {
     this.shape = AppTextFieldShape.boxed,
     this.isError = false,
     this.maxLines = 1,
+    this.minLines,
     this.maxLength,
     this.keyboardType,
     this.onChanged,
     this.onSubmitted,
     this.enabled = true,
+    this.autofocus = false,
   });
 
   final TextEditingController? controller;
@@ -39,7 +41,9 @@ class AppTextField extends StatelessWidget {
   final AppTextFieldShape shape;
   final bool isError;
   final int? maxLines;
+  final int? minLines;
   final bool enabled;
+  final bool autofocus;
 
   /// When set, Flutter's own built-in counter is hidden (`counterText: ''`)
   /// — callers that want a visible count build their own `Text`, matching
@@ -107,11 +111,13 @@ class AppTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      minLines: minLines,
       maxLength: maxLength,
       keyboardType: keyboardType,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
       enabled: enabled,
+      autofocus: autofocus,
       style: textStyleFor(context),
       decoration: maxLength != null ? decoration.copyWith(counterText: '') : decoration,
     );

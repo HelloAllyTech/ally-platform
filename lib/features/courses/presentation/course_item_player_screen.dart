@@ -21,6 +21,7 @@ import '../data/start_item_payload.dart';
 import 'branching/branching_scenario_player.dart';
 import 'bucket_sort/bucket_sort_player.dart';
 import 'celebration_modal.dart';
+import 'discussion/discussion_thread.dart';
 import 'game/game_player.dart';
 import 'journal/journal_player.dart';
 import 'quiz/quiz_player.dart';
@@ -257,6 +258,17 @@ class _CourseItemPlayerScreenState
                         )
                       : _buildBody(),
                 ),
+                // Mirrors RN's own `nav.current?.item.hasDiscussion` gate,
+                // rendered below the item content and above the bottom nav
+                // (`CourseItemPlayerScreen.tsx`). Given a bounded max height
+                // rather than its own flex share — RN's own
+                // `DiscussionThreadProps.style` doc comment calls for
+                // exactly this ("kept fixed so it never collapses each
+                // item player's own flex: 1 internal layout"), which this
+                // port makes explicit since Flutter has no equivalent of
+                // RN's implicit flex-column sizing here.
+                if (hasNav && flat[currentIndex].item.hasDiscussion)
+                  DiscussionThread(itemId: _currentItemId),
                 ?bottomNav,
               ],
             ),
