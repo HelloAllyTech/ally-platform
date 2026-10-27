@@ -1,3 +1,6 @@
+import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
+import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+import { SpecialistLlmService } from '../specialist-llm.service';
 import { validate as isUuid } from 'uuid';
 import { courseCopilotGameOptions } from '../../../util/course-blueprint.util';
 import { BlueprintPlannerSpecialist } from '../blueprint-planner.specialist';
@@ -142,12 +145,56 @@ describe('BlueprintPlannerSpecialist', () => {
     expect(blueprint.sections[0].items).toHaveLength(4);
   });
 
-  it('keeps the first plan when the repair returns no JSON', async () => {
-    const llm = fakeLlm([endsOnGame, 'sorry']);
-    const blueprint = await new BlueprintPlannerSpecialist(llm.service).plan(
-      input(),
+  it('repairs the plan correctly with sufficient token limit', async () => {
+    const completeMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        text: JSON.stringify(endsOnGame),
+        model: 'fake-model',
+        provider: 'fake',
+      })
+      .mockImplementation(async ({ maxTokens }: { maxTokens: number }) => {
+        // This logic simulates the bug and the fix.
+        // The real maxTokens is 16_000, so this will trigger truncation.
+        // After the fix (24_000), it will not.
+        if (maxTokens < 20000) {
+          return {
+            text: JSON.stringify(goodPlan).slice(0, -20), // truncated
+            model: 'fake-model',
+            provider: 'fake',
+          };
+        }
+        return {
+          text: JSON.stringify(goodPlan), // full
+          model: 'fake-model',
+          provider: 'fake',
+        };
+      });
+
+    const llmCompletionService = {
+      complete: completeMock,
+    } as unknown as LlmCompletionService;
+
+    const promptSharedService = {
+      getPromptByCode: jest.fn().mockResolvedValue('template'),
+    } as unknown as PromptSharedService;
+
+    const specialistLlmService = new SpecialistLlmService(
+      promptSharedService,
+      llmCompletionService,
     );
-    expect(blueprint.sections[0].items).toHaveLength(4);
+
+    const specialist = new BlueprintPlannerSpecialist(specialistLlmService);
+    const logger = { warn: jest.fn() };
+    (specialist as any).logger = logger;
+
+    const blueprint = await specialist.plan(input());
+
+    // With current code, maxTokens is 16000, so we get truncated JSON.
+    // The repair fails, we keep the first plan (4 items) and a warning is logged.
+    // This assertion will fail, expecting the repaired plan (3 items).
+    expect(blueprint.sections[0].items).toHaveLength(3);
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it('spends its one retry on unparseable output', async () => {
