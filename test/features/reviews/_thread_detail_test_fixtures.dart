@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
+import 'package:ally_mobile_flutter/features/account/data/user_profile.dart';
 import 'package:ally_mobile_flutter/features/reactions/data/reactions_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
@@ -23,20 +25,37 @@ ThreadComment buildComment({
   required String authorName,
   Map<String, int> reactions = const {},
   String? myReaction,
+  int? authorId,
+  bool hidden = false,
+  String? createdAt,
 }) =>
     ThreadComment(
       id: id,
       content: content,
-      createdAt: null,
+      createdAt: createdAt,
       authorName: authorName,
       reactions: reactions,
       myReaction: myReaction,
+      authorId: authorId,
+      hidden: hidden,
     );
 
 List<Override> threadDetailOverrides(
   MockReviewsRepository reviewsRepository,
-  MockReactionsRepository reactionsRepository,
-) => [
+  MockReactionsRepository reactionsRepository, {
+  int? currentUserId,
+}) => [
   reviewsRepositoryProvider.overrideWithValue(reviewsRepository),
   reactionsRepositoryProvider.overrideWithValue(reactionsRepository),
+  if (currentUserId != null)
+    currentUserProvider.overrideWith(
+      (ref) async => UserProfile(
+        id: currentUserId,
+        email: 'me@example.com',
+        name: 'Me',
+        phone: '',
+        profileImageUrl: null,
+        profileCompleted: true,
+      ),
+    ),
 ];

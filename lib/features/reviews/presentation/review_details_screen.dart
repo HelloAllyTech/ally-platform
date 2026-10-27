@@ -268,6 +268,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                       _ThreadsTab(
                         reviewId: widget.reviewId,
                         reviewType: widget.reviewType,
+                        reviewOwnerId: review.createdBy.id,
                       ),
                     ],
                   ),
@@ -344,10 +345,11 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
 }
 
 class _ThreadsTab extends ConsumerWidget {
-  const _ThreadsTab({required this.reviewId, required this.reviewType});
+  const _ThreadsTab({required this.reviewId, required this.reviewType, required this.reviewOwnerId});
 
   final String reviewId;
   final ReviewType reviewType;
+  final int reviewOwnerId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -393,6 +395,7 @@ class _ThreadsTab extends ConsumerWidget {
                             reviewId: reviewId,
                             thread: thread,
                             reviewType: reviewType,
+                            reviewOwnerId: reviewOwnerId,
                           ),
                         ),
                       ),

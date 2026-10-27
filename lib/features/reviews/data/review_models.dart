@@ -184,21 +184,35 @@ class ReviewComment {
     required this.content,
     required this.createdAt,
     required this.authorName,
+    this.authorId,
+    this.hidden = false,
   });
 
-  factory ReviewComment.fromJson(Map<String, dynamic> json) => ReviewComment(
-    id: json['id'] as String,
-    content: json['content'] as String? ?? '',
-    createdAt: json['createdAt'] as String?,
-    authorName:
-        (json['createdBy'] as Map<String, dynamic>?)?['name'] as String? ??
-        'Unknown',
-  );
+  factory ReviewComment.fromJson(Map<String, dynamic> json) {
+    final createdBy = json['createdBy'] as Map<String, dynamic>?;
+    return ReviewComment(
+      id: json['id'] as String,
+      content: json['content'] as String? ?? '',
+      createdAt: json['createdAt'] as String?,
+      authorName: createdBy?['name'] as String? ?? 'Unknown',
+      authorId: (createdBy?['id'] as num?)?.toInt(),
+      hidden: json['hidden'] as bool? ?? false,
+    );
+  }
 
   final String id;
   final String content;
   final String? createdAt;
   final String authorName;
+
+  /// RN's `createdBy.id` — optional there too (`id?: number`), unlike
+  /// [ReviewAuthor.id] on a whole review/thread.
+  final int? authorId;
+
+  /// Whether the review's owner has hidden this comment — see
+  /// `review.details.hide`/`review.details.unhide`'s gate in
+  /// `ReviewComment.tsx`.
+  final bool hidden;
 }
 
 /// Mirrors `src/types/reviews.ts`'s `MessageData` — the transcript message
@@ -235,20 +249,25 @@ class ThreadComment {
     required this.authorName,
     required this.reactions,
     required this.myReaction,
+    this.authorId,
+    this.hidden = false,
   });
 
-  factory ThreadComment.fromJson(Map<String, dynamic> json) => ThreadComment(
-    id: json['id'] as String,
-    content: json['content'] as String? ?? '',
-    createdAt: json['createdAt'] as String?,
-    authorName:
-        (json['createdBy'] as Map<String, dynamic>?)?['name'] as String? ??
-        'Unknown',
-    reactions: (json['reactions'] as Map<String, dynamic>? ?? {}).map(
-      (key, value) => MapEntry(key, (value as num).toInt()),
-    ),
-    myReaction: json['myReaction'] as String?,
-  );
+  factory ThreadComment.fromJson(Map<String, dynamic> json) {
+    final createdBy = json['createdBy'] as Map<String, dynamic>?;
+    return ThreadComment(
+      id: json['id'] as String,
+      content: json['content'] as String? ?? '',
+      createdAt: json['createdAt'] as String?,
+      authorName: createdBy?['name'] as String? ?? 'Unknown',
+      authorId: (createdBy?['id'] as num?)?.toInt(),
+      reactions: (json['reactions'] as Map<String, dynamic>? ?? {}).map(
+        (key, value) => MapEntry(key, (value as num).toInt()),
+      ),
+      myReaction: json['myReaction'] as String?,
+      hidden: json['hidden'] as bool? ?? false,
+    );
+  }
 
   final String id;
   final String content;
@@ -256,6 +275,23 @@ class ThreadComment {
   final String authorName;
   final Map<String, int> reactions;
   final String? myReaction;
+
+  /// RN's `createdBy.id` — optional there too, unlike [ReviewAuthor.id].
+  final int? authorId;
+
+  /// Whether the review's owner has hidden this comment.
+  final bool hidden;
+
+  ThreadComment copyWith({String? content, bool? hidden}) => ThreadComment(
+    id: id,
+    content: content ?? this.content,
+    createdAt: createdAt,
+    authorName: authorName,
+    authorId: authorId,
+    reactions: reactions,
+    myReaction: myReaction,
+    hidden: hidden ?? this.hidden,
+  );
 }
 
 /// Mirrors `src/types/reviews.ts`'s `Thread` — a transcript-anchored

@@ -158,6 +158,36 @@ class ScribeReviewsRepository {
       data: {'threadId': threadId, 'content': content},
     );
   }
+
+  /// Mirrors `ReviewsRepository.updateComment`
+  /// (`scribeReviewsApi.ts`'s `useUpdateScribeCommentMutation`).
+  Future<void> updateComment({
+    required String commentId,
+    required String content,
+  }) async {
+    await _dio.patch<void>(
+      '/scribe-session-reviews/comments/$commentId',
+      data: {'content': content},
+    );
+  }
+
+  /// Mirrors `ReviewsRepository.deleteComment`
+  /// (`scribeReviewsApi.ts`'s `useDeleteScribeCommentMutation`).
+  Future<void> deleteComment(String commentId) async {
+    await _dio.delete<void>('/scribe-session-reviews/comments/$commentId');
+  }
+
+  /// Mirrors `ReviewsRepository.updateCommentVisibility`
+  /// (`scribeReviewsApi.ts`'s `useUpdateScribeCommentVisibilityMutation`).
+  Future<void> updateCommentVisibility({
+    required String commentId,
+    required bool hidden,
+  }) async {
+    await _dio.patch<void>(
+      '/scribe-session-reviews/comments/$commentId/visibility',
+      data: {'hidden': hidden},
+    );
+  }
 }
 
 final scribeReviewsRepositoryProvider = Provider<ScribeReviewsRepository>((ref) {

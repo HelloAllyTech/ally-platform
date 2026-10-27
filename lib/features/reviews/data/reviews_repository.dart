@@ -171,6 +171,38 @@ class ReviewsRepository {
       data: {'threadId': threadId, 'content': content},
     );
   }
+
+  /// Matches `useUpdateCommentMutation` — editing is only offered within
+  /// `EDIT_COMMENT_TIME_LIMIT_MINUTES` of posting, and only to the
+  /// comment's own author (see `ReviewComment.tsx`'s `getMenuOptions`).
+  Future<void> updateComment({
+    required String commentId,
+    required String content,
+  }) async {
+    await _dio.patch<void>(
+      '/scenario-session-reviews/comments/$commentId',
+      data: {'content': content},
+    );
+  }
+
+  /// Matches `useDeleteCommentMutation` — only offered to the comment's own
+  /// author, same ownership check as [updateComment].
+  Future<void> deleteComment(String commentId) async {
+    await _dio.delete<void>('/scenario-session-reviews/comments/$commentId');
+  }
+
+  /// Matches `useUpdateCommentVisibilityMutation` — Hide/Unhide, offered
+  /// only to the *review's* owner (a different identity from the
+  /// comment's own author — see `ReviewComment.tsx`'s `getMenuOptions`).
+  Future<void> updateCommentVisibility({
+    required String commentId,
+    required bool hidden,
+  }) async {
+    await _dio.patch<void>(
+      '/scenario-session-reviews/comments/$commentId/visibility',
+      data: {'hidden': hidden},
+    );
+  }
 }
 
 final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {
