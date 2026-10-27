@@ -342,6 +342,7 @@ export class PromptSharedService {
             prompt: fromFile,
             version: null,
             contentHash: hashPromptBody(fromFile),
+            useDashboardOverride: false,
           });
         }
       }
