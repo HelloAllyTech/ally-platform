@@ -186,7 +186,11 @@ export class LlmCompletionService {
         'Please check the ANTHROPIC_API_KEY environment variable.';
     }
 
-    this.logger.warn(logMessage);
+    if (process.env.NODE_ENV === 'test') {
+      this.logger.log(logMessage);
+    } else {
+      this.logger.warn(logMessage);
+    }
 
     const result = await this.run(request, fallback);
     return {

@@ -253,7 +253,7 @@ describe('LlmCompletionService', () => {
     });
 
     it('logs an actionable suggestion on an Anthropic auth error', async () => {
-      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
       const { service } = build({
         providers: {
           anthropic: { fail: authError },
@@ -263,12 +263,12 @@ describe('LlmCompletionService', () => {
 
       await service.complete(request);
 
-      expect(warn).toHaveBeenCalledWith(
+      expect(log).toHaveBeenCalledWith(
         expect.stringContaining(
           'SUGGESTION: The Anthropic API key may be invalid or expired',
         ),
       );
-      warn.mockRestore();
+      log.mockRestore();
     });
 
     it('caches the dead provider to avoid re-calling on a second request', async () => {
