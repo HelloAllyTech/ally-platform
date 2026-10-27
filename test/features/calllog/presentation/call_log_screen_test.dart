@@ -41,8 +41,10 @@ List<GoRoute> _routes() => [
       ),
       GoRoute(
         path: '/simulations/feedback/:sessionId',
-        builder: (context, state) =>
-            Text('Feedback for ${state.pathParameters['sessionId']}'),
+        builder: (context, state) => Text(
+          'Feedback for ${state.pathParameters['sessionId']}'
+          ' fromLogs=${state.uri.queryParameters['fromLogs']}',
+        ),
       ),
       GoRoute(path: '/scribe', builder: (context, state) => const Text('Scribe recording')),
     ];
@@ -133,7 +135,10 @@ void main() {
 
     await tester.tap(find.textContaining('Difficult client'));
     await tester.pumpAndSettle();
-    expect(find.text('Feedback for 7'), findsOneWidget);
+    // Reached from the logs list, so SimulationFeedbackScreen's own
+    // leave-without-rating prompt must not force itself on exit — mirrors
+    // RN's `route.params.fromLogs`.
+    expect(find.text('Feedback for 7 fromLogs=true'), findsOneWidget);
   });
 
   testWidgets(

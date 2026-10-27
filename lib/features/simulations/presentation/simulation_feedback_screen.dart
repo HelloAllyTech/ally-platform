@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'simulation_transcript_tab.dart';
@@ -25,9 +26,20 @@ import 'simulation_transcript_tab.dart';
 /// (`TrackSkillCategoryFeedback` in `src/types/courses.ts`), a different
 /// screen entirely.
 class SimulationFeedbackScreen extends ConsumerStatefulWidget {
-  const SimulationFeedbackScreen({super.key, required this.scenarioSessionId});
+  const SimulationFeedbackScreen({
+    super.key,
+    required this.scenarioSessionId,
+    this.fromLogs = false,
+  });
 
   final String scenarioSessionId;
+
+  /// Mirrors RN's `route.params.fromLogs`: reached from a historical Call
+  /// Logs row rather than fresh off a just-finished session. RN never
+  /// forces its leave-without-rating prompt in this case (the session is
+  /// already over and in the past — re-litigating a rating on every visit
+  /// would be a nuisance, not a nudge); see [_shouldForceLeaveConfirm].
+  final bool fromLogs;
 
   @override
   ConsumerState<SimulationFeedbackScreen> createState() =>
@@ -42,6 +54,13 @@ class _SimulationFeedbackScreenState
   bool _isSubmitting = false;
   bool _submitted = false;
   String? _error;
+
+  /// Guards the one-time adoption of the fetched summary's existing
+  /// `hasFeedback`/`feedbackRating` into local state (see the `ref.listen`
+  /// in `build()`) — without it, every later refetch of the same provider
+  /// (e.g. the focus-refresh RN also does) would stomp on whatever the
+  /// learner has typed locally since.
+  bool _initializedFromSummary = false;
 
   @override
   void dispose() {
@@ -67,15 +86,38 @@ class _SimulationFeedbackScreenState
             comment: _commentController.text.trim(),
             tags: _selectedTags.toList(),
           );
-      if (mounted) setState(() => _submitted = true);
+      if (!mounted) return;
+      setState(() => _submitted = true);
+      // Mirrors RN's `showToast(t('callFeedback.submitted'), 'success')` on
+      // the real CallSummaryScreen feedback flow (the same action there).
+      // RN's own SimulationFeedbackScreen.tsx actually calls
+      // `showToast(t('callFeedback.submit'), 'success')` — a confirmed copy
+      // bug reusing the *button label* key ("Submit") instead of the
+      // success-message one, so the real app's toast literally reads
+      // "Submit" after a successful submission. Not reproduced here;
+      // matching the correct, already-established sibling behavior instead.
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(ref.tr('callFeedback.submitted'))),
+      );
     } catch (e) {
+      if (!mounted) return;
       setState(
         () => _error = '${ref.tr('callFeedback.failSubmitFeedback')}: $e',
+      );
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(ref.tr('callFeedback.failSubmitFeedback'))),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
+
+  /// Mirrors RN's `!fromLogs && !hasFeedbackSubmitted.current &&
+  /// !simulationDetails?.hasFeedback` gate in `handleFeedbackAndNavigate`:
+  /// only force the rating prompt when this is neither a historical-logs
+  /// view nor a session that already has feedback (locally submitted this
+  /// visit, or fetched with `hasFeedback` already true).
+  bool get _shouldForceLeaveConfirm => !widget.fromLogs && !_submitted;
 
   /// Mirrors RN's forced-feedback exit interception
   /// (`handleFeedbackAndNavigate`/`feedbackPopupSource.current = 'leave'`):
@@ -106,10 +148,33 @@ class _SimulationFeedbackScreenState
 
   @override
   Widget build(BuildContext context) {
+    // One-time adoption of the fetched summary's existing feedback, if any
+    // — mirrors RN's own `simulationDetails.hasFeedback` init branch
+    // (`hasFeedbackSubmitted.current = true` + `setExistingFeedback(...)`).
+    // Without this, reopening an already-rated session (e.g. from Call
+    // Logs) would show a blank rating form and could still force the
+    // leave-without-rating prompt on exit.
+    ref.listen(simulationSummaryProvider(widget.scenarioSessionId), (
+      previous,
+      next,
+    ) {
+      if (_initializedFromSummary) return;
+      final summary = next.value;
+      if (summary == null) return;
+      _initializedFromSummary = true;
+      if (summary.hasFeedback) {
+        setState(() {
+          _submitted = true;
+          if (summary.feedbackRating != null) _rating = summary.feedbackRating!;
+        });
+      }
+    });
+
     return PopScope(
-      // Already submitted (or came in with feedback already present) —
-      // nothing forcing an exit prompt.
-      canPop: _submitted,
+      // Already submitted (or came in with feedback already present), or
+      // this is just a historical-logs view — nothing forcing an exit
+      // prompt.
+      canPop: !_shouldForceLeaveConfirm,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _confirmLeave();
       },

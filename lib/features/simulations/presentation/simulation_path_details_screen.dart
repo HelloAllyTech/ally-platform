@@ -60,7 +60,11 @@ class SimulationPathDetailsScreen extends ConsumerWidget {
                 .read(simulationsRepositoryProvider)
                 .getScenarioSessionByPathItem(scenario.sessionId!);
             if (sessionId != null && context.mounted) {
-              context.push('/simulations/feedback/$sessionId');
+              // Reviewing an already-completed session (not a fresh
+              // finish) — mirrors RN's own `fromLogs: true` on this exact
+              // call site, so the feedback screen doesn't force a rating
+              // prompt on exit.
+              context.push('/simulations/feedback/$sessionId?fromLogs=true');
             }
           },
         ),

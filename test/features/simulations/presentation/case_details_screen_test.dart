@@ -57,8 +57,10 @@ List<GoRoute> _routes() => [
   ),
   GoRoute(
     path: '/simulations/feedback/:sessionId',
-    builder: (context, state) =>
-        Text('FEEDBACK:${state.pathParameters['sessionId']}'),
+    builder: (context, state) => Text(
+      'FEEDBACK:${state.pathParameters['sessionId']}'
+      ' fromLogs=${state.uri.queryParameters['fromLogs']}',
+    ),
   ),
 ];
 
@@ -203,7 +205,9 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.getScenarioSessionByCaseItem('item-1')).called(1);
-    expect(find.text('FEEDBACK:resolved-session-1'), findsOneWidget);
+    // Viewing an already-completed session — must not force a rating
+    // prompt on exit, mirroring RN's own fromLogs: true here.
+    expect(find.text('FEEDBACK:resolved-session-1 fromLogs=true'), findsOneWidget);
   });
 
   testWidgets('shows an error message when loading case details fails', (

@@ -233,6 +233,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/simulations/feedback/:sessionId',
         builder: (context, state) => SimulationFeedbackScreen(
           scenarioSessionId: state.pathParameters['sessionId']!,
+          fromLogs: state.uri.queryParameters['fromLogs'] == 'true',
         ),
       ),
       GoRoute(

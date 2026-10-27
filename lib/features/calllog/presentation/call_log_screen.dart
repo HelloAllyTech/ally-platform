@@ -461,7 +461,7 @@ class _SimulationLogsList extends ConsumerWidget {
                   ? '${ref.t('calls.table.sessionScore')}: ${log.score!.round()}'
                   : null,
               enabled: canViewDetails,
-              onTap: () => context.push('/simulations/feedback/${log.id}'),
+              onTap: () => context.push('/simulations/feedback/${log.id}?fromLogs=true'),
             );
           },
         );

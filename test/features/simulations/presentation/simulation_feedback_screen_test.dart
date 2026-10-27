@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
@@ -46,6 +48,31 @@ void main() {
       ),
     ],
   );
+
+  /// `pumpApp`'s own `MaterialApp` doesn't wire `scaffoldMessengerKey:
+  /// rootScaffoldMessengerKey` (nothing else needed it to), so
+  /// `rootScaffoldMessengerKey.currentState` is null under it and the
+  /// screen's `showSnackBar` calls silently no-op. Build the same shape
+  /// locally with that key attached, for the two tests that actually need
+  /// to observe a snackbar.
+  Future<void> pumpScreenWithToasts(WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          fixedTranslationsOverride(),
+          simulationsRepositoryProvider.overrideWithValue(repository),
+          simulationTranscriptRepositoryProvider.overrideWithValue(
+            transcriptRepository,
+          ),
+        ],
+        child: MaterialApp(
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
+          home: const SimulationFeedbackScreen(scenarioSessionId: 'session-1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
 
   testWidgets('shows both the Debrief and Transcript tabs', (tester) async {
     when(() => repository.getSimulationDetails('session-1')).thenAnswer(
@@ -282,5 +309,165 @@ void main() {
 
     // Dialog dismissed, screen still showing (didn't actually leave).
     expect(find.text('Debrief'), findsOneWidget);
+  });
+
+  testWidgets(
+    'submitting feedback shows a snackbar in addition to the inline thanks state',
+    (tester) async {
+      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
+        (_) async => SimulationSummary.fromJson({
+          'id': 'session-1',
+          'startedAt': '2026-01-01T10:00:00.000Z',
+        }),
+      );
+      when(
+        () => repository.addSimulationFeedback(
+          scenarioSessionId: 'session-1',
+          rating: 4,
+          comment: '',
+          tags: <String>[],
+        ),
+      ).thenAnswer((_) async {});
+
+      await pumpScreenWithToasts(tester);
+
+      await tester.tap(find.byIcon(Icons.star_border).at(3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(AppButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text('Feedback submitted successfully'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('a failed submission shows a failure snackbar alongside the inline error', (
+    tester,
+  ) async {
+    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
+      (_) async => SimulationSummary.fromJson({
+        'id': 'session-1',
+        'startedAt': '2026-01-01T10:00:00.000Z',
+      }),
+    );
+    when(
+      () => repository.addSimulationFeedback(
+        scenarioSessionId: 'session-1',
+        rating: 4,
+        comment: '',
+        tags: <String>[],
+      ),
+    ).thenThrow(Exception('network down'));
+
+    await pumpScreenWithToasts(tester);
+
+    await tester.tap(find.byIcon(Icons.star_border).at(3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(AppButton, 'Submit'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text('Failed to submit feedback'),
+      ),
+      findsOneWidget,
+    );
+    // The inline form stays up (not a forced "thanks" state) with its own
+    // error text too.
+    expect(find.textContaining('Failed to submit feedback'), findsWidgets);
+  });
+
+  testWidgets(
+    'a session that already has feedback starts in the thanks state with no leave prompt',
+    (tester) async {
+      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
+        (_) async => SimulationSummary.fromJson({
+          'id': 'session-1',
+          'startedAt': '2026-01-01T10:00:00.000Z',
+          'hasFeedback': true,
+          'feedbackRating': 5,
+        }),
+      );
+
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await pumpApp(
+        tester,
+        Navigator(
+          key: navigatorKey,
+          onGenerateRoute: (settings) => MaterialPageRoute(
+            builder: (_) =>
+                const SimulationFeedbackScreen(scenarioSessionId: 'session-1'),
+          ),
+        ),
+        overrides: [
+          fixedTranslationsOverride(),
+          simulationsRepositoryProvider.overrideWithValue(repository),
+          simulationTranscriptRepositoryProvider.overrideWithValue(
+            transcriptRepository,
+          ),
+        ],
+      );
+
+      // Already-submitted "thanks" state, not the blank rating form.
+      expect(find.text('Feedback submitted successfully'), findsOneWidget);
+      verifyNever(
+        () => repository.addSimulationFeedback(
+          scenarioSessionId: any(named: 'scenarioSessionId'),
+          rating: any(named: 'rating'),
+          comment: any(named: 'comment'),
+        ),
+      );
+
+      navigatorKey.currentState!.maybePop();
+      await tester.pumpAndSettle();
+
+      // No forced confirmation dialog — already has feedback.
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
+  testWidgets('fromLogs skips the forced leave-without-rating prompt even with no feedback yet', (
+    tester,
+  ) async {
+    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
+      (_) async => SimulationSummary.fromJson({
+        'id': 'session-1',
+        'startedAt': '2026-01-01T10:00:00.000Z',
+      }),
+    );
+
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await pumpApp(
+      tester,
+      Navigator(
+        key: navigatorKey,
+        onGenerateRoute: (settings) => MaterialPageRoute(
+          builder: (_) => const SimulationFeedbackScreen(
+            scenarioSessionId: 'session-1',
+            fromLogs: true,
+          ),
+        ),
+      ),
+      overrides: [
+        fixedTranslationsOverride(),
+        simulationsRepositoryProvider.overrideWithValue(repository),
+        simulationTranscriptRepositoryProvider.overrideWithValue(
+          transcriptRepository,
+        ),
+      ],
+    );
+
+    navigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
   });
 }
