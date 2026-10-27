@@ -114,7 +114,7 @@ describe('FeatureToggleGuard', () => {
 
     it('denies when the org preference is off', async () => {
       await expect(guard.canActivate(contextFor(tenantAdmin))).rejects.toThrow(
-        `Missing required feature access: ${FeatureToggleKey.CHARACTER_LIBRARY}`,
+        'The Character Library feature is not enabled for your organization. Please contact an administrator to enable it.',
       );
     });
 
