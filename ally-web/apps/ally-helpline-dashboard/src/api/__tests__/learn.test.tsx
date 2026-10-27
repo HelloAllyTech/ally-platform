@@ -26,15 +26,17 @@ import {
 vi.mock("@constants", () => ({
   ApiEndpoints: {
     LEARN: {
-      END_SIMULATION: "/learn/end-simulation",
-      GET_SCENARIO: "/learn/scenario",
-      GET_SCENARIOS: "/learn/scenarios",
+      END_SIMULATION: (sessionId: string) => `/learn/end-simulation/${sessionId}`,
+      GET_SCENARIO: (scenarioId: number) => `/learn/scenario/${scenarioId}`,
+      GET_SCENARIO_PUBLIC: (scenarioId: number) => `/learn/scenario/${scenarioId}/public`,
+      GET_SCENARIOS: "/learn/scenarios/public",
+      GET_SCENARIOS_PRIVATE: "/learn/scenarios",
       START_SIMULATION: "/learn/start-simulation",
       GET_SIMULATION_LOGS: "/learn/simulation-logs",
       GET_ADMIN_SIMULATION_LOGS: "/learn/admin-simulation-logs",
-      GET_SIMULATION_SUMMARY: "/learn/simulation-summary",
-      SUBMIT_SIMULATION_FEEDBACK: "/learn/submit-feedback",
-      GET_SIMULATION_TRANSCRIPT: "/learn/simulation-transcript",
+      GET_SIMULATION_SUMMARY: (sessionId: string) => `/learn/simulation-summary/${sessionId}`,
+      SUBMIT_SIMULATION_FEEDBACK: (sessionId: string) => `/learn/submit-feedback/${sessionId}`,
+      GET_SIMULATION_TRANSCRIPT: (sessionId: string) => `/learn/simulation-transcript/${sessionId}`,
       GET_AVAILABLE_LANGUAGES: "/learn/scenario-languages",
     },
   },
