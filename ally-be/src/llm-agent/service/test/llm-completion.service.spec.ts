@@ -169,6 +169,14 @@ describe('LlmCompletionService', () => {
       // Racing would leave the HTTP request running and its tokens billable.
       expect(streamCalls[0].request.timeoutMs).toBe(4321);
     });
+
+    it('applies a default timeout when none is given', async () => {
+      const { service, streamCalls } = build({});
+
+      await service.complete(request);
+
+      expect(streamCalls[0].request.timeoutMs).toBe(60_000);
+    });
   });
 
   describe('fallback on a dead credential', () => {
