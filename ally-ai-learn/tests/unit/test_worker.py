@@ -1339,6 +1339,35 @@ class TestWorker:
         # Keeping test structure for potential future use
         pass
 
+    # -------------------- _setup_stall_watchdog --------------------
+    @pytest.mark.asyncio
+    async def test_setup_stall_watchdog_handles_generic_exception(
+        self, monkeypatch, caplog
+    ):
+        """A generic exception during watchdog setup should be logged as a WARNING."""
+        monkeypatch.setattr(
+            "app.core.session_watchdog.SessionStallWatchdog",
+            Mock(side_effect=ValueError("a generic error")),
+        )
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(name="room-1")
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        worker_instance.session = self.DummySession()
+
+        with caplog.at_level("WARNING"):
+            worker_instance._setup_stall_watchdog()
+
+        assert worker_instance._stall_watchdog is None
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert record.levelname == "WARNING"
+        assert "[WATCHDOG] failed to arm; continuing without it" in record.message
+        assert "a generic error" in str(record.exc_info)
+
     # -------------------- entrypoint additional tests --------------------
     @pytest.mark.asyncio
     async def test_entrypoint_stt_fallback(self, monkeypatch):

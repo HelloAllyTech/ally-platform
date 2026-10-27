@@ -935,8 +935,18 @@ class AgentWorker:
                 getattr(settings, "SESSION_STALL_THRESHOLD_S", 75.0),
                 room,
             )
+        except (ImportError, AttributeError) as e:
+            logger.exception(
+                "[WATCHDOG] failed to arm due to a code issue (%s); "
+                "continuing without it",
+                e,
+            )
+            self._stall_watchdog = None
         except Exception:  # noqa: BLE001 - watchdog must never break a session
-            logger.exception("[WATCHDOG] failed to arm; continuing without it")
+            logger.warning(
+                "[WATCHDOG] failed to arm; continuing without it", exc_info=True
+            )
+            self._stall_watchdog = None
             self._stall_watchdog = None
 
     @property
