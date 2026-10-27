@@ -276,8 +276,10 @@ describe('TrackBranchingService.listLearnerAttempts', () => {
     trackTitle: 'Course',
     trackItemId: 'i1',
     title: 'Scenario',
+    type: TrackItemType.BRANCHING_SCENARIO,
     content: content({ passScore: 70, maxAttempts: 2 }),
     status: SessionItemStatus.UNLOCKED,
+    score: null,
     meta: null,
     ...over,
   });
@@ -333,6 +335,39 @@ describe('TrackBranchingService.listLearnerAttempts', () => {
     ]);
     // i3's round used every attempt but the pause has passed, so it is a fresh round.
     await expect(service.listLearnerAttempts(7)).resolves.toEqual([]);
+  });
+
+  it('lists a used assessment roleplay, passed or not, as reopenable', async () => {
+    jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue('tenant-a');
+    const submitted = { assessmentSubmittedAt: '2026-10-26T09:00:00.000Z' };
+    const { service } = serviceWith([
+      row({
+        trackItemId: 'r1',
+        type: TrackItemType.ROLEPLAY,
+        content: null,
+        score: '35',
+        meta: submitted,
+      }),
+      row({
+        trackItemId: 'r2',
+        type: TrackItemType.ROLEPLAY,
+        content: null,
+        status: SessionItemStatus.COMPLETED,
+        score: '80',
+        meta: submitted,
+      }),
+    ]);
+    const result = await service.listLearnerAttempts(7);
+    expect(result).toEqual([
+      expect.objectContaining({
+        kind: 'ROLEPLAY_ASSESSMENT',
+        trackItemId: 'r1',
+        bestScore: 35,
+        passed: false,
+        submittedAt: submitted.assessmentSubmittedAt,
+      }),
+      expect.objectContaining({ trackItemId: 'r2', passed: true }),
+    ]);
   });
 
   it('has nothing to show without a tenant in context', async () => {

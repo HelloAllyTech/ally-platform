@@ -7,6 +7,7 @@ import { LearnerScenarioAttempt } from "@types";
 
 const mockAttemptsQuery = vi.fn();
 const mockReset = vi.fn();
+const mockReopenAssessment = vi.fn();
 const mockPermissions = vi.fn();
 const mockToast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 
@@ -50,6 +51,7 @@ vi.mock("@api", () => ({
   }),
   useGetLearnerScenarioAttemptsQuery: (...args: unknown[]) => mockAttemptsQuery(...args),
   useResetBranchingAttemptsMutation: () => [mockReset, { isLoading: false }],
+  useReopenRoleplayAssessmentMutation: () => [mockReopenAssessment, { isLoading: false }],
 }));
 
 vi.mock("@constants", () => ({ Permissions: { EDIT_USER: "edit:user" } }));
@@ -172,11 +174,48 @@ describe("ScenarioAttemptsDrawer", () => {
     );
   });
 
+  it("gives a submitted assessment roleplay another attempt through its own endpoint", async () => {
+    respondWith([
+      attempt({
+        kind: "ROLEPLAY_ASSESSMENT",
+        trackItemId: "rp-1",
+        title: "Intake call",
+        attemptsUsed: 1,
+        maxAttempts: 1,
+        nextRoundAt: null,
+        bestScore: 35,
+        passed: false,
+        submittedAt: "2026-10-26T09:00:00.000Z",
+      }),
+    ]);
+    mockReopenAssessment.mockReturnValue({ unwrap: () => Promise.resolve({ success: true }) });
+    renderDrawer();
+
+    expect(screen.getByText(/Not passed · Score 35/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Give another attempt" }));
+    expect(
+      screen.getByText(
+        "Give Asha Rao another attempt at Intake call? Their earlier attempt and its report are kept.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByTestId("scenario-attempts-confirm").querySelector("button") as HTMLButtonElement,
+    );
+
+    await waitFor(() =>
+      expect(mockReopenAssessment).toHaveBeenCalledWith({ trackItemId: "rp-1", userId: 7 }),
+    );
+    expect(mockReset).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockToast.success).toHaveBeenCalled());
+  });
+
   it("shows the empty state", () => {
     respondWith([]);
     renderDrawer();
     expect(
-      screen.getByText("No scenario quizzes in progress for this learner."),
+      screen.getByText(
+        "No scenario quizzes in progress or submitted assessments for this learner.",
+      ),
     ).toBeInTheDocument();
   });
 });

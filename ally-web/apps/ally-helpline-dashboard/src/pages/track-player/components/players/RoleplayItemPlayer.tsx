@@ -73,6 +73,12 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
   const isCase = payload.type === "CASE";
   const scenarioId = payload.type === "ROLEPLAY" ? payload.scenarioId : 0;
   const lastScenarioSessionId = payload.type === "ROLEPLAY" ? payload.lastScenarioSessionId : null;
+  // Assessment mode: one attempt, so once it is submitted the item can only be
+  // reviewed, never relaunched. The server refuses a second start either way.
+  const isAssessment = payload.type === "ROLEPLAY" && !!payload.completionCriteria?.assessmentMode;
+  const assessmentSubmittedAt =
+    payload.type === "ROLEPLAY" ? (payload.assessmentSubmittedAt ?? null) : null;
+  const assessmentLocked = isAssessment && !!assessmentSubmittedAt;
 
   const { data: scenario } = useGetScenarioQuery({ scenarioId, isPrivate: true }, { skip: isCase });
   const { data: caseDetails } = useGetScenarioCaseDetailsQuery(
@@ -161,11 +167,22 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
             title={item.title}
             description=""
             triggerWarnings={isCase ? undefined : scenario?.triggerWarnings}
-            onClick={launch}
+            onClick={assessmentLocked ? () => undefined : launch}
           />
         </div>
 
-        <p className="mt-5 max-w-md text-sm text-typography-700">{t("tracks2.roleplay.intro")}</p>
+        <p className="mt-5 max-w-md text-sm text-typography-700">
+          {isAssessment ? t("tracks2.roleplay.assessmentIntro") : t("tracks2.roleplay.intro")}
+        </p>
+
+        {isAssessment && !assessmentLocked && (
+          <div
+            className="mt-4 w-full max-w-sm rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-left text-sm text-typography-800"
+            data-testid="roleplay-assessment-notice"
+          >
+            {t("tracks2.roleplay.assessmentNotice")}
+          </div>
+        )}
 
         {challengeDescription && (
           <div className="mt-5 w-full max-w-sm text-left">
@@ -202,6 +219,33 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
               }`}
             />
           </button>
+        ) : assessmentLocked && assessmentSubmittedAt && !alreadyCompleted ? (
+          <button
+            type="button"
+            onClick={() => lastScenarioSessionId && setLogExpanded(prev => !prev)}
+            aria-expanded={logExpanded}
+            disabled={!lastScenarioSessionId}
+            className="mt-4 flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl border border-border-light bg-neutral-50 px-4 py-2.5 text-left transition-colors enabled:hover:bg-neutral-100"
+            data-testid="roleplay-assessment-submitted"
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-typography-900">
+                {t("tracks2.roleplay.assessmentSubmitted", {
+                  date: getFormattedDateTime(assessmentSubmittedAt, "MMM d, yyyy"),
+                })}
+              </span>
+              <span className="block text-xs text-typography-600">
+                {t("tracks2.roleplay.assessmentNotPassed")}
+              </span>
+            </span>
+            {lastScenarioSessionId && (
+              <ArrowDownFilled
+                className={`h-3 w-3 shrink-0 text-typography-600 transition-transform ${
+                  logExpanded ? "rotate-180" : ""
+                }`}
+              />
+            )}
+          </button>
         ) : (
           alreadyCompleted && (
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-success-50 px-4 py-1.5 text-sm font-medium text-success-800">
@@ -215,46 +259,57 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
           <RoleplaySessionLogPanel sessionId={lastScenarioSessionId} />
         )}
 
-        {availableLanguages.length > 0 && (
-          <div className="mt-6 w-full max-w-sm text-left">
-            <DropdownField
-              label={t("tracks2.roleplay.language")}
-              options={availableLanguages.map(lang => lang.label)}
-              value={selectedLanguage?.label || ""}
-              onChange={handleLanguageChange}
-              valueClassName="text-typography-900 font-primary"
-            />
-          </div>
-        )}
-
-        {textChatAvailable && (
-          <InteractionModePicker
-            className="mt-6 w-full max-w-sm text-left"
-            value={preferredMode}
-            onChange={setPreferredMode}
-            disabled={isStarting}
-          />
-        )}
-
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            onClick={launch}
-            disabled={isStarting}
-            className="inline-flex items-center gap-2 rounded-full bg-primary-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-50 max-md:min-h-11"
+        {assessmentLocked ? (
+          <p
+            className="mt-6 max-w-sm text-sm text-typography-700"
+            data-testid="roleplay-assessment-locked"
           >
-            {alreadyCompleted && !isCase ? (
-              <>
-                <Refresh className="h-4 w-4" />
-                {t("tracks2.roleplay.replay")}
-              </>
-            ) : (
-              <>
-                <PlayIcon className="h-4 w-4" />
-                {primaryLabel}
-              </>
+            {t("tracks2.roleplay.assessmentLocked")}
+          </p>
+        ) : (
+          <>
+            {availableLanguages.length > 0 && (
+              <div className="mt-6 w-full max-w-sm text-left">
+                <DropdownField
+                  label={t("tracks2.roleplay.language")}
+                  options={availableLanguages.map(lang => lang.label)}
+                  value={selectedLanguage?.label || ""}
+                  onChange={handleLanguageChange}
+                  valueClassName="text-typography-900 font-primary"
+                />
+              </div>
             )}
-          </button>
-        </div>
+
+            {textChatAvailable && (
+              <InteractionModePicker
+                className="mt-6 w-full max-w-sm text-left"
+                value={preferredMode}
+                onChange={setPreferredMode}
+                disabled={isStarting}
+              />
+            )}
+
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                onClick={launch}
+                disabled={isStarting}
+                className="inline-flex items-center gap-2 rounded-full bg-primary-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-50 max-md:min-h-11"
+              >
+                {alreadyCompleted && !isCase ? (
+                  <>
+                    <Refresh className="h-4 w-4" />
+                    {t("tracks2.roleplay.replay")}
+                  </>
+                ) : (
+                  <>
+                    <PlayIcon className="h-4 w-4" />
+                    {primaryLabel}
+                  </>
+                )}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

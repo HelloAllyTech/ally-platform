@@ -28,6 +28,8 @@ export const ApiEndpoints = {
       `/v1/learn/admin/learners/${userId}/scenario-attempts`,
     RESET_BRANCHING_ATTEMPTS: (trackItemId: string) =>
       `/v1/learn/admin/tracks/items/${trackItemId}/branching-reset`,
+    REOPEN_ROLEPLAY_ASSESSMENT: (trackItemId: string) =>
+      `/v1/learn/admin/tracks/items/${trackItemId}/assessment-reopen`,
   },
   AUDIO_CALL: {
     GET_WAITING_CLIENTS: "/v1/users/waiting-list",

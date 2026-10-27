@@ -185,10 +185,15 @@ export interface JournalContent {
  *  - BUCKET_SORT → nothing; it completes once every item has been placed
  *  - BRANCHING_SCENARIO → passScore (kept in sync with
  *    content.settings.passScore on save); absent = completes on any ending
+ *
+ * `assessmentMode` (ROLEPLAY only) is not a completion rule but rides along
+ * here because it is per-item and read in the same places: the learner gets
+ * one attempt, and the start gate refuses a second session once it is used.
  */
 export interface TrackItemCompletionCriteria {
   minScore?: number;
   minDurationSeconds?: number;
+  assessmentMode?: boolean;
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
@@ -241,4 +246,14 @@ export interface TrackItemProgressMeta {
    * which is also what makes this the record the completion rule counts.
    */
   answeredArticleQuestions?: Record<string, AnsweredArticleQuestion>;
+  /**
+   * ROLEPLAY in assessment mode: when the learner's one attempt ended. Set
+   * whether or not it passed; drives the learner's "submitted" state.
+   */
+  assessmentSubmittedAt?: string;
+  /**
+   * ROLEPLAY in assessment mode: when a trainer last gave the attempt back.
+   * Sessions started before this no longer count against the learner.
+   */
+  assessmentReopenedAt?: string;
 }

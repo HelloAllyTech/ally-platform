@@ -57,6 +57,7 @@ describe('TrackAdminController — course ownership for restricted admins', () =
         trackRepository as any,
         {} as any,
       ),
+      {} as any,
     );
   });
 

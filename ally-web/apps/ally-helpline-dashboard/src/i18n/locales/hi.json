@@ -659,9 +659,9 @@
     },
     "scenarioAttempts": {
       "action": "Scenario attempts",
-      "actionTooltip": "Shows scenario quizzes this learner has started but not passed, so you can reopen their attempts after they run out.",
+      "actionTooltip": "Shows scenario quizzes this learner has started but not passed, and assessment roleplays they have submitted, so you can reopen their attempts.",
       "title": "Scenario attempts: {{name}}",
-      "empty": "No scenario quizzes in progress for this learner.",
+      "empty": "No scenario quizzes in progress or submitted assessments for this learner.",
       "errorTitle": "Couldn't load scenario attempts",
       "errorSubtitle": "There was a problem fetching the data.",
       "attemptsUsed": "{{used}} of {{max}} attempts used",
@@ -674,7 +674,14 @@
       "confirmButton": "Reopen attempts",
       "cancel": "Cancel",
       "reopenSuccess": "Attempts reopened",
-      "reopenError": "Couldn't reopen attempts. Please try again."
+      "reopenError": "Couldn't reopen attempts. Please try again.",
+      "assessmentSubmitted": "Assessment submitted {{when}}",
+      "assessmentPassed": "Passed",
+      "assessmentNotPassed": "Not passed",
+      "assessmentScore": "Score {{score}}",
+      "assessmentReopen": "Give another attempt",
+      "assessmentConfirm": "Give {{name}} another attempt at {{scenario}}? Their earlier attempt and its report are kept.",
+      "assessmentReopenSuccess": "Assessment reopened"
     },
     "courseUsage": {
       "title": "कोर्स का उपयोग",
@@ -1915,7 +1922,12 @@
       "replay": "फिर से करें",
       "completed": "पूर्ण",
       "completedOn": "पूर्ण {{date}}",
-      "language": "भाषा"
+      "language": "भाषा",
+      "assessmentIntro": "यह रोल प्ले एक मूल्यांकन है। लाइव रोल प्ले में यह परिदृश्य पूरा करें।",
+      "assessmentNotice": "आपको एक ही मौका मिलेगा। रोल प्ले खत्म करते ही आपका प्रयास जमा हो जाएगा और दोबारा नहीं किया जा सकेगा।",
+      "assessmentSubmitted": "जमा किया गया {{date}}",
+      "assessmentNotPassed": "यह प्रयास पास होने की शर्तें पूरी नहीं कर पाया।",
+      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।"
     },
     "quiz": {
       "intro": {

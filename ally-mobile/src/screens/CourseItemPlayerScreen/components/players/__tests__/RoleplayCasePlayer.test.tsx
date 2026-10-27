@@ -245,3 +245,68 @@ describe('RoleplayCasePlayer', () => {
     expect(queryByText('courses.roleplay.replay')).toBeNull();
   });
 });
+
+describe('RoleplayCasePlayer — assessment mode', () => {
+  const assessmentPayload = (submittedAt: string | null) => ({
+    ...roleplayPayload(),
+    completionCriteria: {assessmentMode: true},
+    assessmentSubmittedAt: submittedAt,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseGetScenarioByIdQuery.mockReturnValue({
+      data: scenarioDetail({availableLanguages: languages}),
+    });
+  });
+
+  it('warns about the single attempt and still lets the learner start', async () => {
+    const {getByTestId} = render(
+      <RoleplayCasePlayer
+        payload={assessmentPayload(null)}
+        item={buildItem() as any}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    expect(getByTestId('roleplay-assessment-notice')).toBeTruthy();
+    fireEvent.press(getByTestId('roleplay-case-launch'));
+    await waitFor(() => expect(mockStartSimulation).toHaveBeenCalled());
+  });
+
+  it('locks a submitted attempt: no launch from the button or the card', () => {
+    const {getByTestId, queryByTestId} = render(
+      <RoleplayCasePlayer
+        payload={assessmentPayload('2026-10-26T09:00:00.000Z')}
+        item={buildItem() as any}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    expect(getByTestId('roleplay-assessment-locked')).toBeTruthy();
+    expect(getByTestId('roleplay-assessment-submitted')).toBeTruthy();
+    expect(queryByTestId('roleplay-case-launch')).toBeNull();
+    expect(queryByTestId('language-dropdown')).toBeNull();
+
+    fireEvent.press(getByTestId('simulation-card'));
+    expect(mockSetActiveTrackContext).not.toHaveBeenCalled();
+    expect(mockStartSimulation).not.toHaveBeenCalled();
+  });
+
+  it('shows a passed assessment as completed, with no replay', () => {
+    const {getByTestId, queryByTestId} = render(
+      <RoleplayCasePlayer
+        payload={assessmentPayload('2026-10-26T09:00:00.000Z')}
+        item={buildItem({completedAt: '2026-10-26T09:00:00.000Z'}) as any}
+        trackId="track-1"
+        alreadyCompleted
+      />,
+    );
+
+    expect(getByTestId('roleplay-assessment-locked')).toBeTruthy();
+    expect(queryByTestId('roleplay-assessment-submitted')).toBeNull();
+    expect(queryByTestId('roleplay-case-launch')).toBeNull();
+  });
+});

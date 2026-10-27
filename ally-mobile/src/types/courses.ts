@@ -58,6 +58,8 @@ export interface GetLearnTracksResponse {
 export interface TrackCompletionCriteria {
   minScore?: number;
   minDurationSeconds?: number;
+  /** Roleplay: one attempt only, locked once submitted. */
+  assessmentMode?: boolean;
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
@@ -465,8 +467,13 @@ export interface StartRoleplayItemPayload extends StartTrackItemBase {
   type: TrackItemType.ROLEPLAY;
   scenarioId: number;
   completionCriteria: TrackCompletionCriteria | null;
-  /** Latest ended scenario session for this item, when already completed. */
+  /** Latest ended scenario session for this item, when completed or submitted. */
   lastScenarioSessionId: string | null;
+  /**
+   * Assessment roleplay: when the one attempt was submitted; null while still
+   * open. Optional so a payload from an older backend still parses.
+   */
+  assessmentSubmittedAt?: string | null;
 }
 
 export interface StartCaseItemPayload extends StartTrackItemBase {

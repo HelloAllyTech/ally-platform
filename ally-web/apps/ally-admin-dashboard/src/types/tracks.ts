@@ -414,6 +414,8 @@ export interface CompletionCriteria {
   /** Roleplay, 0 or above (score depends on configured behaviours and can exceed 100). */
   minScore?: number;
   minDurationSeconds?: number;
+  /** Roleplay: one attempt only, locked once submitted. Sent only when on. */
+  assessmentMode?: boolean;
   /** Quiz — server mirrors from settings, never sent by the client. */
   passScore?: number;
   /** Video 1-100, default 90. */

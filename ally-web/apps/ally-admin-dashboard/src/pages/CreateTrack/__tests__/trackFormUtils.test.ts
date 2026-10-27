@@ -36,6 +36,27 @@ describe("serializeItem — ARTICLE resources", () => {
   });
 });
 
+describe("serializeItem — ROLEPLAY assessment mode", () => {
+  it("sends assessmentMode when it is on", () => {
+    const item = createItemOfType(TrackItemType.ROLEPLAY);
+    item.scenarioId = 12;
+    item.completionCriteria = { minScore: 40, assessmentMode: true };
+
+    expect(serializeItem(item, 1).completionCriteria).toEqual({
+      minScore: 40,
+      assessmentMode: true,
+    });
+  });
+
+  it("leaves it out when off, so the stored criteria read the same as before", () => {
+    const item = createItemOfType(TrackItemType.ROLEPLAY);
+    item.scenarioId = 12;
+    item.completionCriteria = { minScore: 40, assessmentMode: false };
+
+    expect(serializeItem(item, 1).completionCriteria).toEqual({ minScore: 40 });
+  });
+});
+
 describe("validateTrackForPublish — ARTICLE resources", () => {
   const baseValues = (article: Record<string, unknown>) => ({
     title: "Course",

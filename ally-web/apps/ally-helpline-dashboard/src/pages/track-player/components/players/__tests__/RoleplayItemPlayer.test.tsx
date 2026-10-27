@@ -293,3 +293,56 @@ describe("RoleplayItemPlayer — return-to-track context", () => {
     });
   });
 });
+
+describe("RoleplayItemPlayer — assessment mode", () => {
+  const assessmentPayload = (submittedAt: string | null): StartRoleplayItemPayload => ({
+    ...payload,
+    completionCriteria: { assessmentMode: true },
+    lastScenarioSessionId: submittedAt ? "session-1" : null,
+    assessmentSubmittedAt: submittedAt,
+  });
+
+  const renderAssessment = (submittedAt: string | null, alreadyCompleted = false) =>
+    render(
+      <RoleplayItemPlayer
+        payload={assessmentPayload(submittedAt)}
+        item={buildItem(null)}
+        trackId="track-1"
+        alreadyCompleted={alreadyCompleted}
+      />,
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockScenario();
+    mockCatalogLanguages([ENGLISH]);
+  });
+
+  it("warns that there is one attempt before it is used, and still lets the learner start", async () => {
+    renderAssessment(null);
+
+    expect(screen.getByTestId("roleplay-assessment-notice")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("play-icon").closest("button") as HTMLButtonElement);
+    await waitFor(() => expect(mockStartSimulation).toHaveBeenCalled());
+  });
+
+  it("locks a submitted attempt: no start, no replay, report still reachable", () => {
+    renderAssessment("2026-10-26T09:00:00.000Z");
+
+    expect(screen.getByTestId("roleplay-assessment-locked")).toBeInTheDocument();
+    expect(screen.queryByTestId("play-icon")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("refresh-icon")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("language-dropdown")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("roleplay-assessment-submitted"));
+    expect(screen.getByTestId("session-log-panel")).toBeInTheDocument();
+  });
+
+  it("shows a passed assessment as completed, without a replay button", () => {
+    renderAssessment("2026-10-26T09:00:00.000Z", true);
+
+    expect(screen.queryByTestId("roleplay-assessment-submitted")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("refresh-icon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("roleplay-assessment-locked")).toBeInTheDocument();
+  });
+});

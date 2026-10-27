@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   ParseEnumPipe,
   ParseIntPipe,
@@ -60,6 +61,8 @@ import { TokenUser } from 'src/auth/type/auth.types';
 import { TrackSortBy, TrackSortOrder } from '../type/track.type';
 import { BranchingResetDto } from '../dto/branching-reset.dto';
 import { TrackBranchingService } from '../service/track-branching.service';
+import { TrackProgressService } from '../service/track-progress.service';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { TrackGuideNotesService } from '../service/track-guide-notes.service';
 import { UpdateTrackGuideNotesDto } from '../dto/track-guide-notes.dto';
 
@@ -77,6 +80,7 @@ export class TrackAdminController {
     private readonly imageGenerationJobService: ImageGenerationJobService,
     private readonly trackBranchingService: TrackBranchingService,
     private readonly trackGuideNotesService: TrackGuideNotesService,
+    private readonly trackProgressService: TrackProgressService,
   ) {}
 
   @ApiOperation({ summary: 'List tracks' })
@@ -446,6 +450,30 @@ export class TrackAdminController {
     @Body() dto: BranchingResetDto,
   ) {
     return this.trackBranchingService.resetAttempts(trackItemId, dto.userId);
+  }
+
+  @ApiOperation({
+    summary: 'Give a learner back their attempt at an assessment roleplay',
+    description:
+      'An assessment roleplay allows one attempt. This lets the learner take ' +
+      'it again; the earlier session and its report are kept. Only learners ' +
+      "in the caller's own organisation can be reopened.",
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @Post('tracks/items/:trackItemId/assessment-reopen')
+  async reopenRoleplayAssessment(
+    @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
+    @Body() dto: BranchingResetDto,
+  ) {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Learner progress not found');
+    }
+    return this.trackProgressService.reopenRoleplayAssessment(
+      trackItemId,
+      dto.userId,
+      tenantId,
+    );
   }
 
   @ApiOperation({ summary: 'Assign tracks to a tenant' })

@@ -50,6 +50,16 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
   const {startSimulation, isCreatingRoom} = useStartSimulation();
 
   const isCase = payload.type === TrackItemType.CASE;
+  // Assessment mode: one attempt, so once it is submitted the item can't be
+  // relaunched. The server refuses a second start either way.
+  const isAssessment =
+    payload.type === TrackItemType.ROLEPLAY &&
+    !!payload.completionCriteria?.assessmentMode;
+  const assessmentSubmittedAt =
+    payload.type === TrackItemType.ROLEPLAY
+      ? (payload.assessmentSubmittedAt ?? null)
+      : null;
+  const assessmentLocked = isAssessment && !!assessmentSubmittedAt;
 
   const {data: scenario} = useGetScenarioByIdQuery(
     {
@@ -135,10 +145,24 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
         triggerWarnings={
           isCase ? undefined : getTriggerWarningNames(scenario?.triggerWarnings)
         }
-        onPress={launch}
+        onPress={assessmentLocked ? () => undefined : launch}
       />
 
-      <Text style={styles.intro}>{t('courses.roleplay.intro')}</Text>
+      <Text style={styles.intro}>
+        {isAssessment
+          ? t('courses.roleplay.assessmentIntro')
+          : t('courses.roleplay.intro')}
+      </Text>
+
+      {isAssessment && !assessmentLocked && (
+        <View
+          style={styles.assessmentNotice}
+          testID="roleplay-assessment-notice">
+          <Text style={styles.assessmentNoticeText}>
+            {t('courses.roleplay.assessmentNotice')}
+          </Text>
+        </View>
+      )}
 
       {alreadyCompleted && item.completedAt && (
         <View style={styles.completedChip}>
@@ -151,26 +175,46 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
         </View>
       )}
 
-      {availableLanguages.length > 0 && (
-        <View style={styles.languageDropdownContainer}>
-          <CustomDropdown
-            value={selectedLanguage?.label ?? ''}
-            options={availableLanguages.map(lang => lang.label)}
-            onSelect={handleLanguageSelect}
-            placeholder={t('nav.language.label')}
-            isOpen={isLanguageDropdownOpen}
-            setIsOpen={setIsLanguageDropdownOpen}
-            disabled={isCreatingRoom}
-          />
-        </View>
+      {assessmentLocked && !alreadyCompleted && assessmentSubmittedAt && (
+        <Text
+          style={styles.assessmentSubmitted}
+          testID="roleplay-assessment-submitted">
+          {t('courses.roleplay.assessmentSubmitted', {
+            date: formatDate(assessmentSubmittedAt),
+          })}
+          {'\n'}
+          {t('courses.roleplay.assessmentNotPassed')}
+        </Text>
       )}
 
-      <Button
-        testID="roleplay-case-launch"
-        label={primaryLabel}
-        onPress={launch}
-        isLoading={isCreatingRoom}
-      />
+      {assessmentLocked ? (
+        <Text style={styles.intro} testID="roleplay-assessment-locked">
+          {t('courses.roleplay.assessmentLocked')}
+        </Text>
+      ) : (
+        <>
+          {availableLanguages.length > 0 && (
+            <View style={styles.languageDropdownContainer}>
+              <CustomDropdown
+                value={selectedLanguage?.label ?? ''}
+                options={availableLanguages.map(lang => lang.label)}
+                onSelect={handleLanguageSelect}
+                placeholder={t('nav.language.label')}
+                isOpen={isLanguageDropdownOpen}
+                setIsOpen={setIsLanguageDropdownOpen}
+                disabled={isCreatingRoom}
+              />
+            </View>
+          )}
+
+          <Button
+            testID="roleplay-case-launch"
+            label={primaryLabel}
+            onPress={launch}
+            isLoading={isCreatingRoom}
+          />
+        </>
+      )}
     </View>
   );
 };
@@ -203,5 +247,19 @@ const styles = ScaledSheet.create({
   },
   completedChipText: {
     color: colors.ds.green[700],
+  },
+  assessmentNotice: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.ds.amber[50],
+    borderRadius: '12@ms',
+    paddingHorizontal: '14@ms',
+    paddingVertical: '10@ms',
+  },
+  assessmentNoticeText: {
+    color: colors.ds.amber[900],
+  },
+  assessmentSubmitted: {
+    color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
   },
 });

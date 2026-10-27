@@ -4,7 +4,11 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { ActionableNotification, Loading } from "@ally-ui-mono/ui-shared";
-import { useGetLearnerScenarioAttemptsQuery, useResetBranchingAttemptsMutation } from "@api";
+import {
+  useGetLearnerScenarioAttemptsQuery,
+  useReopenRoleplayAssessmentMutation,
+  useResetBranchingAttemptsMutation,
+} from "@api";
 import { Button, ButtonVariant, Drawer } from "@components";
 import { LearnerScenarioAttempt } from "@types";
 
@@ -15,7 +19,9 @@ interface ScenarioAttemptsDrawerProps {
   learnerName: string;
 }
 
-const formatDateTime = (value: string | null): string =>
+const isAssessment = (item: LearnerScenarioAttempt) => item.kind === "ROLEPLAY_ASSESSMENT";
+
+const formatDateTime = (value: string | null | undefined): string =>
   value ? new Date(value).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "";
 
 /**
@@ -40,7 +46,10 @@ export const ScenarioAttemptsDrawer: FunctionComponent<ScenarioAttemptsDrawerPro
   const { data, isLoading, isError, refetch } = useGetLearnerScenarioAttemptsQuery(userId, {
     skip: !open,
   });
-  const [resetAttempts, { isLoading: isResetting }] = useResetBranchingAttemptsMutation();
+  const [resetAttempts, { isLoading: isResettingBranching }] = useResetBranchingAttemptsMutation();
+  const [reopenAssessment, { isLoading: isReopeningAssessment }] =
+    useReopenRoleplayAssessmentMutation();
+  const isResetting = isResettingBranching || isReopeningAssessment;
 
   const groups = useMemo(() => {
     const byTrack = new Map<string, { trackTitle: string; items: LearnerScenarioAttempt[] }>();
@@ -60,8 +69,14 @@ export const ScenarioAttemptsDrawer: FunctionComponent<ScenarioAttemptsDrawerPro
   const handleConfirm = async () => {
     if (!confirming) return;
     try {
-      await resetAttempts({ trackItemId: confirming.trackItemId, userId }).unwrap();
-      toast.success(t("organizationMetrics.scenarioAttempts.reopenSuccess"));
+      const request = { trackItemId: confirming.trackItemId, userId };
+      if (isAssessment(confirming)) {
+        await reopenAssessment(request).unwrap();
+        toast.success(t("organizationMetrics.scenarioAttempts.assessmentReopenSuccess"));
+      } else {
+        await resetAttempts(request).unwrap();
+        toast.success(t("organizationMetrics.scenarioAttempts.reopenSuccess"));
+      }
       setConfirming(null);
     } catch (err) {
       const message = (err as { data?: { message?: string } })?.data?.message;
@@ -111,38 +126,60 @@ export const ScenarioAttemptsDrawer: FunctionComponent<ScenarioAttemptsDrawerPro
                   data-testid="scenario-attempts-row"
                 >
                   <div className="text-sm font-medium text-typography-800">{item.title}</div>
-                  <div className="text-sm text-typography-600">
-                    {item.maxAttempts == null
-                      ? t("organizationMetrics.scenarioAttempts.attemptsUncapped", {
-                          used: item.attemptsUsed,
-                        })
-                      : t("organizationMetrics.scenarioAttempts.attemptsUsed", {
-                          used: item.attemptsUsed,
-                          max: item.maxAttempts,
-                        })}
-                    {item.bestScore != null &&
-                      ` · ${t("organizationMetrics.scenarioAttempts.bestScore", {
-                        score: item.bestScore,
-                      })}`}
-                  </div>
-                  <div className="text-sm text-typography-800">
-                    {item.exhausted
-                      ? t("organizationMetrics.scenarioAttempts.pausedUntil", {
-                          when: formatDateTime(item.nextRoundAt),
-                        })
-                      : t("organizationMetrics.scenarioAttempts.inProgress")}
-                  </div>
+                  {isAssessment(item) ? (
+                    <div className="text-sm text-typography-600">
+                      {t("organizationMetrics.scenarioAttempts.assessmentSubmitted", {
+                        when: formatDateTime(item.submittedAt),
+                      })}
+                      {" · "}
+                      {item.passed
+                        ? t("organizationMetrics.scenarioAttempts.assessmentPassed")
+                        : t("organizationMetrics.scenarioAttempts.assessmentNotPassed")}
+                      {item.bestScore != null &&
+                        ` · ${t("organizationMetrics.scenarioAttempts.assessmentScore", {
+                          score: item.bestScore,
+                        })}`}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-sm text-typography-600">
+                        {item.maxAttempts == null
+                          ? t("organizationMetrics.scenarioAttempts.attemptsUncapped", {
+                              used: item.attemptsUsed,
+                            })
+                          : t("organizationMetrics.scenarioAttempts.attemptsUsed", {
+                              used: item.attemptsUsed,
+                              max: item.maxAttempts,
+                            })}
+                        {item.bestScore != null &&
+                          ` · ${t("organizationMetrics.scenarioAttempts.bestScore", {
+                            score: item.bestScore,
+                          })}`}
+                      </div>
+                      <div className="text-sm text-typography-800">
+                        {item.exhausted
+                          ? t("organizationMetrics.scenarioAttempts.pausedUntil", {
+                              when: formatDateTime(item.nextRoundAt),
+                            })
+                          : t("organizationMetrics.scenarioAttempts.inProgress")}
+                      </div>
+                    </>
+                  )}
                   {confirming?.trackItemId === item.trackItemId ? (
                     <div className="flex flex-col gap-2" data-testid="scenario-attempts-confirm">
                       <p className="text-sm text-typography-800">
-                        {t("organizationMetrics.scenarioAttempts.confirm", {
-                          name: learnerName,
-                          scenario: item.title,
-                        })}
+                        {t(
+                          isAssessment(item)
+                            ? "organizationMetrics.scenarioAttempts.assessmentConfirm"
+                            : "organizationMetrics.scenarioAttempts.confirm",
+                          { name: learnerName, scenario: item.title },
+                        )}
                       </p>
                       <div className="flex gap-2">
                         <Button onClick={handleConfirm} disabled={isResetting}>
-                          {t("organizationMetrics.scenarioAttempts.confirmButton")}
+                          {isAssessment(item)
+                            ? t("organizationMetrics.scenarioAttempts.assessmentReopen")
+                            : t("organizationMetrics.scenarioAttempts.confirmButton")}
                         </Button>
                         <Button
                           variant={ButtonVariant.SECONDARY}
@@ -156,7 +193,9 @@ export const ScenarioAttemptsDrawer: FunctionComponent<ScenarioAttemptsDrawerPro
                   ) : (
                     <div>
                       <Button variant={ButtonVariant.SECONDARY} onClick={() => setConfirming(item)}>
-                        {t("organizationMetrics.scenarioAttempts.reopen")}
+                        {isAssessment(item)
+                          ? t("organizationMetrics.scenarioAttempts.assessmentReopen")
+                          : t("organizationMetrics.scenarioAttempts.reopen")}
                       </Button>
                     </div>
                   )}

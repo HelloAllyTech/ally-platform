@@ -839,7 +839,12 @@
       "openCase": "Open case",
       "replay": "Replay",
       "completed": "Completed",
-      "completedOn": "Completed on {{date}}"
+      "completedOn": "Completed on {{date}}",
+      "assessmentIntro": "This role play is an assessment.",
+      "assessmentNotice": "You get one attempt. When you end the role play, your attempt is submitted and can't be retaken.",
+      "assessmentSubmitted": "Submitted on {{date}}",
+      "assessmentNotPassed": "This attempt didn't meet the passing requirements.",
+      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer."
     },
     "quiz": {
       "intro": {

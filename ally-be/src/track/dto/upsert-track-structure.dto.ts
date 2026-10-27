@@ -31,6 +31,14 @@ export class UpsertTrackItemCompletionCriteriaDto {
   @Min(0)
   minDurationSeconds?: number;
 
+  @ApiPropertyOptional({
+    description:
+      'Assessment mode (ROLEPLAY): one attempt only, locked after submission',
+  })
+  @IsOptional()
+  @IsBoolean()
+  assessmentMode?: boolean;
+
   @ApiPropertyOptional({ description: 'Pass score percent (QUIZ)' })
   @IsOptional()
   @IsNumber()

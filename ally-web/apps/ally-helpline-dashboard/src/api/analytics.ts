@@ -135,6 +135,21 @@ const analyticsAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
       ],
     }),
+
+    /**
+     * Give a learner back their one attempt at an assessment roleplay. The
+     * earlier session and its report stay; the row drops out of the list.
+     */
+    reopenRoleplayAssessment: builder.mutation<{ success: true }, ResetBranchingAttemptsRequest>({
+      query: ({ trackItemId, userId }) => ({
+        url: ApiEndpoints.ANALYTICS.REOPEN_ROLEPLAY_ASSESSMENT(trackItemId),
+        method: HttpMethod.POST,
+        body: { userId },
+      }),
+      invalidatesTags: (_result, _error, { userId }) => [
+        { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
+      ],
+    }),
   }),
 });
 
@@ -148,4 +163,5 @@ export const {
   useGetCourseUsageTableQuery,
   useGetLearnerScenarioAttemptsQuery,
   useResetBranchingAttemptsMutation,
+  useReopenRoleplayAssessmentMutation,
 } = analyticsAPI;

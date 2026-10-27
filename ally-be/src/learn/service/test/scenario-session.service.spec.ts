@@ -214,6 +214,7 @@ describe('ScenarioSessionService', () => {
       create: jest.fn(),
       save: jest.fn(),
       find: jest.fn(),
+      exists: jest.fn().mockResolvedValue(true),
       getMessagesByScenarioSessionId: jest.fn(),
     };
 
@@ -2425,6 +2426,7 @@ describe('ScenarioSessionService', () => {
         trackItemProgressId: 'tip-1',
         score: 42,
         callDuration: activeMs,
+        learnerTookPart: true,
       });
       expect((service as any).eventEmitter.emit).toHaveBeenCalledWith(
         ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED,
@@ -4724,6 +4726,7 @@ describe('ScenarioSessionService', () => {
         trackItemProgressId: 'tip-1',
         score: undefined,
         callDuration: activeMs,
+        learnerTookPart: true,
       });
       expect((service as any).eventEmitter.emit).toHaveBeenCalledWith(
         ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED,

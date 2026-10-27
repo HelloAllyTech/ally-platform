@@ -1516,8 +1516,20 @@ export class ScenarioSessionService {
         trackItemProgressId: session.trackItemProgressId,
         score,
         callDuration,
+        learnerTookPart: await this.learnerTookPart(session.id),
       });
     }
+  }
+
+  /**
+   * Whether the learner said anything in the session (the client's turns are
+   * stored with senderId -1). An assessment roleplay only counts as submitted
+   * when they did; see TrackProgressService.assertAssessmentAttemptAvailable.
+   */
+  private async learnerTookPart(scenarioSessionId: string): Promise<boolean> {
+    return this.scenarioSessionMessagesRepository.exists({
+      where: { scenarioSessionId, senderId: Not(-1) },
+    });
   }
 
   /**

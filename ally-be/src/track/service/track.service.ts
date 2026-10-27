@@ -898,6 +898,14 @@ export class TrackService {
             passScore: passScore || undefined,
           };
         }
+        if (
+          item.type !== TrackItemType.ROLEPLAY &&
+          item.completionCriteria?.assessmentMode !== undefined
+        ) {
+          // Only a roleplay start is gated on it; anywhere else it would be
+          // a setting that silently does nothing.
+          delete item.completionCriteria.assessmentMode;
+        }
         if (item.type === TrackItemType.VIDEO) {
           item.completionCriteria = {
             ...item.completionCriteria,

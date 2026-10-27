@@ -604,8 +604,15 @@ export class TrackEnrollmentService {
 
     switch (item.type) {
       case TrackItemType.ROLEPLAY: {
+        // A submitted assessment can't be replayed, so the learner's way back
+        // to their attempt is its report — pass or not.
+        const assessmentSubmittedAt =
+          (item.completionCriteria?.assessmentMode &&
+            progress.meta?.assessmentSubmittedAt) ||
+          null;
         const lastScenarioSessionId =
-          progress.status === SessionItemStatus.COMPLETED
+          progress.status === SessionItemStatus.COMPLETED ||
+          assessmentSubmittedAt
             ? await this.scenarioSharedService.getLatestScenarioSessionIdByTrackItemProgressId(
                 progress.id,
               )
@@ -621,6 +628,7 @@ export class TrackEnrollmentService {
           scenarioId: item.scenarioId,
           completionCriteria: item.completionCriteria ?? null,
           lastScenarioSessionId,
+          assessmentSubmittedAt,
           /** The roleplay runs in the scenario's own translated language, which
            *  is translated separately from the course. */
           languageFallbackReason: scenarioTranslated
@@ -1226,6 +1234,11 @@ export class TrackEnrollmentService {
       score: progress?.score ?? null,
       attemptCount: progress?.attemptCount ?? 0,
       maxWatchedPct: progress?.meta?.maxWatchedPct ?? 0,
+      /** Assessment roleplay: set once the one attempt is used (locked). */
+      assessmentSubmittedAt:
+        (item.completionCriteria?.assessmentMode &&
+          progress?.meta?.assessmentSubmittedAt) ||
+        null,
     };
   }
 

@@ -183,7 +183,9 @@ export class TrackBranchingService {
    * The scenario quizzes a learner in the caller's organisation is currently
    * paused on or partway through, so a trainer can see what there is to
    * reopen. Completed items are left out: they replay freely, so there is
-   * nothing to reset.
+   * nothing to reset. Assessment roleplays whose one attempt is used are
+   * listed too (`kind: 'ROLEPLAY_ASSESSMENT'`), completed or not — they never
+   * replay, so a trainer may need to give the attempt back either way.
    */
   async listLearnerAttempts(userId: number) {
     const tenantId = ExecutionManager.getTenantId();
@@ -195,13 +197,16 @@ export class TrackBranchingService {
       trackTitle: string;
       trackItemId: string;
       title: string;
+      type: TrackItemType;
       content: BranchingScenarioContent | null;
       status: SessionItemStatus;
+      score: string | null;
       meta: TrackItemProgressMeta | null;
     }> = await this.dataSource.query(
       `SELECT t.id AS "trackId", t.title AS "trackTitle",
-              ti.id AS "trackItemId", ti.title AS "title", ti.content AS "content",
-              tip.status AS "status", tip.meta AS "meta"
+              ti.id AS "trackItemId", ti.title AS "title", ti.type AS "type",
+              ti.content AS "content",
+              tip.status AS "status", tip.score AS "score", tip.meta AS "meta"
          FROM track_item_progress tip
          JOIN track_enrollments te ON te.id = tip."trackEnrollmentId"
          JOIN track_items ti ON ti.id = tip."trackItemId"
@@ -210,13 +215,41 @@ export class TrackBranchingService {
           AND te."tenantId"::text = $2
           AND te."deletedAt" IS NULL
           AND ti."deletedAt" IS NULL
-          AND ti.type = $3
+          AND (ti.type = $3
+               OR (ti.type = $4
+                   AND (ti."completionCriteria"->>'assessmentMode')::boolean IS TRUE
+                   AND tip.meta->>'assessmentSubmittedAt' IS NOT NULL))
         ORDER BY t.title, ti."order"`,
-      [userId, tenantId, TrackItemType.BRANCHING_SCENARIO],
+      [
+        userId,
+        tenantId,
+        TrackItemType.BRANCHING_SCENARIO,
+        TrackItemType.ROLEPLAY,
+      ],
     );
     const now = new Date();
-    return rows
-      .filter((row) => row.status !== SessionItemStatus.COMPLETED)
+    const assessments = rows
+      .filter((row) => row.type === TrackItemType.ROLEPLAY)
+      .map((row) => ({
+        kind: 'ROLEPLAY_ASSESSMENT' as const,
+        trackId: row.trackId,
+        trackTitle: row.trackTitle,
+        trackItemId: row.trackItemId,
+        title: row.title,
+        attemptsUsed: 1,
+        maxAttempts: 1,
+        exhausted: true,
+        nextRoundAt: null,
+        bestScore: row.score === null ? null : Number(row.score),
+        passed: row.status === SessionItemStatus.COMPLETED,
+        submittedAt: row.meta?.assessmentSubmittedAt ?? null,
+      }));
+    const branching = rows
+      .filter(
+        (row) =>
+          row.type === TrackItemType.BRANCHING_SCENARIO &&
+          row.status !== SessionItemStatus.COMPLETED,
+      )
       .map((row) => {
         const maxAttempts = row.content?.settings?.maxAttempts ?? null;
         const round = resolveBranchingRound(
@@ -226,6 +259,7 @@ export class TrackBranchingService {
           now,
         );
         return {
+          kind: 'BRANCHING_SCENARIO' as const,
           trackId: row.trackId,
           trackTitle: row.trackTitle,
           trackItemId: row.trackItemId,
@@ -238,5 +272,6 @@ export class TrackBranchingService {
         };
       })
       .filter((row) => row.attemptsUsed > 0);
+    return [...branching, ...assessments];
   }
 }

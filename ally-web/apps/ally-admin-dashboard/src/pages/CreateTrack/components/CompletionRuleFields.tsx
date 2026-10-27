@@ -4,6 +4,7 @@ import { Controller, useFormContext } from "react-hook-form";
 
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon } from "@assets";
+import { ToggleSwitch } from "@components";
 import { DEFAULT_VIDEO_WATCH_PCT, MAX_VIDEO_WATCH_PCT, MIN_VIDEO_WATCH_PCT } from "@constants";
 import { TrackFormValues, TrackItemType } from "@types";
 
@@ -78,6 +79,40 @@ export const CompletionRuleFields: FC<CompletionRuleFieldsProps> = ({
             Learner must reach this score to complete this roleplay. Leave blank to let any attempt
             unlock the next item, regardless of score.
           </span>
+        </div>
+      )}
+
+      {type === TrackItemType.ROLEPLAY && (
+        <div className="flex items-start justify-between gap-4 mt-4">
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex items-center gap-1">
+              <label className={fieldLabel}>Assessment (single attempt)</label>
+              <Tooltip
+                label="For assessment, not practice. When the learner finishes the roleplay, their attempt is submitted and they can't retake it. If a minimum score is set and they don't reach it, the course stays paused there until a trainer reopens the attempt."
+                align="top"
+              >
+                <button type="button" className="cursor-pointer inline-flex items-center">
+                  <TooltipIcon />
+                </button>
+              </Tooltip>
+            </span>
+            <span className="text-xs text-typography-500">
+              Learners get one attempt. Trainers can give it back from the learner&apos;s Scenario
+              attempts panel in Analytics. Can&apos;t be changed once learners are enrolled.
+            </span>
+          </div>
+          <Controller
+            control={control}
+            name={`${base}.assessmentMode`}
+            render={({ field }) => (
+              <ToggleSwitch
+                enabled={field.value ?? false}
+                onChange={field.onChange}
+                disabled={disabled}
+                label="Assessment (single attempt)"
+              />
+            )}
+          />
         </div>
       )}
 

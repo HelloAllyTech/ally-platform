@@ -64,6 +64,8 @@ export interface GetLearnTracksResponse {
 export interface TrackCompletionCriteria {
   minScore?: number;
   minDurationSeconds?: number;
+  /** Roleplay: one attempt only, locked once submitted. */
+  assessmentMode?: boolean;
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
@@ -107,6 +109,8 @@ export interface TrackDetailItem {
   score: number | null;
   attemptCount: number | null;
   maxWatchedPct: number | null;
+  /** Assessment roleplay: when the one attempt was submitted; null while still open. */
+  assessmentSubmittedAt?: string | null;
   /** The author enabled a discussion thread beneath this item. */
   hasDiscussion?: boolean;
   /**
@@ -618,8 +622,10 @@ export interface StartRoleplayItemPayload extends StartTrackItemBase {
   type: TrackItemType.ROLEPLAY;
   scenarioId: number;
   completionCriteria: TrackCompletionCriteria | null;
-  /** Latest ended scenario session for this item, when already completed. */
+  /** Latest ended scenario session for this item, when completed or submitted. */
   lastScenarioSessionId: string | null;
+  /** Assessment roleplay: when the one attempt was submitted; null while still open. */
+  assessmentSubmittedAt?: string | null;
 }
 
 export interface StartCaseItemPayload extends StartTrackItemBase {

@@ -178,6 +178,11 @@ export interface LearnerUsageRow {
 
 /** One scenario quiz a learner has started but not passed (trainer view). */
 export interface LearnerScenarioAttempt {
+  /**
+   * A branching scenario quiz, or an assessment roleplay whose one attempt is
+   * used. Absent from servers older than assessment mode: treat as branching.
+   */
+  kind?: "BRANCHING_SCENARIO" | "ROLEPLAY_ASSESSMENT";
   trackId: string;
   trackTitle: string;
   trackItemId: string;
@@ -190,6 +195,10 @@ export interface LearnerScenarioAttempt {
   /** When the paused round reopens by itself. */
   nextRoundAt: string | null;
   bestScore: number | null;
+  /** ROLEPLAY_ASSESSMENT only. */
+  passed?: boolean;
+  /** ROLEPLAY_ASSESSMENT only: when the attempt ended. */
+  submittedAt?: string | null;
 }
 
 export interface ResetBranchingAttemptsRequest {

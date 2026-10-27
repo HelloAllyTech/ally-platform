@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager, Not } from 'typeorm';
@@ -126,6 +130,55 @@ export class TrackProgressService {
         'Track is not available for your organization',
       );
     }
+    if (item.completionCriteria?.assessmentMode) {
+      await this.assertAssessmentAttemptAvailable(progress);
+    }
+  }
+
+  /**
+   * Assessment-mode gate: one attempt per learner. Counts the sessions
+   * themselves rather than `attemptCount` (which only moves when a session's
+   * end is processed), so a second start while the first is still live is
+   * refused too. A session only uses the attempt if the learner actually took
+   * part — at least one message of theirs in the transcript (the client's are
+   * stored with senderId -1) — and it was not a room that closed with no
+   * end-of-session at all (`eventStatus` ABANDONED: a crash, not a
+   * submission). So a denied microphone, a failed connection or leaving before
+   * saying anything never costs the learner their assessment. `startedAt` can't
+   * be the signal: ending a session backfills it. Sessions before a trainer's
+   * reopen don't count.
+   */
+  private async assertAssessmentAttemptAvailable(
+    progress: TrackItemProgress,
+  ): Promise<void> {
+    const reopenedAt = progress.meta?.assessmentReopenedAt ?? null;
+    const [row]: Array<{ live: number; ended: number }> =
+      await this.dataSource.query(
+        `SELECT COUNT(*) FILTER (WHERE s.status = 'ACTIVE')::int AS "live",
+                COUNT(*) FILTER (
+                  WHERE s.status = 'ENDED'
+                    AND s."eventStatus" <> 'ABANDONED'
+                    AND EXISTS (
+                      SELECT 1 FROM scenario_session_messages m
+                       WHERE m."scenarioSessionId" = s.id
+                         AND m."senderId" <> -1
+                    )
+                )::int AS "ended"
+           FROM scenario_sessions s
+          WHERE s."trackItemProgressId" = $1
+            AND ($2::timestamptz IS NULL OR s."createdAt" > $2::timestamptz)`,
+        [progress.id, reopenedAt],
+      );
+    if ((row?.ended ?? 0) > 0) {
+      throw new BadRequestException(
+        'This roleplay is an assessment and you have already submitted your attempt.',
+      );
+    }
+    if ((row?.live ?? 0) > 0) {
+      throw new BadRequestException(
+        'Your assessment attempt for this roleplay is already in progress.',
+      );
+    }
   }
 
   /**
@@ -218,10 +271,16 @@ export class TrackProgressService {
     trackItemProgressId,
     score,
     callDuration = 0,
+    learnerTookPart = true,
   }: {
     trackItemProgressId: string;
     score?: number;
     callDuration: number;
+    /**
+     * Whether the learner said anything in the session. An assessment only
+     * counts as submitted if they did — the same rule the start gate applies.
+     */
+    learnerTookPart?: boolean;
   }): Promise<CompleteItemResult> {
     const progress = await this.trackItemProgressRepository.findOne({
       where: { id: trackItemProgressId },
@@ -232,17 +291,36 @@ export class TrackProgressService {
       );
       return NOOP_RESULT;
     }
-    if (progress.status === SessionItemStatus.COMPLETED) {
-      return { ...NOOP_RESULT, completed: true };
-    }
-
-    await this.trackItemProgressRepository.update(progress.id, {
-      attemptCount: progress.attemptCount + 1,
-    });
-
     const item = await this.trackItemRepository.findOne({
       where: { id: progress.trackItemId },
     });
+    const assessment =
+      !!item?.completionCriteria?.assessmentMode && learnerTookPart;
+    const submitted = assessment
+      ? {
+          meta: {
+            ...(progress.meta ?? {}),
+            assessmentSubmittedAt: new Date().toISOString(),
+          },
+        }
+      : {};
+
+    if (progress.status === SessionItemStatus.COMPLETED) {
+      // A passed assessment a trainer reopened: the new attempt is submitted
+      // too, but it never un-completes the item or replaces its score.
+      if (assessment) {
+        await this.trackItemProgressRepository.update(progress.id, submitted);
+      }
+      return { ...NOOP_RESULT, completed: true };
+    }
+
+    // In assessment mode the ended attempt is final whatever its outcome, so
+    // the score is kept here too — completeItem only writes it on a pass.
+    await this.trackItemProgressRepository.update(progress.id, {
+      attemptCount: progress.attemptCount + 1,
+      ...(assessment ? { score: score ?? undefined, ...submitted } : {}),
+    });
+
     if (!item) {
       this.logger.error(`Track item not found: ${progress.trackItemId}`);
       return NOOP_RESULT;
@@ -285,6 +363,51 @@ export class TrackProgressService {
     const result = await this.completeItem(trackItemProgressId, { score });
     attemptEnded('completed');
     return result;
+  }
+
+  /**
+   * Trainer action: give a learner back their one attempt at an assessment
+   * roleplay. Only touches a learner in the caller's own organisation (the
+   * enrollment carries the tenant). Earlier sessions, scores and reports are
+   * kept; they simply stop counting against the gate.
+   */
+  async reopenRoleplayAssessment(
+    trackItemId: string,
+    userId: number,
+    tenantId: string,
+  ): Promise<{ success: true }> {
+    const item = await this.trackItemRepository.findOne({
+      where: { id: trackItemId },
+    });
+    if (
+      !item ||
+      item.type !== TrackItemType.ROLEPLAY ||
+      !item.completionCriteria?.assessmentMode
+    ) {
+      throw new NotFoundException('Assessment not found');
+    }
+    const progress = await this.trackItemProgressRepository.findOne({
+      where: { trackItemId, userId },
+    });
+    const enrollment = progress
+      ? await this.dataSource
+          .getRepository(TrackEnrollment)
+          .findOne({ where: { id: progress.trackEnrollmentId } })
+      : null;
+    // Same answer for "no such learner" and "not your organisation", so the
+    // endpoint cannot be used to probe other tenants.
+    if (!progress || !enrollment || enrollment.tenantId !== tenantId) {
+      throw new NotFoundException('Learner progress not found');
+    }
+    const meta = { ...(progress.meta ?? {}) };
+    delete meta.assessmentSubmittedAt;
+    await this.trackItemProgressRepository.update(progress.id, {
+      meta: { ...meta, assessmentReopenedAt: new Date().toISOString() },
+    });
+    this.logger.info(
+      `Reopened assessment attempt on track item ${trackItemId} for user ${userId}`,
+    );
+    return { success: true };
   }
 
   /** A quiz attempt's result, for listeners (the Ally guide). */
