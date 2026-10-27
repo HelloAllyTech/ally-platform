@@ -38,7 +38,7 @@ The service is composed of a FastAPI app plus LiveKit agent workers. The core of
 
 **Entry points**
 - `app/main.py` — FastAPI application: `GET /api/health`, `/api/v1` routers (scenario report, voice preview), CORS/middleware.
-- `app/worker.py` — v1 `AgentWorker`; 3-phase session lifecycle (configure → initialize → start).
+- `app/worker.py` — v1 `AgentWorker`; 3-phase session lifecycle (configure → initialize → start), including robust setup for critical components like the session stall watchdog to prevent silent failures.
 
 **Worker connection lifecycle and health signals**
 
