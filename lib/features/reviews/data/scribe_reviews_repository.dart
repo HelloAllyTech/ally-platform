@@ -42,6 +42,39 @@ class ScribeReviewsRepository {
     await _dio.patch<void>('/scribe-session-reviews/$reviewId/mark-read');
   }
 
+  /// Mirrors ally-mobile (React Native)'s `createScribeReview`
+  /// (`scribeReviewsApi.ts`) — POST `/scribe-session-reviews`, a genuinely
+  /// separate backend resource from `ReviewsRepository.createReview`'s
+  /// `/scenario-session-reviews` (confirmed from `src/constants/
+  /// general.ts`'s `API_ROUTES.SCRIBE_REVIEWS`/`API_ROUTES.TRACKS`
+  /// distinction — the two review systems are never the same endpoint
+  /// despite both being "a review of a session"). Returns the new review's
+  /// id, matching RN's `CreateScribeReviewResponse`.
+  Future<String> createReview({
+    required int scribeSessionId,
+    required String note,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/scribe-session-reviews',
+      data: {'scribeSessionId': scribeSessionId, 'note': note},
+    );
+    return response.data!['id'] as String;
+  }
+
+  /// Mirrors ally-mobile (React Native)'s `updateScribeReviewStatus` — same
+  /// request shape as `ReviewsRepository.updateReviewStatus`, just the
+  /// scribe-review resource path.
+  Future<void> updateReviewStatus({
+    required String reviewId,
+    required String status,
+    String? note,
+  }) async {
+    await _dio.patch<void>(
+      '/scribe-session-reviews/$reviewId',
+      data: {'status': status, 'note': ?note},
+    );
+  }
+
   /// Flat, non-transcript-anchored discussion — byte-for-byte path mirror
   /// of `ReviewsRepository.getGeneralComments`/`addGeneralComment` with
   /// `scenario-session-reviews` swapped for `scribe-session-reviews` (same

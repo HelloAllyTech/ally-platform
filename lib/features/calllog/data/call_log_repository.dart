@@ -136,6 +136,12 @@ class CallSummaryDetails {
     // concept and assumes the summary form shows immediately.
     this.isSummaryAvailable = true,
     this.isSummaryFeedbackAdded = false,
+    this.hasTranscript = false,
+    this.archivedAt,
+    this.reviewId,
+    this.reviewStatus,
+    this.reviewNote,
+    this.reviewCreatedAt,
   });
 
   factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
@@ -175,6 +181,15 @@ class CallSummaryDetails {
       // chat/call record exists.
       isSummaryAvailable: summary != null,
       isSummaryFeedbackAdded: callInfo?['isSummaryFeedbackAdded'] as bool? ?? false,
+      // Mirrors RN's `useSummaryState`'s `isTranscriptAvailable`, derived
+      // from `summaryData.details.transcript` (not the live messages list —
+      // this is a flag on the summary response itself).
+      hasTranscript: details?['transcript'] != null,
+      archivedAt: json['archivedAt'] as String?,
+      reviewId: json['reviewId'] as String?,
+      reviewStatus: json['reviewStatus'] as String?,
+      reviewNote: json['reviewNote'] as String?,
+      reviewCreatedAt: json['reviewCreatedAt'] as String?,
     );
   }
 
@@ -186,11 +201,31 @@ class CallSummaryDetails {
   final String? summaryStatus;
   final bool isSummaryAvailable;
   final bool isSummaryFeedbackAdded;
+  final bool hasTranscript;
+
+  /// ISO timestamp, or null when not archived — mirrors RN's own
+  /// `summaryData?.archivedAt` truthiness check (`useCallSummaryActions`'s
+  /// `archived` param).
+  final String? archivedAt;
+
+  /// Mirrors RN's `CallSummaryResponse.reviewId`/`reviewStatus`/
+  /// `reviewNote`/`reviewCreatedAt` — the scribe review tied to this call,
+  /// if one has ever been shared (`/scribe-session-reviews`, a separate
+  /// resource from simulation reviews).
+  final String? reviewId;
+  final String? reviewStatus;
+  final String? reviewNote;
+  final String? reviewCreatedAt;
 
   /// Mirrors RN's `isManualNote`: an already-ended DICTATION chat with
   /// `summaryStatus` SUCCESS but no AI summary object — the counsellor fills
   /// the fields by hand instead of waiting on generation.
   bool get isManualNote => summaryStatus == 'SUCCESS' && !isSummaryAvailable;
+
+  bool get isArchived => archivedAt != null;
+
+  /// Mirrors RN's `isSharedForReview`: a review exists and isn't hidden.
+  bool get isSharedForReview => reviewId != null && reviewStatus != 'HIDDEN';
 
   String? get sessionSummary => fields['sessionSummary'] as String?;
   String? get keyConcerns => fields['keyConcerns'] as String?;
@@ -386,6 +421,15 @@ class CallLogRepository {
   Future<CallSummaryDetails> getCallSummary(int chatId) async {
     final response = await _dio.get<Map<String, dynamic>>('/chats/$chatId');
     return CallSummaryDetails.fromJson(response.data!);
+  }
+
+  /// Mirrors ally-mobile (React Native)'s `updateCallInfo` — the rename
+  /// action in CallSummaryScreen's 3-dot menu.
+  Future<void> updateSummaryName(int chatId, String summaryName) async {
+    await _dio.patch<void>(
+      '/chats/$chatId/call-info',
+      data: {'summaryName': summaryName},
+    );
   }
 
   /// Matches `useCallSummaryForm`'s `handleSubmit` — PUT only the changed

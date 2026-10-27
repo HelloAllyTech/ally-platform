@@ -390,6 +390,20 @@ void main() {
     });
   });
 
+  group('updateSummaryName', () {
+    test('PATCHes the new summaryName to call-info', () async {
+      when(
+        () => dio.patch<void>('/chats/9/call-info', data: {'summaryName': 'Renamed session'}),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.updateSummaryName(9, 'Renamed session');
+
+      verify(
+        () => dio.patch<void>('/chats/9/call-info', data: {'summaryName': 'Renamed session'}),
+      ).called(1);
+    });
+  });
+
   group('getCallSummary / CallSummaryDetails.fromJson merge logic', () {
     test('merges summary + computed callDetails/callInfo fields, and joins tags', () async {
       when(() => dio.get<Map<String, dynamic>>('/chats/9')).thenAnswer(
@@ -517,6 +531,75 @@ void main() {
 
       expect(summary.isSummaryAvailable, isFalse);
       expect(summary.isManualNote, isTrue);
+    });
+
+    test('parses archivedAt, the scribe review fields, and hasTranscript', () async {
+      when(() => dio.get<Map<String, dynamic>>('/chats/9')).thenAnswer(
+        (_) async => _response({
+          'id': 9,
+          'summaryStatus': 'SUCCESS',
+          'archivedAt': '2026-02-01T00:00:00Z',
+          'reviewId': 'rev-1',
+          'reviewStatus': 'IN_REVIEW',
+          'reviewNote': 'Take a look at this one',
+          'reviewCreatedAt': '2026-01-31T00:00:00Z',
+          'details': {
+            'summary': {'sessionSummary': 'Done'},
+            'callInfo': <String, dynamic>{},
+            'transcript': 'the full transcript',
+          },
+        }),
+      );
+
+      final summary = await repository.getCallSummary(9);
+
+      expect(summary.archivedAt, '2026-02-01T00:00:00Z');
+      expect(summary.isArchived, isTrue);
+      expect(summary.reviewId, 'rev-1');
+      expect(summary.reviewStatus, 'IN_REVIEW');
+      expect(summary.reviewNote, 'Take a look at this one');
+      expect(summary.reviewCreatedAt, '2026-01-31T00:00:00Z');
+      expect(summary.isSharedForReview, isTrue);
+      expect(summary.hasTranscript, isTrue);
+    });
+
+    test('isArchived/reviewId/hasTranscript default to not-archived/null/false when absent', () async {
+      when(() => dio.get<Map<String, dynamic>>('/chats/9')).thenAnswer(
+        (_) async => _response({
+          'id': 9,
+          'summaryStatus': 'SUCCESS',
+          'details': {
+            'summary': {'sessionSummary': 'Done'},
+            'callInfo': <String, dynamic>{},
+          },
+        }),
+      );
+
+      final summary = await repository.getCallSummary(9);
+
+      expect(summary.isArchived, isFalse);
+      expect(summary.reviewId, isNull);
+      expect(summary.isSharedForReview, isFalse);
+      expect(summary.hasTranscript, isFalse);
+    });
+
+    test('isSharedForReview is false for a review that exists but is HIDDEN', () async {
+      when(() => dio.get<Map<String, dynamic>>('/chats/9')).thenAnswer(
+        (_) async => _response({
+          'id': 9,
+          'summaryStatus': 'SUCCESS',
+          'reviewId': 'rev-1',
+          'reviewStatus': 'HIDDEN',
+          'details': {
+            'summary': {'sessionSummary': 'Done'},
+            'callInfo': <String, dynamic>{},
+          },
+        }),
+      );
+
+      final summary = await repository.getCallSummary(9);
+
+      expect(summary.isSharedForReview, isFalse);
     });
   });
 

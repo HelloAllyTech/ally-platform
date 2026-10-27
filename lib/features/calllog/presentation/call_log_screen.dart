@@ -398,14 +398,15 @@ class _RealLogsList extends ConsumerWidget {
               ),
               // RN has no swipe-to-archive gesture at all here — archiving
               // only happens deliberately from inside CallSummaryScreen's
-              // own ArchiveActionModal (not yet ported). A bare swipe
-              // reaching the dismiss threshold used to archive immediately
-              // and irreversibly with no confirmation — a real accidental-
+              // own 3-dot menu (now also ported there, but this swipe
+              // predates and is independent of it — the backend's archive
+              // call has no problem running twice). A bare swipe reaching
+              // the dismiss threshold used to archive immediately and
+              // irreversibly with no confirmation — a real accidental-
               // data-loss risk (a stray diagonal scroll touch silently
-              // archives a call log). Reusing that real modal's own copy
+              // archives a call log). Reusing the same confirmation copy
               // keeps this swipe entry point working without the silent
-              // part, until the full menu this normally lives behind is
-              // built.
+              // part.
               confirmDismiss: (_) => ConfirmationModal.show(
                 context,
                 title: ref.t('callSummary.archiveActionModal.archive.header.title'),

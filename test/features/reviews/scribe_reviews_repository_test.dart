@@ -234,4 +234,64 @@ void main() {
       ).called(1);
     });
   });
+
+  group('createReview', () {
+    test('POSTs /scribe-session-reviews (not /scenario-session-reviews) and returns the new id', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/scribe-session-reviews',
+          data: {'scribeSessionId': 1001, 'note': 'Take a look'},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'id': 'rev-9',
+          'scribeSessionId': 1001,
+          'status': 'HIDDEN',
+          'createdAt': '2026-01-01T00:00:00Z',
+        }),
+      );
+
+      final reviewId = await repository.createReview(scribeSessionId: 1001, note: 'Take a look');
+
+      expect(reviewId, 'rev-9');
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/scribe-session-reviews',
+          data: {'scribeSessionId': 1001, 'note': 'Take a look'},
+        ),
+      ).called(1);
+    });
+  });
+
+  group('updateReviewStatus', () {
+    test('PATCHes the scribe review resource with status and an optional note', () async {
+      when(
+        () => dio.patch<void>(
+          '/scribe-session-reviews/rev-9',
+          data: {'status': 'IN_REVIEW', 'note': 'Updated note'},
+        ),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.updateReviewStatus(reviewId: 'rev-9', status: 'IN_REVIEW', note: 'Updated note');
+
+      verify(
+        () => dio.patch<void>(
+          '/scribe-session-reviews/rev-9',
+          data: {'status': 'IN_REVIEW', 'note': 'Updated note'},
+        ),
+      ).called(1);
+    });
+
+    test('omits note from the body when absent (a plain visibility toggle)', () async {
+      when(
+        () => dio.patch<void>('/scribe-session-reviews/rev-9', data: {'status': 'HIDDEN'}),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.updateReviewStatus(reviewId: 'rev-9', status: 'HIDDEN');
+
+      verify(
+        () => dio.patch<void>('/scribe-session-reviews/rev-9', data: {'status': 'HIDDEN'}),
+      ).called(1);
+    });
+  });
 }

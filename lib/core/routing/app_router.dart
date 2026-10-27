@@ -51,6 +51,8 @@ typedef ShareForReviewArgs = ({
   String? note,
   String? contextDateTime,
   String? contextDuration,
+  bool isScribe,
+  String? contextTitle,
 });
 
 /// The redirect gate's actual decision logic, extracted to a pure top-level
@@ -291,6 +293,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             reviewId: args?.reviewId,
             isEditNote: args?.reviewId != null,
             initialNote: args?.note,
+            isScribe: args?.isScribe ?? false,
+            contextTitle: args?.contextTitle,
             contextDateTime: args?.contextDateTime,
             contextDuration: args?.contextDuration,
           );

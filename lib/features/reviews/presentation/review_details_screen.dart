@@ -106,12 +106,21 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
   Future<void> _togglePrivate(bool isEnabled) async {
     final newStatus = isEnabled ? 'IN_REVIEW' : 'HIDDEN';
     try {
-      await ref
-          .read(reviewsRepositoryProvider)
-          .updateReviewStatus(reviewId: widget.reviewId, status: newStatus);
+      // Real bug fixed here: this used to always PATCH
+      // `/scenario-session-reviews/:id` (the simulation-review resource)
+      // even for a scribe review, silently updating the wrong backend
+      // record — scribe reviews live at a genuinely separate
+      // `/scribe-session-reviews/:id` resource (see
+      // `ScribeReviewsRepository`'s own doc comment).
       if (widget._isScribe) {
+        await ref
+            .read(scribeReviewsRepositoryProvider)
+            .updateReviewStatus(reviewId: widget.reviewId, status: newStatus);
         ref.invalidate(scribeReviewDetailProvider(widget.reviewId));
       } else {
+        await ref
+            .read(reviewsRepositoryProvider)
+            .updateReviewStatus(reviewId: widget.reviewId, status: newStatus);
         ref.invalidate(reviewDetailProvider(widget.reviewId));
       }
       if (mounted) {
@@ -136,6 +145,8 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
         note: review.note,
         contextDateTime: null,
         contextDuration: null,
+        isScribe: widget._isScribe,
+        contextTitle: null,
       ),
     );
   }

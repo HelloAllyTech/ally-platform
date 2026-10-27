@@ -253,6 +253,8 @@ class _SimulationFeedbackScreenState
                               .difference(DateTime.parse(summary.startedAt))
                               .inSeconds
                               .toString(),
+                      isScribe: false,
+                      contextTitle: null,
                     ),
                   );
                 },

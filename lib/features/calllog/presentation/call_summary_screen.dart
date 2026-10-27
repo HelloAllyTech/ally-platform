@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
@@ -10,9 +11,27 @@ import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/confirmation_modal.dart';
+import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../reactions/data/reactions_repository.dart';
+import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
+
+/// Mirrors ally-mobile (React Native)'s `PRIVACY_POLICY_URL`.
+const _privacyPolicyUrl = 'https://app.helloally.ai/privacy';
+
+/// Mirrors ally-mobile (React Native)'s `isMinutesPassed` — same private
+/// helper this codebase already duplicates per-file rather than factoring
+/// out (see `review_details_screen.dart`'s own copy).
+bool _isMinutesPassed(String dateString, {int minutes = 10}) {
+  if (dateString.trim().isEmpty) return true;
+  final diff = DateTime.now().toUtc().difference(
+    DateTime.parse(dateString).toUtc(),
+  );
+  return diff.inSeconds / 60 >= minutes;
+}
 
 /// Maps each [SummarySection] to its real translation key, taken from
 /// ally-mobile (React Native)'s `src/constants/summary.ts` `SECTION_LIST`
@@ -151,8 +170,20 @@ const _fieldOptionLabelKeys = <String, String>{
 /// ported from `src/constants/summary.ts`'s `SECTION_LIST`/`summaryFields`:
 /// demographics, flow, key concerns, observations, assessment, intake/risk
 /// screening, ongoing risks, and more), editable and saved back via
-/// `updateCallSummary`, plus the real message-by-message transcript. Not
-/// ported: AI-enhance per section, export, tag *ratings* (as opposed to
+/// `updateCallSummary`, plus the real message-by-message transcript.
+///
+/// The header's share toggle (creating/toggling the visibility of a scribe
+/// review — a genuinely separate backend resource from simulation reviews,
+/// see `ScribeReviewsRepository`'s own doc comment), 3-dot menu
+/// (rename/data-policy-link/archive), and the floating "view review"
+/// button (gated the same way RN's `useHideReviewDetails` does: a private
+/// review with no threads or reactions stays hidden) are now wired too.
+///
+/// Not ported: AI-enhance per section, export (needs platform storage
+/// permissions + a file-save flow — a different, device-dependent kind of
+/// risk from the rest of this screen), delete (RN reaches it from inside
+/// the rename modal rather than the menu itself, and it's destructive
+/// enough to deserve its own careful pass), tag *ratings* (as opposed to
 /// tag names, which are editable here), the Ask-AI chat, and the
 /// separately backend-configurable "custom fields" system.
 class CallSummaryScreen extends ConsumerStatefulWidget {
@@ -176,6 +207,16 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
   late final DateTime _mountTime;
   bool _showFeedbackPopup = false;
 
+  /// Mirrors RN's `useHideReviewDetails`'s `hideReviewDetails` state
+  /// (initial value `true`, same as there) — whether the floating "view
+  /// review" button should stay hidden because the review is private AND
+  /// has no threads/reactions worth surfacing yet.
+  bool _hideReviewDetails = true;
+
+  /// Guards the async visibility check so it only re-runs when the
+  /// review's identity or privacy actually changes, not on every rebuild.
+  String? _hideReviewDetailsCheckedFor;
+
   @override
   void initState() {
     super.initState();
@@ -183,6 +224,149 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
     // be the real mount moment, not whenever `_mountTime` happens to be
     // first read (which is only on back-press, long after mount).
     _mountTime = widget.now();
+  }
+
+  /// Mirrors RN's `useHideReviewDetails`: a non-private review's button is
+  /// always shown; a private one is hidden unless it already has a thread
+  /// or a reaction (otherwise there's nothing behind the button to see).
+  Future<void> _checkHideReviewDetails(String reviewId, bool isPrivate) async {
+    if (!isPrivate) {
+      if (mounted) setState(() => _hideReviewDetails = false);
+      return;
+    }
+    try {
+      final threads = await ref
+          .read(scribeReviewsRepositoryProvider)
+          .getThreads(reviewId, limit: 1);
+      if (threads.threads.isNotEmpty) {
+        if (mounted) setState(() => _hideReviewDetails = false);
+        return;
+      }
+      final reactions = await ref
+          .read(scribeReactionsRepositoryProvider)
+          .getReactionsCount(reviewId);
+      if (mounted) setState(() => _hideReviewDetails = reactions.isEmpty);
+    } catch (_) {
+      // RN only logs this (console.error) and leaves the prior value in
+      // place — matched by simply not updating state here.
+    }
+  }
+
+  /// Mirrors RN's `handleShareToggle`: turning the switch ON when there's
+  /// no review yet, or one was created within the last 10 minutes, opens
+  /// the share/edit-note screen instead of silently flipping a status (a
+  /// very-fresh review's note is still worth reviewing before it goes
+  /// live). Any other toggle — ON for an older review, or OFF at all —
+  /// just flips the review's visibility directly.
+  Future<void> _handleShareToggle(bool isEnabled, CallSummaryDetails summary) async {
+    final reviewId = summary.reviewId;
+    final createdAt = summary.reviewCreatedAt;
+    final recentlyCreated = createdAt != null && !_isMinutesPassed(createdAt);
+    if (isEnabled && (reviewId == null || recentlyCreated)) {
+      await context.push<void>(
+        '/share-for-review/${widget.log.id}',
+        extra: (
+          reviewId: reviewId,
+          note: summary.reviewNote,
+          contextDateTime: null,
+          contextDuration: null,
+          isScribe: true,
+          contextTitle: widget.log.sessionName,
+        ),
+      );
+      ref.invalidate(callSummaryProvider(widget.log.id));
+      return;
+    }
+    if (reviewId == null) return;
+    try {
+      await ref
+          .read(scribeReviewsRepositoryProvider)
+          .updateReviewStatus(
+            reviewId: reviewId,
+            status: isEnabled ? 'IN_REVIEW' : 'HIDDEN',
+          );
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('simulationPage.privacyUpdated'))),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('simulationPage.errorUpdatePrivacy'))),
+        );
+      }
+    } finally {
+      ref.invalidate(callSummaryProvider(widget.log.id));
+    }
+  }
+
+  Future<void> _showRenameDialog(String currentName) async {
+    final controller = TextEditingController(text: currentName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(ref.t('callSummary.info.rename')),
+        content: TextField(controller: controller, autofocus: true),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(ref.t('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: Text(ref.t('common.save')),
+          ),
+        ],
+      ),
+    );
+    if (newName == null || newName.isEmpty) return;
+    try {
+      await ref.read(callLogRepositoryProvider).updateSummaryName(widget.log.id, newName);
+      ref.invalidate(callSummaryProvider(widget.log.id));
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('callSummary.info.summaryNameUpdateSuccess'))),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('callSummary.info.summaryNameUpdateFailed'))),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleArchiveToggle(bool currentlyArchived) async {
+    final action = currentlyArchived ? 'unarchive' : 'archive';
+    final confirmed = await ConfirmationModal.show(
+      context,
+      title: ref.t('callSummary.archiveActionModal.$action.header.title'),
+      subtitle: ref.t('callSummary.archiveActionModal.$action.header.subtitle'),
+      description: ref.t('callSummary.archiveActionModal.$action.description'),
+      confirmLabel: ref.t('callSummary.archiveActionModal.$action.confirm'),
+      cancelLabel: ref.t('callSummary.archiveActionModal.$action.cancel'),
+      confirmVariant: currentlyArchived ? AppButtonVariant.primary : AppButtonVariant.destructive,
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(callLogRepositoryProvider)
+          .archiveCallLog(widget.log.id, archive: !currentlyArchived);
+      ref.invalidate(callSummaryProvider(widget.log.id));
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('callSummary.archiveActionModal.$action.success'))),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('callSummary.archiveActionModal.$action.failed'))),
+        );
+      }
+    }
   }
 
   /// Mirrors RN's `onBackNavigation` — a summary that's already visible,
@@ -248,7 +432,35 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
     // Warms the cache so `_handleBackPress`'s `ref.read` (fired once, on
     // back-press) sees an already-resolved value instead of the still-
     // loading state a cold first `read` of a `FutureProvider` returns.
-    ref.watch(userPermissionsProvider);
+    final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
+
+    // One-time-per-identity visibility check for the floating "view review"
+    // button — mirrors RN's `useEffect([reviewId, isPrivate, ...])` in
+    // `useHideReviewDetails`.
+    ref.listen(callSummaryProvider(widget.log.id), (previous, next) {
+      final summary = next.value;
+      final reviewId = summary?.reviewId;
+      if (reviewId == null) return;
+      final isPrivate = summary!.reviewStatus == 'HIDDEN';
+      final key = '$reviewId|$isPrivate';
+      if (_hideReviewDetailsCheckedFor == key) return;
+      _hideReviewDetailsCheckedFor = key;
+      _checkHideReviewDetails(reviewId, isPrivate);
+    });
+
+    final summary = summaryAsync.value;
+    final showShareSwitch =
+        summary != null &&
+        summary.isSummaryAvailable &&
+        summary.summaryStatus == 'SUCCESS' &&
+        summary.hasTranscript &&
+        !summary.isArchived;
+    final hasScribeReviewPermission = permissions.contains(UserPermissions.viewScribeReview);
+    final showReviewButton =
+        summary?.reviewId != null &&
+        !_hideReviewDetails &&
+        hasScribeReviewPermission &&
+        !(summary?.isArchived ?? false);
 
     return PopScope(
       canPop: false,
@@ -274,6 +486,55 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
               widget.log.sessionName ??
                   ref.t('calls.sessionNumber', {'id': widget.log.id}),
             ),
+            actions: [
+              if (showShareSwitch)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(ref.t('learn.scenario.share')),
+                    Switch(
+                      value: summary.isSharedForReview,
+                      onChanged: (value) => _handleShareToggle(value, summary),
+                    ),
+                  ],
+                ),
+              if (summary != null)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'rename':
+                        _showRenameDialog(widget.log.sessionName ?? '');
+                      case 'dataPolicy':
+                        launchUrl(
+                          Uri.parse(_privacyPolicyUrl),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      case 'archive':
+                        _handleArchiveToggle(summary.isArchived);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'rename',
+                      child: Text(ref.t('callSummary.info.rename')),
+                    ),
+                    PopupMenuItem(
+                      value: 'dataPolicy',
+                      child: Text(ref.t('callSummary.customMenu.dataPolicy')),
+                    ),
+                    PopupMenuItem(
+                      value: 'archive',
+                      child: Text(
+                        ref.t(
+                          summary.isArchived
+                              ? 'callSummary.customMenu.unarchive'
+                              : 'callSummary.customMenu.archive',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
             bottom: TabBar(
               tabs: [
                 Tab(text: ref.t('postCallSummary.header.summary')),
@@ -281,6 +542,16 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
               ],
             ),
           ),
+          floatingActionButton: showReviewButton
+              ? FloatingActionButton(
+                  key: const Key('call-summary-view-review'),
+                  onPressed: () => context.push(
+                    '/reviews/${summary!.reviewId}',
+                    extra: ReviewType.scribe,
+                  ),
+                  child: const Icon(Icons.comment_outlined),
+                )
+              : null,
           body: Stack(
             children: [
               TabBarView(

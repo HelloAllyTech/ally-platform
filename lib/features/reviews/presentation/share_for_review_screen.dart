@@ -11,6 +11,7 @@ import '../../../core/widgets/emoji_insert_picker.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/reviews_repository.dart';
+import '../data/scribe_reviews_repository.dart';
 import 'review_formatting.dart';
 import 'simulation_details_card.dart';
 
@@ -118,7 +119,40 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
       // RN's `handleShare`: a reviewId (edit mode or otherwise) always
       // updates the existing review's status+note instead of creating a
       // new one — `onCreateReview` only ever fires with neither.
-      if (widget.reviewId != null) {
+      //
+      // Scribe reviews are a genuinely separate backend resource
+      // (`/scribe-session-reviews`, confirmed from RN's real
+      // `ShareCallLogScreen.tsx` — it calls `createScribeReview`/
+      // `updateScribeReviewStatus`, never the simulation-review mutations)
+      // — a real, previously-unfixed bug here silently hit the simulation
+      // endpoint for scribe sessions too; fixed by branching on
+      // `widget.isScribe`.
+      if (widget.isScribe) {
+        if (widget.reviewId != null) {
+          await ref
+              .read(scribeReviewsRepositoryProvider)
+              .updateReviewStatus(
+                reviewId: widget.reviewId!,
+                status: 'IN_REVIEW',
+                note: note,
+              );
+          if (mounted) context.pop();
+        } else {
+          // RN's `ShareCallLogScreen.onShareSuccess`: a fresh create lands
+          // on the new review's own details screen (replacing this one),
+          // not just "go back" — there's nothing to go back TO showing the
+          // share yet.
+          final newReviewId = await ref
+              .read(scribeReviewsRepositoryProvider)
+              .createReview(
+                scribeSessionId: int.parse(widget.scenarioSessionId),
+                note: note,
+              );
+          if (mounted) {
+            context.pushReplacement('/reviews/$newReviewId', extra: ReviewType.scribe);
+          }
+        }
+      } else if (widget.reviewId != null) {
         await ref
             .read(reviewsRepositoryProvider)
             .updateReviewStatus(
@@ -126,6 +160,7 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
               status: 'IN_REVIEW',
               note: note,
             );
+        if (mounted) context.go('/home');
       } else {
         await ref
             .read(reviewsRepositoryProvider)
@@ -133,8 +168,8 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
               scenarioSessionId: widget.scenarioSessionId,
               note: note,
             );
+        if (mounted) context.go('/home');
       }
-      if (mounted) context.go('/home');
     } catch (e) {
       setState(() => _error = '${ref.tr('review.shareFailed')}: $e');
     } finally {
