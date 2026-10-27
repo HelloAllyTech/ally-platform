@@ -12,15 +12,34 @@ import '../network/api_client.dart';
 /// `customFieldsApi.ts`, not `settingsApi.ts`, but it hits the same
 /// `/settings/...` prefix and shape as the other two, so it lives here
 /// rather than forcing a second settings client over an import-path
-/// difference). `getNudgeStatus` is also ported now (backlog item 5).
-/// `settingsApi.ts` also has `getVisibleChatTypes` for a separate,
-/// not-yet-ported feature (see flutter-whole-app-status-2026-10-26.md
-/// backlog item 6) — add it here, not as a second settings client, when
-/// that lands.
+/// difference). `getNudgeStatus` is also ported (backlog item 5).
+///
+/// `getVisibleChatTypes` (backlog item 6) is the odd one out: `GET
+/// /settings/chat-types` returns a JSON array of chat-type strings (e.g.
+/// `["MICROPHONE_CHAT", "EXOTEL_CONFERENCE_CHAT"]`), not a bare boolean —
+/// kept as raw strings rather than parsed into an enum, since this app has
+/// no other consumer of RN's `CHAT_TYPES` enum and the only thing anything
+/// here checks for is literal membership of `'MICROPHONE_CHAT'`.
 class SettingsRepository {
   SettingsRepository(this._dio);
 
   final Dio _dio;
+
+  /// `GET /settings/chat-types` — the tenant's enabled chat/session types.
+  /// RN's `CallLogScreen.tsx` re-fetches this on every screen *focus* (not
+  /// just mount) specifically because a token-rotation race was found to
+  /// leave this request permanently failed after the first attempt, with
+  /// `canStartCall` (permissions-only, persisted) still rendering the start
+  /// button as if nothing were wrong — see that file's own long comment
+  /// above its `useFocusEffect`. Refocus-triggered refetch isn't ported here
+  /// (this app's settings toggles are all one-shot `FutureProvider`s so
+  /// far, with no screen-focus-refetch infra anywhere yet); the actual
+  /// chat-type GATING this backlog item is about is still fully correct,
+  /// just without that specific token-rotation resilience RN added later.
+  Future<List<String>> getVisibleChatTypes() async {
+    final response = await _dio.get<List<dynamic>>('/settings/chat-types');
+    return (response.data ?? const []).map((e) => e as String).toList();
+  }
 
   /// `GET /settings/scribe-note-creation-enabled` — gates the manual
   /// "Create Note" (no live call) path in `StartSessionModal`. The backend
@@ -96,4 +115,12 @@ final customFieldsEnabledProvider = FutureProvider<bool>((ref) {
 /// unconditionally from both listening screens.
 final nudgeStatusProvider = FutureProvider<bool>((ref) {
   return ref.watch(settingsRepositoryProvider).getNudgeStatus();
+});
+
+/// Callers should only `ref.watch` this when the user holds a start-call
+/// permission at all — mirrors RN's own `useFocusEffect` guard
+/// (`if (canStartCall) { getVisibleChatTypes(); }`), which likewise never
+/// bothers asking for a user who couldn't start anything either way.
+final visibleChatTypesProvider = FutureProvider<List<String>>((ref) {
+  return ref.watch(settingsRepositoryProvider).getVisibleChatTypes();
 });

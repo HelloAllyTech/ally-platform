@@ -168,6 +168,7 @@ void main() {
               UserPermissions.startMicrophoneChat,
             ],
           ),
+          visibleChatTypesProvider.overrideWith((ref) async => const ['MICROPHONE_CHAT']),
         ],
       );
 
@@ -230,6 +231,7 @@ void main() {
               UserPermissions.startMicrophoneChat,
             ],
           ),
+          visibleChatTypesProvider.overrideWith((ref) async => const ['MICROPHONE_CHAT']),
         ],
       );
 
@@ -265,6 +267,7 @@ void main() {
               UserPermissions.startMicrophoneChat,
             ],
           ),
+          visibleChatTypesProvider.overrideWith((ref) async => const ['MICROPHONE_CHAT']),
         ],
       );
 
@@ -334,6 +337,7 @@ void main() {
             ],
           ),
           scribeNoteCreationEnabledProvider.overrideWith((ref) async => true),
+          visibleChatTypesProvider.overrideWith((ref) async => const ['MICROPHONE_CHAT']),
         ],
       );
 
@@ -402,6 +406,7 @@ void main() {
             ],
           ),
           scribeNoteCreationEnabledProvider.overrideWith((ref) async => false),
+          visibleChatTypesProvider.overrideWith((ref) async => const ['MICROPHONE_CHAT']),
         ],
       );
 
@@ -410,6 +415,67 @@ void main() {
 
       expect(find.text('Start Scribe Mode'), findsOneWidget);
       expect(find.text('Start Dictation Mode'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'no FAB at all when the tenant has disabled microphone chat, even with the start-call '
+    'permission and no Create Note capability — matches RN\'s canOfferAnySessionType, which is '
+    'gated on the tenant\'s enabled chat types, not the permission alone',
+    (tester) async {
+      final repository = _repository();
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.viewCallLogs, UserPermissions.startMicrophoneChat],
+          ),
+          visibleChatTypesProvider.overrideWith((ref) async => const []),
+        ],
+      );
+
+      expect(find.byKey(const Key('start-session-fab')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Start Scribe Mode is hidden but Create Note still offered when the tenant has disabled '
+    'microphone chat but the counsellor note-creation toggle is on',
+    (tester) async {
+      final repository = _repository();
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.counselorAccess,
+              UserPermissions.startMicrophoneChat,
+            ],
+          ),
+          scribeNoteCreationEnabledProvider.overrideWith((ref) async => true),
+          visibleChatTypesProvider.overrideWith((ref) async => const []),
+        ],
+      );
+
+      expect(find.byKey(const Key('start-session-fab')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Start Scribe Mode'),
+        findsNothing,
+        reason: 'the permission is held, but the tenant has not enabled MICROPHONE_CHAT',
+      );
+      expect(find.text('Start Dictation Mode'), findsOneWidget);
     },
   );
 

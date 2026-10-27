@@ -95,4 +95,24 @@ void main() {
       expect(result, isFalse);
     });
   });
+
+  group('getVisibleChatTypes', () {
+    test('GETs the list endpoint and returns the chat-type strings as-is', () async {
+      when(() => dio.get<List<dynamic>>('/settings/chat-types'))
+          .thenAnswer((_) async => _response(<dynamic>['MICROPHONE_CHAT', 'EXOTEL_CONFERENCE_CHAT']));
+
+      final result = await repository.getVisibleChatTypes();
+
+      expect(result, ['MICROPHONE_CHAT', 'EXOTEL_CONFERENCE_CHAT']);
+      verify(() => dio.get<List<dynamic>>('/settings/chat-types')).called(1);
+    });
+
+    test('defaults to an empty list when the body is absent, unlike the bare-boolean toggles', () async {
+      when(() => dio.get<List<dynamic>>('/settings/chat-types')).thenAnswer((_) async => _response(null));
+
+      final result = await repository.getVisibleChatTypes();
+
+      expect(result, isEmpty);
+    });
+  });
 }

@@ -56,7 +56,11 @@ enum _LogTab { real, simulation }
 /// menu action (gated on `ARCHIVE_CALL_LOG`) swaps the whole screen into a
 /// dedicated "Archives" view (real calls only, `archive: true`), not a
 /// third tab. The floating action button for starting a new Scribe
-/// recording is gated on `START_MICROPHONE_CHAT`/`START_CLOUD_TELEPHONY_CHAT`.
+/// recording is gated on the `START_MICROPHONE_CHAT` permission (RN's
+/// `canStartCall`) AND the tenant's `/settings/chat-types` enabled set
+/// actually including microphone chat (RN's `hasMicrophoneChatType`) — a
+/// tenant that has disabled microphone-chat sessions hides the Start Scribe
+/// Mode option even for a permitted counsellor, same as RN.
 /// Tapping it shows the real `StartSessionModal` consent copy (reusing the
 /// shared `IllustratedModal` shell, since this port has only the one
 /// action it needs); confirming requests the microphone permission — with
@@ -100,9 +104,12 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   bool _isStartingScribe = false;
 
   /// Mirrors RN's `StartSessionModal`: Start Scribe Mode is offered as the
-  /// primary button whenever `canStartCall`, and Create Note is offered as a
-  /// secondary button whenever `canCreateNote` — RN renders both, either, or
-  /// (if neither) nothing at all in the same sheet, never two sheets.
+  /// primary button whenever `hasMicrophoneChatType` (the tenant's enabled
+  /// chat types include microphone chat — not RN's permission-only
+  /// `canStartCall`, which only ever gates whether the FAB appears at all),
+  /// and Create Note is offered as a secondary button whenever
+  /// `canCreateNote` — RN renders both, either, or (if neither) nothing at
+  /// all in the same sheet, never two sheets.
   ///
   /// The create-note case needs "close the sheet, then navigate" (matching
   /// RN's `handleCreateNote`, and `_startScribeSession`'s own documented
@@ -115,16 +122,16 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   /// which only completes once the dialog has actually popped *itself* (via
   /// its own context, always on the right navigator) — not on `_createNote`
   /// finishing, which only decides whether that pop should happen at all.
-  Future<void> _showStartSessionModal({required bool canStartCall, required bool canCreateNote}) async {
+  Future<void> _showStartSessionModal({required bool hasMicrophoneChatType, required bool canCreateNote}) async {
     CallLogItem? createdNote;
     await IllustratedModal.show(
       context,
       titleMain: ref.t('calls.dialog.startSession.titleNormal'),
       titleItalic: ref.t('calls.dialog.startSession.titleItalic'),
       description: ref.t('calls.dialog.startSession.footer'),
-      actionButtonText: canStartCall ? ref.t('calls.dialog.startSession.startScribeMode') : null,
+      actionButtonText: hasMicrophoneChatType ? ref.t('calls.dialog.startSession.startScribeMode') : null,
       actionButtonVariant: AppButtonVariant.primary,
-      onActionPressed: canStartCall ? _startScribeSession : null,
+      onActionPressed: hasMicrophoneChatType ? _startScribeSession : null,
       secondaryButtonText: canCreateNote ? ref.t('calls.dialog.startSession.startDictationMode') : null,
       onSecondaryPressed: canCreateNote
           ? () async {
@@ -242,15 +249,13 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     final hasChatDetails = permissions.contains(UserPermissions.viewChatDetails);
     final hasScenarioDetails = permissions.contains(UserPermissions.viewScenarioSessionDetails);
     final hasTags = permissions.contains(UserPermissions.viewTags);
-    // Mirrors RN's `canOfferAnySessionType` (`CallLogScreen.tsx`) exactly:
-    // tapping "Start Session" only ever starts Scribe's microphone
-    // recording (`handleVoiceRecording`) — a cloud-telephony conference call
-    // is never user-initiated (it's the counsellor's real phone ringing),
-    // so `startCloudTelephonyChat` was never part of RN's own gate here.
-    // (RN's own `hasMicrophoneChatType`/tenant `enabledChatTypes` gate is a
-    // separate, not-yet-ported backlog item — see
-    // flutter-whole-app-status-2026-10-26.md item 6 — so this is permission
-    // only for now, same as before.)
+    // RN's own permission-only gate (`START_CALL_PERMISSIONS`): tapping
+    // "Start Session" only ever starts Scribe's microphone recording
+    // (`handleVoiceRecording`) — a cloud-telephony conference call is never
+    // user-initiated (it's the counsellor's real phone ringing), so
+    // `startCloudTelephonyChat` was never part of RN's own gate here either
+    // (confirmed: `StartSessionModal.tsx` has no cloud-telephony button at
+    // all, only Scribe Mode and Create Note).
     final canStartCall = permissions.contains(UserPermissions.startMicrophoneChat);
     // Manual scribe notes: counsellor permission + the per-tenant toggle —
     // mirrors RN's `canCreateNote` (`useScribeNoteCreationEnabled`), which
@@ -259,7 +264,16 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     // that branch reproduces the same skip here.
     final isCounselor = permissions.contains(UserPermissions.counselorAccess);
     final canCreateNote = isCounselor && (ref.watch(scribeNoteCreationEnabledProvider).value ?? false);
-    final canOfferAnySessionType = canStartCall || canCreateNote;
+    // The tenant's enabled chat types (`hasMicrophoneChatType` in RN) — only
+    // watched when the user could start anything at all, mirroring RN's own
+    // `useFocusEffect(() => { if (canStartCall) getVisibleChatTypes(); })`
+    // guard against firing a pointless request.
+    final visibleChatTypes = canStartCall ? (ref.watch(visibleChatTypesProvider).value ?? const <String>[]) : const <String>[];
+    final hasMicrophoneChatType = visibleChatTypes.contains('MICROPHONE_CHAT');
+    // Mirrors RN's `canOfferAnySessionType` exactly: tenant-setting-gated
+    // (not permission-gated) — a tenant that disabled microphone chat
+    // entirely must not offer Start Scribe Mode even to a permitted user.
+    final canOfferAnySessionType = hasMicrophoneChatType || canCreateNote;
 
     if (hasReal && hasSimulation) {
       _activeTab ??= _LogTab.real;
@@ -353,7 +367,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
               bottom: 30,
               child: _StartSessionFab(
                 onPressed: () => _showStartSessionModal(
-                  canStartCall: canStartCall,
+                  hasMicrophoneChatType: hasMicrophoneChatType,
                   canCreateNote: canCreateNote,
                 ),
               ),
