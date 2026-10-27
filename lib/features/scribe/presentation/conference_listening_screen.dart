@@ -9,6 +9,7 @@ import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/realtime/socket_events.dart';
 import '../../../core/realtime/socket_service.dart';
+import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/chat_models.dart';
@@ -238,7 +239,12 @@ class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningS
             isPaused: false,
             isFocusMode: _isFocusMode,
           ),
-          if (!_isFocusMode && (_currentNudge != null || _isNudgeLoading)) ...[
+          // Tenant gate: mirrors RN's `!!nudgeStatus && currentNudge` — see
+          // `nudgeStatusProvider`'s doc comment for why nudge content itself
+          // isn't separately gated (it arrives over the socket regardless).
+          if (!_isFocusMode &&
+              (ref.watch(nudgeStatusProvider).value ?? false) &&
+              (_currentNudge != null || _isNudgeLoading)) ...[
             const SizedBox(height: 16),
             NudgeSection(nudge: _currentNudge, isLoading: _isNudgeLoading),
           ],

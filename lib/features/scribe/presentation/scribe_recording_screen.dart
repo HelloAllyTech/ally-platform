@@ -16,6 +16,7 @@ import '../../../core/permissions/user_permissions.dart';
 import '../../../core/realtime/foreground_recording_service.dart';
 import '../../../core/realtime/socket_events.dart';
 import '../../../core/realtime/socket_service.dart';
+import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/illustrated_modal.dart';
 import '../../../core/widgets/tab_screen_header.dart';
@@ -478,7 +479,13 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
                   ),
                 ] else ...[
                   const SizedBox(height: 16),
-                  if (_currentNudge != null || _isNudgeLoading)
+                  // Tenant gate: mirrors RN's `!!nudgeStatus && currentNudge`
+                  // — nudge content itself still arrives over the socket
+                  // stream regardless of this flag (see
+                  // `nudge_status_provider`'s doc comment); only whether it's
+                  // shown is gated here, same as RN.
+                  if ((ref.watch(nudgeStatusProvider).value ?? false) &&
+                      (_currentNudge != null || _isNudgeLoading))
                     NudgeSection(nudge: _currentNudge, isLoading: _isNudgeLoading),
                   const SizedBox(height: 16),
                   ..._buildTranscript(),

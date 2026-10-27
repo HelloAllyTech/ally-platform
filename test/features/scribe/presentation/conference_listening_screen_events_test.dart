@@ -10,6 +10,7 @@ import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/realtime/socket_events.dart';
 import 'package:ally_mobile_flutter/core/realtime/socket_service.dart';
+import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
 import 'package:ally_mobile_flutter/features/scribe/data/chat_models.dart';
 import 'package:ally_mobile_flutter/features/scribe/data/chat_repository.dart';
 import 'package:ally_mobile_flutter/features/scribe/presentation/conference_listening_screen.dart';
@@ -69,6 +70,10 @@ void main() {
             userPermissionsProvider.overrideWith(
               (ref) async => [UserPermissions.viewReferenceDocument],
             ),
+            // This test's whole point is proving a NUDGE event renders the
+            // nudge section, so the tenant toggle must read enabled here —
+            // the "tenant has nudges off" case has its own test file.
+            nudgeStatusProvider.overrideWith((ref) async => true),
           ],
           child: const MaterialApp(
             home: ConferenceListeningScreen(chatId: 42, userId: 'user-1'),

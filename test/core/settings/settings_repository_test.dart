@@ -76,4 +76,23 @@ void main() {
       expect(result, isTrue);
     });
   });
+
+  group('getNudgeStatus', () {
+    test('GETs the bare-boolean endpoint and returns it', () async {
+      when(() => dio.get<bool>('/settings/nudge-status')).thenAnswer((_) async => _response(true));
+
+      final result = await repository.getNudgeStatus();
+
+      expect(result, isTrue);
+      verify(() => dio.get<bool>('/settings/nudge-status')).called(1);
+    });
+
+    test('defaults to false when the body is absent', () async {
+      when(() => dio.get<bool>('/settings/nudge-status')).thenAnswer((_) async => _response(null));
+
+      final result = await repository.getNudgeStatus();
+
+      expect(result, isFalse);
+    });
+  });
 }
