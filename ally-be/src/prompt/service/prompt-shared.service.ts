@@ -66,18 +66,22 @@ export class PromptSharedService {
         rows = await read();
       } catch (error) {
         const cached = this.cachedRowsFor(selector);
-        if (!cached) {
-          this.logger.error(
-            `[PROMPT_DELIVERY] Skills Store unreadable and nothing cached for this request: ${error?.message}`,
+        if (cached) {
+          this.logger.warn(
+            `[PROMPT_DELIVERY] Skills Store unreadable; serving the last ${cached.length} prompts read successfully: ${error?.message}`,
           );
-          throw new Error(
-            `The prompt store could not be read: ${error?.message}`,
-          );
+          return cached;
         }
-        this.logger.warn(
-          `[PROMPT_DELIVERY] Skills Store unreadable; serving the last ${cached.length} prompts read successfully: ${error?.message}`,
+
+        const fromDisk = await this.fallbackFromDisk(selector);
+        if (fromDisk) return fromDisk;
+
+        this.logger.error(
+          `[PROMPT_DELIVERY] Skills Store unreadable and nothing cached for this request: ${error?.message}`,
         );
-        return cached;
+        throw new Error(
+          `The prompt store could not be read: ${error?.message}`,
+        );
       }
     }
     for (const row of rows) this.lastGoodRows.set(row.promptCode, row);
@@ -85,6 +89,83 @@ export class PromptSharedService {
       this.completePrefixes.add(selector.promptCodePrefix);
     }
     return rows;
+  }
+
+  private async fallbackFromDisk(
+    selector: { promptCode: string[] } | { promptCodePrefix: string },
+  ): Promise<PromptsWithPromptCode[] | null> {
+    try {
+      let codesToRead: string[];
+      if ('promptCode' in selector) {
+        codesToRead = selector.promptCode;
+      } else {
+        const allCodes = await this.listAllPromptCodesFromDisk();
+        codesToRead = allCodes.filter((c) =>
+          c.startsWith(selector.promptCodePrefix),
+        );
+      }
+
+      const prompts = await Promise.all(
+        codesToRead.map(async (code) => {
+          const prompt = await this.readFromFolder(code);
+          if (prompt) {
+            const result: PromptsWithPromptCode = {
+              promptCode: code,
+              prompt: prompt,
+              version: null,
+              contentHash: hashPromptBody(prompt),
+            };
+            return result;
+          }
+          return null;
+        }),
+      );
+
+      const filteredPrompts = prompts.filter(
+        (p): p is PromptsWithPromptCode => p !== null,
+      );
+      if (filteredPrompts.length > 0) {
+        this.logger.warn(
+          `[PROMPT_DELIVERY] Skills Store unreadable; serving ${filteredPrompts.length} prompts from disk fallback.`,
+        );
+        return filteredPrompts;
+      }
+    } catch (e) {
+      this.logger.error(`[PROMPT_DELIVERY] Filesystem fallback failed`, e);
+    }
+    return null;
+  }
+
+  private async listAllPromptCodesFromDisk(): Promise<string[]> {
+    const promptsDir = path.join(process.cwd(), PROMPTS_DIR);
+    const codes: string[] = [];
+    try {
+      await fs.promises.stat(promptsDir);
+      const entries = await fs.promises.readdir(promptsDir, {
+        withFileTypes: true,
+      });
+
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.txt')) {
+          codes.push(entry.name.replace('.txt', ''));
+        } else if (entry.isDirectory()) {
+          const subEntries = await fs.promises.readdir(
+            path.join(promptsDir, entry.name),
+            { withFileTypes: true },
+          );
+          const prefix = entry.name.replace(/-/g, '_');
+          for (const subEntry of subEntries) {
+            if (subEntry.isFile() && subEntry.name.endsWith('.txt')) {
+              const rest = subEntry.name.replace('.txt', '');
+              codes.push(`${prefix}_${rest}`);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore read errors
+    }
+    return codes;
   }
 
   private cachedRowsFor(

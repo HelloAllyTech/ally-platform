@@ -77,6 +77,11 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 - **Never edit a merged migration.** Add a new one.
 - **Every AI call has a registry row** in `src/llm/constants/ai-task-registry.constants.ts`
   — a jest guard and `.docs-map.yml` both fail without one. See the routing table above.
+- **Prompt delivery is resilient to database failure.** `PromptSharedService`
+  falls back to serving default prompt text from the filesystem (`src/prompts/`)
+  if the database (Skills Store) is unreachable. This ensures services that rely
+  on prompts can continue to function, albeit with potentially stale, default
+  content.
 - **HIPAA.** No PII/PHI outside the designated audit loggers.
 - **Module-load-time work in a shared module breaks unrelated suites.** Resolve values
   lazily inside the function that needs them, especially for anything read from a barrel.
