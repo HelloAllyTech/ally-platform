@@ -216,6 +216,89 @@ Adding a prompt does not need a doc change: the docs guard watches the prompt co
 
 ## Changing an existing prompt
 
-- **Its text:** a new version in the Skills Store, or `prompts pull` → edit → `prompts push` with the CLI. Never edit the `.txt` to change what runs. See [prompts-api.md](./prompts-api.md).
-- **The variables the code supplies:** change the contract and the call site in the same PR. Add a new variable as optional, publish a version that uses it, then make it required, so no live text breaks.
-- **Its name or description:** rename it in the Skills Store. The contract's `name` only names a new prompt; its `description` and `category` are rewritten on every deploy.
+Once a prompt exists, the Skills Store owns its text. Git owns only the contract (what the code supplies and how it reads the answer) and the default file (a minimal base for a fresh clone and the last-resort fallback). Every change below falls on one side of that line, and the order of the steps matters when a change touches both.
+
+### What deploys and sync change, and what they never change
+
+Each service syncs its prompts when its container starts: ally-be at boot, ally-ai from its `Dockerfile`, ally-ai-learn from `start.sh`.
+
+- **A new prompt:** sync creates it, with its default file as live version 1 and as its stored default.
+- **An existing prompt:** sync updates only what Git owns, namely the contract, description, category and file metadata. It **never** changes the live version, the version history or the stored default (`defaultPrompt`, what **Restore default** puts live). So editing or shortening a default `.txt` changes nothing that production runs. The new contract applies to every version saved from then on.
+
+### Change the text only
+
+1. **Edit it.** Either:
+   - **In the Skills Store:** open the prompt, edit, **Save as new version**.
+   - **From a laptop:** `prompts pull <code>`, edit `.prompts/<service>/<code>.txt`, `prompts apply-local <code>` to try it on your local stack, then `prompts push <code> --remote prod --note "why"`. This needs a Skills Store key ([set up once](./prompts-api.md#working-on-prompts-from-a-laptop)).
+2. **The new version is a draft.** It serves nothing until someone publishes it, and it is translated in the background. No key can publish: publishing happens in the Skills Store.
+3. **Review and publish it.** In the side panel, **Show text** expands any version with its variables, and **Compare with live** shows the draft's changes line by line. **Publish** puts it live. **Discard** removes a draft that was never live, with its translations. A version that has been live stays in the history, and **Roll back** serves it again.
+
+Rules the store enforces on every new version, whichever way it arrives:
+
+- **Stale base:** a push or save built on an older version than the newest is refused (`409 SKILLS_STORE_STALE_BASE`). `prompts pull <code>` merges your edit onto the newest version; then push again.
+- **Contract:** a version that drops a required variable, or uses one the deployed code doesn't supply, is refused (`422 SKILLS_STORE_CONTRACT_VIOLATION`, `details: {missing, unknown}`). The unknown-variable check applies only to a *closed* contract (all ally-be contracts; ally-ai and ally-ai-learn contracts with `extra="forbid"`). An open contract accepts an unknown placeholder, which then renders empty.
+- **Pinned prompts:** judge rubrics, Builder's eval admin and judge, the actor-goal judge, and Builder's PRD review/recheck and discovery planner publish only with an explicit confirmation (`409 SKILLS_STORE_PROMPT_PINNED`, `details.reason`). Before confirming:
+  - **A judge rubric:** bump the judge's `PROMPT_VERSION` in the same change.
+  - **A scorer:** start a new baseline after publishing.
+  - **A check:** have the change reviewed.
+
+  The list is `src/prompt/constants/pinned-prompts.constants.ts`.
+- **Builder's interviewer and platform rules** go live only through Builder's replay eval, never by publishing (see [prompts-folder.md](./prompts-folder.md)).
+
+**Never** edit the default `.txt` to change what runs: production never reads it while the store answers. CI fails a PR that changes a default without changing its contract (`scripts/prompts/check-prompts.mjs`); label the PR `prompt-default-refresh` when you deliberately refresh the open-source base.
+
+### Add a variable
+
+The store checks a new version against the contract the **deployed** code declared. So the code ships first, and the text second.
+
+1. **Code (one PR):**
+   - Add the variable to the contract as **optional**.
+   - Make every call site supply it.
+   - Add the placeholder to the default `.txt`.
+
+   In ally-be, `renderPrompt` type-checks the call site against the contract.
+2. **Release that service.** Its startup sync gives the store the new contract. The live text doesn't use the variable yet, which is harmless: the code supplies a value nothing reads.
+3. **Text:** pull, add `{new_variable}` (ally-be: `{{new_variable}}`) where it belongs, push, and publish.
+4. **Optional, later:** make it `required` in another PR, once every version that may still go live uses it. From then on the store refuses any version without it, and the release check (below) flags a live version that lacks it.
+
+Doing step 3 before step 2 goes wrong in one of two ways:
+- **A closed contract:** the push is refused as an unknown variable.
+- **An open contract:** the push is accepted, and the placeholder renders as an empty string until the code ships.
+
+### Remove or rename a variable
+
+The reverse order: the live text stops using it first, then the code stops supplying it.
+
+1. **Text:** publish a version without the placeholder. A rename puts the new name in, after the new name has been added as in **Add a variable**.
+2. **Code (one PR):** remove it from the contract, the call sites and the default.
+3. **Release.**
+
+Removing it from the code first breaks any live text that still uses it:
+- **A closed contract:** the next deploy's contract makes that live version invalid.
+- **An open contract:** it renders empty.
+
+The release check below names the prompt.
+
+### Change the answer's shape (JSON keys, enum values, section markers)
+
+The text and the parser have to agree at every moment, so change it in three steps, the same way as a database migration:
+
+1. **Code:** make the parser accept both the old and the new shape. Release it.
+2. **Text:** publish a version that asks for the new shape.
+3. **Code:** drop the old shape from the parser and update the default.
+
+For an `output: 'json'` prompt, CI makes one cheap model call to check the default still produces parseable JSON (`scripts/prompts/check-structured-defaults.mjs`).
+
+### Change the model or temperature
+
+The model and temperature are part of a version. Pick them in the side panel and save a new version, then publish it. The AI task registry row's `promptOverride` must name the prompt for the Skills Store's model to win over the code's default (see [ai-task-registry.md](./ai-task-registry.md)).
+
+### Rename it, describe it, or hide it
+
+- **Name:** rename it in the Skills Store; the contract's `name` only names a new prompt.
+- **Description and category:** these come from the contract and are rewritten on every deploy, so change them in code.
+- **Studio visibility:** a switch in the side panel. See [prompts-api.md](./prompts-api.md#studio-visibility-visibleinstudio).
+
+### Before a release: the release check
+
+Each service's release workflow runs `scripts/prompts/release-check.mjs`. It checks production's **live** version of every prompt against the contracts in the code being released, and names any live prompt that is missing a newly required variable or uses a removed one. It reports only and doesn't block, so read its output when a release changes a contract.

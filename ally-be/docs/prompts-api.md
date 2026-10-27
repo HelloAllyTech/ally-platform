@@ -18,10 +18,13 @@ code supplies, declared in code: `src/prompt/contracts/` here,
    (`scripts/prompts/prompts.mjs`). A new version is a **draft** (candidate):
    it is translated, can be tested, and serves nothing until it is
    **published** (promoted).
-3. **Sync never changes an existing prompt's live text.** It refreshes only
-   what Git owns: the default text (`defaultPrompt`: the fallback when the
-   store is unreachable and the Revert baseline), file metadata, and the
-   contract. Editing a default file changes nothing in production.
+3. **Sync never changes an existing prompt's text.** It refreshes only what
+   Git owns: the contract, description, category and file metadata. The live
+   version, the version history and the stored default (`defaultPrompt`, the
+   production baseline that Restore default puts live) belong to the store.
+   Editing or shortening a default file changes nothing in production. How to
+   change text, variables and answer shapes, and in what order:
+   [Changing an existing prompt](./adding-a-prompt.md#changing-an-existing-prompt).
 
 Versions are immutable. A version carries the English text **and** its model
 settings (`provider`, `model`, `temperature`); the row mirrors the live

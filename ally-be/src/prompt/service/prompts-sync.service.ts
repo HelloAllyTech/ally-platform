@@ -52,7 +52,8 @@ export class PromptsSyncService implements OnModuleInit {
   }
 
   /**
-   * Scan prompts folder and sync to DB. Add-only for new; update defaultPrompt for existing.
+   * Scan prompts folder and sync to DB. Creates new prompts; for existing ones
+   * updates only contract and metadata, never their text or stored default.
    */
   async syncFromFolder(): Promise<{ added: number; updated: number }> {
     const promptsDir = path.join(process.cwd(), PROMPTS_DIR);

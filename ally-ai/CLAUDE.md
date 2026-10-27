@@ -51,6 +51,7 @@ something Ally-specific.
 | Changing a Weaviate collection | `app/core/vector_db/constants.py`, then add `app/migrations/NNN-description.py` |
 | Anything touching stored data | [`ally-be/DATA_SCHEMA.md`](../ally-be/DATA_SCHEMA.md) — the cross-store map; this repo owns its vector half |
 | Adding or editing prompts | Adding: [`ally-be/docs/adding-a-prompt.md`](../ally-be/docs/adding-a-prompt.md#ally-ai). The live text is in the Skills Store; `app/prompts/` holds defaults and `app/prompts/contracts.py` the contracts — see the gotcha below. Editing: the `prompts` CLI with a Skills Store key ([set up once](../ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop)) |
+| Changing a prompt's variables, answer shape or model | [`ally-be/docs/adding-a-prompt.md` → Changing an existing prompt](../ally-be/docs/adding-a-prompt.md#changing-an-existing-prompt). **The order matters:** to add a variable, ship the code and deploy before publishing text that uses it; to remove one, publish text without it first |
 | Transcription / queue work | `app/core/queue/transcription_request_sqs_worker.py` |
 | Language-quality evaluation | [`docs/language-eval-judge-schema.md`](docs/language-eval-judge-schema.md) and [`docs/drift-metrics-spec.md`](docs/drift-metrics-spec.md); platform context in the [wiki](https://tech.helloally.ai/#/wiki/platform/language-quality-eval.md) |
 | Releasing | [`.github/RELEASE_GUIDE.md`](.github/RELEASE_GUIDE.md) |

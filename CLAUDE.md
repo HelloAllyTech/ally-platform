@@ -71,7 +71,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 - **Embeddings**: OpenAI embeddings stored in Weaviate
 - **TTS Providers**: Deepgram, ElevenLabs, Google, Hume, Sarvam
 - **STT Providers**: Deepgram, Google, Sarvam, OpenAI Whisper
-- **Prompt Management**: the Skills Store (ally-be) holds every prompt's live versions; each service keeps a default `.txt` and a typed contract in code. Adding a prompt: [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md). Editing one needs a Skills Store key for the `prompts` CLI: [set up once](ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop)
+- **Prompt Management**: the Skills Store (ally-be) holds every prompt's live versions; each service keeps a default `.txt` and a typed contract in code. Adding a prompt: [`ally-be/docs/adding-a-prompt.md`](ally-be/docs/adding-a-prompt.md). Editing one needs a Skills Store key for the `prompts` CLI: [set up once](ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop). Changing its variables or answer shape needs the steps in a set order (code and deploy first to add a variable; text first to remove one): [Changing an existing prompt](ally-be/docs/adding-a-prompt.md#changing-an-existing-prompt).
 
 ### Message Queues (AWS SQS)
 - `sqs-ai-transcription-request-queue` - Transcription requests (be -> ai)
