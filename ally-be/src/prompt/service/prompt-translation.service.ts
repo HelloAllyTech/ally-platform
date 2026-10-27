@@ -12,7 +12,10 @@ import { PromptSharedService } from './prompt-shared.service';
 import { PromptTranslationProviderService } from './prompt-translation-provider.service';
 import { PromptTranslationTargetsService } from './prompt-translation-targets.service';
 import { SharedLanguageService } from 'src/language/service/shared-language.service';
-import { validateTranslationTokens } from '../util/translation-token-guard.util';
+import {
+  normaliseTranslationTokens,
+  validateTranslationTokens,
+} from '../util/translation-token-guard.util';
 import {
   AGENT_TEMPLATE_TRANSLATION_PROMPT_CODE,
   MAX_TRANSLATION_ATTEMPTS,
@@ -491,7 +494,8 @@ export class PromptTranslationService {
           await this.translationRepository.update(
             { promptId, languageId, sourceHash },
             {
-              translatedPrompt: output,
+              // Stored with its tokens written exactly, so every variable fills.
+              translatedPrompt: normaliseTranslationTokens(output),
               status: PromptTranslationStatus.READY,
               sourceHash,
               provider: engine.provider,

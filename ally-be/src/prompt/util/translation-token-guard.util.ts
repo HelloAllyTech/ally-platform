@@ -100,3 +100,16 @@ export function validateTranslationTokens(
 
   return { ok, placeholders, audioTags };
 }
+
+/**
+ * The output with every placeholder and audio tag written exactly: `{ name }`
+ * becomes `{name}`, `[ laughs ]` becomes `[laughs]`. The guard above tolerates
+ * stray whitespace inside a token, but the runtimes only fill `{name}`, so a
+ * translation is stored normalised or its variables would never be filled.
+ */
+export function normaliseTranslationTokens(output: string): string {
+  if (!output || typeof output !== 'string') return output;
+  return output
+    .replace(PLACEHOLDER_RE, (_, name: string) => `{${name.trim()}}`)
+    .replace(AUDIO_TAG_RE, (_, tag: string) => `[${tag.trim()}]`);
+}

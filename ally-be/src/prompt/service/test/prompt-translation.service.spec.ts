@@ -142,6 +142,22 @@ describe('PromptTranslationService.translateOne', () => {
     );
   });
 
+  // The guard tolerates `{ name }`, but the runtimes only fill `{name}`: a
+  // translation stored as written would never have its variables filled.
+  it('stores a translation with its tokens written exactly', async () => {
+    translate.mockResolvedValue('आप { name } हैं, एक नर्स। [ laughs ]');
+
+    const result = await service.translateOne(promptId, languageId);
+
+    expect(result.status).toBe(PromptTranslationStatus.READY);
+    expect(update).toHaveBeenCalledWith(
+      { promptId, languageId, sourceHash: `hash:${englishBody.length}` },
+      expect.objectContaining({
+        translatedPrompt: 'आप {name} हैं, एक नर्स। [laughs]',
+      }),
+    );
+  });
+
   it('fills {{languageName}} with the target language label', async () => {
     translate.mockResolvedValue('आप {name} हैं [laughs]');
 

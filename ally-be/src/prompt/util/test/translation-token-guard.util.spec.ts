@@ -1,6 +1,7 @@
 import {
   extractPlaceholders,
   extractAudioTags,
+  normaliseTranslationTokens,
   validateTranslationTokens,
 } from '../translation-token-guard.util';
 
@@ -115,6 +116,37 @@ describe('translation-token-guard', () => {
           expect(result.placeholders.added).toEqual(c.added);
         }
       });
+    });
+  });
+
+  describe('normaliseTranslationTokens', () => {
+    it('writes spaced placeholders and audio tags exactly', () => {
+      expect(
+        normaliseTranslationTokens(
+          'नमस्ते { name }, {age } [ laughs ] [sigh ]',
+        ),
+      ).toBe('नमस्ते {name}, {age} [laughs] [sigh]');
+    });
+
+    it('keeps double-brace placeholders double-braced', () => {
+      expect(normaliseTranslationTokens('Hi {{ name }}')).toBe('Hi {{name}}');
+    });
+
+    it('leaves JSON braces, capitalised brackets and exact tokens alone', () => {
+      const text = 'Return {"k": 1} for [Section 2], {name} and [laughs].';
+      expect(normaliseTranslationTokens(text)).toBe(text);
+    });
+
+    it('makes a tolerated translation render like the source', () => {
+      const source = 'You are {name}. [laughs]';
+      const output = 'आप { name } हैं। [ laughs ]';
+      expect(validateTranslationTokens(source, output).ok).toBe(true);
+      expect(extractPlaceholders(normaliseTranslationTokens(output))).toEqual(
+        extractPlaceholders(source),
+      );
+      expect(normaliseTranslationTokens(output)).toBe(
+        'आप {name} हैं। [laughs]',
+      );
     });
   });
 });
