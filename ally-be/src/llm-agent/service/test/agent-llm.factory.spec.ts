@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import {
   AgentLlmProviderFactory,
   normaliseAgentProvider,
@@ -55,7 +55,7 @@ describe('normaliseAgentProvider', () => {
 describe('AgentLlmProviderFactory', () => {
   it('builds an adapter per provider', () => {
     const factory = new AgentLlmProviderFactory(
-      config({ anthropic: 'a', openai: 'o', gemini: 'g' }),
+      config({ anthropic: 'sk-ant-abc', openai: 'o', gemini: 'g' }),
     );
 
     expect(factory.create('anthropic', 'claude-sonnet-4-6').name).toBe(
@@ -67,7 +67,7 @@ describe('AgentLlmProviderFactory', () => {
 
   it('says which kind of misconfiguration it is', () => {
     const factory = new AgentLlmProviderFactory(
-      config({ anthropic: 'a', openai: undefined, gemini: undefined }),
+      config({ anthropic: 'sk-ant-abc', openai: undefined, gemini: undefined }),
     );
 
     // An environment missing a key is the common case and reads differently
@@ -84,12 +84,26 @@ describe('AgentLlmProviderFactory', () => {
 
   it('reports which providers this environment can run', () => {
     const factory = new AgentLlmProviderFactory(
-      config({ anthropic: 'a', openai: undefined, gemini: 'g' }),
+      config({ anthropic: 'sk-ant-abc', openai: undefined, gemini: 'g' }),
     );
 
     expect(factory.isConfigured('anthropic')).toBe(true);
     expect(factory.isConfigured('openai')).toBe(false);
     expect(factory.isConfigured('google')).toBe(true);
     expect(factory.isConfigured('vllm')).toBe(false);
+  });
+
+  it('logs a warning for a malformed anthropic key', () => {
+    const logger = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const factory = new AgentLlmProviderFactory(
+      config({ anthropic: 'bad-key', openai: 'o', gemini: 'g' }),
+    );
+
+    factory.create('anthropic', 'claude-sonnet-4-6');
+    expect(logger).toHaveBeenCalledWith(
+      'Anthropic API key appears to be malformed (does not start with "sk-ant-"). ' +
+        'This will likely cause authentication failures.',
+    );
+    logger.mockRestore();
   });
 });
