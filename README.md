@@ -84,6 +84,23 @@ cd ally-be && npm install && docker compose up -d
 Environment files are never committed. Copy each service's `env_sample` / `.env.example` /
 `docker.env.example` and fill in values. Local SQS and S3 run on LocalStack.
 
+## Prompts
+
+Every service gets its prompts from the **Skills Store**, which is built into ally-be (its own
+database tables). There is nothing to set up or switch on.
+
+- **On first start**, each service creates its prompts in the store from the `.txt` files in Git
+  (`ally-be/src/prompts`, `ally-ai/app/prompts`, `ally-ai-learn/app/prompts`). The files are
+  working bases, not tuned text.
+- **After that, the store is what runs.** Editing a `.txt` file changes nothing that is already in
+  the store, even after a redeploy. To change a prompt, edit it in the admin dashboard
+  (**Skills Store**): save a new version, then publish it.
+- **To move prompts between environments** (for example, to run production's prompts locally),
+  use the `prompts` CLI with a Skills Store key created in the dashboard.
+
+Details: [changing a prompt](ally-be/docs/adding-a-prompt.md#changing-an-existing-prompt),
+[adding one](ally-be/docs/adding-a-prompt.md), and [the CLI and keys](ally-be/docs/prompts-api.md#working-on-prompts-from-a-laptop).
+
 ## Git hooks
 
 Turn on the shared hooks (secret scan, lint and Python checks) before your first commit:
