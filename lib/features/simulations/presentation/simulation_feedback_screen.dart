@@ -242,6 +242,16 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         _tabController.index != 0 &&
         !_hideReviewDetails &&
         hasSimulationReviewPermission;
+    // Mirrors RN's `feedbackEnabled && activeTabKey !== DEBRIEF && !fromLogs
+    // && !pathId && !caseId && simulationDetails` gate on
+    // `renderTryAnotherSimulation`. This screen has no `pathId`/`caseId`
+    // params at all (same already-documented scope reduction as the
+    // floating review button above and the earlier post-submit-flow pass,
+    // commit d9efcb7: RN's path/case-specific navigation has no supporting
+    // infrastructure in this port yet), so those two conditions are always
+    // satisfied here.
+    final showTryAnotherButton =
+        !widget.fromLogs && _tabController.index != 0 && summary != null;
 
     return PopScope(
       // Already submitted (or came in with feedback already present), or
@@ -262,21 +272,53 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
             ],
           ),
         ),
-        floatingActionButton: showReviewButton
-            ? FloatingActionButton(
-                key: const Key('simulation-feedback-view-review'),
-                onPressed: () => context.push(
-                  '/reviews/${summary!.reviewId}',
-                  extra: ReviewType.simulation,
-                ),
-                child: const Icon(Icons.comment_outlined),
-              )
-            : null,
-        body: TabBarView(
-          controller: _tabController,
+        // RN renders these as two independent absolutely-positioned
+        // overlays that CAN coexist (a wide centered "Try another
+        // simulation" button and a small bottom-right review circle) —
+        // `Scaffold.floatingActionButton` only has room for one, so both
+        // live in a `Stack` over the tab content instead.
+        body: Stack(
           children: [
-            _buildDebriefTab(context),
-            SimulationTranscriptTab(scenarioSessionId: widget.scenarioSessionId),
+            TabBarView(
+              controller: _tabController,
+              children: [
+                _buildDebriefTab(context),
+                SimulationTranscriptTab(scenarioSessionId: widget.scenarioSessionId),
+              ],
+            ),
+            if (showTryAnotherButton)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: AppButton(
+                  key: const Key('simulation-feedback-try-another'),
+                  label: ref.t('postSim.common.tryAnother'),
+                  // Another confirmed RN copy-paste bug (same spirit as the
+                  // submit-toast one above): RN's own
+                  // `renderTryAnotherSimulation` wires this button's
+                  // `onPress` to `handleSubmit`, which just reopens the
+                  // rating popup — doing nothing resembling "try another
+                  // simulation" despite the label. Matching the button's
+                  // clear, translated intent instead: push the simulations
+                  // catalog so the learner can actually pick a different
+                  // one.
+                  onPressed: () => context.push('/simulations'),
+                ),
+              ),
+            if (showReviewButton)
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton(
+                  key: const Key('simulation-feedback-view-review'),
+                  onPressed: () => context.push(
+                    '/reviews/${summary!.reviewId}',
+                    extra: ReviewType.simulation,
+                  ),
+                  child: const Icon(Icons.comment_outlined),
+                ),
+              ),
           ],
         ),
       ),

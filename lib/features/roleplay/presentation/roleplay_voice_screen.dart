@@ -14,6 +14,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
+import 'live_feedback_toast.dart';
 import 'participant_tile.dart';
 import 'pause_resume_state.dart';
 import 'session_info_tabs.dart';
@@ -55,7 +56,11 @@ String _formatDuration(Duration d) {
 /// in the app) with a speaking-driven border/pulse and a [TurnIndicator]
 /// -style pill (`turn_state.dart`'s `deriveTurnStates`, fed by `AGENT_STATE`
 /// messages and LiveKit's native `ActiveSpeakersChangedEvent`); a
-/// [SessionScoreMeter] accumulated from each message's `data.score`; and
+/// [SessionScoreMeter] accumulated from each message's `data.score`; an
+/// in-call coaching toast (`live_feedback_toast.dart`, from the SAME
+/// message's `data.message`/`data.emoji`, gated the same
+/// `!hasChecklist && !isFocusMode` way RN's `LiveFeedback` is — RN never
+/// auto-dismisses it either, a new message just replaces the old one); and
 /// pause/resume (`pause_resume_state.dart`) — an optimistic toggle with a
 /// 2.5s ack-timeout revert and an authoritative ack-reconciliation guard
 /// that self-heals any client/agent desync, confirmed line-by-line against
@@ -134,6 +139,15 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   StreamSubscription<List<Participant>>? _activeSpeakersSubscription;
   final Set<String> _detectedEventIds = {};
   int _score = 0;
+
+  // In-call coaching toast — mirrors RN's `feedback`/`feedbackKey` state,
+  // fed by the same live-event payload as `_score`/`_detectedEventIds`.
+  // `_feedbackKey` increments on every new message so `LiveFeedbackToast`
+  // gets a fresh `ValueKey` each time and replays its entrance animation,
+  // matching RN's own remount-via-`key={feedbackKey}` behavior.
+  String? _feedbackMessage;
+  String? _feedbackEmoji;
+  int _feedbackKey = 0;
 
   // Turn-taking — mirrors RN's `agentTurnStatus`/`remoteParticipant.
   // isSpeaking`/`localParticipant.isSpeaking`, fed into `deriveTurnStates`.
@@ -243,6 +257,14 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     final score = data['score'];
     if (score is num) {
       setState(() => _score += score.round());
+    }
+    final feedbackMessage = data['message'];
+    if (feedbackMessage is String && feedbackMessage.isNotEmpty) {
+      setState(() {
+        _feedbackMessage = feedbackMessage;
+        _feedbackEmoji = data['emoji'] is String ? data['emoji'] as String : null;
+        _feedbackKey++;
+      });
     }
   }
 
@@ -593,6 +615,21 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                   )
                 else
                   SvgPicture.asset('assets/icons/micOff.svg', width: 64, height: 64),
+                // Checklist mode already surfaces real-time progress via its
+                // own tab, so the generic coaching toast is redundant there
+                // — same gate RN uses (`!hasChecklist && !isFocusMode`).
+                if (_isConnected &&
+                    !(widget.scenario?.hasChecklist ?? false) &&
+                    !_isFocusMode &&
+                    _feedbackMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: LiveFeedbackToast(
+                      key: ValueKey(_feedbackKey),
+                      message: _feedbackMessage!,
+                      emoji: _feedbackEmoji,
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 Text(
                   _isConnected
