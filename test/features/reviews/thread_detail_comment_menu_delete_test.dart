@@ -34,7 +34,7 @@ void main() {
 
     await pumpApp(
       tester,
-      ThreadDetailScreen(reviewId: 'rev-1', thread: thread, reviewOwnerId: 99),
+      ThreadDetailScreen(reviewId: 'rev-1', thread: thread, reviewOwnerId: 99, isPrivate: false),
       overrides: threadDetailOverrides(reviewsRepository, reactionsRepository, currentUserId: 1),
     );
 

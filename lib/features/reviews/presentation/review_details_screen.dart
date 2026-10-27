@@ -269,6 +269,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                         reviewId: widget.reviewId,
                         reviewType: widget.reviewType,
                         reviewOwnerId: review.createdBy.id,
+                        isPrivate: review.isPrivate,
                       ),
                     ],
                   ),
@@ -345,11 +346,23 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
 }
 
 class _ThreadsTab extends ConsumerWidget {
-  const _ThreadsTab({required this.reviewId, required this.reviewType, required this.reviewOwnerId});
+  const _ThreadsTab({
+    required this.reviewId,
+    required this.reviewType,
+    required this.reviewOwnerId,
+    required this.isPrivate,
+  });
 
   final String reviewId;
   final ReviewType reviewType;
   final int reviewOwnerId;
+
+  /// Mirrors ally-mobile (React Native)'s `isPrivate` prop threaded into
+  /// `ReplyBottomSheet`/`CommentThreadBottomSheet` from
+  /// `ScribeReviewDetailsScreen.tsx`/`SimulationReviewDetailsScreen.tsx`
+  /// (`reviewData?.reviewStatus === ReviewStatus.HIDDEN`) — see
+  /// `ReviewItem.isPrivate`.
+  final bool isPrivate;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -396,6 +409,7 @@ class _ThreadsTab extends ConsumerWidget {
                             thread: thread,
                             reviewType: reviewType,
                             reviewOwnerId: reviewOwnerId,
+                            isPrivate: isPrivate,
                           ),
                         ),
                       ),

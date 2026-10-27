@@ -70,7 +70,7 @@ void main() {
 
       await pumpApp(
         tester,
-        ThreadDetailScreen(reviewId: 'srev-1', thread: thread, reviewType: ReviewType.scribe, reviewOwnerId: 1),
+        ThreadDetailScreen(reviewId: 'srev-1', thread: thread, reviewType: ReviewType.scribe, reviewOwnerId: 1, isPrivate: false),
         overrides: [
           scribeReviewsRepositoryProvider.overrideWithValue(scribeReviews),
           scribeReactionsRepositoryProvider.overrideWithValue(scribeReactions),

@@ -47,6 +47,7 @@ class ThreadDetailScreen extends ConsumerStatefulWidget {
     required this.reviewId,
     required this.thread,
     required this.reviewOwnerId,
+    required this.isPrivate,
     this.reviewType = ReviewType.simulation,
   });
 
@@ -57,6 +58,18 @@ class ThreadDetailScreen extends ConsumerStatefulWidget {
   /// author) — gates the Hide/Unhide menu item, same as RN's
   /// `ReviewComment.tsx`'s `reviewOwnerId` prop.
   final int reviewOwnerId;
+
+  /// Mirrors ally-mobile (React Native)'s `ReplyBottomSheet.tsx`'s
+  /// `isPrivate` prop (`reviewStatus === 'HIDDEN'`): while true, a
+  /// comment's whole actions menu is hidden outright (`showActionsMenu`),
+  /// the reply composer at the bottom disappears entirely
+  /// (`footerComponent={isPrivate ? undefined : ...}`), and — a real,
+  /// confirmed asymmetry in RN's own source, not a simplification made
+  /// here — only the root/anchor comment's reaction button is disabled
+  /// (`disableAddReactionButton`); `renderReplyItem` never passes that prop
+  /// at all, so each reply's reaction button stays fully interactive even
+  /// on a private review.
+  final bool isPrivate;
   final ReviewType reviewType;
 
   bool get _isScribe => reviewType == ReviewType.scribe;
@@ -312,18 +325,28 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
                     onCancelEdit: _cancelEdit,
                     onDelete: () => _confirmAndDelete(comment.id),
                     onToggleHidden: () => _toggleHidden(comment),
+                    // RN's `showActionsMenu={!isPrivate}` hides the whole
+                    // menu trigger outright on a private review, regardless
+                    // of ownership.
                     canEditOrDelete:
+                        !widget.isPrivate &&
                         currentUserId != null &&
                         comment.authorId != null &&
                         currentUserId == comment.authorId &&
                         !comment.hidden,
                     canEdit:
+                        !widget.isPrivate &&
                         currentUserId != null &&
                         comment.authorId != null &&
                         currentUserId == comment.authorId &&
                         !comment.hidden &&
                         !_isMinutesPassed(comment.createdAt ?? ''),
-                    canHide: currentUserId != null && currentUserId == widget.reviewOwnerId,
+                    canHide:
+                        !widget.isPrivate && currentUserId != null && currentUserId == widget.reviewOwnerId,
+                    // RN only passes `disableAddReactionButton` on the
+                    // root/anchor comment, never on a reply — see the class
+                    // doc's note on this asymmetry.
+                    disableReactions: widget.isPrivate && comment.id == _rootComment?.id,
                   ),
                 if (remainingCount > 0 && !_hasLoadedReplies)
                   Center(
@@ -348,17 +371,21 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
               ],
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: AppChatInput(
-                controller: _replyController,
-                placeholder: ref.t('review.details.replyPlaceholder'),
-                enabled: !_isSubmitting,
-                onSend: _submitReply,
+          // Mirrors RN's `footerComponent={isPrivate ? undefined :
+          // renderFooterComponent}` — the reply composer disappears
+          // entirely on a private review, not just disabled.
+          if (!widget.isPrivate)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: AppChatInput(
+                  controller: _replyController,
+                  placeholder: ref.t('review.details.replyPlaceholder'),
+                  enabled: !_isSubmitting,
+                  onSend: _submitReply,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -385,6 +412,7 @@ class _CommentTile extends ConsumerWidget {
     required this.canEditOrDelete,
     required this.canEdit,
     required this.canHide,
+    required this.disableReactions,
   });
 
   final ThreadComment comment;
@@ -399,6 +427,11 @@ class _CommentTile extends ConsumerWidget {
   final bool canEditOrDelete;
   final bool canEdit;
   final bool canHide;
+
+  /// Mirrors RN's `disableAddReactionButton` — only ever true for the
+  /// root/anchor comment on a private review; see the class doc on
+  /// [ThreadDetailScreen.isPrivate] for why replies never get this.
+  final bool disableReactions;
 
   bool get _hasMenu => canEditOrDelete || canHide;
 
@@ -525,20 +558,26 @@ class _CommentTile extends ConsumerWidget {
                             ? Theme.of(context).colorScheme.primaryContainer
                             : null,
                       ),
-                    PopupMenuButton<String>(
-                      icon: SvgPicture.asset('assets/icons/addReaction.svg', width: 18, height: 18),
-                      onSelected: (reactionId) => onReact(comment, reactionId),
-                      itemBuilder: (context) => [
-                        for (final id in kPlatformEmojiIds)
-                          PopupMenuItem(
-                            value: id,
-                            child: Text(
-                              emojiGlyphFor(id),
-                              style: const TextStyle(fontSize: 18),
+                    // RN keeps the icon visible but inert
+                    // (`disableAddReactionButton`) rather than hiding it —
+                    // matched here with a plain, non-interactive icon.
+                    if (disableReactions)
+                      SvgPicture.asset('assets/icons/addReaction.svg', width: 18, height: 18)
+                    else
+                      PopupMenuButton<String>(
+                        icon: SvgPicture.asset('assets/icons/addReaction.svg', width: 18, height: 18),
+                        onSelected: (reactionId) => onReact(comment, reactionId),
+                        itemBuilder: (context) => [
+                          for (final id in kPlatformEmojiIds)
+                            PopupMenuItem(
+                              value: id,
+                              child: Text(
+                                emojiGlyphFor(id),
+                                style: const TextStyle(fontSize: 18),
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
             ],
