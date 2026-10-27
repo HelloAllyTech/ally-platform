@@ -18,6 +18,7 @@ import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
+import 'voice_note_section.dart';
 
 /// Mirrors ally-mobile (React Native)'s `PRIVACY_POLICY_URL`.
 const _privacyPolicyUrl = 'https://app.helloally.ai/privacy';
@@ -613,6 +614,19 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     });
   }
 
+  /// Applies voice-dictated field values: merges them into the form
+  /// optimistically (mirrors RN's `dispatch(setFormData(builtinUpdates))`,
+  /// which updates redux before the save call even starts), then persists
+  /// immediately — RN's `applyGeneratedValues` awaits its own
+  /// `updateCallSummary(...).unwrap()` rather than waiting for this screen's
+  /// explicit Save button, since a dictated note should be saved as soon as
+  /// it's filled in. Rethrows on failure: `VoiceNoteSection._handleGenerate`
+  /// relies on that to know not to close its panel/reset the recorder.
+  Future<void> _applyVoiceValues(Map<String, dynamic> updates) async {
+    setState(() => _formValues.addAll(updates));
+    await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, updates);
+  }
+
   Future<void> _save() async {
     if (_dirtyKeys.isEmpty) return;
     setState(() {
@@ -712,6 +726,8 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         _seedIfNeeded(summary);
         return Column(
           children: [
+            if (summary.isManualNote)
+              VoiceNoteSection(chatId: widget.log.id, onValuesApplied: _applyVoiceValues),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),

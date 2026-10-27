@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -484,6 +486,49 @@ class CallLogRepository {
     final response = await _dio.post<Map<String, dynamic>>('/chats/note');
     final data = response.data ?? {};
     return (chatId: data['chatId'] as int, name: data['name'] as String? ?? '');
+  }
+
+  /// Uploads a manual note's dictated WAV recording for transcription +
+  /// field extraction — mirrors RN's `scribeNoteApi.ts` `generateNoteFromAudio`
+  /// mutation exactly: POST multipart/form-data to
+  /// `/chats/note/generate-from-audio` with an `audio` file part plus a
+  /// `fields` part (the JSON-encoded field catalog the model should try to
+  /// fill). Deliberately NOT scoped to a chatId server-side (RN's own request
+  /// doesn't send one either) — the audio is processed in memory and never
+  /// stored, so which note it's for only matters once the caller applies the
+  /// returned values.
+  ///
+  /// `fields` is only the built-in summary-field catalog
+  /// (`summaryFieldDefs`), not the org's custom-field definitions — RN also
+  /// includes the tenant's custom fields here, but that requires the
+  /// `customFieldsApi` client this app doesn't have yet (flutter-whole-app-
+  /// status-2026-10-26.md backlog item #4). Add custom fields to `fields`
+  /// when that lands; until then, voice dictation can only fill the built-in
+  /// fields a counsellor could otherwise type into directly.
+  Future<({String transcript, List<({String id, String value})> values})> generateNoteFromAudio({
+    required String audioFilePath,
+    required List<Map<String, dynamic>> fields,
+  }) async {
+    final formData = FormData.fromMap({
+      'audio': await MultipartFile.fromFile(audioFilePath, filename: 'dictation.wav', contentType: DioMediaType('audio', 'wav')),
+      'fields': jsonEncode(fields),
+    });
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/chats/note/generate-from-audio',
+      data: formData,
+    );
+    final data = response.data ?? {};
+    final values = (data['values'] as List<dynamic>? ?? [])
+        .map((e) => (id: e['id'] as String, value: e['value'] as String))
+        .toList();
+    return (transcript: data['transcript'] as String? ?? '', values: values);
+  }
+
+  /// Mirrors RN's `scribeNoteApi.ts` `saveNoteTranscript` mutation: replaces
+  /// the manual note's stored dictation transcript (callers re-send the full
+  /// accumulated text, not a delta) so it shows in the note's Transcript view.
+  Future<void> saveNoteTranscript({required int chatId, required String transcript}) async {
+    await _dio.put<void>('/chats/$chatId/transcript', data: {'transcript': transcript});
   }
 
   Future<List<ChatMessage>> getChatMessages(int chatId) async {

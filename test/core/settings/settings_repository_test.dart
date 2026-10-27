@@ -38,4 +38,23 @@ void main() {
       expect(result, isFalse);
     });
   });
+
+  group('getScribeVoiceNoteEnabled', () {
+    test('GETs the bare-boolean endpoint and returns it', () async {
+      when(() => dio.get<bool>('/settings/scribe-voice-note-enabled')).thenAnswer((_) async => _response(true));
+
+      final result = await repository.getScribeVoiceNoteEnabled();
+
+      expect(result, isTrue);
+      verify(() => dio.get<bool>('/settings/scribe-voice-note-enabled')).called(1);
+    });
+
+    test('defaults to false when the body is absent', () async {
+      when(() => dio.get<bool>('/settings/scribe-voice-note-enabled')).thenAnswer((_) async => _response(null));
+
+      final result = await repository.getScribeVoiceNoteEnabled();
+
+      expect(result, isFalse);
+    });
+  });
 }

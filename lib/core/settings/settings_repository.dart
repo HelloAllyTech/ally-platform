@@ -6,11 +6,11 @@ import '../network/api_client.dart';
 /// Ported from ally-mobile (React Native)'s `src/services/settingsApi.ts` —
 /// a handful of flat per-tenant feature toggles, each its own endpoint
 /// returning a bare JSON boolean (not wrapped in an object), rather than one
-/// combined settings payload. Only `getScribeNoteCreationEnabled` is ported
-/// so far; `settingsApi.ts` also has `getNudgeStatus`, `getVisibleChatTypes`,
-/// and `getScribeVoiceNoteEnabled` for separate, not-yet-ported features
-/// (see flutter-whole-app-status-2026-10-26.md backlog items 3/5/6) — add
-/// them here, not as a second settings client, when those land.
+/// combined settings payload. `getScribeNoteCreationEnabled` and
+/// `getScribeVoiceNoteEnabled` are ported so far; `settingsApi.ts` also has
+/// `getNudgeStatus` and `getVisibleChatTypes` for separate, not-yet-ported
+/// features (see flutter-whole-app-status-2026-10-26.md backlog items 5/6) —
+/// add them here, not as a second settings client, when those land.
 class SettingsRepository {
   SettingsRepository(this._dio);
 
@@ -26,6 +26,15 @@ class SettingsRepository {
     final response = await _dio.get<bool>('/settings/scribe-note-creation-enabled');
     return response.data ?? false;
   }
+
+  /// `GET /settings/scribe-voice-note-enabled` — gates the voice-dictation
+  /// path (`VoiceNoteSection` in RN) on a manual note's Call Summary screen.
+  /// Same bare-boolean, counsellor-only-authorized shape as
+  /// [getScribeNoteCreationEnabled] above.
+  Future<bool> getScribeVoiceNoteEnabled() async {
+    final response = await _dio.get<bool>('/settings/scribe-voice-note-enabled');
+    return response.data ?? false;
+  }
 }
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
@@ -38,4 +47,10 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 /// reject.
 final scribeNoteCreationEnabledProvider = FutureProvider<bool>((ref) {
   return ref.watch(settingsRepositoryProvider).getScribeNoteCreationEnabled();
+});
+
+/// Callers should only `ref.watch` this for a counsellor — mirrors RN's
+/// `useScribeVoiceNoteEnabled` hook's same guard.
+final scribeVoiceNoteEnabledProvider = FutureProvider<bool>((ref) {
+  return ref.watch(settingsRepositoryProvider).getScribeVoiceNoteEnabled();
 });

@@ -53,6 +53,7 @@ dependencies:
   livekit_client: ^2.13.1
   socket_io_client: ^3.1.6
   record: ^7.1.2
+  path_provider: ^2.1.6
   audioplayers: ^6.5.1
   flutter_foreground_task: ^11.0.3
   url_launcher: ^6.3.3
@@ -96,6 +97,12 @@ dev_dependencies:
   # ScribeRecordingScreen's eagerly-constructed AudioRecorder doesn't hit a
   # real (absent) platform channel in widget tests.
   record_platform_interface: ^2.1.0
+  # Already resolved transitively via `path_provider` — declared directly
+  # because test/support/mock_path_provider.dart fakes
+  # PathProviderPlatform.instance so VoiceNoteRecorder's
+  # getTemporaryDirectory() call doesn't hit a real (absent) platform channel
+  # in widget/unit tests.
+  path_provider_platform_interface: ^2.1.3
   # Already resolved transitively via several platform-interface packages —
   # declared directly because mock_record_platform.dart uses its
   # MockPlatformInterfaceMixin, the sanctioned way to satisfy a

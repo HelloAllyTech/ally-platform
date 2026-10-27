@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -648,6 +650,75 @@ void main() {
 
       expect(result.chatId, 7);
       expect(result.name, '');
+    });
+  });
+
+  group('generateNoteFromAudio', () {
+    late String audioPath;
+
+    setUp(() async {
+      final file = await File('${Directory.systemTemp.path}/voice_note_repo_test.wav').create();
+      await file.writeAsBytes([1, 2, 3, 4]);
+      audioPath = file.path;
+    });
+
+    tearDown(() async {
+      final file = File(audioPath);
+      if (await file.exists()) await file.delete();
+    });
+
+    test('POSTs multipart form data to the generate-from-audio route and parses values', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>('/chats/note/generate-from-audio', data: any(named: 'data')),
+      ).thenAnswer(
+        (invocation) async {
+          final formData = invocation.namedArguments[#data] as FormData;
+          // The "audio" part is a file upload; "fields" is the JSON-encoded catalog.
+          expect(formData.files.single.key, 'audio');
+          expect(formData.files.single.value.filename, 'dictation.wav');
+          final fieldsPart = formData.fields.singleWhere((f) => f.key == 'fields');
+          expect(fieldsPart.value, '[{"id":"sessionSummary","label":"Session Summary"}]');
+          return _response({
+            'transcript': 'The client discussed anxiety.',
+            'values': [
+              {'id': 'sessionSummary', 'value': 'The client discussed anxiety.'},
+            ],
+          });
+        },
+      );
+
+      final result = await repository.generateNoteFromAudio(
+        audioFilePath: audioPath,
+        fields: [
+          {'id': 'sessionSummary', 'label': 'Session Summary'},
+        ],
+      );
+
+      expect(result.transcript, 'The client discussed anxiety.');
+      expect(result.values, [(id: 'sessionSummary', value: 'The client discussed anxiety.')]);
+    });
+
+    test('defaults transcript/values when the response omits them', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>('/chats/note/generate-from-audio', data: any(named: 'data')),
+      ).thenAnswer((_) async => _response(<String, dynamic>{}));
+
+      final result = await repository.generateNoteFromAudio(audioFilePath: audioPath, fields: const []);
+
+      expect(result.transcript, '');
+      expect(result.values, isEmpty);
+    });
+  });
+
+  group('saveNoteTranscript', () {
+    test('PUTs the transcript to /chats/:id/transcript', () async {
+      when(
+        () => dio.put<void>('/chats/55/transcript', data: {'transcript': 'Full dictation text.'}),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.saveNoteTranscript(chatId: 55, transcript: 'Full dictation text.');
+
+      verify(() => dio.put<void>('/chats/55/transcript', data: {'transcript': 'Full dictation text.'})).called(1);
     });
   });
 
