@@ -29,9 +29,22 @@ vi.mock("@store", () => ({
   store: { dispatch: vi.fn(), getState: () => ({}), subscribe: vi.fn() },
 }));
 
-vi.mock("@api", () => ({
-  useGetScenarioVoicesQuery: () => ({ data: VOICES }),
-}));
+vi.mock("@api", async importOriginal => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useGetScenarioVoicesQuery: () => ({ data: [] }),
+    useGetAvailableLanguageVoicesQuery: () => ({
+      data: [
+        {
+          language_id: 1,
+          label: "English (India)",
+          voices: VOICES.map(v => ({ id: v.id })),
+        },
+      ],
+    }),
+  };
+});
 
 vi.mock("@hooks/useVoicePreview", () => ({
   useVoicePreview: () => ({

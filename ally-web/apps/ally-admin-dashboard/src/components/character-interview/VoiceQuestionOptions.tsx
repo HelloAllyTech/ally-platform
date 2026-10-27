@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useGetScenarioVoicesQuery } from "@api";
+import { useGetAvailableLanguageVoicesQuery } from "@api";
 import { VoiceOptionRow } from "@components/voice-option";
 // Imported by module rather than through the `@hooks` barrel: the barrel pulls
 // in hooks that reach `@store`, which reads `baseAPI.reducerPath` at module
@@ -41,12 +41,26 @@ interface VoiceQuestionOptionsProps {
  * do not.
  */
 export const useIsVoiceQuestion = (options: CharacterInterviewQuestionOption[]): boolean => {
-  const { data: voices } = useGetScenarioVoicesQuery({});
+  const { data: languages } = useGetAvailableLanguageVoicesQuery({
+    active: true,
+    voicesNeeded: true,
+  });
   return useMemo(() => {
-    if (options.length === 0 || !voices?.length) return false;
-    const voiceIds = new Set(voices.map(voice => voice.id).filter(Boolean));
+    if (options.length === 0 || !languages?.length) return false;
+    const voiceIds = new Set<string>();
+    // The response type is `ScenarioLanguage[]`, but with `voicesNeeded: true` it
+    // should contain a `voices` array on each language object, similar to
+    // `VoiceCatalogLanguage` used in `VoiceShortlistStrip`.
+    for (const lang of languages as any[]) {
+      for (const voice of lang.voices ?? []) {
+        if (voice.id) {
+          voiceIds.add(voice.id);
+        }
+      }
+    }
+    if (voiceIds.size === 0) return false;
     return options.every(option => voiceIds.has(option.id));
-  }, [options, voices]);
+  }, [options, languages]);
 };
 
 export const VoiceQuestionOptions = ({
