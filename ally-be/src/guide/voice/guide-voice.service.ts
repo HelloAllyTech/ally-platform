@@ -7,6 +7,7 @@ import { createHash, randomBytes } from 'crypto';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { AppConfigService } from 'src/config/config.service';
 import { ErrorCode } from 'src/exception/error-code.enum';
+import { GUIDE_ROOM_PREFIX } from 'src/livekit/constants/livekit.constants';
 import { LiveKitService } from 'src/livekit/service/livekit.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -14,11 +15,11 @@ import { GuideThread } from '../entity/guide-thread.entity';
 import { GuideSettingsService } from '../settings/guide-settings.service';
 
 /**
- * LiveKit room prefix for Ally's voice sessions. The roleplay webhook
- * handlers skip rooms with this prefix (fix/livekit-webhook-guide-rooms), so
+ * LiveKit room prefix for Ally's voice sessions: the one definition in the
+ * LiveKit constants, which the webhook handlers check with isGuideRoom() so
  * the roleplay agent is never dispatched into a guide room.
  */
-export const GUIDE_VOICE_ROOM_PREFIX = 'guide-';
+export const GUIDE_VOICE_ROOM_PREFIX = GUIDE_ROOM_PREFIX;
 /** A voice session's token lives this long (plan §7.9: two hours). */
 export const GUIDE_VOICE_SESSION_TTL_SECONDS = 2 * 60 * 60;
 

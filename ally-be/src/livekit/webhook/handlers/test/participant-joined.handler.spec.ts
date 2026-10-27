@@ -790,4 +790,104 @@ describe('ParticipantJoinedHandler', () => {
       expect(liveKitService.agentDispatch).toHaveBeenCalled();
     });
   });
+
+  describe('guide rooms', () => {
+    const eventForRoom = (
+      name: string,
+      kind: number = ParticipantInfo_Kind.STANDARD,
+    ): ParticipantJoinedEvent => ({
+      ...mockParticipantJoinedEvent,
+      room: { ...mockParticipantJoinedEvent.room, name },
+      participant: { ...mockParticipantJoinedEvent.participant, kind },
+    });
+
+    const expectNoRoleplayWork = () => {
+      expect(liveKitService.listParticipants).not.toHaveBeenCalled();
+      expect(liveKitService.agentDispatch).not.toHaveBeenCalled();
+      expect(liveKitService.startRoomCompositeEgress).not.toHaveBeenCalled();
+      expect(liveKitService.clearProactiveDispatch).not.toHaveBeenCalled();
+      expect(
+        scenarioSessionService.getScenarioSessionByRoomId,
+      ).not.toHaveBeenCalled();
+      expect(
+        scenarioSessionService.updateScenarioSession,
+      ).not.toHaveBeenCalled();
+      expect(
+        scenarioSessionService.recordLifecycleEvent,
+      ).not.toHaveBeenCalled();
+    };
+
+    it('never falls back to dispatching the roleplay agent when a human joins', async () => {
+      await handler.handle(eventForRoom('guide-abc123'));
+
+      expectNoRoleplayWork();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Ignoring participant_joined for guide room guide-abc123',
+      );
+    });
+
+    it('does no roleplay bookkeeping when the guide agent itself joins', async () => {
+      await handler.handle(
+        eventForRoom('guide-abc123', ParticipantInfo_Kind.AGENT),
+      );
+
+      expectNoRoleplayWork();
+    });
+
+    it('only matches the prefix, so a roleplay room that merely contains "guide-" still dispatches', async () => {
+      scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue({
+        id: 'abc',
+        startedAt: null,
+      } as any);
+      scenarioSessionService.updateScenarioSession.mockResolvedValue({} as any);
+      liveKitService.agentDispatch.mockResolvedValue(undefined);
+
+      await handler.handle(eventForRoom('ss_guide-abc'));
+
+      expect(liveKitService.agentDispatch).toHaveBeenCalledWith(
+        'ss_guide-abc',
+        mockAppConfigService.livekit.agentName,
+        expect.any(String),
+      );
+    });
+
+    it('still dispatches the roleplay agent into a normal roleplay room', async () => {
+      scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue({
+        id: 'abc',
+        startedAt: null,
+      } as any);
+      scenarioSessionService.updateScenarioSession.mockResolvedValue({} as any);
+      liveKitService.agentDispatch.mockResolvedValue(undefined);
+
+      await handler.handle(eventForRoom('ss_abc'));
+
+      expect(liveKitService.listParticipants).toHaveBeenCalledWith('ss_abc');
+      expect(
+        scenarioSessionService.getScenarioSessionByRoomId,
+      ).toHaveBeenCalledWith('ss_abc');
+      expect(liveKitService.agentDispatch).toHaveBeenCalledWith(
+        'ss_abc',
+        mockAppConfigService.livekit.agentName,
+        expect.any(String),
+      );
+      expect(mockLogger.debug).not.toHaveBeenCalledWith(
+        expect.stringContaining('guide room'),
+      );
+    });
+
+    it('still dispatches the roleplay agent into a preview room', async () => {
+      liveKitService.agentDispatch.mockResolvedValue(undefined);
+
+      await handler.handle(eventForRoom('preview-abc'));
+
+      expect(
+        scenarioSessionService.getScenarioSessionByRoomId,
+      ).not.toHaveBeenCalled();
+      expect(liveKitService.agentDispatch).toHaveBeenCalledWith(
+        'preview-abc',
+        mockAppConfigService.livekit.agentName,
+        expect.any(String),
+      );
+    });
+  });
 });
