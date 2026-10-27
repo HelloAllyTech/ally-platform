@@ -1,11 +1,10 @@
 """Two prompts that were built inline now live in the Skills Store.
 
-On first deploy, sync creates each prompt with its default file as live v1, so
-for identical inputs the rendered prompt must be byte-identical to the inline
-text it replaced. The old builders are frozen below, verbatim, as the
-reference; each test renders old vs new for every branch, from the local
-default (a request/session without the store's text) and from the store text
-ally-be ships (the file's content, trimmed).
+Production runs each prompt's live text from the store; the `.txt` default is a
+minimal base a fresh clone runs on. These tests check the base keeps what the
+code depends on (its placeholder and the JSON keys the judge's schema reads),
+that each builder renders the default (or the store's text) with the block it
+builds, and that the store's text, model and cache key are used.
 """
 
 from pathlib import Path
@@ -56,107 +55,35 @@ def _shipped(code: str, rel_path: str) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Frozen reference: the inline builders as they were before the move.
-# ---------------------------------------------------------------------------
+def _default(rel_path: str) -> str:
+    return (PROMPTS_DIR / rel_path).read_text(encoding="utf-8").strip()
 
 
-def _old_build_actor_goal_system_prompt(goals: List[ActorEvaluationGoal]) -> str:
-    goal_lines = []
-    for g in goals:
-        desc = f" — {g.description}" if g.description else ""
-        goal_lines.append(f'- "{g.title}" (category: {g.category}){desc}')
-    goals_block = "\n".join(goal_lines)
-
-    return (
-        "You are an expert evaluator of AI ROLEPLAY ACTOR agents used for "
-        "training. A roleplay actor is an AI that plays a persona (e.g. a "
-        "help-seeker) which a trainee practises a conversation with.\n\n"
-        "You will be given a conversation transcript. Turns labelled "
-        "[assistant] are the ROLEPLAY ACTOR you are evaluating. Turns labelled "
-        "[user] are the trainee — do NOT score the trainee.\n\n"
-        "Evaluate ONLY the actor's performance against each of the following "
-        "superadmin-configured agent test cases. For each goal, assign an "
-        "integer score from 0 to 100 for how well the actor achieved that goal "
-        "across the whole conversation (0 = not at all, 100 = exemplary).\n\n"
-        f"Agent test cases:\n{goals_block}\n\n"
-        "Scoring guidance: 50-59 below average, 60-69 average, 70-79 good, "
-        "80-89 very good, 90-100 exceptional.\n\n"
-        "APPLICABILITY. These test cases are configured globally, so some may "
-        "have nothing to do with this particular conversation. A goal is NOT "
-        "APPLICABLE when the conversation gave the actor no occasion to "
-        "demonstrate it — the situation it describes never arose. Judge this "
-        "on the situation, not on the actor's performance: a goal the actor "
-        "had a clear opportunity to meet and handled badly IS applicable and "
-        "must be scored low. Only the absence of any opportunity makes a goal "
-        "not applicable. When in doubt, treat the goal as applicable.\n\n"
-        "Respond ONLY as JSON with three keys:\n"
-        '- "metrics": an object mapping each goal\'s EXACT title (verbatim, as '
-        "given above) to its integer 0-100 score. Include every goal, "
-        "including any you mark not applicable.\n"
-        '- "not_applicable": an array of the EXACT titles (verbatim) of goals '
-        "the conversation gave no occasion to demonstrate. Use an empty array "
-        "when every goal was genuinely exercised.\n"
-        '- "report_markdown": a markdown report for a training supervisor — a '
-        "short overall summary, then one section per goal with its score and "
-        "1-3 sentences of reasoning citing the transcript (say explicitly when "
-        "a goal was not applicable and why), then overall strengths and areas "
-        "for improvement."
-    )
-
-
-_OLD_MEMORY_FRAMING = (
-    "You pick which of the client's own memories are on their mind right now, "
-    "in a role-played conversation between a counselor and a client (the "
-    "client is an AI agent)."
+@pytest.mark.parametrize(
+    "rel_path, literals",
+    [
+        (
+            "evaluation/actor_goal_system.txt",
+            [
+                "{goals_block}",
+                '"metrics"',
+                '"not_applicable"',
+                '"report_markdown"',
+                "EXACT title",
+                "[assistant]",
+            ],
+        ),
+        ("retrieval/memory_selector_system.txt", ["{topics_block}", "exact titles"]),
+        (
+            "retrieval/memory_glossary_selector_system.txt",
+            ["{topics_block}", "[brackets]", "exact titles"],
+        ),
+    ],
 )
-_OLD_MEMORY_RULE = (
-    "Read the counselor's latest message. Return the title of every memory the "
-    "client would naturally draw on to answer it, including memories the "
-    "question reaches only indirectly. Leave out memories unrelated to what the "
-    "counselor is asking about now."
-)
-
-
-def _old_build_selector_prompt(
-    available_titles: List[str],
-    glossary_hints: Optional[Dict[str, str]],
-    previews: Optional[Dict[str, str]] = None,
-) -> str:
-    glossary_hints = glossary_hints or {}
-    previews = previews or {}
-    lines: List[str] = []
-    for title in available_titles:
-        hint = glossary_hints.get(title)
-        if hint:
-            lines.append(f"- {title}")
-            lines.append(f"  when to retrieve: {hint}")
-            continue
-        gist = previews.get(title)
-        lines.append(f"- {title}: {gist}" if gist else f"- {title}")
-    topics_block = "\n".join(lines)
-
-    if not glossary_hints:
-        return (
-            f"{_OLD_MEMORY_FRAMING}\n\n"
-            f"The client's memories (title: what it is about):\n{topics_block}\n\n"
-            f"{_OLD_MEMORY_RULE} Return exact titles only. If none apply, return an "
-            "empty list."
-        )
-
-    return (
-        f"{_OLD_MEMORY_FRAMING}\n\n"
-        f"Available topics:\n{topics_block}\n\n"
-        "Two kinds of topics are listed:\n"
-        f"- The client's memories (title: what it is about). {_OLD_MEMORY_RULE}\n"
-        "- Language glossary sections (titles in [brackets]): these help the "
-        "client character SPEAK its next reply in its language. Return a "
-        "glossary section when the next reply is likely to enter that "
-        "vocabulary domain, even if it has not been explicitly mentioned yet. "
-        "When the conversation seems to be entering a new topic area, prefer "
-        "including the matching glossary section.\n\n"
-        "Return exact titles only. If none apply, return an empty list."
-    )
+def test_default_keeps_what_the_code_depends_on(rel_path, literals):
+    default = _default(rel_path)
+    missing = [literal for literal in literals if literal not in default]
+    assert not missing, f"{rel_path}: the default lost {missing}"
 
 
 # ---------------------------------------------------------------------------
@@ -193,18 +120,27 @@ GOAL_SETS = {
 }
 
 
+def _goals_block(goals: List[ActorEvaluationGoal]) -> str:
+    return "\n".join(
+        f'- "{g.title}" (category: {g.category})'
+        + (f" — {g.description}" if g.description else "")
+        for g in goals
+    )
+
+
 @pytest.mark.parametrize("name", sorted(GOAL_SETS))
 @pytest.mark.parametrize("source", ["local_default", "store_v1"])
-def test_actor_goal_prompt_is_byte_identical(name, source):
+def test_actor_goal_prompt_renders_the_default_with_every_goal(name, source):
     goals = GOAL_SETS[name]
     prompts = (
         _shipped(ACTOR_CODE, "evaluation/actor_goal_system.txt")["prompts"]
         if source == "store_v1"
         else None
     )
-    assert build_actor_goal_system_prompt(
-        goals, prompts
-    ) == _old_build_actor_goal_system_prompt(goals)
+    # Braces in goal titles and descriptions pass through untouched.
+    assert build_actor_goal_system_prompt(goals, prompts) == _default(
+        "evaluation/actor_goal_system.txt"
+    ).replace("{goals_block}", _goals_block(goals))
 
 
 def test_actor_goal_prompt_runs_the_store_text():
@@ -343,9 +279,25 @@ def _selector_store(glossary: bool) -> dict:
     return _shipped(MEMORY_CODE, "retrieval/memory_selector_system.txt")
 
 
+def _topics_block(
+    titles: List[str],
+    hints: Optional[Dict[str, str]],
+    previews: Optional[Dict[str, str]],
+) -> str:
+    lines: List[str] = []
+    for title in titles:
+        hint = (hints or {}).get(title)
+        if hint:
+            lines += [f"- {title}", f"  when to retrieve: {hint}"]
+            continue
+        gist = (previews or {}).get(title)
+        lines.append(f"- {title}: {gist}" if gist else f"- {title}")
+    return "\n".join(lines)
+
+
 @pytest.mark.parametrize("name", sorted(SELECTOR_CASES))
 @pytest.mark.parametrize("source", ["local_default", "store_v1", "session_object"])
-def test_selector_prompt_is_byte_identical(name, source):
+def test_selector_prompt_renders_its_variants_default(name, source):
     titles, hints, previews = SELECTOR_CASES[name]
     prompt_data = None
     if source == "store_v1":
@@ -357,9 +309,16 @@ def test_selector_prompt_is_byte_identical(name, source):
             **_selector_store(False)["prompts"],
             **_selector_store(True)["prompts"],
         }
+    rel_path = (
+        "retrieval/memory_glossary_selector_system.txt"
+        if hints
+        else "retrieval/memory_selector_system.txt"
+    )
     assert _build_selector_prompt(
         titles, hints, previews, prompt_data=prompt_data
-    ) == _old_build_selector_prompt(titles, hints, previews)
+    ) == _default(rel_path).replace(
+        "{topics_block}", _topics_block(titles, hints, previews)
+    )
 
 
 def test_selector_runs_the_store_text_for_its_variant():

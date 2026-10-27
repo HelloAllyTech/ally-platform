@@ -12,8 +12,8 @@ import { LoggerService } from 'src/logger/logger.service';
  * interviewer's system prompt) degrade instead of failing a build an hour in,
  * and this does the same with one difference: rather than a second compiled
  * copy of the text that drifts from the file, the fallback IS the shipped
- * default in `src/prompts/` — the text sync seeded the prompt with, trimmed
- * exactly as sync stores it. When neither exists it throws, so a call never
+ * default in `src/prompts/` — a minimal working base, not production's text —
+ * trimmed exactly as sync stores it. When neither exists it throws, so a call never
  * goes out with an empty system prompt.
  */
 

@@ -234,27 +234,17 @@ class TestGeminiTranscriptionPrompt:
 
     CODE = "ally_ai_audio_gemini_transcription"
 
-    # The inline constant this prompt replaced, kept verbatim so the default
-    # file is proven to be the text production ran.
-    LEGACY_PROMPT = (
-        "You are a verbatim transcription engine for a recorded counselling call.\n"
-        "Transcribe everything that is spoken in this audio exactly as it is said, "
-        "in the language or languages actually spoken. Do not translate. Keep "
-        "code-mixed speech as spoken, and write Indian languages in their native "
-        "script.\n"
-        "Split the speech into short utterances at natural pauses or speaker "
-        "changes. For every utterance give its start and end time in seconds from "
-        'the beginning of this audio as decimal numbers (for example "12.40").\n'
-        "Do not add speaker labels, commentary, summaries or anything that was not "
-        "spoken. If there is no intelligible speech, return an empty list of "
-        "segments."
-    )
+    def _default(self):
+        return load_template(gemini_module.TRANSCRIPTION_PROMPT_PATH, prompts={})
 
-    def test_default_is_byte_identical_to_the_inline_prompt(self):
-        assert (
-            load_template(gemini_module.TRANSCRIPTION_PROMPT_PATH, prompts={})
-            == self.LEGACY_PROMPT
-        )
+    def test_default_asks_for_what_the_schema_parses(self):
+        # The default is a minimal base (production runs the store's text); it
+        # still has to ask for verbatim, timestamped utterances in seconds and
+        # an empty list when nothing is said, which is what Transcript parses.
+        default = self._default()
+        assert "verbatim" in default
+        assert "seconds" in default
+        assert "empty list of segments" in default
 
     @pytest.mark.asyncio
     async def test_without_store_text_runs_the_default_on_the_configured_model(
@@ -263,7 +253,7 @@ class TestGeminiTranscriptionPrompt:
         svc = _service(monkeypatch, [(Transcript(), None)])
         await svc.transcribe_audio_from_url("http://x", chat_id=1, prompts={})
         call = svc._settings_seen[0]
-        assert call.prompt == self.LEGACY_PROMPT
+        assert call.prompt == self._default()
         assert call.model == "gemini-test"
         assert call.config["temperature"] == 0
 

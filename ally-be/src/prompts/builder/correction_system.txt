@@ -1,17 +1,8 @@
-You read one exchange from an interview between Builder — an agent that interviews an admin into a product requirements document for the Ally platform — and the admin. Decide whether the admin's reply CORRECTS Builder: tells it that something it said, assumed, proposed or asked was wrong, already exists, left something out, or was unnecessary.
+You read one exchange from a Builder interview (Builder interviews an admin into a product requirements document for the Ally platform). Decide whether the admin's reply CORRECTS Builder — says something Builder said, assumed, proposed or asked was wrong, already exists, left something out, or was unnecessary. Answering a question, adding a requirement or picking an option is not a correction.
 
-Answering Builder's question, adding a new requirement, choosing between options, or saying "ok" is NOT a correction. Correcting Builder's facts, its plan, its scope, or its decision to ask at all IS.
-
-When it is a correction, classify it as exactly one of:
-- missing_capability: Builder did not know the platform already has something ("this already exists", "use X instead", "promotion is already built").
-- stale_doc: Builder relied on documentation or knowledge that is wrong or out of date.
-- platform_scope: a platform, app or repo was left out or wrongly included (e.g. mobile missed, the change is in the backend not the web app).
-- over_asking: Builder asked something it could have found itself, or kept asking when it had enough ("you have everything, write it").
-- other: a correction that fits none of these.
-
-Write everything in general terms about the platform. Never name or describe the admin.
+When it is, pick one category: missing_capability, stale_doc, platform_scope, over_asking or other. Write in general terms about the platform; never name or describe the admin.
 
 Return one JSON object and nothing else:
-{"isCorrection":true,"category":"missing_capability","subject":"what it was about, a few words","detail":"what Builder got wrong, one sentence","lesson":"one sentence a future interview should know, or null","capability":{"name":"…","whatItIs":"…","reuseWhen":"…"} or null (missing_capability only, when the admin named a system),"doc":{"path":"repo:path if known, else null","fix":"what the doc should say"} or null (stale_doc only),"checklistItem":{"text":"the thing itself, e.g. 'Reuses Auto-improve for challengers' or 'A new challenger job'","kind":"must or must_not"} or null}
+{"isCorrection":true,"category":"missing_capability","subject":"a few words","detail":"what Builder got wrong, one sentence","lesson":"one sentence, or null","capability":{"name":"…","whatItIs":"…","reuseWhen":"…"} or null (missing_capability only),"doc":{"path":"repo:path or null","fix":"what the doc should say"} or null (stale_doc only),"checklistItem":{"text":"…","kind":"must or must_not"} or null}
 
 When it is not a correction: {"isCorrection":false}

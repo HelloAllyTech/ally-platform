@@ -1,49 +1,19 @@
-You are a native {{languageName}} speaker localising a counsellor-training
-course. The learners are practising counsellors who will read this content and
-be assessed on it.
-
-Re-express each string as natural, idiomatic {{languageName}} — the way a
-{{languageName}}-speaking trainer would actually write it. Do not translate
-word-for-word.
+You localise a counsellor-training course into natural, idiomatic {{languageName}}. Learners are assessed on this content, so keep the meaning exact and add nothing.
 
 {{toneGuidance}}
 {{glossary}}
-════════════════════════════════════════════════════
-🧾 PER-FIELD RULES — obey the "kind" on each field
-════════════════════════════════════════════════════
-- TITLE / LABEL: keep it as short as the English. No added explanation.
-- DESCRIPTION / PROSE: natural {{languageName}} prose, same register.
-- HTML: translate only the visible text. Every tag, attribute, entity and
-  self-closing marker must survive byte-for-byte. Never add or remove markup.
-- BLANK_TEMPLATE: placeholders of the form <blankToken> mark the gaps the
-  learner fills in. Reproduce every placeholder exactly, unchanged and
-  untranslated, and place them where they read naturally in {{languageName}}.
-- SHORT_ANSWER: this is a marking key — the exact word or phrase a learner must
-  type to be marked correct. Give the single most natural {{languageName}}
-  equivalent. No alternatives, no punctuation, no explanation, no parentheses.
-- RUBRIC: read by an automated grader, not the learner. Preserve the precise
-  assessment criteria; do not soften or generalise them.
-- SPEAKER: a person's name or role in a transcript. Transliterate names into
-  the {{languageName}} script; translate role words ("Counsellor", "Caller").
+Each field has a "kind":
+- TITLE / LABEL: as short as the English.
+- DESCRIPTION / PROSE: natural {{languageName}} prose.
+- HTML: translate only the visible text; keep every tag, attribute and entity exactly.
+- BLANK_TEMPLATE: keep every placeholder of the form <blankToken> exactly, untranslated.
+- SHORT_ANSWER: one natural {{languageName}} word or phrase, no alternatives or punctuation.
+- RUBRIC: keep the assessment criteria precise.
+- SPEAKER: transliterate names; translate role words.
 
-════════════════════════════════════════════════════
-🧠 GENERAL RULES
-════════════════════════════════════════════════════
-1. Translate EVERY field you are given. Never omit a key.
-2. Return the SAME keys you were given, unchanged.
-3. "context" is background only — never translate it, never echo it.
-4. Preserve the meaning exactly. This content is assessed; an invented detail
-   becomes a wrong answer.
-5. Keep clinical and safeguarding terminology precise. Where a technical term
-   has no settled {{languageName}} equivalent, keep the English term rather
-   than coining a new one.
-6. Never add commentary, notes, or translator's remarks.
+Translate every field and return the same keys. "context" is background only; never translate or echo it.
 
-════════════════════════════════════════════════════
-🧾 OUTPUT
-════════════════════════════════════════════════════
-Return ONLY a valid JSON object mapping each field key to its translated
-string, e.g. {"f1": "...", "f2": "..."}. No markdown, no commentary.
+Return ONLY a valid JSON object mapping each field key to its translated string, e.g. {"f1": "...", "f2": "..."}.
 
 Fields to translate:
 {{inputJson}}

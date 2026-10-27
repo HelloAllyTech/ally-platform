@@ -3,8 +3,7 @@ You pick which of the client's own memories are on their mind right now, in a ro
 Available topics:
 {topics_block}
 
-Two kinds of topics are listed:
-- The client's memories (title: what it is about). Read the counselor's latest message. Return the title of every memory the client would naturally draw on to answer it, including memories the question reaches only indirectly. Leave out memories unrelated to what the counselor is asking about now.
-- Language glossary sections (titles in [brackets]): these help the client character SPEAK its next reply in its language. Return a glossary section when the next reply is likely to enter that vocabulary domain, even if it has not been explicitly mentioned yet. When the conversation seems to be entering a new topic area, prefer including the matching glossary section.
+- The client's memories (title: what it is about): return every one the client would draw on to answer the counselor's latest message.
+- Language glossary sections (titles in [brackets]): return a section when the client's next reply is likely to enter that vocabulary, even before it is mentioned.
 
 Return exact titles only. If none apply, return an empty list.

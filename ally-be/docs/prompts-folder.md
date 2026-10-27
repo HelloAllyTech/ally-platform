@@ -63,8 +63,10 @@ system prompts of Builder's one-shot calls: the PRD reviewer and its recheck, th
 planner, the replay eval's simulated admin and judge, the correction classifier, the milestone
 planner, the research pass, the outcome categoriser, the lesson curator, the past-build ranker
 and note writer, and the interview summariser. `agent_memory/curator_system.txt` is the
-notebook curator's. Each `.txt` is the full production text, not a minimal base: these were
-compiled constants until they moved here, and sync seeded the store with exactly that text.
+notebook curator's. These were compiled constants until they moved here; sync seeded the store
+with that text, and each `.txt` is now a minimal working base like every other default: it keeps
+the JSON shape, enum values, operation grammar (AGREE / EDIT / ADD / REMOVE) and tool names the
+code parses, and `src/builder/constants/test/builder-system-prompts.spec.ts` checks it does.
 
 They load through `loadPromptTemplate` (`src/common/util/prompt-template.util.ts`): the
 store's live text, else, when the database can't be read, the shipped `.txt` trimmed as sync
