@@ -15,8 +15,8 @@
  * source must appear N times in the output.
  */
 
-const PLACEHOLDER_RE = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
-const AUDIO_TAG_RE = /\[([a-z][a-z0-9 _-]*)\]/g;
+const PLACEHOLDER_RE = /\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}/g;
+const AUDIO_TAG_RE = /\[\s*([a-z][a-z0-9 _-]*)\s*\]/g;
 
 export interface TokenDiff {
   /** Tokens present in source but missing (or under-represented) in output. */
@@ -34,18 +34,18 @@ export interface TokenGuardResult {
 
 /** Extract placeholder tokens (with surrounding braces), in order, with duplicates. */
 export function extractPlaceholders(text: string): string[] {
-  return matchAllTokens(text, PLACEHOLDER_RE);
+  if (!text || typeof text !== 'string') return [];
+  const tokens: string[] = [];
+  for (const m of text.matchAll(PLACEHOLDER_RE))
+    tokens.push(`{${m[1].trim()}}`);
+  return tokens;
 }
 
 /** Extract audio-tag tokens (with surrounding brackets), in order, with duplicates. */
 export function extractAudioTags(text: string): string[] {
-  return matchAllTokens(text, AUDIO_TAG_RE);
-}
-
-function matchAllTokens(text: string, re: RegExp): string[] {
   if (!text || typeof text !== 'string') return [];
   const tokens: string[] = [];
-  for (const m of text.matchAll(re)) tokens.push(m[0]);
+  for (const m of text.matchAll(AUDIO_TAG_RE)) tokens.push(`[${m[1].trim()}]`);
   return tokens;
 }
 

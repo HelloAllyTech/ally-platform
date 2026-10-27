@@ -90,6 +90,18 @@ describe('translation-token-guard', () => {
         output: 'ठीक है',
         ok: false,
       },
+      {
+        name: 'whitespace around placeholder is tolerated',
+        source: 'Hello {name}',
+        output: 'नमस्ते { name }',
+        ok: true,
+      },
+      {
+        name: 'whitespace around audio tag is tolerated',
+        source: 'ok [laughs]',
+        output: 'ठीक है [ laughs ]',
+        ok: true,
+      },
     ];
 
     cases.forEach((c) => {
