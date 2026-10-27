@@ -415,10 +415,8 @@ export class PromptTranslationService {
     }
 
     // 3. Engine + system prompt from the seeded translation prompt row.
-    const [translationRow] = await this.promptSharedService.getPromptsByOptions(
-      {
-        promptCode: [AGENT_TEMPLATE_TRANSLATION_PROMPT_CODE],
-      },
+    const translationRow = await this.promptSharedService.resolvePrompt(
+      AGENT_TEMPLATE_TRANSLATION_PROMPT_CODE,
     );
     if (!translationRow?.prompt?.trim()) {
       throw new BadRequestException(
@@ -432,10 +430,8 @@ export class PromptTranslationService {
     );
     // getPromptsByOptions selects currentVersion at runtime but erases it from
     // the declared return type; narrow locally for provenance.
-    const currentVersion = (translationRow as { currentVersion?: number })
-      .currentVersion;
-    const translationPromptVersion = currentVersion
-      ? String(currentVersion)
+    const translationPromptVersion = translationRow.version
+      ? String(translationRow.version)
       : undefined;
 
     // 4. Provenance: the version being translated (the live one by default).

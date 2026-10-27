@@ -30,6 +30,7 @@ describe('PromptTranslationService.translateOne', () => {
   let findForBody: jest.Mock;
   let getEligibleTargetLanguages: jest.Mock;
   let getRuntimeRows: jest.Mock;
+  let resolvePrompt: jest.Mock;
 
   const engine = {
     provider: 'gemini',
@@ -49,12 +50,16 @@ describe('PromptTranslationService.translateOne', () => {
     findForBody = jest.fn().mockResolvedValue(null);
     getEligibleTargetLanguages = jest.fn().mockResolvedValue([]);
     getRuntimeRows = jest.fn().mockResolvedValue([]);
+    resolvePrompt = jest.fn();
     getPromptByCode = jest.fn().mockResolvedValue(englishBody);
-    getPromptsByOptions = jest
-      .fn()
-      .mockResolvedValue([
-        { prompt: 'Translate to {{languageName}}.', currentVersion: 1 },
-      ]);
+    getPromptsByOptions = jest.fn();
+    resolvePrompt = jest.fn().mockResolvedValue({
+      prompt: 'Translate to {{languageName}}.',
+      version: 1,
+      source: 'store',
+      contentHash: 'hash:28',
+      promptCode: 'agent_template_translation',
+    });
     getLatestPromptVersion = jest.fn().mockResolvedValue({ id: 'v-1' });
     getLanguagesByIds = jest
       .fn()
@@ -93,7 +98,7 @@ describe('PromptTranslationService.translateOne', () => {
         },
         {
           provide: PromptSharedService,
-          useValue: { getPromptByCode, getPromptsByOptions },
+          useValue: { getPromptByCode, getPromptsByOptions, resolvePrompt },
         },
         {
           provide: PromptTranslationProviderService,
@@ -323,6 +328,27 @@ describe('PromptTranslationService.translateOne', () => {
           error: 'translation prompt is not configured',
         }),
       );
+    });
+
+    it('succeeds when translation prompt comes from filesystem fallback', async () => {
+      getPromptsByOptions.mockResolvedValue([]); // DB lookup fails
+      resolvePrompt.mockResolvedValue({
+        // Filesystem fallback succeeds
+        prompt: 'Translate to {{languageName}}.',
+        version: null,
+        source: 'default',
+        contentHash: 'hash:28',
+        promptCode: 'agent_template_translation',
+      });
+      translate.mockResolvedValue('आप {name} हैं, एक नर्स। [laughs]');
+
+      // This will fail before the fix, because translateOne uses getPromptsByOptions
+      // and will throw "not configured". After the fix, it will use resolvePrompt
+      // and succeed.
+      const result = await service.translateOne(promptId, languageId);
+
+      expect(result.status).toBe(PromptTranslationStatus.READY);
+      expect(result.attempts).toBe(1);
     });
 
     it('translates the languages concurrently', async () => {
