@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from 'src/config/config.service';
 import {
   canonicalProvider,
@@ -98,6 +98,15 @@ export class AgentLlmProviderFactory {
       throw new BadRequestException(
         `${normalised} is not configured on this environment (no API key), ` +
           'so it cannot be used. Please contact your administrator.',
+      );
+    }
+
+    if (
+      normalised === AgentLlmProviderName.ANTHROPIC &&
+      !apiKey.startsWith('sk-ant-')
+    ) {
+      new Logger(AgentLlmProviderFactory.name).warn(
+        'Malformed Anthropic API key detected. Key should start with "sk-ant-".',
       );
     }
 
