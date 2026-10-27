@@ -1,4 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/push/push_notification_service.dart';
@@ -26,7 +28,12 @@ void main() {
   });
 
   test('swallows a Firebase.initializeApp() failure instead of throwing', () async {
-    await expectLater(service.initializeAndRegister(repository), completes);
+    // Never actually navigated to — `initializeAndRegister` returns from the
+    // `Firebase.initializeApp()` catch block before touching `router` at all
+    // in this environment (no Firebase platform-channel handler registered).
+    final router = GoRouter(routes: [GoRoute(path: '/', builder: (_, _) => const SizedBox())]);
+
+    await expectLater(service.initializeAndRegister(repository, router), completes);
 
     verifyZeroInteractions(repository);
   });

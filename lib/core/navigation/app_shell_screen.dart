@@ -5,6 +5,7 @@ import '../../features/notifications/data/notifications_repository.dart';
 import '../../features/reviews/data/reviews_repository.dart';
 import '../permissions/permissions_repository.dart';
 import '../push/push_notification_service.dart';
+import '../routing/app_router.dart';
 import 'app_bottom_tab_bar.dart';
 import 'app_drawer.dart';
 import 'drawer_menu_button.dart';
@@ -31,7 +32,7 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
     super.initState();
     ref
         .read(pushNotificationServiceProvider)
-        .initializeAndRegister(ref.read(notificationsRepositoryProvider));
+        .initializeAndRegister(ref.read(notificationsRepositoryProvider), ref.read(appRouterProvider));
   }
 
   @override

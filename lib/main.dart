@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,11 +7,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/auth/auth_state.dart';
 import 'core/chat/active_chat_discovery.dart';
 import 'core/localization/localization_controller.dart';
+import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/root_scaffold_messenger.dart';
 
-void main() {
+Future<void> main() async {
+  // Registering FCM's background-message handler requires a (possibly
+  // repeat) `Firebase.initializeApp()` call here, before `runApp()` — unlike
+  // `PushNotificationService.initializeAndRegister`'s own init call (which
+  // only runs once a user reaches `/home`), this one must happen on every
+  // cold start regardless of auth state, since a killed app's background
+  // isolate needs the handler already registered before any push can arrive.
+  // Calling `Firebase.initializeApp()` twice is safe (it returns the
+  // already-initialized app the second time); wrapped in try/catch for the
+  // same graceful-degradation reason `PushNotificationService` already
+  // documents — this app has no Firebase config files of its own yet.
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (_) {
+    // Expected until this app's own Firebase config files are added.
+  }
+
   runApp(const ProviderScope(child: AllyApp()));
 }
 
