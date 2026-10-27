@@ -246,9 +246,7 @@ export class LlmCompletionService {
         ? { temperature: target.temperature }
         : {}),
       ...(request.jsonMode ? { jsonMode: true } : {}),
-      ...(request.timeoutMs !== undefined
-        ? { timeoutMs: request.timeoutMs }
-        : {}),
+      timeoutMs: request.timeoutMs ?? 60000,
     });
 
     let text = '';

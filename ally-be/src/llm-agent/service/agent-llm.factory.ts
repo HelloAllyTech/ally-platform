@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from 'src/config/config.service';
 import {
   canonicalProvider,
@@ -76,6 +76,8 @@ export const normaliseAgentProvider = (
  */
 @Injectable()
 export class AgentLlmProviderFactory {
+  private readonly logger = new Logger(AgentLlmProviderFactory.name);
+
   constructor(private readonly configService: AppConfigService) {}
 
   create(provider: string, model: string): IAgentLlmProvider {
@@ -123,8 +125,16 @@ export class AgentLlmProviderFactory {
 
   private apiKeyFor(provider: AgentLlmProviderName): string | undefined {
     switch (provider) {
-      case AgentLlmProviderName.ANTHROPIC:
-        return this.configService.anthropic.apiKey;
+      case AgentLlmProviderName.ANTHROPIC: {
+        const apiKey = this.configService.anthropic.apiKey;
+        if (apiKey && !apiKey.startsWith('sk-ant-')) {
+          this.logger.warn(
+            'Anthropic API key appears to be malformed (does not start with "sk-ant-"). ' +
+              'This will likely cause authentication failures.',
+          );
+        }
+        return apiKey;
+      }
       case AgentLlmProviderName.OPENAI:
         return this.configService.openai.apiKey;
       case AgentLlmProviderName.GEMINI:
