@@ -8,6 +8,8 @@ const JUDGE_ROW = {
   promptCode: 'ally_ai_learn_evaluation_actor_goal_system',
   prompt: 'Judge {goals_block}\n',
   availableVariables: ['goals_block'],
+  version: 3,
+  contentHash: 'hash-3',
   model: 'gpt-4.1',
 };
 
@@ -142,6 +144,8 @@ describe('ScenarioSessionEvaluationService — triggerForSession idempotency', (
           ally_ai_learn_evaluation_actor_goal_system: {
             prompt: 'Judge {goals_block}',
             availableVariables: ['goals_block'],
+            version: 3,
+            contentHash: 'hash-3',
             model: 'gpt-4.1',
           },
         },

@@ -16,6 +16,9 @@ export type PromptOverride =
       model?: string;
       /** Prompt-level LLM sampling temperature override (0–2), honored by ally-ai. */
       temperature?: number;
+      /** The Skills Store version this text is, for the runtime's [PROMPT_SOURCE] log. */
+      version?: number | null;
+      contentHash?: string;
     };
 
 export type GenerateSummaryRequest = {

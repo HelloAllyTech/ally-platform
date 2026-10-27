@@ -100,6 +100,9 @@ export class ScenarioSessionEvaluationService {
       prompts[row.promptCode] = {
         prompt: text,
         availableVariables: row.availableVariables ?? [],
+        // What identifies the text that ran, for ai-learn's [PROMPT_SOURCE] log.
+        version: row.version ?? null,
+        ...(row.contentHash ? { contentHash: row.contentHash } : {}),
         ...(row.provider ? { provider: row.provider } : {}),
         ...(row.model ? { model: row.model } : {}),
         ...(typeof row.temperature === 'number'
