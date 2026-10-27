@@ -9,10 +9,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ErrorCode } from 'src/exception/error-code.enum';
-import {
-  AUTHZ_MESSAGES,
-  FAILURE_MESSAGES,
-} from 'src/exception/failure-messages';
+import { FAILURE_MESSAGES } from 'src/exception/failure-messages';
 import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import {
@@ -45,6 +42,14 @@ import { CALLER_SCOPED_ROUTE_KEY } from '../decorators/caller-scoped-route.decor
  * `CreatePlatformAdminRole1895000000001` backfilled every legacy role holder
  * an equivalent toggle before this was safe to retire.
  */
+
+function formatFeatureKey(key: string): string {
+  return key
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 @Injectable()
 export class FeatureToggleGuard implements CanActivate {
   constructor(
@@ -131,8 +136,9 @@ export class FeatureToggleGuard implements CanActivate {
     // machine-readable code. FEATURE_NOT_ENABLED is deliberately distinct from
     // PERMISSION_DENIED: the remedy is an admin flipping a toggle, not a
     // permission grant, and a client that can tell them apart can say so.
+    const formattedFeatureKey = formatFeatureKey(options.featureKey);
     throw new ForbiddenException({
-      message: AUTHZ_MESSAGES.missingFeature(options.featureKey),
+      message: `The ${formattedFeatureKey} feature is not enabled for your organization. Please contact an administrator to enable it.`,
       error: 'Forbidden',
       statusCode: HttpStatus.FORBIDDEN,
       errorCode: ErrorCode.FEATURE_NOT_ENABLED,
