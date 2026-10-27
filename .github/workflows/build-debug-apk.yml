@@ -28,7 +28,17 @@ jobs:
     # compilation from an actual hang. Bounding this so a repeat fails fast
     # with a clear timeout instead of silently consuming CI minutes for
     # hours (the default job timeout is 360 minutes).
-    timeout-minutes: 25
+    #
+    # Raised from 25 to 40 after the 2026-10-27 run: verbose Gradle output
+    # showed assembleDebug genuinely still progressing (not hung) when the
+    # 25-minute budget killed it with SIGTERM (exit 143) at the 11-minute
+    # mark of that single task. The test suite has also grown substantially
+    # this session (960 -> 1008 tests) and alone now takes ~9 minutes, which
+    # the original 25-minute budget didn't leave enough room for on top of
+    # setup/disk-cleanup/analyze/test plus a cold native LiveKit/WebRTC
+    # compile. 40 minutes keeps the same "fail fast on a real hang" intent
+    # while giving a legitimately slow (not stuck) build enough headroom.
+    timeout-minutes: 40
     steps:
       # The second build attempt failed with "No space left on device" —
       # LiveKit/flutter_webrtc's per-ABI native libraries plus the Android
