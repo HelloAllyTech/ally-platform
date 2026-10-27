@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -319,6 +320,34 @@ void main() {
     test('toQueryParameters omits every field left unset', () {
       const empty = CallLogFilterState();
       expect(empty.toQueryParameters(), isEmpty);
+    });
+
+    test('a custom-field value counts toward isEmpty/activeCount and serialises as fieldFilters', () {
+      const withCustom = CallLogFilterState(customFieldValues: {'f1': 'anx', 'f2': <String>[]});
+      expect(withCustom.isEmpty, isFalse);
+      // Only 'f1' is non-empty ('f2' is an empty list) — activeCount counts
+      // actual non-empty values, not just map entries.
+      expect(withCustom.activeCount, 1);
+
+      final params = withCustom.toQueryParameters();
+      expect(jsonDecode(params['fieldFilters'] as String), [
+        {'fieldDefinitionId': 'f1', 'value': 'anx'},
+      ]);
+    });
+
+    test('copyWith overrides customFieldValues like every other field', () {
+      const original = CallLogFilterState(customFieldValues: {'f1': 'anx'});
+      final updated = original.copyWith(customFieldValues: {'f1': 'anx', 'f2': 'hopeful'});
+      expect(updated.customFieldValues, {'f1': 'anx', 'f2': 'hopeful'});
+    });
+
+    test('equality compares customFieldValues structurally, including list values', () {
+      const a = CallLogFilterState(customFieldValues: {'f1': 'anx', 'f2': ['x', 'y']});
+      const b = CallLogFilterState(customFieldValues: {'f1': 'anx', 'f2': ['x', 'y']});
+      const c = CallLogFilterState(customFieldValues: {'f1': 'anx', 'f2': ['x', 'z']});
+
+      expect(a, b);
+      expect(a, isNot(c));
     });
   });
 

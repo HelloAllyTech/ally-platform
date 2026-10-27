@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,16 +10,19 @@ import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../account/data/account_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
+import '../data/custom_fields_repository.dart';
 import 'voice_note_section.dart';
 
 /// Mirrors ally-mobile (React Native)'s `PRIVACY_POLICY_URL`.
@@ -597,6 +602,16 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   bool _isRetrying = false;
   String? _error;
 
+  // Tenant-configured custom fields (see custom_fields_repository.dart) —
+  // kept in their own map/dirty-set rather than merged into _formValues/
+  // _dirtyKeys above: they save through a different endpoint
+  // (upsertValues, not updateCallSummary) and are keyed by field-definition
+  // id, a different id space from the built-in SummaryFieldDef.key values.
+  final Map<String, String?> _customFieldValues = {};
+  final Set<String> _dirtyCustomFieldIds = {};
+  List<CustomFieldDefinition> _customFieldDefs = const [];
+  String? _customFieldsSeededForChatId;
+
   void _seedIfNeeded(CallSummaryDetails summary) {
     final key = '${widget.log.id}';
     if (_seededForChatId == key) return;
@@ -614,6 +629,27 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     });
   }
 
+  /// Mirrors RN's `CallSummaryDetails.tsx` seed effect: seeds local edit
+  /// state once per chat from the live values query, so a background
+  /// refetch (the query has `refetchOnMountOrArgChange: true` upstream)
+  /// never clobbers an in-progress edit.
+  void _seedCustomFieldsIfNeeded(List<CustomFieldValue> values) {
+    final key = '${widget.log.id}';
+    if (_customFieldsSeededForChatId == key) return;
+    _customFieldValues
+      ..clear()
+      ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)));
+    _dirtyCustomFieldIds.clear();
+    _customFieldsSeededForChatId = key;
+  }
+
+  void _onCustomFieldChanged(String fieldDefinitionId, String? value) {
+    setState(() {
+      _customFieldValues[fieldDefinitionId] = value;
+      _dirtyCustomFieldIds.add(fieldDefinitionId);
+    });
+  }
+
   /// Applies voice-dictated field values: merges them into the form
   /// optimistically (mirrors RN's `dispatch(setFormData(builtinUpdates))`,
   /// which updates redux before the save call even starts), then persists
@@ -627,33 +663,62 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, updates);
   }
 
+  bool get _hasDirtyChanges => _dirtyKeys.isNotEmpty || _dirtyCustomFieldIds.isNotEmpty;
+
   Future<void> _save() async {
-    if (_dirtyKeys.isEmpty) return;
+    if (!_hasDirtyChanges) return;
     setState(() {
       _isSaving = true;
       _error = null;
     });
+    var builtinSucceeded = true;
     try {
-      final patch = {for (final key in _dirtyKeys) key: _formValues[key]};
-      await ref
-          .read(callLogRepositoryProvider)
-          .updateCallSummary(widget.log.id, patch);
-      _dirtyKeys.clear();
-      ref.invalidate(callSummaryProvider(widget.log.id));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ref.tr('callSummary.info.summaryUpdatedSuccess')),
-          ),
-        );
+      if (_dirtyKeys.isNotEmpty) {
+        final patch = {for (final key in _dirtyKeys) key: _formValues[key]};
+        await ref
+            .read(callLogRepositoryProvider)
+            .updateCallSummary(widget.log.id, patch);
+        _dirtyKeys.clear();
+        ref.invalidate(callSummaryProvider(widget.log.id));
       }
     } catch (e) {
+      builtinSucceeded = false;
       setState(
         () => _error = '${ref.tr('callSummary.info.summaryUpdateFailed')}: $e',
       );
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
     }
+
+    // Independent of the built-in save above: mirrors RN's
+    // `handleCustomFieldSave`, which sends its own PUT regardless of the
+    // main summary's own save outcome, and — on failure — must NOT clear
+    // the dirty set, or the edit looks saved with no way to detect or retry
+    // it even though the write never reached the backend.
+    var customFieldsSucceeded = true;
+    if (_dirtyCustomFieldIds.isNotEmpty) {
+      final changed = [
+        for (final id in _dirtyCustomFieldIds) (fieldDefinitionId: id, value: _customFieldValues[id]),
+      ];
+      try {
+        await ref.read(customFieldsRepositoryProvider).upsertValues(widget.log.id, changed);
+        _dirtyCustomFieldIds.clear();
+      } catch (_) {
+        customFieldsSucceeded = false;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ref.tr('summary.customFieldSaveFailed'))),
+          );
+        }
+      }
+    }
+
+    if (mounted && builtinSucceeded && customFieldsSucceeded && _error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ref.tr('callSummary.info.summaryUpdatedSuccess')),
+        ),
+      );
+    }
+    if (mounted) setState(() => _isSaving = false);
   }
 
   Future<void> _retrySummary() async {
@@ -724,6 +789,25 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
           );
         }
         _seedIfNeeded(summary);
+
+        // Custom fields: fetched/seeded only once the tenant toggle resolves
+        // true — mirrors RN's `skip: !customFieldsActive` on both the
+        // definitions and values queries, rather than firing either request
+        // unconditionally on every summary open.
+        final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
+        if (customFieldsEnabled) {
+          _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
+          final valuesAsync = ref.watch(customFieldValuesProvider(widget.log.id));
+          final values = valuesAsync.value;
+          if (values != null) _seedCustomFieldsIfNeeded(values);
+        } else {
+          _customFieldDefs = const [];
+        }
+        final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
+        final isAdmin = permissions.contains(UserPermissions.manageCustomFieldDefinitions);
+        final currentUserId = ref.watch(currentUserProvider).value?.id;
+        final isCounsellorForCall = summary.counselorId != null && summary.counselorId == currentUserId;
+
         return Column(
           children: [
             if (summary.isManualNote)
@@ -752,6 +836,11 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                       section: section,
                       formValues: _formValues,
                       onFieldChanged: _onFieldChanged,
+                      customFieldDefs: _customFieldDefs,
+                      customFieldValues: _customFieldValues,
+                      onCustomFieldChanged: _onCustomFieldChanged,
+                      isAdmin: isAdmin,
+                      isCounsellorForCall: isCounsellorForCall,
                     ),
                 ],
               ),
@@ -768,10 +857,10 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: AppButton(
-                  label: _dirtyKeys.isEmpty
-                      ? ref.t('callSummary.noChanges')
-                      : ref.t('callSummary.saveChanges'),
-                  isDisabled: _dirtyKeys.isEmpty,
+                  label: _hasDirtyChanges
+                      ? ref.t('callSummary.saveChanges')
+                      : ref.t('callSummary.noChanges'),
+                  isDisabled: !_hasDirtyChanges,
                   isLoading: _isSaving,
                   onPressed: _save,
                 ),
@@ -784,20 +873,49 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   }
 }
 
+/// Mirrors RN's `SectionWrapper`'s `canEditField` callback.
+bool _canEditCustomField(CustomFieldDefinition def, {required bool isAdmin, required bool isCounsellorForCall}) {
+  switch (def.editPermission) {
+    case CustomFieldEditPermission.both:
+      return true;
+    case CustomFieldEditPermission.adminOnly:
+      return isAdmin;
+    case CustomFieldEditPermission.counsellorOnly:
+      return isCounsellorForCall;
+  }
+}
+
 class _SectionCard extends ConsumerWidget {
   const _SectionCard({
     required this.section,
     required this.formValues,
     required this.onFieldChanged,
+    this.customFieldDefs = const [],
+    this.customFieldValues = const {},
+    this.onCustomFieldChanged,
+    this.isAdmin = false,
+    this.isCounsellorForCall = false,
   });
 
   final SummarySection section;
   final Map<String, dynamic> formValues;
   final void Function(String fieldKey, dynamic value) onFieldChanged;
 
+  /// All of the tenant's custom fields (unfiltered) — this widget filters to
+  /// its own [section] internally, mirroring RN's `CustomFieldsSection`'s own
+  /// `definitions.filter(d => d.sectionKey === sectionKey)`. `sectionKey` is
+  /// matched against [SummarySection.name], which lines up 1:1 with RN's
+  /// `SectionKey` string values (e.g. `ongoingRisks`, `keyConcern`).
+  final List<CustomFieldDefinition> customFieldDefs;
+  final Map<String, String?> customFieldValues;
+  final void Function(String fieldDefinitionId, String? value)? onCustomFieldChanged;
+  final bool isAdmin;
+  final bool isCounsellorForCall;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fields = summaryFieldDefs.where((f) => f.section == section).toList();
+    final sectionCustomFields = customFieldDefs.where((d) => d.sectionKey == section.name).toList();
     // The RN screen also hides a section with no tenant-configured
     // "visible fields" (a backend-driven per-org form config, Redux
     // `selectSummaryVisibleFields`) — not ported, so every section in the
@@ -820,6 +938,13 @@ class _SectionCard extends ConsumerWidget {
                       field: field,
                       formValues: formValues,
                       onChanged: onFieldChanged,
+                    ),
+                  for (final def in sectionCustomFields)
+                    _CustomFieldEditor(
+                      definition: def,
+                      value: customFieldValues[def.id],
+                      onChanged: onCustomFieldChanged,
+                      canEdit: _canEditCustomField(def, isAdmin: isAdmin, isCounsellorForCall: isCounsellorForCall),
                     ),
                 ],
               ),
@@ -911,6 +1036,186 @@ class _FieldEditor extends ConsumerWidget {
         onChanged: (text) => onChanged(field.key, text),
       ),
     );
+  }
+}
+
+/// Mirrors RN's `CustomFieldsSection` — one tenant-defined extra field,
+/// rendered per its [CustomFieldDefinition.fieldType]. [value] is always the
+/// raw stored string (see [CustomFieldValue]'s own doc comment on the
+/// select-types' label-vs-id quirk this faithfully reproduces).
+class _CustomFieldEditor extends ConsumerStatefulWidget {
+  const _CustomFieldEditor({required this.definition, required this.value, required this.onChanged, required this.canEdit});
+
+  final CustomFieldDefinition definition;
+  final String? value;
+  final void Function(String fieldDefinitionId, String? value)? onChanged;
+  final bool canEdit;
+
+  @override
+  ConsumerState<_CustomFieldEditor> createState() => _CustomFieldEditorState();
+}
+
+class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
+  /// RN's `parseMultiSelectValue` — a MULTI_SELECT value is stored as a
+  /// JSON-encoded array of option *labels*; a bare non-JSON string (an old
+  /// single-select-shaped value, or simply malformed) is treated as a
+  /// one-item selection instead of discarded.
+  List<String> _parseMultiSelect(String? value) {
+    if (value == null || value.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(value);
+      return decoded is List ? decoded.map((e) => e.toString()).toList() : [value];
+    } catch (_) {
+      return [value];
+    }
+  }
+
+  Future<void> _pickMultiSelect(List<String> options, List<String> selected) async {
+    var draft = List<String>.from(selected);
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final option in options)
+                  CheckboxListTile(
+                    title: Text(option),
+                    value: draft.contains(option),
+                    onChanged: (checked) => setSheetState(() {
+                      if (checked ?? false) {
+                        draft.add(option);
+                      } else {
+                        draft.remove(option);
+                      }
+                    }),
+                  ),
+                AppButton(label: ref.t('common.done'), onPressed: () => Navigator.of(context).pop(draft)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null) {
+      widget.onChanged?.call(widget.definition.id, result.isEmpty ? null : jsonEncode(result));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final def = widget.definition;
+    final value = widget.value;
+    final label = def.name;
+
+    if (!widget.canEdit) {
+      final display = switch (def.fieldType) {
+        CustomFieldType.boolean => value == 'true'
+            ? ref.t('common.yes')
+            : value == 'false'
+            ? ref.t('common.no')
+            : (value ?? '—'),
+        CustomFieldType.multiSelect => _parseMultiSelect(value).isEmpty ? '—' : _parseMultiSelect(value).join(', '),
+        _ => value == null || value.trim().isEmpty ? '—' : value,
+      };
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            Text(display),
+          ],
+        ),
+      );
+    }
+
+    switch (def.fieldType) {
+      case CustomFieldType.singleSelect:
+        final options = def.sortedOptions.map((o) => o.label).toList();
+        final currentValue = options.contains(value) ? value : null;
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: DropdownButtonFormField<String>(
+            initialValue: currentValue,
+            decoration: InputDecoration(
+              labelText: label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.strokePrimary),
+              ),
+            ),
+            items: [for (final option in options) DropdownMenuItem(value: option, child: Text(option))],
+            onChanged: (selected) => widget.onChanged?.call(def.id, selected),
+          ),
+        );
+
+      case CustomFieldType.boolean:
+        final currentValue = value == 'true' ? ref.t('common.yes') : value == 'false' ? ref.t('common.no') : null;
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: DropdownButtonFormField<String>(
+            initialValue: currentValue,
+            decoration: InputDecoration(
+              labelText: label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.strokePrimary),
+              ),
+            ),
+            items: [
+              DropdownMenuItem(value: ref.t('common.yes'), child: Text(ref.t('common.yes'))),
+              DropdownMenuItem(value: ref.t('common.no'), child: Text(ref.t('common.no'))),
+            ],
+            onChanged: (selected) => widget.onChanged?.call(def.id, selected == ref.t('common.yes') ? 'true' : 'false'),
+          ),
+        );
+
+      case CustomFieldType.multiSelect:
+        final options = def.sortedOptions.map((o) => o.label).toList();
+        final selected = _parseMultiSelect(value);
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: InkWell(
+            onTap: () => _pickMultiSelect(options, selected),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: label,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.strokePrimary),
+                ),
+              ),
+              child: Text(selected.isEmpty ? '—' : selected.join(', ')),
+            ),
+          ),
+        );
+
+      case CustomFieldType.date:
+      case CustomFieldType.number:
+      case CustomFieldType.text:
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextFormField(
+            key: ValueKey(def.id),
+            initialValue: value ?? '',
+            keyboardType: def.fieldType == CustomFieldType.number ? TextInputType.number : TextInputType.text,
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: def.fieldType == CustomFieldType.date ? 'YYYY-MM-DD' : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.strokePrimary),
+              ),
+            ),
+            onChanged: (text) => widget.onChanged?.call(def.id, text.isEmpty ? null : text),
+          ),
+        );
+    }
   }
 }
 

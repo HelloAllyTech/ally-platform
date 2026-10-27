@@ -29,10 +29,18 @@ String _voiceNoteFieldType(SummaryFieldType type) {
 /// The built-in-field catalog voice dictation can fill — editable
 /// `summaryFieldDefs` only. Mirrors RN's `VoiceNoteSection`'s `voiceFields`
 /// memo, minus the org's custom-field definitions and the per-tenant
-/// visible-fields filter: this app has no `customFieldsApi` client yet
-/// (flutter-whole-app-status-2026-10-26.md backlog item #4) and no
-/// per-tenant field-visibility system at all, so both are out of scope here
-/// — voice dictation can fill any editable built-in field, same set a
+/// visible-fields filter. `custom_fields_repository.dart` now exists
+/// (flutter-whole-app-status-2026-10-26.md backlog item #4 is done for
+/// display/edit/filter), but RN's real custom-field voice path runs every
+/// extracted value through `normalizeVoiceValueForCustomField` — per-type
+/// normalization (matching a spoken value to the closest option label,
+/// mapping yes/no to true/false, parsing a spoken date) that has no
+/// equivalent here yet. Wiring custom fields into voice dictation without
+/// that layer would silently store wrong values for select/boolean/date
+/// fields in a clinical record, which is worse than the feature not
+/// existing — left out deliberately, not from the client being missing.
+/// There is also still no per-tenant field-visibility system at all, so
+/// voice dictation can fill any editable built-in field, same set a
 /// counsellor could otherwise type into on this screen.
 List<Map<String, dynamic>> _voiceFieldCatalog() => summaryFieldDefs
     .where((field) => field.editable)

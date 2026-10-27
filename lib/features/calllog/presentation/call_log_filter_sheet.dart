@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../data/call_log_repository.dart';
+import '../data/custom_fields_filter.dart';
+import '../data/custom_fields_repository.dart';
 
 const _modeOptions = [(label: 'Scribe', value: 'SCRIBE'), (label: 'Dictation', value: 'DICTATION')];
 
@@ -19,15 +22,20 @@ const _statusOptions = [
 
 const _sourceOptions = [(label: 'Live Session', value: 'LIVE'), (label: 'Uploaded', value: 'UPLOAD')];
 
-/// Direct port of ally-mobile (React Native)'s `CallLogFilterSheet` — scoped
-/// to the built-in filters (date range, duration range, mode/status/channel/
-/// tags multiselects). RN's dynamic, tenant-configured custom-field filters
-/// (`fieldFilters`, driven by a `CustomFieldDefinition` catalog) aren't
-/// ported — this app has no client for that catalog yet. Field/option labels
-/// are literal English here, matching RN's `fieldFilters.ts` exactly (it
-/// hardcodes these rather than running them through `t()`, the same
-/// inconsistency `StatusBadge`'s own doc comment already documents for the
-/// identical Status options).
+/// Direct port of ally-mobile (React Native)'s `CallLogFilterSheet`: the
+/// built-in filters (date range, duration range, mode/status/channel/tags
+/// multiselects) plus, now, the tenant-configured custom-field filters
+/// (`fieldFilters`, driven by `CustomFieldDefinition` via
+/// `custom_fields_repository.dart`/`custom_fields_filter.dart`). Unlike RN's
+/// single data-driven `getFilterFields` (which merges both kinds into one
+/// list), the built-ins stay hand-built here and the custom fields are
+/// appended as their own section — this app has no generic field-filter
+/// catalog for the *built-in* columns, only for the custom ones. Field/option
+/// labels are literal English here for the built-ins, matching RN's
+/// `fieldFilters.ts` exactly (it hardcodes these rather than running them
+/// through `t()`, the same inconsistency `StatusBadge`'s own doc comment
+/// already documents for the identical Status options); custom-field names
+/// are tenant-authored text, never translated in RN either.
 class CallLogFilterSheet extends ConsumerStatefulWidget {
   const CallLogFilterSheet({super.key, required this.hasTagsPermission});
 
@@ -56,6 +64,13 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
   late final TextEditingController _minDurationController;
   late final TextEditingController _maxDurationController;
 
+  // Custom-field text/range controllers can't be created up front like the
+  // built-in ones above — the field catalog itself only arrives once
+  // `customFieldDefinitionsProvider` resolves — so these are created lazily
+  // on first render of each field and cached here for the sheet's lifetime.
+  final Map<String, TextEditingController> _customTextControllers = {};
+  final Map<String, List<TextEditingController>> _customRangeControllers = {};
+
   @override
   void initState() {
     super.initState();
@@ -72,7 +87,42 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
     _endDateController.dispose();
     _minDurationController.dispose();
     _maxDurationController.dispose();
+    for (final controller in _customTextControllers.values) {
+      controller.dispose();
+    }
+    for (final pair in _customRangeControllers.values) {
+      for (final controller in pair) {
+        controller.dispose();
+      }
+    }
     super.dispose();
+  }
+
+  TextEditingController _customTextController(String id) => _customTextControllers.putIfAbsent(
+    id,
+    () => TextEditingController(text: _draft.customFieldValues[id] is String ? _draft.customFieldValues[id] as String : ''),
+  );
+
+  List<TextEditingController> _customRangeController(String id) => _customRangeControllers.putIfAbsent(id, () {
+    final current = _draft.customFieldValues[id];
+    final list = current is List ? current : const [];
+    return [
+      TextEditingController(text: list.isNotEmpty ? list[0].toString() : ''),
+      TextEditingController(text: list.length > 1 ? list[1].toString() : ''),
+    ];
+  });
+
+  void _setCustomFieldText(String id, String value) {
+    setState(() => _draft = _draft.copyWith(customFieldValues: {..._draft.customFieldValues, id: value}));
+  }
+
+  void _setCustomFieldRange(String id, int index, String value) {
+    setState(() {
+      final current = _draft.customFieldValues[id];
+      final list = current is List ? List<String>.from(current.map((e) => e.toString())) : ['', ''];
+      list[index] = value;
+      _draft = _draft.copyWith(customFieldValues: {..._draft.customFieldValues, id: list});
+    });
   }
 
   void _toggle(List<String> current, String value, ValueChanged<List<String>> onChanged) {
@@ -90,6 +140,14 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
       _endDateController.clear();
       _minDurationController.clear();
       _maxDurationController.clear();
+      for (final controller in _customTextControllers.values) {
+        controller.clear();
+      }
+      for (final pair in _customRangeControllers.values) {
+        for (final controller in pair) {
+          controller.clear();
+        }
+      }
     });
   }
 
@@ -152,6 +210,7 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
                       ),
                     ),
                     if (widget.hasTagsPermission) _tagsField(),
+                    ..._customFieldsSection(),
                   ],
                 ),
               ),
@@ -196,6 +255,76 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
             ),
       orElse: () => const SizedBox.shrink(),
     );
+  }
+
+  /// Mirrors RN's `getFilterFields`'s custom-field half: shown only when the
+  /// tenant has the custom-fields system enabled at all (loading/error both
+  /// render nothing rather than flashing fields that may not apply).
+  List<Widget> _customFieldsSection() {
+    final enabledAsync = ref.watch(customFieldsEnabledProvider);
+    final enabled = enabledAsync.value ?? false;
+    if (!enabled) return const [];
+
+    final defsAsync = ref.watch(customFieldDefinitionsProvider);
+    return defsAsync.maybeWhen(
+      data: (defs) => [
+        for (final def in customFieldFilterDefs(defs)) _field(def.label, _controlForCustomField(def)),
+      ],
+      orElse: () => const [],
+    );
+  }
+
+  Widget _controlForCustomField(CustomFieldFilterDef def) {
+    switch (def.control) {
+      case FilterControl.multiselect:
+        final selected = switch (_draft.customFieldValues[def.id]) {
+          final List list => list.map((e) => e.toString()).toList(),
+          _ => const <String>[],
+        };
+        return _chipRow(
+          def.options,
+          selected,
+          (next) => setState(() => _draft = _draft.copyWith(customFieldValues: {..._draft.customFieldValues, def.id: next})),
+        );
+
+      case FilterControl.number:
+      case FilterControl.date:
+        final controllers = _customRangeController(def.id);
+        final isNumber = def.control == FilterControl.number;
+        return Row(
+          children: [
+            Expanded(
+              child: AppTextField(
+                shape: AppTextFieldShape.line,
+                controller: controllers[0],
+                placeholder: isNumber ? ref.t('calls.filters.min') : ref.t('calls.filters.from'),
+                keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+                onChanged: (text) => _setCustomFieldRange(def.id, 0, text),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('–', style: TextStyle(color: AppColors.mediumEmphasis)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: AppTextField(
+                shape: AppTextFieldShape.line,
+                controller: controllers[1],
+                placeholder: isNumber ? ref.t('calls.filters.max') : ref.t('calls.filters.to'),
+                keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+                onChanged: (text) => _setCustomFieldRange(def.id, 1, text),
+              ),
+            ),
+          ],
+        );
+
+      case FilterControl.text:
+        return AppTextField(
+          shape: AppTextFieldShape.line,
+          controller: _customTextController(def.id),
+          placeholder: ref.t('calls.filters.searchPlaceholder'),
+          onChanged: (text) => _setCustomFieldText(def.id, text),
+        );
+    }
   }
 
   Widget _field(String label, Widget control) {

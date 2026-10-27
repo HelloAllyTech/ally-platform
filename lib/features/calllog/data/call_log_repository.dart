@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import 'custom_fields_filter.dart';
 
 /// Mirrors ally-be's `Tag` type (`src/chat/type/call.details.type.ts`) — a
 /// single AI-generated call tag plus its 1-5 positivity rating, read from
@@ -249,6 +250,7 @@ class CallLogFilterState {
     this.modes = const [],
     this.statuses = const [],
     this.sources = const [],
+    this.customFieldValues = const {},
   });
 
   final String? startDate;
@@ -266,6 +268,12 @@ class CallLogFilterState {
   /// `LIVE` | `UPLOAD`.
   final List<String> sources;
 
+  /// Tenant-configured custom-field filters, keyed by field definition id —
+  /// mirrors RN's `FilterState`'s custom-field entries (see
+  /// `custom_fields_filter.dart`). Each value is a `String` (TEXT) or
+  /// `List<String>` (multiselect option ids, or a 2-element range).
+  final Map<String, CustomFieldFilterValue> customFieldValues;
+
   bool get isEmpty =>
       startDate == null &&
       endDate == null &&
@@ -274,7 +282,8 @@ class CallLogFilterState {
       tags.isEmpty &&
       modes.isEmpty &&
       statuses.isEmpty &&
-      sources.isEmpty;
+      sources.isEmpty &&
+      !customFieldValues.values.any(hasFilterValue);
 
   /// Drives the badge on CallLogScreen's filter button — one count per
   /// non-empty field, matching RN's `countActiveFilters`.
@@ -284,7 +293,8 @@ class CallLogFilterState {
     minDuration,
     maxDuration,
   ].where((v) => v != null).length +
-      [tags, modes, statuses, sources].where((v) => v.isNotEmpty).length;
+      [tags, modes, statuses, sources].where((v) => v.isNotEmpty).length +
+      customFieldValues.values.where(hasFilterValue).length;
 
   CallLogFilterState copyWith({
     String? startDate,
@@ -295,6 +305,7 @@ class CallLogFilterState {
     List<String>? modes,
     List<String>? statuses,
     List<String>? sources,
+    Map<String, CustomFieldFilterValue>? customFieldValues,
   }) {
     return CallLogFilterState(
       startDate: startDate ?? this.startDate,
@@ -305,13 +316,15 @@ class CallLogFilterState {
       modes: modes ?? this.modes,
       statuses: statuses ?? this.statuses,
       sources: sources ?? this.sources,
+      customFieldValues: customFieldValues ?? this.customFieldValues,
     );
   }
 
   /// Builds `getCallLogs`' query-parameter map — comma-joined for the
   /// multiselect fields, matching the backend's `.split(',')` parsing
   /// exactly (`chat.repository.ts`'s `applyTagFilters`/
-  /// `applyModeStatusSourceFilters`).
+  /// `applyModeStatusSourceFilters`). `fieldFilters` mirrors RN's
+  /// `buildFieldFiltersParam` (see `custom_fields_filter.dart`).
   Map<String, dynamic> toQueryParameters() => {
     'startDate': ?startDate,
     'endDate': ?endDate,
@@ -321,6 +334,7 @@ class CallLogFilterState {
     if (modes.isNotEmpty) 'mode': modes.join(','),
     if (statuses.isNotEmpty) 'status': statuses.join(','),
     if (sources.isNotEmpty) 'source': sources.join(','),
+    'fieldFilters': ?buildFieldFiltersParam(customFieldValues),
   };
 
   // Structural equality, not identity — a runtime `copyWith()` result should
@@ -328,16 +342,28 @@ class CallLogFilterState {
   // Riverpod's default `updateShouldNotify` and mocktail's argument matching
   // both behave sensibly), unlike the default `Object.==`.
   @override
-  bool operator ==(Object other) =>
-      other is CallLogFilterState &&
-      startDate == other.startDate &&
-      endDate == other.endDate &&
-      minDuration == other.minDuration &&
-      maxDuration == other.maxDuration &&
-      listEquals(tags, other.tags) &&
-      listEquals(modes, other.modes) &&
-      listEquals(statuses, other.statuses) &&
-      listEquals(sources, other.sources);
+  bool operator ==(Object other) {
+    if (other is! CallLogFilterState) return false;
+    if (startDate != other.startDate ||
+        endDate != other.endDate ||
+        minDuration != other.minDuration ||
+        maxDuration != other.maxDuration ||
+        !listEquals(tags, other.tags) ||
+        !listEquals(modes, other.modes) ||
+        !listEquals(statuses, other.statuses) ||
+        !listEquals(sources, other.sources) ||
+        customFieldValues.length != other.customFieldValues.length) {
+      return false;
+    }
+    for (final entry in customFieldValues.entries) {
+      final otherValue = other.customFieldValues[entry.key];
+      final sameValue = entry.value is List && otherValue is List
+          ? listEquals(entry.value as List, otherValue)
+          : entry.value == otherValue;
+      if (!sameValue) return false;
+    }
+    return true;
+  }
 
   @override
   int get hashCode => Object.hash(
@@ -349,6 +375,10 @@ class CallLogFilterState {
     Object.hashAll(modes),
     Object.hashAll(statuses),
     Object.hashAll(sources),
+    // Values aren't individually hashed (a List's identity hash would break
+    // the structural-equality contract `==` establishes above) — length
+    // alone keeps hashCode consistent with `==` without that risk.
+    customFieldValues.length,
   );
 }
 

@@ -57,4 +57,23 @@ void main() {
       expect(result, isFalse);
     });
   });
+
+  group('getCustomFieldsEnabled', () {
+    test('GETs the bare-boolean endpoint and returns it', () async {
+      when(() => dio.get<bool>('/settings/custom-fields-enabled')).thenAnswer((_) async => _response(false));
+
+      final result = await repository.getCustomFieldsEnabled();
+
+      expect(result, isFalse);
+      verify(() => dio.get<bool>('/settings/custom-fields-enabled')).called(1);
+    });
+
+    test('defaults to true (active) when the body is absent, unlike the other toggles', () async {
+      when(() => dio.get<bool>('/settings/custom-fields-enabled')).thenAnswer((_) async => _response(null));
+
+      final result = await repository.getCustomFieldsEnabled();
+
+      expect(result, isTrue);
+    });
+  });
 }
