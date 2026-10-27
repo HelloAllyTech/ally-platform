@@ -4,11 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/permissions/permissions_repository.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../reactions/data/reactions_repository.dart';
+import '../../reviews/data/reviews_repository.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'simulation_transcript_tab.dart';
@@ -46,14 +51,21 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
       _SimulationFeedbackScreenState();
 }
 
-class _SimulationFeedbackScreenState
-    extends ConsumerState<SimulationFeedbackScreen> {
+class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScreen>
+    with SingleTickerProviderStateMixin {
   int _rating = 0;
   final _selectedTags = <String>{};
   final _commentController = TextEditingController();
   bool _isSubmitting = false;
   bool _submitted = false;
   String? _error;
+  late final TabController _tabController = TabController(length: 2, vsync: this)
+    ..addListener(() {
+      // Only the Debrief/Transcript tab toggles the floating review button
+      // (gated below on `_tabController.index != 0`) — rebuild on every
+      // index change, including mid-swipe, same as RN's `onIndexChange`.
+      if (mounted) setState(() {});
+    });
 
   /// Guards the one-time adoption of the fetched summary's existing
   /// `hasFeedback`/`feedbackRating` into local state (see the `ref.listen`
@@ -62,10 +74,43 @@ class _SimulationFeedbackScreenState
   /// learner has typed locally since.
   bool _initializedFromSummary = false;
 
+  /// Mirrors RN's `useHideReviewDetails`'s `hideReviewDetails` state
+  /// (initial value `true`, same as there) — whether the floating "view
+  /// review" button should stay hidden because the review is private AND
+  /// has no threads/reactions worth surfacing yet.
+  bool _hideReviewDetails = true;
+
+  /// Guards the async visibility check so it only re-runs when the
+  /// review's identity or privacy actually changes, not on every rebuild.
+  String? _hideReviewDetailsCheckedFor;
+
   @override
   void dispose() {
     _commentController.dispose();
+    _tabController.dispose();
     super.dispose();
+  }
+
+  /// Mirrors RN's `useHideReviewDetails`: a non-private review's button is
+  /// always shown; a private one is hidden unless it already has a thread
+  /// or a reaction (otherwise there's nothing behind the button to see).
+  Future<void> _checkHideReviewDetails(String reviewId, bool isPrivate) async {
+    if (!isPrivate) {
+      if (mounted) setState(() => _hideReviewDetails = false);
+      return;
+    }
+    try {
+      final threads = await ref.read(reviewsRepositoryProvider).getThreads(reviewId, limit: 1);
+      if (threads.threads.isNotEmpty) {
+        if (mounted) setState(() => _hideReviewDetails = false);
+        return;
+      }
+      final reactions = await ref.read(reactionsRepositoryProvider).getReactionsCount(reviewId);
+      if (mounted) setState(() => _hideReviewDetails = reactions.isEmpty);
+    } catch (_) {
+      // RN only logs this (console.error) and leaves the prior value in
+      // place — matched by simply not updating state here.
+    }
   }
 
   Future<void> _submit() async {
@@ -170,6 +215,34 @@ class _SimulationFeedbackScreenState
       }
     });
 
+    // One-time-per-identity visibility check for the floating "view review"
+    // button — mirrors RN's `useHideReviewDetails` effect, keyed on
+    // reviewId+isPrivate exactly like `CallSummaryScreen`'s own port of the
+    // same shared RN hook.
+    ref.listen(simulationSummaryProvider(widget.scenarioSessionId), (previous, next) {
+      final summary = next.value;
+      final reviewId = summary?.reviewId;
+      if (reviewId == null) return;
+      final isPrivate = summary!.reviewStatus == 'HIDDEN';
+      final key = '$reviewId|$isPrivate';
+      if (_hideReviewDetailsCheckedFor == key) return;
+      _hideReviewDetailsCheckedFor = key;
+      _checkHideReviewDetails(reviewId, isPrivate);
+    });
+
+    final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
+    final hasSimulationReviewPermission = permissions.contains(UserPermissions.viewSimulationReview);
+    final summary = ref.watch(simulationSummaryProvider(widget.scenarioSessionId)).value;
+    // Mirrors RN's `feedbackEnabled && !!reviewId && activeTabKey !==
+    // DEBRIEF && !hideReviewDetails && hasSimulationReviewPermission` —
+    // this port has no `feedbackTabs` opt-out system (both tabs always
+    // render), so that part of RN's gate is always satisfied here.
+    final showReviewButton =
+        summary?.reviewId != null &&
+        _tabController.index != 0 &&
+        !_hideReviewDetails &&
+        hasSimulationReviewPermission;
+
     return PopScope(
       // Already submitted (or came in with feedback already present), or
       // this is just a historical-logs view — nothing forcing an exit
@@ -178,26 +251,33 @@ class _SimulationFeedbackScreenState
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _confirmLeave();
       },
-      child: DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(ref.t('postSim.feedback.sessionFeedback')),
-            bottom: TabBar(
-              tabs: [
-                Tab(text: ref.t('postSim.tabs.debrief')),
-                Tab(text: ref.t('postSim.tabs.transcript')),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            children: [
-              _buildDebriefTab(context),
-              SimulationTranscriptTab(
-                scenarioSessionId: widget.scenarioSessionId,
-              ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(ref.t('postSim.feedback.sessionFeedback')),
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: [
+              Tab(text: ref.t('postSim.tabs.debrief')),
+              Tab(text: ref.t('postSim.tabs.transcript')),
             ],
           ),
+        ),
+        floatingActionButton: showReviewButton
+            ? FloatingActionButton(
+                key: const Key('simulation-feedback-view-review'),
+                onPressed: () => context.push(
+                  '/reviews/${summary!.reviewId}',
+                  extra: ReviewType.simulation,
+                ),
+                child: const Icon(Icons.comment_outlined),
+              )
+            : null,
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildDebriefTab(context),
+            SimulationTranscriptTab(scenarioSessionId: widget.scenarioSessionId),
+          ],
         ),
       ),
     );

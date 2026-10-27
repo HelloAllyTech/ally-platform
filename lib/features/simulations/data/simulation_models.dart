@@ -331,6 +331,8 @@ class SimulationSummary {
     required this.areasForImprovement,
     required this.hasFeedback,
     required this.feedbackRating,
+    required this.reviewId,
+    required this.reviewStatus,
   });
 
   factory SimulationSummary.fromJson(Map<String, dynamic> json) =>
@@ -346,6 +348,8 @@ class SimulationSummary {
             [],
         hasFeedback: json['hasFeedback'] as bool? ?? false,
         feedbackRating: (json['feedbackRating'] as num?)?.toInt(),
+        reviewId: json['reviewId'] as String?,
+        reviewStatus: json['reviewStatus'] as String?,
       );
 
   final String id;
@@ -356,6 +360,17 @@ class SimulationSummary {
   final List<String> areasForImprovement;
   final bool hasFeedback;
   final int? feedbackRating;
+
+  /// Mirrors ally-mobile (React Native)'s `SimulationSummaryData.reviewId`
+  /// — a simulation review (`/scenario-session-reviews`), a genuinely
+  /// separate resource from a scribe review. Drives the floating "view
+  /// review" button on `SimulationFeedbackScreen`.
+  final String? reviewId;
+
+  /// Mirrors `SimulationSummaryData.reviewStatus` (`ReviewStatus` enum in
+  /// RN — `'HIDDEN'`/`'IN_REVIEW'`/etc., kept as a raw string here the same
+  /// way `CallSummaryDetails.reviewStatus` already does).
+  final String? reviewStatus;
 }
 
 class SimulationPathDetails {
