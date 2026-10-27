@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Literal, Mapping, Optional
 
+from pydantic import ValidationError
+
 from app.core.branching_instructions.base import BranchingInstruction
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
@@ -159,7 +161,7 @@ def _create_event_by_detection_type(
 
             try:
                 time_data = TimeData(**raw_data)
-            except Exception as e:
+            except ValidationError as e:
                 log.warning("Event '%s' (TIME) invalid data: %s", event_id, e)
                 return None
 
@@ -179,7 +181,7 @@ def _create_event_by_detection_type(
                 return None
             try:
                 score_data = ScoreData(**raw_data)
-            except Exception as e:
+            except ValidationError as e:
                 log.warning("Event '%s' (SCORE) invalid data: %s", event_id, e)
                 return None
             return ScoreEvent.create(
@@ -240,7 +242,7 @@ def _create_event_by_detection_type(
                     dependent_events=raw_data.get("dependent_events", []),
                     expression=expression,
                 )
-            except Exception as e:
+            except (ValidationError, ValueError) as e:
                 log.warning(
                     "Event '%s' (COMBINATION) invalid expression/data: %s", event_id, e
                 )
@@ -287,7 +289,7 @@ def _create_event_by_detection_type(
 
             try:
                 utterance_length_data = UtteranceLengthData(**raw_data)
-            except Exception as e:
+            except (ValidationError, ValueError) as e:
                 log.warning(
                     "Event '%s' (HELPER_UTTERANCE_LENGTH) invalid data: %s", event_id, e
                 )
@@ -308,7 +310,7 @@ def _create_event_by_detection_type(
                 if raw_data and isinstance(raw_data, dict):
                     # Allow empty dict or no data for interruption events
                     interruption_data = InterruptionData(**raw_data)
-            except Exception as e:
+            except ValidationError as e:
                 log.warning(
                     "Event '%s' (HELPER_INTERRUPTED) invalid data: %s", event_id, e
                 )
@@ -328,7 +330,7 @@ def _create_event_by_detection_type(
                 helper_paraphrased_data = HelperParaphrasedData()
                 if raw_data and isinstance(raw_data, dict):
                     helper_paraphrased_data = HelperParaphrasedData(**raw_data)
-            except Exception as e:
+            except ValidationError as e:
                 log.warning(
                     "Event '%s' (HELPER_PARAPHRASED) invalid data: %s",
                     event_id,
@@ -408,7 +410,7 @@ def _parse_binary_classifier_data(
             positive_examples=positive_examples,
             negative_examples=negative_examples,
         )
-    except Exception as e:
+    except ValidationError as e:
         log.warning("Event '%s' (BINARY_CLASSIFIER) invalid data: %s", event_id, e)
         return None
 
