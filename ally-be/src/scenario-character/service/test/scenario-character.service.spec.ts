@@ -91,6 +91,7 @@ describe('ScenarioCharacterService', () => {
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      log: jest.fn(),
     });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -241,6 +242,33 @@ describe('ScenarioCharacterService', () => {
       const res = await service.createScenarioCharacter(createDto);
 
       expect(res).toEqual(mockCharacter);
+    });
+
+    it('logs success and error cases', async () => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue(1);
+      mockRepo.create.mockReturnValue(mockCharacter as ScenarioCharacter);
+      mockRepo.save.mockResolvedValue(mockCharacter as ScenarioCharacter);
+      const logger = LoggerService.getInstance('');
+      await service.createScenarioCharacter(createDto);
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        'User 1 attempting to create a character with name: Susan Tom',
+      );
+      expect(logger.info).toHaveBeenCalledWith(
+        'User 1 successfully created a character with name: Susan Tom',
+      );
+
+      const error = new Error('test error');
+      mockRepo.save.mockRejectedValue(error);
+
+      await expect(service.createScenarioCharacter(createDto)).rejects.toThrow(
+        error,
+      );
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'User 1 failed to create a character with name: Susan Tom',
+        error,
+      );
     });
   });
 
