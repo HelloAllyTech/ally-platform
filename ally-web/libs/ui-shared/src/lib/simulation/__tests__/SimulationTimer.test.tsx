@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { vi } from "vitest";
 import { SimulationTimer } from "../SimulationTimer";
 
@@ -31,13 +31,17 @@ describe("SimulationTimer", () => {
 
   it("should call onWarning when the time limit is approaching", async () => {
     render(<SimulationTimer {...props} timeLimit={60} />);
-    await vi.advanceTimersByTimeAsync(31 * 1000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+    });
     expect(mockOnWarning).toHaveBeenCalled();
   });
 
   it("should call onTimeLimit when the time limit is reached", async () => {
     render(<SimulationTimer {...props} timeLimit={60} />);
-    await vi.advanceTimersByTimeAsync(76 * 1000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(76 * 1000);
+    });
     expect(mockOnTimeLimit).toHaveBeenCalled();
   });
 
@@ -68,15 +72,17 @@ describe("SimulationTimer", () => {
     // The key is that `onWarning` and `onTimeLimit` are new function instances
     // on each render.
     for (let i = 0; i < 24; i++) {
-      await vi.advanceTimersByTimeAsync(500);
-      rerender(
-        <SimulationTimer
-          startTime={startTime}
-          timeLimit={timeLimit}
-          onWarning={() => onWarning()}
-          onTimeLimit={() => onTimeLimit()}
-        />,
-      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+        rerender(
+          <SimulationTimer
+            startTime={startTime}
+            timeLimit={timeLimit}
+            onWarning={() => onWarning()}
+            onTimeLimit={() => onTimeLimit()}
+          />,
+        );
+      });
     }
     
     // Total time advanced in loop is 12 seconds.
@@ -88,7 +94,9 @@ describe("SimulationTimer", () => {
     // The time limit callback should be triggered when `timeElapsed >= timeLimit + 15`,
     // which is `timeElapsed >= 25`.
     // We need to advance the clock further.
-    await vi.advanceTimersByTimeAsync(15 * 1000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15 * 1000);
+    });
     expect(onTimeLimit).toHaveBeenCalled();
   });
 });
