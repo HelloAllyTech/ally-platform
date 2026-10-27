@@ -126,7 +126,6 @@ export const ApiEndpoints = {
     UPDATE_SIMULATION_CASE_BY_ID: (id: string | number) => `/v1/learn/admin/cases/${id}`,
     GET_PROMPTS: "/v1/prompts",
     GET_PROMPTS_BY_TYPE: (promptType: string) => `/v1/prompts/by-type/${promptType}`,
-    CREATE_PROMPT: "/v1/prompts",
     UPDATE_PROMPT: (id: string | number) => `/v1/prompts/${id}`,
     DUPLICATE_PROMPT: (id: string | number) => `/v1/prompts/${id}/duplicate`,
     REVERT_PROMPT: (id: string | number) => `/v1/prompts/${id}/revert`,
@@ -146,7 +145,6 @@ export const ApiEndpoints = {
       `/v1/prompts/${id}/translations/${languageId}`,
     SET_TRANSLATION_RUNTIME_MODEL: (id: string | number, languageId: string | number) =>
       `/v1/prompts/${id}/translations/${languageId}/runtime-model`,
-    BACKFILL_PROMPT_TRANSLATIONS: "/v1/prompts/translations/backfill",
     GET_LLM_MODELS: "/v1/llm/models",
     GET_REPORT_BY_ID: (reportId: string) => `/v1/learn/scenarios/reports/${reportId}`,
     GET_REPORTS: (scenarioId: string) => `/v1/learn/scenarios/${scenarioId}/reports`,

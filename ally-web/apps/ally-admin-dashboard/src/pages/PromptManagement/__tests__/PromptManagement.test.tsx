@@ -9,14 +9,12 @@ import { Prompt } from "@types";
 
 // Mock the API hooks
 const mockGetPromptsQuery = vi.fn();
-const mockCreatePromptMutation = vi.fn();
 const mockUpdatePromptMutation = vi.fn();
 const mockDuplicatePromptMutation = vi.fn();
 const mockDeletePromptMutation = vi.fn();
 
 vi.mock("@api", () => ({
   useGetPromptsQuery: () => mockGetPromptsQuery(),
-  useCreatePromptMutation: () => mockCreatePromptMutation(),
   useUpdatePromptMutation: () => mockUpdatePromptMutation(),
   useDuplicatePromptMutation: () => mockDuplicatePromptMutation(),
   useDeletePromptMutation: () => mockDeletePromptMutation(),
@@ -71,24 +69,11 @@ vi.mock("@components", () => ({
         </button>
       </div>
     ) : null,
-  PromptSidePanel: ({ isOpen, selectedPrompt, onClose, onUpdate }: any) =>
+  PromptSidePanel: ({ isOpen, onClose }: any) =>
     isOpen && (
       <div data-testid="prompt-side-panel">
         <button data-testid="side-panel-close" onClick={onClose}>
           Close
-        </button>
-        <button
-          data-testid="side-panel-save"
-          onClick={() => {
-            if (selectedPrompt) {
-              onUpdate({
-                ...selectedPrompt,
-                name: "Updated Prompt",
-              });
-            }
-          }}
-        >
-          Save
         </button>
       </div>
     ),
@@ -152,10 +137,6 @@ describe("PromptManagement Component", () => {
       data: mockPrompts,
       isFetching: false,
     });
-    mockCreatePromptMutation.mockReturnValue([
-      vi.fn().mockResolvedValue({ error: null }),
-      { isLoading: false },
-    ]);
     mockUpdatePromptMutation.mockReturnValue([
       vi.fn().mockResolvedValue({ unwrap: () => Promise.resolve(true) }),
       { isLoading: false },
@@ -294,36 +275,6 @@ describe("PromptManagement Component", () => {
 
     const closeButton = screen.getByTestId("side-panel-close");
     fireEvent.click(closeButton);
-  });
-
-  it("should handle update prompt submission", async () => {
-    const store = createMockStore();
-    const updateMutation = vi.fn().mockResolvedValue({ unwrap: () => Promise.resolve(true) });
-    mockUpdatePromptMutation.mockReturnValue([updateMutation, { isLoading: false }]);
-
-    render(
-      <Provider store={store}>
-        <PromptManagement />
-      </Provider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("table-row-0")).toBeInTheDocument();
-    });
-
-    const tableRow = screen.getByTestId("table-row-0");
-    fireEvent.click(tableRow);
-
-    await waitFor(() => {
-      expect(screen.getByTestId("prompt-side-panel")).toBeInTheDocument();
-    });
-
-    const saveButton = screen.getByTestId("side-panel-save");
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(updateMutation).toHaveBeenCalled();
-    });
   });
 
   it("should display the correct number of prompts from API response", async () => {

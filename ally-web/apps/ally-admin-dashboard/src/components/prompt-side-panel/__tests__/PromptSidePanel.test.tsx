@@ -218,16 +218,13 @@ vi.mock("@constants", async () => {
       simulation: {
         editPrompt: "Edit Prompt",
         restoreDefault: "Restore default",
-        createPrompt: "Create new prompt",
         promptName: "Prompt Name",
         enterPromptName: "Enter prompt name",
         promptCode: "Prompt Code",
-        enterPromptCode: "Enter prompt code",
         promptDescription: "Description",
         enterPromptDescription: "Enter description",
         promptText: "Prompt",
         enterPrompt: "Enter prompt text",
-        promptRequired: "Prompt name, description, prompt code and prompt text are required",
         unsavedChangesWarning: "You have unsaved changes. Do you want to close anyway?",
         availableVariables: "Available variables",
         usedBlocks: "Used Blocks",
@@ -266,7 +263,6 @@ const DEBOUNCE_MS = 750;
 
 describe("PromptSidePanel Component", () => {
   const mockOnClose = vi.fn();
-  const mockOnUpdate = vi.fn();
   const mockOnAutoSave = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
@@ -286,7 +282,6 @@ describe("PromptSidePanel Component", () => {
         selectedPrompt={prompt}
         isOpen={true}
         onClose={mockOnClose}
-        onUpdate={mockOnUpdate}
         onAutoSave={mockOnAutoSave}
       />,
     );
@@ -300,12 +295,7 @@ describe("PromptSidePanel Component", () => {
   describe("Rendering", () => {
     it("should not render when isOpen is false", () => {
       const { container } = render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={false}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
+        <PromptSidePanel selectedPrompt={mockPrompt} isOpen={false} onClose={mockOnClose} />,
       );
 
       expect(container.firstChild).toBeNull();
@@ -313,39 +303,20 @@ describe("PromptSidePanel Component", () => {
 
     it("should not render when selectedPrompt is null", () => {
       const { container } = render(
-        <PromptSidePanel
-          selectedPrompt={null}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
+        <PromptSidePanel selectedPrompt={null} isOpen={true} onClose={mockOnClose} />,
       );
 
       expect(container.firstChild).toBeNull();
     });
 
     it("should display edit header when selectedPrompt has id", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
     });
 
     it("should render all form fields", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByText("test_prompt_code")).toBeInTheDocument(); // Prompt code (read-only)
       expect(screen.getByPlaceholderText("Enter prompt name")).toBeInTheDocument();
@@ -354,14 +325,7 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("shows the auto-save status pill instead of Save/Cancel buttons", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       // Everything persists automatically — no explicit Save/Cancel anymore.
       expect(screen.getByText("Saved")).toBeInTheDocument();
@@ -372,14 +336,7 @@ describe("PromptSidePanel Component", () => {
 
   describe("Form Population", () => {
     it("should populate form with selectedPrompt data", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByText("test_prompt_code")).toBeInTheDocument(); // Prompt code (read-only)
       expect(screen.getByDisplayValue("Test Prompt")).toBeInTheDocument();
@@ -395,23 +352,13 @@ describe("PromptSidePanel Component", () => {
         promptCode: "other_code",
       };
       const { rerender } = render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
+        <PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />,
       );
 
       expect(screen.getByDisplayValue("Test Prompt")).toBeInTheDocument();
 
       rerender(
-        <PromptSidePanel
-          selectedPrompt={otherPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
+        <PromptSidePanel selectedPrompt={otherPrompt} isOpen={true} onClose={mockOnClose} />,
       );
 
       expect(screen.getByDisplayValue("Other Prompt")).toBeInTheDocument();
@@ -421,28 +368,14 @@ describe("PromptSidePanel Component", () => {
 
   describe("Field Changes", () => {
     it("should display prompt code as read-only", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByText("test_prompt_code")).toBeInTheDocument();
       expect(screen.queryByPlaceholderText("Enter prompt code")).not.toBeInTheDocument();
     });
 
     it("should update name field", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const nameInput = screen.getByPlaceholderText("Enter prompt name") as HTMLInputElement;
       fireEvent.change(nameInput, { target: { value: "New Prompt" } });
@@ -451,14 +384,7 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("should update description field", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const descriptionInput = screen.getByPlaceholderText("Enter description") as HTMLInputElement;
       fireEvent.change(descriptionInput, { target: { value: "New Description" } });
@@ -467,14 +393,7 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("should update prompt text field", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const promptInput = screen.getByPlaceholderText("Enter prompt text") as HTMLTextAreaElement;
       fireEvent.change(promptInput, { target: { value: "New prompt text" } });
@@ -485,14 +404,7 @@ describe("PromptSidePanel Component", () => {
 
   describe("Prompt Code Display", () => {
     it("should show prompt code as read-only when editing", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByText("test_prompt_code")).toBeInTheDocument();
     });
@@ -504,7 +416,6 @@ describe("PromptSidePanel Component", () => {
           selectedPrompt={newPrompt as Prompt}
           isOpen={true}
           onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
         />,
       );
 
@@ -613,12 +524,7 @@ describe("PromptSidePanel Component", () => {
   describe("Close Functionality", () => {
     it("closes immediately on backdrop click — auto-save means no discard prompt", () => {
       const { container } = render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
+        <PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />,
       );
 
       fireEvent.change(screen.getByDisplayValue("Test Prompt"), {
@@ -699,27 +605,13 @@ describe("PromptSidePanel Component", () => {
 
   describe("Panel Header", () => {
     it("should display DoubleArrowRight icon", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByTestId("double-arrow-right")).toBeInTheDocument();
     });
 
     it("should have clickable header to close panel", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const headerButton = screen.getByText("Edit Prompt").closest("button");
       if (headerButton) {
@@ -732,14 +624,7 @@ describe("PromptSidePanel Component", () => {
 
   describe("Edge Cases", () => {
     it("should handle rapid field changes", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const nameInput = screen.getByPlaceholderText("Enter prompt name");
 
@@ -751,14 +636,7 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("should handle special characters in input fields", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const nameInput = screen.getByPlaceholderText("Enter prompt name");
       const specialChars = "@#$%^&*()_+-=[]{}|;:,.<>?";
@@ -769,14 +647,7 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("should handle long text input", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const promptInput = screen.getByPlaceholderText("Enter prompt text");
       const longText = "A".repeat(5000);
@@ -787,14 +658,7 @@ describe("PromptSidePanel Component", () => {
     });
 
     it("does not mark a no-op edit as unsaved", () => {
-      render(
-        <PromptSidePanel
-          selectedPrompt={mockPrompt}
-          isOpen={true}
-          onClose={mockOnClose}
-          onUpdate={mockOnUpdate}
-        />,
-      );
+      render(<PromptSidePanel selectedPrompt={mockPrompt} isOpen={true} onClose={mockOnClose} />);
 
       const nameInput = screen.getByDisplayValue("Test Prompt") as HTMLInputElement;
       // Retype the identical value — serialized state matches the baseline.
@@ -1515,7 +1379,6 @@ describe("PromptSidePanel Component", () => {
       });
 
       expect(mockRevertPrompt).toHaveBeenCalledWith({ id: "1" });
-      expect(mockOnUpdate).not.toHaveBeenCalled();
     });
 
     it("asks to confirm a judge rubric's pinned version, then reverts with it", async () => {

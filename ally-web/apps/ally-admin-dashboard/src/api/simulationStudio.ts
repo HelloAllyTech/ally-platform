@@ -853,18 +853,6 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
     }),
 
     /**
-     * Create a new prompt
-     */
-    createPrompt: builder.mutation<Prompt, { prompts: Prompt[] }>({
-      query: ({ prompts }) => ({
-        url: ApiEndpoints.SIMULATION_STUDIO.CREATE_PROMPT,
-        method: HttpMethod.POST,
-        body: { prompts },
-      }),
-      invalidatesTags: [TAG_TYPES.PROMPTS],
-    }),
-
-    /**
      * Update a prompt
      */
     updatePrompt: builder.mutation<
@@ -1060,15 +1048,6 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.SIMULATION_STUDIO.SET_TRANSLATION_RUNTIME_MODEL(id, languageId),
         method: HttpMethod.PUT,
         body: { provider, model },
-      }),
-      invalidatesTags: [TAG_TYPES.PROMPTS],
-    }),
-
-    /** Backfill: (re)translate every enabled source across eligible languages. */
-    backfillPromptTranslations: builder.mutation<unknown, void>({
-      query: () => ({
-        url: ApiEndpoints.SIMULATION_STUDIO.BACKFILL_PROMPT_TRANSLATIONS,
-        method: HttpMethod.POST,
       }),
       invalidatesTags: [TAG_TYPES.PROMPTS],
     }),
@@ -1801,7 +1780,6 @@ export const {
   useGetPromptsQuery,
   useGetLlmModelsQuery,
   useGetPromptsByTypeQuery,
-  useCreatePromptMutation,
   useUpdatePromptMutation,
   useDuplicatePromptMutation,
   useRevertPromptMutation,
@@ -1820,7 +1798,6 @@ export const {
   useRetranslatePromptMutation,
   useRetranslatePromptLanguageMutation,
   useSetTranslationRuntimeModelMutation,
-  useBackfillPromptTranslationsMutation,
   useGetLanguageGlossaryQuery,
   useGetVarietyProfilesQuery,
   useUpsertGlossarySectionMutation,

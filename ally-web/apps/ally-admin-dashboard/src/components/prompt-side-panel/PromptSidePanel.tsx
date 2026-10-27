@@ -98,11 +98,6 @@ interface PromptSidePanelProps {
   isOpen: boolean;
   onClose: () => void;
   /**
-   * Kept for callers that still pass it; the panel no longer writes through it.
-   * Text, blocks and Restore default all go through the version endpoints.
-   */
-  onUpdate?: (prompt: Prompt) => void;
-  /**
    * Silent persistence path used by the panel's metadata auto-save. It MUST NOT
    * toast or close: the panel drives a debounced save on every metadata edit
    * and reflects the result in its own inline status indicator. The payload

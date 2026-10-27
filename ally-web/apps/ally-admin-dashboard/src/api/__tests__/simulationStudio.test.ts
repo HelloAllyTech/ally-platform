@@ -842,10 +842,6 @@ describe("simulationStudio API", () => {
         expect(ApiEndpoints.SIMULATION_STUDIO.GET_PROMPTS).toBe("/v1/prompts");
       });
 
-      it("should have correct create prompt endpoint", () => {
-        expect(ApiEndpoints.SIMULATION_STUDIO.CREATE_PROMPT).toBe("/v1/prompts");
-      });
-
       it("should have correct update prompt endpoint function", () => {
         const promptId = "prompt-123";
         const url = ApiEndpoints.SIMULATION_STUDIO.UPDATE_PROMPT(promptId);

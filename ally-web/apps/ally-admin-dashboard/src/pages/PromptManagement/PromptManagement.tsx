@@ -11,7 +11,6 @@ import {
 import { FilterDropdown, NotionTable, ListToolbar, PromptSidePanel } from "@components";
 import { en, PROMPT_COLUMNS, SORT_BY, SORT_ORDER } from "@constants";
 import { Prompt } from "@types";
-import { getErrorMessage } from "@utils/errorMessage";
 
 type PromptManagementFilters = {
   categories: string[];
@@ -236,34 +235,6 @@ export const PromptManagement: React.FC<PromptManagementProps> = ({ header }) =>
     setSelectedPrompt(null);
   };
 
-  const handlePromptUpdate = async (promptData: Prompt) => {
-    if (!promptData.id) return;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, createdAt, updatedAt, ...rest } = promptData;
-      await updatePrompt({
-        id: promptData.id,
-        prompt: rest,
-      }).unwrap();
-      toast.success(en.simulation.promptUpdatedSuccessfully);
-
-      // Only close the panel if we updated the main prompt, not a sub-block
-      if (promptData.id === selectedPrompt?.id) {
-        handleSidePanelClose();
-      }
-    } catch (error) {
-      // A 409 is the server refusing a change that has to go through Builder's replay
-      // eval instead (a gated Builder prompt): its message says where. Any other
-      // failure keeps the generic toast.
-      const isConflict = (error as { status?: unknown } | null)?.status === 409;
-      toast.error(
-        isConflict
-          ? getErrorMessage(error, en.simulation.failedToUpdatePrompt)
-          : en.simulation.failedToUpdatePrompt,
-      );
-    }
-  };
-
   // Silent persistence for the panel's auto-save: no toast, no close (the
   // panel shows its own inline "Saving…/Saved" indicator). Errors propagate so
   // the panel can flip to its "couldn't save — retry" state.
@@ -395,7 +366,6 @@ export const PromptManagement: React.FC<PromptManagementProps> = ({ header }) =>
           allPrompts={allPromptsForEditor}
           isOpen={isSidePanelOpen}
           onClose={handleSidePanelClose}
-          onUpdate={handlePromptUpdate}
           onAutoSave={handlePromptAutoSave}
           onDuplicate={handlePromptDuplicate}
           onDelete={handlePromptDelete}
