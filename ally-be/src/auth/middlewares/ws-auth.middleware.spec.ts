@@ -5,6 +5,7 @@ import { PermissionsService } from 'src/authorization/service/permissions.servic
 import { WebSocketAuthMiddleware } from './ws-auth.middleware';
 import { Socket } from 'socket.io';
 import { UnauthorizedException } from '../../exception/custom.exception';
+import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 
 describe('WebSocketAuthMiddleware', () => {
   let middleware: WebSocketAuthMiddleware;
@@ -104,6 +105,31 @@ describe('WebSocketAuthMiddleware', () => {
       await middleware.webSocketMiddleware()(socket, next);
 
       expect(next).toHaveBeenCalledWith(originalError);
+    });
+
+    it('should call next with UnauthorizedException when token is expired', async () => {
+      const tokenExpiredError = new TokenExpiredError(
+        'jwt expired',
+        new Date(),
+      );
+      jwtService.verifyAsync.mockRejectedValue(tokenExpiredError);
+
+      await middleware.webSocketMiddleware()(socket, next);
+
+      expect(next).toHaveBeenCalledWith(
+        new UnauthorizedException('Invalid or expired token'),
+      );
+    });
+
+    it('should call next with UnauthorizedException when token is malformed', async () => {
+      const jsonWebTokenError = new JsonWebTokenError('jwt malformed');
+      jwtService.verifyAsync.mockRejectedValue(jsonWebTokenError);
+
+      await middleware.webSocketMiddleware()(socket, next);
+
+      expect(next).toHaveBeenCalledWith(
+        new UnauthorizedException('Invalid or expired token'),
+      );
     });
   });
 });

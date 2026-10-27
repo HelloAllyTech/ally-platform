@@ -10,6 +10,7 @@ import {
 } from '../../exception/custom.exception';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { isPlatformTokenKind } from '../util/token-kind.util';
+import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 
 @Injectable()
 export class WebSocketAuthMiddleware {
@@ -105,6 +106,12 @@ export class WebSocketAuthMiddleware {
           `WebSocket authentication failed for socket ${socket.id}:`,
           error,
         );
+        if (
+          error instanceof TokenExpiredError ||
+          error instanceof JsonWebTokenError
+        ) {
+          return next(new UnauthorizedException('Invalid or expired token'));
+        }
         next(error);
       }
     };
