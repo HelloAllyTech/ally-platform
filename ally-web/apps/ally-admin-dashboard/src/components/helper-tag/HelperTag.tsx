@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCreateHelperTagMutation, useGetHelperTagsQuery } from "@api";
 import { Close, Plus, Search } from "@assets";
@@ -71,12 +71,15 @@ export const HelperTag: React.FC<HelperTagProps> = ({
   }, [options, page, tags]);
 
   // Intersection Observer callback
-  const handleObserver = (entries: IntersectionObserverEntry[]) => {
-    const [target] = entries;
-    if (target.isIntersecting && hasMore && !isFetching) {
-      setPage(prev => prev + 1);
-    }
-  };
+  const handleObserver = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [target] = entries;
+      if (target.isIntersecting && hasMore && !isFetching) {
+        setPage(prev => prev + 1);
+      }
+    },
+    [hasMore, isFetching],
+  );
 
   // Setup Intersection Observer
   useEffect(() => {
