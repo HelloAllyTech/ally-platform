@@ -33,7 +33,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       this.logger.warn(
         `JwtStrategy rejected a token of kind '${String(payload?.kind)}'`,
       );
-      throw new UnauthorizedException();
+      throw new UnauthorizedException(
+        `This token is not valid for platform access (kind: ${String(
+          payload?.kind,
+        )})`,
+      );
     }
 
     const user = {
