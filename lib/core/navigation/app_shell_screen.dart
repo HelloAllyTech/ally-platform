@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/achievements/presentation/badge_popup.dart';
+import '../../features/community/presentation/community_screen.dart';
 import '../../features/notifications/data/notifications_repository.dart';
 import '../../features/reviews/data/reviews_repository.dart';
+import '../localization/translate_ref.dart';
 import '../permissions/permissions_repository.dart';
 import '../permissions/user_permissions.dart';
 import '../push/push_notification_service.dart';
@@ -70,6 +72,22 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
     }
   }
 
+  /// A bottom-tab tap. Community never stays selected: RN's
+  /// `CommunityScreen` focus effect `goBack()`s (to the first tab, the
+  /// default `backBehavior: 'firstRoute'`) and opens the community site,
+  /// on every focus. Only when Community is itself the first tab does it
+  /// stay (RN's `goBack` has nowhere to go).
+  void _selectTab(List<TabConfig> visibleTabs, int index) {
+    final name = visibleTabs[index].name;
+    if (name == kTabCommunity) {
+      if (name == _selectedTabName) return;
+      openCommunity();
+      setState(() => _selectedTabName = visibleTabs.first.name);
+      return;
+    }
+    setState(() => _selectedTabName = name);
+  }
+
   @override
   Widget build(BuildContext context) {
     final permissionsAsync = ref.watch(userPermissionsProvider);
@@ -78,7 +96,25 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
       // Matches `BottomTabs`'s own `if (userLoading) return null`: avoid a
       // flash of the wrong tab set before permissions resolve.
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
+      // RN's checkAuth logs out when the permissions call fails; the team
+      // treats that as a bug (decision: no logout on non-401 errors), so
+      // offer a retry instead of a dead end.
+      error: (error, _) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(ref.t('common.somethingWentWrong'), textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              TextButton(
+                key: const Key('shell-permissions-retry'),
+                onPressed: () => ref.invalidate(userPermissionsProvider),
+                child: Text(ref.t('common.retry')),
+              ),
+            ],
+          ),
+        ),
+      ),
       data: (permissions) {
         final visibleTabs = visibleTabsFor(permissions);
         _selectedTabName ??= getFirstVisibleTab(permissions);
@@ -108,7 +144,7 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
             builder: (context) => Stack(
               children: [
                 if (visibleTabs.isEmpty)
-                  const Center(child: Text('No accessible tabs for this account'))
+                  Center(child: Text(ref.t('home.noAccessibleTabs')))
                 else
                   // Each tab body (`TabScreenHeader` et al.) assumes RN's
                   // per-screen `paddingTop: insets.top`, which nothing here
@@ -140,7 +176,7 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
                     visibleTabs: visibleTabs,
                     currentIndex: currentIndex,
                     hasUnreadReviews: hasUnreadReviews,
-                    onTap: (index) => setState(() => _selectedTabName = visibleTabs[index].name),
+                    onTap: (index) => _selectTab(visibleTabs, index),
                   ),
               ],
             ),

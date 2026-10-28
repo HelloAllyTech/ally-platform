@@ -2096,7 +2096,8 @@
     "boxBreathing": "Phase 4: Box breathing",
     "cases": "Phase 4: Cases",
     "scribe": "Phase 1: Scribe recording",
-    "roleplay": "Phase 1: Roleplay voice"
+    "roleplay": "Phase 1: Roleplay voice",
+    "noAccessibleTabs": "No accessible tabs for this account"
   },
   "notifications": {
     "title": "Notifications",
