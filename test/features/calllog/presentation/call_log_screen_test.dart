@@ -9,7 +9,7 @@ import 'package:permission_handler_platform_interface/permission_handler_platfor
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/core/widgets/app_empty_state.dart';
 import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
@@ -19,13 +19,23 @@ import '../../../support/pump_router_app.dart';
 
 class MockCallLogRepository extends Mock implements CallLogRepository {}
 
-CallLogItem _log({int id = 42, String status = 'SUCCESS'}) => CallLogItem(
+CallLogItem _log({
+  int id = 42,
+  String status = 'SUCCESS',
+  String? summaryStatus,
+  String? sessionName = 'Walk-in #1',
+  int? chatId = -1,
+}) =>
+    CallLogItem(
       id: id,
       startedAt: '2026-01-01T10:00:00Z',
       endedAt: '2026-01-01T10:10:00Z',
       status: status,
-      sessionName: 'Walk-in #1',
+      summaryStatus: summaryStatus,
+      sessionName: sessionName,
       score: 91,
+      // A real row has `details.chatId` (the chat's own id); -1 means "same as id".
+      chatId: chatId == -1 ? id : chatId,
     );
 
 SimulationLogItem _simLog({String id = '7'}) => SimulationLogItem(
@@ -148,11 +158,9 @@ void main() {
   });
 
   testWidgets(
-    'archive action switches into the Archives view with a back button, and swipe-to-archive '
-    'requires confirming before it actually archives',
+    'archive action switches into the Archives view with a back button; rows have no swipe-to-archive',
     (tester) async {
       final repository = _repository(realLogs: [_log()], archivedLogs: [_log(id: 99)]);
-      when(() => repository.archiveCallLog(42)).thenAnswer((_) async {});
 
       await pumpRouterApp(
         tester,
@@ -172,42 +180,27 @@ void main() {
         ],
       );
 
-      expect(find.byIcon(Icons.more_vert), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.more_vert));
+      // RN has no swipe gesture on this list.
+      expect(find.byType(Dismissible), findsNothing);
+
+      expect(find.byKey(const Key('call-log-actions-menu')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('call-log-actions-menu')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Archives').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Archives'), findsWidgets);
       expect(find.text('Walk-in #1'), findsOneWidget); // id 99's session name
-      expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+      expect(find.byKey(const Key('call-log-archive-back')), findsOneWidget);
       expect(
-        find.byIcon(Icons.more_vert),
+        find.byKey(const Key('call-log-actions-menu')),
         findsNothing,
         reason: 'no archive action while already viewing archives',
       );
 
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.tap(find.byKey(const Key('call-log-archive-back')));
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.arrow_back), findsNothing);
-
-      // Swiping alone no longer archives immediately — RN has no such
-      // instant gesture at all (archiving only happens via CallSummaryScreen's
-      // own confirmation modal), and a bare swipe used to archive silently
-      // and irreversibly on an accidental touch. The swipe now only opens
-      // that same real confirmation copy; archiveCallLog fires only once
-      // its own Archive button is tapped.
-      await tester.drag(find.byKey(const ValueKey(42)), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      verifyNever(() => repository.archiveCallLog(42));
-      expect(
-        find.textContaining('This will hide it from session logs'),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.widgetWithText(AppButton, 'Archive'));
-      await tester.pumpAndSettle();
-      verify(() => repository.archiveCallLog(42)).called(1);
+      expect(find.byKey(const Key('call-log-archive-back')), findsNothing);
     },
   );
 
@@ -419,9 +412,8 @@ void main() {
   );
 
   testWidgets(
-    'no FAB at all when the tenant has disabled microphone chat, even with the start-call '
-    'permission and no Create Note capability — matches RN\'s canOfferAnySessionType, which is '
-    'gated on the tenant\'s enabled chat types, not the permission alone',
+    'a greyed, inert FAB when the tenant has disabled microphone chat and there is no Create Note '
+    'capability — RN keeps the button (canStartCall) but disables it (canOfferAnySessionType)',
     (tester) async {
       final repository = _repository();
 
@@ -438,7 +430,11 @@ void main() {
         ],
       );
 
-      expect(find.byKey(const Key('start-session-fab')), findsNothing);
+      expect(find.byKey(const Key('start-session-fab')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+      expect(find.text('Start Scribe Mode'), findsNothing);
+      expect(find.text('Start Dictation Mode'), findsNothing);
     },
   );
 
@@ -524,37 +520,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'cancelling the swipe-to-archive confirmation leaves the row in place and never archives',
-    (tester) async {
-      final repository = _repository(realLogs: [_log()]);
-
-      await pumpRouterApp(
-        tester,
-        initialLocation: '/call-log',
-        routes: _routes(),
-        overrides: [
-          callLogRepositoryProvider.overrideWithValue(repository),
-          userPermissionsProvider.overrideWith(
-            (ref) async => [
-              UserPermissions.viewCallLogs,
-              UserPermissions.archiveCallLog,
-            ],
-          ),
-        ],
-      );
-
-      await tester.drag(find.byKey(const ValueKey(42)), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.widgetWithText(AppButton, 'Cancel'));
-      await tester.pumpAndSettle();
-
-      verifyNever(() => repository.archiveCallLog(any()));
-      expect(find.text('Walk-in #1'), findsOneWidget, reason: 'row is still there, not dismissed');
-    },
-  );
-
   testWidgets('scrolling near the bottom of the real-logs list loads the next page and appends it', (
     tester,
   ) async {
@@ -586,7 +551,7 @@ void main() {
       ],
     );
 
-    expect(find.text('Session #100'), findsNothing, reason: 'page 2 not loaded yet');
+    expect(find.text('ID-100'), findsNothing, reason: 'page 2 not loaded yet');
 
     // A single large drag pins the scroll position near the (pre-append)
     // bottom, which crosses the near-bottom `loadMore` threshold; appending
@@ -594,7 +559,7 @@ void main() {
     // needed to actually scroll the new last row into view —
     // `dragUntilVisible` handles both in one go.
     await tester.dragUntilVisible(
-      find.text('Session #100'),
+      find.text('ID-100'),
       find.byType(ListView),
       const Offset(0, -300),
     );
@@ -631,5 +596,103 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false)).called(1);
+  });
+
+  testWidgets(
+    'rows show the summaryStatus pill (not the chat status) and fall back to the chat id for a title',
+    (tester) async {
+      final repository = _repository(
+        realLogs: [
+          _log(id: 15, status: 'ENDED', summaryStatus: 'FAILED', sessionName: null),
+          _log(id: 11, status: 'ENDED', summaryStatus: 'SUCCESS', sessionName: 'CALL-11-2026-07-27'),
+        ],
+      );
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.viewCallLogs, UserPermissions.viewChatDetails],
+          ),
+        ],
+      );
+
+      expect(find.text('15'), findsOneWidget);
+      expect(find.text('Error'), findsOneWidget);
+      expect(find.text('CALL-11-2026-07-27'), findsOneWidget);
+      expect(find.text('Generated'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'like RN, the first page drops rows whose details.chatId matches the (absent) current chat — '
+    'i.e. rows ally-be returned with empty details',
+    (tester) async {
+      final repository = _repository(
+        realLogs: [
+          _log(id: 16, sessionName: 'No details yet', chatId: null),
+          _log(id: 15, sessionName: 'Has details'),
+        ],
+      );
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.viewCallLogs, UserPermissions.viewChatDetails],
+          ),
+        ],
+      );
+
+      expect(find.text('No details yet'), findsNothing);
+      expect(find.text('Has details'), findsOneWidget);
+    },
+  );
+
+  testWidgets('the header refresh button re-fetches the visible list', (tester) async {
+    final repository = _repository(realLogs: [_log()]);
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: _routes(),
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith(
+          (ref) async => [UserPermissions.viewCallLogs, UserPermissions.viewChatDetails],
+        ),
+      ],
+    );
+    verify(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false)).called(1);
+
+    await tester.tap(find.byKey(const Key('call-log-refresh')));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false)).called(1);
+    expect(find.text('Walk-in #1'), findsOneWidget);
+  });
+
+  testWidgets('the empty state shows RN\'s illustration, title and description', (tester) async {
+    final repository = _repository();
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: _routes(),
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith((ref) async => [UserPermissions.viewCallLogs]),
+      ],
+    );
+
+    expect(find.byType(AppEmptyState), findsOneWidget);
+    expect(find.text('No call logs found'), findsOneWidget);
+    expect(find.text('Your active call will be shown here.'), findsOneWidget);
   });
 }

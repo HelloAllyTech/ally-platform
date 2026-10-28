@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/network/api_client.dart';
 import 'custom_fields_filter.dart';
 
@@ -39,6 +40,10 @@ class CallLogItem {
     required this.sessionName,
     required this.score,
     this.tags = const [],
+    this.summaryStatus,
+    this.chatId,
+    this.provider,
+    this.mode,
   });
 
   factory CallLogItem.fromJson(Map<String, dynamic> json) {
@@ -63,16 +68,46 @@ class CallLogItem {
           (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
       score: (json['score'] as num?)?.toDouble(),
       tags: rawTags.map((t) => CallTag.fromJson(t as Map<String, dynamic>)).toList(),
+      summaryStatus: json['summaryStatus'] as String?,
+      chatId: (details?['chatId'] as num?)?.toInt(),
+      provider: callInfo?['provider'] as String?,
+      mode: callInfo?['mode'] as String?,
     );
   }
 
   final int id;
   final String startedAt;
   final String endedAt;
+
+  /// The chat's own lifecycle status (`ENDED`, ...). The row's status pill
+  /// reads [displayStatus] instead.
   final String status;
   final String? sessionName;
   final double? score;
   final List<CallTag> tags;
+
+  /// RN's `LogItem.summaryStatus` (`PENDING`/`IN_PROGRESS`/`SUCCESS`/
+  /// `FAILED`/`NO_AUDIO`) — the summary-generation state the row's
+  /// Generated/Error/Processing pill shows.
+  final String? summaryStatus;
+
+  /// `details.chatId`. ally-be returns `details: {}` for a chat with no
+  /// call-details row yet, so this is null for those.
+  final int? chatId;
+
+  /// `details.callInfo.provider` / `.mode` — the expanded row's channel and
+  /// mode labels.
+  final String? provider;
+  final String? mode;
+
+  /// RN `CallLogItem.tsx`'s `item.summaryStatus || item.status`.
+  String get displayStatus => (summaryStatus?.isNotEmpty ?? false) ? summaryStatus! : status;
+
+  /// RN `CallLogItem.tsx`'s `logTitle`: `callInfo.summaryName ||
+  /// metadata.sessionName || details.chatId || 'ID-' + id` ([sessionName]
+  /// already holds the first two).
+  String get logTitle =>
+      (sessionName?.isNotEmpty ?? false) ? sessionName! : chatId?.toString() ?? 'ID-$id';
 }
 
 /// The "Role play" sub-tab's row shape — mirrors a `/learn/scenario-sessions`
@@ -86,6 +121,7 @@ class SimulationLogItem {
     required this.status,
     required this.scenarioTitle,
     required this.score,
+    this.sessionName,
   });
 
   factory SimulationLogItem.fromJson(Map<String, dynamic> json) {
@@ -106,6 +142,7 @@ class SimulationLogItem {
       status: json['status'] as String? ?? '',
       scenarioTitle: scenario?['title'] as String? ?? json['scenarioTitle'] as String?,
       score: (json['score'] as num?)?.toDouble(),
+      sessionName: (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
     );
   }
 
@@ -115,6 +152,13 @@ class SimulationLogItem {
   final String status;
   final String? scenarioTitle;
   final double? score;
+
+  /// `metadata.sessionName` — the only `logTitle` source a scenario session
+  /// can have (it has no `details`).
+  final String? sessionName;
+
+  /// RN `CallLogItem.tsx`'s `logTitle` for a role-play row.
+  String get logTitle => (sessionName?.isNotEmpty ?? false) ? sessionName! : 'ID-$id';
 }
 
 /// Mirrors ally-mobile (React Native)'s `src/services/callTranscriptApi.ts`
@@ -630,14 +674,24 @@ const kCallLogPageSize = 10;
 /// separate `totalCount` from either backend list endpoint to check
 /// against instead.
 class PaginatedLogs<T> {
-  PaginatedLogs({required this.items, required this.hasMore, this.isLoadingMore = false});
+  PaginatedLogs({required this.items, required this.hasMore, this.isLoadingMore = false, int? nextOffset})
+      : nextOffset = nextOffset ?? items.length;
 
   final List<T> items;
   final bool hasMore;
   final bool isLoadingMore;
 
-  PaginatedLogs<T> copyWith({bool? isLoadingMore}) =>
-      PaginatedLogs(items: items, hasMore: hasMore, isLoadingMore: isLoadingMore ?? this.isLoadingMore);
+  /// Server offset of the next page. Usually `items.length`, but the real
+  /// list filters its first page client-side (see [RealCallLogsController]),
+  /// so it advances by whole pages like RN's `realLogsOffset`.
+  final int nextOffset;
+
+  PaginatedLogs<T> copyWith({bool? isLoadingMore}) => PaginatedLogs(
+        items: items,
+        hasMore: hasMore,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+        nextOffset: nextOffset,
+      );
 }
 
 /// Common shape for [RealCallLogsController]/[ArchivedCallLogsController] —
@@ -657,13 +711,27 @@ abstract class PaginatedCallLogsController extends AsyncNotifier<PaginatedLogs<C
 /// same effect RN gets from `useFocusEffect` re-running when its filter
 /// params change.
 class RealCallLogsController extends PaginatedCallLogsController {
+  /// RN's `fetchInitialRealLogs` drops every first-page row whose
+  /// `details.chatId` equals `currentChat?.chatId` ("to avoid showing the
+  /// ongoing call log"). With no current chat that comparison is
+  /// `undefined !== undefined`, so it also drops every row whose `details`
+  /// is `{}` — ally-be's `CallLogService.getCallLogs` returns `details: {}`
+  /// for a chat that has no call-details row yet (e.g. a brand-new session
+  /// whose summary hasn't been written). Those rows never show on RN's first
+  /// page, so they don't here either. Like RN, only the first page is
+  /// filtered and `hasMore` still counts the unfiltered page.
   @override
   Future<PaginatedLogs<CallLogItem>> build() async {
     final filter = ref.watch(callLogFilterProvider);
+    final currentChatId = ref.watch(currentChatProvider.select((chat) => chat?.chatId));
     final items = await ref
         .watch(callLogRepositoryProvider)
         .getCallLogs(limit: kCallLogPageSize, filter: filter);
-    return PaginatedLogs(items: items, hasMore: items.length == kCallLogPageSize);
+    return PaginatedLogs(
+      items: items.where((log) => log.chatId != currentChatId).toList(),
+      hasMore: items.length == kCallLogPageSize,
+      nextOffset: items.length,
+    );
   }
 
   @override
@@ -676,11 +744,12 @@ class RealCallLogsController extends PaginatedCallLogsController {
       final filter = ref.read(callLogFilterProvider);
       final newItems = await ref
           .read(callLogRepositoryProvider)
-          .getCallLogs(limit: kCallLogPageSize, offset: current.items.length, filter: filter);
+          .getCallLogs(limit: kCallLogPageSize, offset: current.nextOffset, filter: filter);
       state = AsyncData(
         PaginatedLogs(
           items: [...current.items, ...newItems],
           hasMore: newItems.length == kCallLogPageSize,
+          nextOffset: current.nextOffset + newItems.length,
         ),
       );
     } catch (_) {
