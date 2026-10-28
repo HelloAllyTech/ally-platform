@@ -229,4 +229,10 @@ class AppColors {
   static const black = Color(0xFF000000); // colors.black: question-media video frame
   static const lightboxScrim = Color(0xE6000000); // rgba(0,0,0,0.9): QuestionMedia lightbox
   static const iosPlaceholder = Color(0x4D3C3C43); // iOS default TextInput placeholder (no placeholderTextColor)
+
+  // w5shell parity (src/theme/colors.ts)
+  static const white4 = Color(0xFFECECEC); // ResourceArticleCard light category chip
+  static const darkGray14 = Color(0xFF535353); // ResourceArticleCard light category text
+  static const darkGray15 = Color(0xFF616161); // ResourceArticleCard light tag text
+  static const darkGray6 = Color(0xFF525252); // ResourceArticleCard light content / View more
 }
