@@ -113,6 +113,47 @@ class TrackListItem {
   final String? trackEnrollmentId;
 }
 
+/// Mirrors RN's `TrackCompletionCriteria` (`src/types/courses.ts:58-66`) —
+/// only the two fields `getTrackItemMeta`'s QUIZ/ROLEPLAY branches actually
+/// read.
+class TrackCompletionCriteria {
+  TrackCompletionCriteria({this.minScore, this.passScore});
+
+  factory TrackCompletionCriteria.fromJson(Map<String, dynamic> json) =>
+      TrackCompletionCriteria(
+        minScore: (json['minScore'] as num?)?.toDouble(),
+        passScore: (json['passScore'] as num?)?.toDouble(),
+      );
+
+  final double? minScore;
+  final double? passScore;
+}
+
+/// Mirrors RN's `TrackItemContentMeta` (`src/types/courses.ts:69-80`) — only
+/// the fields `getTrackItemMeta`'s QUIZ/VIDEO/JOURNAL branches read
+/// (`source`/`gameKey` aren't used by the meta line itself).
+class TrackItemContentMeta {
+  TrackItemContentMeta({
+    this.questionCount,
+    this.passScore,
+    this.durationSeconds,
+    this.promptCount,
+  });
+
+  factory TrackItemContentMeta.fromJson(Map<String, dynamic> json) =>
+      TrackItemContentMeta(
+        questionCount: (json['questionCount'] as num?)?.toInt(),
+        passScore: (json['passScore'] as num?)?.toDouble(),
+        durationSeconds: (json['durationSeconds'] as num?)?.toInt(),
+        promptCount: (json['promptCount'] as num?)?.toInt(),
+      );
+
+  final int? questionCount;
+  final double? passScore;
+  final int? durationSeconds;
+  final int? promptCount;
+}
+
 class TrackDetailItem {
   TrackDetailItem({
     required this.id,
@@ -146,7 +187,7 @@ class TrackDetailItem {
             ? TrackItemContentMeta.fromJson(json['contentMeta'] as Map<String, dynamic>)
             : null,
         completionCriteria: json['completionCriteria'] is Map<String, dynamic>
-            ? TrackItemCompletionCriteria.fromJson(
+            ? TrackCompletionCriteria.fromJson(
                 json['completionCriteria'] as Map<String, dynamic>,
               )
             : null,
@@ -174,42 +215,11 @@ class TrackDetailItem {
   /// "In progress".
   final String? startedAt;
   final TrackItemContentMeta? contentMeta;
-  final TrackItemCompletionCriteria? completionCriteria;
+  final TrackCompletionCriteria? completionCriteria;
 
   /// RN's `TrackLanguageFallbackReason` (why this component reads in
   /// English), or null.
   final String? languageFallbackReason;
-}
-
-/// RN's `TrackItemContentMeta` — the fields CourseItemRow's meta line reads.
-class TrackItemContentMeta {
-  TrackItemContentMeta({this.questionCount, this.passScore, this.durationSeconds, this.promptCount});
-
-  factory TrackItemContentMeta.fromJson(Map<String, dynamic> json) => TrackItemContentMeta(
-    questionCount: (json['questionCount'] as num?)?.toInt(),
-    passScore: json['passScore'] as num?,
-    durationSeconds: json['durationSeconds'] as num?,
-    promptCount: (json['promptCount'] as num?)?.toInt(),
-  );
-
-  final int? questionCount;
-  final num? passScore;
-  final num? durationSeconds;
-  final int? promptCount;
-}
-
-/// RN's `TrackCompletionCriteria` — the fields CourseItemRow's meta line reads.
-class TrackItemCompletionCriteria {
-  TrackItemCompletionCriteria({this.minScore, this.passScore});
-
-  factory TrackItemCompletionCriteria.fromJson(Map<String, dynamic> json) =>
-      TrackItemCompletionCriteria(
-        minScore: json['minScore'] as num?,
-        passScore: json['passScore'] as num?,
-      );
-
-  final num? minScore;
-  final num? passScore;
 }
 
 class TrackSection {
@@ -236,6 +246,114 @@ class TrackSection {
   final String? description;
   final int order;
   final List<TrackDetailItem> items;
+}
+
+/// Mirrors ally-mobile (React Native)'s `getTrackItemMeta`
+/// (`src/utils/trackItemMeta.ts`) — the small meta line under a course item
+/// title, e.g. "7 questions · pass 70%" or "4 min video". [t] is this app's
+/// `ref.t`/`ref.tr`, passed in rather than closed over so this stays a pure
+/// function callable from tests.
+String trackItemMetaText(
+  TrackDetailItem item,
+  String Function(String, [Map<String, Object?>?]) t,
+) {
+  final meta = item.contentMeta;
+  final criteria = item.completionCriteria;
+
+  switch (item.type) {
+    case TrackItemType.quiz:
+      final parts = <String>[];
+      final questionCount = meta?.questionCount;
+      if (questionCount != null && questionCount > 0) {
+        parts.add(
+          t(
+            questionCount == 1
+                ? 'courses.meta.questions_one'
+                : 'courses.meta.questions_other',
+            {'count': questionCount},
+          ),
+        );
+      }
+      // Unlike ROLEPLAY's minScore, a QUIZ passScore of 0 is a real,
+      // configured threshold (the quiz's own intro screen shows it
+      // unconditionally too), so it must not be dropped as falsy.
+      final passScore = meta?.passScore ?? criteria?.passScore;
+      if (passScore != null) {
+        parts.add(t('courses.meta.passScore', {'score': passScore}));
+      }
+      return parts.isNotEmpty ? parts.join(' · ') : t('courses.meta.quiz');
+    case TrackItemType.video:
+      final durationSeconds = meta?.durationSeconds;
+      if (durationSeconds != null && durationSeconds > 0) {
+        final minutes = (durationSeconds / 60).round().clamp(1, 1 << 30);
+        return t(
+          minutes == 1 ? 'courses.meta.videoDuration_one' : 'courses.meta.videoDuration_other',
+          {'count': minutes, 'minutes': minutes},
+        );
+      }
+      return t('courses.meta.video');
+    case TrackItemType.journal:
+      final promptCount = meta?.promptCount;
+      if (promptCount != null && promptCount > 0) {
+        return t(
+          promptCount == 1 ? 'courses.meta.prompts_one' : 'courses.meta.prompts_other',
+          {'count': promptCount},
+        );
+      }
+      return t('courses.meta.journal');
+    case TrackItemType.article:
+      return t('courses.meta.article');
+    case TrackItemType.roleplay:
+      // A minScore of 0 is the unconfigured default and gates nothing (see
+      // meetsMinimumScore in ally-be), so only a real threshold is shown —
+      // advertising "min score 0" would read as a hurdle that isn't there.
+      final minScore = criteria?.minScore;
+      if (minScore != null && minScore > 0) {
+        return '${t('courses.meta.roleplay')} · ${t('courses.meta.minScore', {'score': minScore})}';
+      }
+      return t('courses.meta.roleplay');
+    case TrackItemType.caseItem:
+      return t('courses.meta.case');
+    case TrackItemType.game:
+      // No score or threshold in the meta line — there isn't one, and
+      // hinting at one would make an optional break look like another
+      // hurdle.
+      return t('courses.meta.game');
+    case TrackItemType.branchingScenario:
+      return t('courses.meta.branchingScenario');
+    case TrackItemType.bucketSort:
+      return t('courses.meta.bucketSort');
+    case TrackItemType.unknown:
+      return '';
+  }
+}
+
+/// Mirrors RN's `findNextItemId` (`src/utils/trackNavigation.ts`) — the
+/// single next-actionable item across the WHOLE course, used to mark the
+/// one row that gets the "Next" status chip. First pass: an
+/// already-in-progress unlocked item (has `startedAt`), searched section by
+/// section in order. Second pass, only if nothing was in progress: the
+/// first plain unlocked item, same order.
+String? findNextItemId(TrackDetail track) {
+  final sections = [...track.sections]..sort((a, b) => a.order.compareTo(b.order));
+
+  for (final section in sections) {
+    final items = [...section.items]..sort((a, b) => a.order.compareTo(b.order));
+    for (final item in items) {
+      if (item.status == TrackItemStatus.unlocked &&
+          item.startedAt != null &&
+          item.startedAt!.isNotEmpty) {
+        return item.id;
+      }
+    }
+  }
+  for (final section in sections) {
+    final items = [...section.items]..sort((a, b) => a.order.compareTo(b.order));
+    for (final item in items) {
+      if (item.status == TrackItemStatus.unlocked) return item.id;
+    }
+  }
+  return null;
 }
 
 class TrackDetail {
@@ -454,6 +572,10 @@ class NextTrackItem extends TrackDetailItem {
     required super.maxWatchedPct,
     required this.sectionId,
     required this.sectionTitle,
+    super.languageFallbackReason,
+    super.completionCriteria,
+    super.contentMeta,
+    super.startedAt,
   });
 
   factory NextTrackItem.fromJson(Map<String, dynamic> json) {
@@ -467,6 +589,10 @@ class NextTrackItem extends TrackDetailItem {
       status: item.status,
       score: item.score,
       maxWatchedPct: item.maxWatchedPct,
+      languageFallbackReason: item.languageFallbackReason,
+      completionCriteria: item.completionCriteria,
+      contentMeta: item.contentMeta,
+      startedAt: item.startedAt,
       sectionId: json['sectionId'] as String,
       sectionTitle: json['sectionTitle'] as String,
     );

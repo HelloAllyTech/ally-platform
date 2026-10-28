@@ -94,6 +94,7 @@ class AppColors {
   static const amber50 = Color(0xFFFFF8E1); // Warning banner background
   static const red700 = Color(0xFF97413A); // Warning banner text
 
+
   // StatusBadge (src/screens/CallLog/components/StatusBadge + colors.ts)
   static const creamYellow = Color(0xFFF8E6BA); // Processing/Pending background
   static const amberOrange = Color(0xFFFFAD0D); // Processing dot

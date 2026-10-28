@@ -119,6 +119,34 @@ void main() {
       expect(item.score, 90.0);
       expect(item.maxWatchedPct, 50.0);
     });
+
+    test('parses languageFallbackReason, completionCriteria, contentMeta, and startedAt', () {
+      final item = TrackDetailItem.fromJson({
+        'id': 'item-4',
+        'title': 'Quiz with meta',
+        'languageFallbackReason': 'VIDEO_NOT_LOCALISED',
+        'completionCriteria': {'minScore': 70, 'passScore': 80},
+        'contentMeta': {'questionCount': 5, 'durationSeconds': 120, 'promptCount': 3},
+        'startedAt': '2026-01-01T00:00:00Z',
+      });
+
+      expect(item.languageFallbackReason, 'VIDEO_NOT_LOCALISED');
+      expect(item.completionCriteria?.minScore, 70.0);
+      expect(item.completionCriteria?.passScore, 80.0);
+      expect(item.contentMeta?.questionCount, 5);
+      expect(item.contentMeta?.durationSeconds, 120);
+      expect(item.contentMeta?.promptCount, 3);
+      expect(item.startedAt, '2026-01-01T00:00:00Z');
+    });
+
+    test('leaves the new optional fields null when the backend omits them', () {
+      final item = TrackDetailItem.fromJson({'id': 'item-5', 'title': 'Bare item'});
+
+      expect(item.languageFallbackReason, isNull);
+      expect(item.completionCriteria, isNull);
+      expect(item.contentMeta, isNull);
+      expect(item.startedAt, isNull);
+    });
   });
 
   group('TrackSection.fromJson', () {
@@ -149,6 +177,215 @@ void main() {
 
       expect(section.order, 0);
       expect(section.items, isEmpty);
+    });
+
+    test('parses an optional description', () {
+      final section = TrackSection.fromJson({
+        'id': 'sec-3',
+        'title': 'Week 3',
+        'description': '<p>Warm-up</p>',
+      });
+
+      expect(section.description, '<p>Warm-up</p>');
+    });
+  });
+
+  group('trackItemMetaText', () {
+    String t(String key, [Map<String, Object?>? params]) {
+      // Minimal stand-in translate function — exercises the real selection
+      // logic (which key/branch is chosen, and with what params), not the
+      // app's actual locale JSON, which `course_detail_screen_test.dart`'s
+      // widget tests already cover end-to-end.
+      if (params == null || params.isEmpty) return key;
+      var result = key;
+      for (final entry in params.entries) {
+        result = '$result[${entry.key}=${entry.value}]';
+      }
+      return result;
+    }
+
+    TrackDetailItem itemOf(
+      TrackItemType type, {
+      TrackItemContentMeta? contentMeta,
+      TrackCompletionCriteria? completionCriteria,
+    }) => TrackDetailItem(
+      id: 'i',
+      type: type,
+      order: 0,
+      title: 'Item',
+      description: null,
+      status: TrackItemStatus.unlocked,
+      score: null,
+      maxWatchedPct: null,
+      contentMeta: contentMeta,
+      completionCriteria: completionCriteria,
+    );
+
+    test('QUIZ with no meta falls back to the bare "quiz" key', () {
+      expect(trackItemMetaText(itemOf(TrackItemType.quiz), t), 'courses.meta.quiz');
+    });
+
+    test('QUIZ with a question count and pass score joins both parts', () {
+      final item = itemOf(
+        TrackItemType.quiz,
+        contentMeta: TrackItemContentMeta(questionCount: 7, passScore: 70),
+      );
+      expect(
+        trackItemMetaText(item, t),
+        'courses.meta.questions_other[count=7] · courses.meta.passScore[score=70.0]',
+      );
+    });
+
+    test('QUIZ passScore of 0 is a real threshold, not dropped as falsy', () {
+      final item = itemOf(
+        TrackItemType.quiz,
+        contentMeta: TrackItemContentMeta(passScore: 0),
+      );
+      expect(trackItemMetaText(item, t), contains('passScore[score=0.0]'));
+    });
+
+    test('a single question uses the singular key', () {
+      final item = itemOf(
+        TrackItemType.quiz,
+        contentMeta: TrackItemContentMeta(questionCount: 1),
+      );
+      expect(trackItemMetaText(item, t), 'courses.meta.questions_one[count=1]');
+    });
+
+    test('VIDEO with a duration rounds seconds to minutes', () {
+      final item = itemOf(
+        TrackItemType.video,
+        contentMeta: TrackItemContentMeta(durationSeconds: 125),
+      );
+      // 125s rounds to 2 minutes.
+      expect(
+        trackItemMetaText(item, t),
+        'courses.meta.videoDuration_other[count=2][minutes=2]',
+      );
+    });
+
+    test('VIDEO with no duration falls back to the bare "video" key', () {
+      expect(trackItemMetaText(itemOf(TrackItemType.video), t), 'courses.meta.video');
+    });
+
+    test('JOURNAL with a prompt count uses the plural key', () {
+      final item = itemOf(
+        TrackItemType.journal,
+        contentMeta: TrackItemContentMeta(promptCount: 4),
+      );
+      expect(trackItemMetaText(item, t), 'courses.meta.prompts_other[count=4]');
+    });
+
+    test('ROLEPLAY with a real minScore threshold appends it', () {
+      final item = itemOf(
+        TrackItemType.roleplay,
+        completionCriteria: TrackCompletionCriteria(minScore: 60),
+      );
+      expect(
+        trackItemMetaText(item, t),
+        'courses.meta.roleplay · courses.meta.minScore[score=60.0]',
+      );
+    });
+
+    test('ROLEPLAY with an unconfigured (zero) minScore shows no threshold', () {
+      final item = itemOf(
+        TrackItemType.roleplay,
+        completionCriteria: TrackCompletionCriteria(minScore: 0),
+      );
+      expect(trackItemMetaText(item, t), 'courses.meta.roleplay');
+    });
+
+    test('ARTICLE, CASE, GAME, BRANCHING_SCENARIO, and BUCKET_SORT each use their own bare key', () {
+      expect(trackItemMetaText(itemOf(TrackItemType.article), t), 'courses.meta.article');
+      expect(trackItemMetaText(itemOf(TrackItemType.caseItem), t), 'courses.meta.case');
+      expect(trackItemMetaText(itemOf(TrackItemType.game), t), 'courses.meta.game');
+      expect(
+        trackItemMetaText(itemOf(TrackItemType.branchingScenario), t),
+        'courses.meta.branchingScenario',
+      );
+      expect(trackItemMetaText(itemOf(TrackItemType.bucketSort), t), 'courses.meta.bucketSort');
+    });
+
+    test('an unknown type has no meta line', () {
+      expect(trackItemMetaText(itemOf(TrackItemType.unknown), t), '');
+    });
+  });
+
+  group('findNextItemId', () {
+    TrackDetailItem itemOf(String id, TrackItemStatus status, {String? startedAt}) =>
+        TrackDetailItem(
+          id: id,
+          type: TrackItemType.article,
+          order: 0,
+          title: id,
+          description: null,
+          status: status,
+          score: null,
+          maxWatchedPct: null,
+          startedAt: startedAt,
+        );
+
+    TrackDetail detailOf(List<TrackSection> sections) => TrackDetail(
+      id: 't1',
+      title: 'Track',
+      description: null,
+      coverImageUrl: null,
+      status: 'IN_PROGRESS',
+      totalItems: 0,
+      completedItems: 0,
+      enrolled: true,
+      trackEnrollmentId: null,
+      sections: sections,
+    );
+
+    test('prefers an already-in-progress unlocked item over a plain unlocked one', () {
+      final detail = detailOf([
+        TrackSection(
+          id: 's1',
+          title: 'S1',
+          order: 0,
+          items: [
+            itemOf('a', TrackItemStatus.completed),
+            itemOf('b', TrackItemStatus.unlocked),
+            itemOf('c', TrackItemStatus.unlocked, startedAt: '2026-01-01T00:00:00Z'),
+          ],
+        ),
+      ]);
+
+      expect(findNextItemId(detail), 'c');
+    });
+
+    test('falls back to the first plain unlocked item when nothing is in progress', () {
+      final detail = detailOf([
+        TrackSection(
+          id: 's1',
+          title: 'S1',
+          order: 0,
+          items: [
+            itemOf('a', TrackItemStatus.locked),
+            itemOf('b', TrackItemStatus.unlocked),
+          ],
+        ),
+      ]);
+
+      expect(findNextItemId(detail), 'b');
+    });
+
+    test('searches section by section in order, not just within one section', () {
+      final detail = detailOf([
+        TrackSection(id: 's1', title: 'S1', order: 0, items: [itemOf('a', TrackItemStatus.completed)]),
+        TrackSection(id: 's2', title: 'S2', order: 1, items: [itemOf('b', TrackItemStatus.unlocked)]),
+      ]);
+
+      expect(findNextItemId(detail), 'b');
+    });
+
+    test('returns null when nothing is unlocked', () {
+      final detail = detailOf([
+        TrackSection(id: 's1', title: 'S1', order: 0, items: [itemOf('a', TrackItemStatus.locked)]),
+      ]);
+
+      expect(findNextItemId(detail), isNull);
     });
   });
 
