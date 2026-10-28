@@ -48,12 +48,15 @@ void main() {
           _dashboard('sim-2', AnalyticsType.simulationAnalytics),
         ],
       );
-      // Deliberately left unstubbed: `getDashboardUrl` throwing
-      // MissingStubError inside the FutureProvider becomes a real
-      // AsyncError, which `_DashboardWebView`'s `error` branch renders as
-      // plain text — never constructing a real `WebViewController`, which
-      // has no platform implementation under `flutter test` (see
-      // game_player_test.dart's doc comment for the same gotcha).
+      // sim-2's signed URL fails: RN leaves that dashboard out silently.
+      when(() => repository.getDashboardUrl(any())).thenAnswer((inv) async {
+        final id = inv.positionalArguments.first as String;
+        if (id == 'sim-2') throw Exception('signing failed');
+        return 'https://metabase.example/$id';
+      });
+      // No WebView platform under `flutter test`.
+      debugDashboardWebViewOverride = (url) => Text('WEBVIEW $url');
+      addTearDown(() => debugDashboardWebViewOverride = null);
       final accountRepository = MockAccountRepository();
       when(() => accountRepository.getUser()).thenAnswer(
         (_) async => UserProfile(
@@ -86,13 +89,17 @@ void main() {
       expect(find.text('Simulations'), findsOneWidget);
 
       // Default active tab is call-log analytics: 1 dashboard panel.
-      expect(find.byType(ClipRRect), findsOneWidget);
+      expect(find.text('WEBVIEW https://metabase.example/call-1'), findsOneWidget);
+      expect(find.textContaining('WEBVIEW'), findsOneWidget);
 
       await tester.tap(find.text('Simulations'));
       await tester.pumpAndSettle();
 
-      // Switched to simulation analytics: 2 dashboard panels.
-      expect(find.byType(ClipRRect), findsNWidgets(2));
+      // Switched to simulation analytics: sim-1 only; the failed sim-2 URL
+      // renders nothing (no raw error text).
+      expect(find.text('WEBVIEW https://metabase.example/sim-1'), findsOneWidget);
+      expect(find.textContaining('WEBVIEW'), findsOneWidget);
+      expect(find.textContaining('signing failed'), findsNothing);
     },
   );
 }
