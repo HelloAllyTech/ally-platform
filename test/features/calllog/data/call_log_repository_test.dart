@@ -234,8 +234,8 @@ void main() {
             'archive': false,
             'startDate': '2026-01-01',
             'endDate': '2026-01-31',
-            'minDuration': 5.0,
-            'maxDuration': 30.0,
+            'minDuration': 300,
+            'maxDuration': 1800,
             'tags': 'anxious,hopeful',
             'mode': 'SCRIBE,DICTATION',
             'status': 'SUCCESS,FAILED',
@@ -266,8 +266,8 @@ void main() {
             'archive': false,
             'startDate': '2026-01-01',
             'endDate': '2026-01-31',
-            'minDuration': 5.0,
-            'maxDuration': 30.0,
+            'minDuration': 300,
+            'maxDuration': 1800,
             'tags': 'anxious,hopeful',
             'mode': 'SCRIBE,DICTATION',
             'status': 'SUCCESS,FAILED',
@@ -335,6 +335,21 @@ void main() {
       const partial = CallLogFilterState(minDuration: 5, tags: ['anxious']);
       expect(partial.isEmpty, isFalse);
       expect(partial.activeCount, 2);
+    });
+
+    test('duration is entered in minutes and sent in seconds (RN buildBuiltinParams)', () {
+      expect(
+        const CallLogFilterState(minDuration: 1.5, maxDuration: 10).toQueryParameters(),
+        {'minDuration': 90, 'maxDuration': 600},
+      );
+    });
+
+    test('withDuration clears a bound that was emptied', () {
+      const original = CallLogFilterState(minDuration: 5, maxDuration: 30, tags: ['a']);
+      final cleared = original.withDuration(min: null, max: original.maxDuration);
+      expect(cleared.minDuration, isNull);
+      expect(cleared.maxDuration, 30);
+      expect(cleared.tags, ['a']);
     });
 
     test('copyWith overrides only the given fields', () {

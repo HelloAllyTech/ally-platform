@@ -327,6 +327,7 @@ class CallLogFilterState {
 
   final String? startDate;
   final String? endDate;
+  /// Entered in minutes (the sheet's "Duration (mins)"); sent in seconds.
   final double? minDuration;
   final double? maxDuration;
   final List<String> tags;
@@ -392,6 +393,28 @@ class CallLogFilterState {
     );
   }
 
+  /// Sets (or, with null, clears) the duration bounds — `copyWith` can't
+  /// clear a field, so emptying a box used to leave its old filter applied.
+  CallLogFilterState withDuration({required double? min, required double? max}) => CallLogFilterState(
+        startDate: startDate,
+        endDate: endDate,
+        minDuration: min,
+        maxDuration: max,
+        tags: tags,
+        modes: modes,
+        statuses: statuses,
+        sources: sources,
+        customFieldValues: customFieldValues,
+      );
+
+  /// RN `buildBuiltinParams`: duration is entered in minutes and sent in
+  /// seconds, the backend column's unit.
+  static num? _minutesToSeconds(double? minutes) {
+    if (minutes == null) return null;
+    final seconds = minutes * 60;
+    return seconds == seconds.roundToDouble() ? seconds.round() : seconds;
+  }
+
   /// Builds `getCallLogs`' query-parameter map — comma-joined for the
   /// multiselect fields, matching the backend's `.split(',')` parsing
   /// exactly (`chat.repository.ts`'s `applyTagFilters`/
@@ -400,8 +423,8 @@ class CallLogFilterState {
   Map<String, dynamic> toQueryParameters() => {
     'startDate': ?startDate,
     'endDate': ?endDate,
-    'minDuration': ?minDuration,
-    'maxDuration': ?maxDuration,
+    'minDuration': ?_minutesToSeconds(minDuration),
+    'maxDuration': ?_minutesToSeconds(maxDuration),
     if (tags.isNotEmpty) 'tags': tags.join(','),
     if (modes.isNotEmpty) 'mode': modes.join(','),
     if (statuses.isNotEmpty) 'status': statuses.join(','),

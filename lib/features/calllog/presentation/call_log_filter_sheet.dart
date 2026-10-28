@@ -402,7 +402,8 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
             controller: _minDurationController,
             placeholder: ref.t('calls.filters.min'),
             keyboardType: TextInputType.number,
-            onChanged: (text) => _draft = _draft.copyWith(minDuration: double.tryParse(text)),
+            onChanged: (text) =>
+                _draft = _draft.withDuration(min: double.tryParse(text), max: _draft.maxDuration),
           ),
         ),
         const SizedBox(width: 8),
@@ -414,7 +415,8 @@ class _CallLogFilterSheetState extends ConsumerState<CallLogFilterSheet> {
             controller: _maxDurationController,
             placeholder: ref.t('calls.filters.max'),
             keyboardType: TextInputType.number,
-            onChanged: (text) => _draft = _draft.copyWith(maxDuration: double.tryParse(text)),
+            onChanged: (text) =>
+                _draft = _draft.withDuration(min: _draft.minDuration, max: double.tryParse(text)),
           ),
         ),
       ],
