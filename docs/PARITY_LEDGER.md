@@ -1,225 +1,240 @@
-# RN → Flutter PARITY LEDGER v2 (ally-mobile → ally-mobile-flutter)
+# RN → Flutter PARITY LEDGER v3 (ally-mobile → ally-mobile-flutter)
 
-Re-audit date: 2026-10-28. Read-only; nothing was built, run or edited in either repo. Every verdict comes from reading code.
+Re-audit date: 2026-10-28. Read-only: nothing was built, run or edited in either repo, and every verdict comes from reading code.
 
-- **RN (source of truth):** `ally-platform/ally-mobile` at `7a8ce0c19`. `git log 7a8ce0c19..origin/master -- ally-mobile` (after fetch) shows one commit, `fc1253ea7`, an automated version bump to 1.23.47 that touches only `build.gradle` and `project.pbxproj`. No RN screen, component or hook changed, so nothing new needed auditing.
-- **Flutter:** `master` @ `227db3a` (Merge `parity/courses`). Since v1 (`cfb1672`) these were merged: `parity/shell`, `parity/live`, `parity/data`, `parity/i18n`, `parity/callsummary`, `parity/courses`, plus teammate commits (`97c9f94`, `eda4b6d`, `925ee2c`). That is 58 commits.
-- **Method:** every v1 PARTIAL, MISSING and MERGED row was re-read on master and given a new status plus a Flutter file reference. About 10% of PRESENT rows were also spot-checked, weighted toward the areas that changed. Rows that changed have **"v2:"** in their Notes; rows that were re-checked and are still open say "Unchanged".
+- **RN (source of truth):** `ally-platform/ally-mobile` at `7a8ce0c19`, which includes "Single-attempt assessment mode for roleplay items".
+- **Flutter:** `f770200` on `parity/ledger`. It is 56 commits past v2's `227db3a` and covers waves 3–6: force update, error boundary, deep links, token migration, i18n, telephony socket, keep-awake, connectivity, Scribe/Conference, call summary header and icons, toasts and `getErrorDetails`, course players and assessment mode, reviews, shell/drawer, splash, and the deletion of 26 dead assets (`81622e1`).
+- **Method:**
+  - Every v2 row not marked PRESENT/N/A, and every numbered v2 gap item, was re-read in current code.
+  - **About 385 PRESENT rows were spot-checked** across all sections (42 §1/§2 account, 82 Scribe, 40+ Learn, 62 Reviews/§3, 34 §4/§6, 55 §5, about 70 §8–§11).
+  - Discovery diffs were run for routes, rendered components, endpoints (`endpoints.py`, fresh), translation keys (848 RN-used keys), assets (135 RN-rendered files), iOS/Android native config, and RN `7a8ce0c19`.
+  - Rows changed in v3 carry **"v3:"** in their Notes.
 
 ## Status key
 
-- **PRESENT**: the same behaviour exists on master, possibly built differently. The row names the Flutter file.
-- **PARTIAL**: some of the behaviour exists. The Notes say exactly what is missing.
-- **MISSING**: nothing equivalent exists on master.
-- **MERGED**: retired in v2. All 75 v1 MERGED rows (`parity/reviews`) were re-read on master, and every one is now PRESENT.
-- **N/A**: RN dead code, dev-only tooling, or a framework concern with no runtime behaviour.
-- **DEAD**: an RN endpoint that is defined but never called.
+- **PRESENT**: the same behaviour exists, possibly built differently. The row names the Flutter file.
+- **PARTIAL / MISSING**: a **true code gap** in this repo. The Notes say what is missing.
+- **BLOCKED-EXTERNAL**: the code and config in this repo are done, but the feature needs credentials, CI secrets, console registration or web-host files.
+- **DEVICE-CHECK**: the code exists, but the behaviour can only be proven on a physical device (sign-in, links opening, push, audio routing, background audio).
+- **N/A**: RN dead code, dev-only tooling, or a framework concern. **DEAD**: an RN endpoint that is defined but never called.
+- MERGED was retired in v2.
 
-## Totals per section (v2; v1 in brackets)
+## Totals per section (v3; v2 in brackets)
 
-| § | Section | Rows | PRESENT | PARTIAL | MISSING | MERGED | N/A / DEAD |
-|---|---|---|---|---|---|---|---|
-| 1 | Navigation | 47 | 40 (32) | 3 (9) | 1 (3) | 0 | 3 |
-| 2 | Screens: account/shell | 211 | 166 (151) | 20 (26) | 0 (9) | 0 | 25 |
-| 2 | Screens: Scribe | 156 | 134 (80) | 4 (43) | 2 (15) | 0 (1) | 16 (17)¹ |
-| 2 | Screens: Learn | 237 | 208 (162) | 9 (35) | 1 (21) | 0 | 19 |
-| 2 | Screens: Reviews + review hooks | 77 | 69 (26) | 5 (4) | 1 (3) | 0 (42) | 2 |
-| 3 | Shared components | 72 | 59 (33) | 7 (13) | 0 (5) | 0 (15) | 6 |
-| 4 | Hooks | 53 | 43 (22) | 2 (14) | 0 (6) | 0 (3) | 8 |
-| 4b | App shell / services / utils | 62 | 48 (35) | 4 (8) | 5 (14) | 0 | 5 |
-| 5 | Backend endpoints called by RN | 150 | 148 (104) | 2 (21) | 0 (11) | 0 (14) | 25 dead |
-| 6 | Store | 28 | 24 (18) | 2 (4) | 0 (4) | 0 | 2 |
-| 7 | Translations | 9 | 6 (3) | 2 (4) | 0 (1) | 0 | 1 |
-| 8 | Assets (161 files + 7 fonts) | 168 | 123 (103) | 19 (47) | 0 (2) | 0 | 26 (16)² |
-| 9 | Config / env / flags | 15 | 7 (7) | 5 (5) | 2 (2) | 0 | 1 |
-| 10 | Native / platform | 83 | 49 (30) | 8 (16) | 8 (19) | 0 | 18 |
-| 11 | Analytics / telemetry | 4 | 2 (0) | 1 (1) | 0 (2) | 0 | 1 |
-| | **Total** | **1,372** | **1,126 (806)** | **93 (250)** | **20 (117)** | **0 (75)** | |
+| § | Section | Rows | PRESENT | PARTIAL | MISSING | BLOCKED-EXT | DEVICE-CHECK | N/A |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Navigation | 52 (47) | 45 (40) | 2 (3) | 0 (1) | 0 | 1 | 4 (3) |
+| 2 | Screens: account/shell | 211 (211) | 183 (166) | 1 (20) | 0 (0) | 1 | 1 | 25 (25) |
+| 2 | Screens: Scribe | 158 (156) | 140 (134) | 2 (4) | 0 (2) | 0 | 0 | 16 (16) |
+| 2 | Screens: Learn | 238 (237) | 215 (208) | 3 (9) | 0 (1) | 0 | 2 | 18 (19) |
+| 2 | Screens: Reviews + review hooks | 77 (77) | 72 (69) | 3 (5) | 0 (1) | 0 | 0 | 2 (2) |
+| 3 | Shared components | 72 (72) | 63 (59) | 0 (7) | 0 (0) | 2 | 1 | 6 (6) |
+| 4 | Hooks | 53 (53) | 42 (43) | 1 (2) | 0 (0) | 1 | 1 | 8 (8) |
+| 4b | App shell / services / utils | 79 (62) | 65 (48) | 0 (4) | 0 (5) | 4 | 4 | 6 (5) |
+| 5 | Backend endpoints called by RN | 150 (150) | 150 (148) | 0 (2) | 0 (0) | 0 | 0 | 25 dead (separate) |
+| 6 | Store | 29 (28) | 25 (24) | 1 (2) | 0 (0) | 0 | 0 | 3 (2) |
+| 7 | Translations | 12 (9) | 9 (6) | 1 (2) | 0 (0) | 0 | 0 | 2 (1) |
+| 8 | Assets (files + 7 fonts) | 168 (168) | 142 (123) | 0 (19) | 0 (0) | 0 | 0 | 26 (26) |
+| 9 | Config / env / flags | 17 (15) | 12 (7) | 0 (5) | 0 (2) | 4 | 0 | 1 (1) |
+| 10 | Native / platform | 100 (83) | 63 (49) | 5 (8) | 0 (8) | 7 | 3 | 22 (18) |
+| 11 | Analytics / telemetry | 5 (4) | 2 (2) | 1 (1) | 0 (0) | 1 | 0 | 1 (1) |
+| | **Total** | **1,421 (1,372)** | **1,228 (1,126)** | **20 (93)** | **0 (20)** | **20** | **13** | **140** |
 
-¹ Listening L49 changed from N/A to PRESENT: the conference screen now drops its socket in the background and reconnects on resume.
-² Ten v1 PARTIAL assets became N/A: their only RN importers are never rendered (carousel1–4, conversation.png, call/transcript, simulation, arrowUpRight, botThinking.json).
-
-The transport, realtime and cache sub-tables in §5 are not counted above. Each has one PARTIAL left.
-
-As in v1, one gap can show up in several sections; deep links, for example, appear in §1, §4b, §9 and §10. Use the list below to count distinct work items.
-
----
-
-## Remaining gaps: the work list to reach zero (deduplicated)
-
-### A. Needs credentials or release identity (blocked outside engineering)
-1. **Firebase config files** (`GoogleService-Info.plist`, `google-services.json`) for the Flutter app ids. The push, FCM and Crashlytics code is finished but no-ops without them (§10 r20/22, §10e r49, §9 r15, §11 r2).
-2. **Google sign-in:** `GOOGLE_WEB_CLIENT_ID` and `GOOGLE_IOS_CLIENT_ID` default to `''`. Needs an OAuth client for the Flutter package id, plus `GIDClientID` and the reversed-client-id `CFBundleURLTypes` in Info.plist (§9 r7/8, §10 r2, §10e r51).
-3. **Entitlements file + `CODE_SIGN_ENTITLEMENTS`:** `aps-environment`, `com.apple.developer.applesignin` and associated domains. Without it, Apple sign-in fails on device and push can't register (§10b r17–19, §10e r43).
-4. **Release identity decision:** bundle id / applicationId (`com.helloally.allyMobileFlutter` / `com.helloally.ally_mobile_flutter` vs RN `com.helloally.app`). This decision drives:
-   - the force-update store URLs (`force_update.dart:17-18` point at the RN listings)
-   - OAuth and Firebase registration
-   - whether tokens can migrate from AsyncStorage. They can't today, so users log in again.
-   (§10a r1, §10d r27)
-5. **iPad:** Flutter targets `"1,2"` and iPad can rotate; RN is iPhone-only (§10).
-
-### B. Deep links (one feature; 9 rows)
-6. Universal and App Links for `/summary/:id` and `/course/:uuid`. Needs:
-   - an `app_links` plugin and a Dart handler that holds a link until auth/profile completes
-   - AASA and `assetlinks.json` hosted on the web domain
-   - an Android `autoVerify` intent filter with a `${appLinkHost}` placeholder
-   - `launchMode` changed to `singleTask`
-   - iOS cold and warm link forwarding
-   (§1 r42, §4b, §9 r14, §10c r23/24, §10d r36/37). It depends on A3 (associated domains).
-
-### C. Navigation / shell
-7. **Exits that don't pick a tab:** three flows still call `go('/home')` and land on whichever tab was last open. They should use `goToHomeTab`.
-   - `simulation_feedback_screen.dart:250,260`
-   - `course_item_player_screen.dart:290`
-   - `scribe_recording_screen.dart:521`
-   (§1 r41, §4b)
-8. **Community tab:** opens the browser only once, from `initState`. Later taps do nothing and leave a blank tab selected (`community_screen.dart`; §1 r38).
-9. **Review-tab unread dot:** the scribe count is now included, but nothing invalidates `unreadReviewCountProvider`, so the dot never clears after reading (§1 r33).
-10. **Permissions-fetch failure:** shows raw `Text('$error')`, with no retry or fallback tab. `app_shell_screen.dart:81,111` also has the untranslated literal "No accessible tabs for this account".
-11. **Launch auth:** `_restore` validates the token only, so a `/users/me` failure other than 401 doesn't log out (RN logs out on any failure). A returning user sees a blank splash, skips the Lottie, and the status bar isn't hidden. Needs a product call (§2 account, §4b, §6).
-12. **Suspended screen** is pushed rather than replaced, so back returns to the login sheet.
-13. **`dev-user` fallback** `userId` on `/scribe` and `/conference-listening` while the user is still loading.
-
-### D. Account screens
-14. **Social login:** non-cancel Google and Apple SDK errors show a generic toast instead of the SDK or Play-Services message.
-15. **Profile:** the image picker isn't limited to jpeg/png, and `LANGUAGE_SELECTOR_FLAG` doesn't hide the Language row (`profile_settings_screen.dart:279`; §9 r12).
-16. **Bug report:** uses a Material AppBar with a Material back arrow (`bug_report_screen.dart:101`), and the submit button isn't pinned to the bottom.
-17. **Progress:**
-    - the rank link pushes standalone `/leaderboard` with no permission check
-    - the screen is blank when the gate is false
-    - no refetch on revisit
-18. **Analytics WebView:** no page-load spinner, and a failed URL shows raw error text.
-19. **Search tab:**
-    - the result card is a `ListTile` (`search_screen.dart:372`) with no expand (downArrow), no tag chips and no View more/less
-    - `ChoiceChip`s (`:300`) instead of underline tabs
-    - Clear returns to the launch view instead of staying on results
-    (§2, §3 ResourceArticleCard/CustomTabs)
-20. **Achievements badge art:** `Image.network` (`achievements_screen.dart:271`) renders SVG badges blank and shows no spinner. Reuse `badge_popup.dart:312 _BadgeImage` (§3 NetworkImage).
-
-### E. Scribe
-21. **S44:** a second dictation on an existing note overwrites the earlier transcript. `_transcript` is never seeded from `details.transcript` (`voice_note_section.dart:92`).
-22. **Voice-note recorder:** no 24 MB auto-stop, so a long dictation can exceed the 25 MB upload cap (`voice_note_recorder.dart`; §4).
-23. **C12:** the FeatureNotAvailable state on CallLog is missing. There's no "Oops" copy, Learn-more link (`ALLY_WEB_URL`) or link-failure alert (`call_log_screen.dart:401`).
-24. **C6:** the call-log date filters are free-text boxes, not date-time pickers, and an emptied box sends `startDate=''` (`call_log_filter_sheet.dart:376-388`).
-25. **C5:** the filter badge counts four fields where RN counts two (`call_log_repository.dart:404`).
-26. **C24:** several call-log rows can be expanded at once; RN keeps one (`call_log_row.dart:73`).
-27. **C33:** no `GET /chats/counsellor-chat` before `/scribe`. Low impact since the chatId race fix.
-28. **Privacy tooltip** is missing on the call-summary notes section shown while the summary generates (RN `AddNotesSection.tsx:65`; §10e r78).
-29. **Custom-field dropdowns** use Material `DropdownButtonFormField` (`call_summary_screen.dart:1554,1700,1718`; §3 Dropdown).
-
-### F. Learn
-30. **Role-play call audio routing is never configured.** RN `configureAudioSession` prefers bluetooth, then headset, then speaker, then earpiece, and defaults iOS to the speaker. Flutter's call may route to the earpiece. Needs a device check.
-31. **Role-play start sound isn't stopped when the agent first speaks** (`roleplay_voice_screen.dart:499 _transitionToAgentJoined`).
-32. **Speaking waveform** uses LiveKit's speaking flag rather than audio-level amplitude. Flutter treats this as a deliberate difference.
-33. **Path/Case details:**
-    - back has no fallback to the Learn tab when the stack is empty
-    - a `createSession` failure shows raw inline exception text (`learning_path_detail_view.dart:98`) instead of a toast
-    - no `failedToLoadPathDetails` toast when there is no session id
-34. **Course overview:** the progress bar opens a full screen, not RN's 70% bottom sheet. `showCourseBottomSheet` exists but isn't used here.
-35. **Simulation feedback:**
-    - polling doesn't restart when returning from Review details
-    - "Try another" pushes `/simulations` instead of reopening the rating popup (product call)
-    - the short-session summary has no help (?) icon and no SimulationDetailsModal (`feedback_widgets.dart:332`)
-
-### G. Reviews
-36. **Cover video never plays** in review cards, the share card, or the review-header scenario dialog. `simulation_details_card.dart:43` is a TODO and `review_details_parts.dart:142` is unwired; reuse `CoverVideoPreview` (A2.5, A3.4, §3 VideoPreview).
-37. **The share screen never receives the scenario cover or description,** because `ShareForReviewArgs` (`app_router.dart:50`) lacks the fields (A4.3, A3.10).
-38. **Review details don't refetch on app foreground or reconnect,** or after returning from edit-note (A3.2, §5 `getReviewById`).
-39. **The emoji picker has no search, recents or multi-select.** It was scoped down; product to accept (A4.4).
-
-### H. Cross-cutting
-40. **No shared `getErrorDetails`:** about 12 places show raw Dio exception text, e.g.:
-    - `call_log_screen.dart:248`
-    - `call_summary_screen.dart:999,1150`
-    - `search_screen.dart:129,153`
-    (§4b utils/error.ts, §5 transport)
-41. **Toast:** a plain SnackBar with no success/error variants and no top position (§3 Toast; product call).
-42. **`I18N_BASE_URL`** defaults to the retired `https://api.helloally.dev/i18n` (`app_config.dart:51`). RN defaults to `''`; decide between empty and the prod CDN (§7 r8, §9 r13).
-43. **`ALLY_WEB_URL`** is configurable but unused for the deep-link allowlist and the CallLog Learn-more link (§9 r4; closes with items 6 and 23).
-44. **Socket:** no retry timer after a failed first connect (RN `RETRY_AFTER_FAILURE_MS`), and no refetch on network reconnect (§5 realtime, §6 store.ts).
-45. **Low impact:**
-    - the feedback audio playback speed isn't saved (`simulation_audio_player.dart`)
-    - a notification tap that cold-starts the app isn't deduplicated (`HANDLED_TS`)
-    - two untranslated a11y labels, 'Filter' and 'Refresh' (`call_log_screen.dart:461,539`)
-
-### I. Icon/asset visual sweep
-46. There are **33 sites** where RN draws an SVG/PNG and Flutter draws `Icons.*` or nothing. The full list is in §8b.
-    - **Call summary and voice note: 27 sites.**
-      - the 18 section-header icons (product call: the Material set was chosen deliberately)
-      - the expand caret, goldenShield, the summaryFailed.png 403 state and the chatBubble review button
-      - 5 voice-note icons
-    - **Shell: 3 sites.** The InfoTooltipIcon in every TabScreenHeader and on Achievements ×2, and the bug-report back arrow.
-    - **Search: 1 site.** The result-card downArrow.
-    - **Learn: 2 sites.** The course-progress chevron and the feedback help icon.
-
-    Everything except the 17 section icons, goldenShield and play.svg is wiring only: the assets already ship and are referenced elsewhere. In the other direction, 26 N/A asset files are candidates for deletion from Flutter.
-
-### J. Needs a backend check (not a Flutter change)
-47. Does anything consume `SCRIBE_START_DIAGNOSTIC`, which Flutter now emits?
-48. Does the backend still honour `enableRecommendations`?
-49. Keep or remove the Flutter-only `/preferences` route? It calls three endpoints RN never calls. Flutter also has unused client methods for `getTrackLanguages` and `getModeratorTenants`.
-50. Keep or remove the delete-summary code? It is unreachable from the menu, which mirrors RN.
-
-### Regressions found
-None. About 130 PRESENT rows were spot-checked across all slices.
-
-Two rows went PRESENT → PARTIAL, and both are v1 audit misses rather than regressions:
-- **§8 `play.svg`:** v1 matched filenames as substrings, so `replay.svg` hid this. `git log -S` confirms the file was never referenced.
-- **§2 Learn feedback help icon:** never ported.
-
-Minor finding: `voice_note_section.dart:249` reads the voice-note setting before the counsellor permission check, so a non-counsellor triggers one harmless 403.
+Notes on the table:
+- The §5 transport, realtime and cache sub-tables are counted separately, as in v2: 33 rows, 29 PRESENT, 1 DEVICE-CHECK (RN session carry-over), 3 divergent by design.
+- §8b, the icon sweep, is also separate: 33 of 33 sites are now PRESENT.
+- Some gaps appear in more than one section. The 20 PARTIAL rows reduce to the **17 distinct code gaps** listed below.
+- Google sign-in is classed BLOCKED-EXTERNAL everywhere because the Dart-side client ids come from the missing `ENV_VALUES_*` CI secret. After that it still needs a device check.
 
 ---
 
-## Changed since v1
+## Remaining code gaps: the work list to reach zero (v3, deduplicated)
 
-- **Rows that changed status:** about 360 in total.
-  - §1/§2 account: 25
-  - Scribe: 54
-  - Learn: 49
-  - Reviews and §3: 71
-  - §4–§11: about 70
-  - §5/§7: 57
-  - §8: 32
-- **Closed headline gaps (v1 Top 25):**
-  - #1 `languageCode` (interceptor)
-  - #4 role-play lifecycle
-  - #5 telephony socket and chatId race
-  - #6 force update
-  - #7 call-summary tags, in-flight edits, reseed
-  - #8 Scribe resume tooltip
-  - #9 keep-awake
-  - #11 logout push deregistration
-  - #12 summary-fields
-  - #13 transcript paging
-  - #14 duration seconds
-  - #15 stale data (RTK-tag refetch, focus refetch)
-  - #16 path/case/language threading
-  - #17 completed course items
-  - #18 Android back
-  - #19 connectivity and mic-before-credit
-  - #20 feedback recording and transcript language
-  - #21 badge popup
-  - #22 error boundary and Crashlytics (code; config blocked)
-  - #23 article and quiz players
-  - #24 call-summary export/delete/places/notes
-  - #25 portrait, allowBackup, privacy manifest, display name
-  - the v1 "smaller items": Community excepted, Search card excepted, Review dot partly fixed, discussion-reply highlight, start/end sounds, i18n language change, 33 untranslated strings
-- **Still open from v1 Top 25:**
-  - #2 Firebase/entitlements and #3 Google iOS config (credentials)
-  - #10 deep links
-  - part of #25 (bundle id)
-- **Translations:** hi, kn, mr and ta now have all 1,566 en keys, guarded by a completeness test, with i18next plurals and English fallback.
-- **New in v2:** §8b Icon/asset visual sweep, and the MERGED status retired.
+These are true code gaps only. They're grouped so fix waves don't overlap on files. Where two groups touch the same file, the overlap is noted.
+
+### W1. Navigation / back behaviour
+1. **Conference Listening back exits the app** (§1 N2).
+   - RN: `navigation/RootNavigator.tsx:115-133` resets to [CallLog, Listening]; see also `ListeningScreen/hooks/useListeningCommon.ts:179-182`.
+   - Flutter: `core/chat/active_chat_discovery.dart:77` reaches the screen with `router.go`, and `features/scribe/presentation/conference_listening_screen.dart` has no `PopScope`.
+   - Missing: a `PopScope` that clears the current chat and calls `goToHomeTab(kTabCallLog)`. Use the same pattern as `scribe_recording_screen.dart:532-545`.
+2. **iOS swipe-back isn't disabled where RN sets `gestureEnabled:false`** (§1 N3).
+   - RN: `RootNavigator.tsx:441-465`.
+   - Flutter:
+     - `course_item_player_screen.dart` (no `PopScope`)
+     - `roleplay_voice_screen.dart:741-742` (idle state)
+     - `simulation_feedback_screen.dart:497-499` (plain entry)
+   - Missing: `PopScope(canPop:false)` routed through each screen's existing back handler. Low impact.
+   - Overlaps W4 on `roleplay_voice_screen.dart`.
+3. **Login status bar style** (§2.1).
+   - RN: `SplashScreen.tsx:236-239` sets `dark-content`.
+   - Flutter: `login_screen.dart:450-451` sets `SystemUiOverlayStyle.light`.
+   - Either port it or confirm the choice is deliberate; `main.dart:144-147` hints that it is.
+
+### W2. Call summary (Scribe)
+4. **A failed summary fetch wipes loaded data and dead-ends the screen** (Scribe S-N1).
+   - RN: `CallSummaryScreen.tsx:351-403` keeps the data, or falls through to the progress view with "See if ready" and "Check later".
+   - Flutter: `call_summary_screen.dart:1156-1169`. `AsyncValue.when` takes the error branch even when a previous value exists and renders bare text.
+   - Missing: `skipError: true`, or render from `.value`, plus the progress fallback on a first-load error that isn't a 403.
+5. **Voice-note setting is fetched for non-counsellors** (Scribe S-N2).
+   - RN: `hooks/useScribeVoiceNoteEnabled.ts:13-22` uses `skip: !isCounsellor`.
+   - Flutter: `voice_note_section.dart:258-262` makes the call anyway and gets a harmless 403.
+
+### W3. Share for review
+6. **Re-share opens in edit-note mode** (Reviews A4.1, A4.8).
+   - RN: `isEditNote` is true only from the review-details screens (`SimulationReviewDetailsScreen.tsx:99-114`, `ScribeReviewDetailsScreen.tsx:96-110`).
+   - Flutter: `core/routing/app_router.dart:364` derives `isEditNote` from `reviewId != null`.
+   - Result: when a review already exists, sharing from Call summary or Sim feedback shows "Edit note"/"Save" and the edit-note success toast (`share_for_review_screen.dart:145`).
+   - Missing: an explicit `isEditNote` field in `ShareForReviewArgs`, set only by `review_details_screen.dart` `_editNote`.
+7. **The scribe share card shows Duration "-"** (A4.3).
+   - RN: `CallSummaryScreen.tsx:178`.
+   - Flutter: the duration is formatted twice, at `call_summary_screen.dart:382` and `share_for_review_screen.dart:166`.
+   - Fix: pass raw seconds. Overlaps W2 on `call_summary_screen.dart`.
+8. **Scribe edit-note title fallback** (A4.3 nit).
+   - RN: `ScribeReviewDetailsScreen.tsx:100` falls back to "Session Review".
+   - Flutter: renders "-" (`review_details_screen.dart:293` → `simulation_details_card.dart:143`).
+
+### W4. Learn players
+9. **Live role-play errors are inline, not toasts** (Learn §8).
+   - RN: `SimulationAssistantScreen.tsx:379,571,580,612,638,654` call `showErrorToast` with `getErrorDetails`.
+   - Flutter: `roleplay_voice_screen.dart:453,479,488,498,669` set `_error`, which renders as a persistent red line at `:825-832`.
+   - Fix: `showToast(..., ToastType.error)`.
+10. **Branching and bucket-sort screen-reader labels are unused** (Learn §5 a11y = §7 row 11).
+    - RN: `BranchingScenarioPlayer.tsx:285` (`recapLabel`), `:386` (`trailLabel`); `BucketSortPlayer.tsx:176-182` (`bucketA11y`).
+    - Flutter: `branching/branching_scenario_player.dart` and `bucket_sort/bucket_sort_player.dart` have no `Semantics`.
+    - The keys already exist in all 5 locales.
+11. **Course video has no fullscreen and no time readout** (Learn L-N1).
+    - RN: `players/VideoPlayer.tsx:40-49` uses native `controls`.
+    - Flutter: `video/video_player_widget.dart:140-185` has only play/pause and a scrub bar.
+
+### W5. Native / build config (no Dart overlap)
+12. **`NSCameraUsageDescription` is missing** (§10 r5).
+    - RN: `ios/ally/Info.plist`.
+    - Flutter: `ios/Runner/Info.plist`.
+    - LiveKit/WebRTC link camera APIs, so an App Store upload can be rejected (ITMS-90683).
+13. **The iOS launch screen is white; RN's is dark** (§10 r84).
+    - RN: `ios/ally/LaunchScreen.storyboard`.
+    - Flutter: `ios/Runner/Base.lproj/LaunchScreen.storyboard`.
+    - The white flash shows before the dark Lottie splash.
+14. **The Android launch theme is white; RN's is #021922** (§10 r85).
+    - RN: `res/values/styles.xml` `LaunchTheme`.
+    - Flutter: `res/drawable{,-v21}/launch_background.xml` and `res/values{,-night}/styles.xml`.
+15. **Android `BLUETOOTH`/`BLUETOOTH_ADMIN` permissions are missing** (§10 r88).
+    - RN gets them merged from the `@livekit/react-native` manifest.
+    - Flutter: `android/app/src/main/AndroidManifest.xml:15-25`.
+    - Needed for Bluetooth routing on Android ≤11; add them with `maxSdkVersion=30`.
+16. **Android round launcher icon is missing** (§10 r86, low).
+    - RN: `AndroidManifest.xml:16` `roundIcon`.
+    - Flutter: `AndroidManifest.xml:30` sets only `icon`.
+17. **No Crashlytics symbol upload** (§11 r5).
+    - RN: `ios/ally.xcodeproj/project.pbxproj:309` (`FirebaseCrashlytics/run`); `android/build.gradle:19`, `android/app/build.gradle:6`.
+    - Flutter: none in `ios/Runner.xcodeproj/project.pbxproj`, `android/build.gradle.kts` or `android/app/build.gradle.kts`.
+    - Without it, native crashes are unreadable.
+
+### Deliberate divergences recorded in code (need sign-off, not counted as gaps)
+- **Launch auth:** launch logs out only on a 401. RN logs out on any `/users/me` failure (`hooks/useUser.ts:44-63`). Flutter documents this choice at `core/routing/app_router.dart:89-95` and `app_shell_screen.dart:99-117`, where a permissions failure gets a Retry. This is the PARTIAL in §4 useUser and §6 checkAuth.
+- **Scribe notification prompt:** Scribe start calls `Permission.notification.request()` every time (`scribe_recording_screen.dart:336`). RN never prompts there. It is tied to the Android foreground recording service.
+- **HTTP timeout:** `receiveTimeout` is 90 s (`core/network/api_client.dart:27`); RN has none. Slow LLM endpoints could fail in Flutter.
+- **Cosmetic, kept PRESENT:**
+  - LevelIndicator uses a Material spinner with no 1200 ms ease (`core/widgets/level_indicator.dart:59`).
+  - The InfoTooltip bubble is a Material `Tooltip` (`info_tooltip_icon.dart:23`).
+  - `checkForActiveChat` has no in-flight guard (`active_chat_discovery.dart:47`).
+  - The deep-link summary reset keeps the last-selected tab (`deep_link_binding.dart:73-79`).
+  - `/leaderboard`, `/community`, `/search` and `/reviews` are registered but have no callers (`app_router.dart:266-330`).
+  - The dev flavor's `I18N_BASE_URL` fallback points at the retired `.dev` host (`app_config.dart:64`).
+
+### Needs a backend or product decision (not a Flutter change)
+- **v2 #47:** does anything consume `SCRIBE_START_DIAGNOSTIC`? Flutter emits it, as RN does.
+- **v2 #48:** is `enableRecommendations` still honoured?
+- **v2 #49, rest:** these unused client methods could be deleted:
+  - `getTrackLanguages`
+  - `getModeratorTenants`
+  - `NotificationsRepository.unreadCount`
+  - `CallLogRepository.getCallLogItem`
+
+  The `/preferences` route was removed in `9b76a8a`.
+- **v2 #50:** keep the delete-summary code? It is wired, as in RN.
 
 ---
+
+## BLOCKED-EXTERNAL (code done; needs credentials, console or secrets)
+
+1. **The Flutter repo has no CI secrets.** `gh secret list -R HelloAllyTech/ally-mobile-flutter` returns nothing, while RN's repo has 28. Copy across:
+   - `ENV_VALUES_PRODUCTION/DEVELOP`
+   - `*_GOOGLE_SERVICES_S3_URI_*` and the AWS OIDC trust
+   - the Android keystore
+   - `PROVISION_PROFILES_BASE64` and `BUILD_CERTIFICATE_BASE64`
+   - the App Store keys
+
+   This one blocker covers:
+   - **Firebase:** push registration, deregistration on logout, `displayRemoteMessage`, the background handler, and Crashlytics (§4b, §10 r20/r22/r49, §11 r2, §3 ErrorBoundary).
+   - **Google sign-in client ids:** §2.1, §3 GoogleLoginButton, §4 useGoogleLogin, §9 r7/r8, §10e r51.
+   - **Release signing:** §9 r15/r16, §10 r91/r92.
+2. **The "Ally AppStore Distribution" provisioning profile** must carry push, Sign in with Apple and associated domains (§10 r92). RN's profile already does if it's unchanged.
+3. **Dev-flavor ids** (`com.helloally.ally_mobile_flutter` / `com.helloally.allyMobileFlutter`) have no Firebase app, OAuth client or AASA/assetlinks entry (§10 r99). Low: this affects test builds only.
+
+The release identity is decided. The prod flavor uses RN's `com.helloally.app` on both platforms, RN's team and keystore, and `TARGETED_DEVICE_FAMILY = 1`. Prod AASA (`W3ZL4N9N9J.com.helloally.app`) and `assetlinks.json` are already hosted.
+
+## DEVICE-CHECK (code exists; prove on hardware)
+
+1. **Universal/App Links** `/summary/:id` and `/course/:uuid`, cold and warm, on iOS and Android (§1 r42, §4b, §10c r23/r24). Code: `core/deeplink/*`, `Runner.entitlements`, `AndroidManifest.xml:36,60-65`.
+2. **Sign-in:** Apple sign-in (§2.1, §3, §4, §10e r43), and Google sign-in once item 1 above is unblocked.
+3. **Push delivery and notification taps**, after Firebase is unblocked (§10e r49).
+4. **RN → Flutter store upgrade:** the user stays signed in and keeps their language and leaderboard toggle (§4b B63, §5.2). Code: `core/migration/legacy_session_migration.dart`, `MainActivity.kt:40-75`.
+5. **Role-play audio routing:** speaker by default, with Bluetooth or a wired headset taking over (Learn §8; `roleplay_audio_session.dart:29-51`). Bluetooth on Android ≤11 also needs code gap 15.
+6. **Background audio** while the app is backgrounded (Learn §8; Scribe L5/L38):
+   - iOS `UIBackgroundModes: audio`
+   - Android foreground service of type `microphone` on Android 14+
+
+   Flutter declares more here than RN does.
+7. **Scribe:**
+   - 16 kHz pcm16 mic stream and waveform gain
+   - voice-note 24 MB auto-stop (about 13 min) and mic interruption
+   - summary export to Android Downloads (API 28/29/30+) and to iOS Files › Ally
+   - breath-sound mixing and mute
+   - keep-awake during long sessions
+
+---
+
+## Changed since v2
+
+- **Status changes:** about 200 rows changed status, and about 50 rows were added. The added rows are §1 N1–N5, Scribe S-N1/S-N2, Learn L-N1, §4b B63–B79, §5 assessment contract plus RN session carry-over, §7 rows 10–12, §9 r16/r17, §10 r84–r100, and §11 r5.
+- **v2 gap items now closed in code:**
+  - 3 (entitlements)
+  - 4 (release identity = RN's ids; force-update URLs are now correct)
+  - 5 (iPhone-only)
+  - 7–10, 12–29 (13 = `_CurrentUserGate`)
+  - 31–46 (40 = `core/network/error_details.dart`, 41 = toast host, 44 = socket retry timer)
+  - the `/preferences` half of 49
+  - the voice-note 403 minor finding stays open as gap 5
+- **v2 items moved out of the code list:**
+  - 1 and 2 are now BLOCKED-EXTERNAL (CI secrets).
+  - 6 (deep links) and 30 (audio routing) are now DEVICE-CHECK.
+  - 11 is closed except the logout-on-any-failure point, which is now a recorded divergence.
+- **C6 corrected:** RN's call-log date filters are free-text `LineTextInput`s (`CallLogFilterSheet.tsx:108-136`), so Flutter matches. An emptied box is no longer sent (`call_log_repository.dart:460-471`).
+- **§8 assets:**
+  - All 135 RN-rendered asset files are referenced.
+  - All 33 §8b icon sites draw RN's asset, and `lib/` contains no `Icons.*`.
+  - The 26 dead assets were deleted in `81622e1` with no remaining references. Their rows stay N/A.
+- **§7 translations:**
+  - All 848 RN-used keys are present in every locale (en, hi, kn, mr, ta), with zero value drift.
+  - The 7a8ce0c19 assessment keys are ported.
+- **RN 7a8ce0c19 assessment mode:**
+  - It matches RN line by line: warning, lock, report still viewable, and payload fields (`start_item_payload.dart:623-624`, `roleplay_case_player.dart:56-173`).
+  - All 6 HTML5 game bundles are byte-identical to RN's.
+- **§5 endpoints:** a fresh endpoint diff found no new RN endpoint, and all 150 endpoint rows are PRESENT.
+- **Regressions:** none in about 385 PRESENT spot-checks. The new gaps 1–17 are earlier audit misses or new discovery rows, not regressions. Two rows were reclassified because the v3 audit was stricter:
+  - role-play error toasts: PRESENT → PARTIAL
+  - branching/bucket a11y: N/A → PARTIAL
+
+---
+
 ## §1 Navigation — routes, params, tabs, drawer
 
 RN: `src/navigation/{RootNavigator,DrawerNavigator,TabNavigator,types}.tsx`, `src/constants/{navigation,tabs}.ts*`. Flutter: `lib/core/routing/app_router.dart` (go_router), `lib/core/navigation/{app_shell_screen,app_bottom_tab_bar,app_drawer,tab_config}.dart`.
 
-**v2 tally (master 227db3a): 47 rows: 40 PRESENT / 3 PARTIAL / 1 MISSING / 3 N/A** (v1: 32 / 9 / 3 / 3).
+**v3 tally (HEAD f770200): 52 rows: 45 PRESENT / 2 PARTIAL / 0 MISSING / 0 BLOCKED-EXTERNAL / 1 DEVICE-CHECK / 4 N/A** [v2 (227db3a): 47 rows: 40 PRESENT / 3 PARTIAL / 1 MISSING / 3 N/A] (v1: 32 / 9 / 3 / 3).
 
-RN layout: a native stack with two branches. Signed out: Splash, SuspendedAccount. Signed in: Drawer → BottomTabs plus 26 stack screens. Flutter layout: a flat go_router list with a `computeRedirect` gate (`/splash` → `/login` | `/complete-profile` | `/home`; `/suspended` allowed while signed out).
+RN layout: a native stack with two branches. Signed out: Splash, SuspendedAccount. Signed in: Drawer → BottomTabs plus 26 stack screens (incl. a signed-in Splash). Flutter layout: a flat go_router list with a `computeRedirect` gate (`/splash` plays the Lottie on every cold start, then → `/login` | `/complete-profile` | `/home`; `/suspended` allowed while signed out). v3: `/preferences` removed (9b76a8a).
 
 | # | RN route (params; options) | Flutter route / file | Status | Notes |
 |---|---|---|---|---|
@@ -227,8 +242,8 @@ RN layout: a native stack with two branches. Signed out: Splash, SuspendedAccoun
 | 2 | `Splash` (signed-out branch; login lives inside it) | `/splash` (`_LaunchScreen`, blank until the session is restored) + `/login` (`login_screen.dart`) | PRESENT | |
 | 3 | `SuspendedAccount` (signed-out branch) | `/suspended` → `suspended_account_screen.dart` | PRESENT | |
 | 4 | `CompleteProfile` (`gestureEnabled:false`) | `/complete-profile`, forced by `computeRedirect` | PRESENT | |
-| 5 | `Listening {isMicrophoneMode:true}` | `/scribe` → `ScribeRecordingScreen` | PRESENT | Still falls back to `userId 'dev-user'` when the user hasn't loaded yet (app_router.dart:157). |
-| 6 | `Listening {isMicrophoneMode:false}` (conference) | `/conference-listening/:chatId` → `ConferenceListeningScreen` | PRESENT | v2: the app-wide telephony socket now routes here (core/chat/cloud_telephony_listener.dart, wired in main.dart). |
+| 5 | `Listening {isMicrophoneMode:true}` | `/scribe` → `ScribeRecordingScreen` | PRESENT | v3: `dev-user` fallback gone — `_CurrentUserGate` shows a spinner until `/users/me` resolves (app_router.dart:185-188, 416-435). |
+| 6 | `Listening {isMicrophoneMode:false}` (conference) | `/conference-listening/:chatId` → `ConferenceListeningScreen` | PRESENT | v3: route also wrapped in `_CurrentUserGate` (app_router.dart:189-197). Back behaviour see N2. |
 | 7 | `CallSummary {callId?, fromLogs?}` (`gestureEnabled:false`) | `/call-log/:id` → `CallSummaryScreen(log: extra?, fromLogs: ?live!=1)` (app_router.dart:285-293), `/call-summary` (live, app_router.dart:297) | PRESENT | v2: the `CallLogItem` extra is optional, so open-by-id works; `fromLogs` is modelled by `?live=1`. |
 | 8 | `CallLog` (stack copy of the tab) | `/call-log` → `CallLogScreen` | PRESENT | |
 | 9 | `Breathing` (post-call box breathing) | `/box-breathing?chatId=` | PRESENT | Exit target after a live session differs from RN (§2 Scribe). |
@@ -241,7 +256,7 @@ RN layout: a native stack with two branches. Signed out: Splash, SuspendedAccoun
 | 16 | `CourseItemPlayer {trackId, itemId, highlightPostId?}` (`gestureEnabled:false`) | `/courses/item/:itemId` (extra `CourseItemPlayerArgs{trackId,item?,highlightPostId}` or legacy record; app_router.dart:182-197) | PRESENT | v2: opens by id with `highlightPostId` (course_item_player_screen.dart:48-77). |
 | 17 | `CourseProgress {trackId}` | `/courses/:trackId/progress` | PRESENT | |
 | 18 | `SimulationAssistant {sessionData, scenario?, pathId?, caseId?, languageId?}` (`gestureEnabled:false`) | `/roleplay` (extra map incl. `pathId`, `caseId`, `languageId`; app_router.dart:204-219) | PRESENT | v2: ids threaded (c29e765). |
-| 19 | `SimulationFeedback {scenarioSessionId?, fromLogs?, pathId?, caseId?, languageId?}` (`gestureEnabled:false`) | `/simulations/feedback/:sessionId?fromLogs=&pathId=&caseId=&languageId=` (app_router.dart:260-267) | PRESENT | v2: back returns to the path/case details (simulation_feedback_screen.dart:240-254). The non-path, non-logs back still goes to plain `/home`, see row 41. |
+| 19 | `SimulationFeedback {scenarioSessionId?, fromLogs?, pathId?, caseId?, languageId?}` (`gestureEnabled:false`) | `/simulations/feedback/:sessionId?fromLogs=&pathId=&caseId=&languageId=` (app_router.dart:260-267) | PRESENT | v3: back → path/case details on top of the Learn tab, logs → pop, else Learn tab (simulation_feedback_screen.dart:243-265). |
 | 20 | `Achievements` (stack; also a tab) | `/achievements` + tab `kTabAchievements` | PRESENT | |
 | 21 | `Progress` | `/progress` | PRESENT | |
 | 22 | `ProfileSettings` | `/profile` | PRESENT | |
@@ -255,21 +270,26 @@ RN layout: a native stack with two branches. Signed out: Splash, SuspendedAccoun
 | 30 | `LiveKitTest` (declared in `types.ts` / `SCREEN_NAMES`, never registered) | — | N/A | RN dead route. |
 | 31 | Tab `Learn` (perm `EDIT_SCENARIO_SESSION`) → SimulationsScreen | `tab_config.dart` `kTabLearn` | PRESENT | |
 | 32 | Tab `CallLog` (`VIEW_CALL_LOGS` or `VIEW_SCENARIO_SESSION`) | `kTabCallLog` | PRESENT | |
-| 33 | Tab `Review` (`VIEW_SIMULATION_REVIEWS` or `VIEW_SCRIBE_REVIEWS`) + unread dot | `kTabReview`, `app_bottom_tab_bar.dart`, `unreadReviewCountProvider` (reviews_repository.dart:131-148) | PARTIAL | v2: now sums simulation + scribe counts, each gated on its own permission. Remaining: nothing ever invalidates `unreadReviewCountProvider`, so the dot never clears after reading a review or appears for new ones until the API client rebuilds (login/language change). |
+| 33 | Tab `Review` (`VIEW_SIMULATION_REVIEWS` or `VIEW_SCRIBE_REVIEWS`) + unread dot | `kTabReview`, `app_bottom_tab_bar.dart`, `unreadReviewCountProvider` (reviews_repository.dart:131-148) | PRESENT | v3: invalidated after mark-read (review_details_screen.dart:89-93) and on every Review-list refocus (review_screen.dart:274-277); sum of sim + scribe counts (reviews_repository.dart:131-148). |
 | 34 | Tab `UserAnalytics` (`VIEW_ANALYTICS_DASHBOARD`) | `kTabUserAnalytics` | PRESENT | |
-| 35 | Tab `Leaderboard` (`VIEW_COMMUNITY_LEADERBOARD`) | `kTabLeaderboard` | PRESENT | v2: the weekly-reminder tap now selects the tab (`goToLocation(homeTabLocation(kTabLeaderboard))`). Progress's rank link still pushes standalone `/leaderboard` (§2 account, section 10). |
+| 35 | Tab `Leaderboard` (`VIEW_COMMUNITY_LEADERBOARD`) | `kTabLeaderboard` | PRESENT | v2: reminder tap selects the tab. v3: Progress rank link now `goToHomeTab(kTabLeaderboard)`, no-op without permission (progress_screen.dart:86-90). |
 | 36 | Tab `Achievements` (`VIEW_USER_BADGES`; reviewer-only layout via `isReviewerOnly`) | `kTabAchievements`, `isReviewerOnly()` | PRESENT | |
 | 37 | Tab `Search` (`VIEW_REFERENCE_DOCUMENT`) | `kTabSearch` | PRESENT | |
-| 38 | Tab `Community` (`VIEW_COMMUNITY`; opens external link) | `kTabCommunity` → `community_screen.dart` | PARTIAL | Unchanged: opens the browser once from `initState` (community_screen.dart:17-26). Later taps do nothing and a blank tab stays selected. |
+| 38 | Tab `Community` (`VIEW_COMMUNITY`; opens external link) | `kTabCommunity` → `community_screen.dart` | PRESENT | v3: every tap calls `openCommunity()` and reselects the first tab, as RN `goBack()` + `Linking.openURL` on focus (app_shell_screen.dart:80-89, community_screen.dart:15-21). |
 | 39 | Tab permission OR-semantics + `getFirstVisibleTab` initial tab | `tab_config.dart` `_hasAnyPermission`, `app_shell_screen.dart` | PRESENT | |
 | 40 | Android hardware back on a tab root → first visible tab (`useTabBackToHomeHandler`, `useHardwareBackPressHandler`) | `app_shell_screen.dart:150-160` (`PopScope`: back on a non-first tab → first visible tab; on the first tab → exit; closes the badge popup first) | PRESENT | v2: landed in 557dc55. |
-| 41 | "Reset to tab" exits (end of flow → Learn tab / CallLog tab via `navigation.reset`) | `core/navigation/home_tab_navigation.dart` (`goToHomeTab`), used by call_summary_screen.dart:487 and box_breathing_screen.dart:191 | PARTIAL | v2: CallLog flows reset to the CallLog tab. Remaining: simulation_feedback_screen.dart:260, course_item_player_screen.dart:290 (celebration "back to Learn") and scribe_recording_screen.dart:521 still `go('/home')`, which lands on the last-selected tab instead of Learn/CallLog. |
-| 42 | Universal-link routes `https://{ALLY_WEB_URL}/summary/:id` → [CallLog, CallSummary], `/course/:uuid` → CourseOverview (pending until auth/profile) | none | MISSING | Unchanged: no app_links/uni_links, no `/summary/` or `/course/` handler in lib/. §4b and §10 cover the native side. |
+| 41 | "Reset to tab" exits (end of flow → Learn tab / CallLog tab via `navigation.reset`) | `core/navigation/home_tab_navigation.dart` (`goToHomeTab`), used by call_summary_screen.dart:487 and box_breathing_screen.dart:191 | PRESENT | v3: all exits use `goToHomeTab` — simulation_feedback_screen.dart:254,264; course_item_player_screen.dart:292; scribe_recording_screen.dart:543; learning_path_widgets.dart:304; call_summary_screen.dart:503; box_breathing_screen.dart:191. |
+| 42 | Universal-link routes `https://{ALLY_WEB_URL}/summary/:id` → [CallLog, CallSummary], `/course/:uuid` → CourseOverview (pending until auth/profile) | none | DEVICE-CHECK | v3: ported (c536efa). core/deeplink/deep_link.dart:58-108 (parse), deep_link_coordinator.dart:65-114 (hold until auth + summary fields; course waits past /splash,/login,/complete-profile; dropped on listening), deep_link_binding.dart:21-84, main.dart:64-69,121 (`AppLinks().uriLinkStream`). Native: Runner.entitlements:14-18 `applinks:`, AndroidManifest.xml:36 `singleTask`, :60-65 `autoVerify` with `${appLinkHost}` (build.gradle.kts:56,62). Only device confirmation of the OS opening links remains. |
 | 43 | Notification-tap routing by push type (`RootNavigator` + `pushNotificationService`) | `core/push/notification_navigation.dart` | PRESENT | v2: leaderboard reminder selects the tab (notification_navigation.dart:50, push_notification_service.dart:126). RN's push-tap handler never routes COURSE_DISCUSSION_REPLY either; the in-app Notifications list does (section 8). |
-| 44 | Auth-gated stack split (signed-out branch shows only Splash/Suspended) | `computeRedirect` in `app_router.dart` | PRESENT | Launch logs out only on a 401, while RN logs out on any `/users/me` failure (§2 account). |
+| 44 | Auth-gated stack split (signed-out branch shows only Splash/Suspended) | `computeRedirect` in `app_router.dart` | PRESENT | v3: splash now waits for `/users/me` to settle (app_router.dart:93-95); only a 401 logs out — documented team decision (app_router.dart:88-92, app_shell_screen.dart:99-101). |
 | 45 | Drawer content (`CustomDrawerContent`, menu items, LogoutModal) | `app_drawer.dart`, logout modal | PRESENT | v2: logout now deregisters the device token (auth_state.dart:70-78). |
 | 46 | In-screen modals/sheets (CallLogFilterSheet, CourseProgressSheet, LanguageSelectorSheet, comment/thread sheets, start-simulation modals) | per-feature `showModalBottomSheet` | N/A | Not routes in RN either. Each is mapped in §2/§3. |
-| 47 | Flutter-only routes with no RN stack equivalent: `/preferences`, `/reviews`, `/leaderboard`, `/community`, `/search` as standalone pushes | `app_router.dart` | N/A | `/preferences` calls three RN-DEAD endpoints (§5). Decide whether to keep or remove it. |
+| 47 | Flutter-only routes with no RN stack equivalent: `/preferences`, `/reviews`, `/leaderboard`, `/community`, `/search` as standalone pushes | `app_router.dart` | N/A | v3: `/preferences` + features/preferences deleted (9b76a8a). `/leaderboard`, `/community`, `/search`, `/reviews` stay registered (app_router.dart:266-330) but nothing navigates to them — dead, harmless; remove at will. |
+| N1 | Active-chat auto-route: launch, foreground and cloud-telephony `USER_JOINED` → `checkCounselorChat` → reset [CallLog, Listening] unless already on Listening (RootNavigator.tsx:115-171) | main.dart:102-104,126-134; core/chat/active_chat_discovery.dart:47-78,103-106; cloud_telephony_listener.dart | PRESENT | v3 new row. Uses `router.go(target)` (no CallLog underneath); Scribe falls back to the CallLog tab (scribe_recording_screen.dart:537-544), conference does not (N2). |
+| N2 | Conference `Listening` back (Android hardware back / iOS swipe) → CallLog under it (stack reset [CallLog, Listening]; `gestureEnabled: !isMicrophoneMode`, useListeningCommon.ts:280) | conference_listening_screen.dart (no `PopScope`/back handler); reached only via `router.go` (active_chat_discovery.dart:77) | PARTIAL | v3 new row: the route is the only page on the stack, so Android back leaves the app and iOS has nothing to swipe to. Needs a `PopScope` that clears the current chat and `goToHomeTab(kTabCallLog)` (as scribe_recording_screen.dart:532-545). |
+| N3 | `gestureEnabled:false` (iOS swipe-back disabled) on CallSummary, CourseItemPlayer, SimulationAssistant, SimulationFeedback, CompleteProfile (RootNavigator.tsx:407-465) | call_summary_screen.dart:615-616 (`canPop:false`) ✓; course_item_player_screen.dart (no `PopScope`); roleplay_voice_screen.dart:741-742 (`canPop: !_isConnected`); simulation_feedback_screen.dart:497-499 (`canPop` true for a plain session) | PARTIAL | v3 new row. iOS edge-swipe still pops CourseItemPlayer, an idle Roleplay and plain SimulationFeedback. Low impact (same target as their back buttons). |
+| N4 | ErrorBoundary "reset" re-mounts the navigator (App.tsx:26-28) → Splash routes from the current auth state | main.dart:155-158 (`AppErrorBoundary(onReset: () => router.go('/splash'))`), core/errors/error_boundary.dart | PRESENT | v3 new row. |
+| N5 | Dev-env `NetworkLogs` floating overlay (App.tsx:31, components/NetworkLogs; `react-native-network-logger`) | — | N/A | v3 new row: developer tooling shown only when `ENVIRONMENT === "development"`; not user-facing. Port only if the team wants it in the dev flavor. |
 
 
 ---
@@ -284,11 +304,12 @@ Scope: SplashScreen (login), CompleteProfile, SuspendedAccount, Drawer (DrawerNa
 
 - RN root: `ally-platform/ally-mobile/src/` (paths below are relative to it)
 - Flutter root: `ally-mobile-flutter/lib/` on `master` (paths below are relative to it). Branches `parity/reviews` and `parity/feedback` were diffed against their merge base. Neither touches anything in this scope except `core/navigation/app_drawer.dart` (refactor only on parity/feedback, no behaviour change) and the Reactions entry point (moved into `review_widgets.dart` on parity/reviews). No row is IN PROGRESS.
-- **v2 re-audit (2026-10-28, master 227db3a):** every PARTIAL/MISSING row re-read on master; ~20 PRESENT rows spot-checked (shell, drawer, logout, notifications restyle, leaderboard, tab gating). Notes prefixed "v2:" changed; "Unchanged:" rows were re-read and still hold. No regressions found.
+- **v2 re-audit (2026-10-28, master 227db3a):** every PARTIAL/MISSING row re-read on master; ~20 PRESENT rows spot-checked. No regressions found.
+- **v3 re-audit (2026-10-28, HEAD f770200):** every non-PRESENT row re-read against current code; 40+ PRESENT rows spot-checked (splash, shell/drawer, logout, tabs, toasts, notifications, leaderboard, reactions). Notes prefixed "v3:" changed. No regressions found.
 
 #### Overall tally
 
-**v2 (master 227db3a): 211 rows: 166 PRESENT / 20 PARTIAL / 0 MISSING / 0 IN PROGRESS / 25 N/A** (v1: 151 / 26 / 9 / 0 / 25)
+**v3 (HEAD f770200): 211 rows: 183 PRESENT / 1 PARTIAL / 0 MISSING / 1 BLOCKED-EXTERNAL / 1 DEVICE-CHECK / 25 N/A** [v2 (227db3a): 166 / 20 / 0 / 0 IN PROGRESS / 25 N/A] (v1: 151 / 26 / 9 / 0 / 25)
 
 (v2: the "Android back on a tab root" gap, listed once each under UserAnalytics, Community, Search and TabNavigator, is fixed by the shell `PopScope` in 557dc55.)
 
@@ -297,16 +318,16 @@ Scope: SplashScreen (login), CompleteProfile, SuspendedAccount, Drawer (DrawerNa
 ---
 
 #### 1. SplashScreen (login) — `screens/SplashScreen/**`
-Tally: 32 present / 6 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 35 present / 1 partial / 0 missing / 1 blocked-external / 1 device-check / 1 n-a [v2: 32 / 6 / 0 / 0 / 1]
 
 Note: RN has no carousel in this folder. The 17 files are SplashScreen, EmailLogin, OtpVerification, OtpInput, TermsAndAgreementModal, plus their styles, types and tests. Google and Apple login live in `hooks/useGoogleLogin.ts`, `hooks/useAppleLogin.ts` and `components/Button/*LoginButton`.
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Lottie splash plays frames 0→200, then freezes at 0.99 | SplashScreen.tsx | features/auth/presentation/login_screen.dart | PRESENT | Same frame math. |
-| Status bar hidden during the animation; dark-content 1s after it ends | SplashScreen.tsx | login_screen.dart (`SystemUiOverlayStyle.light`) | PARTIAL | Unchanged: `AnnotatedRegion(SystemUiOverlayStyle.light)` at login_screen.dart:431-432; never hidden. |
-| Signed-in user still sees the Lottie, then is routed | SplashScreen.tsx | core/routing/app_router.dart (`_LaunchScreen`, `computeRedirect`) | PARTIAL | Unchanged, deliberate perf change: a returning user gets a blank `/splash` and goes straight to `/home`. Needs a product decision (keep or restore). |
-| `checkAuth()` on launch: GET /users/me + /authorization/permissions; any failure → logout | hooks/useUser.ts | core/auth/auth_state.dart (`_restore`), features/account/data/account_repository.dart (`currentUserProvider`), core/permissions/permissions_repository.dart | PARTIAL | Unchanged: `_restore` (auth_state.dart:44-55) only checks a token exists; only a 401 logs out. Offline/5xx `/users/me` keeps the session. |
+| Status bar hidden during the animation; dark-content 1s after it ends | SplashScreen.tsx | login_screen.dart (`SystemUiOverlayStyle.light`) | PARTIAL | v3: hiding now ported — `hideStatusBarForSplash` on /splash and on a sign-out replay (launch_splash.dart:20-31,88-92; login_screen.dart:184-187). Remaining: login wraps itself in `SystemUiOverlayStyle.light` (login_screen.dart:450-451) where RN sets `dark-content` 1s after the animation (SplashScreen.tsx:236-239). |
+| Signed-in user still sees the Lottie, then is routed | SplashScreen.tsx | core/routing/app_router.dart (`_LaunchScreen`, `computeRedirect`) | PRESENT | v3: `/splash` plays the Lottie on every cold start (launch_splash.dart:72-110) and the router holds it until `finished` and `/users/me` settles (app_router.dart:93-95) (e063d45). |
+| `checkAuth()` on launch: GET /users/me + /authorization/permissions; any failure → logout | hooks/useUser.ts | core/auth/auth_state.dart (`_restore`), features/account/data/account_repository.dart (`currentUserProvider`), core/permissions/permissions_repository.dart | PRESENT | v3: splash waits for `/users/me` (app_router.dart:93-95, 149). Only a 401 logs out; other failures keep the session — documented team decision (app_router.dart:88-92; app_shell_screen.dart:99-101 offers retry for permissions). |
 | Sheet slides up 60% and greeting fades in ("greetingLine1", "welcome" + appName) | SplashScreen.tsx | login_screen.dart (`_buildSheet`, `_buildTitle`) | PRESENT | |
 | Gradient behind the sheet once it is fully open | SplashScreen.tsx | login_screen.dart (`_buildHeroGradient`) | PRESENT | |
 | **Force-update modal** (`useForceUpdate`: minimumSupportedVersion > app version → blocking `ForceUpdateModal`, "Update" opens the store, all routing suppressed) | SplashScreen.tsx, hooks/useForceUpdate.ts, components/ForceUpdateModal | core/app_update/force_update.dart (`/app-version/{ios,android}`, `isVersionLower`), core/app_update/force_update_modal.dart (`ForceUpdateGate` over the whole app, main.dart:132) | PRESENT | v2: landed in 0885d07. |
@@ -320,11 +341,11 @@ Note: RN has no carousel in this folder. The 17 files are SplashScreen, EmailLog
 | "Next" disabled until the email is valid; spinner while sending OTP | EmailLogin.tsx | login_screen.dart | PRESENT | Same regex. |
 | generateOtp failure → Alert "auth.login.errors.sendOtpFailed" / "common.checkInternet" (network) / backend msg / "common.unknownError" | EmailLogin.tsx | login_screen.dart (`_showSendOtpFailedAlert`) | PRESENT | |
 | "OR" divider | EmailLogin.tsx | login_screen.dart | PRESENT | |
-| Google Sign-In button (signOut first, idToken → POST google login, allowedRoles) | EmailLogin.tsx, hooks/useGoogleLogin.ts | login_screen.dart (`_signInWithGoogle`, `_GoogleLoginButton`), features/auth/data/auth_repository.dart | PARTIAL | Unchanged, needs credentials: disabled unless `GOOGLE_WEB_CLIENT_ID` is set at build time, and the Flutter package id has no OAuth client registered. |
-| Google SDK errors: cancel/in-progress silent; toast "Google Play Services not available or outdated"; other → toast with `err.message` | hooks/useGoogleLogin.ts | login_screen.dart | PARTIAL | Unchanged: every non-cancel `GoogleSignInException` toasts generic "auth.login.google.error" (login_screen.dart:274-278). No Play-Services message, no SDK message. |
-| Apple Sign-In (iOS only; email + fullName scopes; identityToken/authorizationCode/fullName) | EmailLogin.tsx, hooks/useAppleLogin.ts | login_screen.dart (`_signInWithApple`, `_AppleLoginButton`), auth_repository.dart | PRESENT | |
-| Apple SDK errors: cancel silent; others → toast with `err.message` | hooks/useAppleLogin.ts | login_screen.dart | PARTIAL | Unchanged: generic "auth.login.apple.error" (login_screen.dart:305-309). |
-| Backend social-login error: suspended → SuspendedAccount; else toast with backend message or fallback | useGoogleLogin.ts, useAppleLogin.ts | login_screen.dart (`_handleSocialLoginError`) | PRESENT | Uses `push('/suspended')` where RN uses `replace`. |
+| Google Sign-In button (signOut first, idToken → POST google login, allowedRoles) | EmailLogin.tsx, hooks/useGoogleLogin.ts | login_screen.dart (`_signInWithGoogle`, `_GoogleLoginButton`), features/auth/data/auth_repository.dart | BLOCKED-EXTERNAL | v3 (normalised: web client id needs the `ENV_VALUES_*` CI secret, §9 r16; then device check): prod flavor = RN identity (afdccc1); iOS client ids in ios/Flutter/prod.xcconfig, `GIDClientID`/URL schemes in Info.plist:28-42; web client id from RN .env via `--dart-define-from-file` (build-android-production.yml:139). `AppConfig.googleWebClientId` still defaults to `''` (app_config.dart:81-84) so a build without the .env disables it. Confirm sign-in on device. |
+| Google SDK errors: cancel/in-progress silent; toast "Google Play Services not available or outdated"; other → toast with `err.message` | hooks/useGoogleLogin.ts | login_screen.dart | PRESENT | v3: `googleSignInErrorToast` — cancel silent, Android provider-config → "Google Play Services not available or outdated", else SDK description or fallback (login_screen.dart:71-79, 295-297). |
+| Apple Sign-In (iOS only; email + fullName scopes; identityToken/authorizationCode/fullName) | EmailLogin.tsx, hooks/useAppleLogin.ts | login_screen.dart (`_signInWithApple`, `_AppleLoginButton`), auth_repository.dart | DEVICE-CHECK | v3: code unchanged and complete; `com.apple.developer.applesignin` in Runner.entitlements:10-13. Only on-device confirmation remains. |
+| Apple SDK errors: cancel silent; others → toast with `err.message` | hooks/useAppleLogin.ts | login_screen.dart | PRESENT | v3: `appleSignInErrorToast` — cancel silent, else SDK `message` or fallback (login_screen.dart:84-87, 325-327). |
+| Backend social-login error: suspended → SuspendedAccount; else toast with backend message or fallback | useGoogleLogin.ts, useAppleLogin.ts | login_screen.dart (`_handleSocialLoginError`) | PRESENT | v3: now `context.go('/suspended')` (replace), toast via `getErrorDetails` (login_screen.dart:256-267). |
 | All inputs and buttons disabled while any login is loading | EmailLogin.tsx | login_screen.dart (`_isLoading`) | PRESENT | |
 | Footer "By proceeding… Terms & Conditions … Privacy Policy" links open URLs | EmailLogin.tsx | login_screen.dart (`_buildTermsFooter`) | PRESENT | |
 | Terms modal shown after social login, before tokens are stored | EmailLogin.tsx | login_screen.dart (`_completeSocialLogin`) | PRESENT | |
@@ -333,7 +354,7 @@ Note: RN has no carousel in this folder. The 17 files are SplashScreen, EmailLog
 | Error state: red box outlines + backend message box | OtpVerification.tsx, OtpInput.tsx | login_screen.dart | PRESENT | |
 | Expiry text using minutes from `expiresIn` (default 10) | OtpVerification.tsx | login_screen.dart (expires_one/expires_other) | PRESENT | Flutter copy says "N minute(s)". RN's en string omits the unit. |
 | Resend link with 60s countdown, disabled while counting or resending; resets OTP and expiry, refocuses the input | OtpVerification.tsx | login_screen.dart (`_resendOtp`, `_startResendCountdown`) | PRESENT | |
-| Resend failure → error toast | OtpVerification.tsx | login_screen.dart | PRESENT | Fallback text is "common.somethingWentWrong". |
+| Resend failure → error toast | OtpVerification.tsx | login_screen.dart | PRESENT | v3: `showToast(getErrorDetails(e).message, error)` (login_screen.dart:394-395). |
 | Verify disabled until 4 digits or while the terms modal is up; spinner | OtpVerification.tsx | login_screen.dart | PRESENT | |
 | 403 USER_SUSPENDED on verify → SuspendedAccount | OtpVerification.tsx, utils/error.ts | login_screen.dart (`_isSuspendedUserError`) | PRESENT | |
 | Terms modal after OTP verify → store tokens → re-run auth routing | OtpVerification.tsx | login_screen.dart (`_verifyCode`) + auth_state.dart (`signIn`) | PRESENT | |
@@ -344,7 +365,7 @@ Note: RN has no carousel in this folder. The 17 files are SplashScreen, EmailLog
 | Analytics events | — | — | N/A | None in RN. |
 
 #### 2. CompleteProfileScreen — `screens/CompleteProfileScreen/CompleteProfileScreen.tsx`
-Tally: 7 present / 0 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 7 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 1 n-a [v2: 7 / 0 / 0 / 0 / 1]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -358,19 +379,19 @@ Tally: 7 present / 0 partial / 0 missing / 0 in-progress / 1 n-a
 | Analytics events | — | — | N/A | None. |
 
 #### 3. SuspendedAccountScreen — `screens/SuspendedAccountScreen/SuspendedAccountScreen.tsx`
-Tally: 3 present / 1 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 4 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 3 / 1 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | EmptyState: suspended icon, "suspended.title", description line1+line2 | SuspendedAccountScreen.tsx | features/suspended/presentation/suspended_account_screen.dart | PRESENT | Flutter adds a missing space between the lines (fixes an RN typo). |
 | "Go to login" outlined pill → reset to Splash | SuspendedAccountScreen.tsx | suspended_account_screen.dart (logout + `go('/login')`) | PRESENT | |
 | Reached from OTP / Google / Apple suspended errors | OtpVerification.tsx, useGoogleLogin.ts, useAppleLogin.ts | features/auth/presentation/login_screen.dart; app_router.dart allows `/suspended` while signed out | PRESENT | |
-| Navigation uses `replace`, so back cannot return to the login form | same | login_screen.dart (`context.push('/suspended')`) | PARTIAL | Unchanged: `context.push('/suspended')` at login_screen.dart:244 and :395. |
+| Navigation uses `replace`, so back cannot return to the login form | same | login_screen.dart (`context.push('/suspended')`) | PRESENT | v3: `context.go('/suspended')` at login_screen.dart:264 and :414 replaces the login route (e063d45). |
 | Suspension detected mid-session (403 on any API) | — | — | N/A | RN does not handle this either. |
 | Analytics events | — | — | N/A | None. |
 
 #### 4. Drawer — `navigation/DrawerNavigator.tsx` + `screens/LogoutScreen/components/CustomDrawerContent.tsx`, `MenuOption/`
-Tally: 11 present / 0 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 11 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 1 n-a [v2: 11 / 0 / 0 / 0 / 1]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -390,7 +411,7 @@ Tally: 11 present / 0 partial / 0 missing / 0 in-progress / 1 n-a
 The drawer has exactly these three items in RN. Flutter's `/preferences` route (features/preferences) is not reachable from the drawer, which matches RN.
 
 #### 5. LogoutModal (presented from the drawer) — `screens/LogoutScreen/components/LogoutModal.tsx`
-Tally: 5 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 5 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 5 / 0 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -403,7 +424,7 @@ Tally: 5 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
 | Analytics events | — | — | N/A | None. |
 
 #### 6. ProfileSettingsScreen — `screens/ProfileSettingsScreen/**`, `hooks/useProfileImage.ts`, `hooks/useLeaderboardNotification.ts`, `components/LanguageSelectorSheet`
-Tally: 14 present / 2 partial / 0 missing / 0 in-progress / 4 n-a
+Tally v3: 16 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 4 n-a [v2: 14 / 2 / 0 / 0 / 4]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -414,13 +435,13 @@ Tally: 14 present / 2 partial / 0 missing / 0 in-progress / 4 n-a
 | Upload hint text | ProfileSettingsScreen.tsx | profile_settings_screen.dart | PRESENT | |
 | "Upload Image" link opens the image sheet (disabled while saving) | ProfileSettingsScreen.tsx | profile_settings_screen.dart | PRESENT | |
 | Image sheet: title, "Change"/"Upload" option, "Remove" when an image exists | components/ProfileImageBottomSheet.tsx | features/account/presentation/profile_image_options_sheet.dart | PRESENT | |
-| Gallery pick: quality 0.8, max 800×800, **jpeg/png only** | hooks/useProfileImage.ts | profile_settings_screen.dart (`_pickImage`, image_picker) | PARTIAL | Unchanged: `pickImage` (profile_settings_screen.dart:99-105) has no MIME restriction; HEIC/GIF can be picked. |
+| Gallery pick: quality 0.8, max 800×800, **jpeg/png only** | hooks/useProfileImage.ts | profile_settings_screen.dart (`_pickImage`, image_picker) | PRESENT | v3: non-jpeg/png picks are re-encoded to PNG before upload (profile_settings_screen.dart:30-34, 138-151) — image_picker cannot filter by MIME (28ff515). |
 | Validation toasts: >2MB "Image size must be less than 2MB…", non-square "Image must be square…" | useProfileImage.ts | profile_settings_screen.dart | PRESENT | Prefixed with "errors.uploadProfileImage". |
 | Save button only while unsaved; upload = presign → S3 PUT → PATCH URL → best-effort delete of the old image | useProfileImage.ts | profile_settings_screen.dart (`_save`), features/account/data/account_repository.dart (`uploadProfileImage`) | PRESENT | |
 | Remove + Save → DELETE old image, PATCH '' | useProfileImage.ts | profile_settings_screen.dart, account_repository.dart | PRESENT | |
 | Save error → toast "errors.uploadProfileImage" | useProfileImage.ts | profile_settings_screen.dart (`_showErrorToast`) | PRESENT | |
 | Read-only Name and Email fields ("—" when empty) | ProfileSettingsScreen.tsx | profile_settings_screen.dart (`_Field`) | PRESENT | |
-| Language row, gated by `env.LANGUAGE_SELECTOR_FLAG` | ProfileSettingsScreen.tsx, config/env.ts | profile_settings_screen.dart (`_LanguageField`) | PARTIAL | Unchanged: always shown (profile_settings_screen.dart:279). `AppConfig.languageSelectorEnabled` only gates the CDN sync. |
+| Language row, gated by `env.LANGUAGE_SELECTOR_FLAG` | ProfileSettingsScreen.tsx, config/env.ts | profile_settings_screen.dart (`_LanguageField`) | PRESENT | v3: row inside `if (AppConfig.languageSelectorEnabled)` (profile_settings_screen.dart:318-320). |
 | Language sheet: en/hi/mr/ta/kn, selected dot, persist, forceRTL, **reset the API cache so localized content refetches** | components/LanguageSelectorSheet/LanguageSelectorSheet.tsx, services/api.ts + languageCodeEndpoints.ts | features/account/presentation/language_selector_sheet.dart, core/network/api_client.dart:46-52 (rebuilds the client on a language switch), core/network/language_code_interceptor.dart (RN allowlist) | PRESENT | v2: `languageCode` injected on the RN endpoint list and loaded content refetches after a switch (249653c). |
 | Leaderboard notification toggle (LEARNER only): persisted, schedules/cancels the weekly reminder | ProfileSettingsScreen.tsx, hooks/useLeaderboardNotification.ts | profile_settings_screen.dart (`LeaderboardNotificationToggleRow`), core/push/leaderboard_notification.dart | PRESENT | |
 | Loading and error states for the user record | — (RN reads Redux user) | profile_settings_screen.dart | N/A | Flutter-only states. |
@@ -429,25 +450,25 @@ Tally: 14 present / 2 partial / 0 missing / 0 in-progress / 4 n-a
 | Analytics events | — | — | N/A | None. |
 
 #### 7. BugReportScreen — `screens/BugReportScreen/BugReportScreen.tsx`, `hooks/useBugReport.ts`, `utils/bugReportContext.ts`
-Tally: 9 present / 2 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 11 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 1 n-a [v2: 9 / 2 / 0 / 0 / 1]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
-| Header: LeftArrowIcon + ReplayPro "bugReport.title", bottom border | BugReportScreen.tsx | features/bugreport/presentation/bug_report_screen.dart | PARTIAL | Unchanged: Material `AppBar` + `Icons.arrow_back` (bug_report_screen.dart:97-101). |
+| Header: LeftArrowIcon + ReplayPro "bugReport.title", bottom border | BugReportScreen.tsx | features/bugreport/presentation/bug_report_screen.dart | PRESENT | v3: `BackTitleHeader` with 16pt padding, 0.5 strokePrimary border (bug_report_screen.dart:107-115) (dbd2148). |
 | Prompt text | BugReportScreen.tsx | bug_report_screen.dart | PRESENT | |
 | Multiline input: placeholder, maxLength 1000, disabled while submitting | BugReportScreen.tsx | bug_report_screen.dart (`AppTextField`) | PRESENT | |
 | Character counter "n/1000" | BugReportScreen.tsx | bug_report_screen.dart | PRESENT | |
-| Submit pinned in a bottom footer; disabled until the trimmed text is non-empty and ≤1000; spinner | BugReportScreen.tsx, useBugReport.ts | bug_report_screen.dart | PARTIAL | Unchanged: button inline under the field, not pinned. |
+| Submit pinned in a bottom footer; disabled until the trimmed text is non-empty and ≤1000; spinner | BugReportScreen.tsx, useBugReport.ts | bug_report_screen.dart | PRESENT | v3: footer pinned under the scroll view, keyboard-aware (bug_report_screen.dart:98-104, 172ff). |
 | Silent context: screen, appVersion, device, os, clientTimestamp | utils/bugReportContext.ts | features/bugreport/data/bug_report_repository.dart | PRESENT | |
 | Previous screen name (deepest active route) | BugReportScreen.tsx | core/navigation/app_drawer.dart passes `activeTabName` | PRESENT | |
 | Success → toast "bugReport.successMessage", clear, goBack | useBugReport.ts | bug_report_screen.dart | PRESENT | |
 | HTTP 429 → toast "bugReport.rateLimitMessage" | useBugReport.ts | bug_report_screen.dart | PRESENT | |
-| Other errors → error toast "errors.submitBugReport" | useBugReport.ts | bug_report_screen.dart | PRESENT | Appends the raw exception text. |
+| Other errors → error toast "errors.submitBugReport" | useBugReport.ts | bug_report_screen.dart | PRESENT | v3: `showErrorToast(e, 'errors.submitBugReport')` via getErrorDetails; no raw exception text (bug_report_screen.dart:79). |
 | Keyboard avoidance | BugReportScreen.tsx | bug_report_screen.dart (Scaffold resize) | PRESENT | |
 | Analytics events | — | — | N/A | None. |
 
 #### 8. NotificationsScreen — `screens/NotificationsScreen/NotificationsScreen.tsx`
-Tally: 11 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 11 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 11 / 0 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -456,7 +477,7 @@ Tally: 11 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
 | Hardware back → goBack | NotificationsScreen.tsx | default route pop | PRESENT | |
 | Initial loading spinner | NotificationsScreen.tsx | notifications_screen.dart | PRESENT | |
 | Empty: "You're all caught up — no notifications yet." | NotificationsScreen.tsx | notifications_screen.dart ("notifications.empty") | PRESENT | |
-| Error state | — | notifications_screen.dart | N/A | RN has none and shows the empty state. Flutter shows "loadError: $error". |
+| Error state | — | notifications_screen.dart | N/A | RN has none and shows the empty state. v3: Flutter shows translated "notifications.loadError" (notifications_screen.dart:159), no raw error. |
 | Row: title, body (max 3 lines), timeAgo ("just now", "Xm/h/d ago", date) | NotificationsScreen.tsx | notifications_screen.dart:205-240 | PRESENT | v2: body `maxLines: 3` (notifications_screen.dart:237), RN text styles. |
 | Unread styling: blue dot + tinted row background | NotificationsScreen.tsx, styles.ts | notifications_screen.dart:205-230 | PRESENT | v2: grey50 row background + 8pt primary dot (`unread-dot`). |
 | Tap → mark read | NotificationsScreen.tsx | notifications_screen.dart (`_onItemTap`) | PRESENT | Invalidates the whole list, so pagination resets to page 1. |
@@ -466,7 +487,7 @@ Tally: 11 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
 | Analytics events | — | — | N/A | None. |
 
 #### 9. AchievementsScreen — `screens/AchievementsScreen/**`
-Tally: 10 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 10 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 10 / 0 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -479,12 +500,12 @@ Tally: 10 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
 | AchievementCard: locked icon or badge image, name, description, locked colours | components/AchievementCard.tsx | achievements_screen.dart (`_AchievementCard`) | PRESENT | |
 | Loading spinner, error text, empty text | AchievementsScreen.tsx | achievements_screen.dart | PRESENT | |
 | Localized badge text (`languageCode` injected on `getAvailableBadges`) | services/api.ts, services/languageCodeEndpoints.ts | core/network/language_code_interceptor.dart (`getAvailableBadges`) | PRESENT | v2: injected centrally. |
-| Tap card → mark badge viewed | — | achievements_screen.dart | N/A | Flutter-only extra; the real popup now exists (next row). |
+| Tap card → mark badge viewed | — | achievements_screen.dart | N/A | v3: Flutter-only tap removed; a badge is marked viewed only by closing its popup, as RN (achievements_screen.dart:32). Badge art now `BadgeNetworkImage` (SVG + spinner, achievements_screen.dart:283-289). |
 | Badge-unlock celebration popup (global `BadgePopup`/`useBadgePopup`, marks viewed on dismiss) | components/BadgePopup, hooks/useBadgePopup.ts | features/achievements/presentation/badge_popup.dart (`BadgePopupHost`, confetti, poll + `PATCH …/viewed`), hosted in core/navigation/app_shell_screen.dart | PRESENT | v2: landed in a5d3ce7/557dc55. Active on Learn tab, and Review tab for reviewer-only users, as RN. |
 | Analytics events | — | — | N/A | None. |
 
 #### 10. ProgressScreen — `screens/ProgressScreen/ProgressScreen.tsx`, `hooks/useProgressSummary.ts`, `components/ProgressHeaderWidget`
-Tally: 7 present / 3 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 10 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 7 / 3 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -493,16 +514,16 @@ Tally: 7 present / 3 partial / 0 missing / 0 in-progress / 2 n-a
 | Header "progress.title" | ProgressScreen.tsx | features/progress/presentation/progress_screen.dart | PRESENT | |
 | Hero: LevelIndicator (a11y "progress.a11y.level"), "hero.level", "hero.toNextLevel" / "hero.maxLevel", progress bar, "hero.xpTotal" | ProgressScreen.tsx | progress_screen.dart (`_Hero`) | PRESENT | |
 | Stats: lifetime minutes, sessions, track items | ProgressScreen.tsx | progress_screen.dart (`_StatsGrid`) | PRESENT | |
-| Link "progress.rank.link" → Leaderboard (tab jump; does nothing without leaderboard permission) | ProgressScreen.tsx | progress_screen.dart → `push('/leaderboard')` | PARTIAL | Unchanged: `context.push('/leaderboard')` (progress_screen.dart:55) — should `goToHomeTab(kTabLeaderboard)` and no-op without the permission. |
+| Link "progress.rank.link" → Leaderboard (tab jump; does nothing without leaderboard permission) | ProgressScreen.tsx | progress_screen.dart → `push('/leaderboard')` | PRESENT | v3: `goToHomeTab(kTabLeaderboard)`, no-op without VIEW_COMMUNITY_LEADERBOARD (progress_screen.dart:62-66, 86-90) (baa67dd). |
 | Link "progress.badges.link" → Achievements | ProgressScreen.tsx | progress_screen.dart → `/achievements` | PRESENT | |
-| When the gate is false RN still renders both link cards | ProgressScreen.tsx | progress_screen.dart (`dashboard == null` → blank) | PARTIAL | Unchanged: `dashboard == null` → blank (progress_screen.dart:42). |
+| When the gate is false RN still renders both link cards | ProgressScreen.tsx | progress_screen.dart (`dashboard == null` → blank) | PRESENT | v3: hero/stats only when `dashboard != null`, both link cards always (progress_screen.dart:53-73). |
 | Loading; error shown before empty | ProgressScreen.tsx | progress_screen.dart | PRESENT | |
-| Refetch on every mount (`refetchOnMountOrArgChange`) | ProgressScreen.tsx | progress_repository.dart (`progressDashboardProvider`, not autoDispose) | PARTIAL | Unchanged: `progressDashboardProvider` (progress_repository.dart:155) is not autoDispose and nothing invalidates it; pull-to-refresh only. |
+| Refetch on every mount (`refetchOnMountOrArgChange`) | ProgressScreen.tsx | progress_repository.dart (`progressDashboardProvider`, not autoDispose) | PRESENT | v3: `progressDashboardProvider` is `FutureProvider.autoDispose` (progress_repository.dart:157). |
 | `useTabBackToHomeHandler` on this stack screen | ProgressScreen.tsx | default pop | N/A | Equivalent effect: back leaves Progress. |
 | Analytics events | — | — | N/A | None. |
 
 #### 11. UserAnalyticsScreen (tab) — `screens/UserAnalyticsScreen/UserAnalyticsScreen.tsx`
-Tally: 11 present / 1 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 12 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 1 n-a [v2: 11 / 1 / 0 / 0 / 1]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -515,13 +536,13 @@ Tally: 11 present / 1 partial / 0 missing / 0 in-progress / 1 n-a
 | Call logs / Simulations TabView, only when both types exist | UserAnalyticsScreen.tsx | user_analytics_screen.dart (`AppTabView`) | PRESENT | Edge case: Flutter counts unknown `analyticsType` values toward "both"; RN ignores them. |
 | Lock to the single type when only one exists | UserAnalyticsScreen.tsx | user_analytics_screen.dart (`effectiveTab`) | PRESENT | |
 | Per-dashboard embed URL (GET /analytics/dashboard/:id) → square WebView | UserAnalyticsScreen.tsx | user_analytics_screen.dart (`_DashboardWebView`, `dashboardUrlProvider`) | PRESENT | |
-| WebView `startInLoadingState` spinner; a failed URL is silently omitted | UserAnalyticsScreen.tsx | user_analytics_screen.dart | PARTIAL | Unchanged: no page-load indicator in `_DashboardWebView`; a failed URL shows raw `Text('$error')` (user_analytics_screen.dart:175-177). |
+| WebView `startInLoadingState` spinner; a failed URL is silently omitted | UserAnalyticsScreen.tsx | user_analytics_screen.dart | PRESENT | v3: white cover + spinner until `onPageFinished`/main-frame error (user_analytics_screen.dart:165-223); failed URLs omitted, spinner until one resolves (:88-97, 119-121) (6ddc45a). |
 | Reset URLs when the user changes | UserAnalyticsScreen.tsx | analytics_repository.dart (provider rebuilds on auth or user change) | PRESENT | |
 | Android back on the tab → first visible tab (`useTabBackToHomeHandler`) | hooks/useTabBackToHomeHandler.ts | core/navigation/app_shell_screen.dart:150-160 (`PopScope`) | PRESENT | v2: one shell-level fix. |
 | Analytics events | — | — | N/A | None. |
 
 #### 12. LeaderboardScreen (tab) — `screens/LeaderboardScreen/LeaderboardScreen.tsx`, `hooks/useLeaderboard.ts`
-Tally: 14 present / 0 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 14 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 1 n-a [v2: 14 / 0 / 0 / 0 / 1]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -542,17 +563,17 @@ Tally: 14 present / 0 partial / 0 missing / 0 in-progress / 1 n-a
 | Analytics events | — | — | N/A | None. |
 
 #### 13. CommunityScreen (tab) — `screens/CommunityScreen/CommunityScreen.tsx`
-Tally: 2 present / 1 partial / 0 missing / 0 in-progress / 1 n-a
+Tally v3: 3 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 1 n-a [v2: 2 / 1 / 0 / 0 / 1]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Tab gate VIEW_COMMUNITY | constants/tabs.tsx | core/navigation/tab_config.dart | PRESENT | |
-| **On every focus**: goBack (to the previous tab) + open https://community.helloally.ai/ externally | CommunityScreen.tsx (`useFocusEffect`) | features/community/presentation/community_screen.dart (`initState` post-frame) | PARTIAL | Unchanged: runs once from `initState` (community_screen.dart:17-26); later taps do nothing; `context.pop()` cannot pop inside the shell so a blank tab stays selected. |
+| **On every focus**: goBack (to the previous tab) + open https://community.helloally.ai/ externally | CommunityScreen.tsx (`useFocusEffect`) | features/community/presentation/community_screen.dart (`initState` post-frame) | PRESENT | v3: shell `_selectTab` opens the site on every Community tap and reselects the first tab (app_shell_screen.dart:75-89; community_screen.dart:15-21). When Community is the only/first tab it opens once on mount (community_screen.dart:36-40), as RN `goBack` has nowhere to go. |
 | Android back → first tab | hooks/useTabBackToHomeHandler.ts | core/navigation/app_shell_screen.dart:150-160 | PRESENT | v2: shell `PopScope`. |
 | Analytics events | — | — | N/A | None. |
 
 #### 14. SearchScreen (tab) — `screens/SearchScreen/**`, `hooks/useSearch.ts`, `components/ResourceArticleCard`
-Tally: 13 present / 2 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 15 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 13 / 2 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -563,25 +584,25 @@ Tally: 13 present / 2 partial / 0 missing / 0 in-progress / 2 n-a
 | Autocomplete dropdown under the input while typing | components/SearchInput.tsx, useSearch.ts | search_screen.dart (`_SearchBar`, `_onTextChanged`) | PRESENT | Divergence: Flutter filters with a 250ms debounce. RN never calls `debounceSearch`, so it always lists all 4. |
 | Suggestion tap → search | useSearch.ts | search_screen.dart (`_search`) | PRESENT | |
 | Submit → POST search (limit 6), category counts | useSearch.ts | features/search/data/search_repository.dart (pageSize 6) | PRESENT | |
-| Clear (X) → reset search state | SearchInput.tsx, useSearch.ts (`resetSearch`) | search_screen.dart (`_resetSearch`) | PARTIAL | Unchanged: `_resetSearch` (search_screen.dart:179-192) returns to the launch view. |
-| Category tabs "All (n)" + "Category (n)", shown when there are results | SearchScreen.tsx (CustomTabs) | search_screen.dart (ChoiceChip row) | PRESENT | Different widget style. |
+| Clear (X) → reset search state | SearchInput.tsx, useSearch.ts (`resetSearch`) | search_screen.dart (`_resetSearch`) | PRESENT | v3: `_resetSearch` clears query/results but stays on the results view (search_screen.dart:185-200), as RN `resetSearch` (3e47357). |
+| Category tabs "All (n)" + "Category (n)", shown when there are results | SearchScreen.tsx (CustomTabs) | search_screen.dart (ChoiceChip row) | PRESENT | v3: RN CustomTabs port `_CategoryTabs` (search_screen.dart:390ff), no longer ChoiceChips. |
 | Category change → refetch with `filters.category`, scroll to top | useSearch.ts | search_screen.dart (`_selectCategory`) | PRESENT | |
 | Infinite scroll via `excludedIds` | useSearch.ts | search_screen.dart (`_loadMore`) | PRESENT | |
 | Initial loader and footer loader | SearchScreen.tsx | search_screen.dart | PRESENT | |
 | Empty: 'search.noResults "query"' + suggestions | components/SearchEmpty.tsx | search_screen.dart | PRESENT | |
-| **Result card** (ResourceArticleCard): category chip, horizontal tag chips, heading, 3-line content, "common.viewMore" expand/collapse | components/ResourceArticleCard | search_screen.dart (plain `ListTile`) | PARTIAL | Unchanged: plain `ListTile`, 2-line content, no expand, no tags (search_screen.dart:372-376). |
-| Error handling | useSearch.ts (logs, shows the empty state) | search_screen.dart (red "search.error: $e") | N/A | Flutter-only state. |
+| **Result card** (ResourceArticleCard): category chip, horizontal tag chips, heading, 3-line content, "common.viewMore" expand/collapse | components/ResourceArticleCard | search_screen.dart (plain `ListTile`) | PRESENT | v3: features/search/presentation/resource_article_card.dart (category chip, tags, heading, 3-line content, downArrow.svg expand, "common.viewMore"), used at search_screen.dart:339; underline `_CategoryTabs` (search_screen.dart:390-394). |
+| Error handling | useSearch.ts (logs, shows the empty state) | search_screen.dart (red "search.error: $e") | N/A | v3: Flutter now only logs, as RN (search_screen.dart:151). |
 | Android back → first tab | hooks/useTabBackToHomeHandler.ts | core/navigation/app_shell_screen.dart:150-160 | PRESENT | v2: shell `PopScope`. |
 | Analytics events | — | — | N/A | None. |
 
 #### 15. ReactionsScreen — `screens/ReactionsScreen/**`, `hooks/useReactions.ts`
-Tally: 9 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
+Tally v3: 9 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 2 n-a [v2: 9 / 0 / 0 / 0 / 2]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Entry: ReactionsCount on a review → Reactions {reviewId, reviewType} | screens/ReviewScreen/components/ReactionsCount.tsx | features/reviews/presentation/review_card.dart → `/reactions/:id` (on `parity/reviews` this moves to review_widgets.dart:667) | PRESENT | |
 | Simulation vs scribe API by reviewType | ReactionsScreen.tsx (ReviewApiProvider) | features/reactions/presentation/reactions_screen.dart, features/reactions/data/reactions_repository.dart | PRESENT | |
-| Header: back + "review.reactionsModal.title" | ReactionsScreen.tsx | reactions_screen.dart (AppBar) | PRESENT | Material AppBar styling. |
+| Header: back + "review.reactionsModal.title" | ReactionsScreen.tsx | reactions_screen.dart (AppBar) | PRESENT | v3: `BackTitleHeader` (reactions_screen.dart:128), no Material AppBar. |
 | Filter tabs: "All {total}" + emoji bubble with count, zero counts dropped, sorted by count descending, underline on the selected tab | components/ReactionFilterTabs.tsx | reactions_screen.dart (`_buildFilterTabs`, `_FilterTab`) | PRESENT | Flutter hides the whole row (including "All") while counts load or when empty. |
 | Row: avatar or initial with an emoji bubble overlay, name | components/ReactionListItem.tsx | reactions_screen.dart (`_ReactionRow`) | PRESENT | |
 | Pagination: 20 per page, threshold 0.3 | useReactions.ts | reactions_screen.dart (`_onScroll`) | PRESENT | |
@@ -592,7 +613,7 @@ Tally: 9 present / 0 partial / 0 missing / 0 in-progress / 2 n-a
 | Analytics events | — | — | N/A | None. |
 
 #### 16. TabNavigator — `navigation/TabNavigator.tsx`, `constants/tabs.tsx`, `hooks/useTabBackToHomeHandler.ts`, `hooks/useTabScreenHeader.ts`
-Tally: 8 present / 2 partial / 0 missing / 0 in-progress / 0 n-a
+Tally v3: 10 present / 0 partial / 0 missing / 0 blocked-external / 0 device-check / 0 n-a [v2: 8 / 2 / 0 / 0 / 0]
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
@@ -602,34 +623,35 @@ Tally: 8 present / 2 partial / 0 missing / 0 in-progress / 0 n-a
 | Render nothing while the user is loading | TabNavigator.tsx | core/navigation/app_shell_screen.dart (spinner while permissions load) | PRESENT | |
 | Floating pill bar (60pt, radius 40, 30pt bottom margin, shadow); wider side margins when fewer than 3 tabs | TabNavigator.tsx | core/navigation/app_bottom_tab_bar.dart | PRESENT | |
 | Lazy tab mount, tabs stay mounted | TabNavigator.tsx (`lazy`) | app_shell_screen.dart (`_visitedTabNames` + IndexedStack) | PRESENT | |
-| Review tab unread dot = simulation unread + scribe unread > 0 (RTK tag-invalidated when reviews are read) | TabNavigator.tsx, services/reviewsApi.ts, services/scribeReviewsApi.ts | app_shell_screen.dart, features/reviews/data/reviews_repository.dart (`unreadReviewCountProvider`) | PARTIAL | v2: scribe count now included and each count gated on its own permission (reviews_repository.dart:131-148). Remaining: nothing invalidates the provider, so the dot never clears after reading. |
+| Review tab unread dot = simulation unread + scribe unread > 0 (RTK tag-invalidated when reviews are read) | TabNavigator.tsx, services/reviewsApi.ts, services/scribeReviewsApi.ts | app_shell_screen.dart, features/reviews/data/reviews_repository.dart (`unreadReviewCountProvider`) | PRESENT | v3: refetched after mark-read (review_details_screen.dart:89-93) and on Review-list refocus (review_screen.dart:274-277) (93ebfa9). |
 | Android hardware back on a tab root → first visible tab instead of exiting (Search, Community, UserAnalytics) | hooks/useTabBackToHomeHandler.ts | core/navigation/app_shell_screen.dart:150-160 | PRESENT | v2: back on a non-first tab → first visible tab; on the first tab → exit. |
 | Hamburger only on the first visible tab's header | hooks/useTabScreenHeader.ts | core/navigation/drawer_menu_button.dart (`DrawerMenuScope`) | PRESENT | |
-| Permissions fetch failure | (RN treats it as an empty permission list) | app_shell_screen.dart (raw `Text('$error')`) | PARTIAL | Unchanged: raw `Text('$error')` (app_shell_screen.dart:80), no retry/fallback tabs. |
+| Permissions fetch failure | (RN treats it as an empty permission list) | app_shell_screen.dart (raw `Text('$error')`) | PRESENT | v3: translated "common.somethingWentWrong" + Retry that invalidates `userPermissionsProvider` (app_shell_screen.dart:99-117); empty-tabs text is `home.noAccessibleTabs` (:147). RN logs out instead — documented team decision (:99-101). |
+
 
 
 
 ### Parity ledger — Scribe screens (CallLog, CallSummary, Listening, Breathing)
 
-RN source of truth: `ally-platform/ally-mobile/src` (screens/CallLog, screens/CallSummaryScreen, screens/ListeningScreen, screens/BoxBreathingScreen + hooks useSummaryState, useCallSummaryActions, useCallSummaryForm, useCallTranscriptDetails, useListeningCommon, useListeningScreen, useLiveAudioStream, useSocketConnection, useSocket, useToggleReviewPrivacy, useHideReviewDetails, utils/fieldRenderer.tsx, constants/summary.ts).
-Flutter: `ally-mobile-flutter` `master` at `227db3a` (lib/features/calllog, lib/features/scribe, lib/features/boxbreathing, lib/core/realtime, lib/core/chat, lib/core/settings, lib/core/navigation, lib/core/routing/app_router.dart).
-**v2 re-audit (2026-10-28):** every row that was PARTIAL/MISSING/MERGED in v1 was re-read on master (parity/data, parity/live, parity/callsummary, parity/shell merges); rows changed in v2 say `v2:` in Notes. ~10% of PRESENT rows spot-checked (S7, S13, S17, S19, S22, S23, S51, L8, L19, L22, L27, L42, C23) — no regressions. Rows marked `Icon sweep:` render a Material icon where RN renders an SVG/PNG. Read-only audit; nothing built or run.
+RN source of truth: `ally-platform/ally-mobile/src` @ 7a8ce0c19 (screens/CallLog, screens/CallSummaryScreen, screens/ListeningScreen, screens/BoxBreathingScreen + hooks useSummaryState, useCallSummaryActions, useCallSummaryForm, useCallTranscriptDetails, useListeningCommon, useListeningScreen, useLiveAudioStream, useSocketConnection, useSocket, useToggleReviewPrivacy, useHideReviewDetails, useScribeVoiceNoteEnabled, utils/fieldRenderer.tsx, constants/summary.ts).
+Flutter: `ally-mobile-flutter` `master` at **`f770200`** (lib/features/calllog, lib/features/scribe, lib/features/boxbreathing, lib/core/realtime, lib/core/chat, lib/core/settings, lib/core/navigation, lib/core/routing/app_router.dart).
+**v3 re-audit (2026-10-28):** every non-PRESENT/N/A row re-read on f770200; rows changed in v3 say `v3:` in Notes. PRESENT rows spot-checked (≈80, list in B_gaps.md (f)) with emphasis on the wave 3–6 Scribe/Conference, call-summary header/icons and toast changes — no regressions. Two new rows (S-N1, S-N2) from discovery. The `Icon sweep:` notes from v2 are all closed: every call-summary/voice-note site now renders the RN SVG/PNG. Read-only audit; nothing built or run.
 
 #### Tallies
 
-| Screen | PRESENT | PARTIAL | MISSING | MERGED (was IN PROGRESS) | N/A | Rows |
-|---|---|---|---|---|---|---|
-| CallLog | 30 | 3 | 2 | 0 | 4 | 39 |
-| CallSummaryScreen | 49 | 1 | 0 | 0 | 6 | 56 |
-| ListeningScreen (Microphone + Conference) | 46 | 0 | 0 | 0 | 5 | 51 |
-| BoxBreathingScreen ("Breathing") | 9 | 0 | 0 | 0 | 1 | 10 |
-| **Overall** | **134** | **4** | **2** | **0** | **16** | **156** |
+| Screen | PRESENT | PARTIAL | MISSING | BLOCKED-EXTERNAL | DEVICE-CHECK | N/A | Rows |
+|---|---|---|---|---|---|---|---|
+| CallLog | 35 [30] | 0 [3] | 0 [2] | 0 | 0 | 4 [4] | 39 [39] |
+| CallSummaryScreen | 50 [49] | 2 [1] | 0 [0] | 0 | 0 | 6 [6] | 58 [56] |
+| ListeningScreen (Microphone + Conference) | 46 [46] | 0 [0] | 0 [0] | 0 | 0 | 5 [5] | 51 [51] |
+| BoxBreathingScreen ("Breathing") | 9 [9] | 0 [0] | 0 [0] | 0 | 0 | 1 [1] | 10 [10] |
+| **Overall** | **140 [134]** | **2 [4]** | **0 [2]** | **0** | **0** | **16 [16]** | **158 [156]** |
 
-v1 → v2: 54 status changes (CallLog 3, CallSummary 25, Listening 24, Breathing 2). L49 moved N/A → PRESENT because Flutter now matches RN's background disconnect.
+v2 → v3: 6 status changes (C5, C6, C12, C24, C33, S44 → PRESENT), 2 new rows (S-N1, S-N2, both PARTIAL), 13 note-only updates. Device-only verification items (background mic, audio routing, export to Downloads) are listed in B_gaps.md (c); their rows stay PRESENT because the code matches RN.
 
 (Backend-call, toast and navigation appendices under each screen are cross-references and are not counted again in the tallies.)
 
-Analytics: RN has **no** product-analytics calls in any of these screens/hooks (grep for track/capture/posthog/logEvent/analytics/mixpanel/amplitude/firebase across the four screens and their hooks returns nothing; the only "analytics" strings are i18n keys `analytics.types.*`). Each screen gets one N/A row for this. The only telemetry-like emit is the socket `SCRIBE_START_DIAGNOSTIC` event (Listening row L37).
+Analytics: RN has **no** product-analytics calls in any of these screens/hooks. Each screen gets one N/A row for this. The only telemetry-like emit is the socket `SCRIBE_START_DIAGNOSTIC` event (L37).
 
 ---
 
@@ -637,252 +659,250 @@ Analytics: RN has **no** product-analytics calls in any of these screens/hooks (
 
 Flutter: `lib/features/calllog/presentation/call_log_screen.dart`, `call_log_row.dart`, `call_log_filter_sheet.dart`, `call_tag_chip.dart`; `lib/features/calllog/data/call_log_repository.dart`, `custom_fields_filter.dart`, `custom_fields_repository.dart`; `lib/core/settings/settings_repository.dart`; `lib/core/widgets/illustrated_modal.dart`, `status_badge.dart`, `app_empty_state.dart`, `app_tab_view.dart`, `tab_screen_header.dart`.
 
-Tally: PRESENT 30 · PARTIAL 3 · MISSING 2 · N/A 4
+Tally: PRESENT 35 · PARTIAL 0 · MISSING 0 · N/A 4  [v2: 30 · 3 · 2 · 4]
 
 | # | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|---|
 | C1 | Header title "calls.header.title" + italic subtitle | CallLogScreen.tsx, CallLogHeader.tsx | call_log_screen.dart (TabScreenHeader) | PRESENT | |
-| C2 | Archive view mode: title `calls.menu.archives`, back arrow, no subtitle, `archive:true` list | CallLogScreen.tsx, CallLogHeader.tsx | call_log_screen.dart (`_isViewingArchive`, `archivedCallLogsControllerProvider`) | PRESENT | |
-| C3 | Actions menu (three dots → "Archives"), gated ARCHIVE_CALL_LOG + real tab + not in archive view | CallLogHeader.tsx (ActionsMenu) | call_log_screen.dart `_ActionsMenu` | PRESENT | |
-| C4 | Refresh button with 600ms spin while fetching | CallLogHeader.tsx | call_log_screen.dart `_RefreshButton` | PRESENT | |
-| C5 | Filter button + active-filter count badge (shown only for real/archived view + VIEW_CALL_LOGS) | CallLogHeader.tsx, utils/fieldFilters.ts `countActiveFilters` | call_log_screen.dart `_FilterButton`, call_log_repository.dart `CallLogFilterState.activeCount` | PARTIAL | Still open (v2): `CallLogFilterState.activeCount` (call_log_repository.dart:404) counts startDate, endDate, minDuration, maxDuration separately; RN counts the date range as 1 and the duration range as 1 (a full date+duration filter shows 4 instead of 2). |
-| C6 | Built-in filters: Date & Time (from/to), Duration (mins, min/max), Mode (Scribe/Dictation), Status (Generated/Processing/Error/No Audio), Channel (Live/Uploaded) → query params | CallLogFilterSheet.tsx, utils/fieldFilters.ts `getBuiltinFilterFields`/`buildBuiltinParams` | call_log_filter_sheet.dart, call_log_repository.dart `toQueryParameters`/`_minutesToSeconds` (:455) | PARTIAL | v2: duration bug fixed (minutes ×60 → seconds; `withDuration` clears an emptied box, f67db72). Remaining: Date & Time from/to are free-text boxes (call_log_filter_sheet.dart:376-388) rather than RN date-time pickers, and emptying one sets `''` via `copyWith` (sent as `startDate=`), not null. |
-| C7 | Tags multiselect filter (options from GET /chats/tags, only if non-empty) | CallLogScreen.tsx (`useGetCallTagsQuery`), fieldFilters.ts | call_log_filter_sheet.dart `_tagsField`, call_log_repository.dart `getAllTags`/`callLogTagOptionsProvider` | PRESENT | Flutter additionally gates on VIEW_TAGS permission (RN gates the query on VIEW_CALL_LOGS; endpoint itself needs view:tags, so visible outcome is the same). |
-| C8 | Tenant custom-field filters (filterable defs → multiselect/number/date/text), `fieldFilters` JSON param | fieldFilters.ts `getFilterFields`/`buildFieldFiltersParam`, CallLogFilterSheet.tsx | custom_fields_filter.dart, call_log_filter_sheet.dart `_customFieldsSection` | PRESENT | Flutter only shows them when `/settings/custom-fields-enabled` is true (RN fetches defs regardless). Class doc in call_log_screen.dart/call_log_repository.dart saying custom filters are "not ported" is stale. |
-| C9 | Filter sheet draft lifecycle: reseed from applied state on open, Clear, Apply → refetch page 0 | CallLogFilterSheet.tsx, CallLogScreen.tsx `handleApplyFilters` | call_log_filter_sheet.dart, call_log_repository.dart `CallLogFilterController` (list controllers watch it) | PRESENT | |
-| C10 | Real/Role-play pill tabs only when both VIEW_CALL_LOGS and VIEW_SCENARIO_SESSION | CallLogScreen.tsx (TabView) | call_log_screen.dart (AppTabView) | PRESENT | |
-| C11 | `availableLogTypes` + initial-tab correction from permissions | CallLogScreen.tsx | call_log_screen.dart `_buildScreen` | PRESENT | |
-| C12 | FeatureNotAvailable state (no TAB_PERMISSIONS): "Oops" title, `calls.appCurrentlyForCounsellors`, "Learn more" → `Linking.openURL(ALLY_WEB_URL)`, Alert `common.unableToOpenLink` on failure | CallLogScreen.tsx, components/FeatureNotAvailable/* | call_log_screen.dart (`_activeTab == null` branch) | MISSING | Still open (v2): call_log_screen.dart:401 shows only a centred `calls.fallback.callEmptyTitle` text; no oops copy, no Learn-more CTA to ALLY_WEB_URL, no link-failure alert. |
-| C13 | Real logs: GET /chats/call-logs, limit 10, offset paging, hasMore = page==10 | CallLogScreen.tsx, services/callsApi.ts | call_log_repository.dart `RealCallLogsController` (kCallLogPageSize=10) | PRESENT | |
+| C2 | Archive view mode: title `calls.menu.archives`, back arrow, no subtitle, `archive:true` list | CallLogScreen.tsx, CallLogHeader.tsx | call_log_screen.dart:411-424 (`_isViewingArchive`, leftArrow.svg) | PRESENT | |
+| C3 | Actions menu (three dots → "Archives"), gated ARCHIVE_CALL_LOG + real tab + not in archive view | CallLogHeader.tsx (ActionsMenu) | call_log_screen.dart `_ActionsMenu` (:622) | PRESENT | |
+| C4 | Refresh button with 600ms spin while fetching | CallLogHeader.tsx | call_log_screen.dart `_RefreshButton` (:576) | PRESENT | |
+| C5 | Filter button + active-filter count badge (shown only for real/archived view + VIEW_CALL_LOGS) | CallLogHeader.tsx, utils/fieldFilters.ts `countActiveFilters` | call_log_screen.dart `_FilterButton` (:517), call_log_repository.dart `activeCount` (:413-417) | PRESENT | v3: fixed (d7964fa) — date range and duration range each count 1, as RN `hasValue` per FilterState entry. |
+| C6 | Built-in filters: Date & Time (from/to), Duration (mins, min/max), Mode, Status, Channel → query params | CallLogFilterSheet.tsx:108-136 (`LineTextInput` ×2 for `date`/`number`), utils/fieldFilters.ts:197-215 `buildBuiltinParams` | call_log_filter_sheet.dart:370-393 (`AppTextField` line shape, `calls.filters.from/to`), call_log_repository.dart:460-471 `withDates`, :488-498 `toQueryParameters` | PRESENT | v3: RN's date bounds are free-text `LineTextInput`s too (v2 "date-time picker" claim was wrong). Emptied/blank box now maps to null and is not sent (RN `if (date[0])`). Minutes×60 → seconds kept. |
+| C7 | Tags multiselect filter (options from GET /chats/tags, only if non-empty) | CallLogScreen.tsx, fieldFilters.ts | call_log_filter_sheet.dart `_tagsField`, call_log_repository.dart `getAllTags` | PRESENT | Flutter additionally gates on VIEW_TAGS (endpoint needs view:tags; same visible outcome). |
+| C8 | Tenant custom-field filters, `fieldFilters` JSON param | fieldFilters.ts, CallLogFilterSheet.tsx | custom_fields_filter.dart, call_log_filter_sheet.dart `_customFieldsSection` | PRESENT | Only when `/settings/custom-fields-enabled` true. Class doc at call_log_screen.dart:105-108 saying custom filters are "not ported" is still stale. |
+| C9 | Filter sheet draft lifecycle: reseed on open, Clear, Apply → refetch page 0 | CallLogFilterSheet.tsx, CallLogScreen.tsx | call_log_filter_sheet.dart, call_log_repository.dart `CallLogFilterController` | PRESENT | |
+| C10 | Real/Role-play pill tabs only when both VIEW_CALL_LOGS and VIEW_SCENARIO_SESSION | CallLogScreen.tsx (TabView) | call_log_screen.dart:453 (AppTabView) | PRESENT | |
+| C11 | `availableLogTypes` + initial-tab correction from permissions | CallLogScreen.tsx | call_log_screen.dart:358-366 | PRESENT | |
+| C12 | FeatureNotAvailable state (no TAB_PERMISSIONS): "Oops" title, `calls.appCurrentlyForCounsellors`, "Learn more" → `Linking.openURL(ALLY_WEB_URL)`, Alert `common.error`/`common.unableToOpenLink` on failure | CallLogScreen.tsx:190-194, 551-557, 682-697; components/FeatureNotAvailable/FeatureNotAvailable.tsx | call_log_screen.dart:341-354 (gate on `_tabPermissions` :1011-1021 = RN TAB_PERMISSIONS), `_openLearnMore` :249-266, `_FeatureNotAvailable` :1026-1093; app_config.dart:32 `allyWebUrl` | PRESENT | v3: fixed (d7964fa). Header kept above it as RN. The old `_activeTab == null` text (:465) is now unreachable in practice. |
+| C13 | Real logs: GET /chats/call-logs, limit 10, offset paging, hasMore = page==10 | CallLogScreen.tsx, services/callsApi.ts | call_log_repository.dart `RealCallLogsController` | PRESENT | |
 | C14 | Simulation logs: GET /learn/scenario-sessions limit/offset | CallLogScreen.tsx, simulationsApi.ts | call_log_repository.dart `SimulationLogsController` | PRESENT | |
 | C15 | Archived logs list (separate offset/hasMore) | CallLogScreen.tsx | call_log_repository.dart `ArchivedCallLogsController` | PRESENT | |
-| C16 | Hide the ongoing call (`details.chatId === currentChat.chatId`) from the real list | CallLogScreen.tsx `fetchInitialRealLogs` | call_log_repository.dart `RealCallLogsController.build` | PRESENT | `currentChatProvider` is only set by active-chat discovery (core/chat/active_chat_discovery.dart), not by ScribeRecordingScreen itself. |
-| C17 | Refetch all permitted lists on every screen focus (`useFocusEffect`) | CallLogScreen.tsx | call_log_screen.dart:324 (`ScreenFocusListener` invalidates real/archived/simulation lists) | PRESENT | v2: fixed (023b77c). |
-| C18 | Pull-to-refresh resets active list to page 0 | CallLogScreen.tsx `handleRefresh` | call_log_screen.dart `_InfiniteScrollListView` (RefreshIndicator) | PRESENT | |
-| C19 | Infinite scroll (`onEndReachedThreshold 0.5`) + footer spinner | CallLogScreen.tsx | call_log_screen.dart `_InfiniteScrollListView` (200px threshold) | PRESENT | |
-| C20 | First-page skeleton (CallLogSkeleton ×10) | CallLogScreen.tsx, components/CallLogSkeleton | call_log_screen.dart `_CallLogSkeleton` | PRESENT | Static blocks (no shimmer). |
-| C21 | Empty state (NoCallLogsIcon, call vs sim titles, `audioCall.fallback.noActiveCallDesc`) | CallLogScreen.tsx (EmptyState) | call_log_screen.dart `_CallLogEmptyState` | PRESENT | |
-| C22 | Error state = empty state (RN resets list to [] on failed fetch) | CallLogScreen.tsx | call_log_screen.dart (`error:` → `_CallLogEmptyState`) | PRESENT | |
-| C23 | Row: title chain (summaryName → metadata.sessionName → chatId → `ID-{id}`), StatusBadge (incl. NO_AUDIO hexagon), eye icon only when enabled, date•time / scenario•date line | CallLogItem.tsx, StatusBadge.tsx | call_log_row.dart, core/widgets/status_badge.dart, call_log_repository.dart `CallLogItem.fromJson/logTitle` | PRESENT | |
-| C24 | Single expanded row at a time (`expandedIdx`) via chevron; header greys when expanded | CallLogScreen.tsx `handleToggle`, CallLogItem.tsx | call_log_row.dart (`_expanded` per row) | PARTIAL | Still open (v2): `_expanded` is per-row state (call_log_row.dart:73); several rows can be open at once (RN collapses the previous one). |
-| C25 | Expanded details: source label + colour (Live/Uploaded) `|`, Duration, Session score (hidden when 0), Mode, tag chips coloured by positivity_rating (clamped 1–5) | CallLogItem.tsx, Tag.tsx, constants TAG_COLORS, utils/callLog `getLogSourceLabelConfig` | call_log_row.dart, call_tag_chip.dart, call_log_screen.dart `_RealLogsList` | PRESENT | |
-| C26 | Row disabled unless VIEW_CHAT_DETAILS (real/archived) / VIEW_SCENARIO_SESSION_DETAILS (sim) | CallLogScreen.tsx `renderItem` | call_log_screen.dart (`enabled:`) | PRESENT | |
-| C27 | Nav real/archived row → CallSummary `{callId: details.chatId, fromLogs:true}` | CallLogScreen.tsx `handleItemPress` | call_log_screen.dart → `/call-log/:id` (extra CallLogItem), core/routing/app_router.dart | PRESENT | Route hard-requires `state.extra as CallLogItem` (see S1). |
-| C28 | Nav sim row → SimulationFeedback `{scenarioSessionId, fromLogs:true}` | CallLogScreen.tsx | call_log_screen.dart → `/simulations/feedback/:id?fromLogs=true` | PRESENT | |
-| C29 | Start-session FAB: shown if (START_CALL_PERMISSIONS or canCreateNote) and no current chat; grey when nothing offerable; when chat-types unknown, re-fetch and toast `common.somethingWentWrong` if nothing offerable | CallLogScreen.tsx | call_log_screen.dart `_StartSessionFab` + onPressed | PRESENT | |
-| C30 | Re-ask GET /settings/chat-types on every focus (401-burst recovery) | CallLogScreen.tsx (`useFocusEffect(getVisibleChatTypes)`) | call_log_screen.dart:329 (invalidates `visibleChatTypesProvider` on focus) | PRESENT | v2: fixed. |
-| C31 | StartSessionModal: consent footer copy, "Start Scribe Mode" (if MICROPHONE_CHAT enabled), "Start Dictation Mode"/Create note (counsellor + scribe-note-creation-enabled), loading/disabled states, close X | StartSessionModal.tsx, CallLogScreen.tsx | call_log_screen.dart `_showStartSessionModal` (core/widgets/illustrated_modal.dart) | PRESENT | |
-| C32 | Start Scribe: mic `check` → `request` each bounded to 30s, double-tap guard, BLOCKED/DENIED → microphone settings alert, error → toast `common.somethingWentWrong`, then navigate `Listening {isMicrophoneMode:true}` | CallLogScreen.tsx `handleVoiceRecording`, hooks/usePermissionAlert | call_log_screen.dart `_startScribeSession`, `_showMicrophoneSettingsAlert` → `/scribe` | PRESENT | |
-| C33 | `checkCounselorChat()` (GET /chats/counsellor-chat) fired right before navigating to Listening | CallLogScreen.tsx, hooks/useCounselorChat | call_log_screen.dart | MISSING | Still open (v2): `_startScribeSession` (call_log_screen.dart:194-205) pushes `/scribe` without priming current chat. Low impact now: the scribe screen takes `chatId` from USER_JOINED (L7) and hydrates itself. |
-| C34 | Create note: POST /chats/note → close sheet → CallSummary `{callId, fromLogs:true}`; failure toast `calls.createNote.error` and sheet stays | CallLogScreen.tsx `handleCreateNote`, scribeNoteApi.ts | call_log_screen.dart `_createNote`, call_log_repository.dart `createNote` | PRESENT | |
-| C35 | Android hardware back: exit app on first visible tab, else navigate to first visible tab | CallLogScreen.tsx (`useHardwareBackPressHandler`, `getFirstVisibleTab`) | core/navigation/app_shell_screen.dart:150 (shell `PopScope`) | PRESENT | v2: fixed in the shell (557dc55): back on a non-first tab selects the first visible tab; on the first tab it pops (exits). |
-| C36 | `checkAuth()` on focus when no userData | CallLogScreen.tsx | — | N/A | Flutter auth/user state is app-global (core/auth); no per-screen re-check needed. |
-| C37 | RetrySessionModal (max-active-users auto-retry) | components/RetrySessionModal/* | — | N/A | Lives in CallLog/components but is only used by SimulationDetails/SimulationPathDetails/CaseDetails screens (out of scope here). |
-| C38 | Badge component | components/Badge/* | — | N/A | Exported but not rendered anywhere in RN. |
+| C16 | Hide the ongoing call (`details.chatId === currentChat.chatId`) from the real list | CallLogScreen.tsx `fetchInitialRealLogs` | call_log_repository.dart `RealCallLogsController.build` | PRESENT | v3: `currentChatProvider` is now also set by ScribeRecordingScreen on USER_JOINED (scribe_recording_screen.dart:398) and by the pre-nav counsellor-chat check (C33). |
+| C17 | Refetch all permitted lists on every screen focus | CallLogScreen.tsx | call_log_screen.dart:390-396 (`ScreenFocusListener`) | PRESENT | |
+| C18 | Pull-to-refresh resets active list to page 0 | CallLogScreen.tsx `handleRefresh` | call_log_screen.dart `_InfiniteScrollListView` | PRESENT | |
+| C19 | Infinite scroll + footer spinner | CallLogScreen.tsx | call_log_screen.dart `_InfiniteScrollListView` | PRESENT | |
+| C20 | First-page skeleton (CallLogSkeleton ×10) | CallLogScreen.tsx | call_log_screen.dart `_CallLogSkeleton` | PRESENT | Static blocks (no shimmer). |
+| C21 | Empty state (NoCallLogsIcon, call vs sim titles, desc) | CallLogScreen.tsx | call_log_screen.dart `_CallLogEmptyState` (noCallRecords.svg :797) | PRESENT | |
+| C22 | Error state = empty state | CallLogScreen.tsx | call_log_screen.dart:896, :953 | PRESENT | |
+| C23 | Row: title chain, StatusBadge, eye icon only when enabled, date•time / scenario•date line | CallLogItem.tsx, StatusBadge.tsx | call_log_row.dart (eye.svg :270), status_badge.dart | PRESENT | |
+| C24 | Single expanded row at a time (`expandedIdx`) via chevron; header greys when expanded | CallLogScreen.tsx:119, 501-503, 521 | call_log_screen.dart:122 `_expandedLogKey`, `_SingleExpandRow` :990-1006; call_log_row.dart:83 | PRESENT | v3: fixed (d7964fa) — one shared key across real/archived/sim lists; opening a row closes the previous. |
+| C25 | Expanded details: source label + colour, Duration, Session score (hidden when 0), Mode, tag chips by positivity_rating | CallLogItem.tsx, Tag.tsx | call_log_row.dart, call_tag_chip.dart, call_log_screen.dart:913-932 | PRESENT | |
+| C26 | Row disabled unless VIEW_CHAT_DETAILS / VIEW_SCENARIO_SESSION_DETAILS | CallLogScreen.tsx `renderItem` | call_log_screen.dart `enabled:` (:929, :979) | PRESENT | |
+| C27 | Nav real/archived row → CallSummary `{callId, fromLogs:true}` | CallLogScreen.tsx | call_log_screen.dart:930 → `/call-log/:id` (extra optional, app_router.dart:312-321) | PRESENT | |
+| C28 | Nav sim row → SimulationFeedback `{scenarioSessionId, fromLogs:true}` | CallLogScreen.tsx | call_log_screen.dart:980 | PRESENT | |
+| C29 | Start-session FAB: visibility, grey when nothing offerable, unknown → refetch + toast | CallLogScreen.tsx | call_log_screen.dart:486-505 | PRESENT | Toast is now the RN-style toast (aedd4b1). |
+| C30 | Re-ask GET /settings/chat-types on every focus | CallLogScreen.tsx | call_log_screen.dart:395 | PRESENT | |
+| C31 | StartSessionModal: consent footer, Scribe / Dictation buttons, loading/disabled, close X | StartSessionModal.tsx | call_log_screen.dart `_showStartSessionModal` (:147) | PRESENT | |
+| C32 | Start Scribe: mic check→request (30s bound), double-tap guard, denied → settings alert, error → toast, navigate Listening | CallLogScreen.tsx `handleVoiceRecording` | call_log_screen.dart `_startScribeSession` :207-231 | PRESENT | |
+| C33 | `checkCounselorChat()` (GET /chats/counsellor-chat) fired right before navigating to Listening | CallLogScreen.tsx:156, 645 | call_log_screen.dart:218-219, `_checkCounselorChat` :238-247 | PRESENT | v3: fixed (d7964fa). Gated on VIEW_COUNSELOR_CHAT as RN's hook; deliberately does not clear the chat when none (scribe screen sets its own from USER_JOINED). |
+| C34 | Create note: POST /chats/note → close sheet → CallSummary; failure toast and sheet stays | CallLogScreen.tsx `handleCreateNote` | call_log_screen.dart `_createNote` :183-198 | PRESENT | |
+| C35 | Android hardware back: exit app on first visible tab, else first visible tab | CallLogScreen.tsx | core/navigation/app_shell_screen.dart (shell `PopScope`) | PRESENT | |
+| C36 | `checkAuth()` on focus when no userData | CallLogScreen.tsx | — | N/A | App-global auth state. |
+| C37 | RetrySessionModal | components/RetrySessionModal/* | — | N/A | Only used by Simulation/Case screens. |
+| C38 | Badge component | components/Badge/* | — | N/A | Not rendered in RN. |
 | C39 | Analytics/tracking | — | — | N/A | None in RN. |
 
-Backend calls (CallLog): GET `/chats/call-logs` {limit, offset, archive, fieldFilters, startDate, endDate, minDuration, maxDuration, tags, mode, status, source} — Flutter PRESENT (seconds since v2; date boxes free text, C6); GET `/chats/tags?offset=0` — PRESENT (no offset param sent); GET `/custom-fields/definitions` — PRESENT; GET `/learn/scenario-sessions` — PRESENT; GET `/settings/chat-types` — PRESENT; GET `/settings/scribe-note-creation-enabled` — PRESENT; POST `/chats/note` — PRESENT; GET `/chats/counsellor-chat` (pre-nav) — MISSING (C33).
-Toasts/alerts (CallLog): `calls.createNote.error` (PRESENT), `common.somethingWentWrong` (PRESENT ×2), mic settings alert `simulationPage.allowMicrophone/microphonePrompt` (PRESENT), Alert `common.error`/`common.unableToOpenLink` (MISSING with C12).
-Navigation targets: CallSummary, SimulationFeedback, Listening(isMicrophoneMode), first visible tab / exit app (C35 PRESENT via shell), external ALLY_WEB_URL (C12 MISSING).
+Backend calls (CallLog): GET `/chats/call-logs` {limit, offset, archive, fieldFilters, startDate, endDate, minDuration, maxDuration, tags, mode, status, source} — PRESENT (v3: empty date not sent); GET `/chats/tags` — PRESENT; GET `/custom-fields/definitions` — PRESENT; GET `/learn/scenario-sessions` — PRESENT; GET `/settings/chat-types` — PRESENT; GET `/settings/scribe-note-creation-enabled` — PRESENT; POST `/chats/note` — PRESENT; GET `/chats/counsellor-chat` (pre-nav) — v3 PRESENT (C33).
+Toasts/alerts (CallLog): `calls.createNote.error`, `common.somethingWentWrong` ×2, mic settings alert, Alert `common.error`/`common.unableToOpenLink` — all PRESENT (v3: C12). A11y labels: v3 `accessibility.filter` / `accessibility.refresh` translated (call_log_screen.dart:527, :605; 0f7839c).
+Navigation targets: CallSummary, SimulationFeedback, Listening, first visible tab / exit app, external ALLY_WEB_URL — all PRESENT.
 
 ---
 
 #### 2. CallSummaryScreen (`screens/CallSummaryScreen/**`, 45 files + hooks)
 
-Flutter: `lib/features/calllog/presentation/call_summary_screen.dart` (1880 lines), `voice_note_section.dart`, `voice_note_recorder.dart`; `lib/features/calllog/data/call_log_repository.dart`, `call_summary_fields.dart`, `custom_fields_repository.dart`; `lib/features/reviews/data/scribe_reviews_repository.dart`, `lib/features/reactions/data/reactions_repository.dart`, `lib/features/reviews/presentation/share_for_review_screen.dart`; `lib/core/widgets/confirmation_modal.dart`.
+Flutter: `lib/features/calllog/presentation/call_summary_screen.dart` (2338 lines), `call_summary_header.dart`, `call_summary_menu.dart`, `call_summary_actions.dart`, `summary_generation_progress.dart`, `call_transcript_tab.dart`, `searchable_location_dropdown.dart`, `voice_note_section.dart`, `voice_note_recorder.dart`; `lib/features/calllog/data/call_log_repository.dart`, `call_summary_fields.dart`, `summary_form_state.dart`, `summary_file_export.dart`, `voice_custom_fields.dart`, `custom_fields_repository.dart`; `lib/features/reviews/...`; `lib/core/widgets/confirmation_modal.dart`, `custom_dropdown.dart`.
 
-Tally: PRESENT 49 · PARTIAL 1 · MISSING 0 · N/A 6
+Tally: PRESENT 50 · PARTIAL 2 · MISSING 0 · N/A 6  [v2: 49 · 1 · 0 · 6, 56 rows]
 
 | # | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|---|
-| S1 | Route params `callId`, `fromLogs`; `chatId = callId ?? currentChat.chatId` (live flow from Breathing passes none) | CallSummaryScreen.tsx | core/routing/app_router.dart:285-299 (`/call-log/:id` with optional extra, `?live=1`; `/call-summary`), call_summary_screen.dart | PRESENT | v2: fixed — opens by id without `extra`; `fromLogs` modelled (live flow = `?live=1` or `/call-summary`). |
-| S2 | GET /chats/:id summary fetch + loading spinner | hooks/useSummaryState.ts, services/callSummaryApi.ts | call_log_repository.dart `callSummaryProvider`/`getCallSummary`; call_summary_screen.dart `_SummaryTab` | PRESENT | |
-| S3 | Refresh on every re-focus after first (e.g. back from share/review screens) | CallSummaryScreen.tsx (`useFocusEffect` + `isFirstFocusRef`) | call_summary_screen.dart `_pushAndRefresh` (:341) | PRESENT | v2: every push from this screen (share, review FAB) refetches on return. |
-| S4 | GET /settings/summary-fields (refetched on open) → `selectSummaryVisibleFields`: hide sections with no visible fields (except AdditionalNotes) and hide non-visible fields | CallSummaryScreen.tsx, CallSummaryDetails.tsx `renderSection`, SectionWrapper.tsx, services/settingsApi.ts | call_summary_screen.dart:1159 (`summaryVisibleFieldsProvider`), voice_note_section.dart:38 | PRESENT | v2: fixed (0de134b). |
-| S5 | Header: back arrow, "Session *Summary*" title, `#summaryName` or `-` | components/Header/Header.tsx | call_summary_screen.dart `_buildHeaderTitle`, `_summaryName` (:274) | PRESENT | v2: rename updates the header at once. Material AppBar + TabBar rather than RN custom header (visual only). |
-| S6 | Share switch visible only when summary available + status SUCCESS + transcript present + not archived | Header.tsx, CallSummaryScreen.tsx | call_summary_screen.dart `showShareSwitch` | PRESENT | |
-| S7 | Share toggle: ON with no review or review <10 min old → ShareCallLog screen; otherwise PATCH scribe review status IN_REVIEW/HIDDEN, toasts `simulationPage.privacyUpdated` / `simulationPage.errorUpdatePrivacy`, then refresh | CallSummaryScreen.tsx `handleShareToggle`, hooks/useToggleReviewPrivacy.ts, services/scribeReviewsApi | call_summary_screen.dart `_handleShareToggle`, scribe_reviews_repository.dart `updateReviewStatus` | PRESENT | |
-| S8 | ShareCallLog nav params `{scribeSessionId, reviewId, sessionData:{title (summaryName ‖ review.feedCard.sharedSimulationForReview), createdAt (details.startTime ‖ createdAt), duration (formatDurationFromSeconds)}, note}` | CallSummaryScreen.tsx `handleShareForReview` | call_summary_screen.dart `_handleShareToggle` (:356-367) | PRESENT | v2: passes `contextDateTime` (startTime ‖ createdAt), `contextDuration` and the translated title fallback. |
-| S9 | ShareCallLog (scribe) screen itself | screens/ShareCallLog (out of folder, entry from here) | lib/features/reviews/presentation/share_for_review_screen.dart | PRESENT | v2: parity/reviews merged (bb6ca2b); on master. |
-| S10 | Menu → Rename (CustomModal with input; PATCH /chats/:id/call-info `{summaryName}`; toasts `callSummary.info.summaryNameUpdateSuccess/Failed`) | SummaryModals.tsx, DeleteRenameModal.tsx, hooks/useCallSummaryActions.ts | call_summary_screen.dart `_showRenameDialog`, call_log_repository.dart `updateSummaryName` | PRESENT | AlertDialog instead of CustomModal; see S5 stale header. |
-| S11 | Menu → Export (only when summary available): storage permission, GET /chats/:id/export-summary (string), save file, toasts `fileExportedSuccess` / `fileExportFailed` / invalid format | SummaryModals.tsx, useCallSummaryActions.ts `handleExport`, hooks/useStoragePermissions.ts, utils/fileOperations `saveFile` | call_summary_screen.dart menu (:452), call_summary_actions.dart `export`, data/summary_file_export.dart | PRESENT | v2: fixed (9d4807b/98ba567); iOS `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` present in Info.plist. |
-| S12 | Menu → Data policy (opens PRIVACY_POLICY_URL) | SummaryModals.tsx | call_summary_screen.dart (`launchUrl(_privacyPolicyUrl)`) | PRESENT | |
-| S13 | Menu → Archive/Unarchive with ConfirmationModal (destructive for archive), PATCH /chats/call-logs/:id/archive, success/failed toasts | SummaryModals.tsx, ArchiveActionModal.tsx, useCallSummaryActions.ts `handleArchive` | call_summary_screen.dart `_handleArchiveToggle`, core/widgets/confirmation_modal.dart | PRESENT | Archive state change is not pushed to the call-log list (C17). |
-| S14 | Delete summary (CustomModal → PUT call-details `{summary:{}}` → goBack after 2s) | DeleteRenameModal.tsx, useCallSummaryActions.ts `handleDelete` | — | N/A | Unreachable in RN (menu never sets `activeModal='delete'`). Flutter mirrors it: `_showDeleteModal` + `CallSummaryActions.delete` exist but are unused. |
-| S15 | SummaryDropdown (summary/transcript switcher) | Header/SummaryDropdown.tsx | — | N/A | Not rendered by Header.tsx. |
-| S16 | Tabs Summary / Transcript; Transcript tab only if chatId && !403 && VIEW_MESSAGES | CallSummaryScreen.tsx (`showTranscriptTab`) | call_summary_screen.dart:601-603 | PRESENT | v2: gated on chatId, not-403 and VIEW_MESSAGES. |
-| S17 | 403 → SummaryUnauthorized (image, `summary.notFoundTitle/Desc`, back button) | SummaryUnauthorized.tsx | call_summary_screen.dart `_SummaryUnauthorizedView` | PRESENT | Icon sweep: `Icons.lock_outline` (call_summary_screen.dart:1800) instead of RN `summaryFailed.png`. |
-| S18 | Generation in progress: Lottie animation, ShinyText cycling SUMMARY_GENERATION_STEPS every 3s (full list live / tail from logs), transient "transcription deleted" shield row (5s), ETA `summaryLoading.estimatedTime`, live vs logs copy (`processingDescMain`/`…2`), success image + `summaryLoading.generated`, 3s "Setting up" hold after summary appears (`canShowSummary`) | SummaryGenerationProgress.tsx, useSummaryState.ts | summary_generation_progress.dart | PRESENT | v2: Lottie, ShinyText steps every 3s (full/tail), transcription-deleted pill, ETA, generated state, 3s setting-up hold (call_summary_screen.dart `_canShowSummaryTimer`). |
-| S19 | FAILED and NO_AUDIO states (no-audio tag, failed title) | SummaryGenerationProgress.tsx | summary_generation_progress.dart:152 | PRESENT | v2: now uses `summaryFailed.png`. |
-| S20 | Buttons under progress: "See if ready" (refresh) / "Retry" (POST /chats/:id/retry-summary + toasts `retryStarted`/`retryFailed`/server message) / "Setting up…" text, hidden for NO_AUDIO; "Check later" → clear currentChat + go to Call Log tab | CallSummaryScreen.tsx `renderSummaryButtons`, `handleRetrySummary`, `onViewCallLogs` | call_summary_screen.dart `_goToCallLog` (:484), summary_generation_progress.dart | PRESENT | v2: "Check later" clears current chat and goes to the Call Log tab. |
-| S21 | AddNotesSection while generating: collapsible "Add notes", info tooltip, debounced (1s) POST /chats/:id/notes `{content}` | SummaryGenerationProgress/AddNotesSection.tsx, useSummaryState.ts `handleNoteChange`, chatApi `updateNotes` | summary_generation_progress.dart:303+ (AddNotes section, debounced POST /chats/:id/notes) | PRESENT | v2: fixed. |
-| S22 | AI-generated warning banner (GoldenShield) above sections | CallSummaryDetails.tsx | call_summary_screen.dart (amber banner) | PRESENT | Icon sweep: `Icons.shield_outlined` (call_summary_screen.dart:1227) instead of RN `goldenShield.svg`. |
-| S23 | Exclusive accordion; toggling blocked while another section is editing; collapsing the editing section exits edit | CallSummaryDetails.tsx `toggleSection`, SectionHeader.tsx | call_summary_screen.dart `_toggleSection`, `_SectionCard` | PRESENT | Icon sweep: section icons are Material (call_summary_screen.dart:88-105, rendered :1384); chevron `Icons.expand_less/expand_more` (:1428) instead of `arrowDown/arrowRight.svg`. |
-| S24 | Edit gate `section.canEdit && (MANAGE_CUSTOM_FIELD_DEFINITIONS admin || counselorId === me)` | SectionWrapper.tsx | call_summary_screen.dart `_SectionCard` (`canEdit`) | PRESENT | |
-| S25 | Edit → Wand (canEnhance) / Tick (save) / Close (reset section) controls with animation | SectionHeader.tsx, SectionWrapper.tsx | call_summary_screen.dart `_SectionCard`, `_onTickPress`, `_onClosePress` | PRESENT | No fade/slide animation. |
-| S26 | AI enhance: POST /chats/enhance `{content}` for the section's editable field; pulsing field while enhancing; toast `summary.enhanceFailed` on error/empty | SectionWrapper.tsx, EditableField.tsx | call_summary_screen.dart `_onWandPress`, call_log_repository.dart `enhanceCallSummary` | PRESENT | Spinner replaces wand instead of pulsing text. |
-| S27 | Built-in field renderers: Text (read-only), InlineTextInput, MultilineTextInput (EditableField), Dropdown (CustomDropdown) with localized labels/options | utils/fieldRenderer.tsx, FieldRow.tsx, EditableField.tsx, GenericSectionContent.tsx, constants/summary.ts | call_summary_screen.dart `_FieldEditor`, call_summary_fields.dart | PRESENT | |
-| S28 | Location = SearchableLocationDropdown (places search) | utils/fieldRenderer.tsx (`FieldType.SearchableDropdown`), services/placesApi.ts | searchable_location_dropdown.dart, data/places_repository.dart; call_summary_screen.dart:1538 | PRESENT | v2: fixed (`/places`, `/places/search`). |
-| S29 | Tags field edit → submit as array of names (`transformFormDataForSubmission` + `tagNames`) | hooks/useCallSummaryForm.ts, utils/formDataTransformer.ts | call_log_repository.dart:1026-1031 (tags sent as a list of names) | PRESENT | v2: fixed (0de134b); in-flight edits kept via `_form.pendingPatch`/`markSaved` (call_summary_screen.dart:986). |
-| S30 | Read transform: dominantFeelings array → ", " string; tags → names; additionalNotes from callInfo.notes; computed read-only fields | utils/formDataTransformer.ts `transformSummaryToFormData`, constants/summary.ts computeValue | call_log_repository.dart:246-250, data/summary_display_format.dart | PRESENT | v2: dominantFeelings joined; duration/date/time formatted like RN (228162f). |
-| S31 | Global Save button: shown when `(!callId || hasChanges)` and feedback popup closed; after save, opens summary-feedback popup (if no feedback, EDIT_SUMMARY_FEEDBACK, not manual note) | CallSummaryScreen.tsx `onSaveButtonPress`, CallSummaryDetails.tsx | call_summary_screen.dart:1277 (`alwaysShowSave || dirty`), `_onSaveButtonPress` | PRESENT | v2: always shown in the live flow; opens the feedback popup after save. |
+| S1 | Route params `callId`, `fromLogs`; live flow passes none | CallSummaryScreen.tsx | app_router.dart:312-326, call_summary_screen.dart | PRESENT | |
+| S2 | GET /chats/:id summary fetch + loading spinner | useSummaryState.ts | call_log_repository.dart:1026 `callSummaryProvider`; call_summary_screen.dart `_SummaryTab` :1155-1158 | PRESENT | |
+| S3 | Refresh on every re-focus after first | CallSummaryScreen.tsx | call_summary_screen.dart `_pushAndRefresh` (:357) | PRESENT | |
+| S4 | GET /settings/summary-fields → visible sections/fields | CallSummaryScreen.tsx, CallSummaryDetails.tsx | call_summary_screen.dart (`summaryVisibleFieldsProvider`), voice_note_section.dart | PRESENT | |
+| S5 | Header: back arrow, "Session *Summary*" title, `#summaryName` or `-` | components/Header/Header.tsx | call_summary_header.dart:64-133 (leftArrowIcon.svg, ReplayPro title + bold-italic subtitle, 80pt row); call_summary_screen.dart:675-685 | PRESENT | v3: RN custom header ported (64636fa) — v2's "Material AppBar" note is gone; rename no longer reverted by refetch (`_lastFetchedSummaryName` :318-327). |
+| S6 | Share switch visible only when summary available + SUCCESS + transcript + not archived | Header.tsx, CallSummaryScreen.tsx | call_summary_screen.dart:623-628 | PRESENT | |
+| S7 | Share toggle → ShareCallLog or PATCH review status + toasts + refresh | CallSummaryScreen.tsx, useToggleReviewPrivacy.ts | call_summary_screen.dart `_handleShareToggle` :366-397; call_summary_header.dart:136-145 (`RnCustomSwitch`, label `learn.scenario.share`) | PRESENT | v3: CustomSwitch port replaces Material Switch. |
+| S8 | ShareCallLog nav params | CallSummaryScreen.tsx | call_summary_screen.dart:372-385 | PRESENT | |
+| S9 | ShareCallLog (scribe) screen | screens/ShareCallLog | reviews/presentation/share_for_review_screen.dart | PRESENT | |
+| S10 | Menu → Rename (CustomModal with input; PATCH call-info; toasts) | SummaryModals.tsx, DeleteRenameModal.tsx | call_summary_screen.dart `_showRenameModal` :401-415 (`CallSummaryTextModal`), call_summary_actions.dart:22-31 | PRESENT | v3: RN-style text modal replaces AlertDialog; failure toast via `showErrorToast`. |
+| S11 | Menu → Export: storage permission, GET export-summary, save file, toasts | SummaryModals.tsx, useCallSummaryActions.ts, useStoragePermissions.ts, utils/fileOperations | call_summary_actions.dart:37-56, summary_file_export.dart:27-80, MainActivity.kt `ally/file_export` | PRESENT | Android: WRITE_EXTERNAL_STORAGE maxSdk 28 + `requestLegacyExternalStorage` match RN manifest; writes to public Downloads + media scan (same as RNFS). Actual file landing is a device check (B_gaps (c)). |
+| S12 | Menu → Data policy | SummaryModals.tsx | call_summary_screen.dart:475-480 | PRESENT | |
+| S13 | Menu → Archive/Unarchive with ConfirmationModal, PATCH, toasts | ArchiveActionModal.tsx, useCallSummaryActions.ts | call_summary_screen.dart `_handleArchiveToggle` :418-431, call_summary_actions.dart:58-69 | PRESENT | |
+| S14 | Delete summary | DeleteRenameModal.tsx | call_summary_screen.dart `_showDeleteModal` (unused) | N/A | Unreachable in RN; Flutter mirrors (product item 50). |
+| S15 | SummaryDropdown | Header/SummaryDropdown.tsx | — | N/A | Not rendered in RN. |
+| S16 | Tabs Summary / Transcript; Transcript only if chatId && !403 && VIEW_MESSAGES | CallSummaryScreen.tsx | call_summary_screen.dart:620-622; call_summary_header.dart `CallSummaryTabBar` | PRESENT | v3: RN tab strip (indicator, labels) replaces Material TabBar (64636fa). |
+| S17 | 403 → SummaryUnauthorized (image, copy, back) | SummaryUnauthorized.tsx | call_summary_screen.dart:2300 (`summaryFailed.png`) | PRESENT | v3: icon sweep closed (was `Icons.lock_outline`). |
+| S18 | Generation in progress (Lottie, ShinyText steps, shield row, ETA, copy, generated state, 3s hold) | SummaryGenerationProgress.tsx, useSummaryState.ts | summary_generation_progress.dart:147-245 | PRESENT | |
+| S19 | FAILED and NO_AUDIO states | SummaryGenerationProgress.tsx | summary_generation_progress.dart:147-153 | PRESENT | |
+| S20 | Buttons: See if ready / Retry (+ toasts incl. server message) / Setting up; Check later → clear chat + Call Log tab | CallSummaryScreen.tsx:143-156, 304-347 | call_summary_screen.dart:1072-1097, :1105-1133, `_goToCallLog` :450-453 | PRESENT | |
+| S21 | AddNotesSection: collapsible, info tooltip, debounced POST notes | AddNotesSection.tsx:50-90 | summary_generation_progress.dart:363-404 (arrowDown/page/info.svg; `showPrivacyTooltip` with `summaryLoading.notesTooltip`) | PRESENT | v3: privacy tooltip on the (i) now present (v2 gap 28 closed). |
+| S22 | AI-generated warning banner (GoldenShield) | CallSummaryDetails.tsx | call_summary_screen.dart:1252 (goldenShield.svg) | PRESENT | v3: icon sweep closed. |
+| S23 | Exclusive accordion; edit lock; collapse exits edit | CallSummaryDetails.tsx, SectionHeader.tsx | call_summary_screen.dart `_toggleSection`, `_SectionCard`; section icons :94-111; chevron arrowDown/arrowRight.svg :1463 | PRESENT | v3: icon sweep closed — 18 RN section SVGs and the RN chevron (67e7051). |
+| S24 | Edit gate `section.canEdit && (admin \|\| counselorId === me)` | SectionWrapper.tsx | call_summary_screen.dart `_SectionCard` | PRESENT | |
+| S25 | Edit → Wand / Tick / Close controls | SectionHeader.tsx, SectionWrapper.tsx | call_summary_screen.dart:1496-1525 (editSquare/wandStars/check/closeCircle.svg) | PRESENT | No fade/slide animation (visual only). |
+| S26 | AI enhance: POST /chats/enhance; toast `summary.enhanceFailed` | SectionWrapper.tsx, EditableField.tsx | call_summary_screen.dart `_onWandPress`, call_log_repository.dart `enhanceCallSummary` | PRESENT | Spinner replaces wand (:1506-1509). v3: wand updates the open field (67e7051). |
+| S27 | Built-in field renderers: Text, InlineTextInput, MultilineTextInput, Dropdown | utils/fieldRenderer.tsx, FieldRow.tsx, EditableField.tsx | call_summary_screen.dart `_FieldEditor`, `_SummaryDropdown` :1658-1690 (`CustomDropdown`) | PRESENT | v3: RN CustomDropdown port replaces Material dropdown. |
+| S28 | Location = SearchableLocationDropdown | utils/fieldRenderer.tsx, placesApi.ts | searchable_location_dropdown.dart; call_summary_screen.dart:2011-2021 | PRESENT | |
+| S29 | Tags field edit → names array | useCallSummaryForm.ts, formDataTransformer.ts | call_log_repository.dart | PRESENT | |
+| S30 | Read transform | formDataTransformer.ts, constants/summary.ts | call_log_repository.dart, summary_display_format.dart | PRESENT | |
+| S31 | Global Save button + post-save feedback popup | CallSummaryScreen.tsx, CallSummaryDetails.tsx | call_summary_screen.dart `_onSaveButtonPress` :534-538 | PRESENT | |
 | S32 | Unsaved edits survive refetch; seed per chat | useCallSummaryForm.ts | call_summary_screen.dart `_seedIfNeeded` | PRESENT | |
-| S33 | Section close resets that section's built-in fields to saved values | useCallSummaryForm.ts `handleSectionFieldsReset` | call_summary_screen.dart `_resetSectionFields` | PRESENT | |
-| S34 | Custom fields: `/settings/custom-fields-enabled` gate, GET definitions, GET values/:chatId (seed once), per-section PUT values/:chatId on tick, toast `summary.customFieldSaveFailed` | CallSummaryDetails.tsx, services/customFieldsApi.ts | call_summary_screen.dart `_seedCustomFieldsIfNeeded`/`_saveCustomFieldsForSection`, custom_fields_repository.dart, settings_repository.dart | PRESENT | |
-| S35 | Custom field editPermission BOTH / ADMIN_ONLY / COUNSELLOR_ONLY | CustomFieldsSection.tsx `canEditField` | call_summary_screen.dart `_canEditCustomField` | PRESENT | |
-| S36 | Custom field renderers TEXT, NUMBER (numeric kb), SINGLE_SELECT (dropdown by label), BOOLEAN (Yes/No → 'true'/'false'), MULTI_SELECT (modal with checkboxes, JSON array) | CustomFieldsSection.tsx | call_summary_screen.dart `_CustomFieldEditor` | PRESENT | |
-| S37 | Custom field DATE: display via `formatCustomFieldDate`, edit value normalized by `normalizeCustomFieldDate` to YYYY-MM-DD | CustomFieldsSection.tsx (utils customFieldDate) | call_summary_screen.dart:1679 (`formatCustomFieldDate`), :1763 (`normalizeCustomFieldDate`) | PRESENT | v2: fixed (228162f). |
-| S38 | Manual note detection latched for the screen's lifetime (`isManualNoteRef`) | useSummaryState.ts | call_summary_screen.dart `_isManualNote` latch (:270, :309) | PRESENT | v2: fixed. |
-| S39 | VoiceNoteSection gate: `/settings/scribe-voice-note-enabled` + COUNSELOR_ACCESS + chatId + ≥1 voice field; "Record" CTA | VoiceNotePanel/VoiceNoteSection.tsx, hooks/useScribeVoiceNoteEnabled.ts | voice_note_section.dart | PRESENT | |
-| S40 | VoiceNotePanel states: recording/paused (dot, m:ss, pause/resume, stop), stopped (discard, generate), generating (rotating transcribing/extracting/populating every 2.2s) | VoiceNotePanel/VoiceNotePanel.tsx | voice_note_section.dart `_VoiceNotePanel` | PRESENT | |
-| S41 | Recorder + mic-permission error → toast `calls.createNote.voice.micDenied` / `generateError`, close panel | hooks/useVoiceNoteRecorder.ts, VoiceNoteSection.tsx | voice_note_recorder.dart, voice_note_section.dart `_onRecorderChanged` | PRESENT | |
-| S42 | Generate: POST /chats/note/generate-from-audio (multipart audio + fields catalog of *visible* editable built-ins + editable custom fields), apply built-ins via PUT call-details (tags as names) | VoiceNoteSection.tsx `handleGenerate`/`applyGeneratedValues`, scribeNoteApi.ts | voice_note_section.dart `_voiceFieldCatalog` (:38) + custom fields (:235-253) | PRESENT | v2: catalog filtered by visible fields, includes editable custom fields; tags saved as names. |
-| S43 | Voice custom-field values: `encodeVoiceCustomValue` (select label match, multiselect JSON, boolean yes/no, spoken date → YYYY-MM-DD) + PUT custom-fields values + remount form | VoiceNoteSection.tsx | data/voice_custom_fields.dart `encodeVoiceCustomValue`; voice_note_section.dart:167-176 | PRESENT | v2: fixed (71ebce0). |
-| S44 | Transcript accumulation: seed from existing `details.transcript`, append new spoken text, PUT /chats/:id/transcript (best effort) | VoiceNoteSection.tsx (`transcriptRef`), scribeNoteApi `saveNoteTranscript` | voice_note_section.dart (`_transcript`), call_log_repository.dart `saveNoteTranscript` | PARTIAL | Still open (v2): `_transcript` starts `''` (voice_note_section.dart:92) and is never seeded from `details.transcript` (RN VoiceNoteSection.tsx:193 seeds `transcriptRef`). A second dictation on an existing note PUTs only the new text and overwrites the earlier transcript. |
-| S45 | Voice toasts: generated / nothingExtracted / noSpeech (NO_SPEECH_DETECTED) / generateError; keep panel for retry on failure | VoiceNoteSection.tsx | voice_note_section.dart | PRESENT | |
-| S46 | Transcript tab UI: SummaryCard titled `callSummary.header.transcript`, per-item mm:ss time (WEBRTC: createdAt−start; else startSeconds), speaker label You/Client, blue/purple bordered cards, DICTATION mode = one merged white block, EmptyTranscript component | CallTranscript.tsx, CallTranscriptItem.tsx, hooks/useCallTranscriptDetails.ts | call_transcript_tab.dart, scribe/presentation/call_transcript_item.dart | PRESENT | v2: mm:ss times, You/Client labels, DICTATION merged block, EmptyTranscript. |
-| S47 | Transcript pagination: GET /chats/:id/messages {limit 20, offset, sortOrder ASC, sortBy createdAt (WEBRTC) / startSeconds}, load more on end reached, footer spinner | useCallTranscriptDetails.ts, services/callTranscriptApi.ts | call_log_repository.dart `getChatMessages` (:764), provider (:1013-1022) | PRESENT | v2: limit 20/offset/sortOrder ASC/sortBy createdAt (WEBRTC) or startSeconds (118522d). Pages are fetched up front rather than on end-reached (no footer spinner); result is the full ordered transcript. |
-| S48 | Back-press summary-feedback prompt: summary shown, not manual note, no feedback yet, EDIT_SUMMARY_FEEDBACK, and (≥30s on screen **or** not from logs) | CallSummaryScreen.tsx `onBackNavigation` | call_summary_screen.dart `_handleBackPress` (:504) | PRESENT | v2: `≥30s || !fromLogs`. |
-| S49 | `handleGoBack`: from logs → goBack; live flow → reset stack to CallLog + `clearCurrentChat` | useCallSummaryActions.ts | call_summary_screen.dart `_handleGoBack` (:477-488) | PRESENT | v2: live flow clears current chat and goes to the Call Log tab. |
-| S50 | FeedbackPopup: stars, rating-dependent tag chips, issue chips (FEEDBACK_ISSUE_OPTIONS for 2–4), comment; POST /chats/:id/summary-feedback `{rating, feedback:{issues, comment, tags}}`; toasts `callFeedback.submitted` / `summaryLoading.summaryFeedbackSubmittedFailed`; close + go back | components/FeedbackPopup/FeedbackPopup.tsx, SummaryModals.tsx, CallSummaryScreen.tsx | simulations/presentation/widgets/feedback/feedback_popup.dart (issue chips), call_summary_screen.dart `_submitFeedback` (:524) | PRESENT | v2: issues and rating tags submitted. |
-| S51 | View-review FAB (CommentIcon) when reviewId && !hideReviewDetails && VIEW_SCRIBE_REVIEW && !archived; hide private reviews with no threads (GET threads limit 1) and no reactions (GET reactions count) | CallSummaryScreen.tsx, hooks/useHideReviewDetails.ts | call_summary_screen.dart `_checkHideReviewDetails`, scribe_reviews_repository.dart, reactions_repository.dart | PRESENT | Icon sweep: FAB uses `Icons.comment_outlined` (call_summary_screen.dart:685) instead of RN `CommentIcon` (`chatBubble.svg`). |
-| S52 | FAB navigates to ScribeReviewDetails `{reviewId, isPrivate}` | CallSummaryScreen.tsx `handleViewReview` | call_summary_screen.dart → `/reviews/:id` (extra ReviewType.scribe); reviews/presentation/review_details_screen.dart:317 | PRESENT | v2: `isPrivate` isn't passed, but the details screen derives it from the fetched review (`review.isPrivate`), so the outcome matches. |
-| S53 | Clear summary Redux slice on unmount | useSummaryState.ts (`clearSummaryStates`) | — | N/A | Flutter keeps form state in the widget; nothing global to clear. |
-| S54 | POST /chats/summary/tag-positivity-ratings (`useGetTagsMutation`) | services/callSummaryApi.ts | — | N/A | Exported but never called in RN (ratings moved server-side). |
-| S55 | FlowSection, KeyConcernSection, NotesSection components | components/FlowSection, KeyConcern, CallSummaryDetails/NotesSection.tsx | — | N/A | Not rendered anywhere in RN. |
+| S33 | Section close resets that section's built-ins | useCallSummaryForm.ts | call_summary_screen.dart `_resetSectionFields` | PRESENT | |
+| S34 | Custom fields gate/definitions/values/PUT/toast | CallSummaryDetails.tsx, customFieldsApi.ts | call_summary_screen.dart, custom_fields_repository.dart | PRESENT | |
+| S35 | Custom field editPermission BOTH / ADMIN_ONLY / COUNSELLOR_ONLY | CustomFieldsSection.tsx | call_summary_screen.dart `_canEditCustomField` | PRESENT | |
+| S36 | Custom field renderers TEXT, NUMBER, SINGLE_SELECT, BOOLEAN, MULTI_SELECT | CustomFieldsSection.tsx | call_summary_screen.dart `_CustomFieldEditor` (:2132, :2150 `_SummaryDropdown`; multi-select dialog :2072) | PRESENT | v3: SINGLE_SELECT/BOOLEAN use the RN CustomDropdown (v2 gap 29 closed). |
+| S37 | Custom field DATE display/normalize | CustomFieldsSection.tsx | call_summary_screen.dart | PRESENT | |
+| S38 | Manual note latched | useSummaryState.ts | call_summary_screen.dart `_onSummary` :323 | PRESENT | |
+| S39 | VoiceNoteSection gate | VoiceNoteSection.tsx, useScribeVoiceNoteEnabled.ts | voice_note_section.dart:257-262 | PRESENT | Visible gate matches; the settings request itself isn't skipped for non-counsellors — see S-N2. |
+| S40 | VoiceNotePanel states | VoiceNotePanel.tsx | voice_note_section.dart `_VoiceNotePanel` | PRESENT | v3: RN panel look (bf5d1c5). |
+| S41 | Recorder + mic-permission error toasts | useVoiceNoteRecorder.ts, VoiceNoteSection.tsx | voice_note_recorder.dart, voice_note_section.dart `_onRecorderChanged` :125 | PRESENT | v3: 24 MB auto-stop ported (voice_note_recorder.dart:41, :64-72; v2 gap 22 closed). |
+| S42 | Generate: POST generate-from-audio + apply built-ins | VoiceNoteSection.tsx, scribeNoteApi.ts | voice_note_section.dart | PRESENT | |
+| S43 | Voice custom-field values encode + PUT + remount | VoiceNoteSection.tsx | voice_custom_fields.dart, voice_note_section.dart | PRESENT | |
+| S44 | Transcript accumulation: seed from `details.transcript`, append, PUT /chats/:id/transcript | VoiceNoteSection.tsx:193 (`transcriptRef`) | voice_note_section.dart:104-123 (`_seedTranscript` in initState/didUpdateWidget), :202-210; call_summary_screen.dart:1216 (`existingTranscript: summary.transcript`); call_log_repository.dart:273 | PRESENT | v3: fixed (bf5d1c5) — seeded once from `details.transcript`, as RN's `if (existingTranscript && !transcriptRef.current)`. |
+| S45 | Voice toasts; keep panel on failure | VoiceNoteSection.tsx | voice_note_section.dart:218-235 | PRESENT | Error toast uses `getErrorDetails` (:230). |
+| S46 | Transcript tab UI | CallTranscript.tsx, CallTranscriptItem.tsx | call_transcript_tab.dart (emptyTranscript.svg :125), call_transcript_item.dart | PRESENT | |
+| S47 | Transcript pagination | useCallTranscriptDetails.ts, callTranscriptApi.ts | call_log_repository.dart `getChatMessages`, `chatMessagesProvider` :1034 | PRESENT | Pages fetched up front (no footer spinner); full ordered transcript. |
+| S48 | Back-press summary-feedback prompt | CallSummaryScreen.tsx `onBackNavigation` | call_summary_screen.dart `_handleBackPress` :509-521, PopScope :639 | PRESENT | Android back routed through PopScope. |
+| S49 | `handleGoBack`: logs → goBack; live → CallLog + clearCurrentChat | useCallSummaryActions.ts | call_summary_screen.dart:440-453 | PRESENT | |
+| S50 | FeedbackPopup + POST summary-feedback + toasts | FeedbackPopup.tsx, SummaryModals.tsx | call_summary_screen.dart `_submitFeedback` :541-557 | PRESENT | |
+| S51 | View-review FAB + hide-private logic | CallSummaryScreen.tsx, useHideReviewDetails.ts | call_summary_screen.dart:629-631, :647-666 (chatBubble.svg :651), `_checkHideReviewDetails` :332-353 | PRESENT | v3: icon sweep closed (RN 56pt white circle + chatBubble.svg). |
+| S52 | FAB → ScribeReviewDetails | CallSummaryScreen.tsx | call_summary_screen.dart:648-653 | PRESENT | |
+| S53 | Clear summary slice on unmount | useSummaryState.ts | — | N/A | |
+| S54 | POST tag-positivity-ratings | callSummaryApi.ts | — | N/A | Never called in RN. |
+| S55 | FlowSection, KeyConcernSection, NotesSection | components/FlowSection, KeyConcern, NotesSection.tsx | — | N/A | Not rendered in RN. |
 | S56 | Analytics/tracking | — | — | N/A | None in RN. |
+| S-N1 | Summary fetch failure (non-403): RN never shows an error view — first-load failure falls through to SummaryGenerationProgress + AddNotes + "See if ready"/"Check later" buttons; a failed refetch keeps the loaded summary (RTK keeps `data`) | CallSummaryScreen.tsx:351-403 (`renderSummaryTab`: only `isUnauthorized` branches out), useSummaryState.ts:21 | call_summary_screen.dart:1156-1169 (`summaryAsync.when` error → centred `getErrorDetails` text, no buttons) | PARTIAL | v3 new (discovery). Riverpod 3 `AsyncValue.when` takes the error branch even when a previous value exists (no `skipError`), so a failed "See if ready"/retry/refocus refetch replaces a loaded summary or the progress view with bare error text and no way to retry except leaving the screen. |
+| S-N2 | `useScribeVoiceNoteEnabled` skips `/settings/scribe-voice-note-enabled` unless COUNSELOR_ACCESS | hooks/useScribeVoiceNoteEnabled.ts:13-22 | voice_note_section.dart:258-262 (`ref.watch(scribeVoiceNoteEnabledProvider)` evaluated before the counsellor check) | PARTIAL | v3 new (was v2 "Minor finding", line moved 249→260). Non-counsellors fire one request that 403s; nothing visible changes. |
 
-Backend calls (CallSummary), v2: GET `/chats/:id`, GET `/settings/summary-fields`, PUT `/chats/:id/call-details` (tags as names), PATCH `/chats/:id/call-info`, GET `/chats/:id/export-summary`, PATCH `/chats/call-logs/:id/archive`, POST `/chats/enhance`, POST `/chats/:id/retry-summary`, POST `/chats/:id/summary-feedback` (issues + tags), POST `/chats/:id/notes`, GET `/chats/:id/messages` (limit/offset/sort), GET `/places` + `/places/search`, custom-fields enabled/definitions/values GET+PUT, GET `/settings/scribe-voice-note-enabled`, POST `/chats/note/generate-from-audio` (visible + custom fields), PATCH `/scribe-session-reviews/:id`, scribe review threads (limit 1), scribe reactions count — all PRESENT. PUT `/chats/:id/transcript` PARTIAL (S44: not seeded from the existing transcript).
-Toasts: all RN toasts PRESENT incl. fileExportedSuccess / fileExportFailed / storagePermissionDenied / invalidResponseFormat.
-Navigation targets: ShareCallLog PRESENT, ScribeReviewDetails PRESENT, CallLog tab reset PRESENT (S20/S49), goBack PRESENT.
+Backend calls (CallSummary): GET `/chats/:id`, GET `/settings/summary-fields`, PUT `/chats/:id/call-details`, PATCH `/chats/:id/call-info`, GET `/chats/:id/export-summary`, PATCH `/chats/call-logs/:id/archive`, POST `/chats/enhance`, POST `/chats/:id/retry-summary`, POST `/chats/:id/summary-feedback`, POST `/chats/:id/notes`, GET `/chats/:id/messages`, GET `/places` + `/places/search`, custom-fields GET+PUT, POST `/chats/note/generate-from-audio`, PATCH `/scribe-session-reviews/:id`, review threads + reactions count — PRESENT. v3: PUT `/chats/:id/transcript` PRESENT (S44). GET `/settings/scribe-voice-note-enabled` PARTIAL (S-N2: sent for non-counsellors).
+Toasts: all RN toasts PRESENT, now on the RN-style toast host with `getErrorDetails`/`showErrorToast` (05d78c1/aedd4b1); no raw exception text remains in calllog/scribe (v2 gap 40 sites `call_log_screen.dart:248`, `call_summary_screen.dart:999,1150` closed).
+Navigation targets: ShareCallLog, ScribeReviewDetails, CallLog tab reset, goBack — PRESENT.
+
 ---
 
 #### 3. ListeningScreen (`screens/ListeningScreen/**`, 39 files) — Microphone (Scribe) + Conference
 
-Flutter: `lib/features/scribe/presentation/scribe_recording_screen.dart`, `conference_listening_screen.dart`, `listening_controls.dart`, `nudge_section.dart`, `network_disconnected.dart`, `audio_waveform.dart`, `elapsed_timer.dart`, `dismissable_banner.dart`, `call_transcript_item.dart`; `lib/features/scribe/data/transcript_logic.dart`, `chat_models.dart`, `chat_repository.dart`; `lib/core/realtime/socket_service.dart`, `socket_events.dart`, `foreground_recording_service.dart`; `lib/core/chat/active_chat_discovery.dart`, `current_chat_provider.dart`; `lib/core/routing/app_router.dart` (`/scribe`, `/conference-listening/:chatId`).
+Flutter: `lib/features/scribe/presentation/scribe_recording_screen.dart`, `conference_listening_screen.dart`, `listening_chrome.dart`, `listening_controls.dart`, `nudge_section.dart`, `network_disconnected.dart`, `audio_waveform.dart`, `elapsed_timer.dart`, `dismissable_banner.dart`, `call_transcript_item.dart`, `scribe_reference_search.dart`; `lib/features/scribe/data/*`; `lib/core/realtime/socket_service.dart`, `socket_events.dart`, `foreground_recording_service.dart`, `keep_awake.dart`, `connectivity.dart`, `microphone_permission.dart`; `lib/core/chat/*`; `lib/core/routing/app_router.dart` (`/scribe`, `/conference-listening/:chatId` behind `_CurrentUserGate`).
 
-Tally: PRESENT 46 · PARTIAL 0 · MISSING 0 · N/A 5
+Tally: PRESENT 46 · PARTIAL 0 · MISSING 0 · N/A 5  [v2: 46 · 0 · 0 · 5]
 
 | # | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|---|
-| L1 | Mode routing: microphone if `isMicrophoneMode` param or chat provider MICROPHONE, else conference | ListeningScreen.tsx | app_router.dart (`/scribe`, `/conference-listening/:chatId`), active_chat_discovery.dart `targetRouteForActiveChat` | PRESENT | |
-| L2 | Auto-start live mic stream on mount (16 kHz, mono, 16-bit, bufferSize 1024) | MicrophoneListeningScreen.tsx, hooks/useLiveAudioStream.ts | scribe_recording_screen.dart `_start` (record `startStream` pcm16) | PRESENT | |
-| L3 | Mic permission on screen: request if needed; denied → settings alert (Cancel → goBack, OK → openSettings); re-check when app returns active | useLiveAudioStream.ts `checkPermission`, AppState listener | scribe_recording_screen.dart (settings alert :281-305; resume re-check :235) | PRESENT | v2: fixed (d4ae9eb). |
-| L4 | Socket.IO to MICROPHONE_SOCKET_PATH, websocket+polling, auth callback with fresh token, reconnection 5 / 1–5s | hooks/useSocket.ts, useSocketConnection.ts | core/realtime/socket_service.dart | PRESENT | |
-| L5 | Mic socket not torn down on background (`disconnectOnBackground:false`) | MicrophoneListeningScreen.tsx | socket_service.dart (no lifecycle disconnect) | PRESENT | |
-| L6 | SESSION_CREATED → once permission + session ready, emit START_AUDIO_CHAT `{isLinear16Encoded, platform MOBILE, sampleRate, mode SCRIBE}` | MicrophoneListeningScreen.tsx, utils/audioUtils.ts `getStartAudioChatPayload` | scribe_recording_screen.dart `_maybeEmitStartAudioChat` | PRESENT | |
-| L7 | USER_JOINED: take `payload.chatId` immediately (`setCurrentChatId`), then hydrate via GET /chats/counsellor-chat | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_onUserJoined` (:364) | PRESENT | v2: takes `payload.chatId` first, then hydrates. |
-| L8 | 5s without chatId → MICROPHONE_FAILURE view | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_chatIdTimeoutTimer` | PRESENT | |
-| L9 | AUDIO_MESSAGE `{audioData base64, chatId}` emitted when not paused and chatId known; never gated on socket.connected | MicrophoneListeningScreen.tsx `handleAudioData` | scribe_recording_screen.dart `_onAudioChunk` | PRESENT | |
-| L10 | Web-microphone mode (chat provider MICROPHONE + platform WEB): no local streaming, pause disabled, no network/socket disconnect states | useListeningCommon.ts, useListeningScreen.ts, MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_isWebMicrophoneMode` (:134) | PRESENT | v2: no local streaming, pause disabled, no disconnect states. |
-| L11 | Starts paused (`isCallPaused=true`) with mute tooltip visible ("Resume to let it listen") until resume or dismiss | MicrophoneListeningScreen.tsx, ListeningControls.tsx | scribe_recording_screen.dart:111 (`_isMuteTooltipOpen = true`), :577 | PRESENT | v2: fixed. |
-| L12 | Pause/Resume debounced 500ms | MicrophoneListeningScreen.tsx (`useDebounce`) | scribe_recording_screen.dart:470 (500ms trailing debounce) | PRESENT | v2: fixed. |
-| L13 | MESSAGE_RECEIVED (TEXT) / UTTERANCE_ENDED interim-final merge, split by sender | useListeningCommon.ts `processTranscription`/`updateLastTranscription` | transcript_logic.dart, scribe_recording_screen.dart | PRESENT | |
-| L14 | Rehydrate existing chat messages (TEXT, reversed, split mine/theirs) | MicrophoneListeningScreen.tsx | transcript_logic.dart `rehydrateTranscriptions` (on USER_JOINED) | PRESENT | |
-| L15 | NUDGE event → 500ms loading → current nudge | MicrophoneListeningScreen.tsx, ConferenceListeningScreen.tsx | scribe_recording_screen.dart / conference_listening_screen.dart `_onNudge` | PRESENT | |
-| L16 | Nudge shown only in non-focus mode and when GET /settings/nudge-status true | both screens | scribe_recording_screen.dart, conference_listening_screen.dart (`nudgeStatusProvider`) | PRESENT | |
-| L17 | Nudge content rendered with CustomMarkdown; SkeletonLoader while loading; scrollable | NudgeSection.tsx, CustomMarkdown.tsx, SkeletonLoader.tsx | nudge_section.dart (`NudgeMarkdown` :195, `_NudgeSkeleton` :319, maxHeight 80vs scroll :101) | PRESENT | v2: fixed. |
-| L18 | Nudge feedback: "Is this helpful?" always shown; thumbs only with EDIT_MESSAGE_FEEDBACK; POST /chats/messages/:id/feedback or PATCH /chats/messages/feedback/:feedbackId; skip same rating; leading debounce | NudgeSection.tsx, chatApi.ts | nudge_section.dart:94-120, same-rating skip :69 | PRESENT | v2: "Is this helpful?" always shown; thumbs only with EDIT_MESSAGE_FEEDBACK. |
-| L19 | CHAT_ENDED → replace with Breathing (only when focused) | useListeningCommon.ts `handleCallEndRedirection` | scribe_recording_screen.dart `_onCallEndedByServer` → `/box-breathing?chatId=` | PRESENT | |
-| L20 | End-session confirmation (IllustratedModal, EndSessionIcon, mic copy `audioCall.endDialog.*`) | CallEndConfirmationModal.tsx | scribe_recording_screen.dart `_showEndConfirmation` (core/widgets/illustrated_modal.dart) | PRESENT | No EndSessionIcon illustration. |
-| L21 | End call: stop stream, POST /chats/:id/end, navigate to Breathing on success **and** on error | useListeningCommon.ts `handleEndCall` + effect | scribe_recording_screen.dart `_endSession` (:484-500) | PRESENT | v2: goes to Breathing on success and error. |
-| L22 | Back: no live session → clear currentChat + goBack; live → open end confirmation | MicrophoneListeningScreen.tsx `handleHardwareBackPress`, useListeningCommon `handleGoBack` | scribe_recording_screen.dart `_handleBackPress`, PopScope | PRESENT | v2: `_handleGoBack` now clears `currentChatProvider`. |
-| L23 | "Connecting…" state with a Cancel button (dark theme) | MicrophoneListeningScreen.tsx | listening_chrome.dart `ListeningConnectingView(onCancel)`; scribe_recording_screen.dart:558 | PRESENT | v2: fixed. |
-| L24 | NetworkDisconnected view: icon, title/desc per SOCKET/NETWORK/MICROPHONE_FAILURE, "Try again" hidden when offline, "Go back" | NetworkDisconnected.tsx | network_disconnected.dart (:43 offline from `isOfflineProvider`, :46 SOCKET → `common.somethingWentWrong`, :96 `networkDisconnected.svg`) | PRESENT | v2: fixed. |
-| L25 | Offline detection (NetInfo) → NETWORK type; socket disconnect classified NETWORK vs SOCKET by offline flag | hooks/useNetworkConnectivity.ts, MicrophoneListeningScreen.tsx | core/realtime/connectivity.dart; scribe_recording_screen.dart:159, :256 | PRESENT | v2: fixed (connectivity_plus). |
-| L26 | Try again → clear disconnected state + go back | MicrophoneListeningScreen.tsx `handleTryAgain` | scribe_recording_screen.dart `_handleTryAgain` | PRESENT | |
-| L27 | Focus layout: lock icon + privacy tooltip (`audioCall.privacy.*` 4 bullets) + "Taking notes", timer, waveform, `listeningScreen.microphoneModeNote` | MicrophoneListeningScreen.tsx `renderFocusMode`, useListeningScreen.ts | scribe_recording_screen.dart `_buildBody`, `_showPrivacyInfo` | PRESENT | v2: tooltip bubble with `audioCall.privacy.*` keys (listening_chrome.dart:96-99). |
-| L28 | Non-focus layout: compact label/timer + waveform row, nudge, Search, transcript ScrollView auto-scrolling to end | MicrophoneListeningScreen.tsx `renderNonFocusMode` | scribe_recording_screen.dart `_buildNonFocusMode` (auto-scroll :459, Search :674) | PRESENT | v2: fixed. |
-| L29 | Search (reference-document search: input, "Try" suggestions, category tabs, ResourceArticleCard list, paging, empty state; dark theme) in non-focus mode | components/Search/Search.tsx, hooks/useSearch.ts, services/searchApi (`/reference-document/search`, `/categories`) | scribe_reference_search.dart; scribe_recording_screen.dart:674, conference_listening_screen.dart:301 | PRESENT | v2: fixed (cd51b4d). |
-| L30 | Live transcript item: mm:ss since chat start, speaker label You/Client, coloured by sender | MicrophoneListeningScreen.tsx `getElapsedSeconds`, CallTranscriptItem | scribe_recording_screen.dart:688 (`speakerLabel`), `_elapsedLabel` mm:ss | PRESENT | v2: fixed. |
-| L31 | Timer HH:MM:SS from chat.startedAt | Timer/Timer.tsx, useListeningScreen.ts `startTime` | elapsed_timer.dart | PRESENT | |
-| L32 | Waveform: 120ms frames from latest amplitudes, silent when paused, focus vs compact sizes, `shapeAmplitudes` edge taper, iOS gain | AudioWaveformContainer.tsx, AudioWaveform.tsx, utils/audioUtils.ts | audio_waveform.dart `shapeAmplitudes` (:129) | PRESENT | v2: taper ported. |
-| L33 | ListeningControls: CollapsibleButtonGroup (maximise/minimise toggle), pause/resume (icon+label, active variant), Focus (VIEW_REFERENCE_DOCUMENT), End session (red square), "data safe" shield footer | ListeningControls.tsx (components/CollapsibleButtonGroup) | listening_controls.dart (collapse chevron, SVG icons, shield footer :154) | PRESENT | v2: fixed. |
-| L34 | Keep screen awake while listening (activate/deactivateKeepAwake) | useListeningCommon.ts | core/realtime/keep_awake.dart (wakelock_plus); scribe_recording_screen.dart:149, conference_listening_screen.dart:67 | PRESENT | v2: fixed. |
-| L35 | App returns to foreground → (500ms) GET /chats/counsellor-chat; none → redirect to Breathing | useListeningCommon.ts AppState effect | scribe_recording_screen.dart `didChangeAppLifecycleState` (:237 `_checkChatStillActive`) | PRESENT | v2: fixed. |
-| L36 | iOS swipe-back disabled for mic mode (`gestureEnabled:false`) | useListeningCommon.ts | scribe_recording_screen.dart PopScope(`canPop: !_hasLiveSession`) | PRESENT | |
-| L37 | SCRIBE_START_DIAGNOSTIC socket emit at 5s/15s with gate booleans + app version | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart:173-197 (5s/15s `SocketEvent.scribeStartDiagnostic`) | PRESENT | v2: fixed (cd51b4d). Backend consumer still unverified. |
-| L38 | Android foreground service + notification permission | — (RN has none) | foreground_recording_service.dart, scribe_recording_screen.dart | N/A | Flutter-only addition. |
-| L39 | Full-screen dark UI, translucent light status bar, no header | MicrophoneListeningScreen.tsx, styles.ts | listening_chrome.dart `ListeningPage` (:30 dark scaffold, no header) | PRESENT | v2: fixed. |
-| L40 | Conference: socket CLOUD_TELEPHONY_PATH; USER_JOINED → checkCounselorChat; "Connecting…" until chatId (no timeout) | ConferenceListeningScreen.tsx | conference_listening_screen.dart `_connect`, `_onUserJoined` | PRESENT | |
-| L41 | Conference AUDIO_STREAM → exotel amplitudes; AUDIO_INACTIVE_TIMEOUT clears amplitudes (fade out) | ConferenceListeningScreen.tsx, utils/audioUtils.ts `exotelAudioDataToAmplitudes` | conference_listening_screen.dart:64, :173 (2s inactivity clear) | PRESENT | v2: fixed. |
-| L42 | Conference DismissableBanner (`scribeStopTakingNotesBanner`) in focus mode | ConferenceListeningScreen.tsx, DismissableBanner.tsx | conference_listening_screen.dart, dismissable_banner.dart | PRESENT | v2: also gated on conference providers (conference_listening_screen.dart:34). |
-| L43 | Conference CHAT_ENDED → replace with Breathing | ConferenceListeningScreen.tsx, useListeningCommon.ts | conference_listening_screen.dart:133, :198 (→ `/box-breathing?chatId=`) | PRESENT | v2: fixed. |
-| L44 | Conference focus/non-focus layouts (timer, waveform, nudge, Search) | ConferenceListeningScreen.tsx | conference_listening_screen.dart | PRESENT | Search missing (see L29). |
-| L45 | Conference controls: pause/resume and end hidden; focus button gated | ConferenceListeningScreen.tsx | conference_listening_screen.dart (ListeningControls flags) | PRESENT | |
-| L46 | Conference end-call confirmation modal | ConferenceListeningScreen.tsx | — | N/A | Unreachable in RN (end button hidden). |
-| L47 | Conference privacy lock + tooltip next to "Taking notes" | ConferenceListeningScreen.tsx `renderTakingNotes` | listening_chrome.dart `TakingNotesRow`; conference_listening_screen.dart:248, :282 | PRESENT | v2: fixed. |
-| L48 | Conference AUDIO_CHAT_PAUSED/RESUMED emits | ConferenceListeningScreen.tsx | — | N/A | Unreachable in RN (pause button hidden). |
-| L49 | Conference socket disconnect on background / reconnect on active | useSocketConnection.ts (default `disconnectOnBackground:true`) | conference_listening_screen.dart `didChangeAppLifecycleState` (:113-121) | PRESENT | v2: now drops the socket on pause and reconnects + re-checks the chat on resume, as RN. |
-| L50 | ControlButtonsSection, ListeningAnimation components | components/ControlButtonsSection, ListeningAnimation | — | N/A | Exported but not rendered in RN. |
-| L51 | Analytics/tracking | — | — | N/A | None in RN (see L37 for socket diagnostic). |
+| L1 | Mode routing: microphone vs conference | ListeningScreen.tsx | app_router.dart:186-195, active_chat_discovery.dart | PRESENT | v3: both routes wait for `/users/me` (`_CurrentUserGate` app_router.dart:415-433) instead of a `dev-user` fallback id (v2 gap 13 closed, 9b76a8a). |
+| L2 | Auto-start live mic stream (16 kHz mono 16-bit) | MicrophoneListeningScreen.tsx, useLiveAudioStream.ts | scribe_recording_screen.dart `_startStreaming` :329-348 | PRESENT | |
+| L3 | Mic permission on screen; denied → settings alert; re-check on resume | useLiveAudioStream.ts | scribe_recording_screen.dart `_checkMicrophone` :302-327, resume :249-258 | PRESENT | |
+| L4 | Socket.IO, websocket+polling, fresh-token auth, reconnection 5 / 1–5s | useSocket.ts, useSocketConnection.ts | socket_service.dart | PRESENT | v3: retry 2s after a failed open (RN `RETRY_AFTER_FAILURE_MS`, 3cb9e36). Cloud-telephony listener uses its own SocketService instance (cloud_telephony_listener.dart:73). |
+| L5 | Mic socket not torn down on background | MicrophoneListeningScreen.tsx:321-327 | scribe_recording_screen.dart:249-258 (resume only) | PRESENT | Long-lock survival is a device check (B_gaps (c)). |
+| L6 | SESSION_CREATED → START_AUDIO_CHAT payload | MicrophoneListeningScreen.tsx, audioUtils.ts | scribe_recording_screen.dart `_maybeEmitStartAudioChat` :367-378 | PRESENT | |
+| L7 | USER_JOINED: take payload.chatId, then hydrate | MicrophoneListeningScreen.tsx:262-268 | scribe_recording_screen.dart `_onUserJoined` :382-405 | PRESENT | |
+| L8 | 5s without chatId → MICROPHONE_FAILURE | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_armChatIdTimeout` :260-267 | PRESENT | |
+| L9 | AUDIO_MESSAGE when not paused and chatId known; not gated on connected | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_onAudioChunk` :351-364 | PRESENT | |
+| L10 | Web-microphone mode | useListeningCommon.ts | scribe_recording_screen.dart `_isWebMicrophoneMode` :153 | PRESENT | |
+| L11 | Starts paused with mute tooltip | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart:110-111, :599 | PRESENT | |
+| L12 | Pause/Resume debounced 500ms | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_onPauseResumePressed` :488-497 | PRESENT | |
+| L13 | MESSAGE_RECEIVED / UTTERANCE_ENDED merge | useListeningCommon.ts | transcript_logic.dart, scribe_recording_screen.dart :441-464 | PRESENT | v3: partials rebuild only the transcript list (aa76bad). |
+| L14 | Rehydrate existing chat messages | MicrophoneListeningScreen.tsx | transcript_logic.dart `rehydrateTranscriptions`; scribe_recording_screen.dart `_rehydrate` | PRESENT | |
+| L15 | NUDGE → 500ms loading → nudge | both screens | scribe_recording_screen.dart `_onNudge`, conference_listening_screen.dart `_onNudge` | PRESENT | |
+| L16 | Nudge only in non-focus + nudge-status | both screens | scribe_recording_screen.dart `_buildNonFocusMode` | PRESENT | |
+| L17 | Nudge markdown, skeleton, scroll | NudgeSection.tsx | nudge_section.dart | PRESENT | |
+| L18 | Nudge feedback | NudgeSection.tsx | nudge_section.dart | PRESENT | |
+| L19 | CHAT_ENDED → replace with Breathing (only when focused) | useListeningCommon.ts:173-177 | scribe_recording_screen.dart `_goToBreathing` :524-529 | PRESENT | Flutter doesn't check focus (nothing in the Scribe flow pushes over the screen; only a push-notification route could). |
+| L20 | End-session confirmation (IllustratedModal, EndSessionIcon, mic copy) | CallEndConfirmationModal.tsx | scribe_recording_screen.dart:606-615 (`CallIllustratedModal`, endSession.svg) | PRESENT | v3: illustration now present (v2 note said none). |
+| L21 | End call: stop stream, POST end, Breathing on success and error | useListeningCommon.ts | scribe_recording_screen.dart `_endSession` :503-521 | PRESENT | |
+| L22 | Back: no live session → clear chat + goBack; live → confirmation | MicrophoneListeningScreen.tsx:121-140 | scribe_recording_screen.dart `_handleBackPress` :555-562, `_handleGoBack` :532-546, PopScope :565 | PRESENT | v3: empty stack falls back to the Call Log tab via `goToHomeTab` (scribe_recording_screen.dart:543; v2 gap 7 Scribe part closed). |
+| L23 | "Connecting…" with Cancel | MicrophoneListeningScreen.tsx:532-552 | scribe_recording_screen.dart:580; listening_chrome.dart `ListeningConnectingView` | PRESENT | |
+| L24 | NetworkDisconnected view | NetworkDisconnected.tsx | network_disconnected.dart | PRESENT | |
+| L25 | Offline → NETWORK; disconnect NETWORK vs SOCKET | useNetworkConnectivity.ts | connectivity.dart; scribe_recording_screen.dart:174-180, :269-283 | PRESENT | |
+| L26 | Try again → clear + go back | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_handleTryAgain` :547-550 | PRESENT | |
+| L27 | Focus layout + privacy tooltip | MicrophoneListeningScreen.tsx, useListeningScreen.ts | scribe_recording_screen.dart `_buildFocusMode` :625-655; listening_chrome.dart | PRESENT | |
+| L28 | Non-focus layout + Search + auto-scroll transcript | MicrophoneListeningScreen.tsx:594-641 | scribe_recording_screen.dart `_buildNonFocusMode` :660-727 | PRESENT | |
+| L29 | Search (reference documents) | components/Search/Search.tsx, useSearch.ts | scribe_reference_search.dart | PRESENT | |
+| L30 | Live transcript item mm:ss + speaker label | MicrophoneListeningScreen.tsx | scribe_recording_screen.dart `_elapsedLabel` :730-752 | PRESENT | |
+| L31 | Timer HH:MM:SS from startedAt | Timer.tsx | elapsed_timer.dart | PRESENT | |
+| L32 | Waveform | AudioWaveformContainer.tsx, AudioWaveform.tsx | audio_waveform.dart | PRESENT | |
+| L33 | ListeningControls | ListeningControls.tsx | listening_controls.dart | PRESENT | |
+| L34 | Keep screen awake | useListeningCommon.ts | keep_awake.dart; scribe_recording_screen.dart:169, conference_listening_screen.dart:90 | PRESENT | |
+| L35 | Foreground → GET counsellor-chat; none → Breathing | useListeningCommon.ts | scribe_recording_screen.dart `_checkChatStillActive` :418-432 | PRESENT | |
+| L36 | iOS swipe-back disabled for mic mode | useListeningCommon.ts:279-281 | scribe_recording_screen.dart PopScope(`canPop: false`) :565-570 | PRESENT | |
+| L37 | SCRIBE_START_DIAGNOSTIC at 5s/15s | MicrophoneListeningScreen.tsx:431-466 | scribe_recording_screen.dart:198-221 | PRESENT | Backend consumer unverified (item 47). |
+| L38 | Android foreground service + notification permission | — (RN has none) | foreground_recording_service.dart (channel `ally_recording_channel`, type microphone); AndroidManifest FOREGROUND_SERVICE(_MICROPHONE); scribe_recording_screen.dart:336-341 | N/A | Flutter-only addition. Note: `Permission.notification.request()` runs on every Scribe start on both platforms — an extra prompt RN never shows (first time only). |
+| L39 | Full-screen dark UI, no header | MicrophoneListeningScreen.tsx | listening_chrome.dart `ListeningPage` | PRESENT | |
+| L40 | Conference: socket path; USER_JOINED → checkCounselorChat; Connecting… until chatId | ConferenceListeningScreen.tsx | conference_listening_screen.dart `_connect` :123-137, `_onUserJoined` :139-150 | PRESENT | |
+| L41 | Conference AUDIO_STREAM amplitudes; inactivity clear | ConferenceListeningScreen.tsx | conference_listening_screen.dart `_onAudioStream` :162-180 | PRESENT | |
+| L42 | Conference DismissableBanner | ConferenceListeningScreen.tsx | conference_listening_screen.dart, dismissable_banner.dart | PRESENT | |
+| L43 | Conference CHAT_ENDED → Breathing | ConferenceListeningScreen.tsx | conference_listening_screen.dart `_goToBreathing` :194-199 | PRESENT | |
+| L44 | Conference focus/non-focus layouts (timer, waveform, nudge, Search) | ConferenceListeningScreen.tsx:265-272 | conference_listening_screen.dart:301 (`ScribeReferenceSearch`) | PRESENT | v3: stale "Search missing" note removed — Search is rendered. |
+| L45 | Conference controls: pause/end hidden; focus gated | ConferenceListeningScreen.tsx | conference_listening_screen.dart | PRESENT | |
+| L46 | Conference end-call confirmation | ConferenceListeningScreen.tsx | — | N/A | Unreachable in RN. |
+| L47 | Conference privacy lock + tooltip | ConferenceListeningScreen.tsx | listening_chrome.dart `TakingNotesRow` | PRESENT | |
+| L48 | Conference AUDIO_CHAT_PAUSED/RESUMED | ConferenceListeningScreen.tsx | — | N/A | Unreachable in RN. |
+| L49 | Conference socket disconnect on background / reconnect on active | useSocketConnection.ts | conference_listening_screen.dart `didChangeAppLifecycleState` :113-121 | PRESENT | Conference has no back handler in RN or Flutter (default pop). |
+| L50 | ControlButtonsSection, ListeningAnimation | components/* | — | N/A | Not rendered in RN. |
+| L51 | Analytics/tracking | — | — | N/A | None in RN. |
 
-Backend/socket calls (Listening), v2: socket `/microphone-chat` and cloud-telephony path, START_AUDIO_CHAT, AUDIO_MESSAGE, SCRIBE_START_DIAGNOSTIC, SESSION_CREATED, USER_JOINED (payload chatId), MESSAGE_RECEIVED, UTTERANCE_ENDED, NUDGE, CHAT_ENDED, AUDIO_STREAM, GET `/chats/counsellor-chat` (USER_JOINED + foreground check), POST `/chats/:id/end`, GET `/settings/nudge-status`, nudge feedback POST/PATCH, reference-document search + categories — all PRESENT. AUDIO_CHAT_PAUSED/RESUMED (conference) N/A.
+Backend/socket calls (Listening): all PRESENT as v2. v3: socket open-failure retry PRESENT.
 Toasts/alerts: mic settings alert PRESENT.
-Navigation targets: Breathing (replace) PRESENT for mic and conference; goBack PRESENT.
+Navigation targets: Breathing (replace) PRESENT; goBack PRESENT with Call Log tab fallback.
+
 ---
 
 #### 4. BoxBreathingScreen — route "Breathing" (`screens/BoxBreathingScreen/**`)
 
-Flutter: `lib/features/boxbreathing/presentation/box_breathing_screen.dart`, `call_end_overlay.dart`, `flower_petal_painter.dart`, `breath_sound_player.dart`; route `/box-breathing?chatId=` in app_router.dart.
+Flutter: `lib/features/boxbreathing/presentation/box_breathing_screen.dart`, `call_end_overlay.dart`, `flower_petal_painter.dart`, `breath_sound_player.dart`; route `/box-breathing?chatId=` (app_router.dart:336-342).
 
-Tally: PRESENT 9 · PARTIAL 0 · N/A 1
+Tally: PRESENT 9 · PARTIAL 0 · N/A 1  [v2: 9 · 0 · 1]
 
 | # | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|---|
-| B1 | CallEndOverlay for 3s: black→darkBlue3 gradient, `stressBuster.messages.gaveBest` fades to `momentForYourself` | BreathingScreen.tsx, CallEndOverlay/CallEndOverlay.tsx | call_end_overlay.dart, box_breathing_screen.dart `_overlayTimer` | PRESENT | |
-| B2 | Background image + gradient + heading `stressBuster.returnToSelf` | BreathingScreen.tsx | box_breathing_screen.dart `_buildBreathing` | PRESENT | |
-| B3 | Box animation: dot around square, flower petals bloom, 4 phases × 4s, phase labels `boxBreathing.phase*` | BoxBreathingAnimation.tsx, FlowerPetal.tsx | box_breathing_screen.dart `_buildAnimation`, flower_petal_painter.dart | PRESENT | |
-| B4 | Breath sound: play on inhale, mix with other audio, volume 0 when muted, replay on unmute mid-inhale | BoxBreathingAnimation.tsx (react-native-sound-player) | breath_sound_player.dart, box_breathing_screen.dart | PRESENT | |
-| B5 | Per-phase seconds counter 1→4 | BreathingScreen.tsx `onPhaseChange` | box_breathing_screen.dart `_restartCountdown` | PRESENT | |
-| B6 | Controls: mute/unmute, play/pause (pause resets to phase 0, seconds 1) | BreathingControls.tsx, BreathingScreen.tsx | box_breathing_screen.dart `_BreathingControls`, `_setPlaying`, `_toggleMute` | PRESENT | |
-| B7 | Pause when app goes inactive; stop on unmount | BreathingScreen.tsx AppState | box_breathing_screen.dart `didChangeAppLifecycleState`, `dispose` | PRESENT | |
-| B8 | "View call summary" → CallSummary with no params (chatId from currentChat, live flow semantics) | BreathingScreen.tsx `onPressViewSessionSummary` | box_breathing_screen.dart `_viewCallSummary` (:196-200) | PRESENT | v2: pushes `/call-log/:id?live=1`, or `/call-summary` with no chat (live-flow semantics). |
-| B9 | Hardware back → clear currentChat, stop, reset stack to CallLog | BreathingScreen.tsx | box_breathing_screen.dart `_resetToCallLog` (:188-192) | PRESENT | v2: clears chat, stops, `goToHomeTab(kTabCallLog)`. |
+| B1 | CallEndOverlay for 3s | BreathingScreen.tsx, CallEndOverlay.tsx | call_end_overlay.dart | PRESENT | |
+| B2 | Background image + gradient + heading | BreathingScreen.tsx | box_breathing_screen.dart:220 (breathingBackground.png) | PRESENT | |
+| B3 | Box animation, petals, 4×4s phases | BoxBreathingAnimation.tsx, FlowerPetal.tsx | box_breathing_screen.dart, flower_petal_painter.dart | PRESENT | |
+| B4 | Breath sound (mix, mute, replay on unmute) | BoxBreathingAnimation.tsx | breath_sound_player.dart, box_breathing_screen.dart:178-184 | PRESENT | Audio mixing is a device check. |
+| B5 | Per-phase seconds counter | BreathingScreen.tsx | box_breathing_screen.dart `_restartCountdown` :141-154 | PRESENT | |
+| B6 | Controls: mute/unmute, play/pause | BreathingControls.tsx | box_breathing_screen.dart `_setPlaying` :156-176, controls :422-434 (RN SVGs) | PRESENT | |
+| B7 | Pause when inactive; stop on unmount | BreathingScreen.tsx | box_breathing_screen.dart | PRESENT | |
+| B8 | "View call summary" → CallSummary, live-flow semantics | BreathingScreen.tsx | box_breathing_screen.dart `_viewCallSummary` :195-199 | PRESENT | |
+| B9 | Hardware back → clear chat, stop, reset to CallLog | BreathingScreen.tsx | box_breathing_screen.dart `_resetToCallLog` :187-191, PopScope :204 | PRESENT | |
 | B10 | Analytics/tracking | — | — | N/A | None in RN. |
 
 ---
 
-#### Top gaps by user impact (v2 — remaining only)
+#### Top gaps by user impact (v3 — remaining only)
 
-1. S44 — Voice dictation on an existing note overwrites the earlier transcript: `_transcript` isn't seeded from `details.transcript` (voice_note_section.dart:92).
-2. C12 — FeatureNotAvailable state missing: users with no Call Log tab permission see a bare "no calls" text, no oops copy and no Learn-more link (call_log_screen.dart:401).
-3. C6 — Call-log date filter is free text, not a date-time picker; emptying a date box sends `startDate=` (call_log_filter_sheet.dart:376-388).
-4. C5 — Filter badge counts date and duration bounds separately (shows 4 where RN shows 2).
-5. C24 — Several call-log rows can be expanded at once.
-6. C33 — No `GET /chats/counsellor-chat` before navigating to `/scribe` (low impact; the screen hydrates from USER_JOINED).
+1. S-N1 — A failed summary fetch/refetch shows bare error text with no buttons, and wipes an already-loaded summary; RN keeps the data or shows the progress view with "See if ready"/"Check later" (call_summary_screen.dart:1156-1169).
+2. S-N2 — Non-counsellors fire `/settings/scribe-voice-note-enabled` and get a 403; invisible (voice_note_section.dart:260).
 
-Icon sweep (RN SVG/PNG → Flutter Material icon), all assets already shipped in Flutter `assets/` but unreferenced:
-- CallSummary FAB: `chatBubble.svg` (CommentIcon) → `Icons.comment_outlined`, call_summary_screen.dart:685
-- AI-generated banner: `goldenShield.svg` → `Icons.shield_outlined`, call_summary_screen.dart:1227
-- 18 section icons (`callDetails, sessionSummary, flow, keyConcern, tableEye, magnifyEye, assessment, smile, brightnessAlert, prescriptions, handShare, newsStand, headsetMic, tag, database, intake, ongoingRisks, notes`.svg) → Material map call_summary_screen.dart:88-105, rendered :1384
-- Section chevron: `arrowDown.svg` / `arrowRight.svg` → `Icons.expand_less/expand_more`, call_summary_screen.dart:1428
-- SummaryUnauthorized: `summaryFailed.png` → `Icons.lock_outline`, call_summary_screen.dart:1800
-- VoiceNotePanel/Section: `mic.svg` → `Icons.mic` (voice_note_section.dart:261, :448); `pause.svg` → `Icons.pause` (:416); `play.svg` → `Icons.play_arrow` (:423); `delete.svg` → `Icons.delete_outline` (:472)
+Closed since v2: S44 transcript seed, voice-note 24 MB cap, C12 FeatureNotAvailable, C6 (was mis-scored; RN is free text too) + empty date param, C5 badge count, C24 single expanded row, C33 counsellor-chat check, AddNotes privacy tooltip, custom-field dropdowns, Scribe exit tab, `dev-user` fallback, raw error text, Filter/Refresh a11y labels, and all 27 call-summary/voice-note icon-sweep sites.
 
 ### Parity ledger — Learn screens (RN → Flutter)
 
-RN root: `ally-platform/ally-mobile/src` (source of truth). Flutter root: `ally-mobile-flutter/lib` on `master`.
+RN root: `ally-platform/ally-mobile/src` (source of truth). Flutter root: `ally-mobile-flutter/lib` on `master` (v3: `f770200`).
 Audit date: 2026-10-28. **v2 re-audit:** 2026-10-28 against Flutter `master` @ `227db3a` (RN unchanged at `7a8ce0c19`; only a release-bot version bump since). Every v1 PARTIAL/MISSING row re-read on master; ~25 PRESENT rows spot-checked in changed areas (course players, role-play lifecycle, mic-before-credit, feedback recording/transcript language, path/case threading, completed items). 49 status changes; 0 regressions; 1 audit miss (short-session help icon/modal, PRESENT → PARTIAL).
 
-**Branch note:** the brief said `parity/feedback` held in-flight work. While this audit ran, `parity/feedback` was merged into `master` (merge commit `e248a07`, which includes `517c5e4` "Match the live role-play screen to RN SimulationAssistantScreen"), and the branch was deleted. Everything that was on that branch is now on master, so it is marked PRESENT or PARTIAL with the master file named. No IN PROGRESS rows are left. `feature/simkit` was already merged (`de796ac`).
+**v3 re-audit:** 2026-10-28 against Flutter `f770200` (RN still `7a8ce0c19`). Every v2 non-PRESENT row re-read; 40+ PRESENT rows spot-checked (course players incl. all 6 game bundles byte-compared, RN 7a8ce0c19 assessment mode line by line incl. 5 locales, role-play voice screen, feedback, path/case, course progress sheet, endpoints). 32 rows touched: 13 closed to PRESENT, 2 → DEVICE-CHECK, 2 reclassified to PARTIAL (audit, not regression), 1 new row (L-N1). Status vocabulary adds BLOCKED-EXTERNAL / DEVICE-CHECK. 0 regressions.
+
+**Branch note (v2):** the brief said `parity/feedback` held in-flight work. While this audit ran, `parity/feedback` was merged into `master` (merge commit `e248a07`, which includes `517c5e4` "Match the live role-play screen to RN SimulationAssistantScreen"), and the branch was deleted. Everything that was on that branch is now on master, so it is marked PRESENT or PARTIAL with the master file named. No IN PROGRESS rows are left. `feature/simkit` was already merged (`de796ac`).
 
 **Analytics:** RN has no client analytics SDK at all. A grep for track/capture/posthog/logEvent/analytics/mixpanel/amplitude/Sentry/crashlytics across `src/` finds no event calls. So there are no event names to port, and every analytics row is N/A.
 
 #### Overall tally
 
-| Screen | PRESENT | PARTIAL | MISSING | N/A | Total |
-|---|---|---|---|---|---|
-| SimulationsScreen — the "Learn" bottom tab | 19 | 0 | 0 | 2 | 21 |
-| SimulationDetailsScreen | 21 | 0 | 0 | 1 | 22 |
-| SimulationPathDetailsScreen + CaseDetailsScreen | 20 | 3 | 0 | 1 | 24 |
-| CourseOverviewScreen | 16 | 1 | 0 | 2 | 19 |
-| CourseItemPlayerScreen | 52 | 0 | 0 | 2 | 54 |
-| CourseProgressScreen | 10 | 0 | 0 | 1 | 11 |
-| BreathingExerciseScreen (course GAME / BREATHING_EXERCISE) | 6 | 0 | 0 | 1 | 7 |
-| SimulationAssistantScreen — live roleplay voice session | 30 | 2 | 1 | 2 | 35 |
-| SimulationFeedbackScreen | 34 | 3 | 0 | 7 | 44 |
-| **Overall** | **208** | **9** | **1** | **19** | **237** |
+v3 counts; v2 in brackets.
+
+| Screen | PRESENT | PARTIAL | MISSING | BLOCKED-EXTERNAL | DEVICE-CHECK | N/A | Total |
+|---|---|---|---|---|---|---|---|
+| SimulationsScreen — the "Learn" bottom tab | 19 [19] | 0 [0] | 0 [0] | 0 | 0 | 2 [2] | 21 [21] |
+| SimulationDetailsScreen | 21 [21] | 0 [0] | 0 [0] | 0 | 0 | 1 [1] | 22 [22] |
+| SimulationPathDetailsScreen + CaseDetailsScreen | 23 [20] | 0 [3] | 0 [0] | 0 | 0 | 1 [1] | 24 [24] |
+| CourseOverviewScreen | 17 [16] | 0 [1] | 0 [0] | 0 | 0 | 2 [2] | 19 [19] |
+| CourseItemPlayerScreen (incl. new L-N1) | 52 [52] | 2 [0] | 0 [0] | 0 | 0 | 1 [2] | 55 [54] |
+| CourseProgressScreen | 10 [10] | 0 [0] | 0 [0] | 0 | 0 | 1 [1] | 11 [11] |
+| BreathingExerciseScreen (course GAME / BREATHING_EXERCISE) | 6 [6] | 0 [0] | 0 [0] | 0 | 0 | 1 [1] | 7 [7] |
+| SimulationAssistantScreen — live roleplay voice session | 30 [30] | 1 [2] | 0 [1] | 0 | 2 | 2 [2] | 35 [35] |
+| SimulationFeedbackScreen | 37 [34] | 0 [3] | 0 [0] | 0 | 0 | 7 [7] | 44 [44] |
+| **Overall** | **215 [208]** | **3 [9]** | **0 [1]** | **0** | **2** | **18 [19]** | **238 [237]** |
 
 ---
 
@@ -915,7 +935,7 @@ Flutter: `features/simulations/presentation/simulations_screen.dart`, `.../widge
 | Offline / no-network handling | — | — | N/A | RN has nothing specific on this screen. |
 | Analytics | — | — | N/A | RN has no analytics calls (see header). |
 
-Tally: PRESENT 19 · PARTIAL 0 · MISSING 0 · N/A 2
+Tally (v3): PRESENT 19 · PARTIAL 0 · MISSING 0 · N/A 2  [v2 same]
 
 ---
 
@@ -936,20 +956,20 @@ Flutter: `features/simulations/presentation/simulation_details_screen.dart`, `..
 | Trigger-warning chips | `getTriggerWarningNames` | simulation_details_screen.dart | PRESENT | |
 | CTA "Start Role play" / "Practice again" | `renderCtaSection` | `AppButton` | PRESENT | |
 | CTA disabled when credits are low | `isStartSimulationDisabled` | `isStartDisabled = credits?.isLow` | PRESENT | |
-| Low-credits modal, auto-hides after 5 s | `IllustratedModal` + `LOW_CREDITS_MODAL_DISPLAY_MS` | start_simulation_controller.dart `onCredits` / `LowCreditsModal` | PRESENT | |
+| Low-credits modal, auto-hides after 5 s | `IllustratedModal` + `LOW_CREDITS_MODAL_DISPLAY_MS` | start_simulation_controller.dart `onCredits` / `LowCreditsModal` | PRESENT |  |
 | Pre-start "Before you get started" modal | `NotificationModal` | start_simulation_modals.dart `PreStartNotificationModal` | PRESENT | |
 | Start call `POST /learn/scenario-session-start` {scenarioId, languageId?} | useStartSimulation `callSessionStart` | simulations_repository.dart `startScenarioSession` | PRESENT | |
 | "Creating room…" full-screen overlay | `renderLoadingOverlay` | `_CreatingRoomOverlay` | PRESENT | |
 | Microphone permission request before start; Settings alert when blocked; toast when denied | useStartSimulation + usePermissionAlert | start_simulation_controller.dart:178 `_ensureMicrophone` (before `_callSessionStart`), core/realtime/microphone_permission.dart (`showPermissionSettingsAlert` → `openAppSettings`) | PRESENT | v2: `497317a`. Checked before the session/credit is spent, as RN. |
 | 429 → RetrySessionModal (retry with stored params) | `isRateLimitError`, `retryStartSimulation` | start_simulation_controller.dart `_showRetry` / `RetrySessionModal` | PRESENT | |
 | `entityId` error → ActiveSimulationModal (end session `POST /learn/scenario-session/:id/end`, success/error toast) | ActiveSimulationModal.tsx | start_simulation_modals.dart `ActiveSimulationModal`, controller `_showActiveSimulation` | PRESENT | |
-| Other errors → error toast `errors.startSimulation` | showErrorToast | controller `_toast` (SnackBar) | PRESENT | |
+| Other errors → error toast `errors.startSimulation` | showErrorToast | start_simulation_controller.dart:230, 269, 340 (`showToast(..., ToastType.error)`) | PRESENT | v3: real RN-style toast (`aedd4b1`); message = key + backend reason, as RN `showErrorToast`. |
 | Navigate to the live screen with sessionData + scenario (reminders only when `remindersEnabled`) | navigate SIMULATION_ASSISTANT | `_pushRoleplay` → `/roleplay` extra; simulation_models.dart filters reminders | PRESENT | |
 | Hardware back → goBack | useHardwareBackPressHandler | default pop | PRESENT | |
-| Error state when the scenario fetch fails | — (RN never fetches) | `learn.details.loadingDetailsError` text | PRESENT | Extra state, harmless. |
+| Error state when the scenario fetch fails | — (RN never fetches) | `learn.details.loadingDetailsError` text | PRESENT | Extra state, harmless. v3: translated copy, no raw exception (`930992c`). |
 | Analytics | — | — | N/A | None in RN. |
 
-Tally: PRESENT 21 · PARTIAL 0 · MISSING 0 · N/A 1
+Tally (v3): PRESENT 21 · PARTIAL 0 · MISSING 0 · N/A 1  [v2 same]
 
 ---
 
@@ -962,7 +982,7 @@ Flutter: `features/simulations/presentation/simulation_path_details_screen.dart`
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Header: back + "Track" / "Case" title + credits read-out | LearningPathHeader | learning_path_widgets.dart `LearningPathHeader(showCredits)` | PRESENT | |
-| Back falls back to the Learn tab when there's no back stack (`navigateToLearnTab`) | `handleBack` | BackTitleHeader default pop | PARTIAL | Still no fallback: path/case screens pass no `onBack`, `BackTitleHeader` just pops (core/widgets/back_title_header.dart:34). Low impact: Feedback→path now builds `/home` + push, so a stack exists; only a cold deep link would hit it. |
+| Back falls back to the Learn tab when there's no back stack (`navigateToLearnTab`) | `handleBack` | widgets/learning_path_widgets.dart:300-305 `learningPathBack` (pop, else `goToHomeTab(kTabLearn)`); simulation_path_details_screen.dart:30-42, case_details_screen.dart:33-45 | PRESENT | v3: closed (`cfaba0b`); header and hardware back both use it. |
 | Fetch `GET /learn/scenario-paths/:id` or `GET /learn/cases/:id` | useLearningPathDetails | simulations_repository.dart `simulationPathDetailsProvider` / `caseDetailsProvider` | PRESENT | |
 | Loading spinner | ActivityIndicator | `LearningPathLoading` | PRESENT | |
 | Error / empty → DataUnavailable EmptyState ("failedToLoadPathDetails" / "…CaseDetails") | EmptyState | `LearningPathLoadError` | PRESENT | |
@@ -971,10 +991,10 @@ Flutter: `features/simulations/presentation/simulation_path_details_screen.dart`
 | Start / Continue button (label by `completedScenarios > 0`) | `handleStartPath` | learning_path_detail_view.dart | PRESENT | |
 | Start disabled when there is no next scenario or credits are low | `isStartPathDisabled` | `isStartDisabled` | PRESENT | |
 | Lazily create the path/case session (`POST …/create-session`) before opening the modal | `createSession` | `onEnsureSession` | PRESENT | |
-| createSession failure → error toast with the server message | showToast(getErrorDetails) | learning_path_detail_view.dart:98 (inline `_error` text) | PARTIAL | Unchanged: inline red text, not a toast, and it appends the raw exception (`$e`). |
+| createSession failure → error toast with the server message | showToast(getErrorDetails) | learning_path_detail_view.dart:100-105, 121-125 (`showToast(getErrorDetails(e).message, error)`) | PRESENT | v3: closed (`cfaba0b`); no raw exception text. |
 | Scenario row: 120×60 thumb, lock overlay, "Role play N", tick, "Next" chip, 2-line title | PathSimulationCard.tsx | learning_path_detail_view.dart `_ScenarioRow` | PRESENT | |
 | Locked row not tappable | `handleSimulationPress` guard | `onTap: locked ? null` | PRESENT | |
-| Completed row file icon → session lookup `GET /learn/scenario-session/(scenario-path-session-item or case-session-item)/:id` → Feedback(fromLogs) | `handleFileIconPress` | simulation_path_details_screen.dart:59-69 / case_details_screen.dart:62-72 → `simulationFeedbackLocation(…, fromLogs: true, pathId/caseId)` | PARTIAL | pathId/caseId now passed. Remaining: when the lookup returns no id RN toasts `failedToLoadPathDetails`; Flutter does nothing (`if (sessionId != null …)`). |
+| Completed row file icon → session lookup `GET /learn/scenario-session/(scenario-path-session-item or case-session-item)/:id` → Feedback(fromLogs) | `handleFileIconPress` | simulation_path_details_screen.dart:69-90 / case_details_screen.dart (same shape) → `onViewFeedback` returns false on no id; learning_path_detail_view.dart:127-133 toasts `sessionNotFoundMessage` | PRESENT | v3: closed (`cfaba0b`); `failedToLoadPathDetails` / `…CaseDetails` toast when the lookup returns no id. |
 | SimulationDetailsModal: header, close, language dropdown, video/image, order label, title, description, trigger warnings, Start | SimulationDetailsModal.tsx | simulation_details_modal.dart | PRESENT | |
 | Modal hidden while the pre-start NotificationModal shows | `visible={!!selected && !showNotification}` | simulation_details_modal.dart → `PreStartNotificationModal` | PRESENT | |
 | Start with `scenarioPathSessionItemId` / `caseSessionItemId` from the *fresh* scenario, plus languageId | `handleProceedWithSimulation` | `startParamsFor(fresh ?? scenario)` | PRESENT | |
@@ -983,22 +1003,22 @@ Flutter: `features/simulations/presentation/simulation_path_details_screen.dart`
 | ActiveSimulationModal / RetrySessionModal / error toast | shared hook | start_simulation_controller.dart | PRESENT | |
 | Low-credits modal (5 s) | useEffect isLow | controller `onCredits` | PRESENT | |
 | Path/case details + credits refreshed after a session ends (RN `endScenarioSession` invalidates SimulationCredits, SimulationPaths, SimulationPathDetails, Cases, CaseDetails) | services/simulationsApi.ts `invalidatesTags` | simulations_repository.dart:120-131 `endScenarioSession` → `_onInvalidate` (credits, paths, pathDetails, cases, caseDetails) wired at :200-218 | PRESENT | v2: `8e6ad33`. |
-| Hardware back | useHardwareBackPressHandler | default | PRESENT | |
+| Hardware back | useHardwareBackPressHandler | `PopScope(canPop: context.canPop())` → `learningPathBack` (simulation_path_details_screen.dart:30-33) | PRESENT | v3: Android back now takes the same Learn-tab fallback as RN. |
 | Analytics | — | — | N/A | |
 
-Tally: PRESENT 20 · PARTIAL 3 · MISSING 0 · N/A 1
+Tally (v3): PRESENT 23 · PARTIAL 0 · MISSING 0 · N/A 1  [v2: 20 · 3 · 0 · 1]
 
 ---
 
 #### 4. CourseOverviewScreen
 
 RN: `screens/CourseOverviewScreen/CourseOverviewScreen.tsx`, `components/CourseSectionBlock.tsx`, `CourseItemRow.tsx`, `CourseLanguageSheet.tsx`, `CourseProgressSheet.tsx`, `utils/trackNavigation.ts`, `utils/trackItemMeta.ts`.
-Flutter: `features/courses/presentation/course_detail_screen.dart`, `course_language_sheet.dart`, `course_progress_screen.dart`.
+Flutter: `features/courses/presentation/course_detail_screen.dart`, `course_language_sheet.dart`, `course_progress_screen.dart` (v3: `showCourseProgressSheet`), `course_progress_body.dart`, `course_bottom_sheet.dart`.
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Header: back + "Course" | LearningPathHeader | course_detail_screen.dart | PRESENT | |
-| Back fallback to the Learn tab when the stack is empty | `handleBack` / navigateToLearnTab | default pop | PRESENT | Only reachable from Learn or a notification push, so there's always a stack. |
+| Back fallback to the Learn tab when the stack is empty | `handleBack` / navigateToLearnTab | default pop | PRESENT | v3: still default pop (course_detail_screen.dart:78 `LearningPathHeader` without onBack), but every entry pushes over a stack, incl. the new `/course/:uuid` deep link (core/deeplink/deep_link_binding.dart:83 `router.push`). |
 | Fetch `GET /learn/tracks/:id` | useGetLearnTrackDetailQuery | courses_repository.dart `trackDetailProvider` | PRESENT | |
 | Loading spinner | ActivityIndicator | course_detail_screen.dart | PRESENT | |
 | 403 → "Course not available" EmptyState; other errors → "Course not found" | CourseOverviewScreen.tsx | course_detail_screen.dart (DioException 403 check) | PRESENT | |
@@ -1007,17 +1027,17 @@ Flutter: `features/courses/presentation/course_detail_screen.dart`, `course_lang
 | Language sheet: list, select → `PUT /learn/tracks/:id/language` {languageCode}, errors swallowed, close | CourseLanguageSheet.tsx | course_language_sheet.dart | PRESENT | |
 | List header: cover, title, description, progress, completed | LearningPathListHeader | course_detail_screen.dart | PRESENT | |
 | Start / Continue: enrol if needed (`POST /learn/tracks/:id/enroll`) → `GET /learn/tracks/:id/next-item` → open player; errors swallowed | `handleStartOrContinue` | `_startOrContinue` | PRESENT | |
-| Tap progress bar → CourseProgressSheet (bottom sheet, 70% snap; session → Feedback; Continue → start/continue) | CourseProgressSheet.tsx | course_detail_screen.dart:182-183 → push `/courses/:id/progress` (full screen) | PARTIAL | Unchanged: full screen instead of RN's 70% bottom sheet (a `showCourseBottomSheet` helper now exists in course_bottom_sheet.dart but isn't used here). Content parity per §6. |
+| Tap progress bar → CourseProgressSheet (bottom sheet, 70% snap; session → Feedback; Continue → start/continue) | CourseProgressSheet.tsx | course_detail_screen.dart:177-185 → course_progress_screen.dart:90-113 `showCourseProgressSheet` (`showCourseBottomSheet`, heightFraction 0.7) + course_progress_body.dart | PRESENT | v3: closed (`6323de1`). Gated on `enrolled` like RN; session/continue run after the sheet closes, as RN. |
 | Section blocks sorted by order: ring with number, title, subtitle | CourseSectionBlock.tsx | `_CourseSectionBlock` | PRESENT | |
 | Item row: type badge letter, lock, tick, status chip (Completed / In progress / Next), meta line, language-fallback caption, locked caption, current-item border | CourseItemRow.tsx | `_CourseItemRow`, `trackItemMeta`, `_typeBadge` | PRESENT | |
 | "Next" item computed client-side (`findNextItemId`) | utils/trackNavigation.ts | `findNextTrackItemId` | PRESENT | |
 | Item tap: locked ignored, otherwise open the player | `handleItemPress` | course_detail_screen.dart:37 `_openItem` | PRESENT | v2: unknown item types now open the player, which shows `_UnsupportedItemCard` (`3ac5dbb`). |
 | Refresh after returning from the player (RN mutations invalidate `ALL_TRACK_TAGS`: list, detail, next-item) | services/coursesApi.ts | courses_repository.dart `_invalidateTracks()` on every mutation, wired at :288-291 (learnTracks, trackDetail, trackProgress) | PRESENT | v2: `8e6ad33`/`05e06d0`. |
 | Track languages endpoint `GET /learn/tracks/:id/languages` | coursesApi `getTrackLanguages` | courses_repository.dart:74-80 `getTrackLanguages` (ported, `05e06d0`) | N/A | No RN screen calls it; options come from the track detail. |
-| Hardware back | useHardwareBackPressHandler | default | PRESENT | |
+| Hardware back | useHardwareBackPressHandler | `PopScope(canPop: context.canPop())` → `learningPathBack` (simulation_path_details_screen.dart:30-33) | PRESENT | v3: Android back now takes the same Learn-tab fallback as RN. |
 | Analytics | — | — | N/A | RN has none. |
 
-Tally: PRESENT 16 · PARTIAL 1 · MISSING 0 · N/A 2
+Tally (v3): PRESENT 17 · PARTIAL 0 · MISSING 0 · N/A 2  [v2: 16 · 1 · 0 · 2]
 
 ---
 
@@ -1045,7 +1065,7 @@ Flutter: `features/courses/presentation/course_item_player_screen.dart` (player 
 | Celebration modal (section / track complete), confetti, reduce-motion respected | CelebrationModal.tsx | celebration_modal.dart | PRESENT | |
 | Celebration stats pill (completedCount) | CelebrationModal `completedCount` | course_item_player_screen.dart:234, 283 | PRESENT | v2. |
 | Celebration "Continue" → go to the next item, or the overview | `onContinue` → goNextOrOverview | course_item_player_screen.dart:284-286 → `_goNextOrOverview` (:198) | PRESENT | v2. |
-| Celebration "Back to Learn" → Learn tab | navigateToLearnTab | `context.go('/home')` | PRESENT | Learn is the first tab. |
+| Celebration "Back to Learn" → Learn tab | navigateToLearnTab | course_item_player_screen.dart:290-293 `goToHomeTab(kTabLearn)` | PRESENT | v3: v2 gap 7 closed (`93ebfa9`): lands on Learn, not the last-open tab. |
 | Refetch the track on return from a launched roleplay/case/breathing (`getActiveTrackContext`) | useFocusEffect | `didChangeDependencies` + `_refetchTrackOnReturn` (roleplay/case only) | PRESENT | Breathing doesn't set the flag, which doesn't matter because it completes on mount. |
 | Unsupported item type → UnsupportedItemCard (title, body, "Back to course") | UnsupportedItemCard.tsx | course_item_player_screen.dart:389, 424, 429-450 `_UnsupportedItemCard(onBackToCourse)` | PRESENT | v2. |
 | Discussion thread under the item when `hasDiscussion` | `DiscussionThread itemId` | discussion/discussion_thread.dart | PRESENT | |
@@ -1071,8 +1091,8 @@ Flutter: `features/courses/presentation/course_item_player_screen.dart` (player 
 | Native S3 playback | VideoPlayer.tsx | video/video_player_widget.dart | PRESENT | |
 | Watch progress: unique seconds, 10 s / +10% throttle, flush on pause/end/unmount → `POST …/video-progress` | hooks/useVideoWatchProgress.ts | data/video_watch_progress.dart, video_item_player.dart | PRESENT | |
 | YouTube/Vimeo/Loom fallback card (open externally + mark watched) | VideoFallbackCard.tsx | video/video_fallback_card.dart | PRESENT | |
-| Interjections: pause at the timestamp, blocking question, submit `POST …/interjections/:id/answer`, result, Continue resumes | VideoInterjectionModal.tsx | video/video_interjection_dialog.dart | PRESENT | Question media missing (see QuestionMedia). |
-| "Watched" state | VideoItemPlayer | video_item_player.dart | PRESENT | Seeded wrongly by the `alreadyCompleted` bug above. |
+| Interjections: pause at the timestamp, blocking question, submit `POST …/interjections/:id/answer`, result, Continue resumes | VideoInterjectionModal.tsx | video/video_interjection_dialog.dart | PRESENT | v3: question media now rendered (video_interjection_dialog.dart, QuestionMedia row). |
+| "Watched" state | VideoItemPlayer | video_item_player.dart | PRESENT | v3: `alreadyCompleted` seeding fixed (course_item_player_screen.dart:186-187, 345). |
 
 ##### Quiz
 
@@ -1080,7 +1100,7 @@ Flutter: `features/courses/presentation/course_item_player_screen.dart` (player 
 |---|---|---|---|---|
 | Intro card: question count, pass score (hidden for surveys), attempts, Start disabled when exhausted | QuizIntro.tsx | quiz_player.dart `_QuizIntro` | PRESENT | |
 | One question per page with "Question x of y", Back / Next / Submit | QuizItemPlayer.tsx | quiz/quiz_player.dart (paged, Back / Next / Submit) | PRESENT | v2. |
-| 8 question types (MCQ single/multi, true/false, ordering, matching, fill-blank, open-ended, Likert) | quiz/widgets/*.tsx | quiz/quiz_question_widget.dart | PRESENT | Ordering uses up/down buttons instead of drag; matching uses dropdowns. Same data. |
+| 8 question types (MCQ single/multi, true/false, ordering, matching, fill-blank, open-ended, Likert) | quiz/widgets/*.tsx | quiz/quiz_question_widget.dart | PRESENT | v3: matching is now RN's tap-left-then-right pairing with pair colours (quiz_question_widget.dart:263-397); ordering uses up/down arrows in RN too (OrderingQuestion.tsx:19-24). |
 | Submit `POST …/quiz-attempts` | `handleSubmit` | `_submit` | PRESENT | Flutter adds an "answer all" check. |
 | Results: passed/failed, score, attempts used, "Your responses" with correct answer, explanation and AI feedback per question | QuizResults.tsx | quiz/quiz_player.dart:440-547 `_QuizResults` (survey state :484, correct answer / explanation / AI feedback accordion) | PRESENT | v2. |
 | PENDING_GRADING → "Finish grading" (regrade `POST …/quiz-attempts/:aid/regrade`) | QuizItemPlayer `handleRegrade` | quiz/quiz_player.dart:126, :470; courses_repository.dart:205 `regradeQuizAttempt` | PRESENT | v2. |
@@ -1094,29 +1114,35 @@ Flutter: `features/courses/presentation/course_item_player_screen.dart` (player 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Journal: prompts, required markers, debounced draft autosave `POST …/journal`, submit `POST …/journal/submit`, read-only after submit | JournalPlayer.tsx | journal/journal_player.dart | PRESENT | v2 spot-check OK; `alreadyCompleted` seeding fixed. |
-| HTML5 game bundles (6) in a WebView + bridge, `POST …/game-result`, last/best score | GamePlayer.tsx, games/*Html.ts | game/game_player.dart, assets/games/*.html | PRESENT | |
+| HTML5 game bundles (6) in a WebView + bridge, `POST …/game-result`, last/best score | GamePlayer.tsx, games/*Html.ts | game/game_player.dart, assets/games/*.html | PRESENT | v3: all 6 RN game keys (TREX_RUNNER, TIC_TAC_TOE, MEMORY_MATCH, CUB_N_PUP, SNAKE, SPROUT) mapped (game_player.dart:19-37); each asset byte-identical to the RN `*Html.ts` string; heights, controlsTouch/lastScore/bestScore/optional strings, bestScore seed and bridge match. |
 | Game in-frame localized strings (`window.__allyGameStrings` via FRAME_STRING_KEYS) | GamePlayer.tsx `injectedStrings` | game/game_player.dart:41-117 (`window.__allyGameStrings`) | PRESENT | v2: `9898caf`. |
 | Unknown game key → unsupported title + body | GamePlayer `unsupported` | game/game_player.dart:266-282 (title + `unsupportedBody`) | PRESENT | v2. |
 | Breathing game key → NativeGamePlayer intro card (completes on mount) → BreathingExercise screen | NativeGamePlayer.tsx | `_BreathingExerciseIntro` → `/breathing-exercise` | PRESENT | |
-| Breathing key with no config → UnsupportedItemCard | CourseItemPlayerScreen switch | falls through to `GamePlayer` (unsupported title) | PRESENT | Same end result: unsupported message. |
+| Breathing key with no config → UnsupportedItemCard | CourseItemPlayerScreen switch | course_item_player_screen.dart:390-391 `_UnsupportedItemCard` | PRESENT | v3: now the exact RN branch (not the GamePlayer fallback). |
 | Branching scenario: intro, nodes, choices, images, outcome / score / takeaway, trail, `POST …/branching-result`, attempts left, exhausted pause with recap and next round, Continue → next | BranchingScenarioPlayer.tsx | branching/branching_scenario_player.dart | PRESENT | Missing only the a11y labels `recapLabel` / `trailLabel`. |
 | Bucket sort: tap-to-place `POST …/bucket-sort/place`, per-item feedback, rounds, restart `POST …/bucket-sort/restart`, first-try %, Continue | BucketSortPlayer.tsx | bucket_sort/bucket_sort_player.dart | PRESENT | Missing the `bucketA11y` label. |
-| ROLEPLAY/CASE item: launch roleplay (trackItemProgressId) or open the case; assessment mode | RoleplayCasePlayer.tsx | roleplay/roleplay_case_player.dart (+ start_simulation_controller) | PRESENT | Translation keys match. |
-| Accessibility labels on branching / bucket sort | various | — | N/A | Non-functional; listed under the rows above. |
+| ROLEPLAY/CASE item: launch roleplay (trackItemProgressId) or open the case; assessment mode | RoleplayCasePlayer.tsx | roleplay/roleplay_case_player.dart (+ start_simulation_controller) | PRESENT | v3: assessment mode (RN 7a8ce0c19) compared line by line: roleplay_case_player.dart:54-57 (isAssessment/submittedAt/locked), :128 card tap no-op when locked, :131 assessmentIntro, :135-145 amber notice, :163-170 submitted+notPassed when locked and not completed, :171-197 locked text replaces dropdown+button; start_item_payload.dart:621-624 parses `completionCriteria.assessmentMode` + `assessmentSubmittedAt`; all 5 `courses.roleplay.*` keys identical in en/hi/kn/mr/ta; `formatDate` = `MMM dd`. |
+| Accessibility labels on branching / bucket sort | various | branching/branching_scenario_player.dart, bucket_sort/bucket_sort_player.dart (no `Semantics` / labels) | PARTIAL | v3 reclassified (N/A → PARTIAL; strings must port): RN `courses.branching.recapLabel` (BranchingScenarioPlayer.tsx:285), `trailLabel` (:386), `courses.bucketSort.bucketA11y` (BucketSortPlayer.tsx:178) unused in Flutter. |
 | Analytics | — | — | N/A | |
 
-Tally: PRESENT 52 · PARTIAL 0 · MISSING 0 · N/A 2
+##### v3 discovery rows
+
+| RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
+|---|---|---|---|---|
+| L-N1 Native video controls (react-native-video `controls`: platform play/pause, scrubber, elapsed/duration readout, fullscreen) | players/VideoPlayer.tsx:40-49 (`controls`, `resizeMode="contain"`) | video/video_player_widget.dart:140-185 (`_PlayPauseOverlay` tap toggle + `VideoProgressIndicator(allowScrubbing)`) | PARTIAL | v3 new: no fullscreen and no time readout; play/pause + scrub present. |
+
+Tally (v3): PRESENT 52 · PARTIAL 2 · MISSING 0 · N/A 1 (55 rows incl. L-N1)  [v2: 52 · 0 · 0 · 2 of 54]
 
 ---
 
 #### 6. CourseProgressScreen
 
 RN: `screens/CourseProgressScreen/CourseProgressScreen.tsx`, `components/CourseProgressBody.tsx`, `PracticeNudge.tsx`, `LatestFeedbackPreview.tsx`, `RoleplaySessionRow.tsx`, `ScoreTrendSparkline.tsx`, `SectionProgressRow.tsx`, `SkillCategoryRow.tsx`.
-Flutter: `features/courses/presentation/course_progress_screen.dart`.
+Flutter: `features/courses/presentation/course_progress_screen.dart`, `course_progress_body.dart` (v3: shared body, `6323de1`).
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
-| Header "Progress" + back | CourseProgressScreen.tsx | course_progress_screen.dart | PRESENT | |
+| Header "Progress" + back | CourseProgressScreen.tsx | course_progress_screen.dart | PRESENT | v3: uses `LearningPathHeader` like RN (`6323de1`). Neither app navigates to this screen (RN registers COURSE_PROGRESS but never navigates to it; Flutter `/courses/:id/progress` likewise); content is shared with the sheet. |
 | Fetch `GET /learn/tracks/:id/progress` | useGetLearnTrackProgressQuery | `trackProgressProvider` | PRESENT | |
 | Loading / error EmptyState (DataUnavailable icon) | CourseProgressScreen.tsx | course_progress_screen.dart:96-101 (`AppEmptyState`, notFound) | PRESENT | v2: `3ac5dbb`. |
 | Overall progress bar + % | CourseProgressBody | course_progress_screen.dart | PRESENT | |
@@ -1125,10 +1151,10 @@ Flutter: `features/courses/presentation/course_progress_screen.dart`.
 | Score-trend sparkline | ScoreTrendSparkline.tsx | `_ScoreTrendSparkline` / `_SparklinePainter` | PRESENT | |
 | Skill-category rows | SkillCategoryRow.tsx | `_SkillCategoryRow` | PRESENT | |
 | Feedback subheading ("based on N evaluated sessions", shown when `evaluatedRoleplaySessionCount > 0`) | CourseProgressBody `feedbackSubheading` | course_progress_screen.dart:160-168 (`feedbackSubheading_one/_other`) | PRESENT | v2. |
-| Latest feedback preview + roleplay session rows → Feedback(scenarioSessionId) | LatestFeedbackPreview.tsx, RoleplaySessionRow.tsx | `_LatestFeedbackPreview`, `_RoleplaySessionRow` → `/simulations/feedback/:id` | PRESENT | Visual: row trailing chevron is Material `Icons.chevron_right` (course_progress_screen.dart:637) instead of RN `chevronRight.svg` (icon sweep). |
+| Latest feedback preview + roleplay session rows → Feedback(scenarioSessionId) | LatestFeedbackPreview.tsx, RoleplaySessionRow.tsx | `_LatestFeedbackPreview`, `_RoleplaySessionRow` → `/simulations/feedback/:id` | PRESENT | v3: chevron is RN `chevronRight.svg` (course_progress_body.dart:568); v2 gap 46 (Learn chevron) closed. |
 | Analytics | — | — | N/A | |
 
-Tally: PRESENT 10 · PARTIAL 0 · MISSING 0 · N/A 1
+Tally (v3): PRESENT 10 · PARTIAL 0 · MISSING 0 · N/A 1  [v2 same]
 
 ---
 
@@ -1147,22 +1173,22 @@ RN: `screens/BreathingExerciseScreen/BreathingExerciseScreen.tsx`. Flutter: `fea
 | Sets the active-track context so the player refetches on return | NativeGamePlayer `setActiveTrackContext` | course_item_player_screen.dart:380-385 (`onLaunched: () => _refetchTrackOnReturn = true`) | PRESENT | v2. |
 | Analytics | — | — | N/A | |
 
-Tally: PRESENT 6 · PARTIAL 0 · MISSING 0 · N/A 1
+Tally (v3): PRESENT 6 · PARTIAL 0 · MISSING 0 · N/A 1  [v2 same]
 
 ---
 
 #### 8. SimulationAssistantScreen — live roleplay voice session
 
 RN: `screens/SimulationAssistantScreen/SimulationAssistantScreen.tsx` + 37 component files (SessionChecklist, SessionInfoTabs, LiveFeedback, SessionGoalTimer, SessionProgress, ScenarioInfoOverlay, SimulationTimer, SimulationControls, SpeakingIndicator, TurnIndicator, EndingSoonModal, SimulationCountdown, SessionScoreMeter, ParticipantTile, AudioWave/useAudioLevel).
-Flutter (master, after merge `e248a07`): `features/roleplay/presentation/roleplay_voice_screen.dart`, `checklist_panel.dart`, `session_info_tabs.dart`, `participant_tile.dart`, `turn_state.dart`, `live_feedback_toast.dart`, `session_score_meter.dart`, `pause_resume_state.dart`, `core/realtime/livekit_room_service.dart`.
+Flutter (master, after merge `e248a07`): `features/roleplay/presentation/roleplay_voice_screen.dart`, `checklist_panel.dart`, `session_info_tabs.dart`, `participant_tile.dart`, `turn_state.dart`, `live_feedback_toast.dart`, `session_score_meter.dart`, `pause_resume_state.dart`, `core/realtime/livekit_room_service.dart`, v3: `roleplay_audio_session.dart`, `participant_audio_level.dart`, `simulation_sound_player.dart`.
 
 | RN item | RN file(s) | Flutter equivalent file(s) | Status | Notes |
 |---|---|---|---|---|
 | Route params: sessionData {id, accessToken, liveKitServerUrl}, scenario, pathId, caseId, languageId | navigation/types.ts | app_router.dart:204-218 (`pathId`, `caseId`, `languageId` read from extra) → roleplay_voice_screen.dart:96-117 | PRESENT | v2: `c29e765`. |
 | Auto-connect on mount (100 ms guard) | `handleConnect` useEffect | roleplay_voice_screen.dart:241-244 (`_connectTimer = Timer(_connectDelay, _connect)`) | PRESENT | v2: `b82d84f`. Manual Connect button gone. |
-| AudioSession configuration (Android communication preset / iOS) before connect | `configureAudioSession` | — (only the start/end sound player sets an `AudioContext`, simulation_sound_player.dart:45; nothing configures the LiveKit call audio) | MISSING | RN `configureAudioSession` (Android `preferredOutputList` bluetooth/headset/speaker/earpiece + media preset, iOS `defaultOutput: speaker`) before `room.connect`. Flutter relies on livekit_client defaults; not verified at runtime (iOS may route to earpiece). |
+| AudioSession configuration (Android communication preset / iOS) before connect | `configureAudioSession` | roleplay_audio_session.dart:29-51 (`LiveKitClient.initialize(... AndroidAudioSessionConfiguration.media)`, `AudioManager.setSpeakerOutputPreferred(true)`); roleplay_voice_screen.dart:474-480 (before connect, `errors.audioSession` on failure) | DEVICE-CHECK | v3: code added (`39f4ee2`). Routing (speaker vs earpiece, BT/headset precedence, Android media preset) only provable on device. |
 | Keep screen awake during the call | activateKeepAwake / deactivateKeepAwake | roleplay_voice_screen.dart:235-236, 250 (`keepAwakeProvider` activate/deactivate) | PRESENT | v2: `b82d84f`. |
-| Start-simulation ringtone on mount, stopped when the agent speaks; end sound on disconnect | `playNotificationSound(sounds.start/endSimulation)`, SoundPlayer | roleplay_voice_screen.dart:238 (start), :512 / :646 (end); simulation_sound_player.dart; assets/sounds/{start,end}Simulation.mp3 | PARTIAL | v2: sounds play (`d12a201`). Remaining: RN stops the start sound when the agent first speaks (`SoundPlayer.stop()`, SimulationAssistantScreen.tsx:365); Flutter never stops it (`_transitionToAgentJoined` :499 doesn't call stop). |
+| Start-simulation ringtone on mount, stopped when the agent speaks; end sound on disconnect | `playNotificationSound(sounds.start/endSimulation)`, SoundPlayer | roleplay_voice_screen.dart:245-246 (start), :517-524 `_transitionToAgentJoined` → `_sound.stop()`, :566 (end); simulation_sound_player.dart (`stop`) | PRESENT | v3: closed (`39f4ee2`); stop on agent join. |
 | 3-2-1 countdown overlay | SimulationCountdown | roleplay_voice_screen.dart:241, 539-552 (on mount) | PRESENT | v2. |
 | Room status: connecting → connected → ringing → AGENT_JOINED (agent speaks, or 1.5 s silent grace after the participant joins) | attachRoomListeners `transitionToAgentJoined`, AGENT_SILENT_GRACE_MS | roleplay_voice_screen.dart:137, 487-506 (`_onParticipantConnected`, 1.5 s silent grace, `_transitionToAgentJoined`; timer starts on participant join) | PRESENT | v2: `b82d84f`. |
 | Loader text (connecting / waiting for agent / ending) + mic prompt | `renderLoader` | `_buildLoader` | PRESENT | |
@@ -1173,7 +1199,7 @@ Flutter (master, after merge `e248a07`): `features/roleplay/presentation/rolepla
 | SessionGoalTimer (when `timerMode`: "x min y sec remaining", session-timer label) | SessionGoalTimer.tsx | session_goal_timer.dart; roleplay_voice_screen.dart:711; simulation_models.dart:122-124 `timerMode` | PRESENT | v2. |
 | SessionProgress (scenario `stateNames` progress) | SessionProgress.tsx | session_progress.dart; roleplay_voice_screen.dart:727; simulation_models.dart:126-129 `stateNames` | PRESENT | v2. |
 | AI ParticipantTile + learner picture-in-picture, speaking border/pulse | ParticipantTile.tsx | participant_tile.dart | PRESENT | |
-| Audio-level waveform (`useAudioLevel`, polled 100 ms) | AudioWave/useAudioLevel.ts | participant_tile.dart (`isSpeaking` only), roleplay_voice_screen.dart:348-356 | PARTIAL | Unchanged and documented as deliberate: one LiveKit `isSpeaking` signal instead of a 100 ms polled `audioLevel`, so no level-driven animation. |
+| Audio-level waveform (`useAudioLevel`, polled 100 ms) | AudioWave/useAudioLevel.ts | participant_audio_level.dart:16-74 (100 ms `audioLevel` poll while speaking, threshold 0.01); roleplay_voice_screen.dart:530-560 `_attachLevel`/`_levelTile` | PRESENT | v3: closed (`39f4ee2`). RN uses the level only for `isSpeaking = level > AUDIO.THRESHOLD` (ParticipantTile.tsx:53-54); same here. |
 | TurnIndicator / SpeakingIndicator (thinking / AI speaking / your turn), AGENT_STATE data messages, debounced remote speaking | TurnIndicator.tsx, SpeakingIndicator.tsx | turn_state.dart `deriveTurnStates`, participant_tile.dart | PRESENT | |
 | ScenarioInfoOverlay (i): title + trigger warnings | ScenarioInfoOverlay.tsx | roleplay_voice_screen.dart (scenario info overlay) | PRESENT | |
 | Info tab bar: Checklist / Reminders / Description (each tab only when it has content) | SimulationAssistantScreen `infoTabs`, SessionInfoTabs.tsx | session_info_tabs.dart | PRESENT | |
@@ -1181,20 +1207,20 @@ Flutter (master, after merge `e248a07`): `features/roleplay/presentation/rolepla
 | LiveFeedback toast (emoji + message), hidden in checklist/focus mode | LiveFeedback.tsx | live_feedback_toast.dart | PRESENT | |
 | SessionScoreMeter (accumulated score; hidden when `showScoreMeter === false`) | SessionScoreMeter.tsx | session_score_meter.dart | PRESENT | |
 | SimulationControls: collapsible button group (mic, focus, pause, end) | SimulationControls.tsx | roleplay_voice_screen.dart (`_controlsMaximized`) | PRESENT | Merged via `517c5e4`. |
-| Mic toggle (error toast `errors.toggleMic`) | `handleToggleMic` | roleplay_voice_screen.dart:609-615 `_toggleMic` | PRESENT | v2: errors now surface (`errors.toggleMic`, inline). |
+| Mic toggle (error toast `errors.toggleMic`) | `handleToggleMic` | roleplay_voice_screen.dart:609-615 `_toggleMic` | PRESENT | v3: behaviour present; error surface counted in the error-toast row. |
 | Focus mode (hidden for NONE experience mode) | `showFocusButton={!isNoneMode}` | `_isFocusMode` | PRESENT | |
 | Pause/resume (only when `pauseEnabled === true`): mic off, clock frozen, publish {type:pause/resume}, 2.5 s ack timeout revert + `errors.pauseControl` | `handleTogglePause`, `armControlAck` | pause_resume_state.dart, `_togglePause` | PRESENT | |
 | Agent control messages paused/resumed ack, cap-warning → EndingSoon, cap-ended | onDataReceived | roleplay_voice_screen.dart:323 (`cap-ended` no-op) + disconnect handler :510 | PRESENT | v2: the room-disconnect listener now exists, so cap-ended leaves for Feedback. |
 | End session: disconnect, `POST /learn/scenario-session/:id/end` {enableRecommendations:true}, always replace with Feedback (in `finally`) with pathId/caseId/languageId | `handleDisconnect` | roleplay_voice_screen.dart:636-660 (`finally` → `_goToFeedback` with pathId/caseId/languageId); simulations_repository.dart:120-131 (body `{enableRecommendations:true}` + invalidation) | PRESENT | v2. |
 | Hardware/system back during the session → "End Simulation?" IllustratedModal | useHardwareBackPressHandler + IllustratedModal | `PopScope` + `_showEndConfirmation` | PRESENT | |
 | Dark full-bleed call layout, RN info-tab styling | styles.ts | roleplay_voice_screen.dart | PRESENT | Merged via `517c5e4`. |
-| Error toasts (`errors.connect` / `attachListeners` / `audioSession` / `toggleMic`) | useErrorToast | inline `_error` text | PRESENT | Different surface, same information. |
+| Error toasts (`errors.connect` / `attachListeners` / `audioSession` / `toggleMic`) | useErrorToast | roleplay_voice_screen.dart:156, 453, 479, 488, 498, 669 set `_error`; rendered inline :825-832 | PARTIAL | v3 reclassified (PRESENT → PARTIAL, not a regression): RN `showErrorToast(error, key)` (SimulationAssistantScreen.tsx:379, 571, 580, 612, 638, 654) is a transient toast with the backend reason; Flutter shows a persistent red line with the key text only. App toast host now exists (`05d78c1`), so this is a code gap. |
 | Mic permission | requested upstream in useStartSimulation | start_simulation_controller.dart:178 (before session start); roleplay screen no longer requests it (:449-453) | PRESENT | v2: Settings alert present (core/realtime/microphone_permission.dart). |
-| Background audio (call continues when the app is backgrounded) | LiveKit SDK | livekit_client (per livekit_room_service doc) | PRESENT | Not verified at runtime. |
+| Background audio (call continues when the app is backgrounded) | LiveKit SDK | ios/Runner/Info.plist:62-64 (`UIBackgroundModes` audio); AndroidManifest FOREGROUND_SERVICE_MICROPHONE + service :79-84 | DEVICE-CHECK | v3: config exists (superset of RN, which declares only remote-notification); behaviour only provable on device. |
 | Credits refresh after the session | endScenarioSession invalidates SimulationCredits | — | N/A | Counted in §3. |
 | Analytics | — | — | N/A | |
 
-Tally: PRESENT 30 · PARTIAL 2 · MISSING 1 · N/A 2
+Tally (v3): PRESENT 30 · PARTIAL 1 · MISSING 0 · DEVICE-CHECK 2 · N/A 2  [v2: 30 · 2 · 1 · – · 2]
 
 ---
 
@@ -1208,10 +1234,10 @@ Flutter (master, after merge `e248a07`): `features/simulations/presentation/simu
 | Route params scenarioSessionId, fromLogs, pathId, caseId | navigation/types.ts | app_router.dart:264-266 (`pathId`, `caseId`, `languageId` query params); simulation_feedback_location.dart | PRESENT | v2. |
 | Fetch `GET /learn/scenario-session/:id?enableRecommendations=true`, polling every 3.5 s ×7 until feedback lands (or both tabs off); retry-limit state | `fetchSimulationDetailsWithRetry` | `_fetchWithRetry` / `_restartPolling` | PRESENT | |
 | Restart polling when the UI language changes | effect on `activeLanguageCode` | simulation_feedback_screen.dart:444-459 (`ref.listen(localizationControllerProvider)` → `_restartPolling`) | PRESENT | v2: `bc9381b`. |
-| Restart polling on screen re-focus | useFocusEffect | simulation_feedback_screen.dart:356-371 (after share-for-review only) | PARTIAL | Unchanged: returning from Review details (`:564` push) or any other pushed route doesn't restart the poll / refetch the review. |
+| Restart polling on screen re-focus | useFocusEffect | simulation_feedback_screen.dart:381-389 `_onRefocus`, :495-496 `ScreenFocusListener` (core/navigation/screen_focus_listener.dart) | PRESENT | v3: closed (`0894fa5`); any pushed route returning restarts the poll and refetches the review / hide-review check. |
 | Header: back arrow, "Simulation *Summary/End*" (by fromLogs) | `renderTitle` | `_buildTitle` | PRESENT | |
 | Title / tabs gated by `view:session-scenario-messages` | `hasScenarioMessagesPermission` | `canSeeMessages` | PRESENT | |
-| Share switch (feedback on, not a short session): on with no review or a review <10 min old → share flow; otherwise toggle privacy (toasts) | `CustomSwitch onToggle`, useToggleReviewPrivacy | `_buildTitle` switch, `_shareSimulation`, privacy toggle + `privacyUpdated` / `errorUpdatePrivacy` snackbars | PRESENT | |
+| Share switch (feedback on, not a short session): on with no review or a review <10 min old → share flow; otherwise toggle privacy (toasts) | `CustomSwitch onToggle`, useToggleReviewPrivacy | `_buildTitle` switch, `_shareSimulation`, privacy toggle + `privacyUpdated` / `errorUpdatePrivacy` snackbars | PRESENT | v3: privacy toasts are now RN-style toasts (simulation_feedback_screen.dart:408, 411). |
 | Share for review → ShareForReview(reviewId, scenarioSessionId, scenarioData, note) | `handleShareSimulation` | `/share-for-review/:id` extra | PRESENT | |
 | Review fetch `GET` review by id (status, note, createdAt) | useGetReviewByIdQuery | `_loadReview` (reviews_repository) | PRESENT | |
 | SessionRatingTrigger (5 stars, sm) → opens the popup with that rating | SessionRatingTrigger | feedback_widgets.dart `SessionRatingTrigger` | PRESENT | |
@@ -1219,9 +1245,9 @@ Flutter (master, after merge `e248a07`): `features/simulations/presentation/simu
 | Auto-open the rating popup on a fresh session without feedback; adopt existing `sessionFeedback` | init effect | `_handledFeedbackInit` | PRESENT | |
 | Leave-without-rating interception (popup source auto/leave/manual) | `handleFeedbackAndNavigate`, `hideFeedbackPopup` | `_onBackPressed`, `_hidePopup`, PopScope | PRESENT | |
 | Submit `POST /learn/scenario-session/:id/feedback` {rating, feedback, tags} + success/fail toast; leave after submit when source=leave or feedback is disabled | `submitFeedback` | `_submitFeedback` | PRESENT | |
-| Back: path/case → reset to path/case details; fromLogs → goBack; otherwise → Learn tab | `handleBack` | simulation_feedback_screen.dart:240-261 (`go('/home')` then push details; fromLogs pop; else `/home`) | PRESENT | v2. |
+| Back: path/case → reset to path/case details; fromLogs → goBack; otherwise → Learn tab | `handleBack` | simulation_feedback_screen.dart:245-264 (`goToHomeTab(kTabLearn)` then push details; fromLogs pop; else `goToHomeTab`) | PRESENT | v3: v2 gap 7 closed (`93ebfa9`): lands on Learn, not the last-open tab. |
 | `feedbackTabs` (debrief / transcript toggles), DEFAULT fallback, both off = rating only | `feedbackTabs`, `feedbackEnabled` | `showDebriefTab` / `showTranscriptTab` / `feedbackEnabled` | PRESENT | |
-| Short session (≤30 s) → only the "Session Review" tab (ShortSessionUI card) | getSimulationSummaryTabs, SummaryTab → SimulationSummary → ShortSessionUI | feedback_widgets.dart:265-370 `ShortSessionSummary` | PARTIAL | v2 spot-check (audit miss, not a regression): RN `SimulationSummary` header has a help (?) icon (`help.svg`) beside the scenario title that opens `SimulationDetailsModal` (description, cover image/video). Flutter renders the title with no icon and no modal (feedback_widgets.dart:332-343). |
+| Short session (≤30 s) → only the "Session Review" tab (ShortSessionUI card) | getSimulationSummaryTabs, SummaryTab → SimulationSummary → ShortSessionUI | feedback_widgets.dart:336-366 (title row + `help.svg` 14pt → `SimulationInfoModal.show`), simulation_info_modal.dart | PRESENT | v3: closed (`0894fa5`); modal shows scenario title header, `simulationPage.simulationDetails`, cover video/image, description, as RN SimulationSummary.tsx:70-112. v2 gap 46 (help icon) closed. |
 | SimulationSummarySkeleton while loading | SummaryTab | `_NoteSkeleton` / summary loading | PRESENT | |
 | Tab bar (scrollable, primary indicator), active tab falls back to the first | `renderTabBar`, effect | `_buildTabBar`, TabController rebuild | PRESENT | |
 | EventChecklist (CHECKLIST mode, not short): `GET /learn/scenario-session/:id/event-checklist`, green/red rows | EventChecklist.tsx | feedback_widgets.dart `EventChecklist`, repository `getEventChecklist` | PRESENT | |
@@ -1231,11 +1257,11 @@ Flutter (master, after merge `e248a07`): `features/simulations/presentation/simu
 | Ask-AI reply thread: history `GET /learn/scenario-sessions/:id/chat/history`, SSE stream `POST …/chat/stream`, streaming bubble, citations table, interrupted state, error + Retry, 2,000-char limit, keyboard handling | AskAI/chatSessionManager.ts, useAskAIChat.ts, ChatElements.tsx, DebriefReplyInput.tsx | core/widgets/ask_ai_chat/{ask_ai_chat_api,controller,widgets,markdown,sse_event_parser}.dart | PRESENT | RN keeps a module-level session store, so a stream survives leaving the screen. Flutter's controller is screen-scoped and cancels on dispose. |
 | Read-only debrief from Logs (no reply thread) | `readOnly={fromLogs}` | `readOnly` | PRESENT | |
 | Transcript tab: card, accuracy disclaimer, paginated `GET /learn/scenario-session/:id/messages` (10/page), learner/AI tinted rows, `mm:ss Speaker`, agent name, empty state | TranscriptTab, SimulationTranscript, SimulationTranscriptItem, EmptyTranscript | simulation_transcript_tab.dart | PRESENT | |
-| Session recording player: `GET /learn/scenario-session/:id/recording` presigned URL, play/pause/seek, "no recording" text | SimulationAudioPlayer.tsx (571 lines), useSimulationSessionRecordingUrl.ts | simulation_transcript_tab.dart:84-111, 360-373; data/simulation_transcript_repository.dart:81-88 (`GET …/recording`); features/reviews/presentation/simulation_audio_player.dart | PRESENT | v2: `bc9381b`. |
+| Session recording player: `GET /learn/scenario-session/:id/recording` presigned URL, play/pause/seek, "no recording" text | SimulationAudioPlayer.tsx (571 lines), useSimulationSessionRecordingUrl.ts | simulation_transcript_tab.dart:84-111, 360-373; simulation_transcript_repository.dart:88; reviews/presentation/simulation_audio_player.dart:62-92, 115, 130 | PRESENT | v3: playback speed persisted under RN `AUDIO_PLAYBACK_RATE` (`930992c`); v2 gap 45 (speed) closed. |
 | Playback-synced transcript highlighting + tap-to-seek | SimulationTranscript | simulation_transcript_tab.dart:140-146 `_seekTo`, :341 tap-to-seek, playback highlight | PRESENT | v2. |
 | Transcript translation language dropdown | SimulationTranscript `useLanguageDropdown`, languageCodeEndpoints | simulation_transcript_tab.dart:31-33, 81-82, 165-203 (`languageCode` on `/messages`) | PRESENT | v2. |
 | Floating review button (feedback on, not the Debrief tab, review exists, `!hideReviewDetails`, `view:simulation-review`) → ReviewDetails | `handleViewReview`, useHideReviewDetails (threads / reactions count) | `_ReviewButton`, `_checkHideReviewDetails` (getThreads, getReactionsCount) | PRESENT | |
-| "Try another simulation" button (not Debrief, not fromLogs, no path/case, details loaded) | `renderTryAnotherSimulation` → `handleSubmit` (opens the rating popup) | simulation_feedback_screen.dart:476-481 (hide conditions incl. path/case), :555 `context.push('/simulations')` | PARTIAL | Hide conditions now match. Remaining: action differs — RN's `handleSubmit` reopens the rating popup; Flutter pushes a standalone `/simulations` route outside the tab shell (code comment says this is intentional). Product decision. |
+| "Try another simulation" button (not Debrief, not fromLogs, no path/case, details loaded) | `renderTryAnotherSimulation` → `handleSubmit` (opens the rating popup) | simulation_feedback_screen.dart:476-481 (hide conditions), :560-566 `setState(_popupVisible = true)` | PRESENT | v3: closed (`0894fa5`); reopens the rating popup like RN `handleSubmit` (SimulationFeedbackScreen.tsx:365-367, 404-411). |
 | Hardware back → same interception | useHardwareBackPressHandler | PopScope | PRESENT | |
 | Lazy tab placeholder spinner | TabView `renderLazyPlaceholder` | TabBarView | PRESENT | |
 | Session date/duration for share (`formatDurationAsMMSS`) | handleShareSimulation | `_shareSimulation` (seconds string) | PRESENT | |
@@ -1250,7 +1276,7 @@ Flutter (master, after merge `e248a07`): `features/simulations/presentation/simu
 | SummaryCard reuse (CallTranscript) | components/SummaryCard | feedback_widgets.dart `FeedbackSummaryCard` | PRESENT | |
 | Analytics | — | — | N/A | |
 
-Tally: PRESENT 34 · PARTIAL 3 · MISSING 0 · N/A 7
+Tally (v3): PRESENT 37 · PARTIAL 0 · MISSING 0 · N/A 7  [v2: 34 · 3 · 0 · 7]
 
 ---
 
@@ -1281,30 +1307,30 @@ Tally: PRESENT 34 · PARTIAL 3 · MISSING 0 · N/A 7
 | Discussion GET/POST/PUT/DELETE + locks | Player discussion | PRESENT (tenants endpoint also ported, discussion_repository.dart:30) |
 | GET /badges/me (BadgePopup polling) | Learn tab BadgePopup | PRESENT (v2: badge_popup.dart) |
 
-
+v3: backend checklist re-grepped (simulations_repository.dart:27-187, simulation_transcript_repository.dart:59/88, ask_ai_chat_api.dart:34-36, courses_repository.dart:53-281); all PRESENT, no change.
 
 ### §2d Reviews (from reviews_and_components part A)
 
 ### Parity ledger — Reviews (Part A) and shared components (Part B)
 
-RN source of truth: `ally-platform/ally-mobile/src` at `7a8ce0c19` (only a release-bot version bump has landed in `ally-mobile` since). Flutter baseline (v2 re-audit, 2026-10-28): `ally-mobile-flutter` **`master` at 227db3a**, which includes `parity/reviews` (bb6ca2b) and the later parity/shell, live, data, i18n, callsummary and courses merges. Every row that was PARTIAL, MISSING or MERGED in v1 was re-read on master; about 10% of PRESENT rows were spot-checked (ActionsMenu, ConfirmationModal, Google/Apple login, start-simulation modals, DiscussionThread, SessionRatingTrigger/StarRating, ReviewTypeChip, RichText, A1.17, A3.6–A3.9) and no regressions were found.
+RN source of truth: `ally-platform/ally-mobile/src` at `7a8ce0c19` (only a release-bot version bump has landed in `ally-mobile` since). v3 baseline (2026-10-28): Flutter worktree `ally-mobile-flutter-wt-ledger` at **f770200** (v2 was 227db3a). Since v2: f87fa32 (review cover video, share args carry cover + description, details refetch), 41744fd (rn-emoji-keyboard port), a6d4e24 (SVG badge art, info.svg), 3e47357 (Search ResourceArticleCard + underline CustomTabs), 67e7051/64636fa (call-summary CustomDropdown + CustomSwitch), 05d78c1/aedd4b1 (RN toast host + getErrorDetails; no SnackBar left), 81622e1 (dead `app_chat_input.dart` / `emoji_insert_picker.dart` removed). v3 re-read every non-PRESENT row and spot-checked 60+ PRESENT rows against current code; verdicts are from code only.
 
-Status key: **PRESENT** = master has the behaviour (or the same behaviour under another name). **PARTIAL** = master has part of it (the Notes column says what is missing). **MISSING** = master has nothing. **N/A** = RN never renders it, or it is gated to dev builds. The v1 MERGED status no longer applies: every MERGED row was re-read on master and re-labelled.
+Status key: **PRESENT** = master has the behaviour (or the same behaviour under another name). **PARTIAL** = master has part of it (the Notes column says what is missing). **MISSING** = master has nothing. **N/A** = RN never renders it, or it is gated to dev builds. v3 adds **BLOCKED-EXTERNAL** (code present; needs credentials/admin config to work) and **DEVICE-CHECK** (code present; only provable on a device). PARTIAL/MISSING are true code gaps only.
 
 #### Tallies
 
-| Part | Rows | PRESENT | PARTIAL | MISSING | MERGED | N/A |
-|---|---|---|---|---|---|---|
-| A — Review screens + hooks | 77 | 69 | 5 | 1 | 0 | 2 |
-| B — Shared components (67 dirs; sub-components split into 72 rows) | 72 | 59 | 7 | 0 | 0 | 6 |
+| Part | Rows | PRESENT | PARTIAL | MISSING | BLOCKED-EXTERNAL | DEVICE-CHECK | N/A |
+|---|---|---|---|---|---|---|---|
+| A — Review screens + hooks | 77 | 72 [69] | 3 [5] | 0 [1] | 0 | 0 | 2 [2] |
+| B — Shared components (67 dirs; sub-components split into 72 rows) | 72 | 63 [59] | 0 [7] | 0 [0] | 2 [–] | 1 [–] | 6 [6] |
 
-v1 → v2: Reviews went 26/4/3/42 → 69/5/1/0 (PRESENT/PARTIAL/MISSING/MERGED); components 33/13/5/15 → 59/7/0/0. 71 status changes across both parts.
+v2 → v3 (v2 in brackets above): Reviews 69/5/1 → 72/3/0 (PRESENT/PARTIAL/MISSING); components 59/7/0 → 63/0/0 + 2 BLOCKED-EXTERNAL + 1 DEVICE-CHECK. 17 status changes (Reviews 7, components 10). Two Reviews rows moved PRESENT → PARTIAL on a new code finding (A4.1, A4.8: share screen treats every reviewId as edit-note), not a regression since v2.
 
 ---
 
 #### Part A — Review screens
 
-Flutter master files: `lib/features/reviews/presentation/{review_screen,review_card,review_widgets,review_details_screen,review_details_parts,review_conversation,review_comment_sheets,comment_list_controller,share_for_review_screen,review_note_callout,simulation_details_card,simulation_audio_player}.dart`, `lib/features/reviews/data/{review_api,reviews_repository,scribe_reviews_repository,review_models}.dart`.
+Flutter files (f770200): `lib/features/reviews/presentation/{review_screen,review_card,review_widgets,review_details_screen,review_details_parts,review_conversation,review_comment_sheets,comment_list_controller,share_for_review_screen,review_note_callout,simulation_details_card,simulation_audio_player,review_formatting}.dart`, `presentation/emoji_keyboard/{emoji_keyboard,emoji_keyboard_data}.dart`, `lib/features/reviews/data/{review_api,reviews_repository,scribe_reviews_repository,review_models}.dart`.
 `thread_detail_screen.dart` no longer exists on master.
 
 ##### A1. ReviewScreen (Review tab) — RN `screens/ReviewScreen/ReviewScreen.tsx`, `components/ReviewList.tsx`, `hooks/useReviews.ts`, `constants/reviews.ts`
@@ -1317,17 +1343,17 @@ Flutter master files: `lib/features/reviews/presentation/{review_screen,review_c
 | A1.4 | No-permission fallback | Neither permission → simulation list (`reviewTypeTabs[0] ?? SIMULATION`) | `features/reviews/presentation/review_screen.dart:94` `AppEmptyState` | PRESENT | |
 | A1.5 | BadgePopup | `isReviewerOnly(permissions) && <BadgePopup/>` on the Review tab | `core/navigation/app_shell_screen.dart:95-165` `BadgePopupHost` (Learn tab, and Review tab for `isReviewerOnly`); `features/achievements/presentation/badge_popup.dart` | PRESENT | v2: landed in a5d3ce7/557dc55. |
 | A1.6 | Read filter | All/Read/Unread pill `TabView tabWidthMode="content"` | `features/reviews/presentation/review_screen.dart:358` `_ContentWidthTabs` | PRESENT | |
-| A1.7 | Sort dropdown | `CustomDropdown alignModalRight`: Latest / Most viewed / Most commented | `features/reviews/presentation/review_screen.dart:439` `_SortDropdown` (right-aligned card) | PRESENT | |
+| A1.7 | Sort dropdown | `CustomDropdown alignModalRight`: Latest / Most viewed / Most commented | `features/reviews/presentation/review_screen.dart:452` `_SortDropdown` (right-aligned card) | PRESENT | v3: private port, not `core/widgets/custom_dropdown.dart`; behaviour matches. |
 | A1.8 | Filter/sort change | Resets offset, clears list, refetches | master: new family-provider key → refetch | PRESENT | |
 | A1.9 | Pagination | `useReviews` LIMIT 10, `onEndReached` 0.5, `hasMore = page==10 && offset+len<count` | `features/reviews/presentation/review_screen.dart:192,235` (10/page, `hasMore` as RN, scroll threshold 0.5 at :259); `data/reviews_repository.dart:26-37` + `scribe_reviews_repository.dart:22-33` send `order: DESC` | PRESENT | `languageCode` injected for `getReviews` by `core/network/language_code_interceptor.dart:40`. |
 | A1.10 | Pull-to-refresh | `FlatList refreshing/onRefresh` | `features/reviews/presentation/review_screen.dart:305` `RefreshIndicator` | PRESENT | |
 | A1.11 | Refresh on re-focus | `useFocusEffect` → `refresh()` on every return after the first | `features/reviews/presentation/review_screen.dart:271` `ScreenFocusListener(onFocus: _fetch(reset: true))` | PRESENT | v2: landed in 023b77c. |
 | A1.12 | Loading state | Footer `ActivityIndicator` while loading/fetching/hasMore | `features/reviews/presentation/review_screen.dart` footer spinner | PRESENT | |
 | A1.13 | Empty state | `EmptyState` icon `EmptyReviewIcon` + `review.empty.title` + `review.empty.description` | `features/reviews/presentation/review_screen.dart:325` `AppEmptyState(emptyReviews.svg, title, description)` | PRESENT | |
-| A1.14 | Error state | `showToast(review.error.title,'error')`; list stays | `features/reviews/presentation/review_screen.dart:241` SnackBar `review.error.title` | PRESENT | Toast styling: see Toast row (B). |
+| A1.14 | Error state | `showToast(review.error.title,'error')`; list stays | `features/reviews/presentation/review_screen.dart:243` `showToast(review.error.title, type: ToastType.error)` | PRESENT | v3: RN-styled error toast (aedd4b1). |
 | A1.15 | Navigation → details | `REVIEW_DETAILS` or `SCRIBE_REVIEW_DETAILS` `{reviewId}` | `/reviews/:id` (+ `extra: ReviewType.scribe`) | PRESENT | Master's simulation path pushes without `extra` (defaults to simulation, fine). |
 | A1.16 | Mark-as-read timing | Not on tap; details screen marks read after 10 s | `features/reviews/presentation/review_details_screen.dart:81` 10 s `_markReadTimer`; list tap is a plain push (`review_screen.dart:252`) | PRESENT | |
-| A1.17 | Unread dot on Review tab | `TabNavigator` sums sim + scribe unread counts | `app_shell_screen.dart:100` → `unreadReviewCountProvider` (`data/reviews_repository.dart:131`) sums sim + scribe counts, each asked only of users with the matching permission | PRESENT | v2: scribe count now included. Not refreshed after mark-read, which matches RN (no tag invalidates `UnreadReviewCount`). |
+| A1.17 | Unread dot on Review tab | `TabNavigator` sums sim + scribe unread counts | `app_shell_screen.dart:100` → `unreadReviewCountProvider` (`data/reviews_repository.dart:131`) sums sim + scribe counts, each asked only of users with the matching permission | PRESENT | v2: scribe count now included. v3: now also invalidated after mark-read (`review_details_screen.dart:93`) and on list re-focus (`review_screen.dart:277`) — fresher than RN, harmless. |
 | A1.18 | Analytics | None in RN review screens/hooks (grep: no analytics/logEvent) | — | N/A | |
 
 ##### A2. ReviewCard (list item) — RN `ReviewScreen/components/ReviewCard.tsx`, `ExpandedComments.tsx`, `ReactionsCount.tsx`
@@ -1338,7 +1364,7 @@ Flutter master files: `lib/features/reviews/presentation/{review_screen,review_c
 | A2.2 | Note | Full note text | `review_card.dart` | PRESENT | |
 | A2.3 | Simulation body | Date&time / Duration rows, then `SimulationDetailsCard` (cover, chip, title, plain-text description with View more) | `review_card.dart` + `simulation_details_card.dart` | PRESENT | |
 | A2.4 | Scribe body | `SimulationDetailsCard` titled `summaryName`, Date/Duration rows inside | `review_card.dart` | PRESENT | |
-| A2.5 | Cover video | `SimulationDetailsCard` plays `coverVideoUrl` via `VideoPreview` | `features/reviews/presentation/simulation_details_card.dart:43` `TODO(video-preview)`; `review_card.dart:178` passes `coverVideoUrl` but it is ignored | MISSING | `core/widgets/cover_video_preview.dart` exists but isn't used here. Same gap as VideoPreview (B). |
+| A2.5 | Cover video | `SimulationDetailsCard` plays `coverVideoUrl` via `VideoPreview` | `features/reviews/presentation/simulation_details_card.dart:71-73` `CoverVideoPreview` (image as thumbnail/fallback); `review_card.dart:178` passes `coverVideoUrl` | PRESENT | v3: MISSING → PRESENT (f87fa32). |
 | A2.6 | Audio player | `SimulationAudioPlayer` when sim review has `audioUrl` | `simulation_audio_player.dart` | PRESENT | |
 | A2.7 | Reactions summary | `ReactionsCount`: top-3 emoji bubbles overlapped + `pluralize(n,'reaction')` → `REACTIONS {reviewId, reviewType}` | `features/reviews/presentation/review_card.dart:212` `ReactionsCount` (`review_widgets.dart:647`, top-3 bubbles) | PRESENT | |
 | A2.8 | Comment-count toggle | Tap → fetch general-comments overview (offset 0, limit 2) once, expand inline; tap again collapses; 0 comments = no-op | `features/reviews/presentation/review_card.dart:87` `_toggleComments` | PRESENT | |
@@ -1352,30 +1378,30 @@ Master `review_details_screen.dart` now follows the RN layout: back arrow + `Rev
 | # | Sub-feature | RN behaviour | Flutter | Status | Notes |
 |---|---|---|---|---|---|
 | A3.1 | Data source per type | `ReviewApiProvider` (simulationApiHooks / scribeApiHooks) | `features/reviews/data/review_api.dart` `ReviewApi` keyed by `ReviewType` | PRESENT | |
-| A3.2 | Review fetch | `useGetReviewByIdQuery` refetchOnMount/Focus/Reconnect | `data/reviews_repository.dart:152` `reviewDetailProvider` is `autoDispose` (fresh fetch on every open, 1c7e502) | PARTIAL | No refetch on app foreground/reconnect (RN `refetchOnFocus/Reconnect`), and returning from edit-note doesn't invalidate it (RN `updateReviewStatus` invalidates `ReviewDetails`; `review_details_screen.dart:273` `_editNote` neither awaits nor refreshes), so the edited note shows stale until the screen is reopened. |
+| A3.2 | Review fetch | `useGetReviewByIdQuery` refetchOnMount/Focus/Reconnect | `data/reviews_repository.dart` `reviewDetailProvider` autoDispose (fresh per open); foreground `review_details_screen.dart:107-114` `didChangeAppLifecycleState`; reconnect `:318-320` (`isOfflineProvider`); after edit-note `:298-312` (`.then(_refreshReview)`) | PRESENT | v3: PARTIAL → PRESENT (f87fa32). |
 | A3.3 | Mark read after 10 s | `setTimeout(markXReviewAsRead, 10000)`, cleared on unmount | `features/reviews/presentation/review_details_screen.dart:81` `_markReadTimer` 10 s, cancelled in dispose | PRESENT | |
-| A3.4 | Header | Back arrow + `ReviewTranscriptHeader` (type chip, title, help icon → scenario details modal (sim), "By avatar name • date • Duration") over a lightGray7 rule | `features/reviews/presentation/review_details_parts.dart:23` `ReviewTranscriptHeader` + `:144` `_ScenarioDetailsDialog` | PARTIAL | Only the dialog's cover video is missing (image shown; `:142` "where the shared video preview plugs in"). Same gap as VideoPreview (B). |
+| A3.4 | Header | Back arrow + `ReviewTranscriptHeader` (type chip, title, help icon → scenario details modal (sim), "By avatar name • date • Duration") over a lightGray7 rule | `features/reviews/presentation/review_details_parts.dart:24` `ReviewTranscriptHeader`; help icon `:89-101` → `simulations/presentation/simulation_info_modal.dart` (`CoverVideoPreview` when `coverVideoUrl`) | PRESENT | v3: PARTIAL → PRESENT; dialog now plays cover video (f87fa32). |
 | A3.5 | Scribe title fallback | `summaryName` or `review.details.callTitle {id}` | `features/reviews/presentation/review_details_screen.dart:424-426` | PRESENT | |
 | A3.6 | Transcription disclaimer | Simulation only: `transcription.accuracyDisclaimer` | master + branch | PRESENT | |
 | A3.7 | Audio player header | `SimulationAudioPlayer` as list header (sim with audioUrl), no transcript sync | master + branch | PRESENT | |
 | A3.8 | ReviewNote | Orange callout "NOTE"; edit icon when the user can edit; "+" add-note button when note is empty and editable; hidden when no note and not editable | `features/reviews/presentation/review_note_callout.dart` (edit icon `editSquare.svg` :82; "+" add-note :57) | PRESENT | |
 | A3.9 | Edit-note gate | Owner && not HIDDEN && created < 10 min (`isMinutesPassed`) | master `_isMinutesPassed` + owner + !private | PRESENT | |
-| A3.10 | Edit-note navigation | → `SHARE_SIMULATION`/`SHARE_CALL_LOG` with `isEditNote`, `note`, scenario/session context (cover, title, description, createdAt, duration) | `features/reviews/presentation/review_details_screen.dart:273` `_editNote` passes title/date/duration | PARTIAL | Cover image and description never reach the share screen: `ShareForReviewArgs` (`core/routing/app_router.dart:50`) has no cover/description fields and the route (`:333`) doesn't forward them. Same fix as A4.3. |
+| A3.10 | Edit-note navigation | → `SHARE_SIMULATION`/`SHARE_CALL_LOG` with `isEditNote`, `note`, scenario/session context (cover, title, description, createdAt, duration) | `features/reviews/presentation/review_details_screen.dart:284-313` `_editNote` pushes `ShareSimulationForReviewArgs` (cover image/video, description) for sims; route `core/routing/app_router.dart:66,348-373` forwards them | PRESENT | v3: PARTIAL → PRESENT (f87fa32). Scribe title fallback nit tracked in A4.3. |
 | A3.11 | Transcript (Conversation) | Paged 10 messages, de-duped, "mm:ss Speaker: text"; owner name for learner side; pull-to-refresh; footer spinner while loading more | `features/reviews/presentation/review_conversation.dart:53` `TranscriptMessageRow` + paging `review_details_screen.dart:101` (10/page, de-duped) | PRESENT | |
-| A3.12 | Comment from text selection | `isSelectable = !isPrivate && canEditThread`; native selection menu "Add comment" → `CommentInput` sheet → POST `{messageId, selection{start,end,text}, content}`; new thread inserted locally | `features/reviews/presentation/review_conversation.dart:204` `_AddCommentMenu` → `review_comment_sheets.dart:886` `_CommentInputSheet`; gate `review_details_screen.dart:362` | PRESENT | |
-| A3.13 | Commented-range highlight + tap | `splitByCommentRanges` amber highlight; tap → `MessageThreadsBottomSheet` (only if `canViewThreads`, not while composing) | `features/reviews/presentation/review_details_screen.dart:479` `onThreadsTap` → `MessageThreadsSheetPage` | PRESENT | |
-| A3.14 | General comments footer | `GeneralCommentsSection` once all transcript pages load: "Comments", own avatar + "Add a comment" input + send; list (20/page, "Load More"); reply → ReplyBottomSheet; inline edit within 10 min; delete with confirmation; hide/unhide (review owner); emoji reactions | `features/reviews/presentation/review_details_parts.dart:263` `GeneralCommentsSection` + `comment_list_controller.dart` | PRESENT | |
-| A3.15 | InteractionsBar (floating) | Bottom pill: Share switch (sim owners with EDIT perm), comment button + count → ThreadsBottomSheet (if `canViewThreads`), own emoji reaction on the review (`myReaction`), divider, ReactionsCount | `features/reviews/presentation/review_details_parts.dart:519` `InteractionsBar` | PRESENT | |
-| A3.16 | Privacy toggle | `useToggleReviewPrivacy`: on→IN_REVIEW, off→HIDDEN; toast success/error; sim: in InteractionsBar; scribe: in header (`toggleInHeader`); owner + `EDIT_*_REVIEW` only | `features/reviews/presentation/review_details_screen.dart` — sim in `InteractionsBar`, scribe in the header (`:344`); `call_summary_screen.dart`, `simulation_feedback_screen.dart` | PRESENT | Placement now matches RN. |
+| A3.12 | Comment from text selection | `isSelectable = !isPrivate && canEditThread`; native selection menu "Add comment" → `CommentInput` sheet → POST `{messageId, selection{start,end,text}, content}`; new thread inserted locally | `features/reviews/presentation/review_conversation.dart:204` `_AddCommentMenu` → `review_comment_sheets.dart:886` `_CommentInputSheet`; gate `review_details_screen.dart:392` | PRESENT | |
+| A3.13 | Commented-range highlight + tap | `splitByCommentRanges` amber highlight; tap → `MessageThreadsBottomSheet` (only if `canViewThreads`, not while composing) | `features/reviews/presentation/review_details_screen.dart:511` `onThreadsTap` → `MessageThreadsSheetPage` | PRESENT | |
+| A3.14 | General comments footer | `GeneralCommentsSection` once all transcript pages load: "Comments", own avatar + "Add a comment" input + send; list (20/page, "Load More"); reply → ReplyBottomSheet; inline edit within 10 min; delete with confirmation; hide/unhide (review owner); emoji reactions | `features/reviews/presentation/review_details_parts.dart:149` `GeneralCommentsSection` (Load More `:351`) + `comment_list_controller.dart` | PRESENT | |
+| A3.15 | InteractionsBar (floating) | Bottom pill: Share switch (sim owners with EDIT perm), comment button + count → ThreadsBottomSheet (if `canViewThreads`), own emoji reaction on the review (`myReaction`), divider, ReactionsCount | `features/reviews/presentation/review_details_parts.dart:405` `InteractionsBar` | PRESENT | |
+| A3.16 | Privacy toggle | `useToggleReviewPrivacy`: on→IN_REVIEW, off→HIDDEN; toast success/error; sim: in InteractionsBar; scribe: in header (`toggleInHeader`); owner + `EDIT_*_REVIEW` only | `features/reviews/presentation/review_details_screen.dart` — sim in `InteractionsBar`, scribe in the header (`:374`), toasts `:187-189`; `call_summary_screen.dart`, `simulation_feedback_screen.dart` | PRESENT | Placement now matches RN. |
 | A3.17 | Threads sheet | `ThreadsBottomSheet`: Inline / General tabs, thread cards (selected text, first comment faded, "N more comments") → CommentThreadBottomSheet; General list + footer input | `features/reviews/presentation/review_comment_sheets.dart:316` `_ThreadsPage` + `:479` `_GeneralList` | PRESENT | |
-| A3.18 | Comment thread view | `CommentThreadBottomSheet`: back header, comments with Reply/reactions/actions, "Add comment" footer hidden when private | `features/reviews/presentation/review_comment_sheets.dart:684` `_CommentThreadPage` | PRESENT | `thread_detail_screen.dart` is gone from master. |
-| A3.19 | Reply view | `ReplyBottomSheet`: original comment + indented replies + "Add reply" footer; deleting original goes back | `features/reviews/presentation/review_comment_sheets.dart:759` `_ReplyPage` | PRESENT | |
+| A3.18 | Comment thread view | `CommentThreadBottomSheet`: back header, comments with Reply/reactions/actions, "Add comment" footer hidden when private | `features/reviews/presentation/review_comment_sheets.dart:688` `_CommentThreadPage` | PRESENT | `thread_detail_screen.dart` is gone from master. |
+| A3.19 | Reply view | `ReplyBottomSheet`: original comment + indented replies + "Add reply" footer; deleting original goes back | `features/reviews/presentation/review_comment_sheets.dart:763` `_ReplyPage` | PRESENT | |
 | A3.20 | Sheet back-stack | `useReviewComments`/`replySourceRef`: back returns to the originating sheet (threads list, message threads, or closes for inline-general) | `features/reviews/presentation/review_comment_sheets.dart:51` `ReviewSheetPage` stack inside one sheet | PRESENT | |
 | A3.21 | Android hardware back | `useHardwareBackPressHandler` closes the top sheet first, then `goBack` | `features/reviews/presentation/review_comment_sheets.dart` (modal route; system back pops) | PRESENT | |
-| A3.22 | Local thread-sync | `handleThreadCommentChange` add/edit/delete/hide mirrored into transcript; a thread with no comments left disappears (un-highlights) | `features/reviews/presentation/review_details_screen.dart:241` (RN `handleThreadCommentChange`), `comment_list_controller.dart:8` | PRESENT | |
-| A3.23 | Gates | sim: `VIEW_SIMULATION_REVIEW_THREADS` (threads), `EDIT_SIMULATION_REVIEW_THREAD` (selection), `EDIT_SIMULATION_REVIEW` (privacy); scribe: threads/selection always on, `EDIT_SCRIBE_REVIEW` | `features/reviews/presentation/review_details_screen.dart:315-316` `canViewThreads`/`canEditThread` | PRESENT | |
-| A3.24 | Private-review restrictions | isPrivate: no selection, no actions menu, no reply button, reaction disabled on anchor, footers hidden | `features/reviews/presentation/review_details_screen.dart:317-362` `isPrivate` threaded through | PRESENT | |
-| A3.25 | Loading / error | `isLoading` spinner; `isError` → spinner (RN shows a spinner on error too) | master: spinner / "loadReviewFailed: $error" text; branch: same + RefreshIndicator | PRESENT | Flutter's error text is more informative than RN's. |
+| A3.22 | Local thread-sync | `handleThreadCommentChange` add/edit/delete/hide mirrored into transcript; a thread with no comments left disappears (un-highlights) | `features/reviews/presentation/review_details_screen.dart:255` (RN `handleThreadCommentChange`), `comment_list_controller.dart:8` | PRESENT | |
+| A3.23 | Gates | sim: `VIEW_SIMULATION_REVIEW_THREADS` (threads), `EDIT_SIMULATION_REVIEW_THREAD` (selection), `EDIT_SIMULATION_REVIEW` (privacy); scribe: threads/selection always on, `EDIT_SCRIBE_REVIEW` | `features/reviews/presentation/review_details_screen.dart:342-346` `canViewThreads`/`canEditThread` | PRESENT | |
+| A3.24 | Private-review restrictions | isPrivate: no selection, no actions menu, no reply button, reaction disabled on anchor, footers hidden | `features/reviews/presentation/review_details_screen.dart:347-392` `isPrivate` threaded through | PRESENT | |
+| A3.25 | Loading / error | `isLoading` spinner; `isError` → spinner (RN shows a spinner on error too) | `review_details_screen.dart:328-340` spinner, else `review.error.loadReviewFailed` text | PRESENT | v3: raw exception text removed (930992c); copy is a Flutter-only i18n key (§i18n). |
 | A3.26 | Delete confirmation | `ConfirmationModal` destructive (threadsBottomSheet.deleteConfirmation.*) | `features/reviews/presentation/review_details_parts.dart`, `review_comment_sheets.dart` `ConfirmationModal.show` | PRESENT | |
 
 ##### A4. ShareForReviewScreen — RN `ShareSimulationScreen.tsx`, `ShareCallLogScreen.tsx`, `components/ShareReviewLayout.tsx`, `hooks/useShareScreenLogic.ts`
@@ -1384,15 +1410,15 @@ Flutter: one `share_for_review_screen.dart` (`isScribe` switch) at `/share-for-r
 
 | # | Sub-feature | RN behaviour | Flutter | Status | Notes |
 |---|---|---|---|---|---|
-| A4.1 | Header | Close (X) + title: edit → `review.details.editNote`; scribe share → `review.details.shareModalHeader`; sim share → `simulationPage.shareScreenTitle` | `features/reviews/presentation/share_for_review_screen.dart:177-195` (close.svg X + editNote / shareModalHeader / shareScreenTitle) | PRESENT | |
-| A4.2 | Note input | `LineTextInput` placeholder `review.addNotePlaceholder`, maxLength 250, counter `n/250` (grapheme count) | `features/reviews/presentation/share_for_review_screen.dart:107,227` (`characters.length`) | PRESENT | |
-| A4.3 | Context card | Sim: Date&time/Duration rows + `SimulationDetailsCard` (cover image/video, title, description); scribe: card titled session name with rows inside | `features/reviews/presentation/share_for_review_screen.dart:232` `SimulationDetailsCard`; sim caller `simulation_feedback_screen.dart:357` passes title/date/duration | PARTIAL | Cover image and description are never supplied (the screen accepts `contextCoverImageUrl`/`contextDescription`, but `ShareForReviewArgs` at `app_router.dart:50` has no such fields and the route doesn't forward them); no cover video. |
-| A4.4 | Emoji picker | `rn-emoji-keyboard` (search, recents, multi-select), appended to note while under limit | `core/widgets/emoji_insert_picker.dart` (fixed grid, no search/recents) | PARTIAL | Scoped down by design (no search, recents or multi-select). Product decision whether to accept. |
+| A4.1 | Header | Close (X) + title: edit → `review.details.editNote`; scribe share → `review.details.shareModalHeader`; sim share → `simulationPage.shareScreenTitle`. `isEditNote` comes only from the edit-note callers (RN `SimulationReviewDetailsScreen.tsx:99-114`, `ScribeReviewDetailsScreen.tsx:96-110`); CallSummary/SimFeedback pass `reviewId` without it (`CallSummaryScreen.tsx:170-181`, `SimulationFeedbackScreen.tsx:396-401`) | `share_for_review_screen.dart:171-174` title/label; `core/routing/app_router.dart:365` `isEditNote: args?.reviewId != null` | PARTIAL | v3: PRESENT → PARTIAL (new finding). Re-sharing an existing review from Call summary (`call_summary_screen.dart:371-384`, recent review) or Sim feedback (`simulation_feedback_screen.dart:359-372`, `summary.reviewId`) shows "Edit note" + "Save" instead of the share title + "Share". Fix: carry an explicit `isEditNote` in the args. |
+| A4.2 | Note input | `LineTextInput` placeholder `review.addNotePlaceholder`, maxLength 250, counter `n/250` (grapheme count) | `features/reviews/presentation/share_for_review_screen.dart:106,206,222` (formatter 250, emoji gate on code points, `characters.length` counter) | PRESENT | |
+| A4.3 | Context card | Sim: Date&time/Duration rows + `SimulationDetailsCard` (cover image/video, title, description); scribe: card titled session name with rows inside (`ShareCallLogScreen` shows `sessionData.duration` preformatted; edit-note title fallback `'Session Review'`) | `share_for_review_screen.dart:224-237` `SimulationDetailsCard`; sim cover/video/description arrive via `ShareSimulationForReviewArgs` (`app_router.dart:66,370-372`) | PARTIAL | v3: cover/description gap closed (f87fa32). New: scribe share from Call summary shows Duration "-": `call_summary_screen.dart:382` passes an already formatted string (`formatReviewDuration(...)`) and `share_for_review_screen.dart:166` formats it again (`int.tryParse` fails → "-", `review_formatting.dart:63-66`). Nit: scribe edit-note title falls back to "-" (`review_details_screen.dart:293`, `simulation_details_card.dart:143`) where RN uses "Session Review". |
+| A4.4 | Emoji picker | `rn-emoji-keyboard` (search, recents, multi-select), appended to note while under limit | `features/reviews/presentation/emoji_keyboard/emoji_keyboard.dart` `EmojiKeyboard.show(allowMultipleSelections, enableRecentlyUsed, enableSearchBar, hideHeader)` from `share_for_review_screen.dart:245-252` | PRESENT | v3: PARTIAL (product call) → PRESENT; full port incl. categories + skin tones (41744fd). Recents are in-memory, as RN default. |
 | A4.5 | Submit button | `Button` Share / Save | `AppButton` | PRESENT | |
-| A4.6 | Create (sim) | `createReview {scenarioSessionId, note}` → toast `callFeedback.sharedForReview` → goBack | `features/reviews/presentation/share_for_review_screen.dart:150-151` toast + `pop` | PRESENT | |
-| A4.7 | Create (scribe) | `createScribeReview` → toast → `replace(SCRIBE_REVIEW_DETAILS, newId)` | `features/reviews/presentation/share_for_review_screen.dart:137-138` toast + `pushReplacement(/reviews/:id)` | PRESENT | |
-| A4.8 | Update (reviewId present) | `updateStatus {IN_REVIEW, note}` → toast (share: sharedForReview; edit: editNoteSuccess) → goBack | `features/reviews/presentation/share_for_review_screen.dart:150-151` | PRESENT | |
-| A4.9 | Error handling | Toast server `data.message` (and goBack) or `callFeedback.issues.editNoteExpired` | `features/reviews/presentation/share_for_review_screen.dart:157-158` server message or `editNoteExpired`, pop on server message | PRESENT | |
+| A4.6 | Create (sim) | `createReview {scenarioSessionId, note}` → toast `callFeedback.sharedForReview` → goBack | `features/reviews/presentation/share_for_review_screen.dart:145-146` toast + `pop` | PRESENT | |
+| A4.7 | Create (scribe) | `createScribeReview` → toast → `replace(SCRIBE_REVIEW_DETAILS, newId)` | `features/reviews/presentation/share_for_review_screen.dart:132-133` toast + `pushReplacement(/reviews/:id)` | PRESENT | |
+| A4.8 | Update (reviewId present) | `updateStatus {IN_REVIEW, note}` → toast (share: sharedForReview; edit: editNoteSuccess) → goBack | `features/reviews/presentation/share_for_review_screen.dart:138-146` | PARTIAL | v3: PRESENT → PARTIAL (new finding, same root as A4.1): toast keyed on `isEditNote`, which the route derives from `reviewId` (`app_router.dart:365`), so a re-share toasts `editNoteSuccess` instead of `sharedForReview`. API call is the same. |
+| A4.9 | Error handling | Toast server `data.message` (and goBack) or `callFeedback.issues.editNoteExpired` | `features/reviews/presentation/share_for_review_screen.dart:147-153` (error toast) server message or `editNoteExpired`, pop on server message | PRESENT | |
 | A4.10 | Analytics | None | — | N/A | |
 
 ##### A5. Review hooks / context
@@ -1410,7 +1436,7 @@ Flutter: one `share_for_review_screen.dart` (`isScribe` switch) at `/share-for-r
 | A5.9 | `useReactions` | Count summary + paged (20) list per emoji filter | `features/reactions/presentation/reactions_screen.dart` | PRESENT | Branch f5fb4f0 restyles it. |
 | A5.10 | `useToggleReviewPrivacy` | IN_REVIEW/HIDDEN + toasts | master `review_details_screen.dart` `_togglePrivate`; `call_summary_screen.dart` `_handleShareToggle`; `simulation_feedback_screen.dart` `_onShareToggled` | PRESENT | |
 | A5.11 | `useHideReviewDetails` | Private review shows the "view review" button only if it has threads or reactions | `call_summary_screen.dart` and `simulation_feedback_screen.dart` (doc-commented as this gate) | PRESENT | |
-| A5.12 | `useShareScreenLogic` | Title/label/submit branching, 250 limit, emoji append | `features/reviews/presentation/share_for_review_screen.dart` | PRESENT | Context-card data gap is A4.3. |
+| A5.12 | `useShareScreenLogic` | Title/label/submit branching, 250 limit, emoji append | `features/reviews/presentation/share_for_review_screen.dart` | PRESENT | v3: emoji append now via `EmojiKeyboard`; open issues are A4.1/A4.3/A4.8. |
 | A5.13 | `useReviewComments` (sheet state machine) | 4 sheets with back-stack | `features/reviews/presentation/review_comment_sheets.dart` | PRESENT | |
 
 ---
@@ -1427,12 +1453,12 @@ RN call sites were found by grepping `<Component` outside `__tests__`. Each Flut
 | RN component | RN file(s) | RN call sites | Flutter equivalent | Status | Notes |
 |---|---|---|---|---|---|
 | ActionsMenu | `ActionsMenu/ActionsMenu.tsx` | ReviewComment (Edit/Delete/Hide), CallLog header (Archive) | `call_log_screen.dart:556` `_ActionsMenu`; `features/reviews/presentation/review_widgets.dart:240` `ReviewActionsMenu` | PRESENT | |
-| BadgePopup | `BadgePopup/BadgePopup.tsx` + `hooks/useBadgePopup` | ReviewScreen (reviewer-only), SimulationsScreen | `features/achievements/presentation/badge_popup.dart` `BadgePopupHost` (SVG/bitmap badge art, first-badge confetti), mounted in `core/navigation/app_shell_screen.dart:165` | PRESENT | v2: a5d3ce7 + 557dc55. |
-| BottomSheet | `BottomSheet/BottomSheet.tsx` (gorhom: snapPoints, handle 80x4, 16 radius, backdrop) | CommentInput, Comment/Reply/Threads/MessageThreads sheets, LanguageSelectorSheet, CallLog, CourseItemPlayer, CourseOverview, ProfileSettings | `showModalBottomSheet` in `language_selector_sheet.dart`, `call_log_filter_sheet.dart`, `course_language_sheet.dart`, `profile_image_options_sheet.dart`, `emoji_insert_picker.dart`; branch `ReviewCommentSheet` (80% snap, 80x4 handle) | PRESENT | No shared styled wrapper; reviews use `ReviewCommentSheet` (80% snap, 80x4 handle); others vary per call site. |
+| BadgePopup | `BadgePopup/BadgePopup.tsx` + `hooks/useBadgePopup` | ReviewScreen (reviewer-only), SimulationsScreen | `features/achievements/presentation/badge_popup.dart` `BadgePopupHost` (art via `badge_network_image.dart` `BadgeNetworkImage` at `:256`, first-badge confetti), mounted in `core/navigation/app_shell_screen.dart:165` | PRESENT | v2: a5d3ce7 + 557dc55. |
+| BottomSheet | `BottomSheet/BottomSheet.tsx` (gorhom: snapPoints, handle 80x4, 16 radius, backdrop) | CommentInput, Comment/Reply/Threads/MessageThreads sheets, LanguageSelectorSheet, CallLog, CourseItemPlayer, CourseOverview, ProfileSettings | `showModalBottomSheet` in `language_selector_sheet.dart`, `call_log_filter_sheet.dart`, `courses/presentation/course_bottom_sheet.dart`, `profile_image_options_sheet.dart`, `review_comment_sheets.dart` (`ReviewCommentSheet`, 80% snap, 80x4 handle) | PRESENT | v3: `emoji_insert_picker.dart` removed (81622e1); emoji keyboard uses its own sheet. No shared styled wrapper; reviews use `ReviewCommentSheet` (80% snap, 80x4 handle); others vary per call site. |
 | BottomSheetBackHeader | `BottomSheetBackHeader/BottomSheetBackHeader.tsx` | CommentThreadBottomSheet, ReplyBottomSheet | `features/reviews/presentation/review_widgets.dart:896` `ReviewSheetBackHeader` | PRESENT | |
 | Button | `Button/Button.tsx` | ~22 screens/components | `core/widgets/app_button.dart` `AppButton` | PRESENT | |
-| GoogleLoginButton | `Button/GoogleLoginButton.tsx` | SplashScreen | `features/auth/presentation/login_screen.dart` (`_signInWithGoogle`) | PRESENT | Disabled when client id unconfigured. |
-| AppleLoginButton | `Button/AppleLoginButton.tsx` | SplashScreen (iOS) | `login_screen.dart` (`sign_in_with_apple`) | PRESENT | |
+| GoogleLoginButton | `Button/GoogleLoginButton.tsx` | SplashScreen | `features/auth/presentation/login_screen.dart:166-169` (`_signInWithGoogle`) | BLOCKED-EXTERNAL | v3: code wired; `AppConfig.googleWebClientId`/`googleIosClientId` default to `''` (`core/config/app_config.dart:81-92`) and no `google-services.json` is in the repo — needs the OAuth clients for the store bundle id (§10). |
+| AppleLoginButton | `Button/AppleLoginButton.tsx` | SplashScreen (iOS) | `login_screen.dart` (`sign_in_with_apple`); entitlement `ios/Runner/Runner.entitlements` | DEVICE-CHECK | v3: code + entitlement present; sign-in only provable on a device with an Apple ID. |
 | ButtonGroup / ButtonItem | `ButtonGroup/ButtonGroup.tsx`, `ButtonItem.tsx` | only via CollapsibleButtonGroup | see next row | PRESENT | Internal to CollapsibleButtonGroup. |
 | CollapsibleButtonGroup | `ButtonGroup/CollapsibleButtonGroup.tsx` | ListeningScreen controls, SimulationAssistantScreen controls | `roleplay_voice_screen.dart:785` `_SimulationControls`; `features/scribe/presentation/listening_controls.dart:20` `ListeningControls` (collapsible dark bar, chevronDown.svg, expanded by default) | PRESENT | v2: Scribe/Conference listening ported in d4ae9eb. |
 | Carousel / Pagination / SecurityCarousel | `Carousel/*.tsx` | none rendered (SplashScreen only mocks it in tests; configs live in `constants/general.ts`) | — | N/A | Dead in RN. |
@@ -1440,7 +1466,7 @@ RN call sites were found by grepping `<Component` outside `__tests__`. Each Flut
 | Checkbox | `Checkbox/Checkbox.tsx` | SplashScreen TermsAndAgreementModal | `features/auth/presentation/terms_and_agreement_modal.dart` `_TermsCheckbox` | PRESENT | |
 | SessionChecklist | `Checklist/SessionChecklist.tsx` | SimulationAssistantScreen | `features/roleplay/presentation/checklist_panel.dart` | PRESENT | Restyled in the parity/feedback merge. |
 | ChipGroup / Chip | `ChipGroup/*.tsx` | FeedbackPopup (rating tags + FEEDBACK_ISSUE_OPTIONS chips) | `feedback_popup.dart:172` issue chips (`feedbackIssueOptions`); call summary passes `showChips: true` (`call_summary_screen.dart:706`) | PRESENT | v2: call summary now uses the shared `FeedbackPopup`. |
-| CircularProgress | `CircularProgress/CircularProgress.tsx` | LevelIndicator, CourseItemPlayer, CourseOverview, CourseProgress, SimulationsScreen | `simulations/presentation/widgets/circular_progress.dart` (used by `course_detail_screen.dart`, `simulations_screen.dart`) | PRESENT | LevelIndicator and course-progress rings use Material `CircularProgressIndicator` (no 1200 ms ease-out animation). |
+| CircularProgress | `CircularProgress/CircularProgress.tsx` | LevelIndicator, CourseItemPlayer, CourseOverview, CourseProgress, SimulationsScreen | `simulations/presentation/widgets/circular_progress.dart` (used by `course_detail_screen.dart`, `course_progress_body.dart`, `quiz/quiz_player.dart`, `simulations_screen.dart`) | PRESENT | v3: course-progress rings now animate; only LevelIndicator still uses Material `CircularProgressIndicator` (`core/widgets/level_indicator.dart:59`, no 1200 ms animation; cosmetic). |
 | CommentBottomSheetFooter | `CommentBottomSheetFooter/*.tsx` (via `hooks/useStableFooterRenderer`) | Comment/Reply/Threads sheets | `review_widgets.dart:755` `CommentFooterInput` | PRESENT | |
 | CommentInput | `CommentInput/CommentInput.tsx` | ReviewDetails (after text selection) | `review_comment_sheets.dart:886` `_CommentInputSheet` | PRESENT | |
 | CommentThreadBottomSheet | `CommentThreadBottomSheet/*.tsx` | ReviewDetails | `review_comment_sheets.dart:684` `_CommentThreadPage` | PRESENT | |
@@ -1449,37 +1475,37 @@ RN call sites were found by grepping `<Component` outside `__tests__`. Each Flut
 | Conversation | `Conversation/Conversation.tsx` | ReviewDetails | `review_details_screen.dart` + `review_conversation.dart` | PRESENT | |
 | CustomLineChart | `CustomLineChart/CustomLineChart.tsx` | none (exported only) | — | N/A | Dead in RN. |
 | CustomModal | `CustomModal/CustomModal.tsx` (title, optional input, primary/secondary buttons) | CallSummary DeleteRenameModal (rename + delete), ProfileSettings (unsaved changes) | `features/calllog/presentation/call_summary_menu.dart:148` `CallSummaryTextModal` (rename + delete); ProfileSettings → `ConfirmationModal.show` | PRESENT | Delete is wired (`call_summary_actions.dart:98`) though, as in RN, the menu never opens it. |
-| CustomSwitch | `CustomSwitch/CustomSwitch.tsx` (32x18 pill) | InteractionsBar/ReviewTranscriptHeader, CallSummary, ProfileSettings, SimulationFeedback | `profile_settings_screen.dart` `RnCustomSwitch` (also used by simulation_feedback_screen); Material `Switch` themed to RN colours (`app_theme.dart switchTheme`) in call_summary and review_details; branch `ReviewSwitch` | PRESENT | Material Switch is larger than the 32x18 RN pill (cosmetic). |
-| CustomTabs | `CustomTabs/CustomTabs.tsx` (scrollable underline tabs, light/dark scheme) | SearchScreen, ListeningScreen resource search | Dark: `features/scribe/presentation/scribe_reference_search.dart:307`; Search tab: `search_screen.dart:300` `ChoiceChip` row | PARTIAL | v2: dark Listening variant ported (cd51b4d). Search tab still shows pill chips instead of RN's scrollable underline tabs. |
+| CustomSwitch | `CustomSwitch/CustomSwitch.tsx` (32x18 pill) | InteractionsBar/ReviewTranscriptHeader, CallSummary, ProfileSettings, SimulationFeedback | `profile_settings_screen.dart:570` `RnCustomSwitch` (ProfileSettings, `simulation_feedback_screen.dart:646`, `call_summary_header.dart:141`); `review_widgets.dart:606` `ReviewSwitch` (32x18 pill) in review header/InteractionsBar | PRESENT | v3: call summary moved to `RnCustomSwitch` (64636fa); no Material `Switch` left in lib/. |
+| CustomTabs | `CustomTabs/CustomTabs.tsx` (scrollable underline tabs, light/dark scheme) | SearchScreen, ListeningScreen resource search | Light: `features/search/presentation/search_screen.dart:390-410` `_CategoryTabs` (horizontal scroll, 2pt underline); dark: `features/scribe/presentation/scribe_reference_search.dart:307` | PRESENT | v3: PARTIAL → PRESENT (3e47357). |
 | DiscussionPost | `DiscussionPost/DiscussionPost.tsx` | DiscussionThread | `courses/presentation/discussion/discussion_post_tile.dart` | PRESENT | |
 | DiscussionThread | `DiscussionThread/DiscussionThread.tsx` | CourseItemPlayer | `courses/presentation/discussion/discussion_thread.dart` | PRESENT | |
-| Dropdown (CustomDropdown) | `Dropdown/Dropdown.tsx` | ReviewScreen sort, Leaderboard period, SimulationDetails language, SimPath modal language, RoleplayCasePlayer language, SimulationTranscript translation language, CallSummary custom fields, fieldRenderer | `core/widgets/custom_dropdown.dart` (review sort, leaderboard, transcript translation `simulation_transcript_tab.dart:547`); `scenario_language_dropdown.dart`; call summary custom fields `DropdownButtonFormField` (`call_summary_screen.dart:1554,1700,1718`) | PARTIAL | v2: translation-language dropdown landed (bc9381b). Remaining: call-summary custom-field dropdowns use Material `DropdownButtonFormField` styling, not RN CustomDropdown (cosmetic). |
+| Dropdown (CustomDropdown) | `Dropdown/Dropdown.tsx` | ReviewScreen sort, Leaderboard period, SimulationDetails language, SimPath modal language, RoleplayCasePlayer language, SimulationTranscript translation language, CallSummary custom fields, fieldRenderer | `core/widgets/custom_dropdown.dart` (leaderboard `leaderboard_screen.dart:299`, transcript translation `simulation_transcript_tab.dart:543`, call-summary custom fields `call_summary_screen.dart:1657-1683` `_SummaryDropdown`); review sort `review_screen.dart:452`; `scenario_language_dropdown.dart` (sim details, roleplay case player) | PRESENT | v3: PARTIAL (cosmetic) → PRESENT; `DropdownButtonFormField` gone (67e7051). |
 | DropdownMenu | `DropdownMenu/DropdownMenu.tsx` | only `SummaryDropdown` / `FeedbackDropdown`, which are exported but never rendered | — | N/A | Dead in RN. |
 | EmojiPicker | `EmojiPicker/EmojiPicker.tsx` (pill of platform emoji above icon; ADD/UPDATE/REMOVE) | ReviewComment, InteractionsBar | `review_widgets.dart:135` `ReviewEmojiPicker` (ADD/UPDATE/REMOVE) | PRESENT | |
 | EmptyState | `EmptyState/EmptyState.tsx` | CallLog, CaseDetails, CourseOverview, CourseProgress, ReviewScreen, SimPathDetails, SuspendedAccount, UserAnalytics | `core/widgets/app_empty_state.dart` | PRESENT | ReviewScreen now uses it (`review_screen.dart:94,325`). |
 | EmptyTranscript | `EmptyTranscript/EmptyTranscript.tsx` (icon + `transcription.empty`) | CallSummary transcript, SimulationFeedback transcript | `simulation_transcript_tab.dart` `_EmptyTranscript`; `features/calllog/presentation/call_transcript_tab.dart:114` `_EmptyTranscript` (`emptyTranscript.svg`) | PRESENT | |
-| ErrorBoundary | `ErrorBoundary/ErrorBoundary.tsx` (crashlytics.recordError + "Something went wrong" + Try again reset) | App.tsx root | `core/errors/error_boundary.dart` `AppErrorBoundary` (`main.dart:128`) + `core/errors/crash_reporting.dart` (`ErrorWidget.builder`, `FlutterError.onError` → `recordError`) | PRESENT | Crashlytics no-ops until Firebase native config (GoogleService-Info.plist / google-services.json) ships — credential item, see §10. |
+| ErrorBoundary | `ErrorBoundary/ErrorBoundary.tsx` (crashlytics.recordError + "Something went wrong" + Try again reset) | App.tsx root | `core/errors/error_boundary.dart` `AppErrorBoundary` (`main.dart:155`) + `core/errors/crash_reporting.dart` (`ErrorWidget.builder`, `FlutterError.onError` → `recordError`) | BLOCKED-EXTERNAL | v3: fallback UI present; crash reporting no-ops until Firebase native config (GoogleService-Info.plist / google-services.json — none in repo) ships (§10). |
 | FeedbackPopup | `FeedbackPopup/FeedbackPopup.tsx` | CallSummary, SimulationFeedback | `feedback_popup.dart` (SimFeedback + CallSummary `call_summary_screen.dart:702`) | PRESENT | |
-| ForceUpdateModal | `ForceUpdateModal/ForceUpdateModal.tsx` + `hooks/useForceUpdate` (`appConfigApi.getForceUpdateConfig.minimumSupportedVersion` vs app version) | SplashScreen | `core/app_update/force_update.dart` (`/app-version/{ios,android}` `minimumSupportedVersion`) + `force_update_modal.dart` `ForceUpdateGate` (`main.dart:132`, `forceUpdateAlert.svg`) | PRESENT | v2: 0885d07. Store URLs depend on final bundle id (product decision). |
+| ForceUpdateModal | `ForceUpdateModal/ForceUpdateModal.tsx` + `hooks/useForceUpdate` (`appConfigApi.getForceUpdateConfig.minimumSupportedVersion` vs app version) | SplashScreen | `core/app_update/force_update.dart` (`/app-version/{ios,android}` `minimumSupportedVersion`) + `force_update_modal.dart` `ForceUpdateGate` (`main.dart:159`, `forceUpdateAlert.svg`) | PRESENT | v3: store URLs (`force_update.dart:18-19`) equal RN `constants/general.ts:453-454`. |
 | IllustratedActionModal | `IllustratedActionModal/*.tsx` | SimulationDetails (ActiveSimulationModal), SimulationAssistant (EndingSoonModal) | `start_simulation/start_simulation_modals.dart` `ActiveSimulationModal`; `roleplay_voice_screen.dart` ending-soon state (`_showEndingSoon`) | PRESENT | |
 | IllustratedModal | `IllustratedModal/IllustratedModal.tsx` | CaseDetails/SimPath (no credits), Listening end-call, Logout, SimAssistant end, SimDetails | `core/widgets/illustrated_modal.dart` (drawer logout, call_log start, scribe end confirmation); `LowCreditsModal` in start_simulation_modals; roleplay `_ConfirmOverlay` | PRESENT | |
-| InfoTooltip | `InfoTooltip/InfoTooltip.tsx` | TabScreenHeader, Achievements, SimulationFeedback | `core/widgets/info_tooltip_icon.dart` (Material Tooltip, tap trigger) | PRESENT | Bubble styling differs from RN's walkthrough tooltip. |
+| InfoTooltip | `InfoTooltip/InfoTooltip.tsx` | TabScreenHeader, Achievements, SimulationFeedback (Debrief SupervisorNote) | `core/widgets/info_tooltip_icon.dart` (Material Tooltip, tap trigger, RN `info.svg` :27); supervisor note `simulations/presentation/widgets/feedback/supervisor_note.dart:91` | PRESENT | v3: icon now RN `info.svg` (a6d4e24). Bubble styling differs from RN's tooltip (cosmetic). |
 | LanguageSelectorSheet | `LanguageSelectorSheet/*.tsx` | ProfileSettings | `account/presentation/language_selector_sheet.dart` | PRESENT | |
 | LearningPathHeader / LearningPathListHeader / ProgressBar | `LearningPathDetails/*.tsx` | CaseDetails, CourseOverview, CourseProgress, SimPathDetails | `simulations/presentation/widgets/learning_path_widgets.dart` (`LearningPathHeader`, `LearningPathProgressBar`, list header); `learning_path_detail_view.dart` | PRESENT | |
 | LevelIndicator | `LevelIndicator/LevelIndicator.tsx` | ProgressHeaderWidget, ProgressScreen | `core/widgets/level_indicator.dart` | PRESENT | Uses `CircularProgressIndicator` (no animation). |
-| LineTextInput | `LineTextInput/LineTextInput.tsx` | CallLog, ShareForReview | `core/widgets/app_chat_input.dart` (send-button mode), `app_text_field.dart`, share screen TextField | PRESENT | |
+| LineTextInput | `LineTextInput/LineTextInput.tsx` | CallLog, ShareForReview | `core/widgets/app_text_field.dart:22` (hairline mode), share screen TextField `share_for_review_screen.dart:198-219` | PRESENT | v3: `app_chat_input.dart` deleted (81622e1, was dead). |
 | CallLogSkeleton | `LoadingSkeleton/CallLogSkeleton.tsx` | CallLog | `calllog/presentation/call_log_screen.dart` `_CallLogSkeleton` | PRESENT | |
 | SimulationsSkeleton | `LoadingSkeleton/SimulationsSkeleton.tsx` | SimulationsScreen | `simulations/presentation/widgets/simulations_skeleton.dart` | PRESENT | |
 | Message | `Message/Message.tsx` (timestamp + body row) | Conversation | `review_conversation.dart:53` `TranscriptMessageRow`; `simulation_transcript_tab.dart` `TranscriptItem` | PRESENT | |
 | MessageThreadsBottomSheet | `MessageThreadsBottomSheet/*.tsx` | ReviewDetails | `review_comment_sheets.dart:640` `_MessageThreadsPage` | PRESENT | |
-| NetworkImage | `NetworkImage/NetworkImage.tsx` (SvgUri → fetch+SvgXml fallback, spinner, error state) | BadgePopup, AchievementsScreen | `badge_popup.dart:312` `_BadgeImage` (SVG via flutter_svg, else bitmap); `achievements_screen.dart:271` `Image.network` | PARTIAL | BadgePopup handles SVG; the Achievements list still uses `Image.network` with no SVG support (SVG badge art renders blank) and no loading spinner. |
+| NetworkImage | `NetworkImage/NetworkImage.tsx` (SvgUri → fetch+SvgXml fallback, spinner, error state) | BadgePopup, AchievementsScreen (AchievementCard) | `features/achievements/presentation/badge_network_image.dart:15` `BadgeNetworkImage` (SVG via `SvgPicture.network`, else bitmap; adaptive spinner; grey error box) used by `badge_popup.dart:256` and `achievements_screen.dart:288` | PRESENT | v3: PARTIAL → PRESENT (a6d4e24). |
 | NetworkLogs | `NetworkLogs/NetworkLogs.tsx` (draggable "Logs" bubble + react-native-network-logger) | App.tsx, gated `env.ENVIRONMENT === 'development'` | — | N/A | Dev-only tool. |
 | NotificationModal | `NotificationModal/NotificationModal.tsx` | CaseDetails, SimDetails, SimPathDetails (pre-start) | `start_simulation_modals.dart` `PreStartNotificationModal` | PRESENT | |
 | PostInput | `PostInput/PostInput.tsx` | DiscussionPost, DiscussionThread | `courses/presentation/discussion/discussion_post_input.dart` | PRESENT | Hard-caps at maxLength instead of showing RN's red over-limit state (documented). |
 | PrivacyTooltip | `PrivacyTooltip/PrivacyTooltip.tsx` | Microphone + Conference ListeningScreen (data-safe bullets), CallSummary AddNotesSection (`summaryLoading.notesTooltip`) | `features/scribe/presentation/listening_chrome.dart:140` `showPrivacyTooltip` (anchored bubble; Scribe + Conference); `summary_generation_progress.dart:393` `summaryLoading.notesTooltip` | PRESENT | v2: d4ae9eb, 98ba567. |
 | ProgressHeaderWidget | `ProgressHeaderWidget/*.tsx` | TabScreenHeader | `progress/presentation/progress_header_widget.dart` | PRESENT | |
 | ReplyBottomSheet | `ReplyBottomSheet/ReplyBottomSheet.tsx` | ReviewDetails | `review_comment_sheets.dart:759` `_ReplyPage` | PRESENT | |
-| ResourceArticleCard | `ResourceArticleCard/*.tsx` (category, tag chips, heading, 3-line content with View more/less, light/dark) | SearchScreen, ListeningScreen resource search (dark) | Dark: `scribe_reference_search.dart:441` `DarkResourceArticleCard` (tags, 3-line View more); light: `search_screen.dart:372` `ListTile` | PARTIAL | v2: dark in-call variant ported. Search tab results are still a `ListTile` (2-line content, category chip): no tag chips, no View more/less. |
+| ResourceArticleCard | `ResourceArticleCard/*.tsx` (category, tag chips, heading, 3-line content with View more/less, light/dark) | SearchScreen, ListeningScreen resource search (dark) | Light: `features/search/presentation/resource_article_card.dart:17` (tags, 3-line + View more, tap-to-collapse as RN) used at `search_screen.dart:339`; dark: `scribe_reference_search.dart:441` `DarkResourceArticleCard` | PRESENT | v3: PARTIAL → PRESENT (3e47357). |
 | ReviewComment | `ReviewComment/ReviewComment.tsx` | All comment sheets, ReviewDetails general comments, ReviewScreen ExpandedComments | `review_widgets.dart:318` `ReviewCommentTile` / `:561` `ControlledCommentTile` | PRESENT | |
 | ReviewTranscriptHeader | `ReviewTranscriptDetails/ReviewTranscriptHeader.tsx` | ReviewDetails | `review_details_parts.dart:23` | PRESENT | |
 | InteractionsBar | `ReviewTranscriptDetails/InteractionsBar.tsx` | ReviewDetails | `review_details_parts.dart:519` | PRESENT | |
@@ -1489,35 +1515,37 @@ RN call sites were found by grepping `<Component` outside `__tests__`. Each Flut
 | SessionRatingTrigger | `SessionRatingTrigger/*.tsx` | SimulationFeedback header | `simulations/presentation/widgets/feedback/feedback_widgets.dart` `SessionRatingTrigger` | PRESENT | Merged from parity/feedback. |
 | ShinyText | `ShinyText/ShinyText.tsx` (shimmer sweep) | CallSummary SummaryGenerationProgress step label | `features/calllog/presentation/summary_generation_progress.dart:258` `ShinyText` (cycling steps :192) | PRESENT | |
 | SimulationCard | `SimulationCard/SimulationCard.tsx` | CourseItemPlayer, SimulationsScreen | `simulations/presentation/widgets/simulation_card.dart` | PRESENT | |
-| SimulationDetailsCard / SimulationDetailRow | `SimulationDetailsCard/*.tsx` | ReviewScreen card, ShareForReview | `reviews/presentation/simulation_details_card.dart` + `ReviewDetailRow` :155 | PARTIAL | View-more overflow measurement now matches RN (:84-90). Remaining: cover video not played (`:43` TODO) — VideoPreview gap. |
+| SimulationDetailsCard / SimulationDetailRow | `SimulationDetailsCard/*.tsx` | ReviewScreen card, ShareForReview | `reviews/presentation/simulation_details_card.dart:27` (cover video `:71-73`) + `ReviewDetailRow` :160 | PRESENT | v3: PARTIAL → PRESENT (f87fa32). |
 | SimulationTransitionSection / UpNextSimulationCard | `SimulationTransitionSection/*.tsx` | none (exported only; SimFeedback has its own UpNextSimulationCard) | — | N/A | Dead in RN. |
 | StarRating | `StarRating/StarRating.tsx` | FeedbackPopup | `feedback_widgets.dart` `StarRatingRow`; `_SummaryFeedbackPopup` stars | PRESENT | |
 | TabScreenHeader | `TabScreenHeader/TabScreenHeader.tsx` | CallLog, Leaderboard, Progress, Review, Search, Simulations, UserAnalytics | `core/widgets/tab_screen_header.dart` | PRESENT | |
 | TabView | `TabView/TabView.tsx` (pill tabs; `tabWidthMode` equal/content) | ThreadsBottomSheet, Achievements, CallLog, CallSummary, Review, SimFeedback, Simulations, UserAnalytics | `core/widgets/app_tab_view.dart` `AppTabView` (+ `learn_tab_view.dart`); branch `_ContentWidthTabs` | PRESENT | Content-width mode exists for reviews (`review_screen.dart:358`). CallSummary uses its own tab bar. |
 | ThreadsBottomSheet / GeneralCommentsList | `ThreadsBottomSheet/*.tsx` | ReviewDetails | `review_comment_sheets.dart:316` `_ThreadsPage` + `:479` `_GeneralList` | PRESENT | |
-| Toast / ToastProvider / useToast | `Toast/*.tsx` (success/error styled, top/bottom, auto-hide) | App root; ~15 screens | Material `SnackBar` via `core/widgets/root_scaffold_messenger.dart` (e.g. `call_summary_actions.dart:11`) | PARTIAL | No success/error visual variants or top position. The earlier "missing toast" flows (share) are fixed. |
-| UserProfileImage | `UserProfileImage/UserProfileImage.tsx` (image or initial, border, fallback icon) | ReviewComment, ReviewTranscriptHeader, LogoutScreen, ReviewDetails, ReviewScreen | `review_widgets.dart:23` `ReviewUserAvatar` (image or initial, 1pt border) | PRESENT | Used in reviews; other call sites (drawer) keep their own avatar. |
-| VideoPreview | `VideoPreview/VideoPreview.tsx` | SimulationDetailsCard, SimulationDetailsScreen, SimulationPathDetailsScreen | `core/widgets/cover_video_preview.dart` (`simulation_details_screen.dart:178`, `simulation_details_modal.dart:243`) | PARTIAL | Not wired into `SimulationDetailsCard` (review cards, share screen) or the review header's scenario dialog (A2.5, A3.4). |
+| Toast / ToastProvider / useToast | `Toast/*.tsx` (success/error styled, top/bottom, auto-hide) | App root; ~15 screens | `core/widgets/toast/{toast_controller,toast_host}.dart` (`ToastHost` in `main.dart:154`; RN `TOAST_STYLES` colours, top/bottom 100, spring + 300 ms fade, 3000 ms default, single toast replaces); `core/network/error_details.dart` `getErrorDetails` | PRESENT | v3: PARTIAL (product call) → PRESENT (05d78c1, aedd4b1). No `SnackBar` left in lib/ (`rootScaffoldMessengerKey` remains, unused). |
+| UserProfileImage | `UserProfileImage/UserProfileImage.tsx` (image or initial, border, fallback icon) | ReviewComment, ReviewTranscriptHeader, LogoutScreen, ReviewDetails, ReviewScreen | `review_widgets.dart:24` `ReviewUserAvatar` (image or initial, 1pt border) | PRESENT | Used in reviews; other call sites (drawer) keep their own avatar. |
+| VideoPreview | `VideoPreview/VideoPreview.tsx` | SimulationDetailsCard, SimulationDetailsScreen, SimulationPathDetailsScreen | `core/widgets/cover_video_preview.dart` (`simulation_details_card.dart:73`, `simulation_info_modal.dart`, `simulation_details_screen.dart:145`, `simulation_details_modal.dart:125`) | PRESENT | v3: PARTIAL → PRESENT; wired into review/share cards and the review header dialog (f87fa32). |
 
 Not a component: `components/shared/commentBottomSheetStyles.ts` (a style sheet), so it has no row.
 
----
-
-### Top gaps by user impact
-
-All v1 top gaps for this area (transcript, pagination, focus refresh, ForceUpdate, ErrorBoundary, BadgePopup, reactions, general comments, share flow, places picker) are closed on master. What remains:
-
-1. **Cover video is never played in review/share cards or the review header's scenario dialog** (A2.5, A3.4, VideoPreview, SimulationDetailsCard). `CoverVideoPreview` exists; it needs wiring into `simulation_details_card.dart:43` and `review_details_parts.dart:142`.
-2. **The share screen never gets the scenario cover or description** (A4.3, A3.10). `ShareForReviewArgs` (`app_router.dart:50`) lacks the fields, though the screen accepts them.
-3. **An edited review note stays stale on Review details** until the screen is reopened, and details don't refetch on app foreground or reconnect (A3.2).
-4. **Achievements list renders SVG badge art blank** (NetworkImage). It uses `Image.network`, while BadgePopup already has an SVG-aware `_BadgeImage` that could be shared.
-5. **Search tab cards and tabs are still Material** (ResourceArticleCard, CustomTabs). There are no tag chips and no View more/less, and pill chips replace underline tabs. The dark in-call variant is done.
-6. **Toasts have no success/error styling or top position** (Toast).
-7. **Cosmetic:** the call-summary custom-field dropdowns use Material styling (Dropdown), and the emoji picker has no search or recents (A4.4, scoped by design).
-
-Icon substitutes in this slice: `core/widgets/info_tooltip_icon.dart:22` renders `Icons.info_outline` where RN renders `InfoIcon` (`assets/icons/info.svg`, which Flutter already ships) in TabScreenHeader (CallLog, Leaderboard, Progress, Review, Search, Simulations, UserAnalytics) and AchievementsScreen (`achievements_screen.dart:115,218`). `core/widgets/app_chat_input.dart:46` `Icons.send` has no callers on master (dead widget). The review and comment widgets use RN SVGs throughout.
+v3 discovery: an import/JSX graph over `src/**` (excluding tests/mocks) finds every rendered component file under `src/components/**` covered by a row above (incl. aliased `Message as MessageComponent` in Conversation, `CustomDropdown` from `Dropdown.tsx`, `ProgressBar` via SessionChecklist/CourseProgressBody). Zero-usage files confirmed dead: Carousel/SecurityCarousel, ChartComponent, CustomLineChart, SimulationTransitionSection; DropdownMenu only via never-rendered `SummaryDropdown`/`FeedbackDropdown`. RN `screens/{ReviewScreen,ReviewDetailsScreen,ShareForReviewScreen}/**` components/hooks all map to rows A1–A5; ReactionsScreen is ledgered in §A (Account/nav). No new rows.
 
 ---
+
+### Top gaps by user impact (v3)
+
+v2 top gaps 1–7 are closed in code (cover video, share cover/description, details refetch, SVG badge art, Search card/tabs, toast, call-summary dropdowns, emoji keyboard). What remains:
+
+1. **Re-sharing an existing review opens the share screen in edit-note mode** (A4.1, A4.8). `app_router.dart:365` sets `isEditNote` from `reviewId`, so Call summary / Sim feedback re-shares show "Edit note"/"Save" and toast `editNoteSuccess`. Carry `isEditNote` explicitly (true only from `review_details_screen.dart:_editNote`).
+2. **Scribe share card shows Duration "-"** (A4.3). `call_summary_screen.dart:382` pre-formats and `share_for_review_screen.dart:166` formats again. Pass raw seconds. Same row: scribe edit-note title falls back to "-" not "Session Review".
+3. **External/device only:** Crashlytics (ErrorBoundary) and Google sign-in need Firebase/OAuth config (BLOCKED-EXTERNAL); Apple sign-in is DEVICE-CHECK.
+4. **Cosmetic, left PRESENT:** LevelIndicator ring has no 1200 ms animation (`level_indicator.dart:59`); InfoTooltip uses a Material tooltip bubble.
+
+Icon substitutes in this slice: none left. `info_tooltip_icon.dart:27` now renders RN `info.svg`; `app_chat_input.dart` (`Icons.send`) was deleted. Review and comment widgets use RN SVGs throughout.
+
+
+---
+
+
 
 ## §4 Hooks, app shell, services, utils (and §6 Store)
 
@@ -1525,26 +1553,30 @@ This part covers §4 (Section A: hooks), §4b (Section B: app shell) and §6 (Se
 
 ### Parity ledger part: hooks, app shell, store
 
-RN source: `ally-platform/ally-mobile/src` at `7a8ce0c19` · Flutter: `ally-mobile-flutter/lib` on `master` at `227db3a` (v2 re-audit, 2026-10-28). Every v1 PARTIAL/MISSING/MERGED row was re-read on master; rows changed in v2 say so in Notes. All branches are merged; there are no MERGED rows left.
+RN source: `ally-platform/ally-mobile/src` at `7a8ce0c19` · Flutter: `ally-mobile-flutter/lib` at `f770200` (v3 re-audit, 2026-10-28; v2 was `227db3a`). Every v2 non-PRESENT row was re-read in current code; 30+ PRESENT rows spot-checked (mostly wave 3–6 areas). Changed notes start with "v3:". Discovery added 17 rows to Section B (RN utils with runtime behaviour, the RN→Flutter storage migration, `I18N_BASE_URL`) and 1 to Section C.
 
 Flutter paths below are relative to `lib/`.
 
 #### Tallies
 
-| Section | Rows | PRESENT | PARTIAL | MISSING | MERGED (was IN PROGRESS) | N/A |
-|---|---|---|---|---|---|---|
-| A. Hooks | 53 | 43 | 2 | 0 | 0 | 8 |
-| B. App shell / services / utils | 62 | 48 | 4 | 5 | 0 | 5 |
-| C. Store | 28 | 24 | 2 | 0 | 0 | 2 |
-| **Total** | **143** | **115** | **8** | **5** | **0** | **15** |
+v3 counts, v2 in brackets. v2 had no BLOCKED-EXTERNAL / DEVICE-CHECK columns.
 
-v1 totals were 75 / 26 / 24 / 3 / 15.
+| Section | Rows | PRESENT | PARTIAL | MISSING | BLOCKED-EXTERNAL | DEVICE-CHECK | N/A |
+|---|---|---|---|---|---|---|---|
+| A. Hooks | 53 [53] | 42 [43] | 1 [2] | 0 [0] | 1 [–] | 1 [–] | 8 [8] |
+| B. App shell / services / utils | 79 [62] | 65 [48] | 0 [4] | 0 [5] | 4 [–] | 4 [–] | 6 [5] |
+| C. Store | 29 [28] | 25 [24] | 1 [2] | 0 [0] | 0 [–] | 0 [–] | 3 [2] |
+| **Total** | **161 [143]** | **132 [115]** | **2 [8]** | **0 [5]** | **5 [–]** | **5 [–]** | **17 [15]** |
+
+The 2 PARTIALs are one behaviour (logout on any `/users/me` failure) counted in §4 and §6; the code says the team decided against it.
 
 Status key:
 - **PRESENT**: the same behaviour exists, possibly built a different way.
 - **PARTIAL**: some of the behaviour exists.
 - **MISSING**: nothing equivalent exists. Every MISSING row was checked by reading the Flutter files and searching `lib/` under several names, not by one failed grep.
 - **N/A**: dead code in RN, an RN-only wrapper, or dev-only.
+- **BLOCKED-EXTERNAL**: code done; needs credentials, CI secrets, console or web-host config.
+- **DEVICE-CHECK**: code done; only provable on a signed device build.
 
 ---
 
@@ -1553,58 +1585,58 @@ Status key:
 | Hook | RN behaviour | Flutter equivalent | Status | Notes |
 |---|---|---|---|---|
 | useAppNavigation | Typed `useNavigation` for the native stack. | go_router `context.push/go` | N/A | Navigation wrapper only. |
-| useAppleLogin | Apple sign-in requests email and full name, then POSTs `/auth/apple` with identityToken, authorizationCode and fullName. A suspended account (403 `USER_SUSPENDED`) is sent to SuspendedAccount. A cancel does nothing; any other error shows a toast. | `features/auth/presentation/login_screen.dart` (`_signInWithApple`), `features/auth/data/auth_repository.dart` (`loginWithApple`) | PRESENT | Cancel, suspended and toast handling are all mirrored. It won't complete for real until an Apple Developer setup exists for the Flutter bundle id. |
+| useAppleLogin | Apple sign-in requests email and full name, then POSTs `/auth/apple` with identityToken, authorizationCode and fullName. A suspended account (403 `USER_SUSPENDED`) is sent to SuspendedAccount. A cancel does nothing; any other error shows a toast. | `features/auth/presentation/login_screen.dart` (`_signInWithApple`), `features/auth/data/auth_repository.dart` (`loginWithApple`) | DEVICE-CHECK | v3: code unchanged; `ios/Runner/Runner.entitlements` now has `com.apple.developer.applesignin` and the prod flavor uses RN's bundle id `com.helloally.app` (`ios/Flutter/prod.xcconfig:6`), so only a signed device build can prove it. |
 | useBadgePopup | Polls `GET /badges/me?viewedStatus=UNVIEWED` every 60s, only while the screen is focused and the user has `VIEW_USER_BADGES`; also refetches on focus and reconnect. Badges are queued: the first shows after 1s, auto-closes after 5s, then the next follows 350ms later. Closing calls `PATCH /badges/me/:id/viewed`. Mounted on SimulationsScreen, and on ReviewScreen for reviewer-only users. | `features/achievements/presentation/badge_popup.dart` (`BadgePopupHost`), hosted in `core/navigation/app_shell_screen.dart:52` | PRESENT | v2: ported (`a5d3ce7`, `557dc55`): 60s poll while the Learn tab (or Review tab for reviewer-only users) is showing, queue with 1s/5s/350ms timings, confetti, `PATCH /badges/me/:id/viewed` on close. Android back closes it first. |
-| useBugReport | Validates description length, then `POST /bug-reports` with context (screen, appVersion, device, os, clientTimestamp). A 429 shows a rate-limit toast; success shows a toast and clears the field. | `features/bugreport/presentation/bug_report_screen.dart`, `features/bugreport/data/bug_report_repository.dart` | PRESENT | Handles 429 (`_httpTooManyRequests`). |
+| useBugReport | Validates description length, then `POST /bug-reports` with context (screen, appVersion, device, os, clientTimestamp). A 429 shows a rate-limit toast; success shows a toast and clears the field. | `features/bugreport/presentation/bug_report_screen.dart`, `features/bugreport/data/bug_report_repository.dart` | PRESENT | v3 spot-check: 429 at `bug_report_screen.dart:16,74`. |
 | useCallSummaryActions | Rename (`updateCallInfo`, then toast). Export: storage permission, `GET` export, save `.txt` to Documents/CallSummary (iOS) or Downloads (Android). Archive/unarchive with modal and toast. Delete (`summary: {}`, then `goBack` after 2s). Summary feedback POST. `handleGoBack` resets to CallLog and clears currentChat outside the log flow. | `features/calllog/presentation/call_summary_actions.dart`, `call_log_repository.dart:612-636`, `data/summary_file_export.dart` | PRESENT | v2: export (permission → `GET /chats/:id/export-summary` → `saveFile`) and delete (`PUT call-details {summary:{}}`, back after 2s) landed in `98ba567`/`9d4807b`. |
 | useCallSummaryForm | Keeps a form baseline shared in the store. Reseeds on every summary refetch while keeping unsaved edits. Seeds manual notes with empty values. Saves only changed keys. Marks clean only the keys actually written, so an edit made during the save stays dirty. Section reset restores the server values. | `features/calllog/data/summary_form_state.dart`, `call_summary_screen.dart` | PRESENT | v2 (`0de134b`): `SummaryFormState.markSaved` only advances the baseline to the sent values, so in-flight edits stay dirty; a refetch of the same chat reseeds untouched fields. |
 | useCallTranscriptDetails | Pages `/chats/:id/messages` with limit 20 and an offset. Sorts by `createdAt` for WEBRTC, otherwise `startSeconds` ASC. Timestamps are relative to the start. Infinite scroll. | `call_log_repository.dart:759-774` | PRESENT | v2 (`118522d`): limit 20 + offset paging, `sortOrder: ASC`, `sortBy` per provider. |
 | useCommentActions | Comment CRUD with local optimistic patching: add (prepend), edit, delete with confirm, hide/unhide, emoji reaction add/update/remove count maths. Dismisses the keyboard; `onCommentsChanged` fires for parents. | `features/reviews/presentation/comment_list_controller.dart` | PRESENT | Re-read on master: `CommentListController` (add/edit/delete/hide/reactions, edit window). |
-| useCounselorChat | When authenticated with `VIEW_COUNSELOR_CHAT`: `GET /chats/counsellor-chat`. On an active chat it sets currentChat and fires a callback; otherwise it clears currentChat unless the user is on Breathing, CallSummary or Listening. Re-checks on AppState background→active. Guards against concurrent checks. | `core/chat/active_chat_discovery.dart` (`checkForActiveChat`), `main.dart` (`didChangeAppLifecycleState`, auth listener) | PRESENT | No in-flight guard, so concurrent calls are possible (low risk). |
+| useCounselorChat | When authenticated with `VIEW_COUNSELOR_CHAT`: `GET /chats/counsellor-chat`. On an active chat it sets currentChat and fires a callback; otherwise it clears currentChat unless the user is on Breathing, CallSummary or Listening. Re-checks on AppState background→active. Guards against concurrent checks. | `core/chat/active_chat_discovery.dart` (`checkForActiveChat`), `main.dart` (`didChangeAppLifecycleState`, auth listener) | PRESENT | v3 spot-check: still no in-flight guard (RN `isCheckingRef`, `useCounselorChat.ts:29-65`); `active_chat_discovery.dart:47`. Low risk. Now reads the top route (`active_chat_discovery.dart:66`). |
 | useDebounce | Debounced callback, leading or trailing. | `Timer` used inline where needed | N/A | |
 | useDrawerNavigation | Typed drawer navigation. | `core/navigation/drawer_menu_button.dart` (`DrawerMenuScope`) | N/A | |
-| useForceUpdate | `GET /app-version/{ios,android}` returns `minimumSupportedVersion`, compared by semver against the app version. Splash shows a blocking ForceUpdateModal whose button opens the store, and navigation is held back. | `core/app_update/force_update.dart`, `force_update_modal.dart:22` (`ForceUpdateGate` in `main.dart` builder) | PRESENT | v2 (`0885d07`): `GET /app-version/{ios,android}`, RN `isVersionLower`, blocking modal over the whole app with store button. Store URLs are the RN app's listings (see release identity). |
-| useGoogleLogin | `GoogleSignin.configure`, `hasPlayServices`, `signOut` before `signIn`, then POST `/auth/google` with the idToken. Suspended goes to SuspendedAccount; cancel and in-progress are silent; Play Services and other errors show a toast. | `login_screen.dart` (`_signInWithGoogle`, `GoogleSignIn.instance.initialize`) | PRESENT | Same signOut-first pattern. Needs a client id configured. |
+| useForceUpdate | `GET /app-version/{ios,android}` returns `minimumSupportedVersion`, compared by semver against the app version. Splash shows a blocking ForceUpdateModal whose button opens the store, and navigation is held back. | `core/app_update/force_update.dart`, `force_update_modal.dart:22` (`ForceUpdateGate` in `main.dart` builder) | PRESENT | v3 spot-check: store URLs `force_update.dart:18-19` now match the prod flavor's identity (`com.helloally.app`), so they are correct, not a gap. |
+| useGoogleLogin | `GoogleSignin.configure`, `hasPlayServices`, `signOut` before `signIn`, then POST `/auth/google` with the idToken. Suspended goes to SuspendedAccount; cancel and in-progress are silent; Play Services and other errors show a toast. | `login_screen.dart` (`_signInWithGoogle`, `GoogleSignIn.instance.initialize`) | BLOCKED-EXTERNAL | v3: code done; `GOOGLE_WEB_CLIENT_ID`/`GOOGLE_IOS_CLIENT_ID` default `''` (`core/config/app_config.dart:82-92`) and come from the `ENV_VALUES_*` repo secret via `--dart-define-from-file` (`.github/workflows/build-ios-production.yml:81,130`); reversed client ids in `ios/Flutter/prod.xcconfig:11-12`. Needs the secret copied to this repo. |
 | useHardwareBackPressHandler | Android back calls a custom callback, else `goBack`, else the system default. | `PopScope` in call_summary, box_breathing, login (OTP→email), celebration_modal, simulation_feedback, profile_settings, scribe_recording, roleplay_voice, start_simulation_modals, simulation_details_modal | PRESENT | Implemented per screen. |
 | useHideReviewDetails | For a private review, fetch threads (limit 1), then reaction counts; hide the review section if both are empty. | `simulation_feedback_screen.dart` (`_hideReviewDetails`), `call_summary_screen.dart` | PRESENT | |
 | useIsEvaluator | `EVALUATOR_ACCESS` permission check. | — | N/A | **Unused in RN**: no caller outside `hooks/index.ts`. |
 | useKeyboardState | Keyboard show/hide listener (used by SearchableLocationDropdown). | `MediaQuery.viewInsets` | N/A | |
 | useLanguageDropdown | Language options and map from `/languages?active&hasVoices` plus preferences. | — | N/A | **Unused in RN** (exported only). Preferences have their own Flutter port. |
 | useLeaderboard | `GET /community/leaderboard?window&limit=50&offset`, deduped by userId, infinite scroll. `GET /community/leaderboard/my-rank`, refetched on focus. Flags the current user; window change resets the offset. | `features/leaderboard/data/leaderboard_repository.dart` (`LeaderboardController`, `myRankProvider`), `leaderboard_screen.dart` | PRESENT | |
-| useLeaderboardNotification | Toggle stored under AsyncStorage `LEADERBOARD_NOTIFICATION_ENABLED` (default ON); schedules or cancels the weekly Notifee trigger. | `core/push/leaderboard_notification.dart` (`leaderboardNotificationEnabledProvider`), `profile_settings_screen.dart:496` | PRESENT | Same key name, in SharedPreferences. |
+| useLeaderboardNotification | Toggle stored under AsyncStorage `LEADERBOARD_NOTIFICATION_ENABLED` (default ON); schedules or cancels the weekly Notifee trigger. | `core/push/leaderboard_notification.dart` (`leaderboardNotificationEnabledProvider`), `profile_settings_screen.dart:496` | PRESENT | Same key name, in SharedPreferences. v3: migrated from RN AsyncStorage on first prod launch (`legacy_session_migration.dart:83-87`). |
 | useLearningPathDetails | Track or case details query, create a path or case session, look up the scenario session for an item, pull to refresh. | `simulations_repository.dart` (`createPathSession`, `createCaseSession`, `/learn/scenario-session/scenario-path-session-item/:id`, `/case-session-item/:id`), `simulation_path_details_screen.dart`, `case_details_screen.dart`, `learning_path_detail_view.dart` | PRESENT | |
 | useListeningScreen | Derives isWebMicrophoneMode and isConferenceCall, the privacy tooltip list (noRecording / encrypted / noTrainingData / personalInfoRemoved), the tooltip insets and the start time. | `features/scribe/presentation/listening_chrome.dart:96-140` (`showPrivacyTooltip`) | PRESENT | v2 (`d4ae9eb`): privacy tooltip (`audioCall.privacy.*`) on both listening screens. |
-| useLiveAudioStream | Mic permission check/request. A start request is held until init finishes (avoids a native crash). Streams 16kHz mono PCM base64. Permission denied: settings alert, and cancel goes back. Re-checks permission when the app returns to the foreground. Stops on unmount. | `scribe_recording_screen.dart:229-299`, `core/realtime/microphone_permission.dart` (`showPermissionSettingsAlert`) | PRESENT | v2: blocked mic shows the Cancel/Open-Settings alert; permission re-checked on foreground (`didChangeAppLifecycleState`). |
+| useLiveAudioStream | Mic permission check/request. A start request is held until init finishes (avoids a native crash). Streams 16kHz mono PCM base64. Permission denied: settings alert, and cancel goes back. Re-checks permission when the app returns to the foreground. Stops on unmount. | `scribe_recording_screen.dart:229-299`, `core/realtime/microphone_permission.dart` (`showPermissionSettingsAlert`) | PRESENT | v3 spot-check: foreground re-check at `scribe_recording_screen.dart:249-250`. |
 | useNavigationAwareCounselorChat | Tracks the current route. An active chat from Splash resets to [CallLog, Listening]; from Listening it does nothing; otherwise it navigates to Listening. Always subscribed to AppState. | `active_chat_discovery.dart` (`targetRouteForActiveChat`, `isListeningRoute`) | PRESENT | Uses `router.go` (replaces the stack) instead of reset/navigate; documented. |
 | useNetworkConnectivity | NetInfo subscription: `isConnected` / `isInternetReachable` / `isOffline`. Drives NetworkDisconnected (network vs socket copy, Try-again hidden while offline) on the Listening screens. | `core/realtime/connectivity.dart:13` (`isOfflineProvider`), `network_disconnected.dart:43`, `scribe_recording_screen.dart:159` | PRESENT | v2 (`d4ae9eb`): `connectivity_plus` stream; NetworkDisconnected picks network vs socket copy from it. |
 | usePaginatedComments | Comment pagination, 20 per page, append/reset, `hasMore`. | `features/reviews/presentation/comment_list_controller.dart` (`fetchPage(offset, limit)`) | PRESENT | Re-read on master. |
 | usePermissionAlert | Alert with Cancel and "Open settings" (`openSettings()`); preset microphone variant. | `core/realtime/microphone_permission.dart:20-56`, `call_log_screen.dart:233` | PRESENT | v2: shared Cupertino alert with Open Settings; used by Scribe and start-simulation (roleplay now never starts without mic, so no alert is needed there). |
-| useProfileImage | Image library (jpeg/png, 0.8 quality, 800px); rejects over 2MB or non-square. Save: presigned URL → PUT to S3 → PATCH `/users/profile-image` → delete the old image best-effort. Remove: delete + PATCH empty. | `features/account/presentation/profile_settings_screen.dart` (`_maxProfileImageBytes`, square check), `account_repository.dart` (`/users/profile-image-url`, PATCH `/users/profile-image`, delete) | PRESENT | |
+| useProfileImage | Image library (jpeg/png, 0.8 quality, 800px); rejects over 2MB or non-square. Save: presigned URL → PUT to S3 → PATCH `/users/profile-image` → delete the old image best-effort. Remove: delete + PATCH empty. | `features/account/presentation/profile_settings_screen.dart` (`_maxProfileImageBytes`, square check), `account_repository.dart` (`/users/profile-image-url`, PATCH `/users/profile-image`, delete) | PRESENT | v3 spot-check: 2MB cap and jpeg/png-only picks (`profile_settings_screen.dart:28-34`, `28ff515`). |
 | useProgressSummary | Two gates: the `VIEW_USER_RANK` permission and `GET progress-enabled`. Then the summary query, shared through one cache entry. | `features/progress/data/progress_repository.dart` (`progressEnabledProvider`, `viewUserRank` gate), `progress_header_widget.dart` | PRESENT | |
 | useReactions | Reaction counts summary (emoji map, sorted), paged list (20) filtered by reaction, refresh. Swaps between simulation and scribe APIs via ReviewApiContext. | `features/reactions/presentation/reactions_screen.dart`, `reactions_repository.dart` | PRESENT | |
 | useReviews | Reviews list: readFilter and sort, LIMIT 10 with offset paging, reset on filter change. | `features/reviews/data/reviews_repository.dart:20-33` | PRESENT | Re-read on master: limit 10, offset paging, `order: DESC`, readFilter/sort. |
 | useScribeNoteCreationEnabled | `GET /settings/scribe-note-creation-enabled`, skipped unless `COUNSELOR_ACCESS` (otherwise 403). | `core/settings/settings_repository.dart` `scribeNoteCreationEnabledProvider`; `call_log_screen.dart:273` watches it only when `isCounselor` | PRESENT | |
-| useScribeVoiceNoteEnabled | `GET /settings/scribe-voice-note-enabled`, gated by counsellor permission. | `settings_repository.dart:113`, `voice_note_section.dart:249` | PRESENT | v2 spot-check: `voice_note_section.dart:247-251` still watches the provider before the `isCounselor` short-circuit, so a non-counsellor that reaches the section fires one 403. Display is gated; cosmetic. Counted PRESENT. |
+| useScribeVoiceNoteEnabled | `GET /settings/scribe-voice-note-enabled`, gated by counsellor permission. | `settings_repository.dart:113`, `voice_note_section.dart:249` | PRESENT | v3 spot-check: `voice_note_section.dart:259-261` still watches the provider before `isCounselor` short-circuits (one harmless 403 for non-counsellors). Cosmetic. |
 | useSearch | `searchDocuments` (PAGE_SIZE, category filter); `excludedIds` pagination; category counts; 250ms debounced suggestion filter; suggestion tap. | `features/search/data/search_repository.dart` (`excludedIds`, `categories`), `search_screen.dart` | PRESENT | |
 | useShareScreenLogic | Share or edit-note: max 250 chars, emoji appended, create review or update status. Toast; on a server message, toast then go back. | `features/reviews/presentation/share_for_review_screen.dart` (`_maxNoteLength = 250`, `EmojiInsertPicker`, `isEditNote`) | PRESENT | Reworked again on `parity/reviews` (UI fidelity). |
-| useSimulationCredits | Fetches `/simulation-credits` on every mounting screen when the user has `EDIT_SCENARIO_SESSION`, otherwise clears. Stores in the credits slice. `refreshCredits`, usage %, low-credit flag. | `simulations_repository.dart:120-131, 206-207` | PRESENT | v2 (`8e6ad33`): `endScenarioSession` emits the credits tag → `ref.invalidate(simulationCreditsProvider)`. |
+| useSimulationCredits | Fetches `/simulation-credits` on every mounting screen when the user has `EDIT_SCENARIO_SESSION`, otherwise clears. Stores in the credits slice. `refreshCredits`, usage %, low-credit flag. | `simulations_repository.dart:120-131, 206-207` | PRESENT | v3 spot-check: `simulations_repository.dart:207` invalidates credits; `usagePercentage`/`isLow` in `simulation_models.dart:262-268`. |
 | useSimulationSessionRecordingUrl | `GET` session recording presigned URL (2 attempts; a 404 means missing). `refreshFromPlaybackError` with a 4s cooldown for expired URLs. Feeds the TranscriptTab audio player. | `simulation_transcript_repository.dart:81-88`, `simulation_transcript_tab.dart:34` | PRESENT | v2 (`bc9381b`): `GET …/recording` presigned URL feeding the feedback-transcript player. |
 | useSimulationTranscriptDetails | Pages `/learn/scenario-session/:id/messages` (limit 10, startSeconds ASC, **languageCode**) with a paging lock, id dedupe and MM:SS formatting. | `simulation_transcript_repository.dart:52-65` | PRESENT | v2 (`bc9381b`): optional `languageCode` for the transcript-language dropdown; repoll on change. |
 | useSimulationTransition | Polls upcoming path/case scenario (5s, 4 tries); retry or start the next simulation. | — | N/A | **Unused in RN** (only a comment in `languageCodeEndpoints.ts`). |
-| useSocket | One socket per owner, idempotent `connect`, a generation stamp against stale connects, auth as a function (fresh token on each reconnect), 5 reconnects, 1–5s delay, 10s timeout, forceNew, retry after failure 2s, emit/on/off. | `core/realtime/socket_service.dart` | PRESENT | No generation stamp and no 2s retry after failure. Minor. |
+| useSocket | One socket per owner, idempotent `connect`, a generation stamp against stale connects, auth as a function (fresh token on each reconnect), 5 reconnects, 1–5s delay, 10s timeout, forceNew, retry after failure 2s, emit/on/off. | `core/realtime/socket_service.dart` | PRESENT | v3: generation stamp (`socket_service.dart:42,66-71,131`) and 2s retry after a failed open (`socket_service.dart:27,111-123`, commits `5a37e28`/`3cb9e36`) now ported. Fully mirrors `useSocket.ts:115-190`. |
 | useSocketConnection | Connects on screen focus, disconnects on blur. AppState: background disconnects (unless `disconnectOnBackground=false`), foreground reconnects. | `scribe_recording_screen.dart:229-233`, `conference_listening_screen.dart:113-118`, `core/chat/cloud_telephony_listener.dart` | PRESENT | v2: Scribe reconnects on foreground (RN `disconnectOnBackground:false` for recording); Conference disconnects on pause and reconnects on resume; app-wide telephony socket exists (Section B). |
 | useStableFooterRenderer | Bottom-sheet footer render-stability shim. | — | N/A | Specific to `@gorhom/bottom-sheet`. |
-| useStartSimulation | Checks or requests mic permission **before** creating the session (blocked: settings alert; denied: toast). Creates the scenario session; navigates to the assistant with token, LiveKit URL, scenario and reminders. 429 shows a retry modal; an `entityId` body shows the active-simulation modal. | `start_simulation_controller.dart:178-202` | PRESENT | v2 (`497317a`): mic checked/requested before the session (and credit) is created; blocked → settings alert. |
+| useStartSimulation | Checks or requests mic permission **before** creating the session (blocked: settings alert; denied: toast). Creates the scenario session; navigates to the assistant with token, LiveKit URL, scenario and reminders. 429 shows a retry modal; an `entityId` body shows the active-simulation modal. | `start_simulation_controller.dart:178-202` | PRESENT | v3 spot-check: mic still checked before session create (`start_simulation_controller.dart:113-115,200-203`). |
 | useStoragePermissions | Android below 33 needs `WRITE_EXTERNAL_STORAGE`; denied shows a toast and opens settings. | `features/calllog/data/summary_file_export.dart:28-34` | PRESENT | v2: Android ≤ 28 requests storage, else granted. |
 | useSummaryState | Lazy summary fetch; holds the loader for 3s after the summary arrives; latches manual-note status; **debounced (1s) notes autosave `POST /chats/:id/notes` while the summary generates** (AddNotesSection); refresh; clears summary state on unmount. | `call_summary_screen.dart:777`, `summary_generation_progress.dart:303`, `call_log_repository.dart:636` | PRESENT | v2 (`98ba567`): notes typed during generation autosave via debounced `POST /chats/:id/notes`. |
-| useTabBackToHomeHandler | On Search, Community, Progress and UserAnalytics tab roots, Android back jumps to the first visible tab instead of leaving the app. | `core/navigation/app_shell_screen.dart:150` | PRESENT | v2 (`557dc55`): `PopScope(canPop: currentIndex == 0)` sends back to the first visible tab (applies to every non-first tab, a superset of RN's four). |
+| useTabBackToHomeHandler | On Search, Community, Progress and UserAnalytics tab roots, Android back jumps to the first visible tab instead of leaving the app. | `core/navigation/app_shell_screen.dart:150` | PRESENT | v3 spot-check: `app_shell_screen.dart:186-187` `PopScope(canPop: currentIndex == 0 && !_isBadgePopupShowing)`. |
 | useTabScreenHeader | The hamburger shows only on the first visible tab and opens the drawer. | `core/navigation/app_shell_screen.dart` (`onOpenDrawer: i == 0`), `drawer_menu_button.dart`, `core/widgets/tab_screen_header.dart` | PRESENT | |
 | useToggleReviewPrivacy | PATCH review status: `IN_REVIEW` when on, `HIDDEN` when off, then a toast. | `simulation_feedback_screen.dart:361`, `call_summary_screen.dart:317`, `review_details_screen.dart:108` | PRESENT | |
 | useTrackPlayerNavigation | Flattens the track by sorted sections and items; current/prev/next; `canAdvance` (completed or just completed); overall %. | `features/courses/presentation/course_item_player_screen.dart` (`_flattenTrackItems`, `goNextOrOverview`) | PRESENT | |
 | useTranslate | `t` (typed) and `tVariable`. | `core/localization/translate_ref.dart` (`ref.t`, `ref.tr`) | PRESENT | |
-| useUser | `checkAuth`: with a token, fetch `/users/me` and permissions, then set user, permissions and authenticated; on any failure, logout. `handleUserLogout`: **unregister push token**, then `handleLogout`, then `resetApiState`. | `core/auth/auth_state.dart`, `features/account/data/account_repository.dart` `currentUserProvider`, `core/permissions/permissions_repository.dart` | PARTIAL | v2: logout now deregisters push (`auth_state.dart:72-76`). Remaining: launch restores auth from the stored token only; a non-401 `/users/me` failure does not log out (lenient divergence; product call whether to match RN). |
-| useVideoWatchProgress | Counts unique watched seconds (a jump over 2s counts as a seek). Reports every 10s or on a +10% change; flushes on unmount. | `features/courses/data/video_watch_progress.dart` | PRESENT | Ported almost line for line. |
-| useVoiceNoteRecorder | WAV dictation 16k mono, start/pause/resume/stop/reset, streamed to file. **Auto-stops at 24MB** (upload cap). Deletes the file on reset; releases the mic on unmount. | `features/calllog/presentation/voice_note_recorder.dart` (`record` `AudioEncoder.wav`) | PARTIAL | Unchanged: no 24MB (`MAX_RECORDING_BYTES`) auto-stop, so a long dictation can exceed the 25MB upload limit. `durationMs` from a ticker. |
+| useUser | `checkAuth`: with a token, fetch `/users/me` and permissions, then set user, permissions and authenticated; on any failure, logout. `handleUserLogout`: **unregister push token**, then `handleLogout`, then `resetApiState`. | `core/auth/auth_state.dart`, `features/account/data/account_repository.dart` `currentUserProvider`, `core/permissions/permissions_repository.dart` | PARTIAL | v3: launch now holds `/splash` until `/users/me` settles (`core/routing/app_router.dart:89-95,148`). Remaining: RN `useUser.ts:44-63` logs out on ANY `/users/me` failure; Flutter moves on (no logout on non-401) by a recorded team decision (`app_router.dart:90-92`, `app_shell_screen.dart:99-101`). Deliberate divergence; close as won't-fix if product confirms. |
+| useVideoWatchProgress | Counts unique watched seconds (a jump over 2s counts as a seek). Reports every 10s or on a +10% change; flushes on unmount. | `features/courses/data/video_watch_progress.dart` | PRESENT | v3 spot-check: `video_watch_progress.dart:14,65,107` (10s/+10%, flush). |
+| useVoiceNoteRecorder | WAV dictation 16k mono, start/pause/resume/stop/reset, streamed to file. **Auto-stops at 24MB** (upload cap). Deletes the file on reset; releases the mic on unmount. | `features/calllog/presentation/voice_note_recorder.dart` (`record` `AudioEncoder.wav`) | PRESENT | v3 (`bf5d1c5`): 24MB auto-stop ported: `maxRecordingBytes = 24*1024*1024` (`voice_note_recorder.dart:41`), bytes derived from 16k mono 16-bit duration (`:37,47`), ticker stops at cap (`:65-74`). v2 gap 22 closed. |
 
 ---
 
@@ -1613,67 +1645,84 @@ Status key:
 | Area | RN behaviour | Flutter equivalent | Status | Notes |
 |---|---|---|---|---|
 | index.js | `registerGlobals()` for LiveKit WebRTC. | livekit_client needs none | N/A | |
-| index.js | `messaging().setBackgroundMessageHandler` → `displayRemoteMessage`, registered at module scope. | `main.dart` `FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler)`; `core/push/push_notification_service.dart` | PRESENT | Inert today: there is **no `google-services.json` or `GoogleService-Info.plist`** in the repo (`Firebase.initializeApp` fails silently). |
+| index.js | `messaging().setBackgroundMessageHandler` → `displayRemoteMessage`, registered at module scope. | `main.dart` `FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler)`; `core/push/push_notification_service.dart` | BLOCKED-EXTERNAL | v3: code done (`main.dart:43-49`, `push_notification_service.dart:184`). Firebase files are fetched by CI from S3 (`.github/workflows/build-ios-production.yml:62`, `build-android-production.yml:80`); prod identity = RN's, so RN's Firebase apps apply. Blocked on repo secrets `*_GOOGLE_SERVICES_S3_URI_PROD` + AWS OIDC trust (docs/RELEASE.md:116-127). |
 | index.js | `notifee.onBackgroundEvent` PRESS on leaderboard id → `navigateToLeaderboard`; reminder → no-op. | `initializeLocalNotifications` `onDidReceiveNotificationResponse` covers foreground and background taps | PRESENT | |
 | App.tsx | Redux `Provider`. | `ProviderScope(retry: appRetryPolicy)` | PRESENT | Flutter adds a retry policy (network/5xx only). |
 | App.tsx | GestureHandlerRootView / SafeAreaProvider. | Flutter built-ins | N/A | |
-| App.tsx | Translucent StatusBar; dark content after splash. | `main.dart` `AnnotatedRegion(SystemUiOverlayStyle.dark)` | PRESENT | |
-| App.tsx | ToastProvider above the navigator, so toasts survive the auth stack swap. | `core/widgets/root_scaffold_messenger.dart` (`rootScaffoldMessengerKey`) | PRESENT | |
-| App.tsx / ErrorBoundary | Catches render errors, shows a fallback with a reset that remounts the navigator, `crashlytics().recordError`. | `core/errors/crash_reporting.dart:24-51`, `core/errors/error_boundary.dart` (`AppErrorBoundary` in `main.dart`) | PRESENT | v2 (`0885d07`): `FlutterError.onError` + `PlatformDispatcher.onError` → Crashlytics (no-op without Firebase), `ErrorWidget.builder` → app-wide fallback with "Try again" (router back to `/splash`). Reporting needs the Firebase config files. |
+| App.tsx | Translucent StatusBar; dark content after splash. | `main.dart` `AnnotatedRegion(SystemUiOverlayStyle.dark)` | PRESENT | v3: plus RN splash `StatusBar.setHidden(true)` then show 1s after the Lottie (`core/routing/launch_splash.dart:20-31,88-92`). |
+| App.tsx | ToastProvider above the navigator, so toasts survive the auth stack swap. | `core/widgets/toast/toast_host.dart` (`ToastHost` in `main.dart:154`) | PRESENT | v3 (`05d78c1`/`aedd4b1`): RN toast host (success/error, top/bottom) `core/widgets/toast/toast_host.dart:14,96-131`, mounted above the navigator at `main.dart:154`; SnackBars replaced. |
+| App.tsx / ErrorBoundary | Catches render errors, shows a fallback with a reset that remounts the navigator, `crashlytics().recordError`. | `core/errors/crash_reporting.dart:24-51`, `core/errors/error_boundary.dart` (`AppErrorBoundary` in `main.dart`) | PRESENT | v2 (`0885d07`). v3 spot-check: `main.dart:52,155-159`. Crashlytics reporting only works once Firebase files are supplied (see BLOCKED-EXTERNAL rows); fallback UI works without. |
 | App.tsx | NetworkLogs overlay in development. | — | N/A | Dev only. |
-| localization/i18n.ts | Synchronous English init; restores the saved UI language (`ally:ui:language`); 5 languages. | `core/localization/localization_controller.dart` (`build`, SharedPreferences `ui_language`) | PRESENT | Different key names (`ui_language`, `i18n_version`). Only matters for migrating an existing install. |
+| localization/i18n.ts | Synchronous English init; restores the saved UI language (`ally:ui:language`); 5 languages. | `core/localization/localization_controller.dart` (`build`, SharedPreferences `ui_language`) | PRESENT | v3: RN's `ally:ui:language` is copied into `ui_language` once on the first prod launch (`core/migration/legacy_session_migration.dart:77-81`), so the key-name difference no longer loses the setting. 5 locales bundled. |
 | localization/dynamic.ts | Behind `LANGUAGE_SELECTOR_FLAG`: fetch the CDN manifest; apply the cached bundle first; re-fetch namespaces when the version moves; cache per (version, lang); refresh every 30s and on foreground; network failure falls back to cache. | `localization_controller.dart` (`refresh`, `_pollTimer`, `didChangeAppLifecycleState`) | PRESENT | |
 | dynamic.ts | On `languageChanged`: refresh and apply **that language's** cached or fetched resource. | `localization_controller.dart:140-170` | PRESENT | v2 (`8e0a859`): reuses the cache only if it holds this language for the current version, else fetches. |
-| LanguageSelectorSheet | `changeLanguage`, persist, `forceRTL`, `api.util.resetApiState()` so content re-fetches in the new language. | `core/network/api_client.dart:46-51` | PRESENT | v2: `apiClientProvider` invalidates itself on a real language switch, so every provider refetches (RN `resetApiState`). |
-| services/api.ts | Injects `languageCode` (the active UI language) into the allowlisted content endpoints: scenarios, paths, cases, simulation details, checklist, skills, reviews, badges, leaderboard, endScenarioSession, learn tracks, enrollTrack. | `core/network/language_code_interceptor.dart:27-81`, added in `api_client.dart` | PRESENT | v2 (`249653c`): central interceptor with RN's endpoint allowlist (query for GET, body for mutations). |
+| LanguageSelectorSheet | `changeLanguage`, persist, `forceRTL`, `api.util.resetApiState()` so content re-fetches in the new language. | `core/network/api_client.dart:46-51` | PRESENT | v3 spot-check: `api_client.dart:50-52`. |
+| services/api.ts | Injects `languageCode` (the active UI language) into the allowlisted content endpoints: scenarios, paths, cases, simulation details, checklist, skills, reviews, badges, leaderboard, endScenarioSession, learn tracks, enrollTrack. | `core/network/language_code_interceptor.dart:27-81`, added in `api_client.dart` | PRESENT | v3 spot-check: allowlist incl. scenarios, badges, leaderboard, enrollTrack (`language_code_interceptor.dart:28-46`). |
 | services/api.ts | `/api/v1` prefix, with `/api/v2` for generate-otp, verify-otp and learn/scenarios (exact match). | `core/network/auth_interceptor.dart`, `api_routes.dart` | PRESENT | |
 | services/api.ts | Bearer token from storage on every request. | `auth_interceptor.dart` `onRequest` | PRESENT | |
 | services/api.ts | 401 → refresh with the refresh token → store new tokens → retry. No tokens, or refresh fails, logs out. | `auth_interceptor.dart` (single-flight `_refreshFuture`) | PRESENT | Better than RN: concurrent 401s share one refresh. |
 | services/api.ts | Unrecoverable 401 → `handleLogout` + `resetApiState` + `auth.sessionExpired` toast. | `auth_state.dart` `sessionExpired()` | PRESENT | |
 | RootNavigator | Swaps stacks on `isAuthenticated` (authed: CallLog, Listening, …; unauthed: Splash, SuspendedAccount). | `core/routing/app_router.dart` `computeRedirect` + `_RouterRefreshListenable` | PRESENT | |
-| Splash | `checkAuth()` on launch; holds the UI while loading. | `AuthController._restore` + `/splash` `_LaunchScreen` (`isRestored`) | PARTIAL | Unchanged: token-only restore, no `/users/me` validation at launch (see useUser). |
+| Splash | `checkAuth()` on launch; holds the UI while loading. | `core/routing/launch_splash.dart` + `computeRedirect` (`isSplashFinished`, `isUserLoading`) | PRESENT | v3 (`e063d45`): `/splash` plays RN's Lottie on every cold start and holds until the animation ends AND (signed in) `/users/me` settles (`launch_splash.dart:72-109`, `app_router.dart:93-95,148`). Logout-on-failure divergence tracked under useUser. |
 | Splash | Authenticated with `profileCompleted === false` → CompleteProfile. | `computeRedirect` (`profileCompleted` gate) | PRESENT | |
 | Splash | Authenticated with `VIEW_COUNSELOR_CHAT` → `checkCounselorChat`: active goes to [CallLog, Listening], otherwise CallLog. | `main.dart` auth listener → `checkForActiveChat` | PRESENT | |
 | Splash | Force-update modal blocks all post-login routing. | `core/app_update/force_update_modal.dart:22` | PRESENT | v2: `ForceUpdateGate` overlays every route (incl. login) and swallows touches. |
 | Splash | Login: a suspended error routes to SuspendedAccount (unauth stack). | `login_screen.dart` `_isSuspendedUserError` → `/suspended`; `computeRedirect` `isSuspended` | PRESENT | |
 | Splash | Hardware back on the OTP step returns to email. | `login_screen.dart` `PopScope` | PRESENT | |
 | RootNavigator | On auth, `getSummaryFields()` loads the tenant's visible summary fields into the store (`setSummaryVisibleFields`), used by CallSummaryDetails, SectionWrapper and VoiceNoteSection. | `core/settings/settings_repository.dart:75-141`, `call_summary_fields.dart:533-541` | PRESENT | v2 (`0de134b`): `GET /settings/summary-fields` → `summaryVisibleFieldsProvider` (kept alive); filters sections and voice-note targets. |
-| RootNavigator + utils/deeplink.ts | Universal links `https://{ALLY_WEB_URL host}/summary/:id` → reset to [CallLog, CallSummary(callId, fromLogs)], kept pending until authenticated and summary fields are loaded; suppresses the active-chat auto-route while a link is in progress. | none | MISSING | Unchanged: no `app_links`/`uni_links` dependency, no `/summary` link handler. Route `/call-log/:id` still needs an in-memory `CallLogItem` extra (§1 row 7). |
-| RootNavigator + deeplink.ts | `/course/:uuid` → CourseOverview once past Splash and CompleteProfile; kept pending through login; dropped if on Listening; launch URL handled once. | none (`/courses/:trackId` exists but nothing routes a link to it) | MISSING | Unchanged. |
-| Native link claims | AASA `paths` and an Android `autoVerify` intent-filter `pathPrefix` for /summary and /course. | none | MISSING | Unchanged: no https intent filter in AndroidManifest; no `.entitlements`/associated-domains on iOS. Needs Apple team signing + `assetlinks.json`/AASA on the web host. |
-| RootNavigator | App-wide socket on `CLOUD_TELEPHONY_PATH` for the whole authenticated session; `USER_JOINED` → `checkCounselorChat` → auto-route to Listening (an incoming conference call is answered from the phone with no screen open). | `core/chat/cloud_telephony_listener.dart`, `main.dart` auth listener | PRESENT | v2 (`d4ae9eb`): own `SocketService`, started on sign-in in `main.dart`, `USER_JOINED` → `checkForActiveChat`; disconnect on pause / reconnect on resume; stopped on sign-out. |
+| RootNavigator + utils/deeplink.ts | Universal links `https://{ALLY_WEB_URL host}/summary/:id` → reset to [CallLog, CallSummary(callId, fromLogs)], kept pending until authenticated and summary fields are loaded; suppresses the active-chat auto-route while a link is in progress. | `core/deeplink/deep_link_coordinator.dart`, `deep_link_binding.dart`, `deep_link.dart` | DEVICE-CHECK | v3 (`c536efa`): `app_links` stream created before `runApp` (`main.dart:64,69`); `deepLinkBindingProvider` (`core/deeplink/deep_link_binding.dart:21-51`); parser = RN `isSupportedDeepLink`/`getCallIdFromUrl` (`deep_link.dart:58-108`); summary held until signed in AND summary fields load (`deep_link_coordinator.dart:99-114`); opens `/home` then pushes `/call-log/:id`, which no longer needs an extra (`app_router.dart:312-320`). RN's `isDeepLinkInProgress` guard is computed once at mount (`RootNavigator.tsx:112-116`), always false, so not porting it is correct. Cold/warm delivery on iOS goes through app_links 7.2.2's `FlutterSceneLifeCycleDelegate`; only provable on device. |
+| RootNavigator + deeplink.ts | `/course/:uuid` → CourseOverview once past Splash and CompleteProfile; kept pending through login; dropped if on Listening; launch URL handled once. | `core/deeplink/deep_link_coordinator.dart` (`openPendingCourse`) | DEVICE-CHECK | v3: held through splash/login/complete-profile, dropped on listening routes, re-checked on every route change (`deep_link_coordinator.dart:61,88-97`, `deep_link_binding.dart:38-41`) → `push('/courses/$trackId')` (`:81-84`). Device-only proof. |
+| Native link claims | AASA `paths` and an Android `autoVerify` intent-filter `pathPrefix` for /summary and /course. | `AndroidManifest.xml:60-65`, `ios/Runner/Runner.entitlements` | DEVICE-CHECK | v3 (normalised: prod AASA `W3ZL4N9N9J.com.helloally.app` and assetlinks for `com.helloally.app` are already hosted, see §10c r23): Android `autoVerify` filter for `/summary`,`/course` on `${appLinkHost}` (`android/app/src/main/AndroidManifest.xml:60-65`, hosts `android/app/build.gradle.kts:56,62`), `launchMode=singleTask` (`:36`), `flutter_deeplinking_enabled=false`; iOS `applinks:` in `ios/Runner/Runner.entitlements`, wired via `CODE_SIGN_ENTITLEMENTS`. Needs AASA/`assetlinks.json` on the web host to list the Flutter build's team/cert (same as RN's only if the same signing key/team is used). |
+| RootNavigator | App-wide socket on `CLOUD_TELEPHONY_PATH` for the whole authenticated session; `USER_JOINED` → `checkCounselorChat` → auto-route to Listening (an incoming conference call is answered from the phone with no screen open). | `core/chat/cloud_telephony_listener.dart`, `main.dart` auth listener | PRESENT | v3 spot-check: `cloud_telephony_listener.dart:35-66`, started `main.dart:131-133`. Inherits the socket retry fix. |
 | useCounselorChat via RootNavigator | Foreground re-check for an active chat. | `main.dart` `didChangeAppLifecycleState(resumed)` | PRESENT | |
 | RootNavigator | Leaderboard reminder when authenticated and `VIEW_COMMUNITY_LEADERBOARD` and enabled (null means ON): create channel, request permission, schedule weekly (Mon 11:00 from env). | `core/push/leaderboard_notification.dart` (`leaderboardNotificationSyncProvider`, `zonedSchedule` `dayOfWeekAndTime`) | PRESENT | Flutter also cancels it on logout; RN doesn't. |
-| RootNavigator + pushNotificationService | When authenticated: create the `reminders` channel, request notification permission, register the FCM token (`POST /notifications/device-tokens` with platform), re-register on `onTokenRefresh`, show foreground messages via Notifee. | `core/navigation/app_shell_screen.dart` initState → `PushNotificationService.initializeAndRegister` | PARTIAL | Code is a full port; blocked only on the Firebase config files (credentials, §10 row 22). Registration fires once `/home` mounts. |
-| pushNotificationService | `unregisterDeviceForPush` on logout: `DELETE` device token, then `messaging().deleteToken()`. | `core/push/push_notification_service.dart:237-260`, called from `core/auth/auth_state.dart:75` | PRESENT | v2 (`98b9518`): `DELETE` device token then `deleteToken`, best-effort, before tokens are cleared; skipped on session expiry like RN. |
-| pushNotificationService | `displayRemoteMessage`: data-only `{title, body}`, skipped when body is empty; `reminders` channel; tap goes to the default action. | `displayReminderNotification` | PRESENT | Unique id per notification, as in RN. |
+| RootNavigator + pushNotificationService | When authenticated: create the `reminders` channel, request notification permission, register the FCM token (`POST /notifications/device-tokens` with platform), re-register on `onTokenRefresh`, show foreground messages via Notifee. | `core/navigation/app_shell_screen.dart` initState → `PushNotificationService.initializeAndRegister` | BLOCKED-EXTERNAL | v3: code is a full port (`push_notification_service.dart:225-270`, called from `app_shell_screen.dart:63`); only the Firebase config (CI S3 secrets) is missing. |
+| pushNotificationService | `unregisterDeviceForPush` on logout: `DELETE` device token, then `messaging().deleteToken()`. | `core/push/push_notification_service.dart:237-260`, called from `core/auth/auth_state.dart:75` | BLOCKED-EXTERNAL | v3: code done (`push_notification_service.dart:281-297`, `auth_state.dart:70-80`); needs a real FCM token, i.e. the Firebase files. Reclassified from PRESENT (vocabulary only). |
+| pushNotificationService | `displayRemoteMessage`: data-only `{title, body}`, skipped when body is empty; `reminders` channel; tap goes to the default action. | `displayReminderNotification` | BLOCKED-EXTERNAL | v3: code done (`push_notification_service.dart:43-72`); only fed by FCM (`onMessage`, background handler), so inert without Firebase files. Reclassified from PRESENT (vocabulary only). |
 | RootNavigator | Foreground notification tap: leaderboard id → jump to the Leaderboard **tab**; reminder → Simulations or Notifications. | `notification_navigation.dart:50`, `push_notification_service.dart:127`, `core/navigation/home_tab_navigation.dart` | PRESENT | v2: leaderboard reminder now selects the Leaderboard **tab** (`homeTabLocation` → `goToHomeTab`). `router.go` still replaces the stack. |
-| RootNavigator | Killed-app initial notification (authenticated only): reminder routing; leaderboard routing deduped through `LEADERBOARD_NOTIF_HANDLED_TS` (scheduledAt); waits until off Splash. | `initializeLocalNotifications` → `getNotificationAppLaunchDetails` | PRESENT | No `HANDLED_TS` dedupe (low impact, since launch details only fire on a real launch). |
+| RootNavigator | Killed-app initial notification (authenticated only): reminder routing; leaderboard routing deduped through `LEADERBOARD_NOTIF_HANDLED_TS` (scheduledAt); waits until off Splash. | `initializeLocalNotifications` → `getNotificationAppLaunchDetails` | PRESENT | v3 (`0f7839c`): `HANDLED_TS` dedupe ported (`push_notification_service.dart:107-141`, key `LEADERBOARD_NOTIF_HANDLED_TS`, payload `scheduledAt` at `leaderboard_notification.dart:128-131`), same semantics as `RootNavigator.tsx:358-370`. v2 gap 45 (cold-start dedupe) closed. |
 | utils/notificationNavigation | `isReminderNotification` (type `ENGAGEMENT_REMINDER`); `handleReminderNavigation` (`screen` hint is Simulations, otherwise Notifications). | `core/push/notification_navigation.dart` | PRESENT | |
 | notificationService | `getNextScheduledNotificationTime` from env day, hour and minute; weekly trigger; cancel. | `leaderboard_notification.dart` `nextWeeklyOccurrence`, `cancel` | PRESENT | |
-| TabNavigator | Tabs filtered by permission; ACHIEVEMENTS only for reviewer-only users; initial tab is `getFirstVisibleTab`; unread-review dot (sim plus scribe unread count); lazy tabs; nothing renders while user is loading. | `core/navigation/app_shell_screen.dart`, `tab_config.dart`, `app_bottom_tab_bar.dart`, `unreadReviewCountProvider` | PRESENT | Spot-check v2: badge popup host + back handling added. Still shows raw `'$error'` with no retry if permissions fail to load (`app_shell_screen.dart:81`). |
-| DrawerNavigator | Drawer with logout confirmation, then `handleUserLogout`. | `core/navigation/app_drawer.dart` `_confirmLogout` | PRESENT | Logout misses push deregistration (row above). |
-| utils/navigation.ts | `navigateToTab` / `navigateToLearnTab` / `navigateToCallLogTab` reset into a specific tab (used by path/case/course/feedback/CallSummary exits). | `core/navigation/home_tab_navigation.dart` (`goToHomeTab`) | PARTIAL | v2: `goToHomeTab` exists and CallSummary / Box breathing use it (`call_summary_screen.dart:487`, `box_breathing_screen.dart:191`). Remaining: SimulationFeedback (`simulation_feedback_screen.dart:250,260`), course "Back to Learn" (`course_item_player_screen.dart:290`) and Scribe exit (`scribe_recording_screen.dart:521`) still `go('/home')`, landing on whichever tab was last selected instead of Learn/CallLog. |
+| TabNavigator | Tabs filtered by permission; ACHIEVEMENTS only for reviewer-only users; initial tab is `getFirstVisibleTab`; unread-review dot (sim plus scribe unread count); lazy tabs; nothing renders while user is loading. | `core/navigation/app_shell_screen.dart`, `tab_config.dart`, `app_bottom_tab_bar.dart`, `unreadReviewCountProvider` | PRESENT | v3 (`110c8e1`): permissions failure now shows translated `common.somethingWentWrong` + Retry (`app_shell_screen.dart:99-115`); Community re-opens on every tap (`:80-89`). |
+| DrawerNavigator | Drawer with logout confirmation, then `handleUserLogout`. | `core/navigation/app_drawer.dart` `_confirmLogout` | PRESENT | v3: stale v2 note removed: drawer logout → `AuthController.logout` deregisters push first (`app_drawer.dart:175-187`, `auth_state.dart:70-80`). |
+| utils/navigation.ts | `navigateToTab` / `navigateToLearnTab` / `navigateToCallLogTab` reset into a specific tab (used by path/case/course/feedback/CallSummary exits). | `core/navigation/home_tab_navigation.dart` (`goToHomeTab`) | PRESENT | v3 (`93ebfa9`): every exit now uses `goToHomeTab`: feedback (`simulation_feedback_screen.dart:254,264`), course Back to Learn (`course_item_player_screen.dart:292`), Scribe exit (`scribe_recording_screen.dart:543`), path widgets (`learning_path_widgets.dart:304`). No `go('/home')` left outside the deep-link reset (`deep_link_binding.dart:74`) and complete-profile. |
 | RootNavigator | `gestureEnabled: false` on CallSummary, CourseItemPlayer, CompleteProfile, SimulationAssistant and SimulationFeedback. | `PopScope` on call_summary, roleplay_voice, simulation_feedback; router redirect pins complete-profile | PRESENT | |
 | contexts/ReviewApiContext | Swaps every comment, thread and reaction hook between the simulation and scribe review APIs. | `ReviewType` parameter + `ScribeReviewsRepository` / `ScribeReactionsRepository` (`review_details_screen.dart`, `reactions_screen.dart`) | PRESENT | |
-| Keep-awake (useListeningCommon, SimulationAssistantScreen) | `activateKeepAwake` while listening or recording and during a live roleplay; deactivated on exit. | `core/realtime/keep_awake.dart`; `scribe_recording_screen.dart:149`, `conference_listening_screen.dart:89`, `roleplay_voice_screen.dart:235` | PRESENT | v2 (`b82d84f`, `d4ae9eb`): `wakelock_plus` on Scribe, Conference and live role play; released on dispose. |
+| Keep-awake (useListeningCommon, SimulationAssistantScreen) | `activateKeepAwake` while listening or recording and during a live roleplay; deactivated on exit. | `core/realtime/keep_awake.dart`; `scribe_recording_screen.dart:149`, `conference_listening_screen.dart:89`, `roleplay_voice_screen.dart:235` | PRESENT | v3 spot-check: `keep_awake.dart:13-31` (`WakelockPlus`). |
 | utils/asyncStorage | JSON get/set/remove over AsyncStorage. | SharedPreferences, plus `core/network/token_storage.dart` (secure storage) | PRESENT | |
-| AsyncStorageKeys.ACCESS_TOKEN / REFRESH_TOKEN | Token pair. | `token_storage.dart` (same key names, Keychain/Keystore) | PRESENT | |
+| AsyncStorageKeys.ACCESS_TOKEN / REFRESH_TOKEN | Token pair. | `token_storage.dart` (same key names, Keychain/Keystore) | PRESENT | v3: RN's tokens are carried over on the first prod launch (new row B63). |
 | AsyncStorageKeys.LEARN_ACCESS_TOKEN | — | — | N/A | Never read or written in RN. |
 | AsyncStorageKeys.LEADERBOARD_NOTIFICATION_ENABLED | Toggle. | `leaderboardNotificationPrefsKey` (same name) | PRESENT | |
-| AsyncStorageKeys.LEADERBOARD_NOTIF_HANDLED_TS | Cold-start tap dedupe. | none | MISSING | Unchanged. Low impact. |
+| AsyncStorageKeys.LEADERBOARD_NOTIF_HANDLED_TS | Cold-start tap dedupe. | `core/push/push_notification_service.dart` (`claimColdStartNotificationTap`) | PRESENT | v3: `push_notification_service.dart:116,136-140` (same key, SharedPreferences). |
 | AsyncStorageKeys.ACTIVE_TRACK_CONTEXT | Set when a course roleplay or game launches; CourseItemPlayer refetches the track on focus to pick up completion. | `course_item_player_screen.dart` `_refetchTrackOnReturn` (in memory, route-aware) | PRESENT | Doesn't survive an app kill (RN's does). |
 | AsyncStorageKeys.UI_LANGUAGE / I18N_VERSION | UI language plus dynamic version cache. | `localization_controller.dart` (`ui_language`, `i18n_version`) | PRESENT | |
-| AsyncStorageKeys.AUDIO_PLAYBACK_RATE | Remembers the feedback-screen audio speed. | `features/reviews/presentation/simulation_audio_player.dart` cycles the rate but **doesn't save it** | MISSING | v2: the feedback recording player now exists (`bc9381b`) but the chosen speed is still not persisted (no SharedPreferences key). Low impact. |
+| AsyncStorageKeys.AUDIO_PLAYBACK_RATE | Remembers the feedback-screen audio speed. | `features/reviews/presentation/simulation_audio_player.dart` (`_rateKey`) | PRESENT | v3 (`930992c`): saved/restored under RN's own key `ally:audio:playback-rate` (`simulation_audio_player.dart:62-63,129`). Not migrated from RN (`legacy_session_migration.dart:16` comment is stale). Trivial. |
 | utils/logger | Console output only in development. | `debugPrint` | N/A | |
-| utils/error.ts | `getErrorDetails` (message, else error, else "somethingWentWrong"), `isBackendApiError`. | ad hoc in `login_screen.dart`, `complete_profile_screen.dart` | PARTIAL | Unchanged in substance: helper logic exists locally in login/complete-profile/discussion, but no shared helper; raw `$error`/`$e` still shown in `call_log_screen.dart:248`, `review_screen.dart:48`, `user_analytics_screen.dart:176`, `profile_settings_screen.dart:260`, `call_summary_screen.dart:1150`, `learning_path_detail_view.dart:121`, `app_shell_screen.dart:81`. |
-| utils/error.ts | `isSuspendedUserError` (403 + `USER_SUSPENDED` or "User suspended"). | `login_screen.dart` `_isSuspendedUserError` | PRESENT | |
+| utils/error.ts | `getErrorDetails` (message, else error, else "somethingWentWrong"), `isBackendApiError`. | `core/network/error_details.dart` | PRESENT | v3 (`05d78c1`/`aedd4b1`): shared `core/network/error_details.dart:33-66` (`getErrorDetails`, `isBackendApiError`), used in 14 files; translator registered at `main.dart:117`. No raw `$error`/`$e` reaches UI any more (only `debugPrint`). v2 gap 40 closed. |
+| utils/error.ts | `isSuspendedUserError` (403 + `USER_SUSPENDED` or "User suspended"). | `login_screen.dart` `_isSuspendedUserError` | PRESENT | v3: now shared `error_details.dart:70-74`; used by `login_screen.dart:262`. |
 | utils/fileOperations | `saveFile`: summary export `.txt` to iOS Documents/CallSummary or Android Downloads, plus `scanFile`. | `features/calllog/data/summary_file_export.dart:40-76` (+ MainActivity channel) | PRESENT | v2: `.txt` to iOS Documents/CallSummary or Android Downloads + media scan. |
 | utils/imageUpload | `uploadImageToS3` (PUT blob to the presigned URL). | `account_repository.dart` (presign, then PUT) | PRESENT | |
 | utils/bugReportContext | screen, appVersion, device label, os, timestamp. | `bug_report_repository.dart` `_buildContext` (PackageInfo) | PRESENT | |
 | utils/version.ts | `getAppVersion`, semver `isVersionLower`. | `core/app_update/force_update.dart:26` | PRESENT | v2: `isVersionLower` ported. |
-| utils/common `openAppStore` | Opens the platform store URL (ForceUpdateModal). | `core/app_update/force_update.dart:84` | PRESENT | v2. Opens the RN listings (`id6745545012`, `com.helloally.app`). |
+| utils/common `openAppStore` | Opens the platform store URL (ForceUpdateModal). | `core/app_update/force_update.dart:84` | PRESENT | v3: listings are now this app's own (prod flavor = `com.helloally.app`). |
 | ListeningScreen NetworkDisconnected | Offline vs socket copy; Try-again hidden while offline. | `network_disconnected.dart:43` | PRESENT | v2: `isOffline` now comes from `isOfflineProvider`. |
+| B63 RN → Flutter storage migration (new) | The store update replaces the RN app in place (same bundle id), so its AsyncStorage session must carry over or every user is signed out. | `core/migration/legacy_session_migration.dart:43-121`, `rn_async_storage.dart:22-72`, Android `MainActivity.kt:40-75` (`ally/legacy_rn_storage`), run from `main.dart:60` (prod flavor only) | DEVICE-CHECK | v3 (`ece2b0a`): reads RN AsyncStorage 2.x (iOS `Application Support/<bundle>/RCTAsyncLocalStorage_V1/manifest.json` + MD5 overflow files; Android SQLite `RKStorage.catalystLocalStorage`), JSON-decodes, moves ACCESS/REFRESH tokens into secure storage (pair only, never over an existing session), `ally:ui:language`, `LEADERBOARD_NOTIFICATION_ENABLED`; one-shot flag; RN data untouched. Identity is RN's on both platforms (`ios/Flutter/prod.xcconfig:6`, `android/app/build.gradle.kts:59-62`). Code complete; proof needs an install-over-RN upgrade on a device signed with RN's team/upload key. Not migrated (trivial): `ally:audio:playback-rate`, `HANDLED_TS`. |
+| B64 config/env `I18N_BASE_URL` (new) | Dynamic translation CDN; RN default `''` (`config/env.ts:82`), real value from `.env`. | `core/config/app_config.dart:62-66` | PRESENT | v3: `--dart-define` wins; else prod flavor → `https://api.helloally.ai/i18n` (manifest returned 200 on 10-28), dev flavor → retired `api.helloally.dev/i18n` (falls back to bundled strings; test-only). v2 gap 42 closed for the store build. |
+| B65 utils/articleSegments (new) | `splitArticleHtml` on `data-ally-question` markers for inline article questions. | `features/courses/presentation/article/article_player.dart:50-54` | PRESENT | Discovery. |
+| B66 utils/callLog (new) | `getLogSourceLabelConfig(provider)` label/colour. | `features/calllog/presentation/call_log_row.dart:56` | PRESENT | Discovery. |
+| B67 utils/callSummary (new) | `mapTagsToString` (`tag` joined by ", "); `getEstimatedSummaryGenerationTime`. | `call_log_repository.dart:251-255`; `summary_generation_progress.dart:30-33` | PRESENT | Discovery. |
+| B68 utils/common (new) | `isValidEmail`, `copyToClipboard`, `playNotificationSound`, `BADGE_CATEGORY_MAP`, `formatAsPercentage`/`formatAsStringOrDash`, `stringToUint8` (LiveKit data). | `login_screen.dart` (email check), `simulation_details_screen.dart:64`, `roleplay/presentation/simulation_sound_player.dart`, `achievements_screen.dart:17`, `livekit_room_service.dart:29` | PRESENT | Discovery. `tryParseJson`/`uint8ToString`/`calculateAverageForObjectArray` have no RN caller. Formatter parity owned by feature sections. |
+| B69 utils/credits (new) | `areCreditsLow`, `getCreditUsagePercentage`. | `simulation_models.dart:262-268`; `app_drawer.dart:309-317`; `learning_path_detail_view.dart:143` | PRESENT | Discovery. |
+| B70 utils/customFieldDate (new) | YYYY-MM-DD storage contract, spoken-date parsing, display. | `features/calllog/data/voice_custom_fields.dart`, `summary_display_format.dart` | PRESENT | Discovery; detail in §2 call summary. |
+| B71 utils/date (new) | formatDate/Time, MM:SS, ordinal, relative time, duration. | `call_transcript_tab.dart:12`, `simulation_transcript_repository.dart:33`, `summary_display_format.dart:9`, `review_formatting.dart` | PRESENT | Discovery; per-use parity in feature sections. |
+| B72 utils/html (new) | `decodeHtmlEntities`, `htmlToPlainText`, `htmlToMultilineText`. | `core/widgets/html_rich_text.dart`, course screens | PRESENT | Discovery. |
+| B73 utils/quizAnswerState + quizHelpers (new) | Quiz answer state, `toAnswerInput`, `isAnswered`, fill-blank split, matching pairs. | `features/courses/data/quiz_answer_state.dart`, `quiz/quiz_question_widget.dart` | PRESENT | Discovery. |
+| B74 utils/reviews (new) | `splitByCommentRanges`, top reactions, reaction action maths. | `features/reviews/data/review_models.dart:416-417`, `review_widgets.dart` | PRESENT | Discovery. |
+| B75 utils/simulation (new) | `isShortSession`, `decodeFeedbackPayloadToJson`, `getTriggerWarningNames`, `parseMaxTimeSec`. | `simulation_models.dart:61,478-495`, `livekit_room_service.dart:29`, `simulation_details_modal.dart:330` | PRESENT | Discovery. |
+| B76 utils/trackItemMeta + trackNavigation (new) | Item meta (icon/label/duration); `findNextItemId`. | `features/courses/data/course_models.dart`, `course_detail_screen.dart` | PRESENT | Discovery. |
+| B77 utils/validation (new) | `isNumeric` for OTP input. | `login_screen.dart:998` (`digitsOnly`) | PRESENT | Discovery. |
+| B78 utils/fieldRenderer (new) | `getFieldValue`/`formatFieldValue`/`renderField` for summary fields. | `features/calllog/presentation/call_summary_screen.dart` | PRESENT | Discovery; UI detail in §2. |
+| B79 utils/trackCompletion (new) | `applyCompletionToDetailDraft`. | — | N/A | Discovery: no RN caller outside `utils/index.ts`. |
 
 ---
 
@@ -1682,21 +1731,21 @@ Status key:
 | Slice / item | RN behaviour | Flutter equivalent | Status | Notes |
 |---|---|---|---|---|
 | store.ts | `configureStore` combining user, chat, summary, credits and the RTK Query api. | Riverpod `ProviderScope` with per-feature providers | PRESENT | |
-| store.ts | `setupListeners` enables `refetchOnFocus` / `refetchOnReconnect` (used by badges). | `core/navigation/screen_focus_listener.dart` | PARTIAL | v2: refetch-on-focus is ported as `ScreenFocusListener` (call log, reviews, leaderboard) and the badge popup refetches when its tab shows. No refetch-on-reconnect anywhere. Low impact. |
+| store.ts | `setupListeners` enables `refetchOnFocus` / `refetchOnReconnect` (used by badges). | `core/navigation/screen_focus_listener.dart` | PRESENT | v3: RN uses `refetchOnReconnect`/`refetchOnFocus` only in useBadgePopup and the two ReviewDetails screens (grep). Both now refetch on reconnect (`badge_popup.dart:191-195`, `review_details_screen.dart:317-320`) and on app resume (`badge_popup.dart:88-89`, `review_details_screen.dart:108-109`). v2 gap 44 (refetch half) closed. |
 | api tagTypes | Tag invalidation keeps 21 cache families fresh after mutations (credits, unread counts, notifications, track detail, discussion, …). | repository `onInvalidate` tag callbacks | PRESENT | v2 (`8e6ad33`, `2c523b3`): per-repository cache tags mirror RN invalidations (e.g. `SimulationCacheTag` in `simulations_repository.dart:197-215`). |
 | userSlice.initialState | `loading: true` until the token check finishes. | `AuthState.unknown` (`isRestored: false`) | PRESENT | |
 | userSlice.setAuthenticated | Flag drives the stack swap. | `AuthController.state.isAuthenticated` | PRESENT | |
 | userSlice.setLoading | Ends the launch wait. | `AuthState.isRestored` | PRESENT | |
 | userSlice.setUser / clearUser | Current user from `/users/me`. | `currentUserProvider` (returns a never-completing future when signed out; refetches on auth change) | PRESENT | |
 | userSlice.setPermissions | Permissions array drives tabs, drawer and gates. | `userPermissionsProvider` (`/authorization/permissions`), rebuilt through `apiClientProvider` on auth change | PRESENT | |
-| userSlice.storeTokens (thunk) | Writes ACCESS and REFRESH tokens to AsyncStorage. | `TokenStorage.storeTokens` (secure storage) via `AuthController.signIn` and the interceptor refresh | PRESENT | Encrypted storage (deliberate). Tokens from an RN install wouldn't migrate, but the bundle id differs today. |
+| userSlice.storeTokens (thunk) | Writes ACCESS and REFRESH tokens to AsyncStorage. | `TokenStorage.storeTokens` (secure storage) via `AuthController.signIn` and the interceptor refresh | PRESENT | Encrypted storage (deliberate). v3: prod flavor now has RN's bundle id/applicationId, and RN tokens are migrated once (§4b B63). |
 | userSlice.handleLogout (thunk) | Removes tokens, `setAuthenticated(false)`, `clearUser`, `setPermissions([])`. | `AuthController.logout()` (`TokenStorage.clear`, state false), with user and permissions providers rebuilt | PRESENT | |
 | useUser.handleUserLogout | Best-effort **push token deregistration** (DELETE device token + FCM `deleteToken`) while auth is still valid, then logout. | `auth_state.dart:72-80` → `PushNotificationService.unregister` | PRESENT | v2. |
 | useUser.handleUserLogout | `api.util.resetApiState()` drops every cached query. | `apiClientProvider` watches `isAuthenticated`; every repository watches it, so the cascade rebuilds | PRESENT | |
 | api.ts handleUserLogout | Session expiry: logout + reset + toast `auth.sessionExpired`. | `AuthController.sessionExpired()` (snackbar, no toast if never signed in) | PRESENT | |
-| useUser.checkAuth failure | Any `/users/me` failure logs out. | none | PARTIAL | Unchanged: lenient divergence (needs a product call). |
+| useUser.checkAuth failure | Any `/users/me` failure logs out. | none | PARTIAL | v3: unchanged divergence, now a recorded team decision (`app_router.dart:90-92`, `app_shell_screen.dart:99-101`). See useUser. |
 | Logout side effects: socket | Sockets close through screen unmount and focus cleanup (userId goes undefined). | Screens dispose `SocketService` when the redirect unmounts them; `socketServiceProvider` disposes on scope teardown | PRESENT | |
-| Logout side effects: analytics | RN has **no** PostHog, and no Crashlytics `setUserId` or reset. | — | N/A | Nothing to port. Flutter has Crashlytics in pubspec but uses none of it. |
+| Logout side effects: analytics | RN has **no** PostHog, and no Crashlytics `setUserId` or reset. | — | N/A | Nothing to port. v3: Flutter wires Crashlytics only for error reporting (`core/errors/crash_reporting.dart`); no user id, like RN. |
 | Logout side effects: chat / credits / summary | RN does **not** clear `chat.currentChat`, credits or summary on logout. | `currentChatProvider` also isn't cleared; credits rebuild through apiClient | N/A | Parity, including RN's latent leak. |
 | chatSlice.setCurrentChat | Set from the counsellor-chat discovery. | `core/chat/current_chat_provider.dart` `set(chat)` from `active_chat_discovery.dart` | PRESENT | |
 | chatSlice.setCurrentChatId | On `USER_JOINED`, MicrophoneListeningScreen records the chat id (merge, not replace), so a slow refetch can't strand the session. | `scribe_recording_screen.dart:379`, `conference_listening_screen.dart:147` | PRESENT | v2 (`d4ae9eb` chatId race fix): Scribe/Conference write the chat into `currentChatProvider`. |
@@ -1709,27 +1758,29 @@ Status key:
 | summarySlice.setSummaryVisibleFields / selectSummaryVisibleFields | Tenant-configured visible summary fields filter the sections and voice-note targets. | `settings_repository.dart:141` (`summaryVisibleFieldsProvider`) | PRESENT | v2. |
 | summarySlice.clearSummaryStates | Clears summary, form and saved data when CallSummary unmounts. | Local `State` is discarded on dispose | PRESENT | |
 | summarySlice selectors | selectSummary, selectCallDetails, selectCallInfo (chatId, counselorId, duration, provider, mode, summaryName), selectMetrics. | `CallSummaryDetails` model fields in `call_log_repository.dart`; metrics fields `listeningShare`, `reflectiveQuestionsAsked`, `emotionalLift` in `call_summary_fields.dart` | PRESENT | `selectMetrics` itself has no `.tsx` consumer in RN. |
+| store/hooks.ts (new) | Typed `useAppDispatch`/`useAppSelector`. | Riverpod `ref.watch/read` | N/A | Discovery: typing wrapper only. |
 
 ---
 
-#### Top gaps by user impact (v2)
+#### Top gaps by user impact (v3)
 
-1. **No deep links**: `/summary/:id` and `/course/:uuid` universal links (Dart handler, `app_links` plugin, Android `autoVerify` intent filter, iOS associated-domains entitlement, AASA/assetlinks on the web host). `/call-log/:id` also can't open by id alone.
-2. **Push and Crashlytics blocked on Firebase config** (`GoogleService-Info.plist`, `google-services.json` for the Flutter ids). The code is complete.
-3. **Tab-targeted exits incomplete**: SimulationFeedback, course "Back to Learn" and Scribe exit `go('/home')` without `goToHomeTab`.
-4. **Launch auth is token-only** (no `/users/me` validation; non-401 failures don't log out). Product call.
-5. **Voice-note dictation has no 24MB auto-stop.**
-6. **Raw exception text** in several error states (no shared `getErrorDetails`).
-7. Low: no refetch-on-reconnect; feedback playback speed not persisted; no cold-start leaderboard-tap dedupe.
+No MISSING rows and no true code gap left in this section beyond one decided divergence.
+
+1. **Firebase config for the store build** (BLOCKED-EXTERNAL): push registration, FCM display, logout deregistration, background handler, Crashlytics. CI fetches the files from S3; needs `IOS/ANDROID_GOOGLE_SERVICES_S3_URI_PROD` + AWS OIDC trust for this repo.
+2. **Deep links** (DEVICE-CHECK + BLOCKED-EXTERNAL): Dart handler, manifest filter and entitlements are done. Needs AASA/`assetlinks.json` matching the Flutter build's signing, then cold/warm checks on device.
+3. **RN session migration** (DEVICE-CHECK): code complete; prove with an over-the-top upgrade from the RN store build on iOS and Android.
+4. **Google sign-in client ids** (BLOCKED-EXTERNAL): `ENV_VALUES_*` secret must be copied to this repo. Apple sign-in: device check.
+5. **Logout on any `/users/me` failure** (PARTIAL ×2): team decided against it (`app_router.dart:90-92`). Close as won't-fix or port.
+6. Low: no in-flight guard on `checkForActiveChat`; voice-note setting fetched before the counsellor check; dev flavor's `I18N_BASE_URL` default is the retired dev host.
 
 ---
-
 
 ## §5 Backend endpoints (actually called by RN) and transport
 
 ### Endpoints and transport parity ledger (RN to Flutter)
 
 - RN source of truth: `ally-platform/ally-mobile/src` (services/*.ts, constants/general.ts `API_ROUTES`, plus raw fetch/XHR/socket.io/LiveKit callers).
+- **v3 re-audit (2026-10-28): Flutter worktree @ f770200** (56 commits since v2's 227db3a), RN @ 7a8ce0c19. Every non-PRESENT row re-read; 55 PRESENT endpoint rows spot-checked (method, path, query/body, caller); endpoint diff re-run (`v3/scripts/endpoints_out.txt`, `fl_calls_out.txt`, `callers_out.txt`). Changed notes prefixed **v3:**.
 - **v2 re-audit (2026-10-28): Flutter master @ 227db3a.** Every PARTIAL/MISSING/MERGED row below was re-read on master; v1 statuses are kept in brackets as `(v2: was …)`. v1 note follows.
 - Flutter (v1): `ally-mobile-flutter` **master @ e248a07**, the tip at 18:52 on 2026-10-28. `parity/feedback` was merged into master at 18:52 and the branch deleted, so Ask-AI and event-checklist now count as PRESENT on master. The only open in-flight branch is **`parity/reviews` @ a91ed21**. I also checked `feature/simkit`, which is already merged.
 - "Called" means an RTK endpoint whose generated hook or `.endpoints.X.initiate` is referenced from non-test code under `src/`, or a raw call. Hooks that are only exported from `hooks/index.ts` and never invoked (`useLanguageDropdown`, `useSimulationTransition`) count as unused, so the endpoints that only they reach are listed as DEAD (transitive).
@@ -1738,18 +1789,18 @@ Status key:
 
 #### Tallies
 
-| Status | Count |
-|---|---|
-| PRESENT | 148 (143 RTK + 5 raw) (v1: 104) |
-| PARTIAL | 2 (1 RTK + 1 raw) (v1: 21) |
-| MISSING | 0 (v1: 11) |
-| MERGED (was IN PROGRESS on parity/reviews) | 0 (v1: 14; all re-read on master → PRESENT) |
-| DEAD (defined in RN, never called) | 25 (21 direct + 4 transitive) |
-| **Called endpoints total** | 150 (144 RTK + 6 raw HTTP) |
+| Status | v3 | (v2) |
+|---|---|---|
+| PRESENT | 150 table rows = 149 v2 rows + 1 new 7a8ce0c19 contract row (covers the 150 called endpoints: the force-update row is GET ios + android) | (148) |
+| PARTIAL | 0 | (2) |
+| MISSING | 0 | (0) |
+| BLOCKED-EXTERNAL / DEVICE-CHECK | 0 / 0 | (n/a) |
+| DEAD (defined in RN, never called) | 25 (21 direct + 4 transitive) | (25) |
+| **Endpoint-table rows** | 150 | (149 rows / 150 endpoints) |
 
-Transport, realtime and cache findings are in separate sections below and are not counted in the table. v2 non-table residue: transport 1 PARTIAL (error normalisation), realtime 1 PARTIAL (socket retry-after-failure), cache 1 PARTIAL (review-details foreground refetch); everything else in §5.2–5.4 is PRESENT or divergent-by-design.
+Transport / realtime / cache (§5.2–5.4, counted separately): **v3 all PRESENT or divergent-by-design, plus 1 new DEVICE-CHECK row (RN session carry-over).** The three v2 PARTIALs are closed: error normalisation (`core/network/error_details.dart:33`), socket retry-after-failure (`core/realtime/socket_service.dart:27,110-127`), review-details resume/reconnect/edit refetch (`features/reviews/presentation/review_details_screen.dart:108-113,309-311,318-320`). Divergent-by-design rows (not gaps): Retry policy, Timeouts (Dio `receiveTimeout 90s`, `core/network/api_client.dart:27`), Network logger.
 
-**v2 spot-check of PRESENT rows (16 checked: generateOtp, completeProfile, getCallLogs filter params incl. seconds + comma-joined multiselects, call-summary 403 transcript gate `call_summary_screen.dart:600`, mark-read ×3, quiz submit, article-read, journal/submit, reference-document search, startScenarioSession, getSimulationDetails, leaderboard, places, reviews list):** no regressions found.
+**v3 spot-check of PRESENT rows (55):** generateOtp, verifyOtp, loginWithGoogle, completeProfile, profile-image-url + S3 PUT + PATCH/DELETE profile-image, getForceUpdateConfig, createBugReport, search, getLeaderboard, getMyRank, getNotifications, markAll, registerDeviceToken, deleteDeviceToken, getCallLogs, getCallTags, getSimulationLogs, archiveCallLog, updateCallInfo, deleteSummary PUT, exportCallSummary (plain), updateNotes, enhance, retrySummary, summary-feedback body, createNote, generate-from-audio (multipart), saveNoteTranscript, getChatMessages, custom-field values PUT, getPlaces/searchPlaces, addFeedback/updateFeedback, enrollTrack, journal draft/submit, video-progress, quiz-attempts, branching, bucket-sort place, startScenarioSession, endScenarioSession, simulation feedback body, getSimulationMessages, getReviews, createReview, createScribeReview, updateReviewStatus, getThreads, review_api comments/reactions, Ask-AI history/stream. All match RN; every repository method has a live caller (`v3/scripts/callers_out.txt`) except the RN-dead extras listed in §5.5. **No regressions.**
 
 ---
 
@@ -1795,12 +1846,12 @@ Transport, realtime and cache findings are in separate sections below and are no
 | markNotificationRead | PATCH /notifications/:id/read | none | NotificationsScreen | `markRead`; invalidates `notificationsControllerProvider` | PRESENT |
 | markAllNotificationsRead | PATCH /notifications/read-all | none | NotificationsScreen | `markAllRead` | PRESENT |
 | registerDeviceToken | PUT /notifications/device-tokens | `{token, platform:'IOS'/'ANDROID'}` | services/pushNotificationService (initiate on login + token refresh) | `NotificationsRepository.registerDeviceToken` via `core/push/push_notification_service.dart:210,216` | PRESENT |
-| deleteDeviceToken | DELETE /notifications/device-tokens/:encodedToken | none | `unregisterDeviceForPush`, called from hooks/useUser logout | `PushNotificationService.unregister` (`core/push/push_notification_service.dart:246-260`) called from logout in `core/auth/auth_state.dart:75` | PRESENT (v2: was MISSING) |
+| deleteDeviceToken | DELETE /notifications/device-tokens/:encodedToken | none | `unregisterDeviceForPush`, called from hooks/useUser logout | `NotificationsRepository.deleteDeviceToken` (`notifications_repository.dart:58-59`, URI-encoded) via `PushNotificationService.unregister`, called from logout `core/auth/auth_state.dart:73` | PRESENT. v3: spot-checked. |
 
 ##### Scribe: live chat, call log, call summary, notes
 | RN endpoint | Method + path | Request shape | RN call site(s) | Flutter | Status |
 |---|---|---|---|---|---|
-| getCounsellorChat | GET /chats/counsellor-chat | none | useCounselorChat (RootNavigator, SplashScreen, CallLogScreen, useListeningCommon) | `ChatRepository.getCounsellorChat`, `core/chat/active_chat_discovery.dart` (cold launch + resume only) | PRESENT. The app-wide socket trigger is missing; see §3. |
+| getCounsellorChat | GET /chats/counsellor-chat | none | useCounselorChat (RootNavigator, SplashScreen, CallLogScreen, useListeningCommon) | `ChatRepository.getCounsellorChat` (`scribe/data/chat_repository.dart:19`); callers `core/chat/active_chat_discovery.dart:55`, `calllog/presentation/call_log_screen.dart:219,238-247` (before `/scribe`), `scribe_recording_screen.dart:391,428`, `conference_listening_screen.dart:142,155`; app-wide telephony `USER_JOINED` → `checkForActiveChat` (`main.dart:128-133`) | PRESENT. v3: v2 gap 27 (no check before `/scribe`) CLOSED (`call_log_screen.dart:219`); stale "socket trigger missing" note removed. |
 | endCall | POST /chats/:chatId/end | none | useListeningCommon | `ChatRepository.endCall` | PRESENT |
 | addFeedback | POST /chats/messages/:messageId/feedback | `{rating}` | NudgeSection | `ChatRepository.addFeedback` | PRESENT |
 | updateFeedback | PATCH /chats/messages/feedback/:feedbackId | `{rating}` | NudgeSection | `ChatRepository.updateFeedback` | PRESENT |
@@ -1854,6 +1905,7 @@ Transport, realtime and cache findings are in separate sections below and are no
 | saveJournalDraft | POST .../items/:itemId/journal | `{responses:[{promptId, response}]}` | JournalPlayer | `saveJournalDraft` | PRESENT |
 | submitJournal | POST .../items/:itemId/journal/submit | none | JournalPlayer | `submitJournal` | PRESENT |
 | setTrackLanguage | PUT /learn/tracks/:trackId/language | `{languageCode}` | CourseLanguageSheet | `setTrackLanguage`; invalidates `trackDetailProvider` | PRESENT |
+| startTrackItem response (ROLEPLAY) — **new v3 row (RN 7a8ce0c19)** | POST /learn/tracks/items/:itemId/start → `completionCriteria.assessmentMode`, `assessmentSubmittedAt?` | response fields | RoleplayCasePlayer (`types/courses.ts` `TrackCompletionCriteria.assessmentMode`, `StartRoleplayItemPayload.assessmentSubmittedAt`) | parsed in `courses/data/start_item_payload.dart:623-624,635-639` and `course_models.dart:120-133`; consumed by `courses/presentation/roleplay/roleplay_case_player.dart:56-57,128-173` | PRESENT (v3 new) |
 | getDiscussion | GET /learn/track-items/:itemId/discussion | none | components/DiscussionThread | `DiscussionRepository.getDiscussion` (`discussion_repository.dart`) | PRESENT |
 | createDiscussionPost | POST /learn/track-items/:itemId/discussion/posts | `{content}` | DiscussionThread | `createPost` | PRESENT |
 | replyToDiscussionPost | POST /learn/discussion/posts/:postId/replies | `{content}` | DiscussionThread | `replyToPost` | PRESENT |
@@ -1894,7 +1946,7 @@ Master files: `features/reviews/data/reviews_repository.dart`, `scribe_reviews_r
 |---|---|---|---|---|---|
 | getReviews (lang) | GET /scenario-session-reviews | `{sortBy, readFilter, limit:10, offset, order:'DESC'}`, infinite scroll | ReviewScreen / ReviewList / useReviews | `ReviewsRepository.getReviews` (`reviews_repository.dart:26-37`): paginated `limit:10, offset`, `order:DESC`; `LanguageCodeInterceptor` (`core/network/language_code_interceptor.dart:27`) injects `languageCode` | PRESENT (v2: was MERGED) |
 | getScribeReviews | GET /scribe-session-reviews | same shape | ReviewScreen | `ScribeReviewsRepository` (`scribe_reviews_repository.dart:22-33`): paginated, `order:DESC` | PRESENT (v2: was MERGED) |
-| getReviewById (lang) | GET /scenario-session-reviews/:id | none; `keepUnusedDataFor:0`, refetchOnFocus/Reconnect | SimulationFeedbackScreen, SimulationReviewDetailsScreen | `ReviewsRepository.getReview`, `reviewDetailProvider` (`reviews_repository.dart`, autoDispose = fresh on every open); `LanguageCodeInterceptor` (`core/network/language_code_interceptor.dart:27`) injects `languageCode` | PARTIAL (v2): no refetch on app foreground/reconnect while the details screen stays open (RN `refetchOnFocus/Reconnect`). |
+| getReviewById (lang) | GET /scenario-session-reviews/:id | none; `keepUnusedDataFor:0`, refetchOnFocus/Reconnect | SimulationFeedbackScreen, SimulationReviewDetailsScreen | `ReviewsRepository.getReview` (`reviews_repository.dart:46-50`), `reviewDetailProvider`; interceptor `languageCode`. v3: refetch on app resume (`review_details_screen.dart:108-113`), on back-online (`:318-320`, `isOfflineProvider`), and after edit-note returns (`:309-311`) | PRESENT. v3: was PARTIAL (v2 gap 38 CLOSED, f87fa32). |
 | getScribeReviewById | GET /scribe-session-reviews/:id | none | ScribeReviewDetailsScreen | `getScribeReview` | PRESENT |
 | createReview | POST /scenario-session-reviews | `{scenarioSessionId, note}` | ShareSimulationScreen | `ReviewsRepository.createReview` | PRESENT |
 | createScribeReview | POST /scribe-session-reviews | `{scribeSessionId:number, note}` | ShareCallLogScreen | `ScribeReviewsRepository.createReview` | PRESENT |
@@ -1936,7 +1988,7 @@ Master files: `features/reviews/data/reviews_repository.dart`, `scribe_reviews_r
 ##### Dynamic translations CDN (raw)
 | RN | Method + path | Shape | RN call site | Flutter | Status |
 |---|---|---|---|---|---|
-| (raw) i18n sync | GET `${I18N_BASE_URL}/manifest.json`, then GET `${base}/${currentVersion}/${lang}/${ns}.json` per namespace | no auth; cached in AsyncStorage per version+lang; refresh on start, on AppState active, every MANIFEST_RECHECK_MS, and on `languageChanged` | localization/dynamic.ts | `LocalizationController._refresh` (`core/localization/localization_controller.dart:141-185`) using a bare `Dio()` (correct, no API interceptor); 30s poll + resume; gated on `LANGUAGE_SELECTOR_FLAG` like RN | PARTIAL (v2): (1) language-change early return FIXED (`localization_controller.dart:150-157` now checks the cached resource for the current language, 8e0a859). (2) Still open: the default `I18N_BASE_URL` is `https://api.helloally.dev/i18n` (the dev env was retired 10-15), where RN defaults to empty, i.e. disabled. |
+| (raw) i18n sync | GET `${I18N_BASE_URL}/manifest.json`, then GET `${base}/${currentVersion}/${lang}/${ns}.json` per namespace | no auth; cached per version+lang; refresh on start, AppState active, every MANIFEST_RECHECK_MS, `languageChanged` | localization/dynamic.ts | `LocalizationController._refresh` (`core/localization/localization_controller.dart:150-185`), bare Dio; language-change cache check `:163-170` | PRESENT. v3: was PARTIAL. v2 gap 42 CLOSED: `AppConfig.i18nBaseUrl` (`core/config/app_config.dart:62-66`) = dart-define if set, else prod flavor → `https://api.helloally.ai/i18n` (probed 2026-10-28: manifest 200, `currentVersion v150`, 5 langs); prod CI passes RN's `.env` via `--dart-define-from-file` (`.github/workflows/build-ios-production.yml:130`, `build-android-production.yml:139`). Non-prod flavor still falls back to retired `api.helloally.dev/i18n` (fails silently into cached/bundled strings; dev-only). |
 
 ---
 
@@ -1945,9 +1997,10 @@ Master files: `features/reviews/data/reviews_repository.dart`, `scribe_reviews_r
 | Concern | RN (`services/api.ts` etc.) | Flutter (`core/network/*`) | Status |
 |---|---|---|---|
 | Base URL | `env.API_BASE_URL + '/api/'` + `v1`/`v2` per exact-match list | `AppConfig.requireApiBaseUrl + '/api'`; interceptor prefixes `/v1` or `/v2` with exact match (`auth_interceptor.dart:47`) | PRESENT |
-| Auth header | `authorization: Bearer <ACCESS_TOKEN>` from AsyncStorage in `prepareHeaders` | Same header from `flutter_secure_storage` (`token_storage.dart`, same key names) | PRESENT. Storage differs: Keychain/Keystore vs AsyncStorage, so tokens do not migrate across the app swap and users must log in again. |
+| Auth header | `authorization: Bearer <ACCESS_TOKEN>` from AsyncStorage in `prepareHeaders` | Same header from `flutter_secure_storage` (`token_storage.dart`, same key names) | PRESENT. v3: storage differs (Keychain/Keystore vs AsyncStorage) but see the new carry-over row below. |
+| **new v3:** RN session carry-over on app swap | n/a (RN is the incumbent; tokens in AsyncStorage `ACCESS_TOKEN`/`REFRESH_TOKEN`) | `core/migration/legacy_session_migration.dart:43-100` + `rn_async_storage.dart`: one-time copy of the token pair, UI language and leaderboard flag when this app has none; run in prod flavor only (`main.dart:60`, ece2b0a) | DEVICE-CHECK: needs an RN-store-build → Flutter-store-build upgrade on a real iOS and Android device (same bundle id) to prove the AsyncStorage read. |
 | 401 refresh | On 401: no tokens means logout; else POST `/auth/refresh {refreshToken}` (through the same baseQuery, with the old bearer); store tokens; retry the original once; on failure, logout. No de-duplication. | Same contract; a bare `refreshDio` posts `/v1/auth/refresh`; concurrent 401s share one `_refreshFuture` (single-use refresh token race fixed); the retry goes via `refreshDio` (keeps `ResponseType.stream`) | PRESENT (Flutter is stricter: if the retried request 401s again it also logs out, where RN would just return the error) |
-| Logout on refresh failure | `handleLogout()` + `api/resetApiState` + toast `auth.sessionExpired` | `AuthController.sessionExpired()`: clear tokens, auth state false, snackbar `auth.sessionExpired` (suppressed if already signed out); `apiClientProvider` watches auth, so every repository/provider is rebuilt (cache reset) | PRESENT. v2: explicit logout now deletes the device token (`auth_state.dart:75` → `push_notification_service.dart:246`); session-expiry doesn't, same as RN. |
+| Logout on refresh failure | `handleLogout()` + `api/resetApiState` + toast `auth.sessionExpired` | `AuthController.sessionExpired()`: clear tokens, auth false, toast `auth.sessionExpired`; `apiClientProvider` watches auth (cache reset) | PRESENT. v3: explicit logout deletes the device token at `core/auth/auth_state.dart:73`; session-expiry doesn't, same as RN. |
 | Retry | None (RTK default) | Riverpod `appRetryPolicy`: provider reads only, max 3, 400ms doubling, skips 4xx/cancel; mutations not retried | Divergent by design (OK) |
 | Timeouts | None on RTK fetch; Ask-AI XHR has no explicit timeout; socket `timeout:10000` | Dio `connectTimeout 20s`, `receiveTimeout 90s` (inter-chunk); socket `setTimeout(10000)` | Divergent: an LLM endpoint (enhance, retry-summary, generate-from-audio) that is silent for more than 90s fails in Flutter but would succeed in RN |
 | Language headers / params | No `Accept-Language`; injects `languageCode` param/body for 18 allowlisted endpoints (`languageCodeEndpoints.ts`) | `LanguageCodeInterceptor` (`core/network/language_code_interceptor.dart`), same 18 endpoints | PRESENT (v2: was PARTIAL) |
@@ -1955,19 +2008,19 @@ Master files: `features/reviews/data/reviews_repository.dart`, `scribe_reviews_r
 | Tenant header | None (tenant comes from the JWT) | None | PRESENT (parity) |
 | 403 suspended | `isSuspendedUserError`: 403 && (`error==='USER_SUSPENDED'` or `message==='User suspended'`) checked only at OTP/Google/Apple sign-in, then `SuspendedAccount` screen. Not global. | `login_screen.dart:55-65` same predicate after all three sign-in methods, then `/suspended`; router allows `/suspended` while unauthenticated | PRESENT |
 | Other 403 | CallSummaryScreen hides transcript tab on 403 | `call_summary_screen.dart:964` 403 branch; `course_detail_screen.dart:88` 403 | PRESENT |
-| Error normalisation and toast | `getErrorDetails`: `data.message \|\| data.error \|\| t('common.somethingWentWrong')` used by screens with `showToast` | No shared helper; a few screens parse `data['message']` (complete_profile, branching, start_simulation, voice note), many render raw `'$error'` / `'...: $e'` (DioException `toString`), v2 still raw: `app_shell_screen.dart:81`, `call_log_screen.dart:248`, `call_summary_screen.dart:999,1150`, `bug_report_screen.dart:81`, `course_progress_screen.dart:62`, `search_screen.dart:129,153`, `learning_path_detail_view.dart:98,121`, `simulation_details_screen.dart:125`, `preferences_screen.dart:43,46`. Only `login_screen.dart:71 _apiErrorMessage` ports `getErrorDetails`. | PARTIAL: users see raw Dio exception text in ~12 places; no shared helper |
+| Error normalisation and toast | `getErrorDetails`: `data.message \|\| data.error \|\| t('common.somethingWentWrong')` used by screens with `showToast` | v3: shared port `core/network/error_details.dart:33-57` (`getErrorDetails`, `isBackendApiError`, `isSuspendedUserError`; NestJS `message[]` joined), 28 call sites; RN-style toast host (05d78c1/aedd4b1). Re-grep of every `AsyncValue.error` builder (21) and `$e`/`$error`/`toString()` interpolation: no raw exception text reaches UI (all use `getErrorDetails(...).message` or a translated key, e.g. `call_log_screen.dart:297`, `call_summary_screen.dart:1168-1170`, `profile_settings_screen.dart:299`, `app_shell_screen.dart:102-117`); remaining `$e` only in `debugPrint` | PRESENT. v3: was PARTIAL (v2 gap 40 CLOSED). |
 | Network logger | `NetworkLogs` overlay in development | none | n/a (dev only) |
 
 #### 3. Realtime: socket.io and LiveKit
 
 | Item | RN | Flutter | Status |
 |---|---|---|---|
-| Client config | `io(API_BASE_URL + path, {path:'/socket.io', transports:['websocket','polling'], auth: cb with fresh token, reconnection 5 attempts 1-5s, timeout 10s, forceNew, autoConnect:false})` + manual retry timer after an open failure (`RETRY_AFTER_FAILURE_MS`) | `core/realtime/socket_service.dart`: identical options; **no retry-after-failure timer** (`connect()` has try/finally only); a single shared `SocketService` instance across namespaces | PARTIAL (v2 unchanged: still no `RETRY_AFTER_FAILURE_MS` timer in `socket_service.dart:37-95`) |
+| Client config | `io(API_BASE_URL + path, {path:'/socket.io', transports:['websocket','polling'], auth: cb with fresh token, reconnection 5 attempts 1-5s, timeout 10s, forceNew, autoConnect:false})` + retry timer after an open failure (`RETRY_AFTER_FAILURE_MS` 2000) | `core/realtime/socket_service.dart:27-142`: identical options; v3: `retryAfterFailure` 2000ms timer in `catch` (`:110-127`), cancelled by `disconnect()` via `_generation` (`:130-136`), same as RN `useSocket.ts:180-187`. Used by mic/conference (`socketServiceProvider` `:147`) and the telephony listener's own instance (`core/chat/cloud_telephony_listener.dart:73`) | PRESENT. v3: was PARTIAL (v2 gap 44 retry part CLOSED, 3cb9e36/5a37e28). |
 | Microphone namespace (`MICROPHONE_SOCKET_PATH` = /microphone-chat) listeners | `SESSION_CREATED`, `CHAT_ENDED`, `NUDGE`, `USER_JOINED`, `MESSAGE_RECEIVED`, `UTTERANCE_ENDED` | `scribe_recording_screen.dart:176-185`: all six | PRESENT |
 | Microphone emits | `AUDIO_MESSAGE {audioData: base64 chunk, chatId}`, `START_AUDIO_CHAT {isLinear16Encoded:true, platform:'MOBILE', sampleRate:16000, mode:'SCRIBE'}` | `scribe_recording_screen.dart:227,237`: same payloads | PRESENT |
 | `SCRIBE_START_DIAGNOSTIC` emit | `{afterMs, appVersion, ...gates}` at 5s/15s when the recording has not started | Emitted at 5s/15s with the RN gate fields (`scribe_recording_screen.dart:170-198`) | PRESENT (v2: was MISSING) |
 | Cloud-telephony namespace (`CLOUD_TELEPHONY_PATH`) on ConferenceListeningScreen | on: `CHAT_ENDED`, `NUDGE`, `USER_JOINED`, `AUDIO_STREAM`; emits `AUDIO_CHAT_PAUSED/RESUMED {chatId}` behind a button that is hidden (`showPauseResumeButton={false}`), so effectively dead | `conference_listening_screen.dart:130-138`: same four listeners; no pause emit (parity, since RN hides it) | PRESENT |
-| **App-wide** cloud-telephony socket | `RootNavigator.tsx:170` keeps a socket on `CLOUD_TELEPHONY_PATH` for the whole authenticated session; `USER_JOINED` calls `checkCounselorChat()` and auto-navigates into an incoming conference call while the app is in the foreground | `core/chat/cloud_telephony_listener.dart` (own `SocketService`, drops on background, reconnects on resume), started from `main.dart:104` | PRESENT (v2: was MISSING) |
+| **App-wide** cloud-telephony socket | `RootNavigator.tsx:170` keeps a socket on `CLOUD_TELEPHONY_PATH` for the whole authenticated session; `USER_JOINED` calls `checkCounselorChat()` | `core/chat/cloud_telephony_listener.dart:23-74` (drops on pause, reconnects on resume), started on sign-in `main.dart:128-133`, lifecycle `main.dart:105`, stopped on sign-out `main.dart:135` | PRESENT. v3: re-verified. |
 | LiveKit token/room | Comes from the `startScenarioSession` response `accessToken.{token, serverUrl}` (no separate token endpoint; `/rooms` `listRooms` is DEAD) | `SessionData.fromJson` reads the same fields; `LiveKitRoomService.connect(url, token)` | PRESENT |
 | LiveKit room events | `Connected`, `Disconnected` (navigate to feedback), `ParticipantConnected` (ringing until agent audio, grace timer), `ActiveSpeakersChanged`, `DataReceived`; `ParticipantEvent.IsSpeakingChanged` | `livekit_room_service.dart:105-118` adds `ParticipantConnectedEvent` + `RoomDisconnectedEvent`; `roleplay_voice_screen.dart:460` (agent joined) and `:508` (room closed → Feedback); `cap-ended` no-op like RN | PRESENT (v2: was PARTIAL) |
 | LiveKit data publish | `localParticipant.publishData` (pause/resume control) | `LiveKitRoomService.publishData` | PRESENT |
@@ -1984,8 +2037,8 @@ Master files: `features/reviews/data/reviews_repository.dart`, `scribe_reviews_r
 | updateProfileImage / deleteProfileImage / completeProfile: refetch `User` | `ref.invalidate(currentUserProvider)` | PRESENT |
 | discussion mutations: `CourseDiscussion` | `ref.invalidate(discussionProvider(itemId))` | PRESENT |
 | markNotificationRead / markAll: `Notifications` + `UnreadNotificationCount` | `ref.invalidate(notificationsControllerProvider)` (the unread-count endpoint is unused in both apps) | PRESENT |
-| markSimulation/ScribeReviewAsRead: (no tags in RN either) | no invalidation of `unreadReviewCountProvider` | parity (both stale) |
-| Polling / refetchOnFocus: `getBadges` every 60s + focus/reconnect; review details refetchOnFocus/Reconnect | `getBadges`: 60s poll + resume refetch in `badge_popup.dart:87,104`; call-log/review lists refetch on focus (`core/navigation/screen_focus_listener.dart`); review details only refetch on open (autoDispose) | PARTIAL (v2): only review-details foreground/reconnect refetch remains |
+| markSimulation/ScribeReviewAsRead: (no tags in RN either) | v3: Flutter invalidates `unreadReviewCountProvider` after mark-read (`review_details_screen.dart:93`, `review_screen.dart:277`) | PRESENT (Flutter refreshes the dot; RN leaves it stale) |
+| Polling / refetchOnFocus / refetchOnReconnect: `getBadges` every 60s + focus/reconnect; review details refetchOnFocus/Reconnect | `getBadges`: 60s poll + resume + back-online refetch (`badge_popup.dart:89,106,193`); review details resume/back-online/after-edit (`review_details_screen.dart:108-113,309-311,318-320`); lists refetch on focus (`core/navigation/screen_focus_listener.dart`); offline signal `core/realtime/connectivity.dart:13` (connectivity_plus) | PRESENT. v3: was PARTIAL (v2 gap 44 reconnect part + gap 38 CLOSED). Note: RN `setupListeners` relies on `window` focus/online events, so these RTK flags are largely inert on RN; Flutter is at least as fresh. |
 
 #### 5. DEAD RTK endpoints (defined in RN, never called)
 
@@ -1995,9 +2048,9 @@ Direct, with zero hook or initiate references outside tests:
 Transitive, reachable only from the unused hooks `useLanguageDropdown` / `useSimulationTransition`:
 `simulationsApi.getAvailableLanguages` (GET /learn/scenario-languages?active&hasVoices) · `userApi.getUserPreferences` (GET /users/me/preferences) · `simulationsApi.getUpcomingScenario` (GET /learn/scenario-paths/:id/upcoming-scenario) · `simulationsApi.getUpcomingCaseScenario` (GET /learn/cases/:id/upcoming-scenario).
 
-**Flutter-only calls to RN-dead endpoints:** `features/preferences/data/preferences_repository.dart` (Preferences screen) calls GET /users/me/preferences, POST /users/preferences `{default_language_id}`, and GET /learn/scenario-languages (without RN's `active=true&hasVoices=true` filter). RN's live simulation language picker uses `scenario.availableLanguages` from the scenario payload instead. This is extra Flutter surface with no RN counterpart; decide whether to keep it.
+**Flutter-only calls to RN-dead endpoints:** v3: **none.** `features/preferences/` and the `/preferences` route were removed in 9b76a8a; the endpoint diff no longer finds `/users/me/preferences`, `/users/preferences` or `/learn/scenario-languages` in Flutter `lib/` (v2 item 49, route half, CLOSED).
 
-**v2:** Flutter now also ports (but never calls from UI) two RN-dead endpoints for API parity: `CoursesRepository.getTrackLanguages` (`courses_repository.dart:77-80`) and `DiscussionRepository.getModeratorTenants` (`discussion_repository.dart:30`). DEAD count unchanged.
+**v2:** Flutter now also ports (but never calls from UI) two RN-dead endpoints for API parity: `CoursesRepository.getTrackLanguages` (`courses_repository.dart:77-80`) and `DiscussionRepository.getModeratorTenants` (`discussion_repository.dart:30`). DEAD count unchanged. v3: still defined-but-uncalled in Flutter (no UI caller): `CoursesRepository.getTrackLanguages` (`courses_repository.dart:78`), `DiscussionRepository.getModeratorTenants` (`discussion_repository.dart:30`), `NotificationsRepository.unreadCount` (`notifications_repository.dart:34`), plus `CallLogRepository.getCallLogItem` (`call_log_repository.dart:617`, same GET as getCallSummary). Harmless; cleanup candidates.
 
 ---
 
@@ -2015,6 +2068,8 @@ Counts:
 | RN keys | 1461 | 1461 | 1461 | 1461 | 1461 |
 | Flutter keys (v1) | 1566 | 1458 | 1458 | 1458 | 1458 |
 | Flutter keys (v2, 227db3a) | 1566 | 1566 | 1566 | 1566 | 1566 |
+| RN keys (v3, 7a8ce0c19) | 1461 | 1461 | 1461 | 1461 | 1461 |
+| Flutter keys (v3, f770200) | 1567 | 1567 | 1567 | 1567 | 1567 |
 
 - RN static keys referenced from code: **848**. All 848 exist in Flutter `en.json`, so **0 are missing**.
 - Dynamic key templates in RN: **13 families**. All expansions exist in Flutter `en.json` because it is a superset of RN `en.json`.
@@ -2022,6 +2077,7 @@ Counts:
 - English value drift: 0. hi/kn/mr/ta value drift on shared keys: 0.
 - Flutter-only keys: **106**. In hi/kn/mr/ta, Flutter is missing **108** of its own en keys (106 Flutter-only plus the 2 plural keys).
 - Flutter `t()` references not present in `en.json`: **0** (509 distinct literal refs checked).
+- **v3 (f770200, `v3/scripts/i18n_v3.py`):** RN static keys used in code: 848 (incl. the 5 new 7a8ce0c19 `courses.roleplay.assessment*` keys); missing in Flutter en/hi/kn/mr/ta: **0/0/0/0/0**. RN locale keys absent from Flutter per locale: 1 each (`auth.login.otp.expires` → `_one/_other`). RN↔Flutter value drift on shared keys: **0 in all 5 locales**. Flutter hi/kn/mr/ta vs Flutter en: 0 missing, 0 extra; identical-to-en values 7/5/5/5 (brand/proper nouns + URL + `drawer.dev`). Flutter `t()/tr()` literal refs: 570, all resolve in all 5 locales. 13 RN dynamic key families: every expansion present in all 5 Flutter locales. Flutter-only keys: 107 (+1 `home.noAccessibleTabs`).
 - **v2 (227db3a):** hi/kn/mr/ta now have every en key (0 missing, 0 extra; 59825bd added a completeness test). RN hi/kn/mr/ta value drift on shared keys: still 0. 569 distinct `t()/tr()` literal refs, all resolve (plural `_one/_other` handled by 53959d0, English fallback per key). Untranslated (identical-to-en) values: 5–7 per language, all brand/proper nouns.
 
 | # | Item | RN | Flutter | Status | Notes |
@@ -2033,10 +2089,13 @@ Counts:
 | 5 | Flutter-only keys **referenced in code** with no hi/kn/mr/ta translation (33) | — | all 33 now in hi/kn/mr/ta (`assets/locales/*.json`) | PRESENT (v2: was MISSING) | The table below is kept for history. |
 | 6 | Flutter-only keys not referenced in code (75) | — | `home.*` (17, the Phase-0 dev shell), `scribe.*` and `conferenceListening.*` debug labels, older `review.*`/`callSummary.*`/`simulations.*`/`postSim.feedback.*` drafts | N/A | Cleanup candidates, no user impact. |
 | 7 | All five languages present for RN keys | 5 × 1461 | 5 files, RN keys complete except rows 3 and 4 | PRESENT | |
-| 8 | Dynamic CDN translation sync (`localization/dynamic.ts`, gated by `LANGUAGE_SELECTOR_FLAG`) | `I18N_BASE_URL` manifest + namespaces | `core/localization/localization_controller.dart` | PARTIAL | v2: language-change early return fixed (8e0a859). Still open: the default URL is `https://api.helloally.dev/i18n` (dev host retired 10-15); RN's default is empty (§9). |
-| 9 | Hardcoded English UI literals in Flutter outside `t()` | RN also hardcodes some (`SUMMARY_STATUS_CONFIG` labels, summary field labels) | v2: 82 grep hits. Most mirror RN (summary field labels in `call_summary_fields.dart:102-283`, `status_badge.dart:36-43`). Flutter-only: `app_shell_screen.dart:111` "No accessible tabs for this account", `call_log_screen.dart:461,539` semantic labels 'Filter'/'Refresh' | PARTIAL | Spot-check only, not exhaustive. |
+| 8 | Dynamic CDN translation sync (`localization/dynamic.ts`, gated by `LANGUAGE_SELECTOR_FLAG`) | `I18N_BASE_URL` manifest + namespaces | `core/localization/localization_controller.dart:150-185`; base URL `core/config/app_config.dart:62-66` | PRESENT | v3: was PARTIAL. Prod flavor default `https://api.helloally.ai/i18n` (live, manifest v150) and prod CI passes RN's `.env` (v2 gap 42 CLOSED). See §5 CDN row. |
+| 9 | Hardcoded English UI literals in Flutter outside `t()` | RN also hardcodes some (`SUMMARY_STATUS_CONFIG`, summary field labels, `fieldFilters.ts` options, `TRANSCRIPT_LANGUAGE_OPTIONS`) | v3 grep (82 hits, `v3/scripts/literals.txt`): all mirror RN literals — `call_summary_fields.dart:102-525`, `status_badge.dart:36-43`, `call_log_filter_sheet.dart:14-23` (= RN `CallLog/utils/fieldFilters.ts:46-82`), `custom_fields_filter.dart:39`, `simulation_transcript_tab.dart:515` (= RN `constants/general.ts:58`), `call_summary_screen.dart:2002` 'Select', emoji-keyboard 'Search' (rn-emoji-keyboard default), 'Ally' app titles. The v2 Flutter-only literals are fixed: `app_shell_screen.dart:147` → `home.noAccessibleTabs`; `call_log_screen.dart:527,605` → `accessibility.filter/refresh` | PRESENT | v3: was PARTIAL. |
+| 10 | **new v3:** RN 7a8ce0c19 assessment-mode keys `courses.roleplay.{assessmentIntro,assessmentNotice,assessmentSubmitted,assessmentNotPassed,assessmentLocked}` | RN en/hi/kn/mr/ta + `RoleplayCasePlayer.tsx` | all 5 Flutter locales (en.json:857-861), values equal RN in every locale; used at `courses/presentation/roleplay/roleplay_case_player.dart:131,142,165-166,173` | PRESENT | |
+| 11 | **new v3:** RN-live accessibility-label keys never rendered by Flutter | `courses.branching.recapLabel` (`BranchingScenarioPlayer.tsx:285`), `courses.branching.trailLabel` (`:386`), `courses.bucketSort.bucketA11y` (`BucketSortPlayer.tsx:178`) | keys exist in all locales but no `Semantics` label in `courses/presentation/branching/branching_scenario_player.dart` or `bucket_sort/bucket_sort_player.dart` | PARTIAL | Screen-reader only; no visible-text impact. |
+| 12 | **new v3:** RN-referenced keys with no literal ref in Flutter `lib/` (69) | `v3/scripts/i18n_v3.json` `rn_used_not_lit_ref_in_flutter` | Classified: built from a prefix/template in Flutter (TermsAndAgreement ×15 `terms_and_agreement_modal.dart:387`; `callFeedback.ratings.$n` `feedback_popup.dart:87`; `*.deleteConfirmation.*` `review_comment_sheets.dart:180-186`; `summary.duration.$name` `summary_display_format.dart:17`); RN-dead or unreachable in RN (AskAI/AskAiInitialState, SessionGlimpse, KeyConcernSection, NotesSection, SummaryDropdown, PrivacyToggle, SecurityCarousel, `REVIEW_FILTERS`, `onUpdateSummary` toast, VoiceNotePanel fallback, conference end-call copy behind `showEndSessionButton={false}`, `fileOperations`/`invalidResponseFormat` thrown-not-shown); hidden in RN layout (`search.headerDescription`, documented `search_screen.dart:475-483`); gated empty states (`simulationPage.noRemindersYet` tab only shown with reminders `session_info_tabs.dart:34`; `calls.filters.noFields`, built-ins always present); a11y labels → row 11 | N/A | Informational; only row 11 is a code gap. |
 
-§7 tally v2: 9 rows — PRESENT 6, PARTIAL 2 (rows 8, 9), MISSING 0, N/A 1 (v1: 3/4/1/1).
+§7 tally v3: 12 rows — PRESENT 9, PARTIAL 1 (row 11), MISSING 0, BLOCKED-EXTERNAL 0, DEVICE-CHECK 0, N/A 2 (rows 6, 12). (v2: 9 rows — 6/2/0/1.)
 
 The 33 referenced but untranslated Flutter keys as of v1 (all translated in v2), grouped by feature:
 
@@ -2059,284 +2118,285 @@ Note: RN `notifications.*` titles come from other RN keys. Before translating, c
 ---
 
 
+
 ## §8 Assets
 
-Re-audited 2026-10-28 against Flutter `master` @ `227db3a`. RN is unchanged at `7a8ce0c19` (the only later `ally-mobile` commit, `fc1253ea7`, is a version bump).
+v3: re-audited 2026-10-28 against Flutter `f770200` (RN unchanged at `7a8ce0c19`). Script: `v3/scripts/assets3.py` → `assets3.out` (exact-boundary match `[/'"]<file>['"]` over `lib/**/*.dart`).
 
-Method:
-- RN: an asset counts as used when a non-test RN `src` file imports its export name (from `@/assets`, `@/assets/icons` or a relative `assets` path) **and that file is rendered**. v2 traced render paths. That moved 7 assets, which v1 counted as used, to N/A, because their only importers are never mounted.
-- Flutter: an asset counts as referenced when `lib/**/*.dart` contains `/<filename>` or `'<filename>` with an exact boundary. v1 matched bare substrings, so `replay.svg` hid the fact that `play.svg` is unused. Flutter still uses literal asset paths only, with no interpolated `assets/...$x`, which was re-checked.
-- Status is per **file** (shipped and referenced somewhere). A file can be PRESENT here and still be swapped for a Material icon at another RN site. Those per-site gaps are listed in **8b**.
+Method (unchanged from v2):
+- RN: an asset counts as used when a non-test RN `src` file imports its export name **and that file is rendered** (v2 render-path trace).
+- Flutter: referenced when `lib/**/*.dart` contains the file name with an exact boundary. Literal paths only (no interpolated `assets/...$x`).
+- Status is per **file**; per-site parity is in **8b**.
 
 Overview:
-- Flutter now ships **all 161 RN asset files**, including `sounds/startSimulation.mp3` and `sounds/endSimulation.mp3`, which are declared in `pubspec.yaml` and played by `lib/features/roleplay/presentation/simulation_sound_player.dart:11-12` from `roleplay_voice_screen.dart:239` (start) and `:512` (end).
-- Fonts: all 7 are still bundled in `pubspec.yaml`. PRESENT.
+- v3: Flutter ships **135 RN-rendered asset files**, every one referenced in `lib/`, plus all 7 fonts (`pubspec.yaml:230+`, 7 `asset: assets/fonts/` entries). The 19 v2 PARTIAL files are now all referenced (calls-summary section icons `call_summary_screen.dart:94-111`, drawn `:1473`; `goldenShield.svg` `:1252`; `play.svg` `voice_note_section.dart:441`).
+- v3: the 26 RN-dead files were **deleted** in `81622e1` (with `core/widgets/app_chat_input.dart`, `core/widgets/emoji_insert_picker.dart`). No file in `lib/`, `test/` or `pubspec.yaml` references any of them (grep empty). `pubspec.yaml` declares `assets/icons/`, `images/`, `animations/` as directories, so no stale entries.
+- Flutter-only asset dirs (no RN file to compare): `assets/locales/*.json` (RN locale JSON, §7), `assets/games/*.html` (RN `*Html.ts` game bundles), `assets/emoji_keyboard/` (rn-emoji-keyboard data/icons, §10e r80), `assets/icon/icon.png` (launcher-icon source).
 
 | Bucket | Count | Status |
 |---|---|---|
-| RN-rendered and Flutter-referenced | 116 files + 7 fonts = 123 | PRESENT |
-| RN-rendered, shipped in Flutter but **never referenced** | 19 | PARTIAL (listed below) |
-| RN-rendered and **not shipped** in Flutter | 0 | — (both sounds now PRESENT) |
-| RN-dead (unused, or used only by never-rendered RN components) | 26 | N/A |
+| RN-rendered and Flutter-referenced | 135 files + 7 fonts = 142 | PRESENT [v2: 123] |
+| RN-rendered, shipped but never referenced | 0 | — [v2: 19 PARTIAL] |
+| RN-rendered and not shipped | 0 | — [v2: 0] |
+| RN-dead, deleted from Flutter in `81622e1` | 26 | N/A [v2: 26 N/A, shipped] |
 | **Total** | **168** | |
 
-### Status changes since v1 (32)
+### Status changes since v2 (19)
 
 **PARTIAL → PRESENT (19)**
+- 17 call-summary section icons (`callDetails`, `sessionSummary`, `flow`, `keyConcern`, `tableEye`, `magnifyEye`, `assessment`, `smile`, `brightnessAlert`, `prescriptions`, `handShare`, `newsStand`, `headsetMic`, `tag`, `database`, `intake`, `ongoingRisks`): `call_summary_screen.dart:94-110` (`_sectionIcons`), rendered `:1473`.
+- `icons/goldenShield.svg`: `call_summary_screen.dart:1252`.
+- `icons/play.svg`: `voice_note_section.dart:441`.
 
-| Asset | Flutter reference |
-|---|---|
-| `images/summaryGenerated.png` | `lib/features/calllog/presentation/summary_generation_progress.dart:177` |
-| `images/summaryFailed.png` | `summary_generation_progress.dart:152`. The Unauthorized view still uses a Material icon (see 8b #21). |
-| `animations/summaryLoading.json` | `summary_generation_progress.dart:184` (Lottie) |
-| `icons/shieldWithTick.svg` | `summary_generation_progress.dart:244` |
-| `icons/page.svg` | `summary_generation_progress.dart:364` (AddNotesSection) |
-| `icons/info.svg` | `summary_generation_progress.dart:394`. The tab-header/Achievements tooltip still uses Material (see 8b #29–30). |
-| `icons/contract.svg` | `call_summary_screen.dart:461` (actions menu) |
-| `icons/export.svg` | `call_summary_screen.dart:455` |
-| `icons/edit.svg` | `call_summary_screen.dart:448`; `courses/presentation/discussion/discussion_post_tile.dart:236` |
-| `icons/unarchive.svg` | `call_summary_screen.dart:467` |
-| `icons/delete.svg` | `discussion_post_tile.dart:242`. VoiceNotePanel still uses Material (see 8b #27). |
-| `icons/arrowRight.svg` | `courses/presentation/course_item_player_screen.dart:719`, `quiz/quiz_player.dart:277`, `quiz/quiz_question_widget.dart:207`. Call-summary SectionHeader still uses Material (see 8b #19). |
-| `icons/pause.svg`, `icons/resume.svg` | `scribe/presentation/listening_controls.dart:72` |
-| `icons/thumb.svg` | `scribe/presentation/nudge_section.dart:170` |
-| `icons/networkDisconnected.svg` | `scribe/presentation/network_disconnected.dart:96` |
-| `icons/endSession.svg` | `scribe/presentation/scribe_recording_screen.dart:589`, `roleplay/presentation/roleplay_voice_screen.dart:895` |
-| `icons/forceUpdateAlert.svg` | `lib/core/app_update/force_update_modal.dart:98` |
-| `icons/downArrow.svg` | `scribe/presentation/scribe_reference_search.dart:569` (dark Listening card). The Search tab card has no expand control (see 8b #31). |
+### N/A (26). RN-dead; v3: deleted from Flutter (`81622e1`), no references remain
 
-**MISSING → PRESENT (2):** `sounds/startSimulation.mp3`, `sounds/endSimulation.mp3`, at `simulation_sound_player.dart:11-12`.
+`icons/{infoBlack,bars,callEnd,callHighlights,demogs,forward10,headphone,keyEvents,lightBulb,profileIcon,replay10,rightArrow,thumbUp,call,transcript,simulation,arrowUpRight}.svg`, `images/{listenLive,joinCall,carousel1..4,conversation}.png`, `animations/{listen,botThinking}.json`. Rows kept as N/A for the count only; no action.
 
-**PARTIAL → N/A (10).** v1 called these "used". Tracing the render paths showed the RN importer is never mounted:
-- `images/carousel1..4.png`: only `SECURITY_CAROUSEL_SLIDES`, whose consumer SecurityCarousel is never rendered.
-- `icons/call.svg`, `icons/transcript.svg`: SummaryDropdown is exported, never rendered.
-- `icons/simulation.svg` (and `transcript.svg`): FeedbackDropdown is exported, never rendered.
-- `icons/arrowUpRight.svg`, `animations/botThinking.json`: AskAiInitialState and ThinkingIndicator are reached only through `AskAI`, which is exported from `SimulationFeedbackScreen/components/index.ts` but never rendered. DebriefTab imports only `CitationsTable`, `types` and `useAskAIChat`.
-- `images/conversation.png`: exported from `assets/images/index.ts`, imported nowhere.
+### PRESENT spot-check (27 files + fonts, no regressions)
 
-**PRESENT → PARTIAL (1):** `icons/play.svg`. RN VoiceNotePanel renders it, and Flutter has never referenced it. v1's substring match on `replay.svg` hid this. It is a v1 miss, not a regression: `git log -S"icons/play.svg" -- lib` is empty.
-
-### Remaining PARTIAL (19). RN renders these; Flutter ships the file and never uses it
-
-- **Call summary section icons (17)** from RN `constants/summary.ts` `SECTION_LIST`, rendered by `CallSummaryDetails`: `callDetails`, `sessionSummary`, `flow`, `keyConcern`, `tableEye`, `magnifyEye`, `assessment`, `smile`, `brightnessAlert`, `prescriptions`, `handShare`, `newsStand`, `headsetMic`, `tag`, `database`, `intake`, `ongoingRisks`. Flutter: `call_summary_screen.dart:88-105` (`_sectionIcons`, Material), rendered at `:1384`. The comment at `:84-86` says the substitution is deliberate.
-- `icons/goldenShield.svg`: the CallSummaryDetails privacy banner. Flutter `call_summary_screen.dart:1227` uses `Icons.shield_outlined`.
-- `icons/play.svg`: the VoiceNotePanel resume button. Flutter `voice_note_section.dart:423` uses `Icons.play_arrow`.
-
-### N/A (26). RN-dead; Flutter ships them unreferenced (deletion candidates)
-
-`icons/{infoBlack,bars,callEnd,callHighlights,demogs,forward10,headphone,keyEvents,lightBulb,profileIcon,replay10,rightArrow,thumbUp}.svg`, `images/{listenLive,joinCall}.png`, `animations/listen.json` (16 from v1), plus `images/carousel{1..4}.png`, `images/conversation.png`, `icons/{call,transcript,simulation,arrowUpRight}.svg`, `animations/botThinking.json` (10 new).
-
-### PRESENT spot-check (12 of 123, no regressions)
-
-`google.svg` `auth/presentation/login_screen.dart:1084`; `splashAnimation.json` `login_screen.dart:38`; `rank1.svg` `leaderboard/presentation/leaderboard_screen.dart:37`; `badgeIcon.svg` `leaderboard_screen.dart:458`; `breathingBackground.png` `boxbreathing/presentation/box_breathing_screen.dart:220`; `breath.mp3` `boxbreathing/presentation/breath_sound_player.dart:51`; `logOut.png` `core/navigation/app_drawer.dart:180`; `suspendedAccount.svg` `suspended/presentation/suspended_account_screen.dart:34`; `emptyReviews.svg` `reviews/presentation/review_screen.dart:95`; `noCallRecords.svg` `calllog/presentation/call_log_screen.dart:731`; all 7 fonts and `assets/icons/`, `images/`, `animations/` declared in `pubspec.yaml`. No asset that was referenced at `cfb1672` has lost its reference.
+`google.svg` `auth/presentation/login_screen.dart:1114`; `splashAnimation.json` `core/routing/launch_splash.dart:14`; `rank1.svg` `leaderboard/presentation/leaderboard_screen.dart:38`; `badgeIcon.svg` `leaderboard_screen.dart:459`; `breathingBackground.png` `boxbreathing/presentation/box_breathing_screen.dart:220`; `breath.mp3` `breath_sound_player.dart:51`; `start/endSimulation.mp3` `roleplay/presentation/simulation_sound_player.dart:11-12`; `logOut.png` `core/navigation/app_drawer.dart:181`; `suspendedAccount.svg` `suspended_account_screen.dart:34`; `emptyReviews.svg` `review_screen.dart:97`; `noCallRecords.svg` `call_log_screen.dart:797`; `summaryGenerated.png` `summary_generation_progress.dart:178`; `summaryFailed.png` `:153` + `call_summary_screen.dart:2300`; `summaryLoading.json` `summary_generation_progress.dart:185`; `shieldWithTick.svg` `:245`; `page.svg` `:366`; `edit/export/contract/unarchive.svg` `call_summary_screen.dart:464/471/477/483`; `thumb.svg` `nudge_section.dart:170`; `networkDisconnected.svg` `network_disconnected.dart:96`; `endSession.svg` `scribe_recording_screen.dart:611`, `roleplay_voice_screen.dart:949`; `forceUpdateAlert.svg` `force_update_modal.dart:98`; `goldenShield.svg`, `play.svg` (above); 7 fonts in `pubspec.yaml`.
 
 ---
 
 ### 8b Icon/asset visual sweep
 
-Each row is an RN render site that draws a bundled SVG/PNG where Flutter master draws a Material `Icons.*` glyph or nothing. Method: every (RN rendered file → asset) import pair, 251 pairs over 128 files, was matched against the Flutter files that reference that asset. Every Flutter `Icons.*` use was then read; there are 35 across 6 files, and no `CupertinoIcons`, custom `IconData` or icon fonts. Rows where the Flutter counterpart uses the same SVG are omitted.
+v3: `lib/` now contains **zero** `Icons.*` / `CupertinoIcons` uses (`grep -rn "Icons\." lib` empty; `cupertino_icons` dropped in `e786616`). Every v2 row was re-read at its Flutter site; all 33 now draw RN's asset.
 
-**Totals: 33 rows.** Call summary + voice note: 27 (18 section icons, 9 other). Shell/account: 3. Search: 1. Learn (course progress + simulation feedback): 2.
+**Totals: 33 rows, 33 PRESENT** [v2: 33 gap rows — 31 Material substitutes, 2 nothing rendered].
 
-| # | Screen / component | RN asset (RN file that renders it) | Flutter file:line using the substitute | Substitute |
+| # | Screen / component | RN asset (RN file that renders it) | v3 Flutter file:line | Status |
 |---|---|---|---|---|
-| 1 | Call summary, section header: Features & demographics | `callDetails.svg` (`constants/summary.ts:333` → `CallSummaryDetails`) | `lib/features/calllog/presentation/call_summary_screen.dart:88` (drawn at `:1384`) | `Icons.call_outlined` |
-| 2 | … Session summary | `sessionSummary.svg` (`summary.ts:341`) | `call_summary_screen.dart:89` | `Icons.auto_awesome_outlined` |
-| 3 | … Flow | `flow.svg` (`summary.ts:349`) | `call_summary_screen.dart:90` | `Icons.waves` |
-| 4 | … Key concern | `keyConcern.svg` (`summary.ts:357`) | `call_summary_screen.dart:91` | `Icons.sentiment_dissatisfied_outlined` |
-| 5 | … Objective observations | `tableEye.svg` (`summary.ts:365`) | `call_summary_screen.dart:92` | `Icons.visibility_outlined` |
-| 6 | … Subjective observations | `magnifyEye.svg` (`summary.ts:373`) | `call_summary_screen.dart:93` | `Icons.search` |
-| 7 | … Assessment | `assessment.svg` (`summary.ts:381`) | `call_summary_screen.dart:94` | `Icons.assignment_outlined` |
-| 8 | … Dominant feelings | `smile.svg` (`summary.ts:389`) | `call_summary_screen.dart:95` | `Icons.sentiment_satisfied_outlined` |
-| 9 | … Issues worked on | `brightnessAlert.svg` (`summary.ts:397`) | `call_summary_screen.dart:96` | `Icons.warning_amber_outlined` |
-| 10 | … Key therapeutic techniques | `prescriptions.svg` (`summary.ts:405`) | `call_summary_screen.dart:97` | `Icons.healing_outlined` |
-| 11 | … Referrals provided | `handShare.svg` (`summary.ts:413`) | `call_summary_screen.dart:98` | `Icons.volunteer_activism_outlined` |
-| 12 | … Homework recommended | `newsStand.svg` (`summary.ts:421`) | `call_summary_screen.dart:99` | `Icons.library_books_outlined` |
-| 13 | … Plan for next call | `headsetMic.svg` (`summary.ts:429`) | `call_summary_screen.dart:100` | `Icons.headset_mic_outlined` |
-| 14 | … Tags | `tag.svg` (`summary.ts:437`) | `call_summary_screen.dart:101` | `Icons.label_outline` |
-| 15 | … Metrics | `database.svg` (`summary.ts:445`) | `call_summary_screen.dart:102` | `Icons.storage_outlined` |
-| 16 | … Intake | `intake.svg` (`summary.ts:453`) | `call_summary_screen.dart:103` | `Icons.assignment_ind_outlined` |
-| 17 | … Ongoing risks | `ongoingRisks.svg` (`summary.ts:461`) | `call_summary_screen.dart:104` | `Icons.report_problem_outlined` |
-| 18 | … Additional notes | `notes.svg` (`summary.ts:469`) | `call_summary_screen.dart:105`. `notes.svg` is used elsewhere: roleplay `session_info_tabs`. | `Icons.note_add_outlined` |
-| 19 | Call summary, section expand/collapse caret | `arrowDown.svg` / `arrowRight.svg` (`CallSummaryScreen/components/CallSummaryDetails/SectionHeader.tsx:90,92`, 10×10) | `call_summary_screen.dart:1428` | `Icons.expand_less` / `Icons.expand_more` |
-| 20 | Call summary, privacy banner | `goldenShield.svg` (`CallSummaryDetails/CallSummaryDetails.tsx`) | `call_summary_screen.dart:1227` (`_SummaryTabState`) | `Icons.shield_outlined` (orange400) |
-| 21 | Call summary, unauthorized state | `images/summaryFailed.png` (`SummaryUnauthorized/SummaryUnauthorized.tsx:21`) | `call_summary_screen.dart:1800` (`_SummaryUnauthorizedView`) | `Icons.lock_outline` 48pt |
-| 22 | Call summary, "view review" comment button | `chatBubble.svg` / `CommentIcon` (`CallSummaryScreen/CallSummaryScreen.tsx:531`) | `call_summary_screen.dart:685` | `Icons.comment_outlined` |
-| 23 | Call summary, voice-note "Record" CTA | `mic.svg` (`VoiceNotePanel/VoiceNoteSection.tsx`) | `voice_note_section.dart:261` | `Icons.mic` |
-| 24 | Voice-note panel, pause | `pause.svg` (`VoiceNotePanel/VoiceNotePanel.tsx:107`) | `voice_note_section.dart:416` | `Icons.pause` |
-| 25 | Voice-note panel, resume | `play.svg` (`VoiceNotePanel.tsx:117`) | `voice_note_section.dart:423` | `Icons.play_arrow` |
-| 26 | Voice-note panel, recording mic | `mic.svg` (`VoiceNotePanel.tsx:141`) | `voice_note_section.dart:448` | `Icons.mic` |
-| 27 | Voice-note panel, discard | `delete.svg` (`VoiceNotePanel.tsx:156`) | `voice_note_section.dart:472` | `Icons.delete_outline` |
-| 28 | Bug report, back button | `leftArrowIcon.svg` (`BugReportScreen/BugReportScreen.tsx:83`) | `lib/features/bugreport/presentation/bug_report_screen.dart:101`. Other screens use `BackTitleHeader` with the SVG. | `Icons.arrow_back` (Material `AppBar`) |
-| 29 | Tab screen header, info tooltip (Analytics/Leaderboard/etc. tabs) | `info.svg` (`components/TabScreenHeader/TabScreenHeader.tsx:86`) | `lib/core/widgets/info_tooltip_icon.dart:22`, used by `core/widgets/tab_screen_header.dart:114` | `Icons.info_outline` |
-| 30 | Achievements, badges / reviewer tooltips | `info.svg` (`AchievementsScreen/AchievementsScreen.tsx:131,217`) | `info_tooltip_icon.dart:22`, used by `features/achievements/presentation/achievements_screen.dart:115,218` | `Icons.info_outline` |
-| 31 | Search tab, ResourceArticleCard expand | `downArrow.svg` (`components/ResourceArticleCard/ResourceArticleCard.tsx`, rendered by `SearchScreen.tsx:106`) | `lib/features/search/presentation/search_screen.dart:372`: a plain `ListTile` with no expand control or tags. The dark Listening card at `scribe_reference_search.dart:569` does use it. | nothing rendered |
-| 32 | Course progress, role-play session row chevron | `chevronRight.svg` (`CourseProgressScreen/components/RoleplaySessionRow.tsx:53`) | `lib/features/courses/presentation/course_progress_screen.dart:637` | `Icons.chevron_right` |
-| 33 | Simulation feedback, Summary tab title "help" (opens SimulationDetailsModal) | `help.svg` (`SimulationFeedbackScreen/components/SimulationSummary/SimulationSummary.tsx:76`) | `lib/features/simulations/presentation/widgets/feedback/feedback_widgets.dart:332` (`ShortSessionSummary` title, no icon). `SimulationDetailsModal` is opened only from `learning_path_detail_view.dart`. | nothing rendered (also loses the details modal) |
+| 1 | Call summary, section header: Features & demographics | `callDetails.svg` (`constants/summary.ts:333`) | `call_summary_screen.dart:94`, drawn `:1473` | PRESENT (v3) |
+| 2 | … Session summary | `sessionSummary.svg` | `call_summary_screen.dart:95` | PRESENT (v3) |
+| 3 | … Flow | `flow.svg` | `:96` | PRESENT (v3) |
+| 4 | … Key concern | `keyConcern.svg` | `:97` | PRESENT (v3) |
+| 5 | … Objective observations | `tableEye.svg` | `:98` | PRESENT (v3) |
+| 6 | … Subjective observations | `magnifyEye.svg` | `:99` | PRESENT (v3) |
+| 7 | … Assessment | `assessment.svg` | `:100` | PRESENT (v3) |
+| 8 | … Dominant feelings | `smile.svg` | `:101` | PRESENT (v3) |
+| 9 | … Issues worked on | `brightnessAlert.svg` | `:102` | PRESENT (v3) |
+| 10 | … Key therapeutic techniques | `prescriptions.svg` | `:103` | PRESENT (v3) |
+| 11 | … Referrals provided | `handShare.svg` | `:104` | PRESENT (v3) |
+| 12 | … Homework recommended | `newsStand.svg` | `:105` | PRESENT (v3) |
+| 13 | … Plan for next call | `headsetMic.svg` | `:106` | PRESENT (v3) |
+| 14 | … Tags | `tag.svg` | `:107` | PRESENT (v3) |
+| 15 | … Metrics | `database.svg` | `:108` | PRESENT (v3) |
+| 16 | … Intake | `intake.svg` | `:109` | PRESENT (v3) |
+| 17 | … Ongoing risks | `ongoingRisks.svg` | `:110` | PRESENT (v3) |
+| 18 | … Additional notes | `notes.svg` | `:111` | PRESENT (v3) |
+| 19 | Call summary, section caret | `arrowDown.svg`/`arrowRight.svg` 10×10 (`SectionHeader.tsx:90,92`) | `call_summary_screen.dart:1463` (10×10) | PRESENT (v3) |
+| 20 | Call summary, privacy banner | `goldenShield.svg` | `call_summary_screen.dart:1252` | PRESENT (v3) |
+| 21 | Call summary, unauthorized state | `images/summaryFailed.png` (`SummaryUnauthorized.tsx:21`) | `call_summary_screen.dart:2300` | PRESENT (v3) |
+| 22 | Call summary, "view review" button | `chatBubble.svg` (`CallSummaryScreen.tsx:531`) | `call_summary_screen.dart:651` | PRESENT (v3) |
+| 23 | Voice-note "Record" CTA | `mic.svg` (`VoiceNoteSection.tsx`) | `voice_note_section.dart:282` | PRESENT (v3) |
+| 24 | Voice-note panel, pause | `pause.svg` (`VoiceNotePanel.tsx:107`) | `voice_note_section.dart:434` | PRESENT (v3) |
+| 25 | Voice-note panel, resume | `play.svg` (`VoiceNotePanel.tsx:117`) | `voice_note_section.dart:441` | PRESENT (v3) |
+| 26 | Voice-note panel, recording mic | `mic.svg` (`VoiceNotePanel.tsx:141`) | `voice_note_section.dart:471` | PRESENT (v3) |
+| 27 | Voice-note panel, discard | `delete.svg` (`VoiceNotePanel.tsx:156`) | `voice_note_section.dart:481` | PRESENT (v3) |
+| 28 | Bug report, back button | `leftArrowIcon.svg` (`BugReportScreen.tsx:83`) | `bug_report_screen.dart:109` (`BackTitleHeader` → `core/widgets/back_title_header.dart:71`) | PRESENT (v3) |
+| 29 | Tab screen header info tooltip | `info.svg` (`TabScreenHeader.tsx:86`) | `core/widgets/info_tooltip_icon.dart:27`, used `tab_screen_header.dart:114` | PRESENT (v3) |
+| 30 | Achievements tooltips | `info.svg` (`AchievementsScreen.tsx:131,217`) | `info_tooltip_icon.dart:27`, used `achievements_screen.dart:110,238` | PRESENT (v3) |
+| 31 | Search tab ResourceArticleCard expand | `downArrow.svg` (`ResourceArticleCard.tsx`) | `features/search/presentation/resource_article_card.dart:156`, used `search_screen.dart:339` | PRESENT (v3) |
+| 32 | Course progress role-play row chevron | `chevronRight.svg` (`RoleplaySessionRow.tsx:53`) | `courses/presentation/course_progress_body.dart:568` | PRESENT (v3) |
+| 33 | Simulation feedback summary "help" → SimulationDetailsModal | `help.svg` (`SimulationSummary.tsx:76`) | `simulations/presentation/widgets/feedback/feedback_widgets.dart:363` (opens `simulation_info_modal.dart`) | PRESENT (v3) |
 
-Flutter-only Material glyphs with no RN asset, so not parity gaps but worth knowing:
-- `voice_note_section.dart:388` (`Icons.circle` recording dot) and `:429` (`Icons.stop`). RN VoiceNotePanel has neither control.
-- `core/widgets/app_chat_input.dart:46` (`Icons.send`). `AppChatInput` has no callers in `lib/`, so it is dead code.
+v3 discovery: re-ran (RN rendered file → asset) vs Flutter references for all 135 files. Where RN uses an asset in more files than Flutter, the Flutter sites are shared widgets (e.g. `dataUnavailable.svg` via `LearningPathLoadError`, `learning_path_widgets.dart:59`, used by course overview/progress/case/path screens; `noCredits.svg` via shared `start_simulation_modals.dart:340`; `leftArrowIcon.svg` via `BackTitleHeader`/`TabScreenHeader`). Remaining RN-only importers are RN-dead (`NetworkLogs`, `SummaryDropdown`, `FeedbackDropdown`, `AskAI`). No new site gaps.
 
-Reverse direction (Flutter ships the asset but never uses it): the 19 PARTIAL files above, plus the 26 N/A files. `notes.svg`, `mic.svg`, `pause.svg`, `delete.svg`, `arrowDown.svg`, `arrowRight.svg`, `info.svg`, `help.svg`, `chatBubble.svg`, `downArrow.svg`, `leftArrowIcon.svg`, `chevronRight.svg` and `summaryFailed.png` are referenced elsewhere in Flutter, so 8b rows 18–33 are wiring changes only, with no new asset work.
+Flutter-only Material glyphs: v3 none (v2's `Icons.circle`/`Icons.stop` in `voice_note_section.dart` and `app_chat_input.dart` are gone).
 
 ## §9 Config / env / flags
 
-RN: `react-native-config` reads `env/.env*` via `src/config/env.ts` (`assertEnvVar` makes most values required). Flutter: `--dart-define(-from-file)` read through `lib/core/config/app_config.dart` and `lib/core/push/leaderboard_notification.dart`.
+RN: `react-native-config` reads `env/.env*` via `src/config/env.ts`. Flutter: `--dart-define(-from-file)` (CI writes RN's `ENV_VALUES_*` to `.env`, `.github/workflows/build-*-production.yml`) read by `lib/core/config/app_config.dart`; flavor via `appFlavor` (`dev`|`prod`).
+
+**v3 tally: 17 rows — PRESENT 12, PARTIAL 0, MISSING 0, BLOCKED-EXTERNAL 4, DEVICE-CHECK 0, N/A 1** [v2: 15 rows — PRESENT 7, PARTIAL 5, MISSING 2, N/A 1].
 
 | # | RN var (required?) | RN consumers | Flutter equivalent & default | Status | Notes |
 |---|---|---|---|---|---|
-| 1 | `ENVIRONMENT` (req.) | `App.tsx` NetworkLogs gate, `utils/logger.ts` (logging on in development only), drawer "(Dev)" suffix | `AppConfig.environment`; default `development` in debug, `production` in release | PRESENT | |
-| 2 | `API_BASE_URL` (req.) | `services/api.ts` | `AppConfig.apiBaseUrl` (default `''`, `requireApiBaseUrl` throws) | PRESENT | |
-| 3 | `API_VERSION` (req.) | read by `env.ts` only; nothing uses it. Versions are per-endpoint: `/api/v1`, plus `/api/v2` for 3 routes | hardcoded v1, with v2 list in `api_routes.dart` | N/A | Dead in RN. |
-| 4 | `ALLY_WEB_URL` (req.) | `utils/deeplink.ts` link allowlist, CallLog "Learn more" link, SimulationDetails copy-link | `AppConfig.allyWebUrl` (default `https://app.helloally.ai/`), used by `simulation_details_screen.dart:63` | PARTIAL | v2 (`c80310b`): now a dart-define (default prod). Remaining: the deep-link allowlist (deep links missing) and CallLog "Learn more" (`CallLogScreen.tsx:554` `openURL(ALLY_WEB_URL)`, not in `features/calllog`). |
-| 5 | `MICROPHONE_SOCKET_PATH` (req.) | `hooks/useSocket.ts` (Scribe) | `AppConfig.microphoneSocketPath`, default `/microphone-chat` | PRESENT | |
-| 6 | `CLOUD_TELEPHONY_PATH` (req.) | app-wide telephony socket, Conference listening | `AppConfig.cloudTelephonyPath`, default `/cloud-telephony-chat` | PRESENT | The value is ported, but the app-wide socket that uses it is MISSING (§4b). |
-| 7 | `GOOGLE_WEB_CLIENT_ID` (req.) | `useGoogleLogin` `webClientId` | `AppConfig.googleWebClientId`, default `''` | PARTIAL | Unchanged. Needs an OAuth client for the Flutter package id (credentials). |
-| 8 | `GOOGLE_IOS_CLIENT_ID` (req.) | `useGoogleLogin` `iosClientId` | `AppConfig.googleIosClientId`, default `''` | PARTIAL | Unchanged. Needs the iOS client + Info.plist `GIDClientID`/URL scheme (credentials). |
-| 9 | `NOTIFICATION_SCHEDULE_DAY` (default 1) | `notificationService.ts` weekly leaderboard reminder | `leaderboard_notification.dart` `int.fromEnvironment`, default 1 | PRESENT | |
-| 10 | `NOTIFICATION_SCHEDULE_HOUR` (default 11) | same | default 11 | PRESENT | |
-| 11 | `NOTIFICATION_SCHEDULE_MINUTE` (default 0) | same | default 0 | PRESENT | |
-| 12 | `LANGUAGE_SELECTOR_FLAG` (default false) | `i18n.ts` dynamic sync, `ProfileSettingsScreen` language row (2 places) | `AppConfig.languageSelectorEnabled` gates the sync in `localization_controller.dart` | PARTIAL | Unchanged: `profile_settings_screen.dart:279` renders the language row unconditionally; RN hides it behind the flag (`ProfileSettingsScreen.tsx:182,232`). |
-| 13 | `I18N_BASE_URL` (default `''`) | `localization/dynamic.ts` | `AppConfig.i18nBaseUrl`, default `https://api.helloally.dev/i18n` | PARTIAL | Unchanged: `app_config.dart:51` still defaults to the retired `https://api.helloally.dev/i18n`. |
-| 14 | Android manifest placeholder `${appLinkHost}` (Gradle, per flavor) | App Links intent filter | none | MISSING | Unchanged. |
-| 15 | Per-environment Firebase config (`GoogleService-Info.plist`, `google-services.json`) | Firebase app, FCM, Crashlytics | none in repo | MISSING | Unchanged (credentials). |
+| 1 | `ENVIRONMENT` (req.) | NetworkLogs gate, logger, drawer "(Dev)" | `AppConfig.environment` (`app_config.dart:112-115`; `development` in debug/dev flavor) | PRESENT | |
+| 2 | `API_BASE_URL` (req.) | `services/api.ts` | `AppConfig.apiBaseUrl` (`requireApiBaseUrl` throws) | PRESENT | |
+| 3 | `API_VERSION` (req.) | unused | hardcoded v1/v2 | N/A | Dead in RN. |
+| 4 | `ALLY_WEB_URL` (req.) | deep-link allowlist, CallLog "Learn more", SimulationDetails copy-link | `AppConfig.allyWebUrl` (`app_config.dart:32-35`) | PRESENT | v3: allowlist `core/deeplink/deep_link.dart:58-59` (RN `deeplink.ts:7,17-23`); Learn more `call_log_screen.dart:249-253`; copy-link `simulation_details_screen.dart:65`. [v2 PARTIAL] |
+| 5 | `MICROPHONE_SOCKET_PATH` (req.) | `useSocket.ts` | default `/microphone-chat` | PRESENT | |
+| 6 | `CLOUD_TELEPHONY_PATH` (req.) | telephony socket | default `/cloud-telephony-chat` | PRESENT | App-wide socket parity is §4b. |
+| 7 | `GOOGLE_WEB_CLIENT_ID` (req.) | `useGoogleLogin` `webClientId` | `AppConfig.googleWebClientId` → `serverClientId` (`login_screen.dart:164-169`) | BLOCKED-EXTERNAL | v3 (normalised): same value as RN via `ENV_VALUES_*`; prod flavor has RN's package id + signing key, so RN's OAuth clients apply. Needs on-device sign-in proof (and the env secret, §9 r16). [v2 PARTIAL] |
+| 8 | `GOOGLE_IOS_CLIENT_ID` (req.) | `useGoogleLogin` `iosClientId` | `AppConfig.googleIosClientId` → `clientId` (`login_screen.dart:166-167`); Info.plist `GIDClientID` (`ios/Runner/Info.plist:41-42`) from `ios/Flutter/prod.xcconfig` (RN's value) | BLOCKED-EXTERNAL | v3 (normalised): config complete in repo; Dart-side `GOOGLE_IOS_CLIENT_ID` comes from the `ENV_VALUES_*` secret (§9 r16), then device check. [v2 PARTIAL] |
+| 9 | `NOTIFICATION_SCHEDULE_DAY` (1) | weekly reminder | `leaderboard_notification.dart` default 1 | PRESENT | |
+| 10 | `NOTIFICATION_SCHEDULE_HOUR` (11) | same | default 11 | PRESENT | |
+| 11 | `NOTIFICATION_SCHEDULE_MINUTE` (0) | same | default 0 | PRESENT | |
+| 12 | `LANGUAGE_SELECTOR_FLAG` | `i18n.ts` sync, ProfileSettings language row | `AppConfig.languageSelectorEnabled` (`app_config.dart:72-75`, default `true`); gates sync `localization_controller.dart:113,140` and row `profile_settings_screen.dart:318` | PRESENT | v3: row now gated (`28ff515`). Default `true` = RN prod value; `env/example.env` sets `false`. [v2 PARTIAL] |
+| 13 | `I18N_BASE_URL` (default `''`) | `localization/dynamic.ts` | `app_config.dart:62-66`: define, else prod flavor `https://api.helloally.ai/i18n`, else `https://api.helloally.dev/i18n` | PRESENT | v3: prod flavor fixed. Residual (dev flavor only, low): fallback is the retired `.dev` host; sync fails silently to bundled JSON. [v2 PARTIAL] |
+| 14 | Android `${appLinkHost}` (per flavor) | App Links filter | `android/app/build.gradle.kts:56` (`app.dev.helloally.ai`), `:62` (`app.helloally.ai`); used `AndroidManifest.xml:64-65` | PRESENT | v3 (`c536efa`). [v2 MISSING] |
+| 15 | Per-env Firebase config | Firebase, FCM, Crashlytics | not in git by design; CI pulls from S3 (`build-android-production.yml:80`, `build-ios-production.yml:62`); conditional apply `build.gradle.kts:110-115`; iOS copy+bundle-id check `project.pbxproj:261-274` | BLOCKED-EXTERNAL | v3: code ready; needs `*_GOOGLE_SERVICES_S3_URI_*` secrets on the Flutter repo (`gh secret list -R HelloAllyTech/ally-mobile-flutter` is empty). [v2 MISSING] |
+| 16 | (new) CI env + signing secrets (`ENV_VALUES_PRODUCTION/DEVELOP`, keystore, provisioning, App Store keys) | RN `HelloAllyTech/ally-mobile` repo secrets | workflows reference the same names | BLOCKED-EXTERNAL | v3 new: Flutter repo has no repo secrets; copy RN's 28. |
+| 17 | (new) Build flavors dev/prod | RN `productFlavors` (`android/app/build.gradle:38-53`) | `pubspec.yaml` `default-flavor: dev`; `build.gradle.kts:50-64`; `ios/Flutter/{dev,prod}.xcconfig` | PRESENT | v3 new (`afdccc1`). Dev ids differ from RN's dev on purpose (§10 r98). |
 
-Flutter-only flags: none beyond the above. Also listed as N/A: `NetworkLogs` and the logger are dev-only.
+Flutter-only flags: none. `NetworkLogs`/logger dev-only (N/A).
 
 ---
 
 ## §10 Native / platform
 
+**v3 tally: 100 rows (83 + 17 new in 10f) — PRESENT 63, PARTIAL 5, MISSING 0, BLOCKED-EXTERNAL 7, DEVICE-CHECK 3, N/A 22** [v2: 83 rows — PRESENT 49, PARTIAL 8, MISSING 8, N/A 18].
+
 ### 10a iOS `Info.plist` (RN `ios/ally/Info.plist` vs Flutter `ios/Runner/Info.plist`)
 
 | # | Key | RN | Flutter | Status | Notes |
 |---|---|---|---|---|---|
-| 1 | `CFBundleDisplayName` | `Ally` | `Ally` | PARTIAL | v2 (`97c9f94`): display name is now `Ally`. Remaining: bundle id `com.helloally.allyMobileFlutter` vs RN prod id (release-identity decision). |
-| 2 | `CFBundleURLTypes` (Google reversed client ids ×2) + `GIDClientID` | present | absent | MISSING | Unchanged. Needs the iOS OAuth client id (credentials). |
-| 3 | `NSMicrophoneUsageDescription` | present | present (different, better copy) | PRESENT | |
-| 4 | `NSPhotoLibraryUsageDescription` | present | present | PRESENT | |
-| 5 | `NSCameraUsageDescription` | present | absent | N/A | Neither app captures camera (RN `launchCamera` unused; Flutter `ImageSource.gallery` only; role play is audio-only). |
-| 6 | `NSLocationWhenInUseUsageDescription` | empty string | absent | N/A | RN has no geolocation calls. |
-| 7 | `UIBackgroundModes` | `remote-notification` | `audio`, `remote-notification` | PRESENT | v2 (`9f08ca4`): `remote-notification` added alongside Flutter's `audio`. |
-| 8 | `NSAppTransportSecurity` `NSAllowsLocalNetworking` | true | absent | N/A | Dev-only (local http backend). Add it if local-network testing on device is needed. |
-| 9 | `UIAppFonts` (7 fonts) | listed | fonts bundled via pubspec | PRESENT | |
-| 10 | `UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`, `UISupportsDocumentBrowser` | true | present | PRESENT | v2: all three keys set; export is ported. |
-| 11 | `ITSAppUsesNonExemptEncryption` = false | present | false | PRESENT | v2. |
-| 12 | `UIRequiredDeviceCapabilities` arm64 | present | absent | N/A | Flutter iOS builds are arm64-only anyway. |
-| 13 | `UISupportedInterfaceOrientations` | Portrait only | Portrait (iPhone); iPad: all four | PRESENT | v2: iPhone list is Portrait only and `main.dart` calls `setPreferredOrientations([portraitUp])`. Residual: Flutter targets iPad (`TARGETED_DEVICE_FAMILY = "1,2"`; RN is iPhone-only) and keeps all four iPad orientations without `UIRequiresFullScreen`, so iPad can still rotate. Decide whether to ship iPad at all. |
-| 14 | `UIViewControllerBasedStatusBarAppearance` false | present | absent | N/A | Flutter controls the status bar via `SystemUiOverlayStyle`. |
-| 15 | `UIApplicationSceneManifest` (scene lifecycle, iOS 27) | SceneDelegate | `FlutterSceneDelegate` scene config | PRESENT | |
-| 16 | `PrivacyInfo.xcprivacy` (app-level privacy manifest) | present (`ios/ally/PrivacyInfo.xcprivacy`) | `ios/Runner/PrivacyInfo.xcprivacy` | PRESENT | v2: added to Runner resources (UserDefaults, FileTimestamp reasons). |
+| 1 | `CFBundleDisplayName` / bundle id | `Ally` / `com.helloally.app` | `$(APP_DISPLAY_NAME)` (`Info.plist:10-11`); prod `Ally` / `com.helloally.app` (`ios/Flutter/prod.xcconfig`) | PRESENT | v3: release identity = RN's for prod flavor. [v2 PARTIAL] |
+| 2 | `CFBundleURLTypes` (2 reversed client ids) + `GIDClientID` | present | `Info.plist:31-42`, values `prod.xcconfig` (= RN) | PRESENT | v3. [v2 MISSING] |
+| 3 | `NSMicrophoneUsageDescription` | present | `Info.plist:69-70` | PRESENT | |
+| 4 | `NSPhotoLibraryUsageDescription` | present | `Info.plist:71-72` | PRESENT | |
+| 5 | `NSCameraUsageDescription` | present ("video communication") | absent | PARTIAL | v3: re-classified. App never uses the camera, but `livekit_client`/`flutter_webrtc` link AVCaptureDevice capture APIs, which is why RN kept the key; App Store upload can be rejected (ITMS-90683 missing purpose string). Add the key to `ios/Runner/Info.plist`. [v2 N/A] |
+| 6 | `NSLocationWhenInUseUsageDescription` | empty string | absent | N/A | No location APIs. |
+| 7 | `UIBackgroundModes` | `remote-notification` | `audio`, `remote-notification` (`Info.plist:62-68`) | PRESENT | |
+| 8 | ATS `NSAllowsLocalNetworking` | true | absent | N/A | Dev-only. |
+| 9 | `UIAppFonts` | 7 fonts | fonts via pubspec | PRESENT | |
+| 10 | `UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`, `UISupportsDocumentBrowser` | true | `Info.plist:51-56` | PRESENT | |
+| 11 | `ITSAppUsesNonExemptEncryption` false | present | `Info.plist:99-100` | PRESENT | |
+| 12 | `UIRequiredDeviceCapabilities` arm64 | present | absent | N/A | |
+| 13 | Orientation / device family | Portrait, iPhone-only | Portrait (`Info.plist:108-111`); `TARGETED_DEVICE_FAMILY = 1` all configs (`project.pbxproj:406,533,587`) | PRESENT | v3: iPad no longer targeted (`~ipad` list is now inert). [v2 PRESENT with iPad residual] |
+| 14 | `UIViewControllerBasedStatusBarAppearance` false | present | absent | N/A | |
+| 15 | `UIApplicationSceneManifest` | SceneDelegate | `FlutterSceneDelegate` (`Info.plist:73-93`) | PRESENT | |
+| 16 | `PrivacyInfo.xcprivacy` | present | `ios/Runner/PrivacyInfo.xcprivacy` (in Resources, `project.pbxproj:251`) | PRESENT | v3: content identical to RN (plist JSON diff empty). |
 
-### 10b iOS entitlements (RN `ios/ally/ally.entitlements`; **Flutter has no `.entitlements` file and no `CODE_SIGN_ENTITLEMENTS` in `project.pbxproj`**)
+### 10b iOS entitlements (RN `ios/ally/ally.entitlements`; v3: Flutter `ios/Runner/Runner.entitlements`, `CODE_SIGN_ENTITLEMENTS` on all 6 Runner configs, `project.pbxproj:417,598,620,641,…`)
 
 | # | Entitlement | RN | Flutter | Status |
 |---|---|---|---|---|
-| 17 | `aps-environment` (push) | development (prod via signing) | none | MISSING: Unchanged: still no `.entitlements` / `CODE_SIGN_ENTITLEMENTS`. |
-| 18 | `com.apple.developer.applesignin` | Default | none | MISSING: Unchanged: Apple sign-in fails on device. |
-| 19 | `com.apple.developer.associated-domains` `applinks:app.dev.helloally.ai`, `applinks:app.helloally.ai` | present | none | MISSING: Unchanged: no universal links. |
+| 17 | `aps-environment` | development | `Runner.entitlements:8-9` | PRESENT: v3. [v2 MISSING] Push delivery: §10e r49. |
+| 18 | `com.apple.developer.applesignin` | Default | `Runner.entitlements:10-13` | PRESENT: v3. [v2 MISSING] Device sign-in: §10e r43. |
+| 19 | associated-domains `applinks:app.dev.helloally.ai`, `applinks:app.helloally.ai` | present | `Runner.entitlements:14-18` | PRESENT: v3. [v2 MISSING] Prod AASA lists `W3ZL4N9N9J.com.helloally.app` `/summary/*`, `/course/*` (fetched). |
 
 ### 10c iOS AppDelegate / SceneDelegate
 
-| # | Behaviour | RN (`AppDelegate.swift`) | Flutter (`AppDelegate.swift`, `SceneDelegate.swift`) | Status | Notes |
+| # | Behaviour | RN | Flutter | Status | Notes |
 |---|---|---|---|---|---|
-| 20 | Firebase configure at launch | `FirebaseApp.configure()` | `Firebase.initializeApp()` in Dart (`main.dart:32`) | PARTIAL | Unchanged: `main.dart` init is guarded and now also gates Crashlytics; fails without `GoogleService-Info.plist`. |
-| 21 | Scene lifecycle (iOS 27 requirement) | custom SceneDelegate | implicit-engine FlutterSceneDelegate | PRESENT | |
-| 22 | `GoogleService-Info.plist` / Android `google-services.json` | present | absent | MISSING | Unchanged (credentials). Blocks FCM, Crashlytics reporting and the Google Android client. |
-| 23 | Cold-start URL / universal-link forwarding (`urlContexts`, `NSUserActivityTypeBrowsingWeb` → `RCTLinkingManager`) | present | none (no `app_links`/`uni_links` plugin, no Dart handler) | MISSING | Unchanged. |
-| 24 | Warm deep links (`openURLContexts`, `continue userActivity`) | present | none | MISSING | Unchanged. |
-| 25 | `UNUserNotificationCenter` delegate | via RN Firebase / notifee | set in `AppDelegate` for flutter_local_notifications | PRESENT | |
-| 26 | Native module `CommentableTextView` (Swift + ObjC manager: text selection → "Comment" menu on the review transcript) | `ios/ally/CommentableText*.swift/.m` + `components/CommentableText/{Ios,Android}CommentableText.tsx` | `features/reviews/presentation/review_conversation.dart` (selection context menu) | PRESENT | Re-read on master (selection menu port in `review_conversation.dart:19-52`). |
+| 20 | Firebase configure at launch | `FirebaseApp.configure()` | `Firebase.initializeApp()` guarded (`lib/main.dart:44`) | BLOCKED-EXTERNAL | v3: only the config file is missing (§9 r15). [v2 PARTIAL] |
+| 21 | Scene lifecycle | custom SceneDelegate | `FlutterSceneDelegate` (`ios/Runner/SceneDelegate.swift`) | PRESENT | |
+| 22 | `GoogleService-Info.plist` / `google-services.json` | present (CI) | CI download + `project.pbxproj:261-274`, `build.gradle.kts:110-115` | BLOCKED-EXTERNAL | v3: wiring done; secrets absent. [v2 MISSING] |
+| 23 | Cold-start URL / universal link | `urlContexts`, `NSUserActivityTypeBrowsingWeb` → RCTLinkingManager | `app_links` 7.2.2 (`FlutterSceneLifeCycleDelegate`, handles `willConnectTo`), `main.dart:64` → `core/deeplink/deep_link_binding.dart:43-47`; `FlutterDeepLinkingEnabled=false` (`Info.plist:46-47`) | DEVICE-CHECK | v3 (`c536efa`). Needs a device to prove links open the app. [v2 MISSING] |
+| 24 | Warm deep links (`openURLContexts`, `continue userActivity`) | present | `app_links` scene `openURLContexts`/`continue` handlers → same stream | DEVICE-CHECK | v3. [v2 MISSING] |
+| 25 | `UNUserNotificationCenter` delegate | RN Firebase / notifee | `AppDelegate.swift` | PRESENT | |
+| 26 | `CommentableTextView` native module | Swift/ObjC + Kotlin | `features/reviews/presentation/review_conversation.dart` | PRESENT | |
 
-### 10d Android manifest (RN `android/app/src/main/AndroidManifest.xml` vs Flutter)
+### 10d Android (RN `android/app` vs Flutter `android/app`)
 
 | # | Item | RN | Flutter | Status | Notes |
 |---|---|---|---|---|---|
-| 27 | Package / applicationId, label | `com.helloally.app`, `@string/app_name` (Ally) | `com.helloally.ally_mobile_flutter`, label `Ally` | PARTIAL | v2: label is now `Ally`. applicationId `com.helloally.ally_mobile_flutter` vs RN `com.helloally.app` is the release-identity decision. |
-| 28 | `INTERNET` | ✓ | ✓ | PRESENT | |
-| 29 | `RECORD_AUDIO` | ✓ | ✓ | PRESENT | |
-| 30 | `MODIFY_AUDIO_SETTINGS` | ✓ | ✓ | PRESENT | |
-| 31 | `POST_NOTIFICATIONS` | ✓ | ✓ | PRESENT | |
-| 32 | `RECEIVE_BOOT_COMPLETED` | ✓ | ✓ (plus the flutter_local_notifications boot receiver) | PRESENT | Reschedules the weekly reminder after reboot. |
-| 33 | `SCHEDULE_EXACT_ALARM` | ✓ (notifee exact trigger) | absent | PRESENT (by design) | Flutter schedules with `AndroidScheduleMode.inexactAllowWhileIdle` (`leaderboard_notification.dart:126`), which needs no permission. The reminder may fire a few minutes late. |
-| 34 | `WRITE_EXTERNAL_STORAGE` (maxSdk 28) + `requestLegacyExternalStorage` | ✓ | present (`maxSdkVersion=28`, `requestLegacyExternalStorage`) | PRESENT | v2: both added (export is ported). |
-| 35 | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MICROPHONE` + `WAKE_LOCK` + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + flutter_foreground_task service (`foregroundServiceType=microphone`) | **absent** | present | N/A | A Flutter addition: RN has no foreground service, so Android 14+ kills its mic in the background. Keep it. |
-| 36 | App Links intent filter `autoVerify`, https `${appLinkHost}` `/summary`, `/course` | ✓ | absent | MISSING | Unchanged. |
-| 37 | `launchMode` | `singleTask` | `singleTop` | PARTIAL | Unchanged (`singleTop`). Revisit with deep links. |
-| 38 | `screenOrientation="portrait"` | ✓ | present | PRESENT | v2 (`9f08ca4`). |
-| 39 | `allowBackup="false"` | ✓ | present | PRESENT | v2 (`9f08ca4`). |
-| 40 | `windowSoftInputMode` | `adjustPan` | `adjustResize` (Flutter default) | N/A | Flutter handles insets itself. |
-| 41 | `supportsRtl` | true | default | N/A | No RTL locales. |
+| 27 | applicationId / label | `com.helloally.app`, `Ally` (prod) | prod flavor `com.helloally.app`, `Ally` (`build.gradle.kts:58-62`); manifest `@string/app_name` (`AndroidManifest.xml:28`) | PRESENT | v3. [v2 PARTIAL] |
+| 28 | `INTERNET` | ✓ | `AndroidManifest.xml:18` | PRESENT | |
+| 29 | `RECORD_AUDIO` | ✓ | `:16` | PRESENT | |
+| 30 | `MODIFY_AUDIO_SETTINGS` | ✓ | `:17` | PRESENT | |
+| 31 | `POST_NOTIFICATIONS` | ✓ | `:19` | PRESENT | |
+| 32 | `RECEIVE_BOOT_COMPLETED` | ✓ | `:21` + boot receiver `:90-97` | PRESENT | |
+| 33 | `SCHEDULE_EXACT_ALARM` | ✓ | absent; inexact schedule (`leaderboard_notification.dart:126`) | PRESENT (by design) | |
+| 34 | `WRITE_EXTERNAL_STORAGE` (max 28) + `requestLegacyExternalStorage` | ✓ | `:15`, `:32` | PRESENT | |
+| 35 | Foreground service (mic) + `WAKE_LOCK` + battery-opt | absent | `:22-25`, service `:82-85` | N/A | Flutter addition; keep. |
+| 36 | App Links filter `autoVerify`, `${appLinkHost}`, `/summary`, `/course` | ✓ | `AndroidManifest.xml:60-66`; `flutter_deeplinking_enabled=false` `:70` | PRESENT | v3. Prod `assetlinks.json` already lists `com.helloally.app` with RN's cert (fetched). [v2 MISSING] |
+| 37 | `launchMode` | `singleTask` | `singleTask` (`:36`) | PRESENT | v3. [v2 PARTIAL] |
+| 38 | `screenOrientation="portrait"` | ✓ | `:37` | PRESENT | |
+| 39 | `allowBackup="false"` | ✓ | `:31` | PRESENT | |
+| 40 | `windowSoftInputMode` | `adjustPan` | `adjustResize` | N/A | |
+| 41 | `supportsRtl` | true | default | N/A | |
 
 ### 10e Native modules (`package.json` dependencies) → Flutter plugins
 
+v3: `package.json` dependencies re-listed (60 packages); every one is covered below.
+
 | # | RN package (used in) | Flutter plugin / approach | Status | Notes |
 |---|---|---|---|---|
-| 42 | `@gorhom/bottom-sheet` (12 files) | `showModalBottomSheet` / `DraggableScrollableSheet` | PRESENT | Per-sheet parity in §2/§3. |
-| 43 | `@invertase/react-native-apple-authentication` | `sign_in_with_apple` | PARTIAL | Unchanged: entitlement missing (row 18). |
-| 44 | `@livekit/react-native` + `@livekit/react-native-webrtc` + `livekit-client` | `livekit_client` | PRESENT | v2: room-disconnect / agent-joined handling landed (`b82d84f`, §2 Learn). |
-| 45 | `@notifee/react-native` (local display, channels, weekly trigger) | `flutter_local_notifications` | PRESENT | Foreground FCM display parity is in §4b. |
-| 46 | `@react-native-async-storage/async-storage` | `shared_preferences` + `flutter_secure_storage` | PRESENT | Tokens move to secure storage, so existing users must log in again after migrating from the RN build (§5 transport). |
-| 47 | `@react-native-clipboard/clipboard` | `flutter/services` `Clipboard` | PRESENT | |
-| 48 | `@react-native-community/netinfo` (`useNetworkConnectivity`) | `connectivity_plus` (`core/realtime/connectivity.dart`) | PRESENT | v2. |
-| 49 | `@react-native-firebase/app` + `messaging` | `firebase_core` + `firebase_messaging` | PARTIAL | Unchanged: config files absent (row 22). |
-| 50 | `@react-native-firebase/crashlytics` (ErrorBoundary) | `firebase_crashlytics` | PRESENT | v2: wired (`core/errors/crash_reporting.dart`); reports only once the Firebase config exists. |
-| 51 | `@react-native-google-signin/google-signin` | `google_sign_in` | PARTIAL | Unchanged (credentials: client ids, plist). |
-| 52 | `@react-native-masked-view/masked-view` (ShinyText) | `ShaderMask` | see §3 ShinyText | PRESENT | |
-| 53 | `@react-navigation/*` (bottom-tabs, drawer, native, native-stack) | `go_router` + custom shell/drawer | PRESENT | §1. |
-| 54 | `@react-navigation/stack` | — | N/A | Unused in RN. |
-| 55 | `@reduxjs/toolkit` + `react-redux` | `flutter_riverpod` | PRESENT | §6. |
-| 56 | `@sayem314/react-native-keep-awake` (useListeningCommon, SimulationAssistantScreen) | `wakelock_plus` (`core/realtime/keep_awake.dart`) | PRESENT | v2. |
-| 57 | `@shopify/react-native-skia` | — | N/A | Unused in RN. |
-| 58 | `@wuba/react-native-echarts` + `echarts` (CustomLineChart) | — | N/A | CustomLineChart is never rendered (§3). |
-| 59 | `i18next` + `react-i18next` | custom `localization_controller.dart` / `translations.dart` | PRESENT | §7. |
-| 60 | `lodash` | — | N/A | No direct imports. |
-| 61 | `lottie-react-native` (4 files) | `lottie` | PRESENT | v2: splash + `summaryLoading.json` (`summary_generation_progress.dart:184`). `botThinking.json` is RN-dead (only exported from `assets/animations/index.ts`). |
-| 62 | `react-native-audio-api` (SimulationAudioPlayer) | `audioplayers` (`simulation_audio_player*.dart`) | PRESENT | v2: SimulationFeedback recording player landed (`bc9381b`). |
-| 63 | `react-native-calendars` | — | N/A | Unused in RN. |
-| 64 | `react-native-chart-kit` (ChartComponent) | — | N/A | ChartComponent is never rendered (§3). |
-| 65 | `react-native-confetti-cannon` (CelebrationModal, QuizItemPlayer, BadgePopup) | `confetti` | PRESENT | v2: celebration modal, quiz player and badge popup all use `confetti`. |
-| 66 | `react-native-config` | `--dart-define` / `AppConfig` | PRESENT | §9. |
-| 67 | `react-native-fs` (fileOperations.saveFile, useVoiceNoteRecorder) | `path_provider` + `dart:io` | PRESENT | v2: export ported (`summary_file_export.dart`). |
-| 68 | `react-native-gesture-handler` / `reanimated` / `screens` / `safe-area-context` / `keyboard-aware-scroll-view` / `size-matters` / `linear-gradient` / `svg` / `tab-view` | Flutter framework (`rn_scale.dart` for size-matters), `flutter_svg`, `TabBar` | PRESENT | Framework-level equivalents. |
-| 69 | `react-native-image-picker` (useProfileImage) | `image_picker` | PRESENT | The jpeg/png restriction is missing (§2 account). |
-| 70 | `react-native-live-audio-stream` (useLiveAudioStream, useVoiceNoteRecorder) | `record` (PCM stream) | PRESENT | |
-| 71 | `react-native-network-logger` (NetworkLogs) | — | N/A | Dev-only "Logs" bubble (`ENVIRONMENT==='development'`). |
-| 72 | `react-native-pager-view` | — | N/A | Unused in RN. |
-| 73 | `react-native-permissions` (7 files: mic, notifications, photo; `openSettings`) | `permission_handler` | PRESENT | v2: Open-Settings alert (`microphone_permission.dart`). |
-| 74 | `react-native-reanimated-carousel` (Carousel) | — | N/A | The Carousel is never rendered. |
-| 75 | `react-native-sound-player` (breath.mp3, start/end simulation sounds) | `audioplayers` (`breath_sound_player.dart`) | PRESENT | v2 (`d12a201`): start/end simulation sounds (`roleplay/presentation/simulation_sound_player.dart`). |
-| 76 | `react-native-version-check` (`utils/version.ts`: store URL + version compare) | `package_info_plus` + `core/app_update/force_update.dart` | PRESENT | v2: force update ported; store URLs are constants (`force_update.dart:17-18`). |
-| 77 | `react-native-video` (VideoItemPlayer, QuestionMedia, VideoPreview) | `video_player` | PRESENT | v2: QuestionMedia video ported (`courses/presentation/question_media.dart`). |
-| 78 | `react-native-walkthrough-tooltip` (InfoTooltip, PrivacyTooltip) | `info_tooltip_icon.dart`, `listening_chrome.dart` (`showPrivacyTooltip`) | PARTIAL | v2: PrivacyTooltip on both listening screens (`listening_chrome.dart`). Still missing on the call-summary AddNotesSection (RN `AddNotesSection.tsx:65`; nothing in `summary_generation_progress.dart`). |
-| 79 | `react-native-webview` (UserAnalytics, QuestionMedia, games) | `webview_flutter` | PRESENT | |
-| 80 | `rn-emoji-keyboard` (ShareForReview note, reactions) | `emoji_insert_picker.dart` | PRESENT | |
-| 81 | `socket.io-client` (useSocket) | `socket_io_client` | PRESENT | Retry and foreground reconnect gaps are in §4/§5. |
-| 82 | (Flutter-only) `flutter_foreground_task`, `timezone`/`flutter_timezone`, `webview_flutter` game bridge | — | N/A | Additions with no RN counterpart. |
-| 83 | `react` / `react-native` core | Flutter SDK | PRESENT | |
+| 42 | `@gorhom/bottom-sheet` | `showModalBottomSheet` / `DraggableScrollableSheet` | PRESENT | |
+| 43 | `@invertase/react-native-apple-authentication` | `sign_in_with_apple` | DEVICE-CHECK | v3: entitlement now present (r18); needs on-device sign-in. [v2 PARTIAL] |
+| 44 | `@livekit/react-native` + webrtc + `livekit-client` | `livekit_client` | PRESENT | v3: audio session configured before connect (`roleplay_voice_screen.dart:247`, `39f4ee2`). Bluetooth permissions: r88. |
+| 45 | `@notifee/react-native` | `flutter_local_notifications` | PRESENT | Same channel ids (`leaderboard`, reminders). |
+| 46 | `@react-native-async-storage/async-storage` | `shared_preferences` + `flutter_secure_storage` | PRESENT | v3: RN session migrated on first prod launch (`core/migration/legacy_session_migration.dart:103`, iOS manifest reader `rn_async_storage.dart`, Android `MainActivity.kt` `ally/legacy_rn_storage`; `main.dart:60`). |
+| 47 | `@react-native-clipboard/clipboard` | `Clipboard` | PRESENT | |
+| 48 | `@react-native-community/netinfo` | `connectivity_plus` (`core/realtime/connectivity.dart`) | PRESENT | |
+| 49 | `@react-native-firebase/app` + `messaging` | `firebase_core` + `firebase_messaging` | BLOCKED-EXTERNAL | v3: only config files/secrets missing (§9 r15). Push delivery then DEVICE-CHECK. [v2 PARTIAL] |
+| 50 | `@react-native-firebase/crashlytics` | `firebase_crashlytics` (`core/errors/crash_reporting.dart:40-42`) | PRESENT | Symbol upload: §11 r5. |
+| 51 | `@react-native-google-signin/google-signin` | `google_sign_in` | BLOCKED-EXTERNAL | v3 (normalised): needs the `ENV_VALUES_*` secret (§9 r16), then device check. Client ids + plist done (§9 r7/8, §10 r2). [v2 PARTIAL] |
+| 52 | `@react-native-masked-view/masked-view` | `ShaderMask` | PRESENT | |
+| 53 | `@react-navigation/*` | `go_router` + custom shell | PRESENT | |
+| 54 | `@react-navigation/stack` | — | N/A | |
+| 55 | `@reduxjs/toolkit` + `react-redux` | `flutter_riverpod` | PRESENT | |
+| 56 | `@sayem314/react-native-keep-awake` | `wakelock_plus` (`core/realtime/keep_awake.dart`) | PRESENT | |
+| 57 | `@shopify/react-native-skia` | — | N/A | |
+| 58 | `@wuba/react-native-echarts` + `echarts` | — | N/A | |
+| 59 | `i18next` + `react-i18next` | `localization_controller.dart` | PRESENT | |
+| 60 | `lodash` | — | N/A | |
+| 61 | `lottie-react-native` | `lottie` | PRESENT | v3: `botThinking.json` deleted (RN-dead). |
+| 62 | `react-native-audio-api` | `audioplayers` | PRESENT | |
+| 63 | `react-native-calendars` | — | N/A | |
+| 64 | `react-native-chart-kit` | — | N/A | |
+| 65 | `react-native-confetti-cannon` | `confetti` | PRESENT | |
+| 66 | `react-native-config` | `--dart-define` / `AppConfig` | PRESENT | |
+| 67 | `react-native-fs` | `path_provider` + `dart:io` + `MainActivity.kt` `ally/file_export` | PRESENT | |
+| 68 | gesture-handler / reanimated / screens / safe-area / keyboard-aware / size-matters / linear-gradient / svg / tab-view | framework, `rn_scale.dart`, `flutter_svg`, `TabBar` | PRESENT | |
+| 69 | `react-native-image-picker` | `image_picker` | PRESENT | jpeg/png restriction landed (`28ff515`). |
+| 70 | `react-native-live-audio-stream` | `record` | PRESENT | |
+| 71 | `react-native-network-logger` | — | N/A | |
+| 72 | `react-native-pager-view` | — | N/A | |
+| 73 | `react-native-permissions` | `permission_handler` (`core/realtime/microphone_permission.dart`) | PRESENT | |
+| 74 | `react-native-reanimated-carousel` | — | N/A | |
+| 75 | `react-native-sound-player` | `audioplayers` | PRESENT | |
+| 76 | `react-native-version-check` | `package_info_plus` + `core/app_update/force_update.dart` | PRESENT | v3: store URLs (`force_update.dart:18-19`) now match the prod identity. |
+| 77 | `react-native-video` | `video_player` | PRESENT | |
+| 78 | `react-native-walkthrough-tooltip` | `info_tooltip_icon.dart`, `listening_chrome.dart` `showPrivacyTooltip` | PRESENT | v3: AddNotesSection tooltip `summary_generation_progress.dart:385-404` (RN `AddNotesSection.tsx:65`). [v2 PARTIAL] |
+| 79 | `react-native-webview` | `webview_flutter` | PRESENT | |
+| 80 | `rn-emoji-keyboard` | `features/reviews/presentation/emoji_keyboard/emoji_keyboard.dart:56` + `assets/emoji_keyboard/` | PRESENT | v3: full port (`41744fd`); old `emoji_insert_picker.dart` deleted (`81622e1`), no callers left. |
+| 81 | `socket.io-client` | `socket_io_client` | PRESENT | |
+| 82 | (Flutter-only) foreground task, timezone, game bridge, `app_links`, `crypto` | — | N/A | |
+| 83 | `react` / `react-native` | Flutter SDK | PRESENT | |
+
+### 10f (v3 new) Launch screen, icons, merged permissions, build/release
+
+| # | Item | RN | Flutter | Status | Notes |
+|---|---|---|---|---|---|
+| 84 | iOS native launch screen | `LaunchScreen.storyboard` dark bg (#1B282F) | template `ios/Runner/Base.lproj/LaunchScreen.storyboard`: white bg + 1×1 `LaunchImage` | PARTIAL | White flash before the dark Lottie splash (`launch_splash.dart:105` `AppColors.darkGreen`). |
+| 85 | Android launch theme | `LaunchTheme` `windowBackground=#021922`, `windowDisablePreview` (`res/values/styles.xml`, `colors.xml`) | `res/drawable(-v21)/launch_background.xml` = `?android:colorBackground` on `Theme.Light` (white) | PARTIAL | Same white flash. |
+| 86 | Android round icon | `android:roundIcon="@mipmap/ic_launcher_round"` (5 densities) | absent (`AndroidManifest.xml:30` icon only) | PARTIAL | Low: launchers fall back to `ic_launcher`. |
+| 87 | Launcher icon artwork (Android mipmaps, iOS AppIcon) | Ally wordmark | visually identical (xxxhdpi and 1024 compared) | PRESENT | |
+| 88 | `BLUETOOTH`, `BLUETOOTH_ADMIN` (merged from `@livekit/react-native` manifest) | ✓ | absent (`flutter_webrtc`/`livekit_client` declare none) | PARTIAL | Flutter role-play prefers Bluetooth output (`roleplay` audio session); on Android ≤11 Bluetooth routing needs these. Add to `AndroidManifest.xml` (maxSdk 30), then DEVICE-CHECK. |
+| 89 | `CAMERA`, `SYSTEM_ALERT_WINDOW` (merged from livekit RN) | ✓ | absent | N/A | Unused by RN. |
+| 90 | `ACCESS_NETWORK_STATE` | merged (netinfo/firebase) | merged (`connectivity_plus`, `firebase_messaging`) | PRESENT | |
+| 91 | Android release signing | `ally-release.keystore` | same keystore from `ANDROID_RELEASE_KEYSTORE_BASE64` (`build.gradle.kts:66-92`) | BLOCKED-EXTERNAL | Secrets absent on Flutter repo (§9 r16). |
+| 92 | iOS signing (team `W3ZL4N9N9J`, "Ally AppStore Distribution") | ✓ | `ios/Flutter/Release-prod.xcconfig`, `prod.xcconfig` | BLOCKED-EXTERNAL | Same; profile must include the 3 entitlements. |
+| 93 | Version above RN (Android 107, iOS build 67) | — | CI computes `versionCode` (`build-android-production.yml:116-129`) / build number (`build-ios-production.yml:131`) | PRESENT | |
+| 94 | minSdk / targetSdk / compileSdk | 24 / 36 / 36 | `flutter.minSdkVersion`=24, `targetSdkVersion`=36, compileSdk 37 | PRESENT | |
+| 95 | R8/ProGuard (`minifyEnabled`, RN rules) | ✓ | Flutter default | N/A | RN rules are RN-specific. |
+| 96 | iOS deployment target | 15.1 | 15.0 | PRESENT | |
+| 97 | `CFBundleName` | `$(PRODUCT_NAME)` | `ally_mobile_flutter` | N/A | Not user-visible (display name set). |
+| 98 | Dev flavor identity | `com.helloally.app.dev` "Ally - Dev" | `com.helloally.ally_mobile_flutter` / `com.helloally.allyMobileFlutter` "Ally Flutter" | N/A | Deliberate (`build.gradle.kts:43-57`, `dev.xcconfig`). |
+| 99 | Dev-flavor Firebase app, OAuth clients, AASA/assetlinks for dev ids | for RN dev ids | not registered (AASA lists only `com.helloally.app`; assetlinks only RN ids) | BLOCKED-EXTERNAL | Low; dev/test builds only. |
+| 100 | Debug `usesCleartextTraffic` | RN `src/debug/AndroidManifest.xml` | absent | N/A | Dev-only (as r8). |
 
 ---
 
 ## §11 Analytics / telemetry
 
-The whole of RN `src/` was searched (non-test) for posthog, mixpanel, amplitude, segment, `logEvent`, `.track(`, `.capture(`, `analytics()` and Sentry. **RN emits no product-analytics events, so there are no event names to port.** The only telemetry is listed below.
+**v3 tally: 5 rows — PRESENT 2, PARTIAL 1, MISSING 0, BLOCKED-EXTERNAL 1, DEVICE-CHECK 0, N/A 1** [v2: 4 rows — PRESENT 2, PARTIAL 1, N/A 1].
+
+RN emits no product-analytics events (posthog/mixpanel/amplitude/segment/`logEvent`/`.track(`/Sentry searched). Telemetry only:
 
 | # | RN telemetry | RN file | Flutter | Status | Notes |
 |---|---|---|---|---|---|
-| 1 | Crashlytics `log()` + `recordError(error, 'UnhandledRenderError')` from the global ErrorBoundary, with fallback UI | `components/ErrorBoundary/ErrorBoundary.tsx`, `App.tsx` | `core/errors/crash_reporting.dart`, `core/errors/error_boundary.dart` | PRESENT | v2 (`0885d07`): global handlers + fallback UI; reporting guarded on Firebase. |
-| 2 | Crashlytics native crash reporting (auto, via RN Firebase) | native | the plugin is in pubspec, but there's no Firebase config file (§10 row 22) and no init | PARTIAL | v2: plugin initialised when Firebase is; blocked only on the config files (credentials). |
-| 3 | `SCRIBE_START_DIAGNOSTIC` socket event at Scribe start (mic/device diagnostics to the backend) | `MicrophoneListeningScreen.tsx:450` | `core/realtime/socket_events.dart:17`, `scribe_recording_screen.dart:140-177` | PRESENT | v2 (`cd51b4d`): emitted at 5s/15s like RN. |
-| 4 | Dev logger (`utils/logger.ts`, console only when `ENVIRONMENT==='development'`) | `utils/logger.ts` | `debugPrint` / `log` | N/A | Dev only. |
+| 1 | Crashlytics `recordError` from ErrorBoundary + fallback UI | `components/ErrorBoundary/ErrorBoundary.tsx` | `core/errors/crash_reporting.dart:40-42`, `core/errors/error_boundary.dart` | PRESENT | |
+| 2 | Crashlytics native crash reporting | RN Firebase | `firebase_crashlytics`, init guarded on Firebase (`main.dart:44`) | BLOCKED-EXTERNAL | v3: config files only. [v2 PARTIAL] |
+| 3 | `SCRIBE_START_DIAGNOSTIC` | `MicrophoneListeningScreen.tsx:450` | `socket_events.dart:17`, `scribe_recording_screen.dart:159-196` | PRESENT | |
+| 4 | Dev logger | `utils/logger.ts` | `debugPrint` | N/A | |
+| 5 | (v3 new) Crashlytics symbol upload: iOS dSYM run script, Android crashlytics Gradle plugin | `ios/ally.xcodeproj/project.pbxproj:309` (`FirebaseCrashlytics/run`); `android/build.gradle:19`, `android/app/build.gradle:6` | none in `ios/Runner.xcodeproj/project.pbxproj` or `android/*.gradle.kts` | PARTIAL | Native crashes arrive unsymbolicated/obfuscated. Dart errors unaffected. |
+
+---
 
 
 ---
 
 ## Not determined / limits of this audit
 
-- **v2 re-audit (2026-10-28, master `227db3a`).** Every v1 PARTIAL/MISSING/MERGED row was re-read on master, plus about 10% of PRESENT rows in the areas that changed. MERGED rows no longer exist: the reviews code was re-read on master and is PRESENT.
-- **Runtime behaviour was still not exercised.** Nothing was built or run, so these are code-reading verdicts. Firebase-dependent paths (FCM registration and deregistration, Crashlytics reporting) can't be proven until the config files exist. The same goes for Google and Apple sign-in on device, the iPad orientation behaviour, and the force-update modal against a real `/app-version` response.
-- **Hardcoded English literals in Flutter** (§7 row 9) were spot-checked by grep, not audited exhaustively.
-- **Backend consumers were not checked.** Flutter now emits `SCRIBE_START_DIAGNOSTIC` and sends `enableRecommendations: true`; whether the backend still reads either is unverified.
-- **Release identity is a product decision, not a parity verdict.** It covers the bundle id / applicationId (`com.helloally.app` vs `com.helloally.allyMobileFlutter` / `com.helloally.ally_mobile_flutter`) and whether Flutter ships as an update to the RN app. That choice affects token migration from AsyncStorage, the force-update store URLs (which currently point at the RN listings), Firebase and OAuth client registration, entitlements and signing. It also covers whether iPad is a supported target (Flutter `TARGETED_DEVICE_FAMILY = "1,2"`, RN iPhone-only).
-- **Scripts and raw outputs:** `scratchpad/scripts/{i18n.py,assets2.py,v2_s4.py}`, `inventory/{i18n.json,assets_final.txt}`, and the per-part source files in `inventory/parts/`.
+- **v3 re-audit (2026-10-28, Flutter `f770200`, RN `7a8ce0c19`).** Every non-PRESENT, non-N/A row and every numbered v2 gap item was re-read in current code. About 385 PRESENT rows were spot-checked, with priority on the screens changed in waves 3–6.
+- **Runtime behaviour was not exercised.** These are code-reading verdicts. The DEVICE-CHECK list names everything that needs hardware.
+- **BLOCKED-EXTERNAL rests on one observation:** the Flutter GitHub repo shows no Actions secrets. The workflows reference the same secret names that RN uses.
+- **Hardcoded English literals** were grepped, not audited exhaustively. Each of the remaining 82 hits mirrors an RN literal.
+- **Scripts and raw outputs:**
+  - `scratchpad/v3/scripts/` (`endpoints_out.txt`, `i18n_v3.json`, `assets3.py`/`assets3.out`, `literals.txt`)
+  - the per-area v3 sources in `scratchpad/v3/out/{A..G}_{section,gaps}.md`
