@@ -1314,13 +1314,12 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     trigger: 'An author generates a simulation cover image',
     detail:
-      'Runs as a background job the editor polls (generate-jobs): at the default ' +
-      'quality gpt-image-1 took 79–95 s in prod, past the 60 s load-balancer idle ' +
-      'timeout. Sent at quality medium (~25 s). Gemini renders from an aspect ' +
-      'ratio rather than pixel dimensions and has no quality setting.',
+      'Runs as a background job the editor polls (generate-jobs): image generation ' +
+      'can outlast the 60 s load-balancer idle timeout. Sent at quality medium (~25 s). ' +
+      'Gemini renders from an aspect ratio rather than pixel dimensions and has no quality setting.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'dall-e-3',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
@@ -1339,7 +1338,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'the roleplay cover library.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'dall-e-3',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
@@ -2342,7 +2341,7 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
       'row, so the session budget counts each at COURSE_COPILOT_IMAGE_COST_USD.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'dall-e-3',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },

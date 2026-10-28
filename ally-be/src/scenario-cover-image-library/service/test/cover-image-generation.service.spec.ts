@@ -19,7 +19,7 @@ describe('CoverImageGenerationService', () => {
   let service: CoverImageGenerationService;
 
   const mockProvider = {
-    getModel: jest.fn().mockReturnValue('gpt-image-1'),
+    getModel: jest.fn().mockReturnValue('dall-e-3'),
     assertConfigured: jest.fn(),
     generateImage: jest.fn(),
   };
@@ -111,7 +111,7 @@ describe('CoverImageGenerationService', () => {
     expect(mockUsage.record).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'openai',
-        model: 'gpt-image-1',
+        model: 'dall-e-3',
         task: 'generate_cover_image',
         unit: 'images',
       }),

@@ -795,7 +795,7 @@ export class AppConfigService {
       ),
       imageModel: this.configService.get<string>(
         'OPENAI_IMAGE_MODEL',
-        'gpt-image-1',
+        'dall-e-3',
       ),
     };
   }
