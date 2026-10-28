@@ -49,6 +49,8 @@ void main() {
       });
 
       expect(translations.t('progress.title'), 'आपकी प्रगति');
+      // Plural keys resolve from `count` in the stored language.
+      expect(translations.t('progress.hero.xpTotal', {'count': 5}), 'कुल 5 XP अर्जित');
     });
   });
 
