@@ -793,10 +793,13 @@ export class AppConfigService {
         'OPENAI_TRANSCRIPTION_MODEL',
         'whisper-1',
       ),
-      imageModel: this.configService.get<string>(
-        'OPENAI_IMAGE_MODEL',
-        'dall-e-3',
-      ),
+      imageModel: (() => {
+        const model = this.configService.get<string>(
+          'OPENAI_IMAGE_MODEL',
+          'dall-e-3',
+        );
+        return model === 'gpt-image-1' ? 'dall-e-3' : model;
+      })(),
     };
   }
 

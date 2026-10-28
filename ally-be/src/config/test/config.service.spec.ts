@@ -75,4 +75,21 @@ describe('AppConfigService', () => {
       ).toEqual(['web-a', 'web-b', 'ios']);
     });
   });
+
+  describe('openai', () => {
+    it('returns dall-e-3 even when the env var is the deprecated gpt-image-1', () => {
+      const service = make({ OPENAI_IMAGE_MODEL: 'gpt-image-1' });
+      expect(service.openai.imageModel).toBe('dall-e-3');
+    });
+
+    it('returns the default when the env var is not set', () => {
+      const service = make({});
+      expect(service.openai.imageModel).toBe('dall-e-3');
+    });
+
+    it('returns a different model when the env var is set to it', () => {
+      const service = make({ OPENAI_IMAGE_MODEL: 'dall-e-2' });
+      expect(service.openai.imageModel).toBe('dall-e-2');
+    });
+  });
 });
