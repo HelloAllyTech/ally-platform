@@ -6,24 +6,27 @@
 /// template format, since this reads directly from that wire format with
 /// no intermediate build step.
 class Translations {
-  Translations(this._tree);
+  Translations(this._tree, {this.language = 'en'});
 
   final Map<String, dynamic> _tree;
 
+  /// The language [_tree] is in — picks the i18next plural category (see
+  /// [_pluralCategory]).
+  final String language;
+
   /// [key] is a dot path, e.g. `progress.hero.level`. Plural keys
-  /// (`foo_one`/`foo_other`, i18next's convention) aren't resolved
-  /// specially here — callers needing pluralization pick the right suffix
-  /// themselves; a full ICU-style plural resolver is further work.
+  /// (`foo_one`/`foo_other`, i18next's v4 JSON convention) resolve like
+  /// i18next's `t('foo', {count})`: when `foo` itself doesn't exist and
+  /// [params] has a numeric `count`, `foo_<category>` is used (then
+  /// `foo_other`). Callers that already pick the suffix themselves keep
+  /// working unchanged.
   /// Returns [key] itself when nothing matches, the same "better a visible
   /// miss than a blank screen" fallback i18next itself uses.
   String t(String key, [Map<String, Object?>? params]) {
-    dynamic node = _tree;
-    for (final segment in key.split('.')) {
-      if (node is Map<String, dynamic> && node.containsKey(segment)) {
-        node = node[segment];
-      } else {
-        return key;
-      }
+    var node = raw(key);
+    final count = params?['count'];
+    if (node is! String && count is num) {
+      node = raw('${key}_${_pluralCategory(count)}') ?? raw('${key}_other');
     }
     if (node is! String) return key;
 
@@ -57,7 +60,18 @@ class Translations {
   /// conflicts) — mirrors i18next's `addResourceBundle(..., deep: true,
   /// overwrite: true)` call in the RN app's dynamic sync.
   Translations mergedWith(Map<String, dynamic> other) {
-    return Translations(_deepMerge(_tree, other));
+    return Translations(_deepMerge(_tree, other), language: language);
+  }
+
+  /// `Intl.PluralRules(language).select(count)` for the categories the
+  /// locale files use (`one`/`other`). CLDR: Hindi and Kannada treat 0 as
+  /// `one` too (`i = 0 or n = 1`); English, Marathi and Tamil only 1.
+  String _pluralCategory(num count) {
+    final isOne = switch (language) {
+      'hi' || 'kn' => count == 0 || count == 1 || (count > 0 && count < 1),
+      _ => count == 1,
+    };
+    return isOne ? 'one' : 'other';
   }
 
   static Map<String, dynamic> _deepMerge(
