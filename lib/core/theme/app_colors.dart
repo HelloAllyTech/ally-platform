@@ -118,4 +118,5 @@ class AppColors {
   static const roseWhite = Color(0xFFFFF0F1); // OTP error background
   static const vividRed = Color(0xFFF50004); // OTP error text/border
   static const ashGray = Color(0xFFEAEAEA); // CompleteProfile/Suspended borders
+  static const gray = Color(0xFF808080); // OtpInput empty-box dash (CSS 'gray')
 }

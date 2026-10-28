@@ -1,12 +1,16 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
 import 'package:ally_mobile_flutter/core/config/app_config.dart';
@@ -14,6 +18,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/auth/data/auth_repository.dart';
 import 'package:ally_mobile_flutter/features/auth/presentation/login_screen.dart';
 
+import '../../../support/fake_translations.dart';
 import '../../../support/pump_app.dart';
 import '../../../support/pump_router_app.dart';
 import '../../../support/prewarm_translations.dart';
@@ -54,7 +59,17 @@ void main() {
     authController = _FakeAuthController();
   });
 
+  /// An iPhone 17 Pro-sized surface (402×874pt): the sheet's geometry is
+  /// fractions of the screen height, so the default 800×600 test surface
+  /// would push the lower buttons out of view.
+  void usePhoneSurface(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1206, 2622);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+  }
+
   Future<void> pumpLogin(WidgetTester tester) async {
+    usePhoneSurface(tester);
     await preWarmTranslations(tester);
     await pumpApp(
       tester,
@@ -66,37 +81,73 @@ void main() {
     );
   }
 
+  Finder emailField() => find.byType(TextField);
+
+  group('splash intro', () {
+    testWidgets('plays the real splash Lottie full-bleed, then raises the sheet with the greeting', (tester) async {
+      usePhoneSurface(tester);
+      await preWarmTranslations(tester);
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            fixedTranslationsOverride(),
+            authRepositoryProvider.overrideWithValue(authRepository),
+            authControllerProvider.overrideWith(() => authController),
+          ],
+          child: const MaterialApp(home: LoginScreen()),
+        ),
+      );
+      await tester.pump();
+
+      final builder = tester.widget<LottieBuilder>(find.byType(LottieBuilder));
+      expect((builder.lottie as AssetLottie).assetName, 'assets/animations/splashAnimation.json');
+      expect(builder.fit, BoxFit.cover);
+      // While the animation plays, the sheet hasn't been shown yet.
+      expect(find.text('Next'), findsNothing);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Next'), findsOneWidget);
+      expect(find.text('Hey,'), findsOneWidget);
+    });
+  });
+
   group('email step', () {
-    testWidgets(
-      'disables Next for an empty or invalid-shaped email, enables it once valid '
-      '(RN\'s isValidEmail gate — Flutter previously had no gate at all, so "abc" '
-      'could reach the backend unvalidated)',
-      (tester) async {
-        await pumpLogin(tester);
+    testWidgets('disables Next for an empty or invalid-shaped email, enables it once valid '
+        '(RN\'s isValidEmail gate)', (tester) async {
+      await pumpLogin(tester);
 
-        var nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
-        expect(nextButton.isDisabled, isTrue, reason: 'empty');
+      var nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
+      expect(nextButton.isDisabled, isTrue, reason: 'empty');
 
-        await tester.enterText(find.byType(TextField), 'not-an-email');
-        await tester.pump();
-        nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
-        expect(nextButton.isDisabled, isTrue, reason: 'no @ or domain');
+      await tester.enterText(emailField(), 'not-an-email');
+      await tester.pump();
+      nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
+      expect(nextButton.isDisabled, isTrue, reason: 'no @ or domain');
 
-        await tester.enterText(find.byType(TextField), 'learner@example.com');
-        await tester.pump();
-        nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
-        expect(nextButton.isDisabled, isFalse);
+      await tester.enterText(emailField(), 'learner@example.com');
+      await tester.pump();
+      nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
+      expect(nextButton.isDisabled, isFalse);
 
-        verifyNever(() => authRepository.generateOtp(any()));
-      },
-    );
+      verifyNever(() => authRepository.generateOtp(any()));
+    });
+
+    testWidgets('lower-cases and strips spaces as typed (RN handleEmailChange)', (tester) async {
+      await pumpLogin(tester);
+
+      await tester.enterText(emailField(), ' Learner@Example.COM ');
+      await tester.pump();
+
+      expect(tester.widget<TextField>(emailField()).controller!.text, 'learner@example.com');
+    });
 
     testWidgets('calls generateOtp and advances to the OTP step on success', (tester) async {
       when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
 
       await pumpLogin(tester);
 
-      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.enterText(emailField(), 'learner@example.com');
       await tester.pump();
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
@@ -107,104 +158,115 @@ void main() {
       expect(find.text('Enter the security code sent to\nlearner@example.com'), findsOneWidget);
     });
 
-    testWidgets('shows an error when generateOtp fails', (tester) async {
-      when(() => authRepository.generateOtp(any())).thenThrow(Exception('network down'));
+    testWidgets('shows RN\'s "Failed to Send OTP" alert when generateOtp fails', (tester) async {
+      when(() => authRepository.generateOtp(any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/v1/auth/generate-otp'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/v1/auth/generate-otp'),
+            statusCode: 400,
+            data: {'message': 'No account for this email'},
+          ),
+        ),
+      );
 
       await pumpLogin(tester);
 
-      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.enterText(emailField(), 'learner@example.com');
       await tester.pump();
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('Failed to generate OTP. Please try again.'),
-        findsOneWidget,
-      );
+      expect(find.text('Failed to Send OTP'), findsOneWidget);
+      expect(find.text('No account for this email'), findsOneWidget);
+
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.text('Failed to Send OTP'), findsNothing);
+      expect(find.text('Next'), findsOneWidget, reason: 'stays on the email step');
     });
 
-    testWidgets(
-      'shows the real two-line greeting ("Hey," then "Welcome to Ally"), '
-      'which switches to a single OTP-step line once advanced',
-      (tester) async {
-        when(() => authRepository.generateOtp(any())).thenAnswer((_) async => null);
+    testWidgets('a network failure says to check the connection', (tester) async {
+      when(() => authRepository.generateOtp(any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/v1/auth/generate-otp'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
 
-        await pumpLogin(tester);
+      await pumpLogin(tester);
+      await tester.enterText(emailField(), 'learner@example.com');
+      await tester.pump();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Hey,'), findsOneWidget);
-        expect(find.text('Welcome to Ally'), findsOneWidget);
+      expect(find.text('Please check your internet connection and try again.'), findsOneWidget);
+    });
 
-        await tester.enterText(find.byType(TextField), 'learner@example.com');
-        await tester.pump();
-        await tester.tap(find.text('Next'));
-        await tester.pumpAndSettle();
+    testWidgets('shows the real two-line greeting ("Hey," then "Welcome to Ally"), '
+        'which switches to a single OTP-step line once advanced', (tester) async {
+      when(() => authRepository.generateOtp(any())).thenAnswer((_) async => null);
 
-        expect(find.text('Hey,'), findsNothing);
-        expect(find.text('Welcome to Ally'), findsNothing);
-        expect(find.text('Verify your email address'), findsOneWidget);
-      },
-    );
+      await pumpLogin(tester);
+
+      expect(find.text('Hey,'), findsOneWidget);
+      expect(find.text('Welcome to Ally'), findsOneWidget);
+
+      await tester.enterText(emailField(), 'learner@example.com');
+      await tester.pump();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hey,'), findsNothing);
+      expect(find.text('Welcome to Ally'), findsNothing);
+      expect(find.text('Verify your email address'), findsOneWidget);
+    });
 
     testWidgets('disables the Google button when googleWebClientId is empty', (tester) async {
       await pumpLogin(tester);
 
-      // The real default (no --dart-define passed in tests): matches
-      // login_screen.dart's own gating — `_googleInitFuture` is only set
-      // when this is non-empty, and the button's `onPressed` is null
-      // whenever that future is null.
+      // The real default (no --dart-define passed in tests).
       expect(AppConfig.googleWebClientId, isEmpty);
 
-      final button = tester.widget<OutlinedButton>(
-        find.ancestor(of: find.text('Continue with Google'), matching: find.byType(OutlinedButton)),
-      );
-      expect(button.onPressed, isNull);
+      final button = tester.widget<GestureDetector>(find.byKey(const Key('google-login-button')));
+      expect(button.onTap, isNull);
     });
 
     testWidgets('only shows the Apple button on iOS', (tester) async {
       await pumpLogin(tester);
 
-      // This test process runs as the host OS (not an iOS simulator), so
-      // `Platform.isIOS` is false here — same condition login_screen.dart
-      // itself gates the button on — and the button should be absent.
       expect(Platform.isIOS, isFalse);
-      expect(find.text('Continue with Apple'), findsNothing);
+      expect(find.byType(SignInWithAppleButton), findsNothing);
     });
 
-    testWidgets(
-      'shows the subtitle, the real Google logo (not a generic icon), and the '
-      'Terms/Privacy footer with its real double period',
-      (tester) async {
+    testWidgets('on iOS the Apple button is RN\'s solid black "Continue with Apple" pill', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
         await pumpLogin(tester);
 
-        expect(find.text('Enter your email address to continue'), findsOneWidget);
+        final apple = tester.widget<SignInWithAppleButton>(find.byType(SignInWithAppleButton));
+        expect(apple.style, SignInWithAppleButtonStyle.black);
+        expect(apple.text, 'Continue with Apple');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
 
-        final googleIcon = tester.widget<SvgPicture>(
-          find.descendant(
-            of: find.ancestor(
-              of: find.text('Continue with Google'),
-              matching: find.byType(OutlinedButton),
-            ),
-            matching: find.byType(SvgPicture),
-          ),
-        );
-        expect(
-          (googleIcon.bytesLoader as SvgAssetLoader).assetName,
-          'assets/icons/google.svg',
-        );
-
-        expect(
-          find.textContaining("By proceeding, i agree to Ally's"),
-          findsOneWidget,
-        );
-        expect(find.textContaining('Privacy Policy..'), findsOneWidget);
-      },
-    );
-
-    testWidgets('shows the real splash Lottie animation above the greeting', (tester) async {
+    testWidgets('shows the subtitle, the real Google logo, and the Terms/Privacy footer with its real double period', (
+      tester,
+    ) async {
       await pumpLogin(tester);
 
-      final builder = tester.widget<LottieBuilder>(find.byType(LottieBuilder));
-      expect((builder.lottie as AssetLottie).assetName, 'assets/animations/splashAnimation.json');
+      expect(find.text('Enter your email address to continue'), findsOneWidget);
+
+      final googleIcon = tester.widget<SvgPicture>(
+        find.descendant(of: find.byKey(const Key('google-login-button')), matching: find.byType(SvgPicture)),
+      );
+      expect((googleIcon.bytesLoader as SvgAssetLoader).assetName, 'assets/icons/google.svg');
+      expect(find.text('Continue with Google'), findsOneWidget);
+
+      expect(find.textContaining("By proceeding, i agree to Ally's"), findsOneWidget);
+      expect(find.textContaining('Privacy Policy..'), findsOneWidget);
     });
   });
 
@@ -212,26 +274,77 @@ void main() {
     Future<void> advanceToOtpStep(WidgetTester tester) async {
       when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
       await pumpLogin(tester);
-      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.enterText(emailField(), 'learner@example.com');
       await tester.pump();
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
     }
 
-    /// The OTP step renders exactly 4 boxed digit `TextField`s (in order) —
-    /// enters one digit into each.
+    Finder otpInput() => find.byKey(const Key('otp-input'));
+
+    /// The digit rendered in box [index] (null when empty).
+    String? boxDigit(WidgetTester tester, int index) {
+      final texts = find.descendant(of: find.byKey(Key('otp-box-$index')), matching: find.byType(Text));
+      if (texts.evaluate().isEmpty) return null;
+      return tester.widget<Text>(texts.first).data;
+    }
+
+    List<String?> boxDigits(WidgetTester tester) => [for (var i = 0; i < 4; i++) boxDigit(tester, i)];
+
     Future<void> enterOtp(WidgetTester tester, String digits) async {
-      final fields = find.byType(TextField);
-      for (var i = 0; i < digits.length; i++) {
-        await tester.enterText(fields.at(i), digits[i]);
-      }
+      await tester.enterText(otpInput(), digits);
       await tester.pump();
     }
 
-    testWidgets('hides the splash Lottie animation once advanced to the OTP step', (tester) async {
+    testWidgets('keeps the hero on the OTP step and shows RN\'s back arrow', (tester) async {
       await advanceToOtpStep(tester);
 
-      expect(find.byType(LottieBuilder), findsNothing);
+      expect(find.byType(LottieBuilder), findsOneWidget);
+      expect(find.byKey(const Key('otp-back-button')), findsOneWidget);
+    });
+
+    testWidgets('the back arrow returns to the email step with an empty field (RN remounts EmailLogin)', (
+      tester,
+    ) async {
+      await advanceToOtpStep(tester);
+
+      await tester.tap(find.byKey(const Key('otp-back-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Next'), findsOneWidget);
+      expect(find.text('Hey,'), findsOneWidget);
+      expect(find.byKey(const Key('otp-back-button')), findsNothing);
+      expect(tester.widget<TextField>(emailField()).controller!.text, isEmpty);
+    });
+
+    testWidgets('four rapid keystrokes fill all four boxes in order', (tester) async {
+      await advanceToOtpStep(tester);
+
+      await tester.showKeyboard(otpInput());
+      // Separate keystrokes with no frame in between — the old per-box
+      // fields lost these because focus hadn't moved yet.
+      tester.testTextInput.enterText('1');
+      tester.testTextInput.enterText('12');
+      tester.testTextInput.enterText('123');
+      tester.testTextInput.enterText('1234');
+      await tester.pump();
+
+      expect(boxDigits(tester), ['1', '2', '3', '4']);
+      expect(tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify')).isDisabled, isFalse);
+    });
+
+    testWidgets('a pasted or autofilled code fills all four boxes; extras and non-digits are dropped', (tester) async {
+      await advanceToOtpStep(tester);
+
+      final field = tester.widget<TextField>(otpInput());
+      expect(field.autofillHints, contains(AutofillHints.oneTimeCode));
+
+      await enterOtp(tester, '5678');
+      expect(boxDigits(tester), ['5', '6', '7', '8']);
+
+      await enterOtp(tester, '');
+      await enterOtp(tester, '12-34 99');
+      expect(boxDigits(tester), ['1', '2', '3', '4']);
     });
 
     testWidgets('disables Verify until all 4 digits are entered, then enables it', (tester) async {
@@ -243,178 +356,188 @@ void main() {
       await enterOtp(tester, '123');
       verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
       expect(verifyButton.isDisabled, isTrue, reason: 'only 3 of 4 boxes filled');
+      expect(boxDigits(tester), ['1', '2', '3', null]);
 
       await enterOtp(tester, '1234');
       verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
       expect(verifyButton.isDisabled, isFalse);
 
-      verifyNever(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')));
+      verifyNever(
+        () => authRepository.verifyOtp(
+          email: any(named: 'email'),
+          otp: any(named: 'otp'),
+        ),
+      );
     });
 
-    testWidgets(
-      'calls verifyOtp, shows the terms modal, and only signs in once agreed',
-      (tester) async {
-        when(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '1234'))
-            .thenAnswer((_) async => ('access-tok', 'refresh-tok'));
+    testWidgets('calls verifyOtp, shows the terms modal, and only signs in once agreed', (tester) async {
+      when(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '1234'))
+          .thenAnswer((_) async => ('access-tok', 'refresh-tok'));
 
-        await advanceToOtpStep(tester);
-        await enterOtp(tester, '1234');
-        await tester.tap(find.text('Verify'));
-        // Not pumpAndSettle: the Verify button's spinner animates
-        // indefinitely while `TermsAndAgreementModal.show` is awaiting the
-        // learner's input, which `pumpAndSettle` would time out on.
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
+      await advanceToOtpStep(tester);
+      await enterOtp(tester, '1234');
+      await tester.tap(find.text('Verify'));
+      await tester.pumpAndSettle();
 
-        verify(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '1234')).called(1);
-        expect(authController.signInCalls, 0, reason: 'tokens are held until the terms are agreed to');
-        expect(find.text('Terms and agreement'), findsOneWidget);
-        expect(find.byKey(const Key('scroll-to-bottom-button')), findsOneWidget);
+      verify(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '1234')).called(1);
+      expect(authController.signInCalls, 0, reason: 'tokens are held until the terms are agreed to');
+      expect(find.text('Terms and agreement'), findsOneWidget);
+      expect(
+        tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify')).isDisabled,
+        isTrue,
+        reason: 'RN disables Verify while the terms modal is up',
+      );
 
-        // Scroll the terms document to the bottom to reveal the
-        // checkbox/Agree button. Not pumpAndSettle here either — same
-        // indefinite-spinner reason as above, still true until Agree is
-        // tapped.
-        // `.last`: the terms modal's own scroll view, not LoginScreen's
-        // (now that it also has one, wrapping the email/OTP form so the
-        // added subtitle/footer text can't overflow a short screen).
-        await tester.fling(
-          find.byType(SingleChildScrollView).last,
-          const Offset(0, -5000),
-          8000,
-        );
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.byKey(const Key('scroll-to-bottom-button')));
+      await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('scroll-to-bottom-button')), findsNothing);
-        final agreeButtonBefore = tester.widget<AppButton>(find.byType(AppButton).last);
-        expect(agreeButtonBefore.isDisabled, isTrue, reason: 'unchecked');
+      final agreeButtonBefore = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Agree'));
+      expect(agreeButtonBefore.isDisabled, isTrue, reason: 'unchecked');
 
-        await tester.tap(find.byKey(const Key('agree-checkbox-container')));
-        await tester.pump();
+      await tester.tap(find.byKey(const Key('agree-checkbox-container')));
+      await tester.pump();
 
-        final agreeButtonAfter = tester.widget<AppButton>(find.byType(AppButton).last);
-        expect(agreeButtonAfter.isDisabled, isFalse);
+      expect(tester.widget<AppButton>(find.widgetWithText(AppButton, 'Agree')).isDisabled, isFalse);
 
-        await tester.tap(find.byType(AppButton).last);
-        await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(AppButton, 'Agree'));
+      await tester.pumpAndSettle();
 
-        expect(authController.signInCalls, 1);
-        expect(authController.lastAccessToken, 'access-tok');
-        expect(authController.lastRefreshToken, 'refresh-tok');
-      },
-    );
+      expect(authController.signInCalls, 1);
+      expect(authController.lastAccessToken, 'access-tok');
+      expect(authController.lastRefreshToken, 'refresh-tok');
+    });
 
-    testWidgets('shows an error when verifyOtp fails', (tester) async {
-      when(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')))
-          .thenThrow(Exception('bad code'));
+    testWidgets('shows the backend\'s message in the error box when verifyOtp fails', (tester) async {
+      when(
+        () => authRepository.verifyOtp(
+          email: any(named: 'email'),
+          otp: any(named: 'otp'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
+            statusCode: 400,
+            data: {'message': 'Invalid OTP'},
+          ),
+        ),
+      );
 
       await advanceToOtpStep(tester);
       await enterOtp(tester, '0000');
       await tester.tap(find.text('Verify'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('Failed to verify OTP. Please try again.'),
-        findsOneWidget,
-      );
+      expect(find.text('Invalid OTP'), findsOneWidget);
       expect(authController.signInCalls, 0);
+
+      // Typing again clears the error (RN handleOtpChange).
+      await enterOtp(tester, '000');
+      expect(find.text('Invalid OTP'), findsNothing);
     });
 
-    testWidgets(
-      'a 403 USER_SUSPENDED response routes to /suspended instead of showing a generic error',
-      (tester) async {
-        when(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')))
-            .thenThrow(
-          DioException(
-            requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
-            response: Response(
-              requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
-              statusCode: 403,
-              data: {'error': 'USER_SUSPENDED', 'message': 'User suspended'},
-            ),
-          ),
-        );
-        when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
+    testWidgets('a non-API verify failure falls back to "Something went wrong!"', (tester) async {
+      when(
+        () => authRepository.verifyOtp(
+          email: any(named: 'email'),
+          otp: any(named: 'otp'),
+        ),
+      ).thenThrow(Exception('bad code'));
 
-        await preWarmTranslations(tester);
-        await pumpRouterApp(
-          tester,
-          initialLocation: '/login',
-          routes: [
-            GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-            GoRoute(path: '/suspended', builder: (context, state) => const Text('Suspended Screen')),
-          ],
-          overrides: [
-            authRepositoryProvider.overrideWithValue(authRepository),
-            authControllerProvider.overrideWith(() => authController),
-          ],
-        );
-
-        await tester.enterText(find.byType(TextField), 'learner@example.com');
-        await tester.pump();
-        await tester.tap(find.text('Next'));
-        await tester.pumpAndSettle();
-        await enterOtp(tester, '1234');
-        await tester.tap(find.text('Verify'));
-        await tester.pumpAndSettle();
-
-        expect(find.text('Suspended Screen'), findsOneWidget);
-        expect(authController.signInCalls, 0);
-      },
-    );
-
-    testWidgets("'use a different email' goes back to the email step", (tester) async {
       await advanceToOtpStep(tester);
-
-      await tester.tap(find.text('Use a different email'));
+      await enterOtp(tester, '0000');
+      await tester.tap(find.text('Verify'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Email'), findsOneWidget);
-      expect(find.text('Next'), findsOneWidget);
-      // The previously entered email is preserved in the controller, same
-      // as the raw _emailController state login_screen.dart keeps around.
-      expect(find.text('learner@example.com'), findsOneWidget);
+      expect(find.text('Something went wrong!'), findsOneWidget);
+    });
+
+    testWidgets('a 403 USER_SUSPENDED response routes to /suspended instead of showing a generic error', (
+      tester,
+    ) async {
+      when(
+        () => authRepository.verifyOtp(
+          email: any(named: 'email'),
+          otp: any(named: 'otp'),
+        ),
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
+            statusCode: 403,
+            data: {'error': 'USER_SUSPENDED', 'message': 'User suspended'},
+          ),
+        ),
+      );
+      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
+
+      usePhoneSurface(tester);
+      await preWarmTranslations(tester);
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/login',
+        routes: [
+          GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+          GoRoute(path: '/suspended', builder: (context, state) => const Text('Suspended Screen')),
+        ],
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepository),
+          authControllerProvider.overrideWith(() => authController),
+        ],
+      );
+
+      await tester.enterText(emailField(), 'learner@example.com');
+      await tester.pump();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      await enterOtp(tester, '1234');
+      await tester.tap(find.text('Verify'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Suspended Screen'), findsOneWidget);
+      expect(authController.signInCalls, 0);
     });
 
     testWidgets('shows a 60s resend countdown that disables Resend, then re-enables it', (tester) async {
       await advanceToOtpStep(tester);
 
       expect(find.text('Resend (60s)'), findsOneWidget);
-      var resendButton = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Resend (60s)'));
-      expect(resendButton.onPressed, isNull);
+      var resend = tester.widget<GestureDetector>(find.byKey(const Key('otp-resend')));
+      expect(resend.onTap, isNull);
 
       await tester.pump(const Duration(seconds: 60));
 
       expect(find.text('Resend'), findsOneWidget);
-      resendButton = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Resend'));
-      expect(resendButton.onPressed, isNotNull);
+      resend = tester.widget<GestureDetector>(find.byKey(const Key('otp-resend')));
+      expect(resend.onTap, isNotNull);
     });
 
-    testWidgets(
-      'tapping Resend once enabled calls generateOtp again, clears the boxes, and restarts the countdown',
-      (tester) async {
-        await advanceToOtpStep(tester);
-        await enterOtp(tester, '1234');
-        await tester.pump(const Duration(seconds: 60));
+    testWidgets('tapping Resend once enabled calls generateOtp again, clears the boxes, and restarts the countdown', (
+      tester,
+    ) async {
+      await advanceToOtpStep(tester);
+      await enterOtp(tester, '1234');
+      await tester.pump(const Duration(seconds: 60));
 
-        when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 120);
+      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 120);
 
-        await tester.tap(find.text('Resend'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Resend'));
+      await tester.pumpAndSettle();
 
-        verify(() => authRepository.generateOtp('learner@example.com')).called(2);
-        expect(find.text('Resend (60s)'), findsOneWidget);
-        final verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
-        expect(verifyButton.isDisabled, isTrue, reason: 'resending clears the previously entered digits');
-      },
-    );
+      verify(() => authRepository.generateOtp('learner@example.com')).called(2);
+      expect(find.text('Resend (60s)'), findsOneWidget);
+      expect(boxDigits(tester), [null, null, null, null]);
+      final verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
+      expect(verifyButton.isDisabled, isTrue, reason: 'resending clears the previously entered digits');
+    });
 
     testWidgets('shows the expiry minutes from the real generateOtp response', (tester) async {
       when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 300);
 
       await pumpLogin(tester);
-      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.enterText(emailField(), 'learner@example.com');
       await tester.pump();
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
@@ -426,7 +549,7 @@ void main() {
       when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 60);
 
       await pumpLogin(tester);
-      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.enterText(emailField(), 'learner@example.com');
       await tester.pump();
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
