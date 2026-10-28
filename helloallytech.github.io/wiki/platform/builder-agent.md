@@ -1,8 +1,8 @@
 ---
 title: Builder Agent — From a Sentence to a Merged Pull Request
 tags: [platform, builder, agent, automation, ci, release, admin, llm]
-summary: The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, and why so much of its machinery is about not lying to the reader.
-last_reconciled: 2026-09-21
+summary: The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, the decision feed that clears what it is waiting on a person for, and why so much of its machinery is about not lying to the reader.
+last_reconciled: 2026-10-28
 ---
 
 # Builder Agent
@@ -268,6 +268,63 @@ the session opened has merged **and** deployed. "Shipped" is deliberately strict
 to see, rather than have quietly marked done.
 
 ---
+
+## The decision feed
+
+Everything above is Builder working. What bounds how much of it there can be is not the
+runner or the model but a person: every session stops at the points where only a human can
+choose — a scope question in the interview, a design to approve, a ceiling to raise, a
+pull request to merge or to take back. Each of those used to live where it was raised: the
+question inline in one session's chat, the merge button in a Slack message, the stopped
+build on mission control. Clearing them meant visiting every session and rebuilding its
+context each time, and across a dozen concurrent sessions that is the whole cost.
+
+The **decision feed** (`/builder/decisions` in the admin console) folds them into one list
+of cards, one shape whatever the kind, to be cleared in one sitting. A card carries what is
+blocked until it is answered, the question, why Builder is asking (for a gated interview
+question: what it rests on and why research could not settle it), a few lines of context
+such as the PRD summary or the error, the options with the recommendation first, and a
+free-text answer wherever one makes sense. Cards group into three questions a person is
+really being asked — **what to build** (interview questions, the situation brief, a ready
+PRD), **how to build it** (a technical design in review) and **how to get unstuck** (a spent
+ceiling, a pull request Builder handed over, a merge, a failed build) — because a product
+owner clearing scope and an engineer clearing stuck pull requests are different sittings.
+
+The design target is decisions per hour of attention, and the rules follow from it:
+
+- **One card has the keyboard.** A digit picks an option; the same digit again, or Enter,
+  sends it; Enter alone sends the recommendation; `C` writes a custom answer; `S` skips.
+  A click still works, but a feed cleared by mouse is a feed cleared slowly.
+- **No confirmation step.** The card already showed the trade-off; a second "are you
+  sure" taxes every decision to insure against a rare one. Refusals come back from the
+  server with their reason ("a ceiling below what was spent", "checks are not green").
+- **Order by cost of waiting and cost of deciding.** A held budget wastes a runner slot
+  and takes one key; a merge is one key between finished work and production; interview
+  questions are the bulk and sit in the middle; starting a build deserves a read of the
+  PRD, so it comes later. Within a kind, the oldest wait first. Skip means later, not
+  never: a skipped card goes to the back of the queue.
+- **The sitting keeps score.** Once two decisions have been made, the header shows how
+  many, the pace, and the rate it implies.
+
+Two properties of how it is built matter more than the layout.
+
+**Nothing is stored.** A decision is *derived* from the state that already records it — an
+unanswered question on the interview's last assistant row, a pull request whose merge was
+prompted and has not happened, a session past its ceiling — and answering one goes
+through the same service call the session page would have made for the same click. A
+second table of pending decisions would have to be kept in step with the truth it
+summarises, and the first time it drifted the feed would be asking about a question
+somebody had already answered elsewhere. The same rule means a decision answered on the
+session page a minute ago is refused in the feed rather than appended a second time to
+the transcript.
+
+**An interview answer runs as a background turn.** The session page streams a turn and the
+admin watches tokens arrive; the feed moves to the next card the moment an answer is sent,
+holding the same per-session lock the stream does so the two surfaces cannot interleave
+over one transcript. Builder's follow-up question, if it has one, comes back into the feed
+as a new card when the turn ends, and the feed says it is working on those answers so a
+quiet queue reads as "thinking" rather than "finished". A session page left open while its
+question is answered from the feed will not show the turn live; it catches up on reload.
 
 ## Reading the UI honestly
 

@@ -4224,6 +4224,110 @@ export const en = {
       },
     },
 
+    // The decision feed: every pending decision across sessions, cleared one key at a time.
+    // Same voice split as the rest of Builder — the agent speaks about the work ("I'll ask
+    // again…"), the app about itself ("Couldn't load the decision feed.").
+    decisions: {
+      link: "Decisions",
+      title: "Decisions",
+      subtitle: "Everything I'm waiting on you for, across every build. One key each.",
+      waiting: (count: number) => (count === 1 ? "1 waiting" : `${count} waiting`),
+      // The nudge on mission control, above "Needs you".
+      banner: (count: number) =>
+        count === 1 ? "1 decision is waiting on you." : `${count} decisions are waiting on you.`,
+      bannerCta: "Decide now",
+      emptyTitle: "Nothing needs you",
+      emptyBody:
+        "Every build is either working or done. Start one from mission control, or come back when I ask.",
+      emptyFiltered: "Nothing in this group. Try another filter.",
+      loadFailed: "Couldn't load the decision feed.",
+      answerFailed: "Couldn't send that answer.",
+      // What happened to the answer, as a toast. Keyed by the server's outcome.
+      answered: {
+        turn_started: "Got it. I'll ask again if something else comes up.",
+        build_started: "Build started.",
+        design_started: "Drafting the technical design.",
+        design_approved: "Design approved.",
+        budget_raised: "Budget raised.",
+        merged: "Merged.",
+        resumed: "I've got the pull request again.",
+        archived: "Archived.",
+        cancelled: "Build stopped.",
+      } as Record<string, string>,
+      categories: {
+        all: "All",
+        what: "What to build",
+        how: "How to build",
+        issue: "Unstick",
+      } as Record<string, string>,
+      kinds: {
+        question: "Question",
+        brief: "Situation brief",
+        start_build: "Ready to build",
+        design_review: "Design review",
+        budget: "Budget",
+        pr_needs_human: "Pull request needs you",
+        pr_merge: "Ready to merge",
+        build_failed: "Build stopped",
+      } as Record<string, string>,
+      questionTypes: {
+        scope: "Scope",
+        behaviour: "Behaviour",
+        priority: "Priority",
+        taste: "Judgement call",
+        contradiction: "Contradiction",
+      } as Record<string, string>,
+      // This sitting's throughput, in the header. Only shown once there is enough to say.
+      stats: {
+        decided: (count: number) => (count === 1 ? "1 decided" : `${count} decided`),
+        perHour: (rate: number) => `~${rate}/hour`,
+        average: (duration: string) => `${duration} each`,
+      },
+      queue: {
+        heading: "Up next",
+        skipped: "Skipped",
+        done: "That's everything.",
+      },
+      card: {
+        waiting: (ago: string) => `Waiting ${ago}`,
+        startedBy: (name: string) => `Started by ${name}`,
+        blocked: "Blocked",
+        said: "Builder said",
+        basedOn: "Based on",
+        yours: "Yours to decide because",
+        context: "Context",
+        showContext: (count: number) => `Show ${count} more`,
+        hideContext: "Show less",
+        recommended: "Recommended",
+        pressEnter: "Enter",
+        custom: "Your own answer",
+        customPlaceholder: "Your own answer…",
+        customHint: "C to write · Enter to send",
+        confirm: "Confirm",
+        noneOfThese: "None of these",
+        selectedCount: (count: number) => (count === 1 ? "1 selected" : `${count} selected`),
+        minSelectionsHint: (min: number) => `pick at least ${min}`,
+        skip: "Skip",
+        openSession: "Open session",
+        openPullRequest: "Open pull request",
+        sending: "Sending…",
+      },
+      shortcuts: {
+        toggle: "Shortcuts",
+        title: "Keyboard",
+        pick: "1–9  pick an option; press it again to send",
+        enter: "Enter  send the pick, or the recommendation",
+        custom: "C  write your own answer",
+        skip: "S  skip to the next card",
+        move: "J / K  next and previous card",
+        open: "O  open the session",
+        help: "?  show or hide this",
+      },
+      // Interview answers run as a background turn; this says so while they do.
+      working: (count: number) =>
+        count === 1 ? "I'm working on 1 answer…" : `I'm working on ${count} answers…`,
+    },
+
     // Notifications
     notifications: {
       title: "Notifications",

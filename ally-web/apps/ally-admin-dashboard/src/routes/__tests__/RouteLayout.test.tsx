@@ -86,6 +86,7 @@ vi.mock("@pages", () => ({
   Builder: () => <div>BuilderPage</div>,
   BuilderSession: () => <div>BuilderSessionPage</div>,
   BuilderSettings: () => <div>BuilderSettingsPage</div>,
+  BuilderDecisions: () => <div>BuilderDecisionsPage</div>,
   BuilderPipeline: () => <div>BuilderPipelinePage</div>,
   BuilderScoreboard: () => <div>BuilderScoreboardPage</div>,
   BuilderKnowledge: () => <div>BuilderKnowledgePage</div>,
@@ -137,6 +138,13 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.BUILDER_SETTINGS);
     render(<RouteLayout />);
     expect(screen.getByText("BuilderSettingsPage")).toBeInTheDocument();
+  });
+
+  it("renders Builder decisions route, not the session route", () => {
+    window.history.pushState({}, "", ROUTES.BUILDER_DECISIONS);
+    render(<RouteLayout />);
+    expect(screen.getByText("BuilderDecisionsPage")).toBeInTheDocument();
+    expect(screen.queryByText("BuilderSessionPage")).not.toBeInTheDocument();
   });
 
   it("renders Builder pipeline route", () => {

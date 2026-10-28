@@ -45,6 +45,7 @@ import { BuilderEpicService } from '../service/builder-epic.service';
 import { BuilderResearchService } from '../service/builder-research.service';
 import { BuilderCatalogService } from '../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../service/builder-evidence-log.service';
+import { BuilderDecisionService } from '../service/builder-decision.service';
 import { BuilderPrdVersionRepository } from '../repository/builder-prd.repository';
 import { BuilderBuildRunRepository } from '../repository/builder-build.repository';
 import {
@@ -60,6 +61,7 @@ import {
   ListBuilderLessonsQueryDto,
   UpdateBuilderLessonDto,
   BuilderResearchDto,
+  AnswerBuilderDecisionDto,
 } from '../dto/builder.dto';
 import {
   BUILDER_EVENT_PAGE_SIZE,
@@ -105,6 +107,7 @@ export class BuilderController {
     private readonly redisService: RedisService,
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
+    private readonly decisionService: BuilderDecisionService,
   ) {}
 
   @Post('sessions')
@@ -810,6 +813,42 @@ export class BuilderController {
   async markAllNotificationsRead(@CurrentUser() user: TokenUser) {
     await this.notificationService.markAllRead(user.id);
     return { ok: true };
+  }
+
+  /**
+   * The decision feed: everything Builder is waiting on a person for, across
+   * every session, as answerable cards. See builder-decision.type.ts.
+   */
+  @Get('decisions')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.VIEW_BUILDER],
+  })
+  @ApiOperation({
+    summary: 'Every pending decision across Builder sessions, oldest first',
+  })
+  async listDecisions() {
+    const decisions = await this.decisionService.listPending();
+    return { decisions, count: decisions.length };
+  }
+
+  /**
+   * EDIT_BUILDER, like every action this routes to: an answer can start a
+   * build, approve a design, raise spend or merge a pull request.
+   */
+  @Post('decisions/:decisionId/answer')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.EDIT_BUILDER],
+  })
+  @ApiOperation({
+    summary:
+      'Answer one decision — routed to the same action the session page would take',
+  })
+  answerDecision(
+    @Param('decisionId') decisionId: string,
+    @Body() dto: AnswerBuilderDecisionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.decisionService.answer(decisionId, dto, user.id);
   }
 
   @Post('sessions/:sessionId/messages/stream')

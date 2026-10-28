@@ -97,6 +97,46 @@ export class BuilderBriefResponseDto {
   note?: string;
 }
 
+/**
+ * An answer from the decision feed. The same three fields as
+ * `BuilderAnswerDto`, plus the free text, because a feed card is answered
+ * without a chat composer beside it. Which field means what depends on the
+ * decision's kind — see BuilderDecisionService.answer.
+ */
+export class AnswerBuilderDecisionDto {
+  @ApiPropertyOptional({ type: [String], description: 'Selected option ids' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  selectedOptionIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Free-text answers the admin typed',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(4000, { each: true })
+  customValues?: string[];
+
+  @ApiPropertyOptional({ description: 'Admin chose "None of these"' })
+  @IsOptional()
+  @IsBoolean()
+  none?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'The answer as one line, when there are no options to pick',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  message?: string;
+}
+
 export class CreateBuilderMessageDto {
   @ApiProperty({ description: "The admin's message for this turn" })
   @IsString()

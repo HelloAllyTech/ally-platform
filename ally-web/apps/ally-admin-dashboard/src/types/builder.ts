@@ -1178,3 +1178,87 @@ export interface UpdateBuilderEvalFixtureRequest {
   active?: boolean;
   checklist?: BuilderEvalChecklistItem[];
 }
+
+/* ── Decision feed ──────────────────────────────────────────────────────── */
+
+/**
+ * One thing Builder is waiting on a person for, in any session. Mirrors ally-be's
+ * `BuilderDecision` (`src/builder/type/builder-decision.type.ts`): derived server-side from
+ * session, transcript and pull-request state, never stored, and answered through the same
+ * action the session page would take.
+ */
+export type BuilderDecisionKind =
+  | "question"
+  | "brief"
+  | "start_build"
+  | "design_review"
+  | "budget"
+  | "pr_needs_human"
+  | "pr_merge"
+  | "build_failed";
+
+/** What is really being asked: what to build, how to build it, or how to get unstuck. */
+export type BuilderDecisionCategory = "what" | "how" | "issue";
+
+export interface BuilderDecisionOption {
+  id: string;
+  label: string;
+  description?: string;
+  /** At most one per decision; Enter answers with it. */
+  recommended?: boolean;
+}
+
+export interface BuilderDecision {
+  id: string;
+  kind: BuilderDecisionKind;
+  category: BuilderDecisionCategory;
+  sessionId: string;
+  sessionTitle: string;
+  sessionStatus: BuilderSessionStatus;
+  createdByName: string | null;
+  repos: string[];
+  prompt: string;
+  /** For a gated question: the model's rationale, then `Based on:` and `Yours to decide because:` lines. */
+  rationale: string | null;
+  questionType: string | null;
+  context: string[];
+  /** One line: what cannot move until this is decided. */
+  blocked: string;
+  selection: "single" | "multi";
+  options: BuilderDecisionOption[];
+  allowCustom: boolean;
+  allowNone: boolean;
+  minSelections: number | null;
+  customPlaceholder: string | null;
+  waitingSince: string;
+  pullRequestUrl: string | null;
+}
+
+export interface BuilderDecisionFeed {
+  decisions: BuilderDecision[];
+  count: number;
+}
+
+export interface AnswerBuilderDecisionRequest {
+  id: string;
+  selectedOptionIds?: string[];
+  customValues?: string[];
+  none?: boolean;
+  message?: string;
+}
+
+export type BuilderDecisionOutcome =
+  | "turn_started"
+  | "build_started"
+  | "design_started"
+  | "design_approved"
+  | "budget_raised"
+  | "merged"
+  | "resumed"
+  | "archived"
+  | "cancelled";
+
+export interface AnswerBuilderDecisionResponse {
+  ok: true;
+  outcome: BuilderDecisionOutcome;
+}
