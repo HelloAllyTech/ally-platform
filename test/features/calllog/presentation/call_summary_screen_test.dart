@@ -289,4 +289,59 @@ void main() {
       expect(find.text('Hello there'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'CallSummaryScreen: typing toggles Save without rebuilding the section list, '
+    'and Save reappears for an edit after a save',
+    (tester) async {
+      final repository = MockCallLogRepository();
+      final summary = CallSummaryDetails(
+        counselorId: 7,
+        fields: {'callId': 1001, 'sessionSummary': 'Initial'},
+      );
+      when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+      when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+      when(() => repository.updateCallSummary(1001, any())).thenAnswer((_) async => summary);
+
+      await pumpApp(
+        tester,
+        CallSummaryScreen(log: _log),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          ..._editorOverrides(visibleFields: const ['sessionSummary']),
+        ],
+      );
+
+      await tester.tap(find.byKey(const ValueKey('section-header-sessionSummary')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('section-edit-sessionSummary')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('sessionSummary'));
+      final listView = tester.widget<ListView>(find.byType(ListView).first);
+
+      await tester.enterText(field, 'Edited');
+      await tester.pump();
+      expect(find.byType(AppButton), findsOneWidget);
+      // The keystroke only rebuilt the Save button, not the list above it.
+      expect(identical(tester.widget<ListView>(find.byType(ListView).first), listView), isTrue);
+
+      // Typing back to the saved value hides Save again (dirty = differs
+      // from the baseline, not "was touched").
+      await tester.enterText(field, 'Initial');
+      await tester.pump();
+      expect(find.byType(AppButton), findsNothing);
+
+      await tester.enterText(field, 'Edited');
+      await tester.pump();
+      await tester.tap(find.byType(AppButton));
+      await tester.pumpAndSettle();
+      verify(() => repository.updateCallSummary(1001, {'sessionSummary': 'Edited'})).called(1);
+      expect(find.byType(AppButton), findsNothing);
+
+      // A further edit after the save must bring Save back.
+      await tester.enterText(field, 'Edited again');
+      await tester.pump();
+      expect(find.byType(AppButton), findsOneWidget);
+    },
+  );
 }

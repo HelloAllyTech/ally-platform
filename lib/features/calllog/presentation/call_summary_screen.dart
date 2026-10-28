@@ -771,6 +771,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   @override
   void dispose() {
     _notesDebounce?.cancel();
+    _dirtyFlag.dispose();
     super.dispose();
   }
 
@@ -829,6 +830,22 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
 
   void _onFieldChanged(String fieldKey, dynamic value) {
     setState(() => _form.set(fieldKey, value));
+  }
+
+  /// Ticked only when [SummaryFormState.hasChanges] differs from what the
+  /// Save button last rendered ([_saveButtonShownDirty]); the button
+  /// listens to it so a keystroke doesn't rebuild the whole tab.
+  final ValueNotifier<int> _dirtyFlag = ValueNotifier(0);
+  bool _saveButtonShownDirty = false;
+
+  /// Per-keystroke path for free-text inputs. Nothing on screen reads a
+  /// text field's value back while it is being edited (the field owns its
+  /// own text via `initialValue`), so only the Save button's visibility
+  /// can change — record the value and update [_dirtyFlag] instead of
+  /// `setState`, which rebuilt every section and field on each character.
+  void _onFieldTyped(String fieldKey, dynamic value) {
+    _form.set(fieldKey, value);
+    if (_form.hasChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Mirrors RN's `SectionHeader`/`toggleSection` (`CallSummaryDetails.tsx`):
@@ -949,6 +966,15 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       _customFieldValues[fieldDefinitionId] = value;
       _dirtyCustomFieldIds.add(fieldDefinitionId);
     });
+  }
+
+  /// Per-keystroke path for custom text/number/date inputs: custom fields
+  /// never affect the global Save button and the field owns its own text,
+  /// so nothing visible depends on this value until the section's tick —
+  /// record it without rebuilding the tab.
+  void _onCustomFieldTyped(String fieldDefinitionId, String? value) {
+    _customFieldValues[fieldDefinitionId] = value;
+    _dirtyCustomFieldIds.add(fieldDefinitionId);
   }
 
   /// Applies voice-dictated field values: merges them into the form
@@ -1183,6 +1209,10 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         final isAdmin = permissions.contains(UserPermissions.manageCustomFieldDefinitions);
         final currentUserId = ref.watch(currentUserProvider).value?.id;
         final isCounsellorForCall = summary.counselorId != null && summary.counselorId == currentUserId;
+        final sections = [
+          for (final section in SummarySection.values)
+            if (isSummarySectionVisible(section, visibleFields)) section,
+        ];
 
         return Column(
           children: [
@@ -1193,73 +1223,80 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                 onCustomValuesApplied: _reseedCustomFields,
               ),
             Expanded(
-              child: ListView(
+              // Builder, not `children:` — sections are only built as they
+              // scroll in. Index 0 is the AI disclaimer banner.
+              child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                children: [
-                  // RN's `CallSummaryDetails.tsx` never shows raw
-                  // status/started/ended/score fields on this screen at all
-                  // — those were this app's own Phase 0 scaffold text,
-                  // leftover from before the real screen was built out, and
-                  // they never got cleaned up. What RN actually shows here
-                  // first is this AI-generated disclaimer banner
-                  // (`styles.alertContainer`/`alertIconContainer`/
-                  // `alertText`), always visible above the section list.
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.amber50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.orange400, width: 0.5),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          margin: const EdgeInsets.only(right: 10),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.orange400, width: 0.5),
-                          ),
-                          child: const Icon(
-                            Icons.shield_outlined,
-                            size: 18,
-                            color: AppColors.orange400,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            ref.t('callSummary.aiGeneratedWarning'),
-                            style: const TextStyle(color: AppColors.red700, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  for (final section in SummarySection.values)
-                    if (isSummarySectionVisible(section, visibleFields))
-                      _SectionCard(
-                        section: section,
-                        visibleFields: visibleFields,
-                        formValues: _form.values,
-                        onFieldChanged: _onFieldChanged,
-                        customFieldDefs: _customFieldDefs,
-                        customFieldValues: _customFieldValues,
-                        onCustomFieldChanged: _onCustomFieldChanged,
-                        isAdmin: isAdmin,
-                        isCounsellorForCall: isCounsellorForCall,
-                        isExpanded: _expandedSections[section] ?? false,
-                        isEditing: _editingSections[section] ?? false,
-                        isEnhancing: _enhancingSections.contains(section),
-                        onToggle: () => _toggleSection(section),
-                        onEditPress: () => _onEditPress(section),
-                        onWandPress: () => _onWandPress(section),
-                        onTickPress: () => _onTickPress(section),
-                        onClosePress: () => _onClosePress(section),
+                itemCount: sections.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    // RN's `CallSummaryDetails.tsx` never shows raw
+                    // status/started/ended/score fields on this screen at all
+                    // — those were this app's own Phase 0 scaffold text,
+                    // leftover from before the real screen was built out, and
+                    // they never got cleaned up. What RN actually shows here
+                    // first is this AI-generated disclaimer banner
+                    // (`styles.alertContainer`/`alertIconContainer`/
+                    // `alertText`), always visible above the section list.
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.amber50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.orange400, width: 0.5),
                       ),
-                ],
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.orange400, width: 0.5),
+                            ),
+                            child: const Icon(
+                              Icons.shield_outlined,
+                              size: 18,
+                              color: AppColors.orange400,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              ref.t('callSummary.aiGeneratedWarning'),
+                              style: const TextStyle(color: AppColors.red700, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final section = sections[index - 1];
+                  return _SectionCard(
+                    key: ValueKey(section),
+                    section: section,
+                    visibleFields: visibleFields,
+                    formValues: _form.values,
+                    onFieldChanged: _onFieldChanged,
+                    onFieldTyped: _onFieldTyped,
+                    customFieldDefs: _customFieldDefs,
+                    customFieldValues: _customFieldValues,
+                    onCustomFieldChanged: _onCustomFieldChanged,
+                    onCustomFieldTyped: _onCustomFieldTyped,
+                    isAdmin: isAdmin,
+                    isCounsellorForCall: isCounsellorForCall,
+                    isExpanded: _expandedSections[section] ?? false,
+                    isEditing: _editingSections[section] ?? false,
+                    isEnhancing: _enhancingSections.contains(section),
+                    onToggle: () => _toggleSection(section),
+                    onEditPress: () => _onEditPress(section),
+                    onWandPress: () => _onWandPress(section),
+                    onTickPress: () => _onTickPress(section),
+                    onClosePress: () => _onClosePress(section),
+                  );
+                },
               ),
             ),
             if (_error != null)
@@ -1274,16 +1311,23 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
             // — the button is absent with nothing to save, not present and
             // disabled with a relabeled "No changes" state (which was never
             // RN's actual behaviour here).
-            if ((widget.alwaysShowSave || _hasDirtyChanges) && !widget.isFeedbackPopupVisible)
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: AppButton(
-                    label: ref.t('common.save'),
-                    isLoading: _isSaving,
-                    onPressed: _save,
-                  ),
-                ),
+            if (!widget.isFeedbackPopupVisible)
+              ValueListenableBuilder<int>(
+                valueListenable: _dirtyFlag,
+                builder: (context, _, _) {
+                  final dirty = _saveButtonShownDirty = _hasDirtyChanges;
+                  if (!(widget.alwaysShowSave || dirty)) return const SizedBox.shrink();
+                  return SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: AppButton(
+                        label: ref.t('common.save'),
+                        isLoading: _isSaving,
+                        onPressed: _save,
+                      ),
+                    ),
+                  );
+                },
               ),
           ],
         );
@@ -1315,6 +1359,7 @@ bool _canEditCustomField(CustomFieldDefinition def, {required bool isAdmin, requ
 /// `check.svg`/`closeCircle.svg`, same assets this app already has.
 class _SectionCard extends ConsumerWidget {
   const _SectionCard({
+    super.key,
     required this.section,
     required this.formValues,
     required this.onFieldChanged,
@@ -1329,6 +1374,8 @@ class _SectionCard extends ConsumerWidget {
     this.customFieldDefs = const [],
     this.customFieldValues = const {},
     this.onCustomFieldChanged,
+    this.onFieldTyped,
+    this.onCustomFieldTyped,
     this.isAdmin = false,
     this.isCounsellorForCall = false,
     this.visibleFields,
@@ -1357,6 +1404,11 @@ class _SectionCard extends ConsumerWidget {
   final List<CustomFieldDefinition> customFieldDefs;
   final Map<String, String?> customFieldValues;
   final void Function(String fieldDefinitionId, String? value)? onCustomFieldChanged;
+
+  /// Per-keystroke variants of [onFieldChanged]/[onCustomFieldChanged] for
+  /// free-text inputs (no full-tab rebuild); fall back to those when null.
+  final void Function(String fieldKey, dynamic value)? onFieldTyped;
+  final void Function(String fieldDefinitionId, String? value)? onCustomFieldTyped;
   final bool isAdmin;
   final bool isCounsellorForCall;
 
@@ -1441,6 +1493,7 @@ class _SectionCard extends ConsumerWidget {
                         field: field,
                         formValues: formValues,
                         onChanged: onFieldChanged,
+                        onTyped: onFieldTyped ?? onFieldChanged,
                         isEditing: isEditing,
                       ),
                     for (final def in sectionCustomFields)
@@ -1448,6 +1501,7 @@ class _SectionCard extends ConsumerWidget {
                         definition: def,
                         value: customFieldValues[def.id],
                         onChanged: onCustomFieldChanged,
+                        onTyped: onCustomFieldTyped ?? onCustomFieldChanged,
                         canEdit: isEditing &&
                             _canEditCustomField(def, isAdmin: isAdmin, isCounsellorForCall: isCounsellorForCall),
                       ),
@@ -1487,12 +1541,16 @@ class _FieldEditor extends ConsumerWidget {
     required this.field,
     required this.formValues,
     required this.onChanged,
+    required this.onTyped,
     required this.isEditing,
   });
 
   final SummaryFieldDef field;
   final Map<String, dynamic> formValues;
   final void Function(String fieldKey, dynamic value) onChanged;
+
+  /// Free-text keystrokes (see `_SummaryTabState._onFieldTyped`).
+  final void Function(String fieldKey, dynamic value) onTyped;
 
   /// RN's `renderField`: a field only gets its editable control
   /// (`isEditing && field.isEditable` for an inline input,
@@ -1588,7 +1646,7 @@ class _FieldEditor extends ConsumerWidget {
             borderSide: const BorderSide(color: AppColors.strokePrimary),
           ),
         ),
-        onChanged: (text) => onChanged(field.key, text),
+        onChanged: (text) => onTyped(field.key, text),
       ),
     );
   }
@@ -1599,11 +1657,20 @@ class _FieldEditor extends ConsumerWidget {
 /// raw stored string (see [CustomFieldValue]'s own doc comment on the
 /// select-types' label-vs-id quirk this faithfully reproduces).
 class _CustomFieldEditor extends ConsumerStatefulWidget {
-  const _CustomFieldEditor({required this.definition, required this.value, required this.onChanged, required this.canEdit});
+  const _CustomFieldEditor({
+    required this.definition,
+    required this.value,
+    required this.onChanged,
+    required this.canEdit,
+    this.onTyped,
+  });
 
   final CustomFieldDefinition definition;
   final String? value;
   final void Function(String fieldDefinitionId, String? value)? onChanged;
+
+  /// Free-text keystrokes (see `_SummaryTabState._onCustomFieldTyped`).
+  final void Function(String fieldDefinitionId, String? value)? onTyped;
   final bool canEdit;
 
   @override
@@ -1770,7 +1837,7 @@ class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
                 borderSide: const BorderSide(color: AppColors.strokePrimary),
               ),
             ),
-            onChanged: (text) => widget.onChanged?.call(def.id, text.isEmpty ? null : text),
+            onChanged: (text) => (widget.onTyped ?? widget.onChanged)?.call(def.id, text.isEmpty ? null : text),
           ),
         );
     }
