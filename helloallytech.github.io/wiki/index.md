@@ -18,6 +18,7 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 - [Login `allowedRoles` — Client-Supplied Filter & Role-Retirement Test Case](platform/login-allowed-roles.md) — Why auth calls carry a client-sent role list, how retiring a role locked every consumer user out of login, and the regression test that guards it
 - [Builder Agent — From a Sentence to a Merged Pull Request](platform/builder-agent.md) — Describe a change, get pull requests: the run protocol, the reconcile loop that reviews, approves and releases them, and what bounds it
 - [Auto-improve — Rubric-Judged Testing for System Skills](platform/auto-improve.md) — How a System Skill is tested and improved on live traffic: connected skills, the designer/router/judge loop, what the target means, why a loop pauses, Apply, and the known limits
+- [Storage Archive — Aged S3 Objects to a Hetzner Storage Box](platform/storage-archive.md) — The plan and recorded decisions for moving private S3 objects older than 30 days off AWS: scope, PHI risk acceptance, archive-only read-back, rollout
 - [Platform Stats](platform/stats.md) — **Generated.** Current counts of entities, migrations, modules, providers — so prose never has to state a number
 
 ## Product Management — ⚠️ Deprecated (2026-08-07)
@@ -43,6 +44,7 @@ Superseded by the **Stacks MCP** — see [Planning with the Stacks MCP](contribu
 - [calibrate](repos/calibrate.md) — Voice-agent evaluation framework (open-source, Python)
 - [calibrate-backend](repos/calibrate-backend.md) — Calibrate API service (FastAPI)
 - [calibrate-frontend](repos/calibrate-frontend.md) — Calibrate web UI (Next.js)
+- [ally-archiver](repos/ally-archiver.md) — Weekly S3 → Storage Box archiver (Go + htmx)
 - [ally-changelog](repos/ally-changelog.md) — Auto-written cross-repo changelog journal
 
 ## Contributing

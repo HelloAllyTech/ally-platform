@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-10-28] create | `platform/storage-archive.md`, `repos/ally-archiver.md`: the storage archive plan and its app.
+- New `platform/storage-archive.md` records the plan to cut the AWS storage bill by moving every private S3 object older than 30 days to a Hetzner Storage Box each week, and the decisions behind it: PHI included without app-layer encryption (an accepted compliance risk), archive-only read-back, public media left on S3, a one-time backfill. It is the plan's home because an earlier version was lost in a chat session.
+- New `repos/ally-archiver.md` documents the Go + htmx app that runs the move. `repos/infra.md` and `platform/architecture.md` gained one line each pointing at it; their `last_reconciled` is unchanged.
+
 ## [2026-10-24] update | `repos/ally-be.md`: Ally, the AI course companion.
 - Added `guide/`, `guide-learning/` and `llm-agent/harness/` under a new "Ally, the AI course companion" heading in Architecture & Key Modules: the turn pipeline, the SSE event stream, the one-schema wire contract and its codegen, the switches that keep it off by default, and the learning loop's evaluator, review queue, curator, canary and delegation stage. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
 

@@ -113,7 +113,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 733,
+      "words": 781,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 11512,
+      "words": 11620,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -168,7 +168,7 @@
         "reference"
       ],
       "last_reconciled": "2026-07-28",
-      "words": 1224,
+      "words": 1285,
       "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
       "skip_reason": ""
     },
@@ -220,7 +220,7 @@
         "storage"
       ],
       "last_reconciled": "2026-10-21",
-      "words": 1459,
+      "words": 1485,
       "url": "https://tech.helloally.ai/#/wiki/platform/architecture.md",
       "skip_reason": ""
     },
@@ -339,6 +339,25 @@
       "last_reconciled": "2026-10-26",
       "words": 175,
       "url": "https://tech.helloally.ai/#/wiki/platform/stats.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/storage-archive.md",
+      "title": "Storage Archive — Moving Aged S3 Objects to a Hetzner Storage Box",
+      "summary": "The plan and recorded decisions for cutting the AWS storage bill — a weekly job in the ally-archiver app copies every private S3 object older than 30 days to a VPN-only Hetzner Storage Box, verifies it, then deletes it from S3.",
+      "tags": [
+        "platform",
+        "storage",
+        "s3",
+        "hetzner",
+        "archive",
+        "cost",
+        "infra",
+        "decision"
+      ],
+      "last_reconciled": "2026-10-28",
+      "words": 1009,
+      "url": "https://tech.helloally.ai/#/wiki/platform/storage-archive.md",
       "skip_reason": ""
     },
     {
@@ -509,7 +528,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3469,
+      "words": 3483,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md",
       "skip_reason": ""
     },
@@ -525,8 +544,27 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3158,
+      "words": 3211,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "repos/ally-archiver.md",
+      "title": "ally-archiver — S3 to Storage Box Archiver",
+      "summary": "A small Go + htmx internal app that weekly copies private S3 objects older than 30 days to a Hetzner Storage Box, verifies them by SHA-256, deletes them from S3 one run later, and restores on demand.",
+      "tags": [
+        "repo",
+        "ally-archiver",
+        "go",
+        "htmx",
+        "storage",
+        "s3",
+        "hetzner",
+        "ops"
+      ],
+      "last_reconciled": "2026-10-28",
+      "words": 472,
+      "url": "https://tech.helloally.ai/#/wiki/repos/ally-archiver.md",
       "skip_reason": ""
     },
     {
@@ -653,7 +691,7 @@
         "devops"
       ],
       "last_reconciled": "2026-10-23",
-      "words": 2034,
+      "words": 2116,
       "url": "https://tech.helloally.ai/#/wiki/repos/infra.md",
       "skip_reason": ""
     },
