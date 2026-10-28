@@ -238,7 +238,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 onChange={setDescription}
                 placeholder="Describe the person the AI should role-play — who they are, their background, what's bringing them to this session, how they speak and behave..."
                 minHeight={96}
-                maxLines={12}
+                maxLines={24}
                 className="w-full rounded border border-border-light px-3 py-2 bg-white text-base"
               />
             </div>
