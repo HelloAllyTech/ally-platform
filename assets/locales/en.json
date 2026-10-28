@@ -759,7 +759,9 @@
       "roleplay": "Role play",
       "minScore": "min score {{score}}%",
       "case": "Case",
-      "game": "Game · just for fun"
+      "game": "Game · just for fun",
+      "branchingScenario": "Scenario quiz",
+      "bucketSort": "Bucket sort"
     },
     "player": {
       "exit": "Exit",
@@ -1074,6 +1076,10 @@
       "practiceAgain": "Sort again",
       "continue": "Continue",
       "placeFailed": "Something went wrong. Please try again."
+    },
+    "notAvailable": {
+      "title": "This course isn't available for your account",
+      "body": "It hasn't been made available to your organisation or group. If you think you should have it, ask your organisation's admin."
     }
   },
   "nav": {

@@ -124,6 +124,10 @@ class TrackDetailItem {
     required this.score,
     required this.maxWatchedPct,
     this.hasDiscussion = false,
+    this.startedAt,
+    this.contentMeta,
+    this.completionCriteria,
+    this.languageFallbackReason,
   });
 
   factory TrackDetailItem.fromJson(Map<String, dynamic> json) =>
@@ -137,6 +141,23 @@ class TrackDetailItem {
         score: (json['score'] as num?)?.toDouble(),
         maxWatchedPct: (json['maxWatchedPct'] as num?)?.toDouble(),
         hasDiscussion: json['hasDiscussion'] as bool? ?? false,
+        startedAt: json['startedAt'] as String?,
+        contentMeta: json['contentMeta'] is Map<String, dynamic>
+            ? TrackItemContentMeta.fromJson(json['contentMeta'] as Map<String, dynamic>)
+            : null,
+        completionCriteria: json['completionCriteria'] is Map<String, dynamic>
+            ? TrackItemCompletionCriteria.fromJson(
+                json['completionCriteria'] as Map<String, dynamic>,
+              )
+            : null,
+        // Lenient on purpose (RN: an unknown reason reads as "no notice").
+        languageFallbackReason: const {
+          'VIDEO_NOT_LOCALISED',
+          'SCENARIO_NOT_TRANSLATED',
+          'CASE_NOT_TRANSLATED',
+        }.contains(json['languageFallbackReason'])
+            ? json['languageFallbackReason'] as String
+            : null,
       );
 
   final String id;
@@ -148,6 +169,47 @@ class TrackDetailItem {
   final double? score;
   final double? maxWatchedPct;
   final bool hasDiscussion;
+
+  /// Set once the learner has opened the item; UNLOCKED + startedAt is RN's
+  /// "In progress".
+  final String? startedAt;
+  final TrackItemContentMeta? contentMeta;
+  final TrackItemCompletionCriteria? completionCriteria;
+
+  /// RN's `TrackLanguageFallbackReason` (why this component reads in
+  /// English), or null.
+  final String? languageFallbackReason;
+}
+
+/// RN's `TrackItemContentMeta` — the fields CourseItemRow's meta line reads.
+class TrackItemContentMeta {
+  TrackItemContentMeta({this.questionCount, this.passScore, this.durationSeconds, this.promptCount});
+
+  factory TrackItemContentMeta.fromJson(Map<String, dynamic> json) => TrackItemContentMeta(
+    questionCount: (json['questionCount'] as num?)?.toInt(),
+    passScore: json['passScore'] as num?,
+    durationSeconds: json['durationSeconds'] as num?,
+    promptCount: (json['promptCount'] as num?)?.toInt(),
+  );
+
+  final int? questionCount;
+  final num? passScore;
+  final num? durationSeconds;
+  final int? promptCount;
+}
+
+/// RN's `TrackCompletionCriteria` — the fields CourseItemRow's meta line reads.
+class TrackItemCompletionCriteria {
+  TrackItemCompletionCriteria({this.minScore, this.passScore});
+
+  factory TrackItemCompletionCriteria.fromJson(Map<String, dynamic> json) =>
+      TrackItemCompletionCriteria(
+        minScore: json['minScore'] as num?,
+        passScore: json['passScore'] as num?,
+      );
+
+  final num? minScore;
+  final num? passScore;
 }
 
 class TrackSection {
@@ -156,11 +218,13 @@ class TrackSection {
     required this.title,
     required this.order,
     required this.items,
+    this.description,
   });
 
   factory TrackSection.fromJson(Map<String, dynamic> json) => TrackSection(
     id: json['id'] as String,
     title: json['title'] as String,
+    description: json['description'] as String?,
     order: (json['order'] as num?)?.toInt() ?? 0,
     items: (json['items'] as List<dynamic>? ?? [])
         .map((e) => TrackDetailItem.fromJson(e as Map<String, dynamic>))
@@ -169,6 +233,7 @@ class TrackSection {
 
   final String id;
   final String title;
+  final String? description;
   final int order;
   final List<TrackDetailItem> items;
 }
@@ -187,6 +252,7 @@ class TrackDetail {
     required this.sections,
     this.languageCode,
     this.availableLanguages = const [],
+    this.completedAt,
   });
 
   factory TrackDetail.fromJson(Map<String, dynamic> json) => TrackDetail(
@@ -209,6 +275,7 @@ class TrackDetail {
     availableLanguages: (json['availableLanguages'] as List<dynamic>? ?? [])
         .map((e) => TrackLanguageOption.fromJson(e as Map<String, dynamic>))
         .toList(),
+    completedAt: json['completedAt'] as String?,
   );
 
   final String id;
@@ -223,6 +290,7 @@ class TrackDetail {
   final List<TrackSection> sections;
   final String? languageCode;
   final List<TrackLanguageOption> availableLanguages;
+  final String? completedAt;
 }
 
 /// Mirrors RN's `SkillFeedbackClassification` — how one skill category's
