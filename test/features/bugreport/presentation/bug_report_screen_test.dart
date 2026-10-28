@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/core/widgets/back_title_header.dart';
 import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/bugreport/data/bug_report_repository.dart';
 import 'package:ally_mobile_flutter/features/bugreport/presentation/bug_report_screen.dart';
@@ -42,6 +43,16 @@ void main() {
       );
       router.push('/bug-report');
       await tester.pumpAndSettle();
+
+      // --- Step 0: RN's hand-rolled header (SVG back arrow, no AppBar) and
+      // a footer pinned below the scroll view. ---
+      expect(find.byType(AppBar), findsNothing);
+      expect(find.byType(BackTitleHeader), findsOneWidget);
+      expect(find.text('Report a problem'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(SingleChildScrollView), matching: find.byType(AppButton)),
+        findsNothing,
+      );
 
       // --- Step 1: Submit stays disabled until there's real text. ---
       var submitButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Submit'));
