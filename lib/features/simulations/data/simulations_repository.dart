@@ -13,9 +13,15 @@ import 'simulation_models.dart';
 /// SimulationPathDetailsScreen, CaseDetailsScreen, and
 /// SimulationFeedbackScreen actually need.
 class SimulationsRepository {
-  SimulationsRepository(this._dio);
+  SimulationsRepository(this._dio, {void Function(Set<SimulationCacheTag> tags)? onInvalidate})
+      : _onInvalidate = onInvalidate;
 
   final Dio _dio;
+
+  /// RN `invalidatesTags` on this API's mutations: the provider wires it to
+  /// `ref.invalidate` of the matching providers, so every caller gets the
+  /// same refetch RN does without each screen remembering to.
+  final void Function(Set<SimulationCacheTag> tags)? _onInvalidate;
 
   /// Matches ally-mobile (React Native)'s `getSimulationDetails` query
   /// exactly: same route, same `enableRecommendations=true` param.
@@ -74,6 +80,7 @@ class SimulationsRepository {
 
   Future<void> createPathSession(String pathId) async {
     await _dio.post<void>('/learn/scenario-paths/$pathId/create-session');
+    _onInvalidate?.call(const {SimulationCacheTag.pathDetails, SimulationCacheTag.paths});
   }
 
   /// Looks up the real session id behind a completed path scenario item —
@@ -107,8 +114,21 @@ class SimulationsRepository {
     return SessionData.fromJson(response.data!);
   }
 
+  /// RN `endScenarioSession`: body `{enableRecommendations: true}` (plus the
+  /// injected `languageCode`), and it invalidates credits and path/case
+  /// progress.
   Future<void> endScenarioSession(String scenarioSessionId) async {
-    await _dio.post<void>('/learn/scenario-session/$scenarioSessionId/end');
+    await _dio.post<void>(
+      '/learn/scenario-session/$scenarioSessionId/end',
+      data: {'enableRecommendations': true},
+    );
+    _onInvalidate?.call(const {
+      SimulationCacheTag.credits,
+      SimulationCacheTag.paths,
+      SimulationCacheTag.pathDetails,
+      SimulationCacheTag.cases,
+      SimulationCacheTag.caseDetails,
+    });
   }
 
   /// Cases (`/learn/cases`) are structurally identical to scenario paths in
@@ -133,6 +153,7 @@ class SimulationsRepository {
 
   Future<void> createCaseSession(String caseId) async {
     await _dio.post<void>('/learn/cases/$caseId/create-session');
+    _onInvalidate?.call(const {SimulationCacheTag.caseDetails, SimulationCacheTag.cases});
   }
 
   /// Looks up the real session id behind a completed case scenario item —
@@ -173,8 +194,29 @@ class SimulationsRepository {
   }
 }
 
-final simulationsRepositoryProvider = Provider<SimulationsRepository>((ref) {
-  return SimulationsRepository(ref.watch(apiClientProvider));
+/// RN `simulationsApi` tag types (`SimulationCredits`, `SimulationPaths`, ...).
+enum SimulationCacheTag { credits, paths, pathDetails, cases, caseDetails }
+
+final Provider<SimulationsRepository> simulationsRepositoryProvider = Provider<SimulationsRepository>((ref) {
+  return SimulationsRepository(
+    ref.watch(apiClientProvider),
+    onInvalidate: (tags) {
+      for (final tag in tags) {
+        switch (tag) {
+          case SimulationCacheTag.credits:
+            ref.invalidate(simulationCreditsProvider);
+          case SimulationCacheTag.paths:
+            ref.invalidate(scenarioPathsProvider);
+          case SimulationCacheTag.pathDetails:
+            ref.invalidate(simulationPathDetailsProvider);
+          case SimulationCacheTag.cases:
+            ref.invalidate(casesProvider);
+          case SimulationCacheTag.caseDetails:
+            ref.invalidate(caseDetailsProvider);
+        }
+      }
+    },
+  );
 });
 
 final scenariosProvider = FutureProvider<List<Scenario>>((ref) {

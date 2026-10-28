@@ -315,16 +315,46 @@ void main() {
   });
 
   group('endScenarioSession', () {
-    test('POSTs to the session end route', () async {
+    test('POSTs {enableRecommendations: true} and invalidates RN tags', () async {
+      final invalidated = <SimulationCacheTag>{};
+      repository = SimulationsRepository(dio, onInvalidate: invalidated.addAll);
       when(
-        () => dio.post<void>('/learn/scenario-session/sess-1/end'),
+        () => dio.post<void>(
+          '/learn/scenario-session/sess-1/end',
+          data: {'enableRecommendations': true},
+        ),
       ).thenAnswer((_) async => _response<void>(null));
 
       await repository.endScenarioSession('sess-1');
 
       verify(
-        () => dio.post<void>('/learn/scenario-session/sess-1/end'),
+        () => dio.post<void>(
+          '/learn/scenario-session/sess-1/end',
+          data: {'enableRecommendations': true},
+        ),
       ).called(1);
+      // RN simulationsApi.endScenarioSession invalidatesTags.
+      expect(invalidated, SimulationCacheTag.values.toSet());
+    });
+  });
+
+  group('cache invalidation on create-session', () {
+    test('path: SimulationPathDetails + SimulationPaths', () async {
+      final invalidated = <SimulationCacheTag>{};
+      repository = SimulationsRepository(dio, onInvalidate: invalidated.addAll);
+      when(() => dio.post<void>('/learn/scenario-paths/p/create-session'))
+          .thenAnswer((_) async => _response<void>(null));
+      await repository.createPathSession('p');
+      expect(invalidated, {SimulationCacheTag.pathDetails, SimulationCacheTag.paths});
+    });
+
+    test('case: CaseDetails + Cases', () async {
+      final invalidated = <SimulationCacheTag>{};
+      repository = SimulationsRepository(dio, onInvalidate: invalidated.addAll);
+      when(() => dio.post<void>('/learn/cases/c/create-session'))
+          .thenAnswer((_) async => _response<void>(null));
+      await repository.createCaseSession('c');
+      expect(invalidated, {SimulationCacheTag.caseDetails, SimulationCacheTag.cases});
     });
   });
 
