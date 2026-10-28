@@ -173,4 +173,95 @@ void main() {
 
     await unmount(tester);
   });
+
+  test('formatVideoTime reads like AVKit (m:ss, h:mm:ss past an hour)', () {
+    expect(formatVideoTime(Duration.zero), '0:00');
+    expect(formatVideoTime(const Duration(seconds: 65)), '1:05');
+    expect(formatVideoTime(const Duration(hours: 1, minutes: 2, seconds: 3)), '1:02:03');
+  });
+
+  testWidgets('RN native controls: elapsed/remaining readout, skip 10 s, play/pause, auto-hide while playing',
+      (tester) async {
+    final key = GlobalKey<VideoPlayerWidgetState>();
+    await pump(
+      tester,
+      VideoPlayerWidget(key: key, url: 'https://example.com/v.mp4', onProgressTime: (_) {}, onPauseOrEnd: () {}),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // Paused at 0 s of a 100 s video: "0:00" and "-1:40".
+    await key.currentState!.pause();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const Key('video-elapsed')), findsOneWidget);
+    final elapsed0 = tester.widget<Text>(find.byKey(const Key('video-elapsed'))).data!;
+    expect(elapsed0, '0:00');
+    expect(tester.widget<Text>(find.byKey(const Key('video-remaining'))).data, '-1:40');
+
+    // Skip forward 10 s.
+    await tester.tap(find.byKey(const Key('video-skip-forward')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<Text>(find.byKey(const Key('video-elapsed'))).data, '0:10');
+    expect(tester.widget<Text>(find.byKey(const Key('video-remaining'))).data, '-1:30');
+
+    // Skip back 10 s, clamped at the start.
+    await tester.tap(find.byKey(const Key('video-skip-back')));
+    await tester.tap(find.byKey(const Key('video-skip-back')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<Text>(find.byKey(const Key('video-elapsed'))).data, '0:00');
+
+    // Paused: the controls stay up.
+    await tester.pump(const Duration(seconds: 4));
+    expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('video-controls'))).opacity, 1);
+
+    // Play from the centre button; after 3 s of playback they fade out.
+    await tester.tap(find.byKey(const Key('video-play-pause')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(fakePlatform.calls.where((c) => c == 'play').length, greaterThanOrEqualTo(2));
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('video-controls'))).opacity, 0);
+
+    // A tap brings them back.
+    await tester.tap(find.byKey(const Key('video-controls-tap-area')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<AnimatedOpacity>(find.byKey(const Key('video-controls'))).opacity, 1);
+
+    await unmount(tester);
+  });
+
+  testWidgets('RN native controls: the fullscreen button opens a full-screen player; its close returns', (
+    tester,
+  ) async {
+    final key = GlobalKey<VideoPlayerWidgetState>();
+    await pump(
+      tester,
+      Scaffold(
+        body: VideoPlayerWidget(key: key, url: 'https://example.com/v.mp4', onProgressTime: (_) {}, onPauseOrEnd: () {}),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await key.currentState!.pause();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.byKey(const Key('video-fullscreen')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('video-fullscreen-page')), findsOneWidget);
+    // The full-screen player has its own readout.
+    expect(
+      find.descendant(of: find.byKey(const Key('video-fullscreen-page')), matching: find.byKey(const Key('video-remaining'))),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(of: find.byKey(const Key('video-fullscreen-page')), matching: find.byKey(const Key('video-fullscreen'))),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('video-fullscreen-page')), findsNothing);
+    expect(find.byType(VideoPlayerWidget), findsOneWidget);
+
+    await unmount(tester);
+  });
 }

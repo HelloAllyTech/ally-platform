@@ -38,7 +38,7 @@ void main() {
           ),
           GoRoute(
             path: '/conference-listening/:chatId',
-            builder: (_, __) => const ConferenceListeningScreen(chatId: 1, userId: 'user-1'),
+            builder: (_, _) => const ConferenceListeningScreen(chatId: 1, userId: 'user-1'),
           ),
         ],
       );

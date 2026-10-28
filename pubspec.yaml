@@ -61,6 +61,8 @@ dependencies:
   image_picker: ^1.2.4
   webview_flutter: ^4.13.0
   video_player: ^2.14.1
+  # SF Symbol-style glyphs for the course video controls (iOS AVKit look).
+  cupertino_icons: ^1.0.9
   flutter_svg: ^2.2.1
   lottie: ^3.3.2
   package_info_plus: ^10.2.2
