@@ -221,10 +221,14 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
         for (final bucket in _buckets) _buildBucket(bucket, current, feedback),
         if (_failed) ...[
           const SizedBox(height: 8),
-          Text(
-            ref.t('courses.bucketSort.placeFailed'),
-            textAlign: TextAlign.center,
-            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+          // RN `accessibilityRole="alert"`.
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              ref.t('courses.bucketSort.placeFailed'),
+              textAlign: TextAlign.center,
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+            ),
           ),
         ],
         if (reviewing != null && feedback != null) _buildFeedback(feedback),
@@ -240,13 +244,26 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
     final isTarget = feedback?.correctBucketId == bucket.id;
     final isWrong = feedback != null && !feedback.correct && feedback.placedBucketId == bucket.id;
     final canPlace = _canPlace;
+    final onTap = canPlace && current != null ? () => _place(current.id, bucket.id) : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
+      // RN Pressable: role button, `disabled: !canPlace`, and the label
+      // `bucketA11y` ("Place "item" in bucket") while an item is up, else
+      // the bucket's own label — replacing the card's text for a reader.
+      child: Semantics(
+        key: Key('bucket-semantics-${bucket.id}'),
+        button: true,
+        enabled: canPlace,
+        label: current != null
+            ? ref.t('courses.bucketSort.bucketA11y', {'item': current.text, 'bucket': bucket.label})
+            : bucket.label,
+        onTap: onTap,
+        excludeSemantics: true,
+        child: InkWell(
         key: Key('bucket-${bucket.id}'),
         borderRadius: BorderRadius.circular(12),
-        onTap: canPlace && current != null ? () => _place(current.id, bucket.id) : null,
+        onTap: onTap,
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -289,6 +306,7 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -318,6 +336,14 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
   }
 
   Widget _buildFeedback(BucketSortFeedback feedback) {
+    // RN `accessibilityLiveRegion="polite"`.
+    return Semantics(
+      liveRegion: true,
+      child: _buildFeedbackCard(feedback),
+    );
+  }
+
+  Widget _buildFeedbackCard(BucketSortFeedback feedback) {
     return Container(
       key: const Key('bucket-sort-feedback'),
       width: double.infinity,

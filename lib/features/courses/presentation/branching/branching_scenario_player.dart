@@ -418,7 +418,10 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
         for (final choice in node.choices ?? const <BranchingChoice>[])
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
+            // RN `accessibilityRole="button"`, label = the choice text.
+            child: Semantics(
+              button: true,
+              child: InkWell(
               key: Key('branching-choice-${choice.id}'),
               borderRadius: BorderRadius.circular(12),
               onTap: () => _handleChoose(choice.id, choice.nextNodeId),
@@ -431,6 +434,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
                 ),
                 child: Text(choice.text, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
               ),
+            ),
             ),
           ),
       ],
@@ -455,7 +459,13 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
           ),
         if (scene.image != null) const SizedBox(height: 12),
         if (scene.title != null) ...[
-          Text(scene.title!, style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500)),
+          Semantics(
+            header: true,
+            child: Text(
+              scene.title!,
+              style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
+            ),
+          ),
           const SizedBox(height: 4),
         ],
         Text(scene.text, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
@@ -465,9 +475,16 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
 
   Widget _buildTrail() {
     if (_path.isEmpty) return const SizedBox.shrink();
+    // RN: one `accessible` view labelled `trailLabel` ("Your choices so
+    // far") — the chips are read as that single label.
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Wrap(
+      child: Semantics(
+        key: const Key('branching-trail'),
+        container: true,
+        label: ref.t('courses.branching.trailLabel'),
+        excludeSemantics: true,
+        child: Wrap(
         spacing: 6,
         runSpacing: 6,
         children: [
@@ -484,6 +501,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -575,10 +593,13 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
         _buildTrail(),
         if (_saveFailed) ...[
           const SizedBox(height: 12),
-          Text(
-            ref.t('courses.branching.saveFailed'),
-            textAlign: TextAlign.center,
-            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              ref.t('courses.branching.saveFailed'),
+              textAlign: TextAlign.center,
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+            ),
           ),
           const SizedBox(height: 10),
           CourseButton(
@@ -640,28 +661,46 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          ref.t('courses.branching.exhaustedTitle'),
-          key: const Key('branching-exhausted'),
-          style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
+        Semantics(
+          header: true,
+          child: Text(
+            ref.t('courses.branching.exhaustedTitle'),
+            key: const Key('branching-exhausted'),
+            style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
+          ),
         ),
         const SizedBox(height: 8),
         Text(nextRoundLine, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
         if (pause.recap.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text(
-            ref.t('courses.branching.whatYouReached'),
-            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis, weight: FontWeight.w500),
+          Semantics(
+            header: true,
+            child: Text(
+              ref.t('courses.branching.whatYouReached'),
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis, weight: FontWeight.w500),
+            ),
           ),
           const SizedBox(height: 10),
-          for (final entry in pause.recap) _buildRecapRow(entry),
+          // RN `accessibilityRole="list"` labelled `recapLabel`.
+          Semantics(
+            key: const Key('branching-recap-list'),
+            container: true,
+            label: ref.t('courses.branching.recapLabel'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [for (final entry in pause.recap) _buildRecapRow(entry)],
+            ),
+          ),
         ],
         if (_roundLoadFailed) ...[
           const SizedBox(height: 12),
-          Text(
-            ref.t('courses.player.loadFailed'),
-            textAlign: TextAlign.center,
-            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              ref.t('courses.player.loadFailed'),
+              textAlign: TextAlign.center,
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+            ),
           ),
         ],
         const SizedBox(height: 16),
@@ -690,9 +729,21 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
     final scoreLabel = _data.passScore != null
         ? ref.t('courses.branching.score', {'score': entry.score})
         : null;
+    final outcome = ending?.outcome;
+    // RN: one `accessible` row read as "outcome. text. score. takeaway".
+    final rowLabel = [
+      if (outcome != null) ref.t(_outcomeKey(outcome)),
+      ?ending?.text,
+      ?scoreLabel,
+      ?ending?.takeaway,
+    ].where((part) => part.isNotEmpty).join('. ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
+      child: Semantics(
+        container: true,
+        label: rowLabel,
+        excludeSemantics: true,
+        child: Container(
         key: const Key('branching-recap-row'),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -713,6 +764,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
               ),
           ],
         ),
+      ),
       ),
     );
   }
