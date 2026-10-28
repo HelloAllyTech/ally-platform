@@ -1606,20 +1606,6 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
         # Select prompt and response model based on memory requirement
         if need_memory:
             template_path = "scenario/scenario_evaluation_with_memory"
-        else:
-            template_path = "scenario/scenario_evaluation"
-
-        evaluation_llm = self._client_for(template_path, prompts)
-
-        # Bound the transcript the evaluator reads (long sessions otherwise
-        # overflow the prompt and fail every time).
-        chat_history_str = await self._condense_for_summary(
-            chat_history_str, llm_override=evaluation_llm, prompts=prompts
-        )
-
-        # Select prompt and response model based on memory requirement
-        if need_memory:
-            template_path = "scenario/scenario_evaluation_with_memory"
             response_model = ScenarioEvaluationWithMemory
         else:
             template_path = "scenario/scenario_evaluation"
