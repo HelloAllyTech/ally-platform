@@ -74,9 +74,11 @@ describe("GuidedCourse: finale, advice, thumbs, memory provenance, scenes on rel
 
       const reveal = await screen.findByTestId("finale-reveal");
       expect(reveal).toHaveAttribute("data-hushed", "false");
-      expect(
-        within(reveal).getByRole("heading", { name: "Looking back on Answering the first call" }),
-      ).toHaveFocus();
+      await waitFor(() => {
+        expect(
+          within(reveal).getByRole("heading", { name: "Looking back on Answering the first call" }),
+        ).toHaveFocus();
+      });
       expect(within(reveal).getByTestId("finale-map").children.length).toBeGreaterThan(0);
       const firstMove = within(reveal).getByTestId("finale-first-move");
       expect(firstMove).toHaveTextContent("I'd ask for their name and what's wrong.");
