@@ -12,6 +12,7 @@ import '../../../core/navigation/home_tab_navigation.dart';
 import '../../../core/navigation/tab_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
 import 'breath_sound_player.dart';
 import 'call_end_overlay.dart';
@@ -348,17 +349,18 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // RN `flowerText` is a plain StyleSheet
+                                // (unscaled 18 / marginTop 60) with no
+                                // fontFamily → SF Semibold, a real face.
                                 Padding(
-                                  padding: const EdgeInsets.only(top: 60),
+                                  padding: EdgeInsets.only(top: RnSize.of(context).raw(60)),
                                   child: Text(
                                     ref.t(phase.label),
-                                    // No fontFamily in RN → iOS system font;
-                                    // inherit:false keeps the theme's
-                                    // IBM Plex Serif from leaking in.
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       inherit: false,
+                                      fontFamily: 'CupertinoSystemText',
                                       color: Colors.white,
-                                      fontSize: 18,
+                                      fontSize: RnSize.of(context).raw(18),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),

@@ -150,7 +150,10 @@ class SessionProgress extends StatelessWidget {
                     fontFamily: AppFonts.robotoRegular,
                     fontSize: 12,
                     height: 16 / 12,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                    // RN asks for 500 / 600 (active), but iOS bundles only
+                    // Roboto Regular and never synthesizes bold, so both
+                    // render Regular; w600 would fake bold in Flutter.
+                    fontWeight: FontWeight.w500,
                     color: labelColor,
                   ),
                 ),

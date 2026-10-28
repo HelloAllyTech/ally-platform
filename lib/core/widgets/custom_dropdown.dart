@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
+import '../theme/rn_scale.dart';
 
 /// Port of ally-mobile (React Native)'s `src/components/Dropdown/
 /// Dropdown.tsx` (`CustomDropdown`) — a closed header sized to its OWN
@@ -49,8 +51,13 @@ class CustomDropdown extends StatefulWidget {
 
   /// RN's `fixedWidth` prop — when null, the header sizes to [value]'s own
   /// content (RN's `alignSelf: 'flex-start'` default), not a fixed box.
+  /// RN passes a plain, unscaled number (`fixedWidth={120}`), so this is
+  /// laid out with [RnSize.raw]; scaled by [RnScale] it came out ~9pt too
+  /// wide on a 402pt iPhone.
   final double? fixedWidth;
   final bool alignRight;
+
+  /// RN's `<ArrowDown width={6} height={6} />` — unscaled, like [fixedWidth].
   final double arrowSize;
 
   /// Key applied to the opened menu's container — used by callers' widget
@@ -76,7 +83,10 @@ class _CustomDropdownState extends State<CustomDropdown> {
       textDirection: TextDirection.ltr,
       textScaler: textScaler,
     )..layout();
-    final minWidth = (painter.width + 36).ceilToDouble();
+    // RN's `Math.ceil(width + 36)` and `Math.min(200, options.length * 40)`
+    // are plain numbers, not `@ms`.
+    final rnSize = RnSize.of(context);
+    final minWidth = (painter.width + rnSize.raw(36)).ceilToDouble();
     painter.dispose();
 
     setState(() => _isOpen = true);
@@ -96,7 +106,7 @@ class _CustomDropdownState extends State<CustomDropdown> {
               key: widget.menuKey,
               constraints: BoxConstraints(
                 minWidth: minWidth > rect.width ? minWidth : rect.width,
-                maxHeight: (widget.options.length * 40).clamp(0, 200).toDouble(),
+                maxHeight: rnSize.raw((widget.options.length * 40).clamp(0, 200).toDouble()),
               ),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -119,9 +129,13 @@ class _CustomDropdownState extends State<CustomDropdown> {
                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                               child: Text(
                                 option,
+                                // RN `selectedItem`: IBM Plex Serif Regular
+                                // at weight 500, which iOS resolves to the
+                                // family's Medium face.
                                 style: option == widget.value
                                     ? widget.itemTextStyle.copyWith(
                                         color: AppColors.primary,
+                                        fontFamily: AppFonts.ibmPlexSerifMedium,
                                         fontWeight: FontWeight.w500,
                                       )
                                     : widget.itemTextStyle,
@@ -145,8 +159,10 @@ class _CustomDropdownState extends State<CustomDropdown> {
 
   @override
   Widget build(BuildContext context) {
+    final rnSize = RnSize.of(context);
+    final arrowSize = rnSize.raw(widget.arrowSize);
     final header = Container(
-      width: widget.fixedWidth,
+      width: widget.fixedWidth == null ? null : rnSize.raw(widget.fixedWidth!),
       padding: widget.headerPadding,
       decoration: widget.headerDecoration ??
           const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.all(Radius.circular(4))),
@@ -160,8 +176,8 @@ class _CustomDropdownState extends State<CustomDropdown> {
             child: RotatedBox(
               quarterTurns: _isOpen ? 2 : 0,
               child: SizedBox(
-                width: widget.arrowSize,
-                height: widget.arrowSize,
+                width: arrowSize,
+                height: arrowSize,
                 child: SvgPicture.asset(
                   'assets/icons/arrowDown.svg',
                 ),

@@ -1316,9 +1316,13 @@ class _CountdownOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rn = RnSize.of(context);
+    // RN `SimulationCountdown` styles: grey[950] overlay, `gap: 16@vs`, an
+    // unscaled 2pt ring, the digit in Replay Pro Bold Italic (no
+    // fontWeight) and the label in Roboto 14 `lightGray3`.
     return Positioned.fill(
       child: ColoredBox(
-        color: Colors.black,
+        color: AppColors.grey950,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1328,23 +1332,27 @@ class _CountdownOverlay extends StatelessWidget {
                 height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF57F646), width: 2),
+                  border: Border.all(color: const Color(0xFF57F646), width: rn.raw(2)),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   '$step',
                   style: const TextStyle(
+                    fontFamily: AppFonts.replayProBoldItalic,
                     color: Colors.white,
                     fontSize: 48,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: rn.vs(16)),
               Text(
                 ref.t('simulationPage.simulationCountdownLabel'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
+                style: const TextStyle(
+                  fontFamily: AppFonts.robotoRegular,
+                  fontSize: 14,
+                  color: AppColors.lightGray3,
+                ),
               ),
             ],
           ),

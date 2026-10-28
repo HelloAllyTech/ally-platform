@@ -262,7 +262,12 @@ class _FilterTab extends StatelessWidget {
                     child: Text(
                       label,
                       style: isSelected
-                          ? _labelStyle.copyWith(color: AppColors.azureBlue, fontWeight: FontWeight.w500)
+                          ? _labelStyle.copyWith(
+                              color: AppColors.azureBlue,
+                              // RN: IBM Plex Serif Regular at 500 → Medium face.
+                              fontFamily: AppFonts.ibmPlexSerifMedium,
+                              fontWeight: FontWeight.w500,
+                            )
                           : _labelStyle,
                     ),
                   )

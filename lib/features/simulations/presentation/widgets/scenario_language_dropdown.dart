@@ -84,10 +84,15 @@ class _ScenarioLanguageDropdownState<T>
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Text(
               widget.labelOf(option),
+              // RN `selectedItem`: weight 500 on IBM Plex Serif Regular
+              // resolves to the Medium face on iOS.
               style: _valueStyle.copyWith(
                 color: option == widget.selected
                     ? AppColors.primary
                     : AppColors.highEmphasis,
+                fontFamily: option == widget.selected
+                    ? AppFonts.ibmPlexSerifMedium
+                    : AppFonts.ibmPlexSerifRegular,
                 fontWeight: option == widget.selected
                     ? FontWeight.w500
                     : FontWeight.w400,

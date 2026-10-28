@@ -307,8 +307,12 @@ class _FeedbackPopupState extends ConsumerState<FeedbackPopup> {
                   child: Text(
                     ref.t(labelKey),
                     textAlign: TextAlign.center,
+                    // RN `Chip`: IBM Plex Serif Regular; `chipTextSelected`
+                    // adds weight 500, which iOS resolves to the Medium face.
                     style: TextStyle(
-                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontFamily: _selectedIssues.contains(value)
+                          ? AppFonts.ibmPlexSerifMedium
+                          : AppFonts.ibmPlexSerifRegular,
                       fontSize: 14,
                       color: _selectedIssues.contains(value) ? Colors.white : AppColors.lightGray3,
                       fontWeight: _selectedIssues.contains(value) ? FontWeight.w500 : FontWeight.w400,

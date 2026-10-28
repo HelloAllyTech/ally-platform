@@ -295,7 +295,12 @@ class _PracticeNudge extends ConsumerWidget {
               decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
               child: Text(
                 ref.t('common.continue'),
-                style: _robotoSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w500),
+                style: _robotoSmall.copyWith(
+                  color: Colors.white,
+                  // RN: Roboto at 500; iOS has only Roboto Regular, so it stays Regular.
+                  fontFamily: AppFonts.robotoRegular,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -453,7 +458,12 @@ class _SkillCategoryRow extends ConsumerWidget {
                   decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(10)),
                   child: Text(
                     ref.t('courses.progressDashboard.classification.$key'),
-                    style: _robotoTiny.copyWith(color: badgeText, fontWeight: FontWeight.w500),
+                    style: _robotoTiny.copyWith(
+                      color: badgeText,
+                      // RN: Roboto at 500; iOS has only Roboto Regular, so it stays Regular.
+                      fontFamily: AppFonts.robotoRegular,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -509,7 +519,12 @@ class _LatestFeedbackPreview extends ConsumerWidget {
             onTap: () => onPress(session),
             child: Text(
               ref.t('courses.progressDashboard.readFullFeedback'),
-              style: _robotoSmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500),
+              style: _robotoSmall.copyWith(
+                color: AppColors.primary,
+                // RN: Roboto at 500; iOS has only Roboto Regular, so it stays Regular.
+                fontFamily: AppFonts.robotoRegular,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

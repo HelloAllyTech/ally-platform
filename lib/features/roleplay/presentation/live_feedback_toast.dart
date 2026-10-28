@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 
 /// Direct port of ally-mobile (React Native)'s `LiveFeedback` component
 /// (`SimulationAssistantScreen/components/LiveFeedback/LiveFeedback.tsx`) —
@@ -79,7 +80,8 @@ class _Content extends StatelessWidget {
               message,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white),
+              // RN `message`: IBM Plex Serif Medium, no fontWeight.
+              style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 14, color: Colors.white),
             ),
           ),
         ],

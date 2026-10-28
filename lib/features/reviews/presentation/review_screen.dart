@@ -522,7 +522,12 @@ class _SortDropdownState extends State<_SortDropdown> {
                                 child: Text(
                                   option,
                                   style: option == widget.value
-                                      ? _itemStyle.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)
+                                      ? _itemStyle.copyWith(
+                                          color: AppColors.primary,
+                                          // RN `selectedItem`: IBM Plex Serif Regular at 500 → Medium face.
+                                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                                          fontWeight: FontWeight.w500,
+                                        )
                                       : _itemStyle,
                                 ),
                               ),

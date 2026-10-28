@@ -30,13 +30,25 @@ class CourseText {
   static TextStyle roboto(TextStyle type, Color color, {FontWeight? weight}) =>
       _style(type, AppFonts.robotoRegular, color, weight);
 
-  /// `fontFamily.IBM_PLEX_SERIF.REGULAR`.
+  /// `fontFamily.IBM_PLEX_SERIF.REGULAR`. With a [weight], iOS RN moves to
+  /// the IBM Plex Serif face closest to it (see [plexFace]).
   static TextStyle serif(TextStyle type, Color color, {FontWeight? weight}) =>
-      _style(type, AppFonts.ibmPlexSerifRegular, color, weight);
+      _style(type, plexFace(AppFonts.ibmPlexSerifRegular, weight), color, weight);
 
   /// `fontFamily.IBM_PLEX_SERIF.MEDIUM`.
   static TextStyle serifMedium(TextStyle type, Color color, {FontWeight? weight}) =>
-      _style(type, AppFonts.ibmPlexSerifMedium, color, weight);
+      _style(type, plexFace(AppFonts.ibmPlexSerifMedium, weight), color, weight);
+
+  /// The IBM Plex Serif face iOS RN renders for [named] at [weight]: 400 (or
+  /// none) keeps the named face; any other weight picks the bundled member
+  /// closest to it (Regular 0 / Medium 0.23 in UIFontWeight terms), so 500
+  /// and up land on Medium and 300 and below on Regular. RN never fakes a
+  /// bolder face, and Flutter only does so from w600, which callers here
+  /// don't pass.
+  static String plexFace(String named, FontWeight? weight) {
+    if (weight == null || weight == FontWeight.w400) return named;
+    return weight.value >= FontWeight.w500.value ? AppFonts.ibmPlexSerifMedium : AppFonts.ibmPlexSerifRegular;
+  }
 
   /// No `fontFamily` in RN: the system font. [type] may be a bare
   /// `TextStyle(fontSize: …)` for RN styles that set only a size.

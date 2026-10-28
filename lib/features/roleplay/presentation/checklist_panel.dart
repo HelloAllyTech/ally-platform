@@ -129,12 +129,23 @@ class _ChecklistPanelState extends State<ChecklistPanel> {
                                       TextSpan(text: '${ref.t('simulationPage.progress')}: '),
                                       TextSpan(
                                         text: '$completedCount',
-                                        style: const TextStyle(color: AppColors.callGreen, fontWeight: FontWeight.bold),
+                                        // RN `progressCompleted`: bold on IBM Plex Serif Regular → the
+                                        // family's heaviest face, Medium (no Plex Bold is bundled).
+                                        style: const TextStyle(
+                                          color: AppColors.callGreen,
+                                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                       const TextSpan(text: ' of '),
                                       TextSpan(
                                         text: '${sorted.length} ${ref.t('simulationPage.completed')}',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                                        // RN `progressTotal`: 500 → IBM Plex Serif Medium.
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ],
                                   ),

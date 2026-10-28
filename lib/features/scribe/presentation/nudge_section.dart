@@ -211,15 +211,22 @@ class NudgeMarkdown extends StatelessWidget {
     color: AppColors.paleBlue,
   );
 
+  /// RN `bold` (`fontWeight: '600'`) inside a `description` Text: iOS
+  /// moves IBM Plex Serif Regular to the family's closest face, Medium.
+  static const _descriptionBold = TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontWeight: FontWeight.w500);
+
+  /// The same `bold` inside a `title` (Replay Pro Bold) stays on that face.
+  static const _titleBold = TextStyle(fontFamily: AppFonts.replayProBold, fontWeight: FontWeight.w600);
+
   /// RN `parseBoldAndText`: `**…**` pairs become weight-600 spans.
-  List<InlineSpan> _inline(String line) {
+  List<InlineSpan> _inline(String line, {TextStyle bold = _descriptionBold}) {
     final parts = line.split('**');
     return [
       for (var i = 0; i < parts.length; i++)
         if (parts[i].isNotEmpty)
           TextSpan(
             text: parts[i],
-            style: i.isOdd && i < parts.length - 1 ? const TextStyle(fontWeight: FontWeight.w600) : null,
+            style: i.isOdd && i < parts.length - 1 ? bold : null,
           ),
     ];
   }
@@ -238,7 +245,7 @@ class NudgeMarkdown extends StatelessWidget {
           Padding(
             padding: EdgeInsets.only(bottom: rn.s(4)),
             child: Text.rich(
-              TextSpan(children: _inline(section.first)),
+              TextSpan(children: _inline(section.first, bold: _titleBold)),
               style: const TextStyle(
                 fontFamily: AppFonts.replayProBold,
                 fontSize: 16,
@@ -263,7 +270,8 @@ class NudgeMarkdown extends StatelessWidget {
                       children: [
                         Padding(
                           padding: EdgeInsets.only(right: rn.s(6)),
-                          child: const Text('•', style: TextStyle(color: Colors.white)),
+                          // RN `bullet` sets no fontFamily → system font.
+                          child: const Text('•', style: TextStyle(fontFamily: 'CupertinoSystemText', color: Colors.white)),
                         ),
                         Expanded(child: Text.rich(TextSpan(children: _inline(item)), style: _description)),
                       ],

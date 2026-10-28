@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_fonts.dart';
 import '../../../../core/theme/rn_scale.dart';
 import '../../../../core/widgets/html_rich_text.dart';
 import '../../../simulations/presentation/widgets/circular_progress.dart';
@@ -606,7 +607,13 @@ class _QuestionRowState extends ConsumerState<_QuestionRow> {
         ? AppColors.green400
         : AppColors.red400;
     final detailText = CourseText.roboto(CourseType.bodySmall, AppColors.mediumEmphasis);
-    const labelStyle = TextStyle(fontWeight: FontWeight.w500, color: AppColors.highEmphasis);
+    // RN `rowDetailLabel` nested in `rowDetailText` (Roboto): 500 has no
+    // Roboto Medium on iOS to land on, so it stays Roboto Regular.
+    const labelStyle = TextStyle(
+      fontFamily: AppFonts.robotoRegular,
+      fontWeight: FontWeight.w500,
+      color: AppColors.highEmphasis,
+    );
     final correctAnswer = result.correctAnswer;
     final correctText = correctAnswer != null && result.correct == false
         ? formatQuizCorrectAnswer(question, correctAnswer, ref.t)

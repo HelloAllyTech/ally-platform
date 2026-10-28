@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:ally_mobile_flutter/core/theme/app_fonts.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/course_styles.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// On iOS, RN (Fabric's RCTFontWithFontProperties) treats a `fontFamily` like
@@ -84,5 +87,40 @@ void main() {
       }
     }
     expect(offenders, isEmpty, reason: offenders.join('\n'));
+  });
+
+  test('styles at weight 500+ name the face they render with instead of inheriting one', () {
+    // An inherited family is usually DefaultTextStyle's IBM Plex Serif
+    // Regular, where RN would have used a parent Text's font, Medium, or SF.
+    final style = RegExp(r'(TextStyle|copyWith)\(');
+    final heavy = RegExp(r'fontWeight:\s*FontWeight\.(w[5-9]00|bold)\b');
+    final offenders = <String>[];
+    for (final file in Directory('lib').listSync(recursive: true).whereType<File>()) {
+      if (!file.path.endsWith('.dart')) continue;
+      final source = file.readAsStringSync();
+      for (final match in style.allMatches(source)) {
+        var depth = 1;
+        var end = match.end;
+        while (depth > 0 && end < source.length) {
+          if (source[end] == '(') depth++;
+          if (source[end] == ')') depth--;
+          end++;
+        }
+        final args = source.substring(match.end, end);
+        if (!heavy.hasMatch(args) || args.contains('fontFamily')) continue;
+        offenders.add('${file.path}:${'\n'.allMatches(source.substring(0, match.start)).length + 1}');
+      }
+    }
+    expect(offenders, isEmpty, reason: offenders.join('\n'));
+  });
+
+  test('CourseText resolves IBM Plex Serif weights to the face RN lands on', () {
+    const type = TextStyle(fontSize: 14);
+    const color = Color(0xFF000000);
+    expect(CourseText.serif(type, color).fontFamily, AppFonts.ibmPlexSerifRegular);
+    expect(CourseText.serif(type, color, weight: FontWeight.w500).fontFamily, AppFonts.ibmPlexSerifMedium);
+    expect(CourseText.serif(type, color, weight: FontWeight.w300).fontFamily, AppFonts.ibmPlexSerifRegular);
+    expect(CourseText.serifMedium(type, color, weight: FontWeight.w400).fontFamily, AppFonts.ibmPlexSerifMedium);
+    expect(CourseText.serifMedium(type, color, weight: FontWeight.w300).fontFamily, AppFonts.ibmPlexSerifRegular);
   });
 }
