@@ -35,7 +35,6 @@ import '../data/summary_form_state.dart';
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/navigation/home_tab_navigation.dart';
 import '../../../core/navigation/tab_config.dart';
-import '../../reviews/presentation/review_formatting.dart';
 import '../../simulations/presentation/widgets/feedback/feedback_popup.dart';
 import 'call_summary_actions.dart';
 import 'call_summary_header.dart';
@@ -377,9 +376,12 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
           '/share-for-review/$_chatId',
           extra: (
             reviewId: reviewId,
+            isEditNote: false,
             note: summary.reviewNote,
             contextDateTime: summary.startTime ?? summary.createdAt,
-            contextDuration: formatReviewDuration('${summary.callDuration ?? 0}'),
+            // Raw seconds: the share screen formats it (RN formats once, in
+            // `handleShareForReview`). Formatting here too gave "-".
+            contextDuration: '${summary.callDuration ?? 0}',
             isScribe: true,
             contextTitle: title,
           ),
@@ -1151,185 +1153,186 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     if (mounted) setState(() => _isRetrying = false);
   }
 
+  /// RN `CallSummaryScreen.renderSummaryTab` over RTK Query's state: a
+  /// failed refetch keeps the summary that already loaded (RTK keeps `data`
+  /// on a rejected refetch), and a first load that fails with no data falls
+  /// through to the progress view with "See if ready" / "Check later" — no
+  /// bare error text. Only a 403 (`isUnauthorized`) gets its own view.
   @override
   Widget build(BuildContext context) {
-    return widget.summaryAsync.when(
-      skipLoadingOnRefresh: true,
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) {
-        // RN's `isUnauthorized`: any 403 on the summary fetch (viewing a
-        // call not owned/assigned to you) gets its own view instead of the
-        // generic error text, and suppresses the transcript tab too — see
-        // `CallSummaryScreen`'s own `showTranscriptTab` check.
-        if (error is DioException && error.response?.statusCode == 403) {
-          return _SummaryUnauthorizedView(onGoBack: widget.onGoBack);
-        }
-        return Center(
-          child: Text(getErrorDetails(error, t: ref.t).message),
-        );
-      },
-      data: (summary) {
-        if (summary == null || !((widget.isSummaryAvailable || widget.isManualNote) && widget.canShowSummary)) {
-          return _buildGenerating(summary);
-        }
-        _seedIfNeeded(summary);
+    final summaryAsync = widget.summaryAsync;
+    final error = summaryAsync.error;
+    if (error is DioException && error.response?.statusCode == 403) {
+      return _SummaryUnauthorizedView(onGoBack: widget.onGoBack);
+    }
+    if (!summaryAsync.hasValue) {
+      // RN `isLoading` is the first load only (no data, no error yet).
+      if (!summaryAsync.hasError) return const Center(child: CircularProgressIndicator());
+      return _buildGenerating(null);
+    }
+    return _buildSummary(summaryAsync.value);
+  }
 
-        // RN `selectSummaryVisibleFields` (tenant `/settings/summary-fields`).
-        // RN has it in redux before this screen opens; here the first load
-        // waits for it rather than flashing sections that then vanish. An
-        // error is RN's untouched initial `[]`.
-        final visibleFieldsAsync = ref.watch(summaryVisibleFieldsProvider);
-        if (!visibleFieldsAsync.hasValue && visibleFieldsAsync.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final visibleFields = visibleFieldsAsync.value ?? const <String>[];
+  Widget _buildSummary(CallSummaryDetails? summary) {
+    if (summary == null || !((widget.isSummaryAvailable || widget.isManualNote) && widget.canShowSummary)) {
+      return _buildGenerating(summary);
+    }
+    _seedIfNeeded(summary);
 
-        // Custom fields: fetched/seeded only once the tenant toggle resolves
-        // true — mirrors RN's `skip: !customFieldsActive` on both the
-        // definitions and values queries, rather than firing either request
-        // unconditionally on every summary open.
-        final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
-        if (customFieldsEnabled) {
-          _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
-          final valuesAsync = ref.watch(customFieldValuesProvider(_chatId));
-          final values = valuesAsync.value;
-          if (values != null) _seedCustomFieldsIfNeeded(values);
-        } else {
-          _customFieldDefs = const [];
-        }
-        final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
-        final isAdmin = permissions.contains(UserPermissions.manageCustomFieldDefinitions);
-        final currentUserId = ref.watch(currentUserProvider).value?.id;
-        final isCounsellorForCall = summary.counselorId != null && summary.counselorId == currentUserId;
-        final sections = [
-          for (final section in SummarySection.values)
-            if (isSummarySectionVisible(section, visibleFields)) section,
-        ];
+    // RN `selectSummaryVisibleFields` (tenant `/settings/summary-fields`).
+    // RN has it in redux before this screen opens; here the first load
+    // waits for it rather than flashing sections that then vanish. An
+    // error is RN's untouched initial `[]`.
+    final visibleFieldsAsync = ref.watch(summaryVisibleFieldsProvider);
+    if (!visibleFieldsAsync.hasValue && visibleFieldsAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final visibleFields = visibleFieldsAsync.value ?? const <String>[];
 
-        return Column(
-          children: [
-            if (widget.isManualNote)
-              VoiceNoteSection(
-                chatId: _chatId,
-                onValuesApplied: _applyVoiceValues,
-                onCustomValuesApplied: _reseedCustomFields,
-                existingTranscript: summary.transcript,
-              ),
-            Expanded(
-              // Builder, not `children:` — sections are only built as they
-              // scroll in. Index 0 is the AI disclaimer banner.
-              child: ListView.builder(
-                // RN `contentContainer` paddingBottom 70; the banner and the
-                // section card carry their own horizontal spacing.
-                padding: const EdgeInsets.only(bottom: 70),
-                itemCount: sections.length + 1,
-                itemBuilder: (context, index) {
-                  final size = RnSize.of(context);
-                  if (index == 0) {
-                    // RN `CallSummaryDetails.tsx` `alertContainer`: the
-                    // AI-generated disclaimer above the section card, with
-                    // RN's goldenShield SVG in a carrotOrange ring.
-                    return Container(
-                      margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
-                      padding: EdgeInsets.all(size.s(10)),
-                      decoration: BoxDecoration(
-                        color: AppColors.amber50,
-                        borderRadius: BorderRadius.circular(size.s(8)),
-                        border: Border.all(color: AppColors.orange400, width: 0.5),
+    // Custom fields: fetched/seeded only once the tenant toggle resolves
+    // true — mirrors RN's `skip: !customFieldsActive` on both the
+    // definitions and values queries, rather than firing either request
+    // unconditionally on every summary open.
+    final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
+    if (customFieldsEnabled) {
+      _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
+      final valuesAsync = ref.watch(customFieldValuesProvider(_chatId));
+      final values = valuesAsync.value;
+      if (values != null) _seedCustomFieldsIfNeeded(values);
+    } else {
+      _customFieldDefs = const [];
+    }
+    final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
+    final isAdmin = permissions.contains(UserPermissions.manageCustomFieldDefinitions);
+    final currentUserId = ref.watch(currentUserProvider).value?.id;
+    final isCounsellorForCall = summary.counselorId != null && summary.counselorId == currentUserId;
+    final sections = [
+      for (final section in SummarySection.values)
+        if (isSummarySectionVisible(section, visibleFields)) section,
+    ];
+
+    return Column(
+      children: [
+        if (widget.isManualNote)
+          VoiceNoteSection(
+            chatId: _chatId,
+            onValuesApplied: _applyVoiceValues,
+            onCustomValuesApplied: _reseedCustomFields,
+            existingTranscript: summary.transcript,
+          ),
+        Expanded(
+          // Builder, not `children:` — sections are only built as they
+          // scroll in. Index 0 is the AI disclaimer banner.
+          child: ListView.builder(
+            // RN `contentContainer` paddingBottom 70; the banner and the
+            // section card carry their own horizontal spacing.
+            padding: const EdgeInsets.only(bottom: 70),
+            itemCount: sections.length + 1,
+            itemBuilder: (context, index) {
+              final size = RnSize.of(context);
+              if (index == 0) {
+                // RN `CallSummaryDetails.tsx` `alertContainer`: the
+                // AI-generated disclaimer above the section card, with
+                // RN's goldenShield SVG in a carrotOrange ring.
+                return Container(
+                  margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
+                  padding: EdgeInsets.all(size.s(10)),
+                  decoration: BoxDecoration(
+                    color: AppColors.amber50,
+                    borderRadius: BorderRadius.circular(size.s(8)),
+                    border: Border.all(color: AppColors.orange400, width: 0.5),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: size.s(32),
+                        height: size.s(32),
+                        margin: EdgeInsets.only(right: size.s(10)),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.carrotOrange, width: 0.5),
+                        ),
+                        child: SvgPicture.asset('assets/icons/goldenShield.svg', key: const Key('ai-warning-shield')),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: size.s(32),
-                            height: size.s(32),
-                            margin: EdgeInsets.only(right: size.s(10)),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.carrotOrange, width: 0.5),
-                            ),
-                            child: SvgPicture.asset('assets/icons/goldenShield.svg', key: const Key('ai-warning-shield')),
+                      Expanded(
+                        child: Text(
+                          ref.t('callSummary.aiGeneratedWarning'),
+                          style: const TextStyle(
+                            fontFamily: AppFonts.ibmPlexSerifRegular,
+                            fontSize: 12,
+                            height: 16 / 12,
+                            letterSpacing: 0.2,
+                            color: AppColors.red700,
                           ),
-                          Expanded(
-                            child: Text(
-                              ref.t('callSummary.aiGeneratedWarning'),
-                              style: const TextStyle(
-                                fontFamily: AppFonts.ibmPlexSerifRegular,
-                                fontSize: 12,
-                                height: 16 / 12,
-                                letterSpacing: 0.2,
-                                color: AppColors.red700,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    );
-                  }
-                  final section = sections[index - 1];
-                  // RN `styles.card`: paddingHorizontal 16@s, paddingTop 8.
-                  return Padding(
-                    padding: EdgeInsets.only(left: size.s(16), right: size.s(16), top: index == 1 ? 8 : 0),
-                    child: _SectionCard(
-                    key: ValueKey(section),
-                    section: section,
-                    visibleFields: visibleFields,
-                    formValues: _form.values,
-                    onFieldChanged: _onFieldChanged,
-                    onFieldTyped: _onFieldTyped,
-                    customFieldDefs: _customFieldDefs,
-                    customFieldValues: _customFieldValues,
-                    onCustomFieldChanged: _onCustomFieldChanged,
-                    onCustomFieldTyped: _onCustomFieldTyped,
-                    isAdmin: isAdmin,
-                    isCounsellorForCall: isCounsellorForCall,
-                    isExpanded: _expandedSections[section] ?? false,
-                    isEditing: _editingSections[section] ?? false,
-                    isEnhancing: _enhancingSections.contains(section),
-                    onToggle: () => _toggleSection(section),
-                    onEditPress: () => _onEditPress(section),
-                    onWandPress: () => _onWandPress(section),
-                    onTickPress: () => _onTickPress(section),
-                    onClosePress: () => _onClosePress(section),
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: AppColors.red400),
+                    ],
+                  ),
+                );
+              }
+              final section = sections[index - 1];
+              // RN `styles.card`: paddingHorizontal 16@s, paddingTop 8.
+              return Padding(
+                padding: EdgeInsets.only(left: size.s(16), right: size.s(16), top: index == 1 ? 8 : 0),
+                child: _SectionCard(
+                key: ValueKey(section),
+                section: section,
+                visibleFields: visibleFields,
+                formValues: _form.values,
+                onFieldChanged: _onFieldChanged,
+                onFieldTyped: _onFieldTyped,
+                customFieldDefs: _customFieldDefs,
+                customFieldValues: _customFieldValues,
+                onCustomFieldChanged: _onCustomFieldChanged,
+                onCustomFieldTyped: _onCustomFieldTyped,
+                isAdmin: isAdmin,
+                isCounsellorForCall: isCounsellorForCall,
+                isExpanded: _expandedSections[section] ?? false,
+                isEditing: _editingSections[section] ?? false,
+                isEnhancing: _enhancingSections.contains(section),
+                onToggle: () => _toggleSection(section),
+                onEditPress: () => _onEditPress(section),
+                onWandPress: () => _onWandPress(section),
+                onTickPress: () => _onTickPress(section),
+                onClosePress: () => _onClosePress(section),
                 ),
-              ),
-            // RN's `CallSummaryDetails.tsx` renders `showSaveButton && (...)`
-            // — the button is absent with nothing to save, not present and
-            // disabled with a relabeled "No changes" state (which was never
-            // RN's actual behaviour here).
-            if (!widget.isFeedbackPopupVisible)
-              ValueListenableBuilder<int>(
-                valueListenable: _dirtyFlag,
-                builder: (context, _, _) {
-                  final dirty = _saveButtonShownDirty = _hasDirtyChanges;
-                  if (!(widget.alwaysShowSave || dirty)) return const SizedBox.shrink();
-                  return SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: AppButton(
-                        label: ref.t('common.save'),
-                        isLoading: _isSaving,
-                        onPressed: _save,
-                      ),
-                    ),
-                  );
-                },
-              ),
-          ],
-        );
-      },
+              );
+            },
+          ),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              _error!,
+              style: const TextStyle(color: AppColors.red400),
+            ),
+          ),
+        // RN's `CallSummaryDetails.tsx` renders `showSaveButton && (...)`
+        // — the button is absent with nothing to save, not present and
+        // disabled with a relabeled "No changes" state (which was never
+        // RN's actual behaviour here).
+        if (!widget.isFeedbackPopupVisible)
+          ValueListenableBuilder<int>(
+            valueListenable: _dirtyFlag,
+            builder: (context, _, _) {
+              final dirty = _saveButtonShownDirty = _hasDirtyChanges;
+              if (!(widget.alwaysShowSave || dirty)) return const SizedBox.shrink();
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: AppButton(
+                    label: ref.t('common.save'),
+                    isLoading: _isSaving,
+                    onPressed: _save,
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 }

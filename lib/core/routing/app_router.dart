@@ -49,8 +49,14 @@ import '../widgets/review_type_chip.dart';
 /// covers both real callers (edit-note's `reviewId`/`note`, and a fresh
 /// share's session `contextDateTime`/`contextDuration`) since a route's
 /// `extra` is a single `Object?` slot, not per-caller overloads.
+///
+/// [isEditNote] is set only by the review-details screen's "Edit note"
+/// (RN `ScribeReviewDetailsScreen`/`SimulationReviewDetailsScreen`
+/// `isEditNote: true`). A re-share from Call summary or Simulation feedback
+/// passes an existing `reviewId` but stays in share mode (RN `handleShare`).
 typedef ShareForReviewArgs = ({
   String? reviewId,
+  bool isEditNote,
   String? note,
   String? contextDateTime,
   String? contextDuration,
@@ -69,6 +75,31 @@ typedef ShareSimulationForReviewArgs = ({
   String? coverVideoUrl,
   String? description,
 });
+
+/// The `/share-for-review/:scenarioSessionId` page from its `extra`.
+/// Edit-note mode comes only from the args' explicit `isEditNote` (RN sets
+/// it only from the review-details screens); a re-share from Call summary
+/// or Simulation feedback with an existing `reviewId` stays a share (RN
+/// `useShareScreenLogic.handleShare`: "Share" title/button and the
+/// shared-for-review toast). The path's id is a dummy in edit mode
+/// (editing only PATCHes the existing review).
+ShareForReviewScreen buildShareForReviewScreen(String scenarioSessionId, Object? extra) {
+  final scenario = extra is ShareSimulationForReviewArgs ? extra : null;
+  final args = scenario?.args ?? (extra is ShareForReviewArgs ? extra : null);
+  return ShareForReviewScreen(
+    scenarioSessionId: scenarioSessionId,
+    reviewId: args?.reviewId,
+    isEditNote: args?.isEditNote ?? false,
+    initialNote: args?.note,
+    isScribe: args?.isScribe ?? false,
+    contextTitle: args?.contextTitle,
+    contextDateTime: args?.contextDateTime,
+    contextDuration: args?.contextDuration,
+    contextCoverImageUrl: scenario?.coverImageUrl,
+    contextCoverVideoUrl: scenario?.coverVideoUrl,
+    contextDescription: scenario?.description,
+  );
+}
 
 /// The redirect gate's actual decision logic, extracted to a pure top-level
 /// function so it's testable without constructing a real [GoRouterState]
@@ -348,29 +379,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/share-for-review/:scenarioSessionId',
         builder: (context, state) {
-          // Edit-note mode (from ReviewDetailsScreen) passes reviewId/note;
-          // the fresh-share flow (from SimulationFeedbackScreen) instead
-          // passes the session's own date/duration as the context card's
-          // data — one combined optional-fields record covers both, since
-          // the path's own `scenarioSessionId` is a dummy value in edit
-          // mode anyway (editing only PATCHes the existing review, it
-          // never needs the session id).
-          final extra = state.extra;
-          final scenario = extra is ShareSimulationForReviewArgs ? extra : null;
-          final args = scenario?.args ?? (extra is ShareForReviewArgs ? extra : null);
-          return ShareForReviewScreen(
-            scenarioSessionId: state.pathParameters['scenarioSessionId']!,
-            reviewId: args?.reviewId,
-            isEditNote: args?.reviewId != null,
-            initialNote: args?.note,
-            isScribe: args?.isScribe ?? false,
-            contextTitle: args?.contextTitle,
-            contextDateTime: args?.contextDateTime,
-            contextDuration: args?.contextDuration,
-            contextCoverImageUrl: scenario?.coverImageUrl,
-            contextCoverVideoUrl: scenario?.coverVideoUrl,
-            contextDescription: scenario?.description,
-          );
+          // Edit-note mode (from ReviewDetailsScreen) sets isEditNote;
+          // see [buildShareForReviewScreen].
+          return buildShareForReviewScreen(state.pathParameters['scenarioSessionId']!, state.extra);
         },
       ),
       GoRoute(
