@@ -24,6 +24,8 @@ import 'journal/journal_player.dart';
 import 'quiz/quiz_player.dart';
 import 'roleplay/roleplay_case_player.dart';
 import 'video/video_item_player.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 
 /// Port of RN `screens/CourseItemPlayerScreen/CourseItemPlayerScreen.tsx`:
 /// a single screen that walks the whole track (RN's
@@ -287,7 +289,7 @@ class _CourseItemPlayerScreenState
                 },
                 onBackToLearn: () {
                   setState(() => _celebration = null);
-                  context.go('/home');
+                  goToHomeTab(GoRouter.of(context), kTabLearn);
                 },
               ),
             ),

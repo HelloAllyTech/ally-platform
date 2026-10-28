@@ -82,7 +82,11 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
       final markRead = _isScribe
           ? ref.read(scribeReviewsRepositoryProvider).markAsRead(widget.reviewId)
           : ref.read(reviewsRepositoryProvider).markAsRead(widget.reviewId);
-      markRead.catchError((_) {});
+      // The Review tab's unread dot reads `unreadReviewCountProvider`; once
+      // this review is read the count is stale, so refetch it (the shell
+      // outlives this screen, hence the container rather than `ref`).
+      final container = ProviderScope.containerOf(context, listen: false);
+      markRead.then((_) => container.invalidate(unreadReviewCountProvider)).catchError((_) {});
     });
   }
 

@@ -269,7 +269,11 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
     // RN ReviewList `useFocusEffect`: every return to the list (not the
     // first focus) refreshes it from page 0.
     return ScreenFocusListener(
-      onFocus: () => _fetch(reset: true),
+      onFocus: () {
+        _fetch(reset: true);
+        // Keep the tab bar's unread dot in step with the refreshed list.
+        ref.invalidate(unreadReviewCountProvider);
+      },
       child: Column(
         children: [
           Padding(

@@ -35,6 +35,8 @@ import 'listening_controls.dart';
 import 'network_disconnected.dart';
 import 'nudge_section.dart';
 import 'scribe_reference_search.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 
 /// Port of ally-mobile (React Native)'s `MicrophoneListeningScreen.tsx` +
 /// `hooks/useListeningCommon.ts` + `hooks/useLiveAudioStream.ts` — Scribe's
@@ -535,7 +537,8 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     if (navigator.canPop()) {
       navigator.pop();
     } else {
-      GoRouter.maybeOf(context)?.go('/home');
+      final router = GoRouter.maybeOf(context);
+      if (router != null) goToHomeTab(router, kTabCallLog);
     }
   }
 
