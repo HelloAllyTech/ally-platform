@@ -54,3 +54,5 @@ app.*.map.json
 **/google-services.json
 /.env
 /.env.*
+/env/*.env
+!/env/example.env
