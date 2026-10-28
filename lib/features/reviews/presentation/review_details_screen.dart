@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_chat_input.dart';
@@ -163,7 +164,13 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        // RN's `ReviewDetailsLayout.tsx` is a plain white layout with a
+        // black back arrow (`<LeftArrow color={colors.black} .../>`), not
+        // this app's global blue `AppBarTheme` default.
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.highEmphasis,
+          elevation: 0,
           title: Text(ref.t('review.title')),
           actions: [
             IconButton(

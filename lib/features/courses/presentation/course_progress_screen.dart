@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 
@@ -68,7 +69,27 @@ class _CourseProgressScreenState extends ConsumerState<CourseProgressScreen> {
     final progressAsync = ref.watch(trackProgressProvider(widget.trackId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('courses.progressDashboard.title'))),
+      // Mirrors RN's `LearningPathHeader` — a white header (black back
+      // arrow + title, thin bottom border), not the plain `AppBar()` this
+      // screen was using, which inherits this app's global blue
+      // `AppBarTheme` default. RN never uses a blue header anywhere (see
+      // `CallSummaryScreen`'s identical fix earlier this session) —
+      // `course_detail_screen.dart` already avoids this by building its own
+      // header instead of `AppBar`; this screen didn't.
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
+        shape: const Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+        title: Text(
+          ref.t('courses.progressDashboard.title'),
+          style: const TextStyle(
+            fontFamily: AppFonts.replayProHeadline,
+            fontSize: 18,
+            color: AppColors.highEmphasis,
+          ),
+        ),
+      ),
       body: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
@@ -284,8 +305,12 @@ class _PracticeNudge extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
+      // RN's `colors.ds.blue[50]` — already a named token elsewhere in this
+      // app (`AppColors.blue50`, used correctly on `LeaderboardScreen`) —
+      // not Material's default `Colors.blue.shade50`, which is a visibly
+      // different hex (#E3F2FD vs RN's #E2F2FF).
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppColors.blue50,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -299,7 +324,17 @@ class _PracticeNudge extends ConsumerWidget {
           isLoading
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
               : TextButton(
+                  // RN's `styles.button`: a solid `colors.ds.theme.primary`
+                  // pill with white text — this was a bare, unfilled
+                  // `TextButton`, reading as a plain text link rather than
+                  // RN's prominent filled CTA.
                   onPressed: onContinuePress,
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
                   child: Text(ref.t('common.continue')),
                 ),
         ],

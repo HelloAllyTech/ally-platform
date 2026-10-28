@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
@@ -90,7 +91,13 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // RN's `BugReportScreen.tsx` is a plain white header with a black
+      // back arrow (`<LeftArrowIcon color={colors.black} />`), not this
+      // app's global blue `AppBarTheme` default.
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(ref.t('bugReport.title')),
       ),
