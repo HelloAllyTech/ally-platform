@@ -447,8 +447,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     final size = MediaQuery.sizeOf(context);
     final h = size.height;
 
+    // RN SplashScreen.tsx `onAnimationFinish`: `StatusBar.setBarStyle(
+    // 'dark-content')` — dark icons, even over the dark-green hero.
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SystemUiOverlayStyle.dark,
       child: PopScope(
         canPop: _step == _Step.email,
         onPopInvokedWithResult: (didPop, _) {

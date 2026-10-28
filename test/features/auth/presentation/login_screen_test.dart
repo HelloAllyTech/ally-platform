@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -110,6 +111,18 @@ void main() {
       expect(find.text('Next'), findsOneWidget);
       expect(find.text('Hey,'), findsOneWidget);
     });
+  });
+
+  testWidgets('the status bar is dark-content, as RN sets it after the splash', (tester) async {
+    await pumpLogin(tester);
+    final region = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.descendant(
+        of: find.byType(LoginScreen),
+        matching: find.byWidgetPredicate((w) => w is AnnotatedRegion<SystemUiOverlayStyle>),
+      ).first,
+    );
+    expect(region.value.statusBarIconBrightness, Brightness.dark);
+    expect(region.value.statusBarBrightness, Brightness.light);
   });
 
   group('email step', () {
