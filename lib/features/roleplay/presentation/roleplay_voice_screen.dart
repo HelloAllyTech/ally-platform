@@ -15,6 +15,7 @@ import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
+import '../../simulations/presentation/simulation_feedback_location.dart';
 import 'live_feedback_toast.dart';
 import 'participant_tile.dart';
 import 'pause_resume_state.dart';
@@ -79,6 +80,9 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
     required this.accessToken,
     this.scenarioSessionId,
     this.scenario,
+    this.pathId,
+    this.caseId,
+    this.languageId,
     this.now = DateTime.now,
   });
 
@@ -93,6 +97,11 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
   /// `pauseEnabled` is read here too but has no control to gate yet (see the
   /// class doc on pause/resume).
   final Scenario? scenario;
+
+  /// RN route params `pathId`/`caseId`/`languageId`, passed on to Feedback.
+  final String? pathId;
+  final String? caseId;
+  final int? languageId;
 
   /// Injectable clock for the session timer, so tests can assert on a
   /// specific elapsed duration without a real wall-clock wait — the
@@ -497,7 +506,14 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
           .read(simulationsRepositoryProvider)
           .endScenarioSession(sessionId);
       await _disconnect();
-      if (mounted) context.pushReplacement('/simulations/feedback/$sessionId');
+      if (mounted) {
+        context.pushReplacement(simulationFeedbackLocation(
+          sessionId,
+          pathId: widget.pathId,
+          caseId: widget.caseId,
+          languageId: widget.languageId,
+        ));
+      }
     } catch (e) {
       setState(() => _error = '${ref.tr('errors.endSimulation')}: $e');
     } finally {

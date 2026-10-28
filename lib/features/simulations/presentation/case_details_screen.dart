@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 import 'learning_path_detail_view.dart';
+import 'simulation_feedback_location.dart';
 import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/learning_path_widgets.dart';
 
@@ -56,6 +57,7 @@ class CaseDetailsScreen extends ConsumerWidget {
                   scenarioId: scenario.scenarioId,
                   caseSessionItemId: scenario.sessionId,
                   languageId: languageId,
+                  caseId: caseId,
                 ),
                 onViewFeedback: (scenario) async {
                   final sessionId = await ref
@@ -67,7 +69,7 @@ class CaseDetailsScreen extends ConsumerWidget {
                     // call site, so the feedback screen doesn't force a rating
                     // prompt on exit.
                     context.push(
-                      '/simulations/feedback/$sessionId?fromLogs=true',
+                      simulationFeedbackLocation(sessionId, fromLogs: true, caseId: caseId),
                     );
                   }
                 },

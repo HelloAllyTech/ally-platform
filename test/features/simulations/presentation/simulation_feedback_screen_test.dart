@@ -287,6 +287,28 @@ void main() {
       expect(find.text('HOME'), findsOneWidget);
     });
 
+    testWidgets('a path session goes back to the path details (RN reset)', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      final router = await h.pump(tester, pathId: 'p1');
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('PATH_DETAILS:p1'), findsOneWidget);
+      // The shell sits underneath, as RN's details back goes to Learn.
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+    });
+
+    testWidgets('a case session reviewed from its details goes back to the case', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      await h.pump(tester, fromLogs: true, caseId: 'c1');
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('CASE_DETAILS:c1'), findsOneWidget);
+    });
+
     testWidgets('an already-rated session leaves without asking', (tester) async {
       h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
       await h.pump(tester);
@@ -421,6 +443,14 @@ void main() {
       await tester.tap(find.byKey(const Key('simulation-feedback-try-another')));
       await tester.pumpAndSettle();
       expect(find.text('SIMULATIONS_LIST'), findsOneWidget);
+    });
+
+    testWidgets('no Try another for a path or case session', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester, pathId: 'p1');
+      await toTranscript(tester);
+
+      expect(find.byKey(const Key('simulation-feedback-try-another')), findsNothing);
     });
 
     testWidgets('no Try another from Logs', (tester) async {
