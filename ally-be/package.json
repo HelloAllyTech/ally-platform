@@ -53,6 +53,9 @@
     "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/translate": "^9.3.0",
     "@google/genai": "^2.10.0",
+    "@langchain/mcp-adapters": "^2.0.1",
+    "@langchain/openai": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/common": "^11.1.17",
     "@nestjs/config": "^4.0.3",
@@ -92,6 +95,7 @@
     "jose": "^5.10.0",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
+    "langchain": "^1.6.0",
     "livekit-server-sdk": "^2.15.0",
     "lodash": "^4.17.23",
     "mammoth": "^1.12.1",
@@ -111,7 +115,8 @@
     "typeorm": "^0.3.28",
     "uuid": "^13.0.0",
     "winston": "^3.19.0",
-    "winston-cloudwatch": "^6.3.0"
+    "winston-cloudwatch": "^6.3.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

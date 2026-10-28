@@ -10,10 +10,12 @@ import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorat
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import {
   AnalyticsAgentCatalogResponseDto,
+  AnalyticsAgentOutcome,
   AskAnalyticsAgentDto,
   AskAnalyticsAgentResponseDto,
 } from '../dto/analytics-agent.dto';
 import { AnalyticsAgentService } from '../service/analytics-agent.service';
+import { invokeAnalyticalAgent } from '../service/new-analytical-agent.service';
 
 /**
  * The Analytics Agent's HTTP surface — two endpoints, gated on
@@ -63,7 +65,30 @@ export class AnalyticsAgentController {
     @Body() body: AskAnalyticsAgentDto,
     @Req() req: { user: { id: number } },
   ): Promise<AskAnalyticsAgentResponseDto> {
-    return this.analyticsAgentService.ask(body, req.user?.id);
+    // Previous SQL-planner pipeline, kept for now:
+    // return this.analyticsAgentService.ask(body, req.user?.id);
+
+    const { response, queries } = await invokeAnalyticalAgent(
+      body.question,
+      String(req.user?.id),
+    );
+    return {
+      outcome: AnalyticsAgentOutcome.ANSWER,
+      question: body.question,
+      message: '',
+      answer: response.response,
+      sql: queries.map((q) => q.sql).filter(Boolean).join('\n\n'),
+      rationale: '',
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      truncated: false,
+      chart: null,
+      caveats: [],
+      followUps: response.followUps ?? [],
+      durationMs: 0,
+      provenance: { plannerModel: '', answerModel: '', promptVersion: '' },
+    };
   }
 
   @Get('catalog')

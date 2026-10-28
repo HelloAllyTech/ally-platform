@@ -1,4 +1,7 @@
+import { Children, isValidElement } from "react";
 import { Components } from "react-markdown";
+
+import { MermaidBlock } from "./MermaidBlock";
 
 /**
  * Compact markdown renderers for the copilot chat. Kept local to
@@ -36,11 +39,18 @@ export const sharedMarkdownComponents: Components = {
   code: ({ children }) => (
     <code className="bg-neutral-100 rounded px-1 py-0.5 text-xs font-mono">{children}</code>
   ),
-  pre: ({ children }) => (
-    <pre className="bg-neutral-100 rounded p-3 text-xs font-mono overflow-x-auto mb-2">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => {
+    const code = Children.toArray(children).find(isValidElement);
+    const props = code?.props as { className?: string; children?: unknown } | undefined;
+    if (props?.className?.includes("language-mermaid")) {
+      return <MermaidBlock chart={String(props.children ?? "").trim()} />;
+    }
+    return (
+      <pre className="bg-neutral-100 rounded p-3 text-xs font-mono overflow-x-auto mb-2">
+        {children}
+      </pre>
+    );
+  },
   table: ({ children }) => (
     <div className="overflow-x-auto mb-2">
       <table className="w-full border-collapse text-sm">{children}</table>
