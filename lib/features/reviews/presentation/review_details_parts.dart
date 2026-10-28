@@ -10,12 +10,12 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../account/data/user_profile.dart';
+import '../../simulations/presentation/simulation_info_modal.dart';
 import '../data/review_models.dart';
 import 'comment_list_controller.dart';
 import 'review_formatting.dart';
 import 'review_styles.dart';
 import 'review_widgets.dart';
-import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of RN's `ReviewTranscriptDetails/ReviewTranscriptHeader`: type chip,
 /// one-line title and (simulation) a help icon opening the scenario's
@@ -89,10 +89,14 @@ class ReviewTranscriptHeader extends ConsumerWidget {
                       SizedBox(width: rn.s(8)),
                       GestureDetector(
                         key: const Key('review-header-help'),
-                        onTap: () => showDialog<void>(
-                          context: context,
-                          barrierColor: AppColors.blackAlpha700,
-                          builder: (_) => _ScenarioDetailsDialog(scenario: scenario!),
+                        // RN SimulationDetailsModal (fitContent, read-only).
+                        onTap: () => SimulationInfoModal.show(
+                          context,
+                          headerTitle: scenario!.title,
+                          title: ref.tr('simulationPage.simulationDetails'),
+                          description: htmlToPlainText(scenario!.description),
+                          coverImageUrl: scenario!.coverImageUrl,
+                          coverVideoUrl: scenario!.coverVideoUrl,
                         ),
                         child: SvgPicture.asset('assets/icons/help.svg', width: 14, height: 14),
                       ),
@@ -132,125 +136,6 @@ class ReviewTranscriptHeader extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// RN's `SimulationDetailsModal` as the review header opens it
-/// (`fitContent`, no start button): the scenario title as the heading, a
-/// close icon, then the cover, title, "Scenario" label and description in
-/// a bordered box. `coverVideoUrl` is where the shared video preview plugs
-/// in; the image shows meanwhile.
-class _ScenarioDetailsDialog extends ConsumerWidget {
-  const _ScenarioDetailsDialog({required this.scenario});
-
-  final ReviewScenario scenario;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cover = scenario.coverImageUrl;
-    final description = htmlToPlainText(scenario.description);
-    return Dialog(
-      backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 500, maxHeight: MediaQuery.sizeOf(context).height * 0.8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      scenario.title,
-                      style: ReviewText.style(
-                        RnType.displaySmall,
-                        AppFonts.replayProHeadline,
-                        AppColors.highEmphasis,
-                        weight: FontWeight.w300,
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: SvgPicture.asset(
-                        'assets/icons/close.svg',
-                        width: 20,
-                        height: 20,
-                        colorFilter: const ColorFilter.mode(AppColors.mediumEmphasis, BlendMode.srcIn),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.strokePrimary, width: 0.35),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (cover != null && cover.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedNetworkImage(
-                              cover,
-                              height: 180,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(height: 180, color: AppColors.grey200),
-                            ),
-                          ),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Text(scenario.title, style: ReviewText.serif(RnType.bodyLarge, AppColors.highEmphasis)),
-                            ),
-                            if (description.isNotEmpty) ...[
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Text(
-                                  ref.t('learn.scenario.scenarioLabel'),
-                                  style: ReviewText.serifMedium(RnType.bodyMedium, AppColors.mediumEmphasis),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Text(description, style: ReviewText.serif(RnType.bodyMedium, AppColors.mediumEmphasis)),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

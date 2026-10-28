@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
+import 'error_details.dart';
 import 'simulation_details_modal.dart';
 import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/learning_path_widgets.dart';
@@ -40,6 +41,7 @@ class LearningPathDetailView extends ConsumerStatefulWidget {
     required this.onEnsureSession,
     required this.startParamsFor,
     required this.onViewFeedback,
+    required this.sessionNotFoundMessage,
     this.onRefresh,
   });
 
@@ -58,8 +60,13 @@ class LearningPathDetailView extends ConsumerStatefulWidget {
   final StartSimulationParams Function(PathScenario scenario, int? languageId) startParamsFor;
 
   /// Resolves a completed scenario's real session id and navigates to its
-  /// feedback screen. Matches `handleFileIconPress`.
-  final Future<void> Function(PathScenario scenario) onViewFeedback;
+  /// feedback screen. Matches `handleFileIconPress`. Returns false when the
+  /// lookup found no session id.
+  final Future<bool> Function(PathScenario scenario) onViewFeedback;
+
+  /// RN's toast when that lookup returns no id
+  /// (`simulationPage.failedToLoadPathDetails` / `…CaseDetails`).
+  final String sessionNotFoundMessage;
 
   /// Pull-to-refresh (RN's `RefreshControl` → `refetch`).
   final Future<void> Function()? onRefresh;
@@ -72,7 +79,6 @@ class LearningPathDetailView extends ConsumerStatefulWidget {
 class _LearningPathDetailViewState
     extends ConsumerState<LearningPathDetailView> {
   bool _isStarting = false;
-  String? _error;
   late final StartSimulationController _start = StartSimulationController(ref);
 
   @override
@@ -89,14 +95,12 @@ class _LearningPathDetailViewState
     // opening the preview modal, not after confirming inside it — matches
     // `handleStartPath`/`handleSimulationPress` both calling `createSession`
     // ahead of `setSelectedSimulation`.
-    setState(() {
-      _isStarting = true;
-      _error = null;
-    });
+    setState(() => _isStarting = true);
     try {
       await widget.onEnsureSession();
     } catch (e) {
-      setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
+      // RN: `showToast(getErrorDetails(err)?.message, 'error')`.
+      _toast(errorDetailsMessage(e, ref.tr('common.somethingWentWrong')));
       return;
     } finally {
       if (mounted) setState(() => _isStarting = false);
@@ -113,15 +117,18 @@ class _LearningPathDetailViewState
     );
   }
 
+  /// RN `showToast(message, 'error')` — the app's snackbar for now.
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _viewFeedback(PathScenario scenario) async {
     try {
-      await widget.onViewFeedback(scenario);
+      final found = await widget.onViewFeedback(scenario);
+      if (!found) _toast(widget.sessionNotFoundMessage);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${ref.tr('errors.loadSession')}: $e')),
-        );
-      }
+      _toast(errorDetailsMessage(e, ref.tr('common.somethingWentWrong')));
     }
   }
 
@@ -153,11 +160,6 @@ class _LearningPathDetailViewState
           isStartDisabled: isStartDisabled,
           isLoading: _isStarting,
         ),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
-          ),
         for (final scenario in details.scenarios)
           _ScenarioRow(
             scenario: scenario,

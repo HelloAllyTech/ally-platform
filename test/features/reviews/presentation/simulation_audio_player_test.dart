@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ally_mobile_flutter/features/reviews/presentation/simulation_audio_player.dart';
 
@@ -9,6 +10,7 @@ void main() {
   late FakeSimulationAudioPlaybackController controller;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     controller = FakeSimulationAudioPlaybackController();
   });
 
@@ -114,5 +116,20 @@ void main() {
     await tester.pumpWidget(const SizedBox());
 
     expect(controller.disposed, isTrue);
+  });
+
+  testWidgets('the picked speed is remembered (RN AUDIO_PLAYBACK_RATE) and restored next time', (tester) async {
+    await pump(tester);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('simulation-audio-player-rate')));
+    await tester.pump();
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getDouble('ally:audio:playback-rate'), 1.5);
+
+    await tester.pumpWidget(const SizedBox());
+    controller = FakeSimulationAudioPlaybackController();
+    await pump(tester);
+    await tester.pump();
+    expect(find.text('1.5x'), findsOneWidget);
   });
 }

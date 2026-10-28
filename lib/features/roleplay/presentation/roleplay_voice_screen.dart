@@ -23,6 +23,8 @@ import 'session_goal_timer.dart';
 import 'session_info_tabs.dart';
 import 'session_progress.dart';
 import 'session_score_meter.dart';
+import 'participant_audio_level.dart';
+import 'roleplay_audio_session.dart';
 import 'simulation_sound_player.dart';
 import 'turn_state.dart';
 
@@ -165,6 +167,12 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   StreamSubscription<void>? _disconnectedSubscription;
   late final KeepAwake _keepAwake;
   late final SimulationSoundPlayer _sound;
+  late final RoleplayAudioSession _audioSession;
+
+  /// RN `useAudioLevel` per tile (100 ms-polled `audioLevel` while the
+  /// participant speaks) — drives each tile's border and speaking bars.
+  ParticipantAudioLevel? _localLevel;
+  ParticipantAudioLevel? _remoteLevel;
 
   int? _countdownStep;
   final _countdownTimers = <Timer>[];
@@ -208,7 +216,6 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   // isSpeaking`/`localParticipant.isSpeaking`, fed into `deriveTurnStates`.
   String? _agentTurnStatus;
   bool _localSpeaking = false;
-  bool _remoteSpeaking = false;
   bool _debouncedRemoteSpeaking = false;
   Timer? _remoteSpeakingDebounceTimer;
 
@@ -237,6 +244,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     // RN: `useEffect(() => playNotificationSound(sounds.startSimulation), [])`.
     _sound = ref.read(simulationSoundPlayerProvider);
     _sound.play(SimulationSound.start);
+    _audioSession = ref.read(roleplayAudioSessionProvider);
     // RN: the countdown and the connect both start on mount.
     _startCountdown();
     if (widget.accessToken.isNotEmpty) {
@@ -261,6 +269,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     _controlAckTimer?.cancel();
     _dataSubscription?.cancel();
     _activeSpeakersSubscription?.cancel();
+    _localLevel?.dispose();
+    _remoteLevel?.dispose();
     _liveKitService.disconnect();
     super.dispose();
   }
@@ -345,27 +355,25 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     }
   }
 
-  /// Mirrors LiveKit's own `ActiveSpeakersChangedEvent` → RN's per-tile
-  /// `useAudioLevel`/`isSpeaking`, one native signal standing in for both
-  /// the tile's visual highlight and (via the 1500ms debounce below, for
-  /// the remote participant only) the turn-state label — RN keeps these as
-  /// two separate mechanisms (a 100ms-polled `audioLevel` for the tile,
-  /// `ParticipantEvent.IsSpeakingChanged` debounced for the label); this
-  /// port uses the one SDK-native speaking signal for both, since there's
-  /// no separate polling need once LiveKit already exposes `isSpeaking`.
+  /// LiveKit's `ActiveSpeakersChangedEvent`: RN's `isSpeaking` flags that
+  /// feed the turn-state labels (`localParticipant.isSpeaking`, the remote
+  /// one debounced below). The tiles' border/bars come from the per-tile
+  /// audio-level monitors instead (RN `useAudioLevel`), see [_levelTile].
   void _handleActiveSpeakers(List<Participant> speakers) {
-    final local = _liveKitService.room.localParticipant;
+    final local = _liveKitService.localParticipant;
     final isLocalSpeaking = local != null && speakers.contains(local);
     final isRemoteSpeaking = speakers.any((p) => p != local);
 
     // RN `onActiveSpeakersChanged`: the agent emitting audio ends the ring.
-    if (isRemoteSpeaking) _transitionToAgentJoined();
+    if (isRemoteSpeaking) {
+      _transitionToAgentJoined();
+      // An agent already in the room before connect never fires
+      // ParticipantConnected; pick it up here.
+      if (_remoteLevel == null) _attachLevel(local: false);
+    }
 
     if (isLocalSpeaking != _localSpeaking) {
       setState(() => _localSpeaking = isLocalSpeaking);
-    }
-    if (isRemoteSpeaking != _remoteSpeaking) {
-      setState(() => _remoteSpeaking = isRemoteSpeaking);
     }
 
     // Debounce remote speaking to avoid flicker on natural pauses — matches
@@ -463,6 +471,14 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     _disconnectedSubscription = _liveKitService.disconnected.listen(
       (_) => _onRoomDisconnected(),
     );
+    // RN `handleConnect`: `await configureAudioSession()` (speaker, not the
+    // earpiece) before `room.connect`; a failure toasts and still connects.
+    try {
+      await _audioSession.configure();
+    } catch (e) {
+      if (mounted) setState(() => _error = ref.tr('errors.audioSession'));
+    }
+    if (!mounted) return;
     try {
       await _liveKitService.connect(
         liveKitServerUrl: widget.liveKitServerUrl,
@@ -474,6 +490,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     }
     if (!mounted || _status == RoleplayRoomStatus.disconnecting) return;
     setState(() => _status = RoleplayRoomStatus.connected);
+    _attachLevel(local: true);
     try {
       await _liveKitService.setMicrophoneEnabled(true);
       if (mounted) setState(() => _isMicEnabled = true);
@@ -487,6 +504,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   /// to AGENT_JOINED if the agent hasn't spoken by then.
   void _onParticipantConnected() {
     if (!mounted) return;
+    _attachLevel(local: false);
     if (_startTime == null) _startTimer();
     if (!_agentJoined && _silentGraceTimer == null) {
       _silentGraceTimer = Timer(_agentSilentGrace, () {
@@ -501,8 +519,44 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     _agentJoined = true;
     _silentGraceTimer?.cancel();
     _silentGraceTimer = null;
+    // RN: "Stop the ringtone once the agent is actually speaking (or
+    // grace-timer expired)" — `SoundPlayer.stop()`.
+    _sound.stop();
     if (_status == RoleplayRoomStatus.disconnecting) return;
     setState(() => _status = RoleplayRoomStatus.agentJoined);
+  }
+
+  /// Starts the RN `useAudioLevel` monitor for the local participant (once
+  /// connected) or the agent (once it joins, RN `remoteParticipants[0]`).
+  void _attachLevel({required bool local}) {
+    final participant = local
+        ? _liveKitService.localParticipant
+        : _liveKitService.remoteParticipant;
+    final current = local ? _localLevel : _remoteLevel;
+    if (participant == null || identical(current?.participant, participant)) {
+      return;
+    }
+    current?.dispose();
+    final monitor = ParticipantAudioLevel(participant);
+    setState(() {
+      if (local) {
+        _localLevel = monitor;
+      } else {
+        _remoteLevel = monitor;
+      }
+    });
+  }
+
+  /// RN `ParticipantTile`: `isSpeaking = useAudioLevel(...) > THRESHOLD`.
+  Widget _levelTile(
+    ParticipantAudioLevel? level,
+    Widget Function(bool isSpeaking) builder,
+  ) {
+    if (level == null) return builder(false);
+    return ListenableBuilder(
+      listenable: level,
+      builder: (context, _) => builder(level.isSpeaking),
+    );
   }
 
   /// RN `onDisconnected`: the room closed from the other side (the agent
@@ -998,12 +1052,15 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       clipBehavior: Clip.none,
       children: [
         Positioned.fill(
-          child: ParticipantTile(
-            key: const ValueKey('participant-tile-remote'),
-            avatarUrl: scenario?.coverImageUrl,
-            name: title,
-            isSpeaking: _remoteSpeaking,
-            turnState: _turnStates.remote,
+          child: _levelTile(
+            _remoteLevel,
+            (isSpeaking) => ParticipantTile(
+              key: const ValueKey('participant-tile-remote'),
+              avatarUrl: scenario?.coverImageUrl,
+              name: title,
+              isSpeaking: isSpeaking,
+              turnState: _turnStates.remote,
+            ),
           ),
         ),
         Positioned(
@@ -1025,13 +1082,16 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
               ],
             ),
             clipBehavior: Clip.antiAlias,
-            child: ParticipantTile(
-              key: const ValueKey('participant-tile-local'),
-              avatarUrl: null,
-              isSpeaking: _localSpeaking,
-              turnState: _turnStates.local,
-              isMuted: !_isMicEnabled,
-              compact: true,
+            child: _levelTile(
+              _localLevel,
+              (isSpeaking) => ParticipantTile(
+                key: const ValueKey('participant-tile-local'),
+                avatarUrl: null,
+                isSpeaking: isSpeaking,
+                turnState: _turnStates.local,
+                isMuted: !_isMicEnabled,
+                compact: true,
+              ),
             ),
           ),
         ),

@@ -13,6 +13,7 @@ import '../../simulations/presentation/widgets/learning_path_widgets.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import 'course_language_sheet.dart';
+import 'course_progress_screen.dart';
 
 /// Port of ally-mobile (React Native)'s `CourseOverviewScreen` (header,
 /// language row, LearningPathListHeader, CourseSectionBlock/CourseItemRow).
@@ -173,8 +174,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         onStart: () => _startOrContinue(detail),
         isStartDisabled: _isStarting,
         isLoading: _isStarting,
+        // RN: `CourseProgressSheet` (70% bottom sheet), not a screen.
         onProgressTap: detail.enrolled
-            ? () => context.push('/courses/${widget.trackId}/progress')
+            ? () => showCourseProgressSheet(
+                context,
+                trackId: widget.trackId,
+                onSessionPress: (session) => openCourseProgressSession(context, session),
+                onContinuePress: () => _startOrContinue(detail),
+              )
             : null,
       ),
     ];

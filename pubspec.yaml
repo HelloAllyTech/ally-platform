@@ -185,6 +185,9 @@ flutter:
     - assets/icons/
     - assets/images/
     - assets/animations/
+    # rn-emoji-keyboard 1.7.0 (MIT) data + category icons, for the Share
+    # for review emoji keyboard (features/reviews/.../emoji_keyboard).
+    - assets/emoji_keyboard/
     # RN's src/assets/sounds/breath.mp3 (BoxBreathingAnimation's SoundPlayer).
     - assets/sounds/breath.mp3
     # RN's src/assets/sounds/{start,end}Simulation.mp3 (SimulationAssistantScreen's

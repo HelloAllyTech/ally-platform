@@ -26,6 +26,10 @@ enum SimulationSound {
 abstract class SimulationSoundPlayer {
   /// Fire-and-forget; never throws.
   Future<void> play(SimulationSound sound);
+
+  /// RN `SoundPlayer.stop()`: cuts the start ringtone short once the agent
+  /// first speaks (`transitionToAgentJoined`). Never throws.
+  Future<void> stop();
 }
 
 /// The real player. App-lifetime (RN's `SoundPlayer` is a global
@@ -56,6 +60,15 @@ class AudioplayersSimulationSoundPlayer implements SimulationSoundPlayer {
     }
   }
 
+  @override
+  Future<void> stop() async {
+    try {
+      await _player?.stop();
+    } catch (_) {
+      // RN: "Ignore if sound already finished".
+    }
+  }
+
   Future<void> dispose() async {
     try {
       await _player?.dispose();
@@ -73,6 +86,9 @@ class SilentSimulationSoundPlayer implements SimulationSoundPlayer {
 
   @override
   Future<void> play(SimulationSound sound) async {}
+
+  @override
+  Future<void> stop() async {}
 }
 
 final simulationSoundPlayerProvider = Provider<SimulationSoundPlayer>((ref) {

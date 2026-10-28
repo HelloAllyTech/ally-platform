@@ -232,4 +232,8 @@ class AppColors {
   // w5scribe parity (src/theme/colors.ts)
   static const carrotOrange = Color(0xFFEC930F); // colors.carrotOrange: call-summary AI banner icon ring
   static const rnGray = Color(0xFF7E7E7E); // colors.gray: call-summary editing section border, multi-select checkbox
+  // w5learn parity (src/theme/designSystem/colors.ts)
+  static const green500 = Color(0xFF4CAF50); // ds.green[500]: demonstrated skill ring
+  static const orange500 = Color(0xFFFF9800); // ds.orange[500]: needs-practice skill ring
+  static const orange800 = Color(0xFFEF6C00); // ds.orange[800]: needs-practice badge text
 }

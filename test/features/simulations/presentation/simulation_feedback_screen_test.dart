@@ -81,6 +81,20 @@ void main() {
       expect(find.byKey(const Key('simulation-feedback-share-switch')), findsNothing);
     });
 
+    testWidgets('the short-session help icon opens RN\'s SimulationDetailsModal (read-only)', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, callDuration: 20));
+      await h.pump(tester);
+
+      await tester.tap(find.byKey(const Key('short-session-help')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-info-modal')), findsOneWidget);
+      expect(find.text('Simulation Details'), findsOneWidget);
+      expect(find.text('Supporting a grieving parent'), findsNWidgets(2));
+      await tester.tap(find.byKey(const Key('simulation-info-modal-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-info-modal')), findsNothing);
+    });
+
     testWidgets('feedbackTabs.transcript off: only Debrief, and moment anchors become plain prose', (tester) async {
       h.stubSummary(
         summaryJson(note: _note, hasFeedback: true, feedbackTabs: {'debrief': true, 'transcript': false}),
@@ -321,13 +335,21 @@ void main() {
 
   group('share switch', () {
     testWidgets('on with no review yet opens Share for review with the session context', (tester) async {
-      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      final json = summaryJson(note: _note, hasFeedback: true);
+      (json['scenario'] as Map<String, dynamic>)
+        ..['coverImageUrl'] = 'https://x/cover.png'
+        ..['description'] = 'A parent lost a child';
+      h.stubSummary(json);
       await h.pump(tester);
 
       await tester.tap(find.byKey(const Key('simulation-feedback-share-switch')));
       await tester.pumpAndSettle();
 
-      expect(find.text('SHARE:null:300:Supporting a grieving parent'), findsOneWidget);
+      // RN scenarioData carries the cover and description too.
+      expect(
+        find.text('SHARE:null:300:Supporting a grieving parent:https://x/cover.png:A parent lost a child'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('off on an older shared review makes it private', (tester) async {
@@ -433,16 +455,33 @@ void main() {
       expect(find.byKey(const Key('simulation-feedback-view-review')), findsOneWidget);
     });
 
-    testWidgets('Try another simulation shows off Debrief and opens the catalog; never from Logs', (tester) async {
+    testWidgets('Try another simulation shows off Debrief and reopens the rating popup (RN handleSubmit)', (tester) async {
       h.stubSummary(summaryJson(note: _note, hasFeedback: true));
       await h.pump(tester);
 
       expect(find.byKey(const Key('simulation-feedback-try-another')), findsNothing);
       await toTranscript(tester);
       expect(find.text('Try another simulation'), findsOneWidget);
+      expect(find.byKey(const Key('feedback-popup')), findsNothing);
       await tester.tap(find.byKey(const Key('simulation-feedback-try-another')));
       await tester.pumpAndSettle();
-      expect(find.text('SIMULATIONS_LIST'), findsOneWidget);
+      expect(find.text('SIMULATIONS_LIST'), findsNothing);
+      expect(find.byKey(const Key('feedback-popup')), findsOneWidget);
+    });
+
+    testWidgets('returning from Review details restarts the poll (RN useFocusEffect)', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, reviewId: 'rev-1'));
+      h.stubReview();
+      final router = await h.pump(tester);
+      await toTranscript(tester);
+      clearInteractions(h.simulations);
+
+      router.push('/reviews/rev-1');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.simulations.getSimulationDetails('session-1'));
+      router.pop();
+      await tester.pumpAndSettle();
+      verify(() => h.simulations.getSimulationDetails('session-1')).called(1);
     });
 
     testWidgets('no Try another for a path or case session', (tester) async {

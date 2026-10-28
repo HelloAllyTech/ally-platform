@@ -2,6 +2,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
@@ -57,6 +58,12 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
   bool _isLoading = false;
   bool _sourceLoaded = false;
   int _rateIndex = 0;
+
+  /// RN `AsyncStorageKeys.AUDIO_PLAYBACK_RATE`: the last speed picked.
+  static const _rateKey = 'ally:audio:playback-rate';
+
+  /// RN `rateSettledRef`: a pick made before the stored rate loads wins.
+  bool _rateSettled = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
@@ -72,6 +79,22 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
     _controller.onPlayerStateChanged.listen((state) {
       if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
     });
+    _restoreRate();
+  }
+
+  /// RN: restore the last speed once per player, without re-saving it.
+  Future<void> _restoreRate() async {
+    try {
+      final stored = (await SharedPreferences.getInstance()).getDouble(_rateKey);
+      final index = stored == null ? -1 : _rates.indexOf(stored);
+      if (!mounted || _rateSettled || index == -1) return;
+      setState(() => _rateIndex = index);
+      if (_sourceLoaded) await _controller.setPlaybackRate(_rates[index]);
+    } catch (_) {
+      // A preference that fails to load must not block playback.
+    } finally {
+      _rateSettled = true;
+    }
   }
 
   @override
@@ -99,8 +122,12 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
   }
 
   Future<void> _cyclePlaybackRate() async {
+    _rateSettled = true;
     setState(() => _rateIndex = (_rateIndex + 1) % _rates.length);
-    await _controller.setPlaybackRate(_rates[_rateIndex]);
+    final rate = _rates[_rateIndex];
+    // Fire-and-forget, as RN `setStoredItem`.
+    SharedPreferences.getInstance().then((p) => p.setDouble(_rateKey, rate)).catchError((_) => false);
+    await _controller.setPlaybackRate(rate);
   }
 
   Future<void> _seekToFraction(double fraction) async {
