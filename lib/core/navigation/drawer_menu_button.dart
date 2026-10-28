@@ -41,15 +41,22 @@ class DrawerMenuButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return IconButton(
-      key: const Key('drawer-menu-button'),
-      tooltip: ref.t('accessibility.openMenu'),
-      padding: const EdgeInsets.all(4),
-      constraints: const BoxConstraints(),
-      // RN renders this SVG at its intrinsic 16x12 (react-native-svg's
-      // default), not 24x24.
-      icon: SvgPicture.asset('assets/icons/drawerMenu.svg'),
-      onPressed: DrawerMenuScope.openDrawerOf(context),
+    // RN's `hamburgerButton` is a TouchableOpacity with 4pt padding around
+    // the SVG at its intrinsic 16x12. An IconButton added Material's own
+    // minimum size and padding on top, pushing the icon and the title
+    // right of where RN draws them.
+    return Semantics(
+      button: true,
+      label: ref.t('accessibility.openMenu'),
+      child: GestureDetector(
+        key: const Key('drawer-menu-button'),
+        behavior: HitTestBehavior.opaque,
+        onTap: DrawerMenuScope.openDrawerOf(context),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: SvgPicture.asset('assets/icons/drawerMenu.svg'),
+        ),
+      ),
     );
   }
 }
