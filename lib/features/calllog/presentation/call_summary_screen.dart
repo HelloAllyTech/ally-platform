@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -35,6 +36,7 @@ import '../../../core/navigation/tab_config.dart';
 import '../../reviews/presentation/review_formatting.dart';
 import '../../simulations/presentation/widgets/feedback/feedback_popup.dart';
 import 'call_summary_actions.dart';
+import 'call_summary_header.dart';
 import 'call_summary_menu.dart';
 import 'call_transcript_tab.dart';
 import 'searchable_location_dropdown.dart';
@@ -305,8 +307,18 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
     super.dispose();
   }
 
+  /// The last `callInfo.summaryName` seen from the server. RN's
+  /// `useEffect(() => { if (name) setSummaryName(name) }, [name])` only
+  /// re-seeds the header when the fetched name *changes*, so a refetch that
+  /// still carries the old name can't overwrite a rename (ledger S5).
+  String? _lastFetchedSummaryName;
+
   void _onSummary(CallSummaryDetails summary) {
-    if (summary.summaryName != null) _summaryName = summary.summaryName;
+    final fetchedName = summary.summaryName;
+    if (fetchedName != null && fetchedName.isNotEmpty && fetchedName != _lastFetchedSummaryName) {
+      _lastFetchedSummaryName = fetchedName;
+      _summaryName = fetchedName;
+    }
     if (summary.isSummaryAvailable) _isSummaryAvailable = true;
     if (summary.isManualNote) _isManualNote = true;
     if (_isSummaryAvailable && !_canShowSummary && _canShowSummaryTimer == null) {
@@ -541,35 +553,6 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
     _handleGoBack();
   }
 
-  Widget _buildHeaderTitle(BuildContext context) {
-    // "Session" (regular) + "Summary" (bold italic), then `#summaryName`
-    // or `-` (RN `Header.tsx`).
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        RichText(
-          text: TextSpan(
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.highEmphasis),
-            children: [
-              TextSpan(text: '${ref.t('callSummary.header.title')} '),
-              TextSpan(
-                text: ref.t('callSummary.header.subtitle'),
-                style: const TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          (_summaryName?.isNotEmpty ?? false) ? '#$_summaryName' : '-',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.mediumEmphasis),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final chatId = widget.resolvedChatId;
@@ -636,45 +619,7 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
         key: ValueKey(showTranscriptTab),
         length: showTranscriptTab ? 2 : 1,
         child: Scaffold(
-          appBar: AppBar(
-            // RN `Header.tsx`: a plain white header.
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.highEmphasis,
-            elevation: 0,
-            // `PopScope(canPop: false)` hides the implied back button, so
-            // an explicit one routes through the same interception.
-            leading: IconButton(
-              icon: const BackButtonIcon(),
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-              onPressed: _handleBackPress,
-            ),
-            title: _buildHeaderTitle(context),
-            actions: [
-              if (showShareSwitch)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(ref.t('learn.scenario.share')),
-                    Switch(
-                      value: summary.isSharedForReview,
-                      onChanged: (value) => _handleShareToggle(value, summary),
-                    ),
-                  ],
-                ),
-              if (chatId != null)
-                IconButton(
-                  key: const Key('call-summary-menu'),
-                  icon: SvgPicture.asset('assets/icons/threeDots.svg'),
-                  onPressed: () => _showMenu(summary),
-                ),
-            ],
-            bottom: TabBar(
-              tabs: [
-                Tab(text: ref.t('postCallSummary.header.summary')),
-                if (showTranscriptTab) Tab(text: ref.t('summary.tabs.transcript')),
-              ],
-            ),
-          ),
+          backgroundColor: Colors.white,
           // RN `styles.reviewIconButton`: a 56pt white circle with a 0.5pt
           // stroke and soft shadow holding the 20pt chatBubble icon, 20pt
           // in from the right (the Scaffold already insets FABs by 16).
@@ -706,32 +651,63 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
                   ),
                 )
               : null,
-          body: Stack(
-            children: [
-              TabBarView(
+          body: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
                 children: [
-                  summaryTab,
-                  if (showTranscriptTab)
-                    CallTranscriptTab(
-                      messagesAsync: ref.watch(chatMessagesProvider(chatId)),
-                      summary: summary,
+                  // RN `components/Header/Header.tsx`.
+                  CallSummaryHeader(
+                    title: ref.t('callSummary.header.title'),
+                    subtitle: ref.t('callSummary.header.subtitle'),
+                    summaryName: _summaryName,
+                    onBackPress: _handleBackPress,
+                    onMenuPress: chatId == null ? null : () => _showMenu(summary),
+                    shareLabel: ref.t('learn.scenario.share'),
+                    showShareSwitch: showShareSwitch,
+                    isSharedForReview: summary?.isSharedForReview ?? false,
+                    onShareToggle: showShareSwitch ? (value) => _handleShareToggle(value, summary) : null,
+                  ),
+                  // RN `renderTabBar` (react-native-tab-view `TabBar`).
+                  CallSummaryTabBar(
+                    labels: [
+                      ref.t('postCallSummary.header.summary'),
+                      if (showTranscriptTab) ref.t('summary.tabs.transcript'),
+                    ],
+                  ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        TabBarView(
+                          children: [
+                            summaryTab,
+                            if (showTranscriptTab)
+                              CallTranscriptTab(
+                                messagesAsync: ref.watch(chatMessagesProvider(chatId)),
+                                summary: summary,
+                              ),
+                          ],
+                        ),
+                        if (_showFeedbackPopup)
+                          Positioned.fill(
+                            child: FeedbackPopup(
+                              title: ref.t('callFeedback.rateTitle'),
+                              placeholder: ref.t('callFeedback.suggestionPlaceholder'),
+                              note: ref.t('callFeedback.rateSubtitle'),
+                              showChips: true,
+                              // RN `hideSummaryFeedbackPopup`: just closes.
+                              onClose: () => setState(() => _showFeedbackPopup = false),
+                              onSubmit: (value) => _submitFeedback(value, const []),
+                              onSubmitWithIssues: _submitFeedback,
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
               ),
-              if (_showFeedbackPopup)
-                Positioned.fill(
-                  child: FeedbackPopup(
-                    title: ref.t('callFeedback.rateTitle'),
-                    placeholder: ref.t('callFeedback.suggestionPlaceholder'),
-                    note: ref.t('callFeedback.rateSubtitle'),
-                    showChips: true,
-                    // RN `hideSummaryFeedbackPopup`: just closes.
-                    onClose: () => setState(() => _showFeedbackPopup = false),
-                    onSubmit: (value) => _submitFeedback(value, const []),
-                    onSubmitWithIssues: _submitFeedback,
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
       ),
