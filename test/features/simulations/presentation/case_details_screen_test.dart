@@ -10,6 +10,8 @@ import 'package:ally_mobile_flutter/features/simulations/presentation/case_detai
 import 'package:ally_mobile_flutter/features/simulations/presentation/learning_path_detail_view.dart';
 
 import '../../../support/pump_router_app.dart';
+import '../../../support/fake_permission_platform.dart';
+import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 class MockSimulationsRepository extends Mock implements SimulationsRepository {}
 
@@ -65,6 +67,10 @@ List<GoRoute> _routes() => [
 ];
 
 void main() {
+  // The start flow asks for the microphone before creating the session
+  // (RN useStartSimulation); granted unless a test says otherwise.
+  setUp(() => PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({}));
+
   late MockSimulationsRepository repository;
 
   setUp(() {
