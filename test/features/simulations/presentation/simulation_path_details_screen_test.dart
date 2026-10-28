@@ -46,6 +46,10 @@ PathScenario _scenario({
 
 List<GoRoute> _routes() => [
   GoRoute(
+    path: '/home',
+    builder: (context, state) => Text('HOME:${state.uri.queryParameters['tab']}'),
+  ),
+  GoRoute(
     path: '/simulation-paths/:pathId',
     builder: (context, state) =>
         SimulationPathDetailsScreen(pathId: state.pathParameters['pathId']!),
@@ -257,5 +261,18 @@ void main() {
 
     expect(find.text('Track'), findsOneWidget);
     expect(find.text('23/120', findRichText: true), findsOneWidget);
+  });
+
+  testWidgets('back with nothing to pop falls back to the Learn tab (RN navigateToLearnTab)', (tester) async {
+    when(() => repository.getSimulationPathDetails('path-1')).thenThrow(Exception('x'));
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulation-paths/path-1',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+    await tester.tap(find.byKey(const Key('back-title-header-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('HOME:Learn'), findsOneWidget);
   });
 }

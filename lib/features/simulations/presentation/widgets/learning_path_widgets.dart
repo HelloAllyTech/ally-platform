@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/navigation/home_tab_navigation.dart';
+import '../../../../core/navigation/tab_config.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -287,5 +291,16 @@ class _TappableProgress extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// RN `SimulationPathDetailsScreen` / `CaseDetailsScreen` `handleBack`:
+/// `navigation.goBack()` when there is somewhere to go back to, else
+/// `navigateToLearnTab(navigation)`.
+void learningPathBack(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    goToHomeTab(GoRouter.of(context), kTabLearn);
   }
 }

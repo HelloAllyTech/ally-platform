@@ -98,7 +98,8 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -129,7 +130,8 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -158,7 +160,8 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -189,7 +192,8 @@ void main() {
               calls.add('start:${scenario.id}');
               return _params(scenario, languageId);
             },
-            onViewFeedback: (_) async {},
+            onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
           ),
         );
 
@@ -238,7 +242,8 @@ void main() {
               capturedLanguageId = languageId;
               return _params(scenario, languageId);
             },
-            onViewFeedback: (_) async {},
+            onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
           ),
         );
 
@@ -289,7 +294,8 @@ void main() {
             startCalls++;
             return _params(scenario, languageId);
           },
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -326,7 +332,8 @@ void main() {
             details: details,
             onEnsureSession: () async {},
             startParamsFor: _params,
-            onViewFeedback: (_) async {},
+            onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
           ),
         ),
       );
@@ -363,7 +370,8 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -400,7 +408,8 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
         credits: SimulationCredits(creditLimit: 5, consumedCredits: 5, secondsAllowedPerCredit: 60),
       );
@@ -431,7 +440,8 @@ void main() {
             calls.add(scenario.id);
             return _params(scenario, languageId);
           },
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -470,7 +480,11 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (scenario) async => calls.add(scenario.id),
+          onViewFeedback: (scenario) async {
+            calls.add(scenario.id);
+            return true;
+          },
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -479,6 +493,58 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(calls, ['s1']);
+      expect(find.text('not found'), findsNothing);
+    });
+
+    testWidgets('a lookup with no session id shows RN\'s failedToLoad toast', (tester) async {
+      final details = _details(
+        completedScenarios: 1,
+        scenarios: [
+          _scenario(id: 's1', scenarioId: 1, order: 1, status: SessionItemStatus.completed, sessionId: 'sess-1'),
+        ],
+      );
+      await _pump(
+        tester,
+        Scaffold(
+          body: LearningPathDetailView(
+            details: details,
+            onEnsureSession: () async {},
+            startParamsFor: _params,
+            onViewFeedback: (_) async => false,
+            sessionNotFoundMessage: 'Failed to load path details',
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('path-item-feedback')));
+      await tester.pump();
+      expect(find.text('Failed to load path details'), findsOneWidget);
+    });
+
+    testWidgets('a createSession failure toasts the API message, not the raw exception', (tester) async {
+      final details = _details(scenarios: [_scenario(id: 's1', scenarioId: 1, order: 1)]);
+      await _pump(
+        tester,
+        Scaffold(
+          body: LearningPathDetailView(
+            details: details,
+            onEnsureSession: () async => throw DioException(
+              requestOptions: RequestOptions(path: '/x'),
+              response: Response(
+                requestOptions: RequestOptions(path: '/x'),
+                statusCode: 400,
+                data: {'message': 'Path is archived'},
+              ),
+            ),
+            startParamsFor: _params,
+            onViewFeedback: (_) async => true,
+            sessionNotFoundMessage: 'not found',
+          ),
+        ),
+      );
+      await tester.tap(find.text('Start'));
+      await tester.pump();
+      expect(find.text('Path is archived'), findsOneWidget);
+      expect(find.textContaining('DioException'), findsNothing);
     });
 
     testWidgets('tapping a non-locked row starts that specific scenario', (
@@ -501,7 +567,8 @@ void main() {
             calls.add(scenario.id);
             return _params(scenario, languageId);
           },
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
@@ -542,7 +609,8 @@ void main() {
           details: details,
           onEnsureSession: () async {},
           startParamsFor: _params,
-          onViewFeedback: (_) async {},
+          onViewFeedback: (_) async => true,
+          sessionNotFoundMessage: 'not found',
         ),
       );
 
