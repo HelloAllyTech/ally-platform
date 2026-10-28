@@ -66,6 +66,25 @@ class AppTheme {
         foregroundColor: AppColors.onPrimary,
       ),
       textTheme: _textTheme,
+      // Material3's default Switch leans on `colorScheme.outline` for its
+      // unselected thumb plus a visible track border — against this app's
+      // blue AppBar (the share-toggle's only home, in
+      // `call_summary_screen.dart`/`review_details_screen.dart`) that reads
+      // as a flat grey blob, not a recognizable toggle. RN's own switch
+      // (`CustomSwitch.tsx`) is simpler: an always-white thumb on a pill
+      // track that's `colors.ds.grey[200]` (AppColors.surfaceContainerHigh)
+      // off and `colors.ds.theme.primary` (AppColors.primary) on, no
+      // border. Matching that here, globally, fixes both call sites at
+      // once rather than overriding each `Switch(...)` individually.
+      switchTheme: SwitchThemeData(
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.surfaceContainerHigh;
+        }),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+        thumbColor: const WidgetStatePropertyAll(Colors.white),
+      ),
     );
   }
 

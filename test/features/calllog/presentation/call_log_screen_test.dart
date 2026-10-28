@@ -28,7 +28,7 @@ CallLogItem _log({int id = 42, String status = 'SUCCESS'}) => CallLogItem(
       score: 91,
     );
 
-SimulationLogItem _simLog({int id = 7}) => SimulationLogItem(
+SimulationLogItem _simLog({String id = '7'}) => SimulationLogItem(
       id: id,
       startedAt: '2026-01-02T10:00:00Z',
       endedAt: '2026-01-02T10:10:00Z',

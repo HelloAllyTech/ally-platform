@@ -362,7 +362,12 @@ void main() {
         (_) async => _response({
           'data': [
             {
-              'id': 3,
+              // A scenario session's real id is a UUID (ally-be's
+              // `ScenarioSessions` entity: `@PrimaryGeneratedColumn('uuid')`)
+              // — this mock used to say `3`, which is exactly how the
+              // `(json['id'] as num)` bug this guards against slipped past
+              // the test suite in the first place.
+              'id': 'b1c9b7b0-7e2b-4b1a-9f0a-7b9f6a2e5c33',
               'startedAt': '2026-01-01T00:00:00Z',
               'status': 'SUCCESS',
               'scenario': {'title': 'Difficult client'},
@@ -375,7 +380,7 @@ void main() {
       final logs = await repository.getSimulationLogs();
 
       expect(logs, hasLength(1));
-      expect(logs.first.id, 3);
+      expect(logs.first.id, 'b1c9b7b0-7e2b-4b1a-9f0a-7b9f6a2e5c33');
       expect(logs.first.scenarioTitle, 'Difficult client');
       expect(logs.first.status, 'SUCCESS');
       expect(logs.first.score, 80.0);

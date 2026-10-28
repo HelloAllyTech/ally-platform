@@ -82,7 +82,16 @@ class SimulationLogItem {
   factory SimulationLogItem.fromJson(Map<String, dynamic> json) {
     final scenario = json['scenario'] as Map<String, dynamic>?;
     return SimulationLogItem(
-      id: (json['id'] as num).toInt(),
+      // A scenario session's id is a UUID (ally-be's `ScenarioSessions`
+      // entity: `@PrimaryGeneratedColumn('uuid')`), not a number — forcing
+      // it through `num` crashed this whole tab ("type 'String' is not a
+      // subtype of type 'num' in type cast") the moment a real row loaded,
+      // since dev/test data never exercised this with a real session id.
+      // Every other call site that threads a scenario session id through
+      // this app (`/simulations/feedback/:sessionId`,
+      // `CourseProgress.scenarioSessionId`, `roleplay_voice_screen.dart`)
+      // already treats it as a `String` — this was the one outlier.
+      id: json['id'] as String,
       startedAt: json['startedAt'] as String,
       endedAt: json['endedAt'] as String? ?? '',
       status: json['status'] as String? ?? '',
@@ -91,7 +100,7 @@ class SimulationLogItem {
     );
   }
 
-  final int id;
+  final String id;
   final String startedAt;
   final String endedAt;
   final String status;
