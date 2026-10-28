@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
@@ -90,7 +91,7 @@ void main() {
       );
       when(() => repository.getMyRank(LeaderboardWindow.allTime)).thenAnswer((_) async => null);
 
-      await tester.tap(find.byType(DropdownMenu<String>));
+      await tester.tap(find.byKey(const Key('leaderboard-period-dropdown')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('All time').last);
       await tester.pumpAndSettle();
@@ -244,7 +245,8 @@ void main() {
 
     await _pumpLeaderboard(tester, repository: repository);
 
-    expect(find.byType(CircleAvatar), findsOneWidget, reason: 'only the user avatar, no rank badge/circle');
+    expect(find.text('Rank'), findsNothing, reason: 'no rank column header');
+    expect(find.byKey(const Key('leaderboard-avatar-placeholder')), findsOneWidget);
   });
 
   testWidgets(
@@ -300,6 +302,40 @@ void main() {
         find.textContaining('This view reflects overall activity in the selected time period'),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'matches RN: outlined initial avatars, plain badge counts (no badge icon per row), RN-style period dropdown',
+    (tester) async {
+      final repository = MockLeaderboardRepository();
+      when(() => repository.getLeaderboard(LeaderboardWindow.lastWeek)).thenAnswer(
+        (_) async => (
+          items: [_entry(userId: 1, name: 'alice', rank: 1), _entry(userId: 2, name: 'Bob', rank: 2)],
+          totalCount: 2,
+        ),
+      );
+      when(() => repository.getMyRank(LeaderboardWindow.lastWeek)).thenAnswer((_) async => null);
+
+      await _pumpLeaderboard(tester, repository: repository);
+
+      expect(find.byKey(const Key('leaderboard-avatar-placeholder')), findsNWidgets(2));
+      expect(find.text('A'), findsOneWidget, reason: 'upper-cased first letter');
+      expect(find.byType(CircleAvatar), findsNothing);
+      // Only the header's "N Badges" button carries the badge icon.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is SvgPicture && w.bytesLoader.toString().contains('badgeIcon'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(DropdownMenu<String>), findsNothing);
+      expect(find.text('Last 7 days'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('leaderboard-period-dropdown')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('leaderboard-period-menu')), findsOneWidget);
+      expect(find.text('Last 28 days'), findsOneWidget);
     },
   );
 }

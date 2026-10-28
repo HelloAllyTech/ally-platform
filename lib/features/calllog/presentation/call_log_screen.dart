@@ -5,14 +5,16 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_tab_view.dart';
-import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/illustrated_modal.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -44,6 +46,11 @@ String? _durationText(WidgetRef ref, String startedAt, String endedAt) {
   final seconds = (ms % 60000) ~/ 1000;
   return '${ref.t('common.duration')}: $minutes mins $seconds secs';
 }
+
+/// RN prints `item.score` as-is (a falsy 0 hides it): whole numbers without
+/// a trailing `.0`.
+String _formatScore(double score) =>
+    score == score.roundToDouble() ? score.toInt().toString() : score.toString();
 
 enum _LogTab { real, simulation }
 
@@ -268,12 +275,18 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     // watched when the user could start anything at all, mirroring RN's own
     // `useFocusEffect(() => { if (canStartCall) getVisibleChatTypes(); })`
     // guard against firing a pointless request.
-    final visibleChatTypes = canStartCall ? (ref.watch(visibleChatTypesProvider).value ?? const <String>[]) : const <String>[];
-    final hasMicrophoneChatType = visibleChatTypes.contains('MICROPHONE_CHAT');
+    final enabledChatTypes = canStartCall ? ref.watch(visibleChatTypesProvider).value : null;
+    final hasMicrophoneChatType = enabledChatTypes?.contains('MICROPHONE_CHAT') ?? false;
     // Mirrors RN's `canOfferAnySessionType` exactly: tenant-setting-gated
     // (not permission-gated) — a tenant that disabled microphone chat
     // entirely must not offer Start Scribe Mode even to a permitted user.
     final canOfferAnySessionType = hasMicrophoneChatType || canCreateNote;
+    // RN's `isSessionTypeUnknown`: the settings answer is missing (usually a
+    // failed request), which must not present as a disabled control.
+    final isSessionTypeUnknown = enabledChatTypes == null;
+    // RN hides the FAB while a call is ongoing (`!currentChat?.chatId`).
+    final hasCurrentChat = ref.watch(currentChatProvider) != null;
+    final showFab = (canStartCall || canCreateNote) && !hasCurrentChat;
 
     if (hasReal && hasSimulation) {
       _activeTab ??= _LogTab.real;
@@ -288,13 +301,31 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     final showTabs = hasReal && hasSimulation && !_isViewingArchive;
     final showArchiveAction =
         hasArchive && !_isViewingArchive && _activeTab == _LogTab.real;
-    final showFilterAction = hasReal && _activeTab == _LogTab.real;
+    final showFilterAction = hasReal && (_isViewingArchive || _activeTab == _LogTab.real);
+
+    // The list the header's refresh button (RN's `handleRefresh`) reloads,
+    // and whether it's fetching (RN spins the icon while it is).
+    VoidCallback? onRefresh;
+    var isFetching = false;
+    if (_activeTab != null) {
+      if (_isViewingArchive || _activeTab == _LogTab.real) {
+        final provider = _isViewingArchive ? archivedCallLogsControllerProvider : realCallLogsControllerProvider;
+        isFetching = ref.watch(provider).isLoading;
+        onRefresh = () => ref.invalidate(provider);
+      } else {
+        isFetching = ref.watch(simulationLogsControllerProvider).isLoading;
+        onRefresh = () => ref.invalidate(simulationLogsControllerProvider);
+      }
+    }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           Column(
             children: [
+              // RN `CallLogHeader`: filter, refresh and (when allowed) the
+              // archive actions menu, `gap: 12`, all 16pt icons.
               TabScreenHeader(
                 title: _isViewingArchive
                     ? ref.t('calls.menu.archives')
@@ -302,30 +333,43 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                 subtitle: _isViewingArchive ? null : ref.t('calls.header.subtitle'),
                 italicSubtitle: true,
                 leading: _isViewingArchive
-                    ? IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => setState(() => _isViewingArchive = false),
+                    ? GestureDetector(
+                        key: const Key('call-log-archive-back'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(() => _isViewingArchive = false),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: SvgPicture.asset(
+                            'assets/icons/leftArrow.svg',
+                            width: 14,
+                            height: 14,
+                            colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+                          ),
+                        ),
                       )
                     : null,
-                trailing: (showFilterAction || showArchiveAction)
-                    ? Row(
+                trailing: onRefresh == null
+                    ? null
+                    : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (showFilterAction)
+                          if (showFilterAction) ...[
                             _FilterButton(hasTagsPermission: hasTags),
-                          if (showArchiveAction)
-                            PopupMenuButton<void>(
-                              icon: const Icon(Icons.more_vert),
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  onTap: () => setState(() => _isViewingArchive = true),
-                                  child: Text(ref.t('calls.menu.archives')),
-                                ),
-                              ],
+                            const SizedBox(width: 12),
+                          ],
+                          _RefreshButton(
+                            isFetching: isFetching,
+                            onRefresh: onRefresh,
+                          ),
+                          if (showArchiveAction) ...[
+                            const SizedBox(width: 12),
+                            _ActionsMenu(
+                              label: ref.t('callSummary.header.actionsMenu.archive'),
+                              onArchivePress: () => setState(() => _isViewingArchive = true),
                             ),
+                          ],
                         ],
-                      )
-                    : null,
+                      ),
               ),
               if (showTabs)
                 Padding(
@@ -349,27 +393,40 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                         ? _RealLogsList(
                             provider: archivedCallLogsControllerProvider,
                             canViewDetails: hasChatDetails,
-                            canArchive: false,
                           )
                         : _activeTab == _LogTab.real
                             ? _RealLogsList(
                                 provider: realCallLogsControllerProvider,
                                 canViewDetails: hasChatDetails,
-                                canArchive: hasArchive,
                               )
                             : _SimulationLogsList(canViewDetails: hasScenarioDetails),
               ),
             ],
           ),
-          if (canOfferAnySessionType)
+          if (showFab)
             Positioned(
               right: 20,
-              bottom: 30,
+              bottom: MediaQuery.paddingOf(context).bottom + 100,
               child: _StartSessionFab(
-                onPressed: () => _showStartSessionModal(
-                  hasMicrophoneChatType: hasMicrophoneChatType,
-                  canCreateNote: canCreateNote,
-                ),
+                // Only inert when we actually KNOW there is nothing to offer;
+                // while the chat-types answer is missing the press re-asks.
+                enabled: canOfferAnySessionType || isSessionTypeUnknown,
+                hasOptions: canOfferAnySessionType,
+                onPressed: () {
+                  if (isSessionTypeUnknown) {
+                    if (canStartCall) ref.invalidate(visibleChatTypesProvider);
+                    if (!canOfferAnySessionType) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(ref.t('common.somethingWentWrong'))),
+                      );
+                      return;
+                    }
+                  }
+                  _showStartSessionModal(
+                    hasMicrophoneChatType: hasMicrophoneChatType,
+                    canCreateNote: canCreateNote,
+                  );
+                },
               ),
             ),
         ],
@@ -378,6 +435,8 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   }
 }
 
+/// RN `CallLogHeader`'s filter button: a 16pt `FilterIcon` with a blue
+/// count badge (`styles.filterBadge`) when filters are applied.
 class _FilterButton extends ConsumerWidget {
   const _FilterButton({required this.hasTagsPermission});
 
@@ -386,58 +445,281 @@ class _FilterButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeCount = ref.watch(callLogFilterProvider).activeCount;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.filter_list),
-          onPressed: () =>
-              CallLogFilterSheet.show(context, hasTagsPermission: hasTagsPermission),
-        ),
-        if (activeCount > 0)
-          Positioned(
-            right: 4,
-            top: 4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '$activeCount',
-                style: const TextStyle(color: Colors.white, fontSize: 10),
-              ),
-            ),
+    return Semantics(
+      button: true,
+      label: 'Filter',
+      child: GestureDetector(
+        key: const Key('call-log-filter'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => CallLogFilterSheet.show(context, hasTagsPermission: hasTagsPermission),
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              SvgPicture.asset('assets/icons/filter.svg', width: 16, height: 16),
+              if (activeCount > 0)
+                Positioned(
+                  top: -6,
+                  right: -8,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 14),
+                    height: 14,
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    // typography.body.nano + ROBOTO.REGULAR, white.
+                    child: Text(
+                      '$activeCount',
+                      style: const TextStyle(
+                        fontFamily: AppFonts.robotoRegular,
+                        fontSize: 8,
+                        height: 10 / 8,
+                        letterSpacing: 0.08,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }
 
-class _StartSessionFab extends StatelessWidget {
-  const _StartSessionFab({required this.onPressed});
+/// RN `CallLogHeader`'s refresh button: a 16pt `ReplayIcon` that spins one
+/// full turn over 600ms when a fetch starts.
+class _RefreshButton extends StatefulWidget {
+  const _RefreshButton({required this.isFetching, required this.onRefresh});
 
-  final VoidCallback onPressed;
+  final bool isFetching;
+  final VoidCallback onRefresh;
+
+  @override
+  State<_RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends State<_RefreshButton> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+
+  @override
+  void didUpdateWidget(covariant _RefreshButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isFetching && !oldWidget.isFetching) _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.primary,
-      shape: const CircleBorder(),
+    return Semantics(
+      button: true,
+      label: 'Refresh',
+      child: GestureDetector(
+        key: const Key('call-log-refresh'),
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onRefresh,
+        child: RotationTransition(
+          turns: _controller,
+          child: SvgPicture.asset('assets/icons/replay.svg', width: 16, height: 16),
+        ),
+      ),
+    );
+  }
+}
+
+/// RN's shared `ActionsMenu` as `CallLogHeader` uses it: a 16pt
+/// `ThreeDotsIcon` opening a white, 8pt-radius, 160pt-min-wide menu whose
+/// one option is the archive icon + "Archives".
+class _ActionsMenu extends StatelessWidget {
+  const _ActionsMenu({required this.label, required this.onArchivePress});
+
+  final String label;
+  final VoidCallback onArchivePress;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<void>(
+      key: const Key('call-log-actions-menu'),
+      padding: EdgeInsets.zero,
+      tooltip: '',
+      color: Colors.white,
       elevation: 6,
-      child: InkWell(
-        key: const Key('start-session-fab'),
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SvgPicture.asset(
-            'assets/icons/transcribe.svg',
-            width: 28,
-            height: 28,
-            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+      shadowColor: const Color(0xFF6C6C6C),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      constraints: const BoxConstraints(minWidth: 160),
+      menuPadding: const EdgeInsets.symmetric(vertical: 8),
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 4),
+      itemBuilder: (context) => [
+        PopupMenuItem<void>(
+          height: 0,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          onTap: onArchivePress,
+          child: Row(
+            children: [
+              SvgPicture.asset('assets/icons/archive.svg', width: 16, height: 16),
+              const SizedBox(width: 8),
+              // IBM_PLEX_SERIF.REGULAR + typography.body.small, medium weight.
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 12,
+                  height: 16 / 12,
+                  letterSpacing: 0.2,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
+        ),
+      ],
+      child: SvgPicture.asset('assets/icons/threeDots.svg', width: 16, height: 16),
+    );
+  }
+}
+
+/// RN's start-session FAB: `padding: 20` around the 24pt white
+/// `TranscribeIcon`, `borderRadius: '30%'`, azure blue (ash grey when there
+/// is nothing to offer), with a soft drop shadow.
+class _StartSessionFab extends StatelessWidget {
+  const _StartSessionFab({required this.onPressed, required this.enabled, required this.hasOptions});
+
+  final VoidCallback onPressed;
+  final bool enabled;
+  final bool hasOptions;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(64 * 0.3);
+    return GestureDetector(
+      key: const Key('start-session-fab'),
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onPressed : null,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: hasOptions ? AppColors.primary : AppColors.ashGray,
+          borderRadius: radius,
+          boxShadow: const [
+            BoxShadow(color: Color(0x33000000), offset: Offset(0, 4), blurRadius: 8),
+          ],
+        ),
+        child: SvgPicture.asset('assets/icons/transcribe.svg', width: 24, height: 24),
+      ),
+    );
+  }
+}
+
+/// Static port of RN's `CallLogSkeleton` (the first-page loading state):
+/// the same row frame as [CallLogRow] with grey placeholder blocks.
+class _CallLogSkeleton extends StatelessWidget {
+  const _CallLogSkeleton();
+
+  static const count = 10;
+
+  static Widget _block(double width, double height, {double radius = 4, Color color = AppColors.lightGray8}) =>
+      Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(radius)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      key: const Key('call-log-skeleton'),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: count,
+      itemBuilder: (context, _) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.all(10),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.lightGray2)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 18, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.only(right: 4),
+                    alignment: Alignment.center,
+                    child: _block(16, 16, radius: 2),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => Row(
+                        children: [
+                          _block(constraints.maxWidth * 0.6, 14),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.lightGray8,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                _block(4, 4, radius: 2, color: AppColors.lightGray6),
+                                const SizedBox(width: 4),
+                                _block(30, 8, radius: 2, color: AppColors.lightGray6),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _block(16, 16, radius: 2),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 30, top: 4),
+                child: _block(120, 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// RN's `EmptyState` with `NoCallLogsIcon`, centred in the remaining space.
+/// RN also lands here when the fetch fails (`result.data` is undefined, so
+/// the list is reset to `[]`).
+class _CallLogEmptyState extends ConsumerWidget {
+  const _CallLogEmptyState({required this.isSimulation});
+
+  final bool isSimulation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: SingleChildScrollView(
+        child: AppEmptyState(
+          iconAsset: 'assets/icons/noCallRecords.svg',
+          title: ref.t(isSimulation ? 'calls.fallback.simEmptyTitle' : 'calls.fallback.callEmptyTitle'),
+          description: ref.t('audioCall.fallback.noActiveCallDesc'),
         ),
       ),
     );
@@ -494,15 +776,24 @@ class _InfiniteScrollListViewState<T> extends State<_InfiniteScrollListView<T>> 
     final items = widget.page.items;
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
-      child: ListView.separated(
+      // RN's rows draw their own bottom border (no separators), and the
+      // list reserves `paddingBottom: 100` to clear the floating tab bar.
+      child: ListView.builder(
         controller: _scrollController,
+        padding: const EdgeInsets.only(bottom: 100),
         itemCount: items.length + (widget.page.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           if (index >= items.length) {
+            // RN's footer: a small darkSlate ActivityIndicator.
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF292929)),
+                ),
+              ),
             );
           }
           return widget.itemBuilder(context, items[index]);
@@ -513,83 +804,48 @@ class _InfiniteScrollListViewState<T> extends State<_InfiniteScrollListView<T>> 
 }
 
 class _RealLogsList extends ConsumerWidget {
-  const _RealLogsList({
-    required this.provider,
-    required this.canViewDetails,
-    required this.canArchive,
-  });
+  const _RealLogsList({required this.provider, required this.canViewDetails});
 
   final AsyncNotifierProvider<PaginatedCallLogsController, PaginatedLogs<CallLogItem>> provider;
   final bool canViewDetails;
-  final bool canArchive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pageAsync = ref.watch(provider);
 
     return pageAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
+      loading: () => const _CallLogSkeleton(),
+      error: (_, _) => const _CallLogEmptyState(isSimulation: false),
       data: (page) {
-        if (page.items.isEmpty) {
-          return Center(child: Text(ref.t('calls.fallback.callEmptyTitle')));
-        }
+        if (page.items.isEmpty) return const _CallLogEmptyState(isSimulation: false);
         return _InfiniteScrollListView<CallLogItem>(
           page: page,
           onLoadMore: () => ref.read(provider.notifier).loadMore(),
           onRefresh: () => ref.refresh(provider.future),
           itemBuilder: (context, log) {
-            final row = CallLogRow(
-              title: log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id}),
-              status: chatSummaryStatusFromString(log.status),
+            final isUpload = log.provider == 'AUDIO_UPLOAD';
+            // RN has no swipe-to-archive on this list; archiving lives in
+            // CallSummaryScreen's own menu.
+            return CallLogRow(
+              key: ValueKey(log.id),
+              title: log.logTitle,
+              status: chatSummaryStatusFromString(log.displayStatus),
+              noAudioLabel: ref.t('calls.status.noAudio'),
               dateLine: _formatDateTimeLine(log.startedAt),
               durationText: _durationText(ref, log.startedAt, log.endedAt),
-              scoreText: log.score != null
-                  ? '${ref.t('calls.table.sessionScore')}: ${log.score!.round()}'
+              scoreText: log.score != null && log.score != 0
+                  ? '${ref.t('calls.table.sessionScore')}: ${_formatScore(log.score!)}'
                   : null,
+              modeText: (log.mode?.isNotEmpty ?? false)
+                  ? '${ref.t('calls.table.mode')}: ${ref.t(log.mode!.toUpperCase() == 'DICTATION' ? 'calls.mode.dictation' : 'calls.mode.scribe')}'
+                  : null,
+              sourceLabel: log.provider == null
+                  ? null
+                  : ref.t(isUpload ? 'calls.source.uploaded' : 'calls.source.liveSession'),
+              sourceColor: isUpload ? AppColors.primary : AppColors.deepPurple500,
               tags: log.tags,
               enabled: canViewDetails,
               onTap: () => context.push('/call-log/${log.id}', extra: log),
-            );
-
-            if (!canArchive) return row;
-
-            return Dismissible(
-              key: ValueKey(log.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                color: Colors.red,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                child: SvgPicture.asset(
-                  'assets/icons/archive.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                ),
-              ),
-              // RN has no swipe-to-archive gesture at all here — archiving
-              // only happens deliberately from inside CallSummaryScreen's
-              // own 3-dot menu (now also ported there, but this swipe
-              // predates and is independent of it — the backend's archive
-              // call has no problem running twice). A bare swipe reaching
-              // the dismiss threshold used to archive immediately and
-              // irreversibly with no confirmation — a real accidental-
-              // data-loss risk (a stray diagonal scroll touch silently
-              // archives a call log). Reusing the same confirmation copy
-              // keeps this swipe entry point working without the silent
-              // part.
-              confirmDismiss: (_) => ConfirmationModal.show(
-                context,
-                title: ref.t('callSummary.archiveActionModal.archive.header.title'),
-                subtitle: ref.t('callSummary.archiveActionModal.archive.header.subtitle'),
-                description: ref.t('callSummary.archiveActionModal.archive.description'),
-                confirmLabel: ref.t('callSummary.archiveActionModal.archive.confirm'),
-                cancelLabel: ref.t('callSummary.archiveActionModal.archive.cancel'),
-                confirmVariant: AppButtonVariant.destructive,
-              ).then((confirmed) => confirmed ?? false),
-              onDismissed: (_) => ref.read(callLogRepositoryProvider).archiveCallLog(log.id),
-              child: row,
             );
           },
         );
@@ -608,30 +864,27 @@ class _SimulationLogsList extends ConsumerWidget {
     final pageAsync = ref.watch(simulationLogsControllerProvider);
 
     return pageAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
+      loading: () => const _CallLogSkeleton(),
+      error: (_, _) => const _CallLogEmptyState(isSimulation: true),
       data: (page) {
-        if (page.items.isEmpty) {
-          return Center(child: Text(ref.t('calls.fallback.simEmptyTitle')));
-        }
+        if (page.items.isEmpty) return const _CallLogEmptyState(isSimulation: true);
         return _InfiniteScrollListView<SimulationLogItem>(
           page: page,
           onLoadMore: () => ref.read(simulationLogsControllerProvider.notifier).loadMore(),
           onRefresh: () => ref.refresh(simulationLogsControllerProvider.future),
           itemBuilder: (context, log) {
-            // RN's `logTitle` fallback chain (summaryName/sessionName/chatId)
-            // never resolves for a simulation row — none of those fields
-            // exist on a scenario session — so the title row always falls
-            // through to the bare `ID-{id}` label; the scenario's own title
-            // shows in the *subtitle* line instead (`{title} • {date}`),
-            // confirmed directly from `CallLogItem.tsx`.
+            // RN's `logTitle` fallback chain for a scenario session can only
+            // resolve `metadata.sessionName`, else the bare `ID-{id}`; the
+            // scenario's own title shows in the *subtitle* line instead
+            // (`{title} • {date}`), confirmed directly from `CallLogItem.tsx`.
             return CallLogRow(
-              title: ref.t('calls.sessionNumber', {'id': log.id}),
+              title: log.logTitle,
+              isSimulation: true,
               status: chatSummaryStatusFromString(log.status),
               dateLine: '${log.scenarioTitle ?? ''} • ${_formatDate(log.startedAt)}',
               durationText: _durationText(ref, log.startedAt, log.endedAt),
-              scoreText: log.score != null
-                  ? '${ref.t('calls.table.sessionScore')}: ${log.score!.round()}'
+              scoreText: log.score != null && log.score != 0
+                  ? '${ref.t('calls.table.sessionScore')}: ${_formatScore(log.score!)}'
                   : null,
               enabled: canViewDetails,
               onTap: () => context.push('/simulations/feedback/${log.id}?fromLogs=true'),

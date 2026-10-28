@@ -60,6 +60,36 @@ void main() {
       expect(logs.first.score, 87.5);
     });
 
+    test('CallLogItem.fromJson reads summaryStatus, details.chatId, provider and mode', () {
+      final log = CallLogItem.fromJson({
+        'id': 15,
+        'startedAt': '2026-10-22T16:13:00Z',
+        'endedAt': '2026-10-22T16:20:00Z',
+        'status': 'ENDED',
+        'summaryStatus': 'FAILED',
+        'details': {
+          'chatId': 15,
+          'callInfo': {'provider': 'AUDIO_UPLOAD', 'mode': 'DICTATION'},
+        },
+      });
+      expect(log.displayStatus, 'FAILED');
+      expect(log.chatId, 15);
+      expect(log.provider, 'AUDIO_UPLOAD');
+      expect(log.mode, 'DICTATION');
+      // RN's logTitle: summaryName || sessionName || chatId || `ID-${id}`.
+      expect(log.logTitle, '15');
+
+      final bare = CallLogItem.fromJson({
+        'id': 16,
+        'startedAt': '2026-10-23T12:07:00Z',
+        'status': 'ENDED',
+        'details': <String, dynamic>{},
+      });
+      expect(bare.chatId, isNull);
+      expect(bare.displayStatus, 'ENDED');
+      expect(bare.logTitle, 'ID-16');
+    });
+
     test('defaults to limit 25 / offset 0 / archive false', () async {
       when(
         () => dio.get<Map<String, dynamic>>(

@@ -8,7 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/info_tooltip_icon.dart';
-import '../../../core/widgets/tab_screen_header.dart';
+import '../../../core/widgets/back_title_header.dart';
 import '../data/achievements_repository.dart';
 
 enum _AchievementsFilter { all, unlocked }
@@ -43,76 +43,118 @@ class AchievementsScreen extends ConsumerStatefulWidget {
 class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
   _AchievementsFilter _filter = _AchievementsFilter.all;
 
+  static const _bodyMedium = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 14,
+    height: 22 / 14,
+    letterSpacing: 0.2,
+    color: AppColors.mediumEmphasis,
+  );
+
   @override
   Widget build(BuildContext context) {
     final badgesAsync = ref.watch(badgesProvider);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
-            TabScreenHeader(
+            // RN's own header (styles.header): always a black LeftArrowIcon,
+            // 16pt gap, REPLAY_PRO.HEADLINE display.small title, 21/16
+            // padding and a 0.5pt strokePrimary bottom border — also when
+            // this is the reviewer-only Achievements tab.
+            BackTitleHeader(
               title: ref.t('achievements.title'),
-              // RN's real header always has a back arrow — this screen is
-              // also reachable via a direct push (e.g. from Leaderboard's
-              // Badges button), not only as the Achievements bottom tab, so
-              // only show it when there's actually somewhere to pop back to.
-              leading: GoRouter.of(context).canPop()
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => context.pop(),
-                    )
-                  : null,
+              margin: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 21, vertical: 16),
+              gap: 16,
+              borderColor: AppColors.strokePrimary,
+              onBack: () {
+                if (GoRouter.of(context).canPop()) context.pop();
+              },
             ),
             _buildFilterRow(context),
-            Expanded(child: _buildBody(context, badgesAsync)),
+            Expanded(
+              child: SingleChildScrollView(
+                // styles.content: 24pt sides, 16pt top/bottom.
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: _buildBody(context, badgesAsync),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  /// styles.filterContainer/filterRow: 24pt sides, 16pt above; "Badges"
+  /// (IBM_PLEX_SERIF.MEDIUM 16/24) + info icon on the left, the equal-width
+  /// All/Unlocked TabView at 65% width on the right.
   Widget _buildFilterRow(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      child: Row(
-        children: [
-          Text(
-            ref.t('achievements.badges'),
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          const SizedBox(width: 4),
-          InfoTooltipIcon(message: ref.t('achievements.badgesTooltip')),
-          const SizedBox(width: 12),
-          Expanded(
-            child: AppTabView<_AchievementsFilter>(
-              tabs: [
-                AppTabViewItem(
-                  key: _AchievementsFilter.all,
-                  label: ref.t('achievements.filters.all'),
-                ),
-                AppTabViewItem(
-                  key: _AchievementsFilter.unlocked,
-                  label: ref.t('achievements.filters.unlocked'),
-                ),
-              ],
-              activeTab: _filter,
-              onTabChange: (filter) => setState(() => _filter = filter),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      ref.t('achievements.badges'),
+                      style: const TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifMedium,
+                        fontSize: 16,
+                        height: 24 / 16,
+                        color: AppColors.highEmphasis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InfoTooltipIcon(message: ref.t('achievements.badgesTooltip')),
+                  const SizedBox(width: 12),
+                ],
+              ),
             ),
-          ),
-        ],
+            SizedBox(
+              width: constraints.maxWidth * 0.65,
+              child: AppTabView<_AchievementsFilter>(
+                tabs: [
+                  AppTabViewItem(key: _AchievementsFilter.all, label: ref.t('achievements.filters.all')),
+                  AppTabViewItem(key: _AchievementsFilter.unlocked, label: ref.t('achievements.filters.unlocked')),
+                ],
+                activeTab: _filter,
+                onTabChange: (filter) => setState(() => _filter = filter),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    AsyncValue<List<BadgeCategoryGroup>> badgesAsync,
-  ) {
+  Widget _buildBody(BuildContext context, AsyncValue<List<BadgeCategoryGroup>> badgesAsync) {
     return badgesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) =>
-          Center(child: Text('${ref.t('achievements.errors.title')}: $error')),
+      // styles.centerContainer: 48pt top/bottom.
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      ),
+      // styles.errorText: body.medium in ds.feedback.error.
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: Text(
+            ref.t('achievements.errors.description'),
+            textAlign: TextAlign.center,
+            style: _bodyMedium.copyWith(color: AppColors.error),
+          ),
+        ),
+      ),
       data: (groups) {
         final filteredGroups = _filter == _AchievementsFilter.all
             ? groups
@@ -120,27 +162,32 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                 for (final group in groups)
                   BadgeCategoryGroup(
                     category: group.category,
-                    badges: group.badges
-                        .where((b) => b.lockStatus == BadgeLockStatus.unlocked)
-                        .toList(),
+                    badges: group.badges.where((b) => b.lockStatus == BadgeLockStatus.unlocked).toList(),
                   ),
               ].where((group) => group.badges.isNotEmpty).toList();
 
         if (filteredGroups.isEmpty) {
-          return Center(child: Text(ref.t('achievements.noAchievements')));
+          // styles.emptyContainer/emptyText.
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+            child: Center(
+              child: Text(ref.t('achievements.noAchievements'), textAlign: TextAlign.center, style: _bodyMedium),
+            ),
+          );
         }
 
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            for (final group in filteredGroups) _CategorySection(group: group),
-          ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [for (final group in filteredGroups) _CategorySection(group: group)],
         );
       },
     );
   }
 }
 
+/// RN `renderCategorySection`: 24pt below each section; header row (12pt
+/// below) of the body.small lowEmphasis category label, the info icon and a
+/// 0.5pt strokePrimary rule filling the rest.
 class _CategorySection extends ConsumerWidget {
   const _CategorySection({required this.group});
 
@@ -149,34 +196,36 @@ class _CategorySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final slug = _badgeCategorySlugs[group.category];
-    final label = slug != null
-        ? ref.t('achievements.badgeTypes.$slug')
-        : group.category;
+    final label = slug != null ? ref.t('achievements.badgeTypes.$slug') : group.category;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifMedium,
-                  fontSize: 16,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 12,
+                    height: 16 / 12,
+                    letterSpacing: 0.2,
+                    color: AppColors.lowEmphasis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              if (slug != null)
+                const SizedBox(width: 8),
                 InfoTooltipIcon(
-                  message: ref.t('achievements.badgeTypes.tooltip.$slug'),
+                  message: ref.t('achievements.badgeTypes.tooltip.${slug ?? group.category}'),
                 ),
-              const SizedBox(width: 8),
-              const Expanded(child: Divider()),
-            ],
+                const SizedBox(width: 12),
+                Expanded(child: Container(height: 0.5, color: AppColors.strokePrimary)),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
           for (final badge in group.badges) _AchievementCard(badge: badge),
         ],
       ),
@@ -184,7 +233,8 @@ class _CategorySection extends ConsumerWidget {
   }
 }
 
-/// RN's `AchievementCard` — a horizontal row: icon, then title+description.
+/// RN's `AchievementCard` — a horizontal row: icon, then title+description
+/// centred vertically beside it.
 class _AchievementCard extends ConsumerWidget {
   const _AchievementCard({required this.badge});
 
@@ -197,86 +247,78 @@ class _AchievementCard extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: () => ref
-            .read(achievementsRepositoryProvider)
-            .markBadgeAsViewed(badge.id),
+        onTap: () => ref.read(achievementsRepositoryProvider).markBadgeAsViewed(badge.id),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isLocked ? AppColors.lightGray2 : AppColors.strokePrimary,
-              width: 0.5,
-            ),
+            border: Border.all(color: isLocked ? AppColors.lightGray2 : AppColors.strokePrimary, width: 0.5),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                margin: const EdgeInsets.only(right: 16),
-                decoration: BoxDecoration(
-                  color: isLocked ? Colors.transparent : AppColors.lightGray,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: isLocked
-                    ? SvgPicture.asset(
-                        'assets/icons/achievementLocked.svg',
-                        width: 60,
-                        height: 60,
-                      )
-                    : (badge.imageUrl.isNotEmpty
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  margin: const EdgeInsets.only(right: 16),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isLocked ? Colors.transparent : AppColors.lightGray1,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: isLocked
+                      // AchievementLockedIcon at its intrinsic 60x60.
+                      ? SvgPicture.asset('assets/icons/achievementLocked.svg')
+                      : (badge.imageUrl.isNotEmpty
                           ? Image.network(
                               badge.imageUrl,
+                              width: 60,
+                              height: 60,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => SvgPicture.asset(
-                                'assets/icons/badgeIcon.svg',
-                                width: 28,
-                                height: 28,
-                              ),
+                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
                             )
-                          : Center(
-                              child: SvgPicture.asset(
-                                'assets/icons/badgeIcon.svg',
-                                width: 28,
-                                height: 28,
-                              ),
-                            )),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      badge.name,
-                      style: TextStyle(
-                        fontFamily: AppFonts.ibmPlexSerifMedium,
-                        fontSize: 14,
-                        color: isLocked
-                            ? AppColors.lowEmphasis
-                            : AppColors.highEmphasis,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      badge.description,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.ibmPlexSerifRegular,
-                        fontSize: 13,
-                        color: AppColors.lowEmphasis,
-                      ),
-                    ),
-                  ],
+                          : const SizedBox.shrink()),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          badge.name,
+                          style: TextStyle(
+                            fontFamily: AppFonts.ibmPlexSerifMedium,
+                            fontSize: 14,
+                            height: 18 / 14,
+                            letterSpacing: 0,
+                            fontWeight: FontWeight.w500,
+                            color: isLocked ? AppColors.lowEmphasis : AppColors.highEmphasis,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        badge.description,
+                        style: TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 13,
+                          height: 18 / 13,
+                          letterSpacing: 0,
+                          color: isLocked ? AppColors.lowEmphasis : AppColors.mediumEmphasis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-

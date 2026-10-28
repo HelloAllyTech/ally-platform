@@ -39,8 +39,18 @@ void main() {
         signedInAuthOverride(),
       ],
     );
+    // The screen's first frame is RN's bare loading spinner, which reads no
+    // translations, so the locale only starts loading once the dashboards
+    // resolve — give that real async I/O a second window.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pumpAndSettle();
 
     expect(find.byType(AppEmptyState), findsOneWidget);
+    // RN's EmptyState renders DataUnavailableIcon above the title.
+    expect(
+      tester.widget<AppEmptyState>(find.byType(AppEmptyState)).iconAsset,
+      'assets/icons/dataUnavailable.svg',
+    );
     expect(find.text('No data'), findsOneWidget);
   });
 }

@@ -48,6 +48,11 @@ void main() {
         signedInAuthOverride(),
       ],
     );
+    // The screen's first frame is RN's bare loading spinner, which reads no
+    // translations, so the locale only starts loading once the dashboards
+    // resolve — give that real async I/O a second window.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pumpAndSettle();
 
     expect(find.byType(AppTabView<AnalyticsType>), findsNothing);
     expect(find.byType(ClipRRect), findsOneWidget);

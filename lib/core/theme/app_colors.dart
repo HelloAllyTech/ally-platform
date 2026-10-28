@@ -137,4 +137,13 @@ class AppColors {
   static const vividRed = Color(0xFFF50004); // OTP error text/border
   static const ashGray = Color(0xFFEAEAEA); // CompleteProfile/Suspended borders
   static const gray = Color(0xFF808080); // OtpInput empty-box dash (CSS 'gray')
+  // tabs parity
+  static const lightGray8 = Color(0xFFF6F6F6); // CallLogSkeleton blocks
+  static const lightGray6 = Color(0x33E5E7EB); // CallLogSkeleton status dot/text
+  static const deepPurple500 = Color(0xFF673AB7); // CallLogItem "Live Session" label
+  static const blue = Color(0xFF1480FB); // colors.blue: Leaderboard highlighted row text
+  static const gray99 = Color(0xFF999999); // Search suggestion text
+  static const lightGray12 = Color(0xFFA5A5A5); // Search no-results text
+  static const lightGray13 = Color(0xFF898989); // Search input placeholder
+  static const lightGray1 = Color(0xFFF8F8F8); // AchievementCard icon background
 }

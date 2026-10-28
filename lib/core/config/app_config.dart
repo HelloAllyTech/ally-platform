@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 /// Mirrors ally-mobile (React Native)'s `src/config/env.ts`: fail fast on a
 /// missing required value rather than silently falling back to a wrong
 /// environment, since that's exactly the class of bug env.ts's
@@ -73,4 +75,14 @@ class AppConfig {
     }
     return apiBaseUrl;
   }
+
+  /// Mirrors `env.ENVIRONMENT` (`development` | `staging` | `production`).
+  /// The drawer appends `drawer.dev` ("(Dev)") to the version when this is
+  /// `development`, like RN's `CustomDrawerContent`. Debug builds default to
+  /// `development` so a local run reads like RN's dev build; release builds
+  /// must pass `--dart-define=ENVIRONMENT=...` to say otherwise.
+  static const String environment = String.fromEnvironment(
+    'ENVIRONMENT',
+    defaultValue: kDebugMode ? 'development' : 'production',
+  );
 }
