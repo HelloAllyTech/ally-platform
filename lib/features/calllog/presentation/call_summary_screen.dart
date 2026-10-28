@@ -805,6 +805,11 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// refetch (the query has `refetchOnMountOrArgChange: true` upstream)
   /// never clobbers an in-progress edit.
   void _seedCustomFieldsIfNeeded(List<CustomFieldValue> values) {
+    final pending = _customValuesBeforeReseed;
+    if (pending != null && !identical(values, pending)) {
+      _customFieldsSeededForChatId = null;
+      _customValuesBeforeReseed = null;
+    }
     final key = '${widget.log.id}';
     if (_customFieldsSeededForChatId == key) return;
     _customFieldValues
@@ -812,6 +817,14 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)));
     _dirtyCustomFieldIds.clear();
     _customFieldsSeededForChatId = key;
+  }
+
+  /// RN `onCustomValuesApplied` (remount + re-seed): voice dictation wrote
+  /// custom values server-side, so seed again from the refetched list.
+  List<CustomFieldValue>? _customValuesBeforeReseed;
+  void _reseedCustomFields() {
+    _customValuesBeforeReseed = ref.read(customFieldValuesProvider(widget.log.id)).value ?? const [];
+    ref.invalidate(customFieldValuesProvider(widget.log.id));
   }
 
   void _onCustomFieldChanged(String fieldDefinitionId, String? value) {
@@ -1018,7 +1031,11 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         return Column(
           children: [
             if (summary.isManualNote)
-              VoiceNoteSection(chatId: widget.log.id, onValuesApplied: _applyVoiceValues),
+              VoiceNoteSection(
+                chatId: widget.log.id,
+                onValuesApplied: _applyVoiceValues,
+                onCustomValuesApplied: _reseedCustomFields,
+              ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
