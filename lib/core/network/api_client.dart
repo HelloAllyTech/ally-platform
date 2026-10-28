@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_state.dart';
 import '../config/app_config.dart';
+import '../localization/localization_controller.dart';
 import 'auth_interceptor.dart';
+import 'language_code_interceptor.dart';
 
 /// Equivalent of `src/services/api.ts`'s `createApi({baseQuery: ...})`: one
 /// shared Dio client for the whole app, auth/versioning handled centrally
@@ -41,7 +43,31 @@ final apiClientProvider = Provider<Dio>((ref) {
   // constructor doc for why it must not carry the same interceptor.
   final refreshDio = _buildDio(apiBaseUrl);
 
+  // RN `LanguageSelectorSheet` dispatches `api.util.resetApiState()` after a
+  // language switch because `languageCode` sits below the cache key. Same
+  // here: rebuilding this client re-runs every provider that reads it. Only
+  // a real switch counts, not the controller's first load.
+  ref.listen<String?>(uiLanguageCodeProvider, (previous, next) {
+    if (previous != null && next != null && previous != next) ref.invalidateSelf();
+  });
+
   final dio = _buildDio(apiBaseUrl);
+  dio.interceptors.add(
+    LanguageCodeInterceptor(() async {
+      try {
+        final now = ref.read(uiLanguageCodeProvider);
+        if (now != null) return now;
+        // First requests can race the controller's prefs/asset load; wait
+        // for it rather than sending 'en' for a hi/mr/ta/kn user.
+        await ref.read(localizationControllerProvider.future);
+        final loaded = ref.read(uiLanguageCodeProvider);
+        return loaded ?? 'en';
+      } catch (_) {
+        // Controller failed to load, or this client was already replaced.
+        return 'en';
+      }
+    }),
+  );
   dio.interceptors.add(
     AuthInterceptor(
       refreshDio: refreshDio,
