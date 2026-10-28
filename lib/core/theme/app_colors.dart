@@ -116,4 +116,5 @@ class AppColors {
   static const lightGray6 = Color(0x33E5E7EB); // CallLogSkeleton status dot/text
   static const darkGray = Color(0xB302060B); // rgba(2,6,11,0.7) analytics error text
   static const deepPurple500 = Color(0xFF673AB7); // CallLogItem "Live Session" label
+  static const blue = Color(0xFF1480FB); // colors.blue: Leaderboard highlighted row text
 }

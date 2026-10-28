@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
-import '../../../core/widgets/app_dropdown.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/leaderboard_repository.dart';
 
@@ -41,29 +40,76 @@ class _RankBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = _iconByRank[rank];
-    if (icon != null) {
-      return SvgPicture.asset(icon, width: 28, height: 28);
-    }
-    return CircleAvatar(
-      radius: 13,
-      backgroundColor: AppColors.surfaceContainerHigh,
-      // RN's styles.rankText: label.medium size, but IBM_PLEX_SERIF.MEDIUM
-      // family — not labelMedium's Roboto-Regular default.
-      child: Text(
-        '$rank',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          fontFamily: AppFonts.ibmPlexSerifMedium,
-          color: AppColors.mediumEmphasis,
+    // RN renders the medal SVGs at their intrinsic size (rank1 24pt,
+    // rank2/rank3 28pt) — no width/height passed.
+    if (icon != null) return SvgPicture.asset(icon);
+    // styles.rankBadge: a bare 26pt circle (no fill) + styles.rankText
+    // (IBM_PLEX_SERIF.MEDIUM, label.medium, mediumEmphasis).
+    return SizedBox(
+      width: 26,
+      height: 26,
+      child: Center(
+        child: Text(
+          '$rank',
+          style: const TextStyle(
+            fontFamily: AppFonts.ibmPlexSerifMedium,
+            fontSize: 12,
+            height: 20 / 12,
+            letterSpacing: 0.2,
+            color: AppColors.mediumEmphasis,
+          ),
         ),
       ),
     );
   }
 }
 
-/// Fixed row height used for the sticky-footer scroll math below. RN
-/// measures the real row height at runtime via `onLayout`; a fixed value is
-/// an acceptable simplification since every row renders the same layout.
-const double _kRowHeight = 64;
+/// RN `LeaderboardScreen`'s avatar: a 36pt circle (radius 20) showing the
+/// profile image, or a blue50 circle with a 0.5pt stroke and the name's
+/// first letter (IBM_PLEX_SERIF.MEDIUM, body.small, iconDefault, w600).
+class _LeaderboardAvatar extends StatelessWidget {
+  const _LeaderboardAvatar({required this.name, required this.imageUrl});
+
+  final String name;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(imageUrl, width: 36, height: 36, fit: BoxFit.cover),
+      );
+    }
+    return Container(
+      key: const Key('leaderboard-avatar-placeholder'),
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.blue50,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+      ),
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '',
+        style: const TextStyle(
+          fontFamily: AppFonts.ibmPlexSerifMedium,
+          fontSize: 12,
+          height: 16 / 12,
+          letterSpacing: 0.2,
+          fontWeight: FontWeight.w600,
+          color: AppColors.iconDefault,
+        ),
+      ),
+    );
+  }
+}
+
+/// Row height used for the sticky-footer scroll math below. RN measures the
+/// first non-highlighted row via `onLayout`; every such row is the same:
+/// `paddingVertical: 10` around the 36pt avatar plus the separator's 12pt
+/// top margin and hairline.
+const double _kRowHeight = 10 + 36 + 12 + 1 / 3 + 10;
 
 /// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list
 /// with pull-to-refresh, infinite-scroll pagination, the current user's row
@@ -100,19 +146,18 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     }
   }
 
+  /// RN `renderLeaderboardItem`. Column widths deliberately differ from
+  /// the table header's (rank 21+38 vs 45, duration 95 vs 88), as in RN.
   Widget _row({
-    required BuildContext context,
     required LeaderboardEntry entry,
     required bool showRankColumn,
     required bool isHighlighted,
   }) {
-    // An explicit Row with the same column widths _TableHeaderRow uses
-    // (rank 32+8, duration 90, gap 16, badges 50), not a ListTile — a
-    // ListTile's leading/title/trailing sizing is content-driven and
-    // doesn't guarantee the data actually lines up under the header's
-    // fixed column boundaries above it.
+    final highlightColor = isHighlighted ? AppColors.blue : null;
+    final highlightWeight = isHighlighted ? FontWeight.w500 : null;
     return Container(
-      height: _kRowHeight,
+      key: isHighlighted ? const Key('leaderboard-highlighted-row') : null,
+      padding: EdgeInsets.only(top: 10, bottom: 10, left: isHighlighted ? 5 : 0),
       margin: isHighlighted ? const EdgeInsets.symmetric(horizontal: 8) : null,
       decoration: isHighlighted
           ? BoxDecoration(
@@ -121,51 +166,85 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               borderRadius: BorderRadius.circular(8),
             )
           : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (showRankColumn) ...[
-            SizedBox(width: 32, child: _RankBadge(rank: entry.rank)),
-            const SizedBox(width: 8),
-          ],
-          CircleAvatar(
-            backgroundImage: entry.profileImageUrl.isNotEmpty
-                ? NetworkImage(entry.profileImageUrl)
-                : null,
-            child: entry.profileImageUrl.isEmpty
-                ? Text(entry.name.isNotEmpty ? entry.name[0].toUpperCase() : '?')
-                : null,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          SizedBox(
-            width: 90,
-            child: Text(
-              _formatDuration(entry.minutesPlayed),
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 50,
-            child: Row(
-              children: [
-                SvgPicture.asset('assets/icons/badgeIcon.svg', width: 14, height: 14),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '${entry.badgeCount}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              if (showRankColumn)
+                Container(
+                  width: 38,
+                  margin: EdgeInsets.only(left: isHighlighted ? 9 : 21),
+                  alignment: Alignment.centerLeft,
+                  child: _RankBadge(rank: entry.rank),
+                ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: showRankColumn ? 0 : 21, right: 10),
+                  child: Row(
+                    children: [
+                      _LeaderboardAvatar(name: entry.name, imageUrl: entry.profileImageUrl),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          entry.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: AppFonts.ibmPlexSerifMedium,
+                            fontSize: 12,
+                            height: 16 / 12,
+                            letterSpacing: 0.2,
+                            fontWeight: highlightWeight ?? FontWeight.w600,
+                            color: highlightColor ?? AppColors.highEmphasis,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              SizedBox(
+                width: 95,
+                child: Text(
+                  _formatDuration(entry.minutesPlayed),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 10,
+                    height: 14 / 10,
+                    letterSpacing: 0.3,
+                    fontWeight: highlightWeight,
+                    color: highlightColor ?? Colors.black,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 60,
+                child: Text(
+                  '${entry.badgeCount}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 10,
+                    height: 14 / 10,
+                    letterSpacing: 0.3,
+                    fontWeight: highlightWeight,
+                    color: highlightColor ?? AppColors.highEmphasis,
+                  ),
+                ),
+              ),
+            ],
           ),
+          // styles.rowSeparator, inside the row (not on the highlighted one).
+          if (!isHighlighted)
+            Container(
+              height: 1 / 3,
+              margin: const EdgeInsets.only(left: 21, right: 21, top: 12),
+              color: AppColors.strokePrimary,
+            ),
         ],
       ),
     );
@@ -184,6 +263,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final showRankColumn = !(myRank?.hideRankInCommunity ?? false);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -191,158 +271,362 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               title: ref.t('community.title'),
               tooltip:
                   '${ref.t('community.title')}\n${ref.t('achievements.badgeTooltipDescription')}',
-              trailing: TextButton.icon(
+              trailing: _BadgesButton(
+                label: '$myBadgeCount ${ref.t('community.table.badges')}',
                 onPressed: () => context.push('/achievements'),
-                icon: SvgPicture.asset(
-                  'assets/icons/badgeIcon.svg',
-                  width: 20,
-                  height: 20,
-                ),
-                label: Text('$myBadgeCount ${ref.t('community.table.badges')}'),
               ),
             ),
+            // styles.leaderboardHeader: right-aligned, 24pt sides, 10pt top/bottom.
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: SizedBox(
-                  width: 160,
-                  child: AppDropdown(
-                    // RN's `getPeriodLabel` (`LeaderboardScreen.tsx`)
-                    // translates this dropdown via `t()` — it was rendering
-                    // the enum's bare English `label` verbatim, the one
-                    // untranslated spot on an otherwise fully-localized
-                    // screen, even though `community.filters.*` already has
-                    // real translations in every locale file.
-                    value: ref.t(selectedWindow.labelKey),
-                    options: [
-                      for (final window in LeaderboardWindow.values)
-                        ref.t(window.labelKey),
-                    ],
-                    onSelect: (label) {
-                      final window = LeaderboardWindow.values.firstWhere(
-                        (w) => ref.t(w.labelKey) == label,
-                      );
-                      ref
-                          .read(leaderboardWindowProvider.notifier)
-                          .select(window);
-                    },
+                child: _PeriodDropdown(
+                  // RN's `getPeriodLabel` translates this via `t()`.
+                  value: ref.t(selectedWindow.labelKey),
+                  options: [for (final window in LeaderboardWindow.values) ref.t(window.labelKey)],
+                  onSelect: (label) {
+                    final window = LeaderboardWindow.values.firstWhere((w) => ref.t(w.labelKey) == label);
+                    ref.read(leaderboardWindowProvider.notifier).select(window);
+                  },
+                ),
+              ),
+            ),
+            // styles.listContainer: marginBottom 100.
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 100),
+                child: Column(
+                  children: [
+                    _TableHeaderRow(showRankColumn: showRankColumn),
+                    Expanded(
+                      child: pageAsync.when(
+                        loading: () => const _LeaderboardLoading(),
+                        // RN's screen never reads the hook's error: a failed
+                        // fetch leaves `data` empty and shows the empty state.
+                        error: (_, _) => const _LeaderboardEmpty(),
+                        data: (page) {
+                          if (page.items.isEmpty) return const _LeaderboardEmpty();
+
+                          final currentUserIndex =
+                              myRank == null ? -1 : page.items.indexWhere((e) => e.userId == myRank.userId);
+
+                          return Stack(
+                            children: [
+                              RefreshIndicator(
+                                color: AppColors.primary,
+                                onRefresh: () => ref.refresh(leaderboardControllerProvider.future),
+                                child: ListView.builder(
+                                  controller: _scrollController,
+                                  padding: const EdgeInsets.only(bottom: 100),
+                                  itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    if (index >= page.items.length) {
+                                      return const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 20),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return _row(
+                                      entry: page.items[index],
+                                      showRankColumn: showRankColumn,
+                                      isHighlighted: index == currentUserIndex,
+                                    );
+                                  },
+                                ),
+                              ),
+                              // RN's sticky footer: pinned current-user row, shown only
+                              // while that row's position is still below the visible
+                              // viewport (not yet scrolled to) — never when already in
+                              // view or when the row hasn't loaded into this page yet.
+                              if (showRankColumn && myRank != null && myRank.rank > 0)
+                                AnimatedBuilder(
+                                  animation: _scrollController,
+                                  builder: (context, _) {
+                                    final attached =
+                                        _scrollController.hasClients && _scrollController.position.haveDimensions;
+                                    final offset = attached ? _scrollController.offset : 0.0;
+                                    final viewportHeight =
+                                        attached ? _scrollController.position.viewportDimension : 0.0;
+                                    final rowTop = currentUserIndex == -1 ? 0.0 : currentUserIndex * _kRowHeight;
+                                    final shouldShow = rowTop > offset + viewportHeight;
+                                    if (!shouldShow) return const SizedBox.shrink();
+                                    // styles.stickyFooter: plain white, no shadow.
+                                    return Align(
+                                      key: const Key('leaderboard-sticky-footer'),
+                                      alignment: Alignment.bottomCenter,
+                                      child: ColoredBox(
+                                        color: Colors.white,
+                                        child: _row(
+                                          entry: LeaderboardEntry(
+                                            userId: myRank.userId,
+                                            name: myRank.name,
+                                            profileImageUrl: myRank.profileImageUrl,
+                                            rank: myRank.rank,
+                                            minutesPlayed: myRank.minutesPlayed,
+                                            badgeCount: myRank.badgeCount,
+                                          ),
+                                          showRankColumn: showRankColumn,
+                                          isHighlighted: true,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// RN `renderBadgesButton`: the 20pt `BadgeIcon` + "N Badges" in
+/// IBM_PLEX_SERIF.REGULAR label.medium, blue[500], `gap: 4`.
+class _BadgesButton extends StatelessWidget {
+  const _BadgesButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onPressed,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset('assets/icons/badgeIcon.svg', width: 20, height: 20),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: AppFonts.ibmPlexSerifRegular,
+              fontSize: 12,
+              height: 20 / 12,
+              letterSpacing: 0.2,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN's loading state: a large primary ActivityIndicator, 40pt top/bottom.
+class _LeaderboardLoading extends StatelessWidget {
+  const _LeaderboardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 40),
+      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+    );
+  }
+}
+
+/// RN `renderEmptyComponent`: headline.small title + body.medium
+/// description, centred, 40pt sides and 60pt top/bottom.
+class _LeaderboardEmpty extends ConsumerWidget {
+  const _LeaderboardEmpty();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              ref.t('community.emptyLeaderboard'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifMedium,
+                fontSize: 24,
+                height: 32 / 24,
+                color: AppColors.highEmphasis,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              ref.t('community.emptyLeaderBoardDescription'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 14,
+                height: 22 / 14,
+                letterSpacing: 0.2,
+                color: AppColors.mediumEmphasis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Port of RN's `CustomDropdown` as this screen configures it
+/// (`fixedWidth={120}`, `alignModalRight`, `styles.dropdownHeader`/
+/// `dropdownText`): a 120pt white header with a 0.5pt stroke, 4pt radius,
+/// 12/20 IBM Plex Serif text and a 6pt arrow that flips when open; the menu
+/// drops from 2pt above the header's bottom edge, right-aligned to it, at
+/// least as wide as the longest option + 36, 10pt radius, lightGray7
+/// border, body.medium items with the selected one in primary/w500.
+/// The shared `AppDropdown` wraps Material's `DropdownMenu`, which can't
+/// reproduce this header (it clipped "Last 7 days").
+class _PeriodDropdown extends StatefulWidget {
+  const _PeriodDropdown({required this.value, required this.options, required this.onSelect});
+
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onSelect;
+
+  @override
+  State<_PeriodDropdown> createState() => _PeriodDropdownState();
+}
+
+class _PeriodDropdownState extends State<_PeriodDropdown> {
+  bool _isOpen = false;
+
+  static const _itemStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 14,
+    height: 22 / 14,
+    letterSpacing: 0.2,
+    color: AppColors.highEmphasis,
+  );
+
+  Future<void> _open() async {
+    final box = context.findRenderObject()! as RenderBox;
+    final topLeft = box.localToGlobal(Offset.zero);
+    final rect = topLeft & box.size;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final longest = widget.options.fold('', (a, b) => a.length >= b.length ? a : b);
+    final painter = TextPainter(
+      text: TextSpan(text: longest, style: _itemStyle),
+      textDirection: TextDirection.ltr,
+      textScaler: textScaler,
+    )..layout();
+    final minWidth = (painter.width + 36).ceilToDouble();
+    painter.dispose();
+
+    setState(() => _isOpen = true);
+    final selected = await showGeneralDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.transparent,
+      transitionDuration: Duration.zero,
+      pageBuilder: (dialogContext, _, _) => Stack(
+        children: [
+          Positioned(
+            top: rect.bottom - 2,
+            right: screenWidth - rect.right,
+            child: Container(
+              key: const Key('leaderboard-period-menu'),
+              constraints: BoxConstraints(
+                minWidth: minWidth > rect.width ? minWidth : rect.width,
+                maxHeight: (widget.options.length * 40).clamp(0, 200).toDouble(),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.lightGray7),
+                boxShadow: const [BoxShadow(color: Color(0x33000000), offset: Offset(0, 2), blurRadius: 4)],
+              ),
+              child: Material(
+                type: MaterialType.transparency,
+                child: SingleChildScrollView(
+                  child: IntrinsicWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final option in widget.options)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => Navigator.of(dialogContext).pop(option),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                              child: Text(
+                                option,
+                                style: option == widget.value
+                                    ? _itemStyle.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)
+                                    : _itemStyle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-            _TableHeaderRow(showRankColumn: showRankColumn),
-            Expanded(
-              child: pageAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Center(
-                  child: Text('${ref.t('community.loadError')}: $error'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _isOpen = false);
+    if (selected != null) widget.onSelect(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const Key('leaderboard-period-dropdown'),
+      behavior: HitTestBehavior.opaque,
+      onTap: _open,
+      child: Container(
+        width: 120,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                widget.value,
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 12,
+                  height: 20 / 12,
+                  letterSpacing: 0.2,
+                  color: AppColors.highEmphasis,
                 ),
-                data: (page) {
-                  if (page.items.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              ref.t('community.emptyLeaderboard'),
-                              style: Theme.of(context).textTheme.titleMedium,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              ref.t('community.emptyLeaderBoardDescription'),
-                              style: Theme.of(context).textTheme.bodyMedium,
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  final currentUserIndex = myRank == null
-                      ? -1
-                      : page.items.indexWhere((e) => e.userId == myRank.userId);
-
-                  return Stack(
-                    children: [
-                      RefreshIndicator(
-                        onRefresh: () =>
-                            ref.refresh(leaderboardControllerProvider.future),
-                        child: ListView.separated(
-                          controller: _scrollController,
-                          itemCount:
-                              page.items.length + (page.isLoadingMore ? 1 : 0),
-                          separatorBuilder: (_, _) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            if (index >= page.items.length) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              );
-                            }
-                            return _row(
-                              context: context,
-                              entry: page.items[index],
-                              showRankColumn: showRankColumn,
-                              isHighlighted: index == currentUserIndex,
-                            );
-                          },
-                        ),
-                      ),
-                      // RN's sticky footer: pinned current-user row, shown only
-                      // while that row's position is still below the visible
-                      // viewport (not yet scrolled to) — never when already in
-                      // view or when the row hasn't loaded into this page yet.
-                      if (showRankColumn && myRank != null)
-                        AnimatedBuilder(
-                          animation: _scrollController,
-                          builder: (context, _) {
-                            final attached =
-                                _scrollController.hasClients &&
-                                _scrollController.position.haveDimensions;
-                            final offset = attached
-                                ? _scrollController.offset
-                                : 0.0;
-                            final viewportHeight = attached
-                                ? _scrollController.position.viewportDimension
-                                : 0.0;
-                            final rowTop = currentUserIndex == -1
-                                ? 0.0
-                                : currentUserIndex * _kRowHeight;
-                            final shouldShow = rowTop > offset + viewportHeight;
-                            if (!shouldShow) return const SizedBox.shrink();
-                            return Align(
-                              key: const Key('leaderboard-sticky-footer'),
-                              alignment: Alignment.bottomCenter,
-                              child: Material(
-                                elevation: 8,
-                                color: Theme.of(context).colorScheme.surface,
-                                child: _row(
-                                  context: context,
-                                  entry: LeaderboardEntry(
-                                    userId: myRank.userId,
-                                    name: myRank.name,
-                                    profileImageUrl: myRank.profileImageUrl,
-                                    rank: myRank.rank,
-                                    minutesPlayed: myRank.minutesPlayed,
-                                    badgeCount: myRank.badgeCount,
-                                  ),
-                                  showRankColumn: showRankColumn,
-                                  isHighlighted: true,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  );
-                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: RotatedBox(
+                quarterTurns: _isOpen ? 2 : 0,
+                child: SvgPicture.asset('assets/icons/arrowDown.svg', width: 6, height: 6),
               ),
             ),
           ],
@@ -354,7 +638,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
 /// Port of ally-mobile (React Native)'s `renderTableHeader` — column labels
 /// above the ranked list, shown unconditionally (even while loading/empty),
-/// same as RN.
+/// same as RN: 12pt top/bottom, 21pt sides, lightGray2 bottom border,
+/// 8pt below; rank 45, user flex (min 160), duration 88, badges 60;
+/// IBM_PLEX_SERIF.REGULAR label.tiny in mediumEmphasis.
 class _TableHeaderRow extends ConsumerWidget {
   const _TableHeaderRow({required this.showRankColumn});
 
@@ -362,52 +648,29 @@ class _TableHeaderRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
-      fontFamily: AppFonts.ibmPlexSerifMedium,
+    const style = TextStyle(
+      fontFamily: AppFonts.ibmPlexSerifRegular,
+      fontSize: 10,
+      height: 14 / 10,
+      letterSpacing: 0.3,
       color: AppColors.mediumEmphasis,
     );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    // Bounded + ellipsized: an unbounded label measured wider than the row
+    // with real fonts once (a real RenderFlex overflow), so keep the guard.
+    Text label(String key) =>
+        Text(ref.t(key), style: style, maxLines: 1, overflow: TextOverflow.ellipsis);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 21, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.lightGray2)),
+      ),
       child: Row(
         children: [
-          if (showRankColumn) ...[
-            SizedBox(width: 32, child: Text(ref.t('community.table.rank'), style: style)),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: Text(
-              ref.t('community.table.user'),
-              style: style,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          // Bounded + ellipsized, matching RN's own fixed-width
-          // durationColumnHeader (88)/badgesColumnHeader (60) — an
-          // unbounded `Text` here measured wider than the available row
-          // width once real fonts were loaded (confirmed via a direct
-          // screenshot render: this row threw a real RenderFlex overflow
-          // at ordinary phone widths, not just a narrow edge case).
-          SizedBox(
-            width: 90,
-            child: Text(
-              ref.t('community.table.totalDuration'),
-              style: style,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 50,
-            child: Text(
-              ref.t('community.table.badges'),
-              style: style,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          if (showRankColumn) SizedBox(width: 45, child: label('community.table.rank')),
+          Expanded(child: label('community.table.user')),
+          SizedBox(width: 88, child: label('community.table.totalDuration')),
+          SizedBox(width: 60, child: label('community.table.badges')),
         ],
       ),
     );
