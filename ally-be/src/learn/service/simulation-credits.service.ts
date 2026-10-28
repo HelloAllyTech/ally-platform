@@ -48,7 +48,8 @@ export class SimulationCreditsService {
       [PERMISSIONS.SYSTEM_ACCESS],
     );
 
-    const targetUserId = hasSystemAccess ? userId : tokenUserId;
+    const targetUserId =
+      hasSystemAccess && userId !== undefined ? userId : tokenUserId;
     if (!targetUserId) {
       throw new BadRequestException('User ID is required');
     }
