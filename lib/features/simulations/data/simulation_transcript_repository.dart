@@ -30,11 +30,13 @@ class SimulationTranscriptMessage {
 
   bool get isLearner => senderId != -1;
 
+  /// RN `formatTimeToMMSS(Math.round(startSeconds * 1000))`: zero-padded
+  /// `mm:ss`, whole seconds floored.
   String get formattedTime {
-    final totalSeconds = startSeconds.round();
+    final totalSeconds = (startSeconds * 1000).round() ~/ 1000;
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 }
 
