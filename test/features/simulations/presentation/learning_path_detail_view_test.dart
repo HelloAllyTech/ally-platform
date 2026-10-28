@@ -341,8 +341,8 @@ void main() {
         ),
       );
 
-      expect(find.byIcon(Icons.description_outlined), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.description_outlined));
+      expect(find.byKey(const Key('path-item-feedback')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('path-item-feedback')));
       await tester.pumpAndSettle();
 
       expect(calls, ['s1']);
@@ -413,7 +413,7 @@ void main() {
       expect(find.text('Role play 1'), findsOneWidget);
       expect(find.text('Role play 2'), findsOneWidget);
       expect(find.text('Next'), findsOneWidget, reason: 'only scenario 2 is the resumable one');
-      expect(find.byIcon(Icons.lock), findsOneWidget, reason: 'only scenario 3 is locked');
+      expect(find.byKey(const Key('path-item-locked')), findsOneWidget, reason: 'only scenario 3 is locked');
     });
   });
 }

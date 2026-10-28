@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/simulation_models.dart';
+import 'widgets/scenario_language_dropdown.dart';
 
 /// Direct port of ally-mobile (React Native)'s `SimulationDetailsModal` — the
 /// pre-start preview shown when a learner taps a scenario card (or the path/
@@ -28,7 +30,11 @@ import '../data/simulation_models.dart';
 /// rather than silently dropping the behavior. [onStart] here fires the
 /// real start directly instead.
 class SimulationDetailsModal extends ConsumerStatefulWidget {
-  const SimulationDetailsModal({super.key, required this.scenario, required this.onStart});
+  const SimulationDetailsModal({
+    super.key,
+    required this.scenario,
+    required this.onStart,
+  });
 
   final PathScenario scenario;
 
@@ -50,15 +56,18 @@ class SimulationDetailsModal extends ConsumerStatefulWidget {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => SimulationDetailsModal(scenario: scenario, onStart: onStart),
+      builder: (context) =>
+          SimulationDetailsModal(scenario: scenario, onStart: onStart),
     );
   }
 
   @override
-  ConsumerState<SimulationDetailsModal> createState() => _SimulationDetailsModalState();
+  ConsumerState<SimulationDetailsModal> createState() =>
+      _SimulationDetailsModalState();
 }
 
-class _SimulationDetailsModalState extends ConsumerState<SimulationDetailsModal> {
+class _SimulationDetailsModalState
+    extends ConsumerState<SimulationDetailsModal> {
   SimulationLanguageOption? _selectedLanguage;
   bool _isStarting = false;
   String? _error;
@@ -90,32 +99,47 @@ class _SimulationDetailsModalState extends ConsumerState<SimulationDetailsModal>
     }
   }
 
+  static const _sectionLabelStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifMedium,
+    fontSize: 14,
+    height: 22 / 14,
+    letterSpacing: 0.2,
+    color: AppColors.mediumEmphasis,
+  );
+
   @override
   Widget build(BuildContext context) {
     final scenario = widget.scenario;
     final languages = scenario.availableLanguages ?? const [];
+    final cover = scenario.coverImageUrl;
 
     return PopScope(
       canPop: !_isStarting,
       child: Dialog(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        // styles.modalBackdrop paddingHorizontal 20; modalContainer radius.lg.
         insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 640),
-          child: Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+          constraints: const BoxConstraints(maxWidth: 500),
+          // styles.modalContainer: height 80% of the screen.
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.8,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
+                // styles.header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
+                      Flexible(
                         child: Text.rich(
                           TextSpan(
+                            text: '${ref.t('common.start')} ',
                             children: [
-                              TextSpan(text: '${ref.t('common.start')} '),
                               TextSpan(
                                 text: ref.t('common.simulation'),
                                 style: const TextStyle(
@@ -125,154 +149,236 @@ class _SimulationDetailsModalState extends ConsumerState<SimulationDetailsModal>
                               ),
                             ],
                           ),
+                          // styles.headerTitle: REPLAY_PRO.HEADLINE + display.small, light.
                           style: const TextStyle(
                             fontFamily: AppFonts.replayProHeadline,
-                            fontSize: 20,
+                            fontSize: 18,
+                            height: 24 / 18,
+                            letterSpacing: 0.18,
+                            fontWeight: FontWeight.w300,
                             color: AppColors.highEmphasis,
                           ),
                         ),
                       ),
-                      IconButton(
+                      GestureDetector(
                         key: const Key('simulation-details-modal-close'),
-                        onPressed: _isStarting ? null : () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close, size: 20, color: AppColors.mediumEmphasis),
-                        visualDensity: VisualDensity.compact,
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _isStarting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          // close.svg's #424242 fill is baked in; RN's
+                          // `color` prop doesn't reach it.
+                          child: SvgPicture.asset(
+                            'assets/icons/close.svg',
+                            width: 20,
+                            height: 20,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Flexible(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.strokePrimary, width: 0.5),
-                        borderRadius: BorderRadius.circular(16),
+                // styles.contentContainer: flex 1, 16 margin, hairline border.
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.all(16),
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.strokePrimary,
+                        width: 0.35,
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (languages.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: _LanguagePicker(
-                                  options: languages,
-                                  selected: _selectedLanguage,
-                                  enabled: !_isStarting,
-                                  onSelected: (lang) => setState(() => _selectedLanguage = lang),
-                                ),
-                              ),
-                            ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (languages.isNotEmpty)
                           Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: scenario.coverImageUrl != null
-                                  ? Image.network(
-                                      scenario.coverImageUrl!,
-                                      height: 180,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) =>
-                                          Container(height: 180, color: AppColors.lightGray2),
-                                    )
-                                  : Container(height: 180, color: AppColors.lightGray2),
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child:
+                                  ScenarioLanguageDropdown<
+                                    SimulationLanguageOption
+                                  >(
+                                    key: const Key(
+                                      'simulation-details-modal-language',
+                                    ),
+                                    options: languages,
+                                    selected: _selectedLanguage,
+                                    labelOf: (lang) => lang.label,
+                                    enabled: !_isStarting,
+                                    onSelected: (lang) => setState(
+                                      () => _selectedLanguage = lang,
+                                    ),
+                                  ),
                             ),
                           ),
-                          Flexible(
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${ref.t('common.simulation')} ${scenario.order}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.lowEmphasis),
+                        // styles.mediaContainer padding 12 (always present).
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: cover == null || cover.isEmpty
+                              ? const SizedBox.shrink()
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    cover,
+                                    height: 180,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Container(
+                                      height: 180,
+                                      color: AppColors.grey200,
+                                    ),
                                   ),
-                                  if (scenario.title != null) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
+                                ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.only(
+                              left: 16,
+                              right: 16,
+                              bottom: 16,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // styles.orderLabel: ROBOTO.REGULAR + body.small.
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Text(
+                                    '${ref.t('common.simulation')} ${scenario.order}',
+                                    style: const TextStyle(
+                                      fontFamily: AppFonts.robotoRegular,
+                                      fontSize: 12,
+                                      height: 16 / 12,
+                                      letterSpacing: 0.2,
+                                      color: AppColors.lowEmphasis,
+                                    ),
+                                  ),
+                                ),
+                                if (scenario.title != null &&
+                                    scenario.title!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    // styles.title: IBM_PLEX_SERIF.REGULAR + body.large.
+                                    child: Text(
                                       scenario.title!,
                                       style: const TextStyle(
-                                        fontFamily: AppFonts.ibmPlexSerifRegular,
+                                        fontFamily:
+                                            AppFonts.ibmPlexSerifRegular,
                                         fontSize: 16,
+                                        height: 24 / 16,
+                                        letterSpacing: 0.5,
                                         color: AppColors.highEmphasis,
                                       ),
                                     ),
-                                  ],
-                                  if (scenario.description != null) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
+                                  ),
+                                if (scenario.description != null &&
+                                    scenario.description!.isNotEmpty) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(
                                       ref.t('learn.scenario.scenarioLabel'),
-                                      style: const TextStyle(
-                                        fontFamily: AppFonts.ibmPlexSerifMedium,
-                                        fontSize: 14,
-                                        color: AppColors.mediumEmphasis,
-                                      ),
+                                      style: _sectionLabelStyle,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Text(
                                       scenario.description!,
-                                      style: const TextStyle(fontSize: 14, color: AppColors.mediumEmphasis),
-                                    ),
-                                  ],
-                                  if (scenario.triggerWarnings.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${ref.t('common.triggerWarnings')}:',
-                                      style: const TextStyle(
-                                        fontFamily: AppFonts.ibmPlexSerifMedium,
-                                        fontSize: 14,
-                                        color: AppColors.mediumEmphasis,
+                                      style: _sectionLabelStyle.copyWith(
+                                        fontFamily:
+                                            AppFonts.ibmPlexSerifRegular,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
+                                  ),
+                                ],
+                                if (scenario.triggerWarnings.isNotEmpty) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    // RN appends a second ':'; shown once.
+                                    child: Text(
+                                      ref.t('common.triggerWarnings'),
+                                      style: _sectionLabelStyle,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Wrap(
                                       spacing: 6,
                                       runSpacing: 6,
                                       children: [
-                                        for (final warning in scenario.triggerWarnings)
+                                        for (final warning
+                                            in scenario.triggerWarnings)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.lightGray,
-                                              borderRadius: BorderRadius.circular(999),
-                                              border: Border.all(color: AppColors.lightGray2, width: 0.5),
+                                              color: AppColors.grey50,
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              border: Border.all(
+                                                color: AppColors.grey300,
+                                                width: 0.5,
+                                              ),
                                             ),
                                             child: Text(
                                               warning,
-                                              style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                                              style: _sectionLabelStyle
+                                                  .copyWith(
+                                                    fontFamily: AppFonts
+                                                        .ibmPlexSerifRegular,
+                                                  ),
                                             ),
                                           ),
                                       ],
                                     ),
-                                  ],
+                                  ),
                                 ],
-                              ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 if (_error != null)
                   Padding(
-                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 8,
+                    ),
                     child: Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.red400, fontSize: 12),
+                      style: const TextStyle(
+                        color: AppColors.red400,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
+                // styles.buttonContainer / ctaWrapper.
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                  ),
                   child: AppButton(
                     key: const Key('simulation-details-modal-start'),
-                    label: '${ref.t('common.start')} ${ref.t('common.simulation')}',
+                    label:
+                        '${ref.t('common.start')} ${ref.t('common.simulation')}',
                     isLoading: _isStarting,
                     isDisabled: _isStarting,
                     onPressed: _handleStart,
@@ -281,50 +387,6 @@ class _SimulationDetailsModalState extends ConsumerState<SimulationDetailsModal>
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Inline language dropdown, embedded in the preview card above the cover
-/// media — RN's `CustomDropdown`. A plain `PopupMenuButton` here, matching
-/// `SimulationDetailsScreen`'s own `_LanguageDropdown`.
-class _LanguagePicker extends StatelessWidget {
-  const _LanguagePicker({
-    required this.options,
-    required this.selected,
-    required this.enabled,
-    required this.onSelected,
-  });
-
-  final List<SimulationLanguageOption> options;
-  final SimulationLanguageOption? selected;
-  final bool enabled;
-  final ValueChanged<SimulationLanguageOption> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<SimulationLanguageOption>(
-      key: const Key('simulation-details-modal-language'),
-      enabled: enabled,
-      onSelected: onSelected,
-      itemBuilder: (context) => [
-        for (final option in options) PopupMenuItem(value: option, child: Text(option.label)),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.strokePrimary),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(selected?.label ?? '', style: const TextStyle(fontSize: 12, color: AppColors.highEmphasis)),
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.mediumEmphasis),
-          ],
         ),
       ),
     );

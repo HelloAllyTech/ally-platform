@@ -31,10 +31,12 @@ class ScenarioLanguageDropdown<T> extends StatefulWidget {
   final String placeholder;
 
   @override
-  State<ScenarioLanguageDropdown<T>> createState() => _ScenarioLanguageDropdownState<T>();
+  State<ScenarioLanguageDropdown<T>> createState() =>
+      _ScenarioLanguageDropdownState<T>();
 }
 
-class _ScenarioLanguageDropdownState<T> extends State<ScenarioLanguageDropdown<T>> {
+class _ScenarioLanguageDropdownState<T>
+    extends State<ScenarioLanguageDropdown<T>> {
   bool _isOpen = false;
 
   // commonStyles.fieldValueText / styles.itemText (same size, different colour).
@@ -48,7 +50,8 @@ class _ScenarioLanguageDropdownState<T> extends State<ScenarioLanguageDropdown<T
 
   Future<void> _open() async {
     final box = context.findRenderObject() as RenderBox?;
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (box == null || overlay == null) return;
     final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
     // RN: top = header bottom - 2, left-aligned with the header.
@@ -82,8 +85,12 @@ class _ScenarioLanguageDropdownState<T> extends State<ScenarioLanguageDropdown<T
             child: Text(
               widget.labelOf(option),
               style: _valueStyle.copyWith(
-                color: option == widget.selected ? AppColors.primary : AppColors.highEmphasis,
-                fontWeight: option == widget.selected ? FontWeight.w500 : FontWeight.w400,
+                color: option == widget.selected
+                    ? AppColors.primary
+                    : AppColors.highEmphasis,
+                fontWeight: option == widget.selected
+                    ? FontWeight.w500
+                    : FontWeight.w400,
               ),
             ),
           ),
@@ -99,36 +106,41 @@ class _ScenarioLanguageDropdownState<T> extends State<ScenarioLanguageDropdown<T
     final selected = widget.selected;
     final label = selected == null ? '' : widget.labelOf(selected);
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Opacity(
-        opacity: widget.enabled ? 1 : 0.5,
-        child: GestureDetector(
-          key: const Key('scenario-language-dropdown'),
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.enabled ? _open : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label.isEmpty ? widget.placeholder : label,
-                  style: label.isEmpty
-                      ? _valueStyle.copyWith(color: AppColors.charcoal2.withValues(alpha: 0.5))
-                      : _valueStyle,
+    // Sized to its content (RN: alignSelf flex-start); callers in a
+    // stretching column wrap it in an Align.
+    return Opacity(
+      opacity: widget.enabled ? 1 : 0.5,
+      child: GestureDetector(
+        key: const Key('scenario-language-dropdown'),
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.enabled ? _open : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label.isEmpty ? widget.placeholder : label,
+                style: label.isEmpty
+                    ? _valueStyle.copyWith(
+                        color: AppColors.charcoal2.withValues(alpha: 0.5),
+                      )
+                    : _valueStyle,
+              ),
+              const SizedBox(width: 8),
+              RotatedBox(
+                quarterTurns: _isOpen ? 2 : 0,
+                child: SvgPicture.asset(
+                  'assets/icons/arrowDown.svg',
+                  width: 6,
+                  height: 6,
                 ),
-                const SizedBox(width: 8),
-                RotatedBox(
-                  quarterTurns: _isOpen ? 2 : 0,
-                  child: SvgPicture.asset('assets/icons/arrowDown.svg', width: 6, height: 6),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

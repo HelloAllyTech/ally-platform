@@ -33,7 +33,11 @@ const _allyWebUrl = 'https://app.helloally.ai/';
 /// 429-rate-limit retry modal — same scope line `LearningPathDetailView`
 /// already draws for the equivalent path/case flows.
 class SimulationDetailsScreen extends ConsumerStatefulWidget {
-  const SimulationDetailsScreen({super.key, required this.scenarioId, this.initialScenario});
+  const SimulationDetailsScreen({
+    super.key,
+    required this.scenarioId,
+    this.initialScenario,
+  });
 
   final int scenarioId;
 
@@ -79,12 +83,14 @@ class _SimulationDetailsScreenState
       _error = null;
     });
     try {
-      final session = await ref.read(simulationsRepositoryProvider).startScenarioSession(
-        scenarioId: widget.scenarioId,
-        languageId: scenario.availableLanguages.isNotEmpty
-            ? _selectedLanguage?.languageId
-            : null,
-      );
+      final session = await ref
+          .read(simulationsRepositoryProvider)
+          .startScenarioSession(
+            scenarioId: widget.scenarioId,
+            languageId: scenario.availableLanguages.isNotEmpty
+                ? _selectedLanguage?.languageId
+                : null,
+          );
       if (mounted) {
         context.push(
           '/roleplay',
@@ -125,7 +131,9 @@ class _SimulationDetailsScreenState
             child: scenarioAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
-                child: Text('${ref.t('learn.details.loadingDetailsError')}: $error'),
+                child: Text(
+                  '${ref.t('learn.details.loadingDetailsError')}: $error',
+                ),
               ),
               data: (scenario) {
                 _ensureLanguageInitialized(scenario);
@@ -153,13 +161,17 @@ class _SimulationDetailsScreenState
             if (scenario.availableLanguages.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: ScenarioLanguageDropdown<ScenarioLanguageOption>(
-                  options: scenario.availableLanguages,
-                  selected: _selectedLanguage,
-                  labelOf: (lang) => lang.label,
-                  placeholder: ref.t('nav.language.label'),
-                  enabled: !_isStarting,
-                  onSelected: (lang) => setState(() => _selectedLanguage = lang),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ScenarioLanguageDropdown<ScenarioLanguageOption>(
+                    options: scenario.availableLanguages,
+                    selected: _selectedLanguage,
+                    labelOf: (lang) => lang.label,
+                    placeholder: ref.t('nav.language.label'),
+                    enabled: !_isStarting,
+                    onSelected: (lang) =>
+                        setState(() => _selectedLanguage = lang),
+                  ),
                 ),
               ),
             // styles.imageContainer (marginBottom 12) — empty when the
@@ -177,9 +189,13 @@ class _SimulationDetailsScreenState
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
                             Container(height: 180, color: AppColors.lightGray4),
-                        loadingBuilder: (context, child, progress) => progress == null
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
                             ? child
-                            : Container(height: 180, color: AppColors.lightGray4),
+                            : Container(
+                                height: 180,
+                                color: AppColors.lightGray4,
+                              ),
                       ),
                     ),
             ),
@@ -191,7 +207,9 @@ class _SimulationDetailsScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.85),
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * 0.85,
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.only(top: 18, bottom: 16),
                         // styles.cardTitle: IBM_PLEX_SERIF.MEDIUM 20, black.
@@ -239,11 +257,17 @@ class _SimulationDetailsScreenState
                   children: [
                     for (final warning in scenario.triggerWarnings)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.grey50,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppColors.grey300, width: 0.5),
+                          border: Border.all(
+                            color: AppColors.grey300,
+                            width: 0.5,
+                          ),
                         ),
                         // styles.chipText: IBM_PLEX_SERIF.REGULAR + label.large.
                         child: Text(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 import 'learning_path_detail_view.dart';
+import 'widgets/learning_path_widgets.dart';
 
 /// Port of ally-mobile (React Native)'s `CaseDetailsScreen`. Cases are
 /// structurally identical to scenario paths in the backend contract (RN's
@@ -23,54 +24,70 @@ class CaseDetailsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detailsAsync = ref.watch(caseDetailsProvider(caseId));
 
+    // RN: white screen, LearningPathHeader with the credits read-out, then
+    // a large spinner / DataUnavailable EmptyState / the list.
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('learn.choose.case'))),
-      body: detailsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Text('${ref.t('simulationPage.failedToLoadCaseDetails')}: $error'),
-        ),
-        data: (details) => LearningPathDetailView(
-          details: details,
-          onEnsureSession: () async {
-            if (details.caseSessionId != null) return;
-            await ref
-                .read(simulationsRepositoryProvider)
-                .createCaseSession(caseId);
-            ref.invalidate(caseDetailsProvider(caseId));
-          },
-          onStartScenario: (scenario, {languageId}) async {
-            final session = await ref
-                .read(simulationsRepositoryProvider)
-                .startScenarioSession(
-                  scenarioId: scenario.scenarioId,
-                  caseSessionItemId: scenario.sessionId,
-                  languageId: languageId,
-                );
-            if (context.mounted) {
-              context.push(
-                '/roleplay',
-                extra: {
-                  'liveKitServerUrl': session.liveKitServerUrl,
-                  'accessToken': session.accessToken,
-                  'scenarioSessionId': session.id,
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          LearningPathHeader(
+            title: ref.t('learn.choose.case'),
+            showCredits: true,
+          ),
+          Expanded(
+            child: detailsAsync.when(
+              loading: () => const LearningPathLoading(),
+              error: (_, _) => LearningPathLoadError(
+                title: ref.t('simulationPage.failedToLoadCaseDetails'),
+              ),
+              data: (details) => LearningPathDetailView(
+                details: details,
+                onRefresh: () =>
+                    ref.refresh(caseDetailsProvider(caseId).future),
+                onEnsureSession: () async {
+                  if (details.caseSessionId != null) return;
+                  await ref
+                      .read(simulationsRepositoryProvider)
+                      .createCaseSession(caseId);
+                  ref.invalidate(caseDetailsProvider(caseId));
                 },
-              );
-            }
-          },
-          onViewFeedback: (scenario) async {
-            final sessionId = await ref
-                .read(simulationsRepositoryProvider)
-                .getScenarioSessionByCaseItem(scenario.sessionId!);
-            if (sessionId != null && context.mounted) {
-              // Reviewing an already-completed session (not a fresh
-              // finish) — mirrors RN's own `fromLogs: true` on this exact
-              // call site, so the feedback screen doesn't force a rating
-              // prompt on exit.
-              context.push('/simulations/feedback/$sessionId?fromLogs=true');
-            }
-          },
-        ),
+                onStartScenario: (scenario, {languageId}) async {
+                  final session = await ref
+                      .read(simulationsRepositoryProvider)
+                      .startScenarioSession(
+                        scenarioId: scenario.scenarioId,
+                        caseSessionItemId: scenario.sessionId,
+                        languageId: languageId,
+                      );
+                  if (context.mounted) {
+                    context.push(
+                      '/roleplay',
+                      extra: {
+                        'liveKitServerUrl': session.liveKitServerUrl,
+                        'accessToken': session.accessToken,
+                        'scenarioSessionId': session.id,
+                      },
+                    );
+                  }
+                },
+                onViewFeedback: (scenario) async {
+                  final sessionId = await ref
+                      .read(simulationsRepositoryProvider)
+                      .getScenarioSessionByCaseItem(scenario.sessionId!);
+                  if (sessionId != null && context.mounted) {
+                    // Reviewing an already-completed session (not a fresh
+                    // finish) — mirrors RN's own `fromLogs: true` on this exact
+                    // call site, so the feedback screen doesn't force a rating
+                    // prompt on exit.
+                    context.push(
+                      '/simulations/feedback/$sessionId?fromLogs=true',
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
