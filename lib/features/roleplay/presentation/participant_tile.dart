@@ -6,6 +6,7 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import 'turn_state.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of RN `SimulationAssistantScreen/components/ParticipantTile` —
 /// audio-only (RN renders no video): a rounded translucent tile filling its
@@ -60,7 +61,7 @@ class ParticipantTile extends ConsumerWidget {
               if (avatarUrl != null && avatarUrl!.isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
+                  child: SizedNetworkImage(
                     avatarUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => const SizedBox(),

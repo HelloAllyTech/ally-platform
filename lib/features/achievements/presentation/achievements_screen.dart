@@ -10,6 +10,7 @@ import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/info_tooltip_icon.dart';
 import '../../../core/widgets/back_title_header.dart';
 import '../data/achievements_repository.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 enum _AchievementsFilter { all, unlocked }
 
@@ -283,7 +284,7 @@ class _AchievementCard extends ConsumerWidget {
                     // AchievementLockedIcon at its intrinsic 60x60.
                     ? SvgPicture.asset('assets/icons/achievementLocked.svg')
                     : (badge.imageUrl.isNotEmpty
-                        ? Image.network(
+                        ? SizedNetworkImage(
                             badge.imageUrl,
                             width: 60,
                             height: 60,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../theme/app_colors.dart';
+import 'sized_network_image.dart';
 
 /// Builds the controller for [CoverVideoPreview] — injectable so tests can
 /// count/fake controllers.
@@ -134,7 +135,7 @@ class _CoverVideoPreviewState extends State<CoverVideoPreview> {
     final thumbnail = widget.thumbnailUrl;
     Widget content;
     if (_failed && thumbnail != null && thumbnail.isNotEmpty) {
-      content = Image.network(
+      content = SizedNetworkImage(
         thumbnail,
         key: const Key('cover-video-preview-thumbnail'),
         fit: BoxFit.cover,

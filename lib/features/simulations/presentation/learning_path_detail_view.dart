@@ -10,6 +10,7 @@ import '../data/simulations_repository.dart';
 import 'simulation_details_modal.dart';
 import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/learning_path_widgets.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
 /// mobile (React Native)'s `useLearningPathDetails` hook backs both with
@@ -216,7 +217,7 @@ class _ScenarioRow extends ConsumerWidget {
                     if (thumb != null && thumb.isNotEmpty)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
+                        child: SizedNetworkImage(
                           thumb,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.grey200),

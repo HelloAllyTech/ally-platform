@@ -10,6 +10,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/back_title_header.dart';
 import '../../../../core/widgets/html_rich_text.dart';
 import 'credits_display.dart';
+import '../../../../core/widgets/sized_network_image.dart';
 
 /// RN's `components/LearningPathDetails/LearningPathHeader.tsx` — back arrow,
 /// a single ReplayPro title, and (for case/path screens) the credits read-out
@@ -214,7 +215,7 @@ class LearningPathListHeader extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 16),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.network(
+                child: SizedNetworkImage(
                   cover,
                   height: 177,
                   width: double.infinity,

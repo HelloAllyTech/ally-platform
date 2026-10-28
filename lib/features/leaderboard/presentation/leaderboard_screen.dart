@@ -10,6 +10,7 @@ import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/custom_dropdown.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/leaderboard_repository.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Mirrors ally-mobile (React Native)'s `formatMinutesToDuration` exactly —
 /// including its hardcoded, un-translated "h"/"min" literals (that util
@@ -79,7 +80,7 @@ class _LeaderboardAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (imageUrl.isNotEmpty) {
       return ClipOval(
-        child: Image.network(imageUrl, width: 36, height: 36, fit: BoxFit.cover),
+        child: SizedNetworkImage(imageUrl, width: 36, height: 36, fit: BoxFit.cover),
       );
     }
     return Container(

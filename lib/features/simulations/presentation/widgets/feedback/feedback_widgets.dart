@@ -9,6 +9,7 @@ import '../../../../../core/theme/app_fonts.dart';
 import '../../../../../core/theme/app_radius.dart';
 import '../../../data/simulation_models.dart';
 import '../../../data/simulations_repository.dart';
+import '../../../../../core/widgets/sized_network_image.dart';
 
 /// Port of RN `SimulationFeedbackScreen/components/SummaryCard`: a white
 /// card (0.5 stroke border, radius 8, soft shadow) with an optional title
@@ -323,7 +324,7 @@ class ShortSessionSummary extends ConsumerWidget {
             if (cover != null && cover.isNotEmpty) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.network(cover, height: 152.9, fit: BoxFit.cover),
+                child: SizedNetworkImage(cover, height: 152.9, fit: BoxFit.cover),
               ),
               const SizedBox(height: 16),
             ],

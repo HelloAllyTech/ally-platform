@@ -8,6 +8,7 @@ import '../../../core/widgets/back_title_header.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../data/emoji_catalog.dart';
 import '../data/reactions_repository.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of ally-mobile (React Native)'s `ReactionsScreen` — a view-only
 /// who-reacted-with-what list, filterable by an "All"/per-emoji tab row
@@ -336,7 +337,7 @@ class _ReactionRow extends StatelessWidget {
                   width: 40,
                   height: 40,
                   child: (image?.isNotEmpty ?? false)
-                      ? Image.network(image!, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink())
+                      ? SizedNetworkImage(image!, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink())
                       : Container(
                           color: AppColors.grey200,
                           alignment: Alignment.center,

@@ -16,6 +16,7 @@ import '../data/review_models.dart';
 import 'comment_list_controller.dart';
 import 'review_formatting.dart';
 import 'review_styles.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of RN's shared `UserProfileImage`: a circle with a 1pt lightGray17
 /// (#D2D2D2) border on lightGray, showing the image or the name's first
@@ -49,7 +50,7 @@ class ReviewUserAvatar extends StatelessWidget {
         border: Border.all(color: AppColors.strokePrimary),
       ),
       child: (url != null && url.isNotEmpty)
-          ? Image.network(
+          ? SizedNetworkImage(
               url,
               width: size,
               height: size,
