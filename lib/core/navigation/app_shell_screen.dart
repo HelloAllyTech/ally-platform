@@ -139,6 +139,10 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
             );
 
         final scaffold = Scaffold(
+          // Shows through above the SafeArea, behind the status bar. Every
+          // tab screen is white and RN draws its white container under the
+          // status bar, so the theme's off-white left a grey strip here.
+          backgroundColor: Colors.white,
           drawer: AppDrawer(permissions: permissions, activeTabName: _selectedTabName),
           body: Builder(
             builder: (context) => Stack(

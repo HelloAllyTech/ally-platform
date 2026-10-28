@@ -121,7 +121,15 @@ class TabScreenHeader extends StatelessWidget {
           // which the busiest screens already use for credits/badge counts.
           ProgressHeaderWidget(isOnProgressScreen: hideProgressWidget),
           if (trailing != null) const SizedBox(width: 12),
-          if (trailing != null) Flexible(child: trailing!),
+          // Capped rather than `Flexible`: a Flexible here shares the free
+          // width with the title's Expanded, and spaceBetween then pushed
+          // the title right of the menu icon. The cap still keeps a wide
+          // control (Leaderboard's "7 Badges") from overflowing the row.
+          if (trailing != null)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.45),
+              child: trailing!,
+            ),
         ],
       ),
     );

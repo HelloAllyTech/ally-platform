@@ -51,34 +51,37 @@ void main() {
     expect(find.byKey(const Key('leading')), findsOneWidget);
   });
 
-  testWidgets('trailing is wrapped in Flexible, so it can shrink instead of overflowing the row', (
-    tester,
-  ) async {
-    // Regression test for a real RenderFlex overflow, found via a direct
-    // screenshot render with the app's real fonts loaded (not reproducible
-    // in an ordinary widget test, which uses a fallback test font whose
-    // glyphs measure narrower and hid the bug entirely — confirmed by
-    // trying; loading real fonts inside a single test to force it proved
-    // too fragile, hanging instead of failing cleanly). `trailing` had no
-    // flex/shrink behavior at all, so a title long enough to need its own
-    // space plus a wide trailing control (e.g. LeaderboardScreen's icon +
-    // "7 Badges" button) could together demand more width than the row
-    // actually had. Asserting the fix's actual mechanism — a `Flexible`
-    // ancestor — is deterministic regardless of font metrics, unlike
-    // reproducing the overflow pixel-for-pixel.
+  testWidgets('a wide trailing control is capped instead of overflowing the row', (tester) async {
+    // Leaderboard's icon + "7 Badges" button once overflowed this row. The
+    // trailing slot is width-capped rather than Flexible: a Flexible split
+    // the free width with the title and pushed it away from the menu.
     await tester.pumpWidget(
       _wrap(
         const TabScreenHeader(
           title: 'Community',
-          trailing: Icon(Icons.badge, key: Key('trailing')),
+          trailing: SizedBox(key: Key('trailing'), width: 2000, height: 10),
         ),
       ),
     );
 
-    expect(
-      find.ancestor(of: find.byKey(const Key('trailing')), matching: find.byType(Flexible)),
-      findsOneWidget,
+    expect(tester.takeException(), isNull);
+    final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getSize(find.byKey(const Key('trailing'))).width, lessThanOrEqualTo(width * 0.45));
+  });
+
+  testWidgets('the title starts right after the leading control', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const TabScreenHeader(
+          title: 'Ally',
+          leading: SizedBox(key: Key('leading'), width: 24, height: 20),
+          trailing: Text('23/120'),
+        ),
+      ),
     );
+
+    final leadingRight = tester.getRect(find.byKey(const Key('leading'))).right;
+    expect(tester.getRect(find.textContaining('Ally')).left, leadingRight + 6);
   });
 
   testWidgets('omits the bottom border when showBorder is false', (tester) async {
