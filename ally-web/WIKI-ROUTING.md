@@ -33,7 +33,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `platform/overview.md` (432w) — What Ally is, its mission, and the multi-repo ecosystem that makes up the platform
 - `platform/scribe-summary-writes.md` (1332w) — Why scribe session notes appeared not to save, the merge-based write contract that replaced the…
 - `platform/stats.md` (175w) — Generated counts of the things prose keeps getting wrong — entities, migrations, modules, providers. Regenerated…
-- `platform/storage-archive.md` (1009w) — The plan and recorded decisions for cutting the AWS storage bill — a weekly job…
+- `platform/storage-archive.md` (1012w) — The plan and recorded decisions for cutting the AWS storage bill — a weekly job…
 - `platform/tech-stack.md` (660w) — The polyglot technology stack used across Ally's frontend, mobile, backend, AI, and infrastructure layers
 
 ## Per-repo pages
@@ -79,4 +79,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_46 pages, 82,218 words total. Loading all of it would cost roughly 109,624 tokens — which is the entire reason this index exists._
+_46 pages, 82,221 words total. Loading all of it would cost roughly 109,628 tokens — which is the entire reason this index exists._
