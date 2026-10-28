@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
+
 /// Port of ally-mobile (React Native)'s `src/components/RichText/RichText.tsx`
 /// — renders the constrained HTML the backend stores for article/simulation
 /// copy as native widgets, not a WebView. Supports the same tag set: p,
@@ -178,7 +181,7 @@ TextStyle? _inlineStyle(String tag) {
   switch (tag) {
     case 'strong':
     case 'b':
-      return const TextStyle(fontWeight: FontWeight.w600);
+      return const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium);
     case 'em':
     case 'i':
       return const TextStyle(fontStyle: FontStyle.italic);
@@ -205,10 +208,14 @@ Widget _paragraph(List<Object> inlineNodes, bool dark, {TextStyle? style}) {
   );
 }
 
+// RN's styles.paragraph / listItemText: IBM_PLEX_SERIF.REGULAR 14/22 in
+// darkCharcoal. Without an explicit family, `RichText` (which doesn't inherit
+// DefaultTextStyle) fell back to the platform sans font.
 TextStyle _paragraphStyle(bool dark) => TextStyle(
+  fontFamily: AppFonts.ibmPlexSerifRegular,
   fontSize: 14,
   height: 22 / 14,
-  color: dark ? const Color(0xFFD9D9DC) : Colors.black87,
+  color: dark ? const Color(0xFFD9D9DC) : AppColors.darkCharcoal,
 );
 
 Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
@@ -233,10 +240,7 @@ Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
           width: 20,
           child: Text(
             ordered ? '${index + 1}.' : '•',
-            style: TextStyle(
-              color: dark ? const Color(0xFFD9D9DC) : Colors.black87,
-              fontSize: 14,
-            ),
+            style: _paragraphStyle(dark),
           ),
         ),
         Expanded(child: body),
@@ -255,7 +259,7 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
           style: TextStyle(
             fontSize: 20,
             height: 28 / 20,
-            fontWeight: FontWeight.w600,
+            fontFamily: AppFonts.ibmPlexSerifMedium,
             color: dark ? const Color(0xFFD9D9DC) : Colors.black,
           ),
         ),
@@ -268,7 +272,7 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
           style: TextStyle(
             fontSize: 18,
             height: 26 / 18,
-            fontWeight: FontWeight.w600,
+            fontFamily: AppFonts.ibmPlexSerifMedium,
             color: dark ? const Color(0xFFD9D9DC) : Colors.black,
           ),
         ),
@@ -281,7 +285,7 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
-            fontWeight: FontWeight.w600,
+            fontFamily: AppFonts.ibmPlexSerifMedium,
             color: dark ? const Color(0xFFD9D9DC) : Colors.black,
           ),
         ),
