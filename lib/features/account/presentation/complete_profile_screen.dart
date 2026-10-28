@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/chat/active_chat_discovery.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/account_repository.dart';
@@ -23,12 +25,11 @@ const _systemFont = 'CupertinoSystemText';
 /// Typography, ashGray input (darkGray2 when focused) and spacing follow
 /// CompleteProfileScreen.tsx's ScaledSheet; all its text is system font.
 ///
-/// Not ported: on success RN does `navigation.reset` back to the Splash
-/// screen to re-run its full auth-routing effect, which (among other
-/// things) checks for an active counsellor chat session to resume —
-/// this just navigates to `/home` directly, skipping that active-session
-/// check. Replicating it needs Splash's whole routing effect ported
-/// first, out of scope for this screen alone.
+/// On success RN does `navigation.reset` back to the Splash screen, whose
+/// routing effect re-runs the active counsellor-chat check before landing
+/// on Home. Here: run that same check ([checkForActiveChat]) first — it
+/// routes to the live chat itself when there is one — and only go to
+/// `/home` when it didn't navigate anywhere.
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
 
@@ -63,7 +64,18 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     try {
       await ref.read(accountRepositoryProvider).completeProfile(name: _nameController.text.trim());
       ref.invalidate(currentUserProvider);
-      if (mounted) context.go('/home');
+      if (!mounted) return;
+      final router = GoRouter.of(context);
+      // `go()` swaps the information provider's value synchronously, so an
+      // identity change means the check already routed to a live chat.
+      final before = router.routeInformationProvider.value;
+      // The check reads permissions synchronously; make sure they've loaded.
+      try {
+        await ref.read(userPermissionsProvider.future);
+      } catch (_) {}
+      if (!mounted) return;
+      await checkForActiveChat(ref, router);
+      if (identical(router.routeInformationProvider.value, before)) router.go('/home');
     } catch (e) {
       if (!mounted) return;
       // RN's mutation stops loading before its Alert shows.
