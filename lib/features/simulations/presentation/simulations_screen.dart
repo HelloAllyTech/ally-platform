@@ -290,7 +290,7 @@ class _ListTitle extends StatelessWidget {
       child: Text.rich(
         TextSpan(
           style: const TextStyle(
-            fontFamily: AppFonts.replayProHeadline,
+            fontFamily: AppFonts.replayProBold,
             fontSize: 18,
             height: 24 / 18,
             letterSpacing: 0.18,

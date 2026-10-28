@@ -88,7 +88,7 @@ class TabScreenHeader extends StatelessWidget {
                     TextSpan(
                       text: title,
                       style: const TextStyle(
-                        fontFamily: AppFonts.replayProHeadline,
+                        fontFamily: AppFonts.replayProBold,
                         fontSize: 18,
                         height: 24 / 18,
                         letterSpacing: 0.18,
@@ -100,7 +100,10 @@ class TabScreenHeader extends StatelessWidget {
                           TextSpan(
                             text: ' $subtitle',
                             style: TextStyle(
-                              fontFamily: italicSubtitle ? AppFonts.replayProBoldItalic : null,
+                              // RN's nested <Text> re-resolves the inherited 'ReplayPro-Headline'
+                              // with its own light weight, landing back on Headline, not the
+                              // title's Bold.
+                              fontFamily: italicSubtitle ? AppFonts.replayProBoldItalic : AppFonts.replayProHeadline,
                               fontWeight: FontWeight.w300,
                               fontStyle: italicSubtitle ? FontStyle.italic : FontStyle.normal,
                             ),

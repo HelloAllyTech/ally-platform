@@ -112,7 +112,7 @@ class _ChecklistPanelState extends State<ChecklistPanel> {
                             Text(
                               ref.t('simulationPage.sessionChecklist'),
                               style: const TextStyle(
-                                fontFamily: AppFonts.ibmPlexSerifRegular,
+                                fontFamily: AppFonts.ibmPlexSerifMedium,
                                 fontSize: 18,
                                 height: 22 / 18,
                                 fontWeight: FontWeight.w500,
@@ -237,7 +237,7 @@ class _ChecklistRow extends StatelessWidget {
                         displayText,
                         key: ValueKey('checklist-item-${item.id}'),
                         style: const TextStyle(
-                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontFamily: AppFonts.ibmPlexSerifMedium,
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                           color: Colors.white,

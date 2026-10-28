@@ -485,7 +485,7 @@ class SummaryProgressButtons extends ConsumerWidget {
 
   static const _text = TextStyle(
     fontFamily: AppFonts.robotoRegular,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
     fontSize: 16,
     color: AppColors.darkGray10,
   );

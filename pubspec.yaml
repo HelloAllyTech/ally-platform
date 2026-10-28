@@ -239,6 +239,7 @@ flutter:
     - family: ReplayPro-BoldItalic
       fonts:
         - asset: assets/fonts/ReplayPro-BoldItalic.otf
+          style: italic
     - family: Roboto-Regular
       fonts:
         - asset: assets/fonts/Roboto-Regular.ttf

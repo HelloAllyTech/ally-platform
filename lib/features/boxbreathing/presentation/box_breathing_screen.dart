@@ -253,7 +253,7 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 48,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w400,
                         fontFamily: AppFonts.robotoRegular,
                       ),
                     ),

@@ -100,7 +100,7 @@ class _LeaderboardAvatar extends StatelessWidget {
           fontSize: 12,
           height: 16 / 12,
           letterSpacing: 0.2,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
           color: AppColors.iconDefault,
         ),
       ),

@@ -662,7 +662,7 @@ class _ActionsMenu extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontFamily: AppFonts.ibmPlexSerifMedium,
                   fontSize: 12,
                   height: 16 / 12,
                   letterSpacing: 0.2,

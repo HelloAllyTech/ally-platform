@@ -543,10 +543,10 @@ class _ReactionBubbles extends StatelessWidget {
                 child: Text(
                   shown[i],
                   style: const TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
                     fontSize: 8.62,
                     height: 12 / 8.62,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.darkGray17,
                   ),
                 ),

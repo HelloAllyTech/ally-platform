@@ -602,7 +602,7 @@ class _RetrySessionModalState extends ConsumerState<RetrySessionModal> {
             ref.t('common.maxActiveUsers.title'),
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontFamily: AppFonts.replayProHeadline,
+              fontFamily: AppFonts.replayProBold,
               fontSize: 16,
               height: 24 / 16,
               letterSpacing: 0.5,

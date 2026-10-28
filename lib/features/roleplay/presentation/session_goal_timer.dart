@@ -66,7 +66,7 @@ class SessionGoalTimer extends ConsumerWidget {
     final rn = RnSize.of(context);
     final maxSeconds = parseGoalTimeValue(maxTimeValue);
     const labelStyle = TextStyle(
-      fontFamily: AppFonts.ibmPlexSerifRegular,
+      fontFamily: AppFonts.ibmPlexSerifMedium,
       fontSize: 10,
       fontWeight: FontWeight.w500,
       letterSpacing: 0.5,
@@ -75,7 +75,7 @@ class SessionGoalTimer extends ConsumerWidget {
     const valueStyle = TextStyle(
       fontFamily: AppFonts.ibmPlexSerifMedium,
       fontSize: 14,
-      fontWeight: FontWeight.bold,
+      fontWeight: FontWeight.w500,
     );
     return ValueListenableBuilder<Duration>(
       valueListenable: elapsed,

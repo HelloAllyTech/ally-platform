@@ -272,7 +272,7 @@ class _BadgeCard extends ConsumerWidget {
                     textAlign: TextAlign.center,
                     // typography.body.large, medium weight.
                     style: const TextStyle(
-                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontFamily: AppFonts.ibmPlexSerifMedium,
                       fontSize: 16,
                       height: 24 / 16,
                       letterSpacing: 0.5,

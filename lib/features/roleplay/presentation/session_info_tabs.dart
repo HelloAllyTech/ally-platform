@@ -156,7 +156,7 @@ class _InfoTabButton extends ConsumerWidget {
                 Text(
                   ref.t(labelKey),
                   style: TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: color,
