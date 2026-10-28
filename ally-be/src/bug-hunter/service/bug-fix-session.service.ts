@@ -324,6 +324,11 @@ export class BugFixSessionService {
     await this.budgetService.assertCanStartSession(finding, {
       force: false,
       userId: null,
+      // The escalation cap stops Bug Hunter asking again, and asking once is
+      // usually what reached it. Answering resolves that question, so it must
+      // not also block the session the answer was given to start — that left
+      // every answered bug at Needs input. The other caps still apply.
+      ignore: actor === 'answer' ? ['escalations'] : [],
     });
     await this.dispatchFix(finding, repo, actor);
     return this.bugFindingService.getOne(finding.id);

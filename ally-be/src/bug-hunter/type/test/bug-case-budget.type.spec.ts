@@ -80,6 +80,21 @@ describe('bug case budget', () => {
     expect(explainSessionRefusal(spent)).toMatch(/start it anyway/);
   });
 
+  it('leaves ignored kinds out of the refusal, and still refuses on the rest', () => {
+    const asked = chargeBudget(withBudgetDefaults(null), 'escalations', 1);
+    expect(explainSessionRefusal(asked)).toMatch(/asked for help/);
+    expect(explainSessionRefusal(asked, ['escalations'])).toBeNull();
+
+    const askedAndSpent = chargeBudget(
+      chargeBudget(asked, 'sessions', 1),
+      'sessions',
+      1,
+    );
+    expect(explainSessionRefusal(askedAndSpent, ['escalations'])).toMatch(
+      /already run 2 fix sessions/,
+    );
+  });
+
   it('records an override and lifts the exhausted flag so the next breach is seen again', () => {
     const spent = chargeBudget(
       chargeBudget(withBudgetDefaults(null), 'sessions', 1),

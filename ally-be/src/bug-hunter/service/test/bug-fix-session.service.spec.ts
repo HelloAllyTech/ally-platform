@@ -282,9 +282,11 @@ describe('BugFixSessionService', () => {
 
       await service.continueAfterAnswer('finding-1');
 
+      // The answer resolves the question that spent the escalation cap, so
+      // that cap alone must not refuse the session; every other cap still does.
       expect(budgetService.assertCanStartSession).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'finding-1' }),
-        { force: false, userId: null },
+        { force: false, userId: null, ignore: ['escalations'] },
       );
       expect(github.dispatchWorkflow).toHaveBeenCalled();
       expect(bugHunterService.appendEvent).toHaveBeenCalledWith(
