@@ -15,20 +15,27 @@ class ScribeReviewsRepository {
 
   final Dio _dio;
 
-  Future<List<ReviewItem>> getScribeReviews({String? readFilter, String sortBy = 'LATEST'}) async {
+  /// One page of RN's `useReviews` infinite list (`LIMIT = 10`).
+  Future<ReviewsPage> getScribeReviews({
+    String? readFilter,
+    String sortBy = 'LATEST',
+    int limit = 10,
+    int offset = 0,
+  }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/scribe-session-reviews',
       queryParameters: {
         'sortBy': sortBy,
-        'limit': 25,
-        'offset': 0,
+        'limit': limit,
+        'offset': offset,
         'readFilter': ?readFilter,
       },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => ReviewItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return (
+      items: data.map((e) => ReviewItem.fromJson(e as Map<String, dynamic>)).toList(),
+      count: (response.data?['count'] as num?)?.toInt() ?? data.length,
+    );
   }
 
   Future<ReviewItem> getScribeReview(String reviewId) async {
@@ -194,14 +201,6 @@ final scribeReviewsRepositoryProvider = Provider<ScribeReviewsRepository>((ref) 
   return ScribeReviewsRepository(ref.watch(apiClientProvider));
 });
 
-final scribeReviewsListProvider = FutureProvider.family<List<ReviewItem>, ReviewListQuery>((
-  ref,
-  query,
-) {
-  return ref
-      .watch(scribeReviewsRepositoryProvider)
-      .getScribeReviews(readFilter: query.readFilter.apiValue, sortBy: query.sortBy.apiValue);
-});
 
 final scribeReviewDetailProvider = FutureProvider.family<ReviewItem, String>((
   ref,

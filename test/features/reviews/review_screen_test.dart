@@ -68,7 +68,7 @@ void main() {
   }
 
   testWidgets('shows an empty state when there are no reviews', (tester) async {
-    when(() => repository.getReviews()).thenAnswer((_) async => []);
+    when(() => repository.getReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset'))).thenAnswer((_) async => (items: <ReviewItem>[], count: 0));
 
     await pumpReview(
       tester,
@@ -80,9 +80,7 @@ void main() {
   });
 
   testWidgets('renders review rows with note, summary name and comment count', (tester) async {
-    when(() => repository.getReviews()).thenAnswer(
-      (_) async => [review(id: 'rev-1', note: 'please check this', commentsCount: 4)],
-    );
+    when(() => repository.getReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset'))).thenAnswer((_) async => (items: [review(id: 'rev-1', note: 'please check this', commentsCount: 4)], count: 0));
 
     await pumpReview(
       tester,
@@ -92,11 +90,11 @@ void main() {
 
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('please check this'), findsOneWidget);
-    expect(find.text('4 comments'), findsOneWidget);
+    expect(find.text('4 Comments'), findsOneWidget);
   });
 
-  testWidgets('tapping a review marks it read and navigates to its detail route', (tester) async {
-    when(() => repository.getReviews()).thenAnswer((_) async => [review(id: 'rev-42')]);
+  testWidgets('tapping Review Conversation navigates to the detail route without marking it read', (tester) async {
+    when(() => repository.getReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset'))).thenAnswer((_) async => (items: [review(id: 'rev-42')], count: 0));
     when(() => repository.markAsRead('rev-42')).thenAnswer((_) async {});
 
     final router = GoRouter(
@@ -128,10 +126,13 @@ void main() {
     // Tapping the user's name/avatar does nothing on the real card — only
     // the "Review Conversation" link (or the comment count) opens the
     // detail screen, confirmed from the real ReviewCard source.
+    await tester.ensureVisible(find.text('Review Conversation'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Review Conversation'));
     await tester.pumpAndSettle();
 
-    verify(() => repository.markAsRead('rev-42')).called(1);
+    // RN marks a review read from the details screen (after 10s), not here.
+    verifyNever(() => repository.markAsRead(any()));
     expect(find.text('review-detail-rev-42'), findsOneWidget);
   });
 }

@@ -149,4 +149,15 @@ class AppColors {
   // box breathing parity (src/theme/colors.ts)
   static const black0 = Color(0x1A000000); // rgba(0,0,0,0.1) BreathingScreen gradient bottom
   static const darkBlue3 = Color(0xFF0A1F3C); // CallEndOverlay gradient bottom
+  // reviews parity (src/theme/colors.ts + designSystem/colors.ts)
+  static const lightGray9 = Color(0xFFFBFBFB); // ReviewScreen list background
+  static const lightGrayD9 = Color(0xFFD9D9D9); // ReviewComment separator dot
+  static const lightGray11 = Color(0xFF6C6C6C); // ActionsMenu shadow
+  static const darkGray17 = Color(0xFF1A1A1A); // ReviewComment reaction emoji
+  static const azureBlue = Color(0xFF0957D0); // ReactionFilterTabs indicator
+  static const amber500 = Color(0xFFFFC107); // transcript comment underline
+  static const transcriptHighlight = Color(0x80FFF8E1); // rgba(255,248,225,0.5)
+  static const green200 = Color(0xFFA5D6A7); // CustomSwitch "Share" track
+  static const whiteTransparent40 = Color(0x66FFFFFF); // thread card fade
+  static const whiteTransparent60 = Color(0x99FFFFFF); // thread card fade
 }

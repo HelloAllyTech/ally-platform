@@ -46,7 +46,7 @@ void main() {
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'LATEST',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
             },
           )).thenAnswer(
@@ -57,13 +57,13 @@ void main() {
 
       final result = await repository.getReviews();
 
-      expect(result, hasLength(1));
-      expect(result.first.id, 'rev-1');
+      expect(result.items, hasLength(1));
+      expect(result.items.first.id, 'rev-1');
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'LATEST',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
             },
           )).called(1);
@@ -74,7 +74,7 @@ void main() {
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'MOST_COMMENTED',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
               'readFilter': 'UNREAD',
             },
@@ -82,12 +82,12 @@ void main() {
 
       final result = await repository.getReviews(readFilter: 'UNREAD', sortBy: 'MOST_COMMENTED');
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'MOST_COMMENTED',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
               'readFilter': 'UNREAD',
             },
@@ -102,7 +102,7 @@ void main() {
 
       final result = await repository.getReviews();
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
     });
   });
 

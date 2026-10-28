@@ -17,21 +17,22 @@ class MockReviewsRepository extends Mock implements ReviewsRepository {}
 // ancestor since `ShareForReviewScreen` navigates via `context.go('/home')`
 // on success.
 void main() {
-  testWidgets('submitting a note calls createReview and navigates home on success', (tester) async {
+  testWidgets('submitting a note calls createReview and shows the success toast and goes back (RN navigation.goBack)', (tester) async {
     final repository = MockReviewsRepository();
     when(() => repository.createReview(scenarioSessionId: 'sess-1', note: 'please check this'))
         .thenAnswer((_) async {});
 
     SharedPreferences.setMockInitialValues({});
     final router = GoRouter(
-      initialLocation: '/',
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const ShareForReviewScreen(scenarioSessionId: 'sess-1'),
-        ),
-        GoRoute(path: '/home', builder: (context, state) => const Text('home-screen')),
-      ],
+
+        initialLocation: '/share',
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const Text('home-screen'),
+            routes: [GoRoute(path: 'share', builder: (context, state) => const ShareForReviewScreen(scenarioSessionId: 'sess-1'))],
+          ),
+        ],
     );
     addTearDown(router.dispose);
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/review_type_chip.dart';
+import 'package:ally_mobile_flutter/features/reviews/data/review_api.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/presentation/review_card.dart';
 
@@ -11,17 +13,19 @@ import '../../../support/pump_app.dart';
 
 ReviewItem _simulationReview({
   String note = 'Great session overall.',
+  String description = 'A tough case.',
+  int commentsCount = 2,
   ReviewScenarioSession? scenarioSession,
 }) => ReviewItem(
   id: 'rev-1',
   createdAt: DateTime.now().toUtc().subtract(const Duration(days: 2)).toIso8601String(),
   note: note,
   createdBy: ReviewAuthor(id: 1, name: 'Dr. Patel', profileImage: ''),
-  commentsCount: 2,
+  commentsCount: commentsCount,
   summaryName: null,
-  scenario: ReviewScenario(title: 'Help Sandeep balance work and life', description: 'A tough case.'),
+  scenario: ReviewScenario(title: 'Help Sandeep balance work and life', description: description),
   scenarioSession: scenarioSession ?? ReviewScenarioSession(duration: '277', createdAt: '2026-06-02T21:10:00'),
-  reactions: {'HAPPY': 2, 'SAD': 1},
+  reactions: {'1f44d': 2, '2764-fe0f': 1},
 );
 
 ReviewItem _scribeReview() => ReviewItem(
@@ -43,12 +47,11 @@ void main() {
     return pumpApp(
       tester,
       Scaffold(
-        body: ReviewCard(
+        body: SingleChildScrollView(child: ReviewCard(
           review: review,
           reviewType: reviewType,
-          canViewDetails: true,
           onOpenReview: onOpen ?? () {},
-        ),
+        )),
       ),
       overrides: [fixedTranslationsOverride()],
     );
@@ -82,6 +85,7 @@ void main() {
     var opened = false;
     await pump(tester, _simulationReview(), ReviewType.simulation, onOpen: () => opened = true);
 
+    await tester.ensureVisible(find.text('Review Conversation'));
     await tester.tap(find.text('Review Conversation'));
     await tester.pump();
 
@@ -114,7 +118,7 @@ void main() {
     await pumpApp(
       tester,
       Scaffold(
-        body: ReviewCard(
+        body: SingleChildScrollView(child: ReviewCard(
           review: _simulationReview(
             scenarioSession: ReviewScenarioSession(
               duration: '277',
@@ -122,10 +126,9 @@ void main() {
             ),
           ),
           reviewType: ReviewType.simulation,
-          canViewDetails: true,
           onOpenReview: () {},
           audioPlayerController: FakeSimulationAudioPlaybackController(),
-        ),
+        )),
       ),
       overrides: [fixedTranslationsOverride()],
     );
@@ -133,20 +136,30 @@ void main() {
     expect(find.byKey(const ValueKey('simulation-audio-player-toggle')), findsOneWidget);
   });
 
-  testWidgets('tapping "View more" expands the description, and toggles back on "View less"', (
+  testWidgets('a short description shows no "View more" toggle (RN only shows it once text overflows)', (
     tester,
   ) async {
     await pump(tester, _simulationReview(), ReviewType.simulation);
+    expect(find.text('A tough case.'), findsOneWidget);
+    expect(find.text('View more'), findsNothing);
+  });
+
+  testWidgets('tapping "View more" expands the description, and toggles back on "View less"', (
+    tester,
+  ) async {
+    await pump(tester, _simulationReview(description: 'A long scenario description. ' * 20), ReviewType.simulation);
 
     expect(find.text('View more'), findsOneWidget);
     expect(find.text('View less'), findsNothing);
 
+    await tester.ensureVisible(find.text('View more'));
     await tester.tap(find.text('View more'));
     await tester.pump();
 
     expect(find.text('View less'), findsOneWidget);
     expect(find.text('View more'), findsNothing);
 
+    await tester.ensureVisible(find.text('View less'));
     await tester.tap(find.text('View less'));
     await tester.pump();
 
@@ -206,12 +219,100 @@ void main() {
         commentsCount: 1,
         summaryName: null,
         scenario: ReviewScenario(title: 'T'),
-        reactions: {'HAPPY': 1},
+        reactions: {'1f44d': 1},
       ),
       ReviewType.simulation,
     );
 
     expect(find.text('1 reaction'), findsOneWidget);
-    expect(find.text('1 comment'), findsOneWidget);
+    expect(find.text('1 Comment'), findsOneWidget);
+  });
+
+  testWidgets('without view permission (no onOpenReview) the Review Conversation link is hidden', (tester) async {
+    await pumpApp(
+      tester,
+      Scaffold(
+        body: SingleChildScrollView(
+          child: ReviewCard(review: _simulationReview(), reviewType: ReviewType.simulation, onOpenReview: null),
+        ),
+      ),
+      overrides: [fixedTranslationsOverride()],
+    );
+    expect(find.text('Review Conversation'), findsNothing);
+  });
+
+  group('inline expanded comments (RN ExpandedComments)', () {
+    late _MockReviewApi api;
+
+    ThreadComment comment(String id, String content) => ThreadComment(
+      id: id,
+      content: content,
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+      authorName: 'Reviewer $id',
+      reactions: const {},
+      myReaction: null,
+      replyCount: 0,
+    );
+
+    Future<void> pumpWithApi(WidgetTester tester, ReviewItem review, {VoidCallback? onOpen}) => pumpApp(
+      tester,
+      Scaffold(
+        body: SingleChildScrollView(
+          child: ReviewCard(review: review, reviewType: ReviewType.simulation, onOpenReview: onOpen ?? () {}),
+        ),
+      ),
+      overrides: [
+        fixedTranslationsOverride(),
+        reviewApiProvider(ReviewType.simulation).overrideWithValue(api),
+      ],
+    );
+
+    setUp(() => api = _MockReviewApi());
+
+    testWidgets('tapping the comment count loads the overview once and expands; Collapse hides it', (tester) async {
+      when(() => api.getCommentsOverview('rev-1')).thenAnswer(
+        (_) async => (comments: [comment('c1', 'First thought'), comment('c2', 'Second thought')], count: 5),
+      );
+      var opened = 0;
+      await pumpWithApi(tester, _simulationReview(commentsCount: 5), onOpen: () => opened++);
+
+      await tester.ensureVisible(find.byKey(const Key('review-card-comments')));
+      await tester.tap(find.byKey(const Key('review-card-comments')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('expanded-comments')), findsOneWidget);
+      expect(find.text('First thought'), findsOneWidget);
+      expect(find.text('Second thought'), findsOneWidget);
+      expect(find.text('Show more'), findsOneWidget, reason: 'count 5 > 2');
+
+      await tester.ensureVisible(find.text('Show more'));
+      await tester.tap(find.text('Show more'));
+      expect(opened, 1);
+
+      await tester.ensureVisible(find.text('Collapse'));
+      await tester.tap(find.text('Collapse'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('expanded-comments')), findsNothing);
+
+      // Re-expanding reuses the loaded page (RN checks generalCommentsData).
+      await tester.ensureVisible(find.byKey(const Key('review-card-comments')));
+      await tester.tap(find.byKey(const Key('review-card-comments')));
+      await tester.pumpAndSettle();
+      expect(find.text('First thought'), findsOneWidget);
+      verify(() => api.getCommentsOverview('rev-1')).called(1);
+    });
+
+    testWidgets('a review with no comments does not expand or fetch', (tester) async {
+      await pumpWithApi(tester, _simulationReview(commentsCount: 0));
+
+      await tester.ensureVisible(find.byKey(const Key('review-card-comments')));
+      await tester.tap(find.byKey(const Key('review-card-comments')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('expanded-comments')), findsNothing);
+      verifyNever(() => api.getCommentsOverview(any()));
+    });
   });
 }
+
+class _MockReviewApi extends Mock implements ReviewApi {}

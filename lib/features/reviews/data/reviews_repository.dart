@@ -20,20 +20,27 @@ class ReviewsRepository {
   /// real query, which sends `sortBy`/`readFilter`/`limit`/`offset` only
   /// (no `order` param; this previously sent `sortBy: 'createdAt', order:
   /// 'DESC'`, a shape the real backend doesn't use at all).
-  Future<List<ReviewItem>> getReviews({String? readFilter, String sortBy = 'LATEST'}) async {
+  /// One page of RN's `useReviews` infinite list (`LIMIT = 10`).
+  Future<ReviewsPage> getReviews({
+    String? readFilter,
+    String sortBy = 'LATEST',
+    int limit = 10,
+    int offset = 0,
+  }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/scenario-session-reviews',
       queryParameters: {
         'sortBy': sortBy,
-        'limit': 25,
-        'offset': 0,
+        'limit': limit,
+        'offset': offset,
         'readFilter': ?readFilter,
       },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => ReviewItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return (
+      items: data.map((e) => ReviewItem.fromJson(e as Map<String, dynamic>)).toList(),
+      count: (response.data?['count'] as num?)?.toInt() ?? data.length,
+    );
   }
 
   Future<ReviewItem> getReview(String reviewId) async {
@@ -209,14 +216,6 @@ final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {
   return ReviewsRepository(ref.watch(apiClientProvider));
 });
 
-final reviewsListProvider = FutureProvider.family<List<ReviewItem>, ReviewListQuery>((
-  ref,
-  query,
-) {
-  return ref
-      .watch(reviewsRepositoryProvider)
-      .getReviews(readFilter: query.readFilter.apiValue, sortBy: query.sortBy.apiValue);
-});
 
 /// Simulation-review half of RN's `hasUnreadReviews` (`simUnread.count +
 /// scribeUnread.count > 0`) — the scribe-review half isn't modeled yet

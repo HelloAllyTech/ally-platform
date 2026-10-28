@@ -23,7 +23,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/scribe-session-reviews',
-          queryParameters: {'sortBy': 'LATEST', 'limit': 25, 'offset': 0},
+          queryParameters: {'sortBy': 'LATEST', 'limit': 10, 'offset': 0},
         ),
       ).thenAnswer(
         (_) async => _response({
@@ -41,9 +41,9 @@ void main() {
 
       final reviews = await repository.getScribeReviews();
 
-      expect(reviews, hasLength(1));
-      expect(reviews.first.id, 'rev-1');
-      expect(reviews.first.createdBy.name, 'Alex');
+      expect(reviews.items, hasLength(1));
+      expect(reviews.items.first.id, 'rev-1');
+      expect(reviews.items.first.createdBy.name, 'Alex');
     });
 
     test('forwards the readFilter query parameter and a non-default sortBy when provided', () async {
@@ -52,7 +52,7 @@ void main() {
           '/scribe-session-reviews',
           queryParameters: {
             'sortBy': 'MOST_VIEWED',
-            'limit': 25,
+            'limit': 10,
             'offset': 0,
             'readFilter': 'UNREAD',
           },
@@ -66,7 +66,7 @@ void main() {
           '/scribe-session-reviews',
           queryParameters: {
             'sortBy': 'MOST_VIEWED',
-            'limit': 25,
+            'limit': 10,
             'offset': 0,
             'readFilter': 'UNREAD',
           },
@@ -84,7 +84,7 @@ void main() {
 
       final reviews = await repository.getScribeReviews();
 
-      expect(reviews, isEmpty);
+      expect(reviews.items, isEmpty);
     });
   });
 

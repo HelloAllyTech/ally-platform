@@ -28,7 +28,8 @@ void main() {
     await tester.tap(find.text('Share'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Failed to share for review'), findsOneWidget);
+    // RN toasts the server message, else the edit-window copy.
+    expect(find.textContaining('Editing time has expired'), findsOneWidget);
     // The button is interactable again (not stuck in its submitting state).
     final button = tester.widget<AppButton>(find.byType(AppButton));
     expect(button.isLoading, isFalse);
