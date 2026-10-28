@@ -36,15 +36,19 @@ jobs:
           SERVICES: s3
         ports:
           - 4566:4566
-        options: >-
-          --health-cmd "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"\\(available\\|running\\)\"'"
-          --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: ally-archiver/go.mod
           cache-dependency-path: ally-archiver/go.sum
+      - name: Wait for LocalStack S3
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4566/_localstack/health | grep -Eq '"s3": "(available|running)"' && exit 0
+            sleep 2
+          done
+          echo "LocalStack S3 did not come up"; exit 1
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w ."; exit 1; }
       - name: go vet

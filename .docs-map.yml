@@ -64,7 +64,7 @@ rules:
     watch:
       - "ally-archiver/cmd/**"
       - "ally-archiver/internal/**/*.go"
-    requires: wiki:repos/ally-archiver.md
+    requires: helloallytech.github.io/wiki/repos/ally-archiver.md
     why: >
       repos/ally-archiver.md documents the commands, packages, object states and safety
       defaults; a change to how objects move or what the UI does must reach it, and a change to
