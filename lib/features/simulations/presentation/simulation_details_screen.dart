@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
@@ -14,11 +15,6 @@ import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/scenario_language_dropdown.dart';
-
-/// Shared-link base for a scenario — RN's `env.ALLY_WEB_URL` (no equivalent
-/// env config exists in this app yet; hardcoded the same way LoginScreen's
-/// Terms/Privacy links are, matching the production value).
-const _allyWebUrl = 'https://app.helloally.ai/';
 
 /// Port of ally-mobile (React Native)'s `SimulationDetailsScreen` — scenario
 /// detail + "start simulation": the "Before you get started" confirmation,
@@ -64,7 +60,7 @@ class _SimulationDetailsScreenState
 
   Future<void> _copyLink() async {
     await Clipboard.setData(
-      ClipboardData(text: '${_allyWebUrl}scenario/${widget.scenarioId}'),
+      ClipboardData(text: '${AppConfig.allyWebUrl}scenario/${widget.scenarioId}'),
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
