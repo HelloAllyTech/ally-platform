@@ -36,6 +36,9 @@ class Scenario {
     this.checklistEvents = const [],
     this.reminders = const [],
     this.showScoreMeter = true,
+    this.timerMode = false,
+    this.stateNames = const [],
+    this.difficultyLevel,
   });
 
   factory Scenario.fromJson(Map<String, dynamic> json) => Scenario(
@@ -71,6 +74,12 @@ class Scenario {
     // (`isSimulationInProgress && scenario?.showScoreMeter !== false`), not
     // gated to FEEDBACK mode specifically.
     showScoreMeter: json['showScoreMeter'] as bool? ?? true,
+    timerMode: json['timerMode'] as bool? ?? false,
+    stateNames: (json['stateNames'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(StateInstruction.fromJson)
+        .toList(),
+    difficultyLevel: json['difficultyLevel'] as String?,
   );
 
   final int id;
@@ -110,10 +119,35 @@ class Scenario {
   /// Opt-out: the live score meter shows unless this is explicitly `false`.
   final bool showScoreMeter;
 
+  /// RN `timerMode`: shows the live `SessionGoalTimer` (time remaining
+  /// against [maxTimeValue]) under the session timer.
+  final bool timerMode;
+
+  /// RN `stateNames`: the conversational states the learner moves the
+  /// client through, drawn as the live `SessionProgress` stepper. Which one
+  /// is current comes from the accumulated score and [difficultyLevel].
+  final List<StateInstruction> stateNames;
+
+  /// RN `difficultyLevel` ('EASY'/'MEDIUM'/'HARD').
+  final String? difficultyLevel;
+
   /// Mirrors RN's `hasChecklist` (`SimulationAssistantScreen.tsx`): a
   /// CHECKLIST-mode scenario with zero checklist-visible events falls back
   /// to the plain layout rather than showing an empty panel.
   bool get hasChecklist => experienceMode == 'CHECKLIST' && checklistEvents.isNotEmpty;
+}
+
+/// RN `StateInstruction` (`src/types/simulations.ts`).
+class StateInstruction {
+  const StateInstruction({required this.stateId, required this.name});
+
+  factory StateInstruction.fromJson(Map<String, dynamic> json) => StateInstruction(
+    stateId: '${json['stateId'] ?? ''}',
+    name: json['name'] as String? ?? '',
+  );
+
+  final String stateId;
+  final String name;
 }
 
 /// Mirrors RN's `ChecklistItem` (`src/types/simulations.ts`) — a single

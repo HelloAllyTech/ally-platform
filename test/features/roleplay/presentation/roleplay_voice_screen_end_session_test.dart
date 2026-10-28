@@ -39,8 +39,6 @@ void main() {
         simulationsRepositoryProvider.overrideWithValue(simulationsRepository),
       ],
     );
-    await tester.tap(find.text('Connect'));
-    await tester.pump();
     // See roleplay_voice_screen_connected_flow_test.dart: the 3-2-1
     // countdown blocks the live-call UI for 3s after connecting, and the
     // session timer it starts is a live `Timer.periodic` for the rest of

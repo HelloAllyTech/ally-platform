@@ -315,15 +315,18 @@ void main() {
   });
 
   group('endScenarioSession', () {
-    test('POSTs to the session end route', () async {
+    test('POSTs to the session end route with enableRecommendations', () async {
       when(
-        () => dio.post<void>('/learn/scenario-session/sess-1/end'),
+        () => dio.post<void>('/learn/scenario-session/sess-1/end', data: any(named: 'data')),
       ).thenAnswer((_) async => _response<void>(null));
 
       await repository.endScenarioSession('sess-1');
 
       verify(
-        () => dio.post<void>('/learn/scenario-session/sess-1/end'),
+        () => dio.post<void>(
+          '/learn/scenario-session/sess-1/end',
+          data: {'enableRecommendations': true},
+        ),
       ).called(1);
     });
   });

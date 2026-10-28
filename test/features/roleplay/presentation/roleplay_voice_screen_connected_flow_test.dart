@@ -36,8 +36,6 @@ void main() {
         overrides: [liveKitRoomServiceProvider.overrideWithValue(liveKitService)],
       );
 
-      await tester.tap(find.text('Connect'));
-      await tester.pump();
       // A fixed 3-2-1 countdown overlay blocks the live-call UI for 3s after
       // connecting (mirrors RN's own SimulationCountdown) — advance past it
       // explicitly; `pump(duration)` already rebuilds once after firing the

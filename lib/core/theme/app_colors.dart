@@ -192,4 +192,7 @@ class AppColors {
   static const transcriptHighlight = Color(0x80FFF8E1); // rgba(255,248,225,0.5)
   static const whiteTransparent40 = Color(0x66FFFFFF); // thread card fade
   static const whiteTransparent60 = Color(0x99FFFFFF); // thread card fade
+  // live parity (SimulationAssistantScreen, ListeningScreen)
+  static const brightRed = Color(0xFFF93535); // colors.brightRed: IllustratedModal action
+  static const lightGray6B = Color(0xFF6B7280); // '#6B7280' literal: SessionProgress inactive label
 }

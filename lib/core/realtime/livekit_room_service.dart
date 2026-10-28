@@ -14,7 +14,11 @@ import 'package:livekit_client/livekit_client.dart';
 /// pause/resume/connection-state control, live supervisor notes) over the
 /// same channel, several with no `topic` at all.
 class LiveKitDataMessage {
-  LiveKitDataMessage({required this.topic, required this.raw, required this.json});
+  LiveKitDataMessage({
+    required this.topic,
+    required this.raw,
+    required this.json,
+  });
 
   /// Decodes a raw data-channel payload — `json` is `null` when the bytes
   /// aren't valid UTF-8 JSON mapping to an object, so a malformed or
@@ -60,7 +64,10 @@ class LiveKitRoomService {
 
   EventsListener<RoomEvent>? _listener;
   final _dataController = StreamController<LiveKitDataMessage>.broadcast();
-  final _activeSpeakersController = StreamController<List<Participant>>.broadcast();
+  final _activeSpeakersController =
+      StreamController<List<Participant>>.broadcast();
+  final _participantConnectedController = StreamController<void>.broadcast();
+  final _disconnectedController = StreamController<void>.broadcast();
 
   /// Every data-channel message received while connected. A broadcast
   /// stream so more than one consumer (e.g. a checklist handler and a
@@ -72,13 +79,28 @@ class LiveKitRoomService {
   /// `roleplay/presentation/turn_state.dart`'s speaking-based turn
   /// derivation, mirroring RN's `useAudioLevel`/`ParticipantEvent.
   /// IsSpeakingChanged`-based tile highlighting.
-  Stream<List<Participant>> get activeSpeakers => _activeSpeakersController.stream;
+  Stream<List<Participant>> get activeSpeakers =>
+      _activeSpeakersController.stream;
 
+  /// A remote participant (the agent) joined the room — RN's
+  /// `RoomEvent.ParticipantConnected`, which starts the session clock and
+  /// the agent's silent-grace window.
+  Stream<void> get participantConnected =>
+      _participantConnectedController.stream;
+
+  /// The room was closed from the other side (agent auto-end, `cap-ended`,
+  /// server teardown, network loss) — RN's `RoomEvent.Disconnected`. Not
+  /// emitted for this client's own [disconnect], whose listener is disposed
+  /// before the room is closed.
+  Stream<void> get disconnected => _disconnectedController.stream;
+
+  /// Listeners are attached BEFORE `room.connect`, as RN's
+  /// `attachRoomListeners` effect does, so an agent that joins while the
+  /// connect call is still settling isn't missed.
   Future<void> connect({
     required String liveKitServerUrl,
     required String accessToken,
   }) async {
-    await room.connect(liveKitServerUrl, accessToken);
     await _listener?.dispose();
     _listener = room.createListener()
       ..on<DataReceivedEvent>((event) {
@@ -86,7 +108,14 @@ class LiveKitRoomService {
       })
       ..on<ActiveSpeakersChangedEvent>((event) {
         _activeSpeakersController.add(event.speakers);
+      })
+      ..on<ParticipantConnectedEvent>((_) {
+        _participantConnectedController.add(null);
+      })
+      ..on<RoomDisconnectedEvent>((_) {
+        _disconnectedController.add(null);
       });
+    await room.connect(liveKitServerUrl, accessToken);
   }
 
   Future<void> setMicrophoneEnabled(bool enabled) async {
@@ -128,6 +157,8 @@ class LiveKitRoomService {
     _room = null;
     await _dataController.close();
     await _activeSpeakersController.close();
+    await _participantConnectedController.close();
+    await _disconnectedController.close();
   }
 }
 
