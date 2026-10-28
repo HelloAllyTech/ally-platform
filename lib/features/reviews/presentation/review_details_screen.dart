@@ -459,7 +459,9 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
     final note = review?.note;
     final hasNote = (note != null && note.isNotEmpty) || canEditNote;
 
-    final children = <Widget>[
+    // Messages are built lazily by the list below (the transcript pages
+    // without bound); only the few rows around them are built up front.
+    final leading = <Widget>[
       if (audioUrl != null)
         SimulationAudioPlayer(audioUrl: audioUrl, margin: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4)),
       if (review != null && hasNote)
@@ -468,8 +470,8 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
         Center(
           child: Text(ref.t('conversation.noMessages'), style: const TextStyle(fontFamily: systemFontFamily, fontSize: 14)),
         ),
-      for (final message in _messages)
-        TranscriptMessageRow(
+    ];
+    Widget messageRow(TranscriptMessage message) => TranscriptMessageRow(
           key: ValueKey('message-${message.id}'),
           message: message,
           senderName: _senderName(message, review),
@@ -486,7 +488,8 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                   ),
                 )
               : null,
-        ),
+        );
+    final trailing = <Widget>[
       if (_isFetching && _messages.isNotEmpty)
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 16),
@@ -504,6 +507,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
         ),
     ];
 
+    Map<String, int>? messageIndex;
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: _refresh,
@@ -512,11 +516,25 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
           if (n.metrics.extentAfter < n.metrics.viewportDimension * 0.5) _loadMessages(reset: false);
           return false;
         },
-        child: ListView(
+        child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
-          children: children,
+          itemCount: leading.length + _messages.length + trailing.length,
+          // Like ListView(children:)'s key lookup: a message row keeps its
+          // state when the rows above it (audio player, note) come or go.
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<String>) return null;
+            messageIndex ??= {for (var i = 0; i < _messages.length; i++) 'message-${_messages[i].id}': i};
+            final i = messageIndex![key.value];
+            return i == null ? null : leading.length + i;
+          },
+          itemBuilder: (context, index) {
+            if (index < leading.length) return leading[index];
+            index -= leading.length;
+            if (index < _messages.length) return messageRow(_messages[index]);
+            return trailing[index - _messages.length];
+          },
         ),
       ),
     );

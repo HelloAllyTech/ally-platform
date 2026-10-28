@@ -158,39 +158,46 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
     final sections = [...detail.sections]..sort((a, b) => a.order.compareTo(b.order));
     final nextItemId = findNextTrackItemId(sections);
 
+    final leading = <Widget>[
+      ?languageRow,
+      LearningPathListHeader(
+        title: detail.title,
+        description: detail.description,
+        coverImageUrl: detail.coverImageUrl,
+        completed: detail.completedItems,
+        total: detail.totalItems,
+        isCompleted: isCompleted,
+        startButtonLabel: (!detail.enrolled || detail.completedItems == 0)
+            ? ref.t('common.start')
+            : ref.t('common.continue'),
+        onStart: () => _startOrContinue(detail),
+        isStartDisabled: _isStarting,
+        isLoading: _isStarting,
+        onProgressTap: detail.enrolled
+            ? () => context.push('/courses/${widget.trackId}/progress')
+            : null,
+      ),
+    ];
+
     return RefreshIndicator(
       onRefresh: () => ref.refresh(trackDetailProvider(widget.trackId).future),
-      child: ListView(
+      // Builder: section blocks (each sorting and rendering its item rows)
+      // are only built as they scroll in; the language row and header lead.
+      child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         // styles.scrollContent + ListHeaderComponentStyle paddingTop 4.
         padding: const EdgeInsets.only(left: 21, right: 21, top: 4, bottom: 32),
-        children: [
-          ?languageRow,
-          LearningPathListHeader(
-            title: detail.title,
-            description: detail.description,
-            coverImageUrl: detail.coverImageUrl,
-            completed: detail.completedItems,
-            total: detail.totalItems,
-            isCompleted: isCompleted,
-            startButtonLabel: (!detail.enrolled || detail.completedItems == 0)
-                ? ref.t('common.start')
-                : ref.t('common.continue'),
-            onStart: () => _startOrContinue(detail),
-            isStartDisabled: _isStarting,
-            isLoading: _isStarting,
-            onProgressTap: detail.enrolled
-                ? () => context.push('/courses/${widget.trackId}/progress')
-                : null,
-          ),
-          for (var i = 0; i < sections.length; i++)
-            _CourseSectionBlock(
-              section: sections[i],
-              sectionIndex: i,
-              nextItemId: nextItemId,
-              onItemTap: _openItem,
-            ),
-        ],
+        itemCount: leading.length + sections.length,
+        itemBuilder: (context, index) {
+          if (index < leading.length) return leading[index];
+          final i = index - leading.length;
+          return _CourseSectionBlock(
+            section: sections[i],
+            sectionIndex: i,
+            nextItemId: nextItemId,
+            onItemTap: _openItem,
+          );
+        },
       ),
     );
   }

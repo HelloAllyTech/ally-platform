@@ -73,13 +73,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
               },
             ),
             _buildFilterRow(context),
-            Expanded(
-              child: SingleChildScrollView(
-                // styles.content: 24pt sides, 16pt top/bottom.
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: _buildBody(context, badgesAsync),
-              ),
-            ),
+            Expanded(child: _buildBody(context, badgesAsync)),
           ],
         ),
       ),
@@ -134,21 +128,31 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     );
   }
 
+  /// styles.content: 24pt sides, 16pt top/bottom.
+  static const _contentPadding = EdgeInsets.symmetric(horizontal: 24, vertical: 16);
+
+  /// Loading/error/empty states scroll like the badge list does.
+  Widget _scrollable(Widget child) => SingleChildScrollView(padding: _contentPadding, child: child);
+
   Widget _buildBody(BuildContext context, AsyncValue<List<BadgeCategoryGroup>> badgesAsync) {
     return badgesAsync.when(
       // styles.centerContainer: 48pt top/bottom.
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      loading: () => _scrollable(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        ),
       ),
       // styles.errorText: body.medium in ds.feedback.error.
-      error: (_, _) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: Text(
-            ref.t('achievements.errors.description'),
-            textAlign: TextAlign.center,
-            style: _bodyMedium.copyWith(color: AppColors.error),
+      error: (_, _) => _scrollable(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48),
+          child: Center(
+            child: Text(
+              ref.t('achievements.errors.description'),
+              textAlign: TextAlign.center,
+              style: _bodyMedium.copyWith(color: AppColors.error),
+            ),
           ),
         ),
       ),
@@ -165,28 +169,48 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
 
         if (filteredGroups.isEmpty) {
           // styles.emptyContainer/emptyText.
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-            child: Center(
-              child: Text(ref.t('achievements.noAchievements'), textAlign: TextAlign.center, style: _bodyMedium),
+          return _scrollable(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+              child: Center(
+                child: Text(ref.t('achievements.noAchievements'), textAlign: TextAlign.center, style: _bodyMedium),
+              ),
             ),
           );
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [for (final group in filteredGroups) _CategorySection(group: group)],
+        // One flat lazily-built list (header, cards, 24pt section gap per
+        // category) instead of every badge card — each an IntrinsicHeight
+        // row with a network icon — laid out up front in a Column.
+        final rows = <Object>[
+          for (final group in filteredGroups) ...[
+            group,
+            ...group.badges,
+            _sectionGap,
+          ],
+        ];
+        return ListView.builder(
+          padding: _contentPadding,
+          itemCount: rows.length,
+          itemBuilder: (context, index) => switch (rows[index]) {
+            final BadgeCategoryGroup group => _CategoryHeader(group: group),
+            final AchievementBadge badge => _AchievementCard(badge: badge),
+            _ => const SizedBox(height: 24),
+          },
         );
       },
     );
   }
 }
 
-/// RN `renderCategorySection`: 24pt below each section; header row (12pt
-/// below) of the body.small lowEmphasis category label, the info icon and a
-/// 0.5pt strokePrimary rule filling the rest.
-class _CategorySection extends ConsumerWidget {
-  const _CategorySection({required this.group});
+/// Marker for the 24pt gap below each category section in the flat list.
+const _sectionGap = Object();
+
+/// RN `renderCategorySection`: 24pt below each section (a separate list
+/// row); header row (12pt below) of the body.small lowEmphasis category
+/// label, the info icon and a 0.5pt strokePrimary rule filling the rest.
+class _CategoryHeader extends ConsumerWidget {
+  const _CategoryHeader({required this.group});
 
   final BadgeCategoryGroup group;
 
@@ -196,34 +220,25 @@ class _CategorySection extends ConsumerWidget {
     final label = slug != null ? ref.t('achievements.badgeTypes.$slug') : group.category;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
-                    fontSize: 12,
-                    height: 16 / 12,
-                    letterSpacing: 0.2,
-                    color: AppColors.lowEmphasis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InfoTooltipIcon(
-                  message: ref.t('achievements.badgeTypes.tooltip.${slug ?? group.category}'),
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: Container(height: 0.5, color: AppColors.strokePrimary)),
-              ],
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: AppFonts.ibmPlexSerifRegular,
+              fontSize: 12,
+              height: 16 / 12,
+              letterSpacing: 0.2,
+              color: AppColors.lowEmphasis,
             ),
           ),
-          for (final badge in group.badges) _AchievementCard(badge: badge),
+          const SizedBox(width: 8),
+          InfoTooltipIcon(
+            message: ref.t('achievements.badgeTypes.tooltip.${slug ?? group.category}'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Container(height: 0.5, color: AppColors.strokePrimary)),
         ],
       ),
     );

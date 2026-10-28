@@ -604,15 +604,19 @@ class _ControlledCommentPageState extends ConsumerState<_ControlledCommentPage> 
           if (n.metrics.extentAfter < n.metrics.viewportDimension * 0.3) controller.loadMore();
           return false;
         },
-        child: ListView(
+        // Builder: comment rows (paged without bound) are only built as
+        // they scroll in.
+        child: ListView.builder(
           padding: widget.listPadding(rn),
-          children: [
-            for (final (i, comment) in controller.comments.indexed) ...[
-              if (i > 0) SizedBox(height: widget.gap(rn)),
-              widget.itemBuilder(comment, () => _delete(comment)),
-            ],
-            if (controller.isLoading) _sheetSpinner(),
-          ],
+          itemCount: controller.comments.length + (controller.isLoading ? 1 : 0),
+          itemBuilder: (context, i) {
+            if (i == controller.comments.length) return _sheetSpinner();
+            final comment = controller.comments[i];
+            return Padding(
+              padding: EdgeInsets.only(top: i > 0 ? widget.gap(rn) : 0),
+              child: widget.itemBuilder(comment, () => _delete(comment)),
+            );
+          },
         ),
       );
     }
