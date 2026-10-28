@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/push/leaderboard_notification.dart';
@@ -24,6 +25,28 @@ import '../../../core/widgets/sized_network_image.dart';
 
 /// RN's `MAX_PROFILE_IMAGE_SIZE` (2 MB).
 const _maxProfileImageBytes = 2 * 1024 * 1024;
+
+/// RN's picker only offers `image/jpeg` and `image/png`.
+@visibleForTesting
+bool isJpegOrPngPath(String path) {
+  final ext = path.split('.').last.toLowerCase();
+  return ext == 'jpg' || ext == 'jpeg' || ext == 'png';
+}
+
+/// Decodes any image Flutter can read and re-encodes its first frame as PNG.
+@visibleForTesting
+Future<Uint8List?> encodeAsPng(Uint8List bytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    return data?.buffer.asUint8List();
+  } catch (_) {
+    return null;
+  }
+}
 
 /// Port of ally-mobile (React Native)'s `ProfileSettingsScreen` and its
 /// `useProfileImage` hook: the profile photo is edited as a local preview
@@ -106,11 +129,27 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     );
     if (picked == null || !mounted) return;
 
+    var path = picked.path;
     Uint8List? bytes;
     try {
-      bytes = File(picked.path).readAsBytesSync();
+      bytes = File(path).readAsBytesSync();
     } catch (_) {
       // Unreadable here: RN also skips checks it has no data for.
+    }
+    // RN `restrictMimeTypes: ['image/jpeg', 'image/png']`. Neither photo
+    // picker can filter by type, so anything else the picker hands back
+    // (GIF, HEIC, WebP) is re-encoded as PNG before it can be uploaded.
+    if (bytes != null && !isJpegOrPngPath(path)) {
+      final png = await encodeAsPng(bytes);
+      if (png != null) {
+        path = '$path.png';
+        try {
+          File(path).writeAsBytesSync(png);
+          bytes = png;
+        } catch (_) {
+          path = picked.path;
+        }
+      }
     }
     if (bytes != null) {
       if (bytes.length > _maxProfileImageBytes) {
@@ -126,7 +165,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     if (!mounted) return;
     setState(() {
       _hasEdit = true;
-      _editedPreview = _FilePreview(picked.path);
+      _editedPreview = _FilePreview(path);
     });
   }
 
@@ -276,11 +315,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
               _Field(label: ref.t('profile.settings.name'), value: user.name),
               const SizedBox(height: 24),
               _Field(label: ref.t('profile.settings.email'), value: user.email),
-              const SizedBox(height: 24),
-              _LanguageField(
-                label: ref.t('profile.settings.language'),
-                onTap: () => LanguageSelectorSheet.show(context),
-              ),
+              // RN `{env.LANGUAGE_SELECTOR_FLAG && (...)}`.
+              if (AppConfig.languageSelectorEnabled) ...[
+                const SizedBox(height: 24),
+                _LanguageField(
+                  label: ref.t('profile.settings.language'),
+                  onTap: () => LanguageSelectorSheet.show(context),
+                ),
+              ],
               if (user.isLearner) ...[
                 const SizedBox(height: 24),
                 const LeaderboardNotificationToggleRow(),

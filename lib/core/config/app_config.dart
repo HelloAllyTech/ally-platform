@@ -65,10 +65,13 @@ class AppConfig {
 
   static const String _i18nBaseUrlDefine = String.fromEnvironment('I18N_BASE_URL');
 
-  /// Mirrors `env.LANGUAGE_SELECTOR_FLAG` — gates the dynamic sync exactly
-  /// like the RN app does, defaulting off until explicitly enabled.
+  /// Mirrors `env.LANGUAGE_SELECTOR_FLAG` — gates the dynamic translation
+  /// sync and Profile Settings' Language row, as in RN. Defaults to RN
+  /// production's value (`true`); `--dart-define=LANGUAGE_SELECTOR_FLAG=false`
+  /// turns both off.
   static const bool languageSelectorEnabled = bool.fromEnvironment(
     'LANGUAGE_SELECTOR_FLAG',
+    defaultValue: true,
   );
 
   /// Mirrors `Config.GOOGLE_WEB_CLIENT_ID` — used as `serverClientId` so the

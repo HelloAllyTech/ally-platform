@@ -15,14 +15,11 @@ class MockDio extends Mock implements Dio {}
 Response<T> _response<T>(T data) =>
     Response<T>(data: data, statusCode: 200, requestOptions: RequestOptions(path: ''));
 
-// NOTE on what's intentionally NOT covered here: `AppConfig.languageSelectorEnabled`
-// is a `bool.fromEnvironment` compile-time constant, so a plain `flutter test`
-// run (no --dart-define) always sees it as false. That means build()'s
-// WidgetsBindingObserver registration, the 30s Timer.periodic poll, and the
-// automatic fire-and-forget `refresh()` call on first build are never
-// exercised by this suite — they're unreachable without a differently-defined
-// test binary. `refresh()`/`_refresh()` themselves are still fully testable
-// by calling them directly on the notifier, which is what the tests below do.
+// NOTE: `AppConfig.languageSelectorEnabled` is a `bool.fromEnvironment`
+// compile-time constant (default true, RN production's value), so these
+// tests can't switch it off. build()'s observer registration, 30s poll and
+// first fire-and-forget `refresh()` run but aren't asserted on here;
+// `refresh()`/`_refresh()` are tested by calling them directly.
 void main() {
   group('bundled asset loading', () {
     testWidgets('loads the bundled en translations when no language is stored', (tester) async {
