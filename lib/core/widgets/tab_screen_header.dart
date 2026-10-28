@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../features/progress/presentation/progress_header_widget.dart';
 import '../navigation/drawer_menu_button.dart';
@@ -51,11 +52,20 @@ class TabScreenHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     // A caller's own leading control (e.g. a back arrow) takes the slot;
     // otherwise the first tab's header carries the drawer menu, as in RN.
+    // On a pushed screen with neither, it gets a back arrow, the way
+    // Flutter's own AppBar implies one; RN's pushed screens all have one.
     final leading = this.leading ??
-        (DrawerMenuScope.showsMenu(context) ? const DrawerMenuButton() : null);
+        (DrawerMenuScope.showsMenu(context)
+            ? const DrawerMenuButton()
+            : (ModalRoute.of(context)?.impliesAppBarDismissal ?? false)
+                ? const _BackArrow()
+                : null);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      margin: const EdgeInsets.only(top: 16),
+      // Inside the tab shell's SafeArea the top inset is already consumed
+      // (0 here); pushed screens that reuse this header get it instead of
+      // drawing under the status bar.
+      margin: EdgeInsets.only(top: 16 + MediaQuery.paddingOf(context).top),
       decoration: showBorder
           ? const BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
@@ -72,19 +82,20 @@ class TabScreenHeader extends StatelessWidget {
               children: [
                 Flexible(
                   child: Text.rich(
+                    // RN nests the subtitle <Text> inside the title's, so it
+                    // inherits the 18pt headline size; as a sibling span it
+                    // fell back to the 14pt default.
                     TextSpan(
+                      text: title,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.replayProHeadline,
+                        fontSize: 18,
+                        height: 24 / 18,
+                        letterSpacing: 0.18,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.highEmphasis,
+                      ),
                       children: [
-                        TextSpan(
-                          text: title,
-                          style: const TextStyle(
-                            fontFamily: AppFonts.replayProHeadline,
-                            fontSize: 18,
-                            height: 24 / 18,
-                            letterSpacing: 0.18,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.highEmphasis,
-                          ),
-                        ),
                         if (subtitle != null)
                           TextSpan(
                             text: ' $subtitle',
@@ -112,6 +123,28 @@ class TabScreenHeader extends StatelessWidget {
           if (trailing != null) const SizedBox(width: 12),
           if (trailing != null) Flexible(child: trailing!),
         ],
+      ),
+    );
+  }
+}
+
+/// RN's `LeftArrowIcon` (41x41, black), as its pushed screens draw it.
+class _BackArrow extends StatelessWidget {
+  const _BackArrow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: MaterialLocalizations.of(context).backButtonTooltip,
+      child: GestureDetector(
+        key: const Key('tab-screen-header-back'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).maybePop(),
+        child: SvgPicture.asset(
+          'assets/icons/leftArrowIcon.svg',
+          colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+        ),
       ),
     );
   }

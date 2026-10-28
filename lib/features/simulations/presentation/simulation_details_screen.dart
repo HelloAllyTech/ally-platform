@@ -9,7 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/html_rich_text.dart';
-import '../../../core/widgets/tab_screen_header.dart';
+import '../../../core/widgets/back_title_header.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 
@@ -109,14 +109,15 @@ class _SimulationDetailsScreenState
         : ref.watch(scenarioByIdProvider(widget.scenarioId));
 
     return Scaffold(
+      // RN's `safe` style: white, not the app's off-white background.
+      backgroundColor: Colors.white,
       body: Column(
         children: [
-          // RN's pageTitle/pageTitleItalic: "Start" plain + "Role play"
-          // italic, not one flat "Start role play" string.
-          TabScreenHeader(
+          // RN's own renderHeader(): back arrow, then "Start" plain +
+          // "Role play" italic.
+          BackTitleHeader(
             title: ref.t('common.start'),
-            subtitle: ref.t('common.simulation'),
-            italicSubtitle: true,
+            italicTitle: ref.t('common.simulation'),
           ),
           Expanded(
             child: scenarioAsync.when(

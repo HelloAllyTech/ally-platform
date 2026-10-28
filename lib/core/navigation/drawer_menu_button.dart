@@ -46,7 +46,9 @@ class DrawerMenuButton extends ConsumerWidget {
       tooltip: ref.t('accessibility.openMenu'),
       padding: const EdgeInsets.all(4),
       constraints: const BoxConstraints(),
-      icon: SvgPicture.asset('assets/icons/drawerMenu.svg', width: 24, height: 24),
+      // RN renders this SVG at its intrinsic 16x12 (react-native-svg's
+      // default), not 24x24.
+      icon: SvgPicture.asset('assets/icons/drawerMenu.svg'),
       onPressed: DrawerMenuScope.openDrawerOf(context),
     );
   }

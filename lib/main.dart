@@ -10,6 +10,7 @@ import 'core/localization/localization_controller.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/rn_scale.dart';
 import 'core/widgets/root_scaffold_messenger.dart';
 
 Future<void> main() async {
@@ -91,6 +92,7 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
       theme: AppTheme.light,
       routerConfig: router,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
+      builder: (context, child) => RnScale(child: child!),
       // Flutter's own built-in widget strings (date pickers, dialog button
       // labels) localized across the same 5 languages the app's own
       // content supports — separate from this app's own translation

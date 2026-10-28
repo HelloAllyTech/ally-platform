@@ -80,6 +80,7 @@ class AppColors {
   // the nearest `ds.*` token.
   static const lightGray = Color(0xFFF5F5F5); // CommentInput fill
   static const lightGray4 = Color(0xFFD5D5D5); // TabView container border
+  static const lightGray5 = Color(0xFFDBDBDB); // pushed screens' header divider
   static const lightGray7 = Color(0xFFE5E5E5); // Dropdown menu border
   static const lightGray14 = Color(0xFFDADCE1); // ResourceArticleCard border
   static const lightGray19 = Color(0xFFF3F3F3); // TabView container background

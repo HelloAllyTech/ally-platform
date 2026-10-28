@@ -13,10 +13,9 @@ import 'app_fonts.dart';
 /// the extra in-between sizes aren't modeled since Flutter's TextTheme has
 /// nowhere to put them. `lineHeight` values are converted to Flutter's
 /// `height` (a multiplier of fontSize, not an absolute px value) via
-/// `lineHeight / fontSize`. RN's `ms()` (react-native-size-matters'
-/// device-size scaling) isn't replicated — these are the base px values,
-/// consistent with Flutter's own responsive-text conventions rather than
-/// RN's specific scaling algorithm.
+/// `lineHeight / fontSize`. These are RN's base (pre-`ms()`) values; the
+/// device-size scaling RN applies on top is done once for the whole app by
+/// `RnScale` (rn_scale.dart).
 ///
 /// Font families: RN sets `fontFamily` per-component (no global default —
 /// there are 210+ call sites each choosing their own token from
