@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -22,12 +24,22 @@ import '../network/token_storage.dart';
 /// below is kept anyway — belt and suspenders — since nothing prevents two
 /// *callers* from both invoking `connect()` around the same time.
 class SocketService {
-  SocketService(this._tokenStorage);
+  SocketService(this._tokenStorage, {this.retryAfterFailure = const Duration(milliseconds: 2000)});
 
   final TokenStorage _tokenStorage;
 
+  /// RN `RETRY_AFTER_FAILURE_MS`: when opening the socket throws (e.g. the
+  /// token read fails), try again after this long.
+  final Duration retryAfterFailure;
+
   io.Socket? _socket;
   bool _isConnecting = false;
+  Timer? _retryTimer;
+
+  /// RN `generationRef`: bumped by [disconnect] so a connect still awaiting
+  /// the token (or a pending retry) abandons itself instead of installing a
+  /// socket nobody holds.
+  int _generation = 0;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -42,6 +54,8 @@ class SocketService {
     void Function(String? reason)? onDisconnect,
     void Function(Object? error)? onConnectionError,
   }) async {
+    _retryTimer?.cancel();
+    _retryTimer = null;
     // Already ours — never replace it, matching useSocket.ts exactly.
     if (_socket != null) {
       if (_socket!.connected != true) _socket!.connect();
@@ -49,9 +63,12 @@ class SocketService {
     }
     if (_isConnecting) return;
     _isConnecting = true;
+    final generation = _generation;
 
     try {
       final accessToken = await _tokenStorage.accessToken;
+      // `disconnect()` ran while the token was being read.
+      if (generation != _generation) return;
       if (accessToken == null) {
         return;
       }
@@ -90,12 +107,30 @@ class SocketService {
 
       _socket = socket;
       socket.connect();
+    } catch (_) {
+      // RN: "Failed to open socket connection" → retry after
+      // RETRY_AFTER_FAILURE_MS unless disconnect() ran meanwhile.
+      if (generation != _generation) return;
+      _retryTimer = Timer(retryAfterFailure, () {
+        _retryTimer = null;
+        connect(
+          namespacePath: namespacePath,
+          userId: userId,
+          eventCallbacks: eventCallbacks,
+          onConnect: onConnect,
+          onDisconnect: onDisconnect,
+          onConnectionError: onConnectionError,
+        );
+      });
     } finally {
       _isConnecting = false;
     }
   }
 
   void disconnect() {
+    _generation++;
+    _retryTimer?.cancel();
+    _retryTimer = null;
     _isConnecting = false;
     final socket = _socket;
     _socket = null;

@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
@@ -535,7 +537,10 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     if (navigator.canPop()) {
       navigator.pop();
     } else {
-      GoRouter.maybeOf(context)?.go('/home');
+      // Nothing to pop back to: land where RN's goBack() would (Listening is
+      // only ever pushed from Call Logs) — RN `navigateToCallLogTab`.
+      final router = GoRouter.maybeOf(context);
+      if (router != null) goToHomeTab(router, kTabCallLog);
     }
   }
 
