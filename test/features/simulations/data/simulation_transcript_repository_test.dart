@@ -132,24 +132,24 @@ void main() {
       return message.formattedTime;
     }
 
-    test('0 seconds formats as 0:00', () {
-      expect(formattedTimeFor(0), '0:00');
+    test('0 seconds formats as 00:00 (RN formatTimeToMMSS)', () {
+      expect(formattedTimeFor(0), '00:00');
     });
 
-    test('59 seconds formats as 0:59', () {
-      expect(formattedTimeFor(59), '0:59');
+    test('59 seconds formats as 00:59', () {
+      expect(formattedTimeFor(59), '00:59');
     });
 
-    test('60 seconds rolls over to 1:00', () {
-      expect(formattedTimeFor(60), '1:00');
+    test('60 seconds rolls over to 01:00', () {
+      expect(formattedTimeFor(60), '01:00');
     });
 
-    test('125 seconds formats as 2:05', () {
-      expect(formattedTimeFor(125), '2:05');
+    test('125 seconds formats as 02:05', () {
+      expect(formattedTimeFor(125), '02:05');
     });
 
-    test('fractional seconds round to the nearest second first', () {
-      expect(formattedTimeFor(59.6), '1:00');
+    test('fractional seconds are floored, as RN does', () {
+      expect(formattedTimeFor(59.6), '00:59');
     });
   });
 }

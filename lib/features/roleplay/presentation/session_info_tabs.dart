@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/html_rich_text.dart';
 import '../../simulations/data/simulation_models.dart';
 import 'checklist_panel.dart';
@@ -53,42 +56,66 @@ class _SessionInfoTabsState extends State<SessionInfoTabs> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Horizontally scrollable rather than a fixed `Row`: translated tab
-        // labels vary a lot in length across this app's languages, and a
-        // fixed-width Row overflows even at this test's wide 800px default
-        // viewport with just two short English labels.
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final tab in tabs) _InfoTabButton(
-                tab: tab,
-                isActive: tab == _activeTab,
-                onTap: () => setState(() => _activeTab = tab),
-              ),
-            ],
+        // RN `infoTabBar`: icon + label buttons 16 apart over a #3D4045
+        // rule; the active one is white with a green underline.
+        Container(
+          key: const ValueKey('simulation-info-tab-bar'),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.callDivider)),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < tabs.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 16),
+                  _InfoTabButton(
+                    tab: tabs[i],
+                    isActive: tabs[i] == _activeTab,
+                    onTap: () => setState(() => _activeTab = tabs[i]),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        switch (_activeTab) {
-          SessionInfoTab.checklist => ChecklistPanel(
+        Flexible(
+          child: switch (_activeTab) {
+            SessionInfoTab.checklist => ChecklistPanel(
               mode: checklistModeFromString(widget.scenario.checklistType),
               items: widget.scenario.checklistEvents,
               triggeredEventIds: widget.triggeredEventIds,
+              hideHeader: true,
             ),
-          SessionInfoTab.reminders => _RemindersTab(reminders: widget.scenario.reminders),
-          SessionInfoTab.description => Container(
-              key: const ValueKey('session-info-description'),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(12),
+            SessionInfoTab.reminders => _DarkPane(child: _RemindersTab(reminders: widget.scenario.reminders)),
+            SessionInfoTab.description => _DarkPane(
+              child: Container(
+                key: const ValueKey('session-info-description'),
+                child: HtmlRichText(html: widget.scenario.description, dark: true),
               ),
-              child: HtmlRichText(html: widget.scenario.description, dark: false),
             ),
-        },
+          },
+        ),
       ],
+    );
+  }
+}
+
+/// RN `SessionInfoTabs` container: `#1d2020`, radius 8, padding 10,
+/// scrolling its content.
+class _DarkPane extends StatelessWidget {
+  const _DarkPane({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: const Color(0xFF1D2020), borderRadius: BorderRadius.circular(8)),
+      child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 8), child: child),
     );
   }
 }
@@ -102,32 +129,52 @@ class _InfoTabButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final labelKey = switch (tab) {
-      SessionInfoTab.checklist => 'simulationPage.checklistTab',
-      SessionInfoTab.reminders => 'simulationPage.remindersTab',
-      SessionInfoTab.description => 'simulationPage.descriptionTab',
+    final (labelKey, icon) = switch (tab) {
+      SessionInfoTab.checklist => ('simulationPage.checklistTab', 'assets/icons/checklist.svg'),
+      SessionInfoTab.reminders => ('simulationPage.remindersTab', 'assets/icons/bulb.svg'),
+      SessionInfoTab.description => ('simulationPage.descriptionTab', 'assets/icons/notes.svg'),
     };
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: InkWell(
-        key: ValueKey('session-info-tab-${tab.name}'),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            children: [
-              Text(
-                ref.t(labelKey),
-                style: TextStyle(
-                  color: isActive ? AppColors.primary : AppColors.mediumEmphasis,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+    final color = isActive ? Colors.white : AppColors.infoTabInactive;
+    return GestureDetector(
+      key: ValueKey('session-info-tab-${tab.name}'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(icon, width: 16, height: 16, colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                const SizedBox(width: 6),
+                Text(
+                  ref.t(labelKey),
+                  style: TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isActive)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: -1,
+              child: Container(
+                height: 2,
+                decoration: const BoxDecoration(
+                  color: AppColors.callGreen,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
                 ),
               ),
-              const SizedBox(height: 2),
-              Container(height: 2, width: 24, color: isActive ? AppColors.primary : Colors.transparent),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -136,30 +183,32 @@ class _InfoTabButton extends ConsumerWidget {
 class _RemindersTab extends StatelessWidget {
   const _RemindersTab({required this.reminders});
 
-  // Never empty in practice — the Reminders tab itself doesn't exist
-  // unless `scenario.reminders.isNotEmpty` (see `SessionInfoTabs.build`),
-  // matching RN's own `hasReminders` gate exactly. No empty-state UI here,
-  // matching real RN behavior (confirmed from source), even though RN's
-  // own `SessionInfoTabs` component separately happens to define one that
-  // this condition keeps unreachable.
+  // Never empty in practice — the tab only exists when there are
+  // reminders (RN `hasReminders`).
   final List<String> reminders;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       key: const ValueKey('session-info-reminders'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final reminder in reminders)
+        for (var i = 0; i < reminders.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
           Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppColors.darkGray10, borderRadius: BorderRadius.circular(16)),
+            child: Text(
+              reminders[i],
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 14,
+                height: 20 / 14,
+                color: Colors.white,
+              ),
             ),
-            child: Text(reminder),
           ),
+        ],
       ],
     );
   }

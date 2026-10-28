@@ -145,6 +145,17 @@ class SimulationsRepository {
     return response.data?['id'] as String?;
   }
 
+  /// RN `simulationsApi.getEventChecklist` (ally-be `learn.controller.ts`
+  /// `scenario-session/:id/event-checklist`).
+  Future<List<EventChecklistItem>> getEventChecklist(String scenarioSessionId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-session/$scenarioSessionId/event-checklist',
+    );
+    return (response.data?['eventChecklist'] as List<dynamic>? ?? const [])
+        .map((e) => EventChecklistItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> addSimulationFeedback({
     required String scenarioSessionId,
     required int rating,
@@ -204,3 +215,11 @@ final simulationSummaryProvider =
           .watch(simulationsRepositoryProvider)
           .getSimulationDetails(scenarioSessionId);
     });
+
+/// RN `useGetEventChecklistQuery({scenarioSessionId})`.
+final eventChecklistProvider = FutureProvider.autoDispose.family<List<EventChecklistItem>, String>((
+  ref,
+  scenarioSessionId,
+) {
+  return ref.watch(simulationsRepositoryProvider).getEventChecklist(scenarioSessionId);
+});

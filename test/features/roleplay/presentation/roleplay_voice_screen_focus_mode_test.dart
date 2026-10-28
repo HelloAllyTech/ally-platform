@@ -48,6 +48,7 @@ void main() {
       await tester.tap(find.text('Connect'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester);
 
       expect(find.text('Turn focus mode on'), findsOneWidget);
       expect(find.textContaining('Session Duration:'), findsOneWidget);
@@ -60,7 +61,9 @@ void main() {
       await tester.pump();
 
       expect(find.text('Turn focus mode off'), findsOneWidget);
-      expect(find.textContaining('Session Duration:'), findsNothing);
+      // RN keeps the session timer up in focus mode (SimulationTimer isn't
+      // gated on it).
+      expect(find.textContaining('Session Duration:'), findsOneWidget);
     },
   );
 }

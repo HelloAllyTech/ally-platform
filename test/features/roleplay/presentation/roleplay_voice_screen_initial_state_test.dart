@@ -37,7 +37,7 @@ void main() {
       overrides: [liveKitRoomServiceProvider.overrideWithValue(liveKitService)],
     );
 
-    expect(find.text('Not connected'), findsOneWidget);
+    expect(find.text('Connecting to session...'), findsOneWidget);
     expect(find.widgetWithText(AppButton, 'Connect'), findsOneWidget);
     verifyNever(
       () => liveKitService.connect(

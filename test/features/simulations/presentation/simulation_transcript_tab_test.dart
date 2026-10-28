@@ -62,8 +62,13 @@ void main() {
     final helloIndex = tester.getTopLeft(find.text('Hello!')).dy;
     expect(hiIndex, lessThan(helloIndex));
 
-    expect(find.textContaining('Client · 0:00'), findsOneWidget);
-    expect(find.textContaining('You · 0:05'), findsOneWidget);
+    // RN SimulationTranscriptItem: `mm:ss ` then the speaker label, which
+    // for the AI client is "AI client" (no agent name passed here).
+    expect(find.text('00:00 '), findsOneWidget);
+    expect(find.text('00:05 '), findsOneWidget);
+    expect(find.text('AI client'), findsOneWidget);
+    expect(find.text('You'), findsOneWidget);
+    expect(find.text('Transcription may not always be fully accurate.'), findsOneWidget);
   });
 
   testWidgets('shows an empty state when there is no transcript', (tester) async {

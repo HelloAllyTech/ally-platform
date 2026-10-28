@@ -10,8 +10,9 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/realtime/livekit_room_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/tab_screen_header.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
 import 'live_feedback_toast.dart';
@@ -515,34 +516,131 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     }
   }
 
+  /// RN `isControlButtonMaximized` (starts collapsed).
+  bool _controlsMaximized = false;
+
+  bool get _hasTabs => widget.scenario != null && SessionInfoTabs.hasAnyTab(widget.scenario!);
+
   @override
   Widget build(BuildContext context) {
+    final inProgress = _isConnected;
     return PopScope(
       canPop: !_isConnected,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _handleBackPress();
       },
       child: Scaffold(
+        // RN: a full-bleed dark call screen (`ds.grey[950]`) with no header;
+        // leaving is the hardware back / End session.
+        backgroundColor: AppColors.grey950,
         body: Stack(
           children: [
-            Column(
-              children: [
-                TabScreenHeader(
-                  title: ref.t('roleplayVoice.title'),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: _handleBackPress,
+            SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (inProgress) _buildTimer(),
+                          if (!inProgress || _countdownStep != null)
+                            Expanded(child: Center(child: _buildLoader()))
+                          else ...[
+                            _hasTabs
+                                ? Flexible(child: _buildParticipants())
+                                : Expanded(child: _buildParticipants()),
+                            if (_hasTabs)
+                              Expanded(
+                                child: SessionInfoTabs(
+                                  scenario: widget.scenario!,
+                                  triggeredEventIds: _detectedEventIds,
+                                ),
+                              ),
+                          ],
+                          if (inProgress && (widget.scenario?.showScoreMeter ?? true))
+                            FractionallySizedBox(
+                              widthFactor: 0.8,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 10, bottom: 20),
+                                child: SessionScoreMeter(score: _score),
+                              ),
+                            ),
+                          if (_error != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppColors.red400),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                Expanded(child: _buildBody()),
-              ],
-            ),
-            if (_showScenarioInfo && (widget.scenario?.title ?? '').isNotEmpty)
-              Positioned(
-                top: 16,
-                left: 16,
-                child: _ScenarioInfoPanel(scenario: widget.scenario!),
+                  if (inProgress)
+                    _SimulationControls(
+                      isMaximized: _controlsMaximized,
+                      onToggleMaximized: () => setState(() => _controlsMaximized = !_controlsMaximized),
+                      buttons: [
+                        _ControlButton(
+                          id: 'mic',
+                          icon: SvgPicture.asset(_isMicEnabled ? 'assets/icons/micOn.svg' : 'assets/icons/micOff.svg'),
+                          label: ref.t(_isMicEnabled ? 'simulationPage.mute' : 'simulationPage.unmute'),
+                          onPressed: _toggleMic,
+                          // Pause is a superset of mute.
+                          disabled: _isPaused,
+                          variant: _isMicEnabled ? _ControlVariant.normal : _ControlVariant.active,
+                        ),
+                        if (_showFocusButton)
+                          _ControlButton(
+                            id: 'focus',
+                            icon: SvgPicture.asset(
+                              'assets/icons/mic.svg',
+                              colorFilter: ColorFilter.mode(
+                                _isFocusMode ? Colors.black : Colors.white,
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                            label: ref.t(_isFocusMode ? 'listeningScreen.focused' : 'listeningScreen.focus'),
+                            onPressed: () => setState(() => _isFocusMode = !_isFocusMode),
+                            disabled: _isPaused,
+                            variant: _isFocusMode ? _ControlVariant.active : _ControlVariant.normal,
+                          ),
+                        if (_showPauseButton)
+                          _ControlButton(
+                            id: 'pause',
+                            key: const ValueKey('pause-resume-button'),
+                            icon: SvgPicture.asset(
+                              _isPaused ? 'assets/icons/playWhite.svg' : 'assets/icons/pauseWhite.svg',
+                            ),
+                            label: ref.t(_isPaused ? 'simulationPage.resume' : 'simulationPage.pause'),
+                            onPressed: _togglePause,
+                            variant: _isPaused ? _ControlVariant.active : _ControlVariant.normal,
+                          ),
+                        _ControlButton(
+                          id: 'end',
+                          icon: Container(
+                            width: RnSize.of(context).s(16),
+                            height: RnSize.of(context).s(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.coralRed,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          label: widget.scenarioSessionId == null
+                              ? ref.t('roleplayVoice.disconnect')
+                              : ref.t('simulationPage.endSession'),
+                          onPressed: _isEnding ? null : _endCall,
+                          variant: _ControlVariant.destructive,
+                        ),
+                      ],
+                    ),
+                ],
               ),
+            ),
             if (_showEndingSoon && _isConnected)
               _ConfirmOverlay(
                 title:
@@ -579,173 +677,262 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     );
   }
 
-  Widget _buildBody() {
-    // The checklist panel makes this body taller than a typical phone
-    // viewport can show without scrolling — `LayoutBuilder` +
-    // `ConstrainedBox(minHeight: ...)` keeps the original vertical-centering
-    // look when content is short (no checklist, or not yet connected) while
-    // letting it scroll instead of overflowing once it isn't.
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isConnected)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: ParticipantTile(
-                          key: const ValueKey('participant-tile-remote'),
-                          avatarUrl: widget.scenario?.coverImageUrl,
-                          isSpeaking: _remoteSpeaking,
-                          turnState: _turnStates.remote,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ParticipantTile(
-                          key: const ValueKey('participant-tile-local'),
-                          avatarUrl: null,
-                          isSpeaking: _localSpeaking,
-                          turnState: _turnStates.local,
-                          isMuted: !_isMicEnabled,
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  SvgPicture.asset('assets/icons/micOff.svg', width: 64, height: 64),
-                // Checklist mode already surfaces real-time progress via its
-                // own tab, so the generic coaching toast is redundant there
-                // — same gate RN uses (`!hasChecklist && !isFocusMode`).
-                if (_isConnected &&
-                    !(widget.scenario?.hasChecklist ?? false) &&
-                    !_isFocusMode &&
-                    _feedbackMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: LiveFeedbackToast(
-                      key: ValueKey(_feedbackKey),
-                      message: _feedbackMessage!,
-                      emoji: _feedbackEmoji,
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                Text(
-                  _isConnected
-                      ? ref.t('roleplayVoice.connectedToRoom')
-                      : ref.t('roleplayVoice.notConnected'),
+  /// RN `SimulationTimer`: "Session Duration: " + the mm:ss value in
+  /// Medium 16, centred, 8 above and below. Only this text listens to the
+  /// per-second [_elapsed] notifier, so the screen doesn't rebuild.
+  Widget _buildTimer() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: RnSize.of(context).vs(8)),
+      child: ValueListenableBuilder<Duration>(
+        valueListenable: _elapsed,
+        builder: (context, elapsed, _) => Text.rich(
+          TextSpan(
+            // RN appends ': ' to a key that already ends in ':' ("Session
+            // Duration::") — matched without the doubled colon.
+            text: '${ref.t('simulationPage.sessionDuration')} ',
+            style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 14, color: Colors.white),
+            children: [
+              TextSpan(
+                text: _formatDuration(elapsed),
+                style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// RN `renderLoader`: the connection status in Replay Pro bold italic,
+  /// white, centred. This port connects on demand rather than on mount, so
+  /// before connecting it also offers the Connect action.
+  Widget _buildLoader() {
+    final status = _isConnected
+        ? ref.t('simulationPage.waitingForAgent')
+        : ref.t('simulationPage.connectingToSession');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            status,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: AppFonts.replayProBoldItalic,
+              fontStyle: FontStyle.italic,
+              fontSize: 16,
+              color: Colors.white,
+            ),
+          ),
+          if (!_isConnected) ...[
+            const SizedBox(height: 24),
+            AppButton(label: ref.t('roleplayVoice.connect'), onPressed: _connect),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// RN `renderParticipants`: the AI client's tile (280pt tall, 180 with
+  /// the info tabs below, full height otherwise) with the learner's own
+  /// 84x116 picture-in-picture bubble inlaid bottom-right, the scenario
+  /// (i) overlay top-left, and the live coaching nudge underneath.
+  Widget _buildParticipants() {
+    final scenario = widget.scenario;
+    final title = scenario?.title ?? '';
+    final tile = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: ParticipantTile(
+            key: const ValueKey('participant-tile-remote'),
+            avatarUrl: scenario?.coverImageUrl,
+            name: title,
+            isSpeaking: _remoteSpeaking,
+            turnState: _turnStates.remote,
+          ),
+        ),
+        Positioned(
+          right: 10,
+          bottom: 10,
+          width: 84,
+          height: 116,
+          child: Container(
+            key: const ValueKey('participant-pip'),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.callDivider, width: 2),
+              boxShadow: const [BoxShadow(color: Color(0x59000000), offset: Offset(0, 2), blurRadius: 6)],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ParticipantTile(
+              key: const ValueKey('participant-tile-local'),
+              avatarUrl: null,
+              isSpeaking: _localSpeaking,
+              turnState: _turnStates.local,
+              isMuted: !_isMicEnabled,
+              compact: true,
+            ),
+          ),
+        ),
+        if (title.isNotEmpty) ...[
+          Positioned(
+            top: 12,
+            left: 12,
+            child: GestureDetector(
+              key: const ValueKey('scenario-info-toggle'),
+              onTap: () => setState(() => _showScenarioInfo = !_showScenarioInfo),
+              child: SvgPicture.asset('assets/icons/infoBlackCircle.svg'),
+            ),
+          ),
+          if (_showScenarioInfo)
+            Positioned(
+              top: 12,
+              left: 36,
+              right: 35,
+              child: Align(alignment: Alignment.topLeft, child: _ScenarioInfoPanel(scenario: scenario!)),
+            ),
+        ],
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      child: Column(
+        mainAxisSize: _hasTabs ? MainAxisSize.min : MainAxisSize.max,
+        children: [
+          // RN `participantsCompact`: 180 tall, but shrinks with the rest
+          // (flexShrink) when the expanded controls need the room.
+          if (_hasTabs)
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 180),
+                child: SizedBox.expand(child: tile),
+              ),
+            )
+          else
+            Expanded(child: tile),
+          if (!(scenario?.hasChecklist ?? false) && !_isFocusMode && _feedbackMessage != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              child: LiveFeedbackToast(
+                key: ValueKey(_feedbackKey),
+                message: _feedbackMessage!,
+                emoji: _feedbackEmoji,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _ControlVariant { normal, active, destructive }
+
+class _ControlButton {
+  const _ControlButton({
+    required this.id,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.disabled = false,
+    this.variant = _ControlVariant.normal,
+    this.key,
+  });
+
+  final String id;
+  final Widget icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool disabled;
+  final _ControlVariant variant;
+  final Key? key;
+}
+
+/// Port of RN `SimulationControls` → `components/ButtonGroup`'s
+/// `CollapsibleButtonGroup` + `ButtonItem`: a translucent bottom bar with
+/// a chevron that expands/collapses a full-width stack of 8pt-radius
+/// `#282B31` buttons (white when active, icon + IBM Plex Serif Medium 14
+/// label), collapsed by default.
+class _SimulationControls extends StatelessWidget {
+  const _SimulationControls({required this.isMaximized, required this.onToggleMaximized, required this.buttons});
+
+  final bool isMaximized;
+  final VoidCallback onToggleMaximized;
+  final List<_ControlButton> buttons;
+
+  @override
+  Widget build(BuildContext context) {
+    final rn = RnSize.of(context);
+    return Container(
+      key: const ValueKey('simulation-control-buttons'),
+      width: double.infinity,
+      color: AppColors.blackAlpha200,
+      padding: EdgeInsets.only(top: rn.mvs(8), bottom: rn.mvs(6), left: 16, right: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            key: const ValueKey('simulation-control-buttons-toggle'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggleMaximized,
+            child: Container(
+              width: 48,
+              height: rn.mvs(32),
+              margin: EdgeInsets.only(bottom: rn.mvs(12)),
+              alignment: Alignment.center,
+              child: AnimatedRotation(
+                turns: isMaximized ? 0 : 0.5,
+                duration: const Duration(milliseconds: 250),
+                child: SvgPicture.asset(
+                  'assets/icons/chevronDown.svg',
+                  width: 24,
+                  height: 12,
+                  colorFilter: const ColorFilter.mode(AppColors.lightGrayD9, BlendMode.srcIn),
                 ),
-                if (_isConnected && !_isFocusMode)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: ValueListenableBuilder<Duration>(
-                      valueListenable: _elapsed,
-                      builder: (context, elapsed, _) => Text(
-                        '${ref.t('simulationPage.sessionDuration')} ${_formatDuration(elapsed)}',
-                      ),
-                    ),
-                  ),
-                if (_isConnected && (widget.scenario?.showScoreMeter ?? true))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: SessionScoreMeter(score: _score),
-                  ),
-                if (_isConnected &&
-                    !_isFocusMode &&
-                    widget.scenario != null &&
-                    SessionInfoTabs.hasAnyTab(widget.scenario!))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: SessionInfoTabs(
-                      scenario: widget.scenario!,
-                      triggeredEventIds: _detectedEventIds,
-                    ),
-                  ),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.red400),
-                    ),
-                  ),
-                const SizedBox(height: 24),
-                if (!_isConnected)
-                  AppButton(
-                    label: ref.t('roleplayVoice.connect'),
-                    onPressed: _connect,
-                  )
-                else ...[
-                  AppButton(
-                    label: _isMicEnabled
-                        ? ref.t('simulationPage.mute')
-                        : ref.t('simulationPage.unmute'),
-                    iconLeft: SvgPicture.asset(
-                      _isMicEnabled
-                          ? 'assets/icons/mic.svg'
-                          : 'assets/icons/micOff.svg',
-                      width: 20,
-                      height: 20,
-                      colorFilter: const ColorFilter.mode(
-                        Colors.white,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    onPressed: _toggleMic,
-                  ),
-                  if (_showPauseButton) ...[
-                    const SizedBox(height: 12),
-                    AppButton(
-                      key: const ValueKey('pause-resume-button'),
-                      label: ref.t(_isPaused ? 'simulationPage.resume' : 'simulationPage.pause'),
-                      variant: AppButtonVariant.secondary,
-                      onPressed: _togglePause,
-                    ),
-                  ],
-                  if (_showFocusButton) ...[
-                    const SizedBox(height: 12),
-                    AppButton(
-                      label: ref.t(
-                        _isFocusMode
-                            ? 'listeningScreen.focused'
-                            : 'listeningScreen.focus',
-                      ),
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () =>
-                          setState(() => _isFocusMode = !_isFocusMode),
-                    ),
-                  ],
-                  if ((widget.scenario?.title ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    AppButton(
-                      label: ref.t('common.details'),
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => setState(
-                        () => _showScenarioInfo = !_showScenarioInfo,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  if (widget.scenarioSessionId != null)
-                    AppButton(
-                      label: ref.t('simulationPage.endSession'),
-                      variant: AppButtonVariant.destructive,
-                      isLoading: _isEnding,
-                      onPressed: _endSession,
-                    )
-                  else
-                    AppButton(
-                      label: ref.t('roleplayVoice.disconnect'),
-                      variant: AppButtonVariant.secondary,
-                      onPressed: _disconnect,
-                    ),
-                ],
+              ),
+            ),
+          ),
+          if (isMaximized)
+            for (var i = 0; i < buttons.length; i++) ...[
+              if (i > 0) SizedBox(height: rn.s(8)),
+              _buildButton(context, buttons[i], isLast: i == buttons.length - 1),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildButton(BuildContext context, _ControlButton button, {required bool isLast}) {
+    final rn = RnSize.of(context);
+    final background = switch (button.variant) {
+      _ControlVariant.active => Colors.white,
+      _ => AppColors.darkGray10,
+    };
+    final textColor = button.variant == _ControlVariant.active ? AppColors.darkGray5 : Colors.white;
+    final enabled = !button.disabled && button.onPressed != null;
+    return Padding(
+      key: button.key,
+      padding: EdgeInsets.only(bottom: isLast ? rn.mvs(8) : 0),
+      child: Opacity(
+        opacity: button.disabled ? 0.5 : 1,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? button.onPressed : null,
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(vertical: rn.vs(16)),
+            decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                button.icon,
+                SizedBox(width: rn.s(10)),
+                Text(
+                  button.label,
+                  style: TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 14, color: textColor),
+                ),
               ],
             ),
           ),
@@ -872,10 +1059,9 @@ class _ConfirmOverlay extends StatelessWidget {
   }
 }
 
-/// Port of RN's `ScenarioInfoOverlay` panel content (the (i)-icon toggle
-/// lives inline in `_buildBody` as the "common.info" button instead of a
-/// floating icon, since this scoped screen has no participant-tile corner
-/// to anchor one to).
+/// Port of RN's `ScenarioInfoOverlay` panel: title (3 lines max) and the
+/// trigger warnings joined with bullets, on 87% black, opened by the (i)
+/// icon in the AI tile's top-left corner.
 class _ScenarioInfoPanel extends ConsumerWidget {
   const _ScenarioInfoPanel({required this.scenario});
 
@@ -884,10 +1070,10 @@ class _ScenarioInfoPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 200, maxWidth: 320),
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 400),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.85),
+        color: Colors.black.withValues(alpha: 0.87),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -898,17 +1084,20 @@ class _ScenarioInfoPanel extends ConsumerWidget {
             scenario.title,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, color: Colors.white),
           ),
           if (scenario.triggerWarnings.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
                 scenario.triggerWarnings.join(' • '),
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 12,
+                  height: 16 / 12,
+                  letterSpacing: 0.2,
+                  color: Color(0xB3FFFFFF),
+                ),
               ),
             ),
         ],

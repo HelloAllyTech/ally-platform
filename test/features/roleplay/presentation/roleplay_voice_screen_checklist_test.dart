@@ -52,9 +52,13 @@ void main() {
       await tester.tap(find.text('Connect'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester);
 
-      expect(find.text('Session Checklist'), findsOneWidget);
-      expect(find.textContaining('0 of 2'), findsOneWidget);
+      // The live screen hides the panel header (RN `hideHeader`): the tab
+      // bar's "Checklist" names it, and the tick circles show progress.
+      expect(find.text('Checklist'), findsOneWidget);
+      expect(find.text('Session Checklist'), findsNothing);
+      expect(_circleColor(tester, 'evt-greet'), const Color(0xFF3D4045));
       expect(find.byKey(const ValueKey('checklist-status-evt-greet')), findsOneWidget);
 
       liveKitService.emitData({
@@ -68,7 +72,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.textContaining('1 of 2'), findsOneWidget);
+      expect(_circleColor(tester, 'evt-greet'), const Color(0xFF57F646));
     },
   );
+}
+
+Color? _circleColor(WidgetTester tester, String id) {
+  final container = tester.widget<Container>(find.byKey(ValueKey('checklist-status-$id')));
+  return (container.decoration! as BoxDecoration).color;
 }

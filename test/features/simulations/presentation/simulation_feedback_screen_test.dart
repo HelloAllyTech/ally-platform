@@ -1,473 +1,455 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
-import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
+import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
+import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
-import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
-import 'package:ally_mobile_flutter/features/simulations/presentation/simulation_feedback_screen.dart';
 
-import '../../../support/fake_translations.dart';
-import '../../../support/pump_app.dart';
+import 'feedback_test_harness.dart';
 
-class MockSimulationsRepository extends Mock implements SimulationsRepository {}
+const _note = '''Hi there, good effort today.
 
-class MockSimulationTranscriptRepository extends Mock
-    implements SimulationTranscriptRepository {}
+## [what_worked]
+You **named the feeling** early [[msg:42]].
+
+## [try_next]
+Slow down before advising.
+
+## [closing]
+Reply and we'll talk it through.''';
 
 void main() {
-  late MockSimulationsRepository repository;
-  late MockSimulationTranscriptRepository transcriptRepository;
+  setUpAll(registerFeedbackFallbacks);
 
-  setUp(() {
-    repository = MockSimulationsRepository();
-    transcriptRepository = MockSimulationTranscriptRepository();
-    // The Transcript tab's content is built eagerly by `TabBarView` even
-    // while the Debrief tab is the one showing, so it always needs a stub.
-    when(
-      () => transcriptRepository.getMessages(
-        scenarioSessionId: any(named: 'scenarioSessionId'),
-        offset: any(named: 'offset'),
-      ),
-    ).thenAnswer(
-      (_) async => (messages: <SimulationTranscriptMessage>[], count: 0),
-    );
-  });
+  late FeedbackHarness h;
+  setUp(() => h = FeedbackHarness());
 
-  Future<void> pumpScreen(WidgetTester tester) => pumpApp(
-    tester,
-    const SimulationFeedbackScreen(scenarioSessionId: 'session-1'),
-    overrides: [
-      fixedTranslationsOverride(),
-      simulationsRepositoryProvider.overrideWithValue(repository),
-      simulationTranscriptRepositoryProvider.overrideWithValue(
-        transcriptRepository,
-      ),
-    ],
-  );
-
-  /// `pumpApp`'s own `MaterialApp` doesn't wire `scaffoldMessengerKey:
-  /// rootScaffoldMessengerKey` (nothing else needed it to), so
-  /// `rootScaffoldMessengerKey.currentState` is null under it and the
-  /// screen's `showSnackBar` calls silently no-op. Build the same shape
-  /// locally with that key attached, for the two tests that actually need
-  /// to observe a snackbar.
-  Future<void> pumpScreenWithToasts(WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          fixedTranslationsOverride(),
-          simulationsRepositoryProvider.overrideWithValue(repository),
-          simulationTranscriptRepositoryProvider.overrideWithValue(
-            transcriptRepository,
-          ),
-        ],
-        child: MaterialApp(
-          scaffoldMessengerKey: rootScaffoldMessengerKey,
-          home: const SimulationFeedbackScreen(scenarioSessionId: 'session-1'),
-        ),
-      ),
-    );
+  Future<void> closePopup(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('feedback-popup-backdrop')), warnIfMissed: false);
     await tester.pumpAndSettle();
   }
 
-  testWidgets('shows both the Debrief and Transcript tabs', (tester) async {
-    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-      (_) async => SimulationSummary.fromJson({
-        'id': 'session-1',
-        'startedAt': '2026-01-01T10:00:00.000Z',
-      }),
-    );
+  group('header', () {
+    testWidgets('a fresh session reads "Simulation End" with a Share switch and rating stars', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 3));
+      await h.pump(tester);
 
-    await pumpScreen(tester);
+      final title = tester.widget<Text>(find.byKey(const Key('simulation-feedback-title')));
+      expect(title.textSpan!.toPlainText(), 'Simulation End');
+      expect(find.text('Share'), findsOneWidget);
+      expect(find.byKey(const Key('simulation-feedback-share-switch')), findsOneWidget);
+      expect(find.byKey(const Key('session-rating-star-5')), findsOneWidget);
+    });
 
-    expect(find.text('Debrief'), findsOneWidget);
-    expect(find.text('Transcript'), findsOneWidget);
+    testWidgets('from Logs it reads "Simulation Summary"', (tester) async {
+      h.stubSummary(summaryJson(note: _note));
+      await h.pump(tester, fromLogs: true);
+
+      final title = tester.widget<Text>(find.byKey(const Key('simulation-feedback-title')));
+      expect(title.textSpan!.toPlainText(), 'Simulation Summary');
+    });
+
+    testWidgets('without the scenario-messages permission: no title and no tabs', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester, permissions: const []);
+
+      expect(find.byKey(const Key('simulation-feedback-title')), findsNothing);
+      expect(find.text('Debrief'), findsNothing);
+    });
   });
 
-  testWidgets(
-    'renders the AI debrief summary (score, duration, well/improve lists)',
-    (tester) async {
-      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-        (_) async => SimulationSummary.fromJson({
-          'id': 'session-1',
-          'score': 87,
-          'startedAt': '2026-01-01T10:00:00.000Z',
-          'endedAt': '2026-01-01T10:20:00.000Z',
-          'whatWentWell': ['Good pacing'],
-          'areasForImprovement': ['Ask more open questions'],
-        }),
+  group('tabs', () {
+    testWidgets('Debrief and Transcript by default, opening on Debrief', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester);
+
+      expect(find.text('Debrief'), findsOneWidget);
+      expect(find.text('Transcript'), findsOneWidget);
+      expect(find.byKey(const Key('supervisor-note')), findsOneWidget);
+    });
+
+    testWidgets('a short session only gets Session Review with the ended-too-soon notice', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, callDuration: 20));
+      await h.pump(tester);
+
+      expect(find.text('Session Review'), findsOneWidget);
+      expect(find.text('Debrief'), findsNothing);
+      expect(find.text('Session ended too soon'), findsOneWidget);
+      // RN hides the share switch for short sessions.
+      expect(find.byKey(const Key('simulation-feedback-share-switch')), findsNothing);
+    });
+
+    testWidgets('feedbackTabs.transcript off: only Debrief, and moment anchors become plain prose', (tester) async {
+      h.stubSummary(
+        summaryJson(note: _note, hasFeedback: true, feedbackTabs: {'debrief': true, 'transcript': false}),
       );
+      await h.pump(tester);
 
-      await pumpScreen(tester);
+      expect(find.text('Debrief'), findsOneWidget);
+      expect(find.text('Transcript'), findsNothing);
+      expect(find.byKey(const ValueKey('debrief-moment-42')), findsNothing);
+    });
 
-      expect(find.text('87'), findsOneWidget);
-      expect(find.text('20 min session'), findsOneWidget);
-      expect(find.text('Good pacing'), findsOneWidget);
-      expect(find.text('Ask more open questions'), findsOneWidget);
-    },
-  );
+    testWidgets('both feedback tabs off: no tabs at all', (tester) async {
+      h.stubSummary(
+        summaryJson(note: _note, hasFeedback: true, feedbackTabs: {'debrief': false, 'transcript': false}),
+      );
+      await h.pump(tester);
 
-  testWidgets('requires a rating before submitting', (tester) async {
-    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-      (_) async => SimulationSummary.fromJson({
-        'id': 'session-1',
-        'startedAt': '2026-01-01T10:00:00.000Z',
-      }),
-    );
-
-    await pumpScreen(tester);
-
-    await tester.tap(find.widgetWithText(AppButton, 'Submit'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Please select a rating.'), findsOneWidget);
-    verifyNever(
-      () => repository.addSimulationFeedback(
-        scenarioSessionId: any(named: 'scenarioSessionId'),
-        rating: any(named: 'rating'),
-        comment: any(named: 'comment'),
-      ),
-    );
+      expect(find.text('Debrief'), findsNothing);
+      expect(find.text('Transcript'), findsNothing);
+    });
   });
 
-  testWidgets(
-    'submitting a rating and comment calls addSimulationFeedback and shows the thanks state',
-    (tester) async {
-      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-        (_) async => SimulationSummary.fromJson({
-          'id': 'session-1',
-          'startedAt': '2026-01-01T10:00:00.000Z',
-        }),
-      );
+  group('debrief', () {
+    testWidgets('renders the note by section, with headings and the reply composer', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester);
+
+      expect(find.text('WHAT WORKED'), findsOneWidget);
+      expect(find.text('TRY THIS NEXT'), findsOneWidget);
+      expect(find.text('from Ally'), findsOneWidget);
+      expect(find.text('AI-GENERATED'), findsOneWidget);
+      expect(find.byKey(const ValueKey('debrief-moment-42')), findsOneWidget);
+      expect(find.text('Have a question about any of this? Reply below.'), findsOneWidget);
+      expect(find.byKey(const Key('ask-ai-input')), findsOneWidget);
+      verify(() => h.chatApi.getHistory('session-1')).called(1);
+    });
+
+    testWidgets('while the note is still being written: skeleton and "writing" copy', (tester) async {
+      h.stubSummary(summaryJson(hasFeedback: true));
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-note-skeleton')), findsOneWidget);
+      expect(find.textContaining('Ally is writing your debrief'), findsOneWidget);
+      expect(find.byKey(const Key('ask-ai-input')), findsNothing);
+    });
+
+    testWidgets('a failed generation shows its error message', (tester) async {
+      h.stubSummary(summaryJson(hasFeedback: true, errorMessage: 'Generation failed'));
+      await h.pump(tester);
+
+      expect(find.text('Generation failed'), findsOneWidget);
+    });
+
+    testWidgets('from Logs it is read-only: no composer, no closing, no history load', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester, fromLogs: true);
+
+      expect(find.byKey(const Key('ask-ai-input')), findsNothing);
+      expect(find.textContaining("Reply and we'll talk"), findsNothing);
+      verifyNever(() => h.chatApi.getHistory(any()));
+    });
+
+    testWidgets('a "See this moment" chip switches to the Transcript tab and outlines that row', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
       when(
-        () => repository.addSimulationFeedback(
-          scenarioSessionId: 'session-1',
-          rating: 4,
-          comment: 'Really helpful session',
-          tags: <String>[],
+        () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0),
+      ).thenAnswer(
+        (_) async => (
+          messages: [
+            SimulationTranscriptMessage.fromJson({'id': 41, 'senderId': -1, 'content': 'Hello', 'startSeconds': 3}),
+            SimulationTranscriptMessage.fromJson({'id': 42, 'senderId': 7, 'content': 'That sounds hard', 'startSeconds': 65}),
+          ],
+          count: 2,
         ),
-      ).thenAnswer((_) async {});
+      );
+      await h.pump(tester);
 
-      await pumpScreen(tester);
-
-      // 5 star IconButtons rendered left-to-right for ratings 1..5 — tap the
-      // 4th to select a rating of 4.
-      final starButtons = find.byIcon(Icons.star_border);
-      await tester.tap(starButtons.at(3));
+      await tester.tap(find.byKey(const ValueKey('debrief-moment-42')));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField), 'Really helpful session');
+      expect(find.text('That sounds hard'), findsOneWidget);
+      expect(find.text('Asha (AI client)'), findsOneWidget);
+      expect(find.text('01:05 '), findsOneWidget);
+      final focused = tester.widget<Container>(
+        find.ancestor(of: find.text('That sounds hard'), matching: find.byType(Container)).first,
+      );
+      expect((focused.decoration! as BoxDecoration).border!.top.width, 2);
+
+      // The highlight expires after 2.5s.
+      await tester.pump(const Duration(milliseconds: 2600));
+      final after = tester.widget<Container>(
+        find.ancestor(of: find.text('That sounds hard'), matching: find.byType(Container)).first,
+      );
+      expect((after.decoration! as BoxDecoration).border!.top.width, 0.5);
+    });
+
+    testWidgets('replying streams Ally\'s answer into the thread', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      when(() => h.chatApi.streamChat('session-1', 'Why?', cancelToken: any(named: 'cancelToken'))).thenAnswer(
+        (_) => Stream.fromIterable(const [
+          AskAiSseStart(),
+          AskAiSseToken('Because '),
+          AskAiSseToken('**pacing** matters.'),
+          AskAiSseDone(),
+        ]),
+      );
+      await h.pump(tester);
+
+      await tester.enterText(find.byKey(const Key('ask-ai-input')), 'Why?');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('ask-ai-send')));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(AppButton, 'Submit'));
+      expect(find.text('Why?'), findsOneWidget);
+      expect(find.textContaining('Because', findRichText: true), findsOneWidget);
+      expect(find.textContaining('pacing', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('a stream error shows the banner, and Retry re-sends', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      var calls = 0;
+      when(() => h.chatApi.streamChat('session-1', 'Why?', cancelToken: any(named: 'cancelToken'))).thenAnswer((_) {
+        calls++;
+        return calls == 1
+            ? Stream.fromIterable(const [AskAiSseError('Something broke')])
+            : Stream.fromIterable(const [AskAiSseToken('Fine now'), AskAiSseDone()]);
+      });
+      await h.pump(tester);
+
+      await tester.enterText(find.byKey(const Key('ask-ai-input')), 'Why?');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('ask-ai-send')));
+      await tester.pumpAndSettle();
+      expect(find.text('Something broke'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('ask-ai-retry')));
+      await tester.pumpAndSettle();
+      expect(find.text('Something broke'), findsNothing);
+      expect(find.textContaining('Fine now', findRichText: true), findsOneWidget);
+    });
+  });
+
+  group('rating', () {
+    testWidgets('a fresh unrated session opens the rating popup straight away', (tester) async {
+      h.stubSummary(summaryJson(note: _note));
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('feedback-popup')), findsOneWidget);
+      expect(find.text('How was your experience?'), findsOneWidget);
+    });
+
+    testWidgets('never auto-opens from Logs', (tester) async {
+      h.stubSummary(summaryJson(note: _note));
+      await h.pump(tester, fromLogs: true);
+
+      expect(find.byKey(const Key('feedback-popup')), findsNothing);
+    });
+
+    testWidgets('submitting sends rating, tags and comment, then toasts', (tester) async {
+      h.stubSummary(summaryJson(note: _note));
+      await h.pump(tester);
+
+      await tester.tap(find.byKey(const ValueKey('feedback-popup-star-4')));
+      await tester.pumpAndSettle();
+      expect(find.text('Good quality - Above expectations'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('feedback-popup-comment')), 'Useful');
+      await tester.tap(find.byKey(const Key('feedback-popup-submit')));
       await tester.pumpAndSettle();
 
       verify(
-        () => repository.addSimulationFeedback(
+        () => h.simulations.addSimulationFeedback(
           scenarioSessionId: 'session-1',
           rating: 4,
-          comment: 'Really helpful session',
+          comment: 'Useful',
           tags: <String>[],
         ),
       ).called(1);
+      expect(find.byKey(const Key('feedback-popup')), findsNothing);
       expect(find.text('Feedback submitted successfully'), findsOneWidget);
-    },
-  );
+    });
 
-  testWidgets(
-    'picking a rating shows that rating\'s tags, and selecting one submits it',
-    (tester) async {
-      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-        (_) async => SimulationSummary.fromJson({
-          'id': 'session-1',
-          'startedAt': '2026-01-01T10:00:00.000Z',
-        }),
-      );
+    testWidgets('tapping a header star opens the popup at that rating', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester);
+
+      await tester.tap(find.byKey(const ValueKey('session-rating-star-2')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('feedback-popup')), findsOneWidget);
+      expect(find.text('Below expectations - Could be much better'), findsOneWidget);
+    });
+
+    testWidgets('leaving unrated asks again; dismissing that leaves to Learn', (tester) async {
+      h.stubSummary(summaryJson(note: _note));
+      await h.pump(tester);
+      await closePopup(tester);
+      expect(find.byKey(const Key('feedback-popup')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('feedback-popup')), findsOneWidget);
+
+      await closePopup(tester);
+      expect(find.text('HOME'), findsOneWidget);
+    });
+
+    testWidgets('an already-rated session leaves without asking', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      await h.pump(tester);
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+    });
+  });
+
+  group('share switch', () {
+    testWidgets('on with no review yet opens Share for review with the session context', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester);
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-share-switch')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SHARE:null:300:Supporting a grieving parent'), findsOneWidget);
+    });
+
+    testWidgets('off on an older shared review makes it private', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, reviewId: 'rev-1', reviewStatus: 'IN_REVIEW'));
+      h.stubReview();
       when(
-        () => repository.addSimulationFeedback(
-          scenarioSessionId: 'session-1',
-          rating: 4,
-          comment: '',
-          tags: ['Helpful'],
-        ),
+        () => h.reviews.updateReviewStatus(reviewId: 'rev-1', status: 'HIDDEN'),
       ).thenAnswer((_) async {});
+      await h.pump(tester);
 
-      await pumpScreen(tester);
-
-      // Rating 4's real tag set (`postSim.feedback.dialog.rating.tags.4`).
-      expect(
-        find.text('Helpful'),
-        findsNothing,
-        reason: 'no rating picked yet',
-      );
-
-      final starButtons = find.byIcon(Icons.star_border);
-      await tester.tap(starButtons.at(3));
+      await tester.tap(find.byKey(const Key('simulation-feedback-share-switch')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Good'), findsOneWidget);
-      expect(find.text('Helpful'), findsOneWidget);
-
-      await tester.tap(find.text('Helpful'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.widgetWithText(AppButton, 'Submit'));
-      await tester.pumpAndSettle();
-
-      verify(
-        () => repository.addSimulationFeedback(
-          scenarioSessionId: 'session-1',
-          rating: 4,
-          comment: '',
-          tags: ['Helpful'],
-        ),
-      ).called(1);
-    },
-  );
-
-  testWidgets('picking a new rating clears any tags already chosen', (
-    tester,
-  ) async {
-    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-      (_) async => SimulationSummary.fromJson({
-        'id': 'session-1',
-        'startedAt': '2026-01-01T10:00:00.000Z',
-      }),
-    );
-
-    await pumpScreen(tester);
-
-    final starButtons = find.byIcon(Icons.star_border);
-    await tester.tap(starButtons.at(3)); // rating 4
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Helpful'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byIcon(Icons.star).first); // re-tap rating 1
-    await tester.pumpAndSettle();
-
-    // Rating 1's own tag set is showing, and the previous rating-4 chip is gone.
-    expect(find.text('Helpful'), findsNothing);
-    expect(find.text('Poor'), findsOneWidget);
+      verify(() => h.reviews.updateReviewStatus(reviewId: 'rev-1', status: 'HIDDEN')).called(1);
+      expect(find.text('Privacy setting updated'), findsOneWidget);
+    });
   });
 
-  testWidgets('leaving before submitting feedback prompts a confirmation', (
-    tester,
-  ) async {
-    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-      (_) async => SimulationSummary.fromJson({
-        'id': 'session-1',
-        'startedAt': '2026-01-01T10:00:00.000Z',
-      }),
-    );
-
-    final navigatorKey = GlobalKey<NavigatorState>();
-    await pumpApp(
-      tester,
-      Navigator(
-        key: navigatorKey,
-        onGenerateRoute: (settings) => MaterialPageRoute(
-          builder: (_) =>
-              const SimulationFeedbackScreen(scenarioSessionId: 'session-1'),
-        ),
-      ),
-      overrides: [
-        fixedTranslationsOverride(),
-        simulationsRepositoryProvider.overrideWithValue(repository),
-        simulationTranscriptRepositoryProvider.overrideWithValue(
-          transcriptRepository,
-        ),
-      ],
-    );
-
-    navigatorKey.currentState!.maybePop();
-    await tester.pumpAndSettle();
-
-    final dialog = find.byType(AlertDialog);
-    expect(dialog, findsOneWidget);
-    expect(
-      find.descendant(
-        of: dialog,
-        matching: find.text('How did that session go?'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: dialog,
-        matching: find.text('Please select a rating.'),
-      ),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-
-    // Dialog dismissed, screen still showing (didn't actually leave).
-    expect(find.text('Debrief'), findsOneWidget);
-  });
-
-  testWidgets(
-    'submitting feedback shows a snackbar in addition to the inline thanks state',
-    (tester) async {
-      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-        (_) async => SimulationSummary.fromJson({
-          'id': 'session-1',
-          'startedAt': '2026-01-01T10:00:00.000Z',
-        }),
-      );
-      when(
-        () => repository.addSimulationFeedback(
-          scenarioSessionId: 'session-1',
-          rating: 4,
-          comment: '',
-          tags: <String>[],
-        ),
-      ).thenAnswer((_) async {});
-
-      await pumpScreenWithToasts(tester);
-
-      await tester.tap(find.byIcon(Icons.star_border).at(3));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(AppButton, 'Submit'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(SnackBar), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(SnackBar),
-          matching: find.text('Feedback submitted successfully'),
-        ),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets('a failed submission shows a failure snackbar alongside the inline error', (
-    tester,
-  ) async {
-    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-      (_) async => SimulationSummary.fromJson({
-        'id': 'session-1',
-        'startedAt': '2026-01-01T10:00:00.000Z',
-      }),
-    );
-    when(
-      () => repository.addSimulationFeedback(
-        scenarioSessionId: 'session-1',
-        rating: 4,
-        comment: '',
-        tags: <String>[],
-      ),
-    ).thenThrow(Exception('network down'));
-
-    await pumpScreenWithToasts(tester);
-
-    await tester.tap(find.byIcon(Icons.star_border).at(3));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(AppButton, 'Submit'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(SnackBar), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(SnackBar),
-        matching: find.text('Failed to submit feedback'),
-      ),
-      findsOneWidget,
-    );
-    // The inline form stays up (not a forced "thanks" state) with its own
-    // error text too.
-    expect(find.textContaining('Failed to submit feedback'), findsWidgets);
-  });
-
-  testWidgets(
-    'a session that already has feedback starts in the thanks state with no leave prompt',
-    (tester) async {
-      when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-        (_) async => SimulationSummary.fromJson({
-          'id': 'session-1',
-          'startedAt': '2026-01-01T10:00:00.000Z',
-          'hasFeedback': true,
-          'feedbackRating': 5,
-        }),
-      );
-
-      final navigatorKey = GlobalKey<NavigatorState>();
-      await pumpApp(
-        tester,
-        Navigator(
-          key: navigatorKey,
-          onGenerateRoute: (settings) => MaterialPageRoute(
-            builder: (_) =>
-                const SimulationFeedbackScreen(scenarioSessionId: 'session-1'),
-          ),
-        ),
-        overrides: [
-          fixedTranslationsOverride(),
-          simulationsRepositoryProvider.overrideWithValue(repository),
-          simulationTranscriptRepositoryProvider.overrideWithValue(
-            transcriptRepository,
-          ),
+  group('event checklist', () {
+    testWidgets('CHECKLIST roleplays show which events happened', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, experienceMode: 'CHECKLIST'));
+      when(() => h.simulations.getEventChecklist('session-1')).thenAnswer(
+        (_) async => [
+          EventChecklistItem(id: 'a', name: 'Introduced self', hasOccurred: true),
+          EventChecklistItem(id: 'b', name: 'Asked about safety', hasOccurred: false),
         ],
       );
+      await h.pump(tester);
 
-      // Already-submitted "thanks" state, not the blank rating form.
-      expect(find.text('Feedback submitted successfully'), findsOneWidget);
-      verifyNever(
-        () => repository.addSimulationFeedback(
-          scenarioSessionId: any(named: 'scenarioSessionId'),
-          rating: any(named: 'rating'),
-          comment: any(named: 'comment'),
+      expect(find.text('Evaluation Checklist'), findsOneWidget);
+      expect(find.text('Introduced self'), findsOneWidget);
+      expect(find.text('Asked about safety'), findsOneWidget);
+    });
+
+    testWidgets('other modes never fetch it', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester);
+
+      verifyNever(() => h.simulations.getEventChecklist(any()));
+    });
+  });
+
+  group('floating buttons (off the Debrief tab)', () {
+    Future<void> toTranscript(WidgetTester tester) async {
+      await tester.tap(find.text('Transcript'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a shared review: the review button shows on Transcript but not Debrief', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, reviewId: 'rev-1', reviewStatus: 'IN_REVIEW'));
+      h.stubReview();
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('simulation-feedback-view-review')), findsNothing);
+      verifyNever(() => h.reviews.getThreads(any(), limit: any(named: 'limit')));
+      await toTranscript(tester);
+      expect(find.byKey(const Key('simulation-feedback-view-review')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-view-review')));
+      await tester.pumpAndSettle();
+      expect(find.text('REVIEW_DETAILS:rev-1:ReviewType.simulation'), findsOneWidget);
+    });
+
+    testWidgets('a private review with nothing on it stays hidden', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, reviewId: 'rev-1', reviewStatus: 'HIDDEN'));
+      h.stubReview(status: 'HIDDEN');
+      await h.pump(tester);
+      await toTranscript(tester);
+
+      expect(find.byKey(const Key('simulation-feedback-view-review')), findsNothing);
+      verify(() => h.reviews.getThreads('rev-1', limit: 1)).called(1);
+    });
+
+    testWidgets('a private review with a thread or reaction shows it', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, reviewId: 'rev-1', reviewStatus: 'HIDDEN'));
+      h.stubReview(status: 'HIDDEN');
+      when(() => h.reviews.getThreads('rev-1', limit: 1)).thenAnswer(
+        (_) async => (
+          threads: [
+            ReviewThread.fromJson({
+              'id': 'thread-1',
+              'commentCount': 1,
+              'createdBy': {'id': 1, 'name': 'A'},
+            }),
+          ],
+          count: 1,
         ),
       );
+      await h.pump(tester);
+      await toTranscript(tester);
 
-      navigatorKey.currentState!.maybePop();
+      expect(find.byKey(const Key('simulation-feedback-view-review')), findsOneWidget);
+      verifyNever(() => h.reactions.getReactionsCount(any()));
+    });
+
+    testWidgets('a private review with only a reaction shows it', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, reviewId: 'rev-1', reviewStatus: 'HIDDEN'));
+      h.stubReview(status: 'HIDDEN');
+      when(() => h.reactions.getReactionsCount('rev-1')).thenAnswer((_) async => {'👍': 1});
+      await h.pump(tester);
+      await toTranscript(tester);
+
+      expect(find.byKey(const Key('simulation-feedback-view-review')), findsOneWidget);
+    });
+
+    testWidgets('Try another simulation shows off Debrief and opens the catalog; never from Logs', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('simulation-feedback-try-another')), findsNothing);
+      await toTranscript(tester);
+      expect(find.text('Try another simulation'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('simulation-feedback-try-another')));
       await tester.pumpAndSettle();
+      expect(find.text('SIMULATIONS_LIST'), findsOneWidget);
+    });
 
-      // No forced confirmation dialog — already has feedback.
-      expect(find.byType(AlertDialog), findsNothing);
-    },
-  );
+    testWidgets('no Try another from Logs', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      await h.pump(tester, fromLogs: true);
+      await toTranscript(tester);
 
-  testWidgets('fromLogs skips the forced leave-without-rating prompt even with no feedback yet', (
-    tester,
-  ) async {
-    when(() => repository.getSimulationDetails('session-1')).thenAnswer(
-      (_) async => SimulationSummary.fromJson({
-        'id': 'session-1',
-        'startedAt': '2026-01-01T10:00:00.000Z',
-      }),
-    );
+      expect(find.byKey(const Key('simulation-feedback-try-another')), findsNothing);
+    });
+  });
 
-    final navigatorKey = GlobalKey<NavigatorState>();
-    await pumpApp(
-      tester,
-      Navigator(
-        key: navigatorKey,
-        onGenerateRoute: (settings) => MaterialPageRoute(
-          builder: (_) => const SimulationFeedbackScreen(
-            scenarioSessionId: 'session-1',
-            fromLogs: true,
-          ),
-        ),
-      ),
-      overrides: [
-        fixedTranslationsOverride(),
-        simulationsRepositoryProvider.overrideWithValue(repository),
-        simulationTranscriptRepositoryProvider.overrideWithValue(
-          transcriptRepository,
-        ),
-      ],
-    );
+  group('polling', () {
+    testWidgets('re-fetches every 3.5s until Ally\'s note lands, then stops', (tester) async {
+      var calls = 0;
+      when(() => h.simulations.getSimulationDetails('session-1')).thenAnswer((_) async {
+        calls++;
+        return SimulationSummary.fromJson(summaryJson(hasFeedback: true, note: calls >= 2 ? _note : null));
+      });
+      await h.pump(tester);
+      expect(calls, 1);
+      expect(find.byKey(const Key('debrief-note-skeleton')), findsOneWidget);
 
-    navigatorKey.currentState!.maybePop();
-    await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 3600));
+      await tester.pumpAndSettle();
+      expect(calls, 2);
+      expect(find.byKey(const Key('supervisor-note')), findsOneWidget);
 
-    expect(find.byType(AlertDialog), findsNothing);
+      await tester.pump(const Duration(seconds: 10));
+      expect(calls, 2);
+    });
   });
 }

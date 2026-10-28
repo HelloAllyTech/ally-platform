@@ -46,6 +46,7 @@ void main() {
     // session timer it starts is a live `Timer.periodic` for the rest of
     // this test — bounded `pump()` from here on, not `pumpAndSettle()`.
     await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester);
     expect(find.text('End session'), findsOneWidget);
 
     // The new participant tiles push this button below this test's 600px

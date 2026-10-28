@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../simulations/data/simulation_models.dart';
 
 /// Mirrors ally-mobile (React Native)'s `ChecklistType` enum
@@ -23,25 +24,28 @@ ChecklistMode checklistModeFromString(String? value) {
   }
 }
 
-/// Scoped port of ally-mobile (React Native)'s `SessionChecklist` — the live
-/// roleplay checklist, populated by `detected_event_ids` LiveKit
-/// data-channel messages (see `roleplay_voice_screen.dart`'s
-/// `_detectedEventIds`). RN nests this under a Checklist/Reminders/
-/// Description tab bar the Flutter screen has no equivalent of yet (neither
-/// "Reminders" nor a description tab exist here); rather than build tab
-/// chrome around features that don't exist, this renders standalone,
-/// matching RN's own `hideHeader: false` (always-shown header) case.
+/// Port of ally-mobile (React Native)'s `SessionChecklist` — the live
+/// roleplay checklist, ticked off from `detected_event_ids` LiveKit
+/// data-channel messages (see `roleplay_voice_screen.dart`). RN's dark
+/// look: a `#1d2020` panel, an optional header (checklist icon, "Session
+/// Checklist", "Progress: N of M completed" with N in green), then one
+/// `#282B31` card per item with a green/grey tick circle, the name (or the
+/// rank, in UNGUIDED mode until it's triggered) and, in GUIDED/LIST mode,
+/// a chevron that expands the item's coaching message. The live screen
+/// passes [hideHeader] (its tab bar already says "Checklist").
 class ChecklistPanel extends StatefulWidget {
   const ChecklistPanel({
     super.key,
     required this.mode,
     required this.items,
     required this.triggeredEventIds,
+    this.hideHeader = false,
   });
 
   final ChecklistMode mode;
   final List<ChecklistItem> items;
   final Set<String> triggeredEventIds;
+  final bool hideHeader;
 
   @override
   State<ChecklistPanel> createState() => _ChecklistPanelState();
@@ -56,6 +60,8 @@ class _ChecklistPanelState extends State<ChecklistPanel> {
     });
   }
 
+  static const _panel = Color(0xFF1D2020); // '#1d2020' literal
+
   @override
   Widget build(BuildContext context) {
     if (widget.mode == ChecklistMode.off) return const SizedBox.shrink();
@@ -66,52 +72,84 @@ class _ChecklistPanelState extends State<ChecklistPanel> {
       if (rankA != rankB) return rankA.compareTo(rankB);
       return (b.score ?? 0).compareTo(a.score ?? 0);
     });
-    final completedCount = sorted
-        .where((item) => widget.triggeredEventIds.contains(item.id))
-        .length;
+    final completedCount = sorted.where((item) => widget.triggeredEventIds.contains(item.id)).length;
+    final isList = widget.mode == ChecklistMode.list;
 
     return Consumer(
       key: const ValueKey('checklist-panel'),
       builder: (context, ref, _) {
+        const italic = TextStyle(
+          fontFamily: AppFonts.ibmPlexSerifRegular,
+          fontSize: 12,
+          fontStyle: FontStyle.italic,
+          color: AppColors.infoTabInactive,
+        );
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: const EdgeInsets.all(12),
-          constraints: const BoxConstraints(maxHeight: 260),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(12),
-          ),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(8)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  SvgPicture.asset('assets/icons/checklist.svg', width: 24, height: 24),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ref.t('simulationPage.sessionChecklist'),
-                          style: Theme.of(context).textTheme.titleSmall,
+              if (!widget.hideHeader)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 24),
+                  child: Row(
+                    crossAxisAlignment: isList ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.only(top: isList ? 0 : 4, right: 16),
+                        child: SvgPicture.asset(
+                          'assets/icons/checklist.svg',
+                          width: 40,
+                          height: 40,
+                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                         ),
-                        if (widget.mode != ChecklistMode.list)
-                          Text(
-                            '${ref.t('simulationPage.progress')}: $completedCount of '
-                            '${sorted.length} ${ref.t('simulationPage.completed')}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                      ],
-                    ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ref.t('simulationPage.sessionChecklist'),
+                              style: const TextStyle(
+                                fontFamily: AppFonts.ibmPlexSerifRegular,
+                                fontSize: 18,
+                                height: 22 / 18,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (!isList)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text.rich(
+                                  TextSpan(
+                                    style: italic,
+                                    children: [
+                                      TextSpan(text: '${ref.t('simulationPage.progress')}: '),
+                                      TextSpan(
+                                        text: '$completedCount',
+                                        style: const TextStyle(color: AppColors.callGreen, fontWeight: FontWeight.bold),
+                                      ),
+                                      const TextSpan(text: ' of '),
+                                      TextSpan(
+                                        text: '${sorted.length} ${ref.t('simulationPage.completed')}',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
+                ),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 20, right: 4),
                   itemCount: sorted.length,
                   itemBuilder: (context, index) {
                     final item = sorted[index];
@@ -151,62 +189,95 @@ class _ChecklistRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showsName = mode == ChecklistMode.guided || mode == ChecklistMode.list;
-    // GUIDED/LIST always show the item's name; UNGUIDED reveals the name
-    // only once triggered, showing the item's rank until then — mirrors
-    // RN's `displayText` exactly.
-    final displayText = showsName
-        ? item.name
-        : (isTriggered ? item.name : (item.rank?.toString() ?? ''));
+    // GUIDED/LIST always show the name; UNGUIDED shows the rank until the
+    // item is triggered — RN's `displayText`.
+    final displayText = showsName ? item.name : (isTriggered ? item.name : (item.rank?.toString() ?? ''));
     final canExpand = showsName && (item.message ?? '').isNotEmpty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: canExpand ? onTap : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                if (mode != ChecklistMode.list)
-                  Container(
-                    key: ValueKey('checklist-status-${item.id}'),
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isTriggered ? AppColors.emeraldGreen : Colors.transparent,
-                      border: Border.all(
-                        color: isTriggered ? AppColors.emeraldGreen : AppColors.strokePrimary,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(color: AppColors.darkGray10, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: canExpand ? onTap : null,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  if (mode != ChecklistMode.list) ...[
+                    Container(
+                      key: ValueKey('checklist-status-${item.id}'),
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isTriggered ? AppColors.callGreen : AppColors.callDivider,
+                      ),
+                      child: SvgPicture.asset(
+                        'assets/icons/tick.svg',
+                        width: 14,
+                        height: 14,
+                        colorFilter: ColorFilter.mode(
+                          isTriggered ? Colors.black : const Color(0xFF25272A),
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
-                    child: isTriggered
-                        ? const Icon(Icons.check, size: 14, color: Colors.black)
-                        : null,
+                    const SizedBox(width: 4),
+                  ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: Text(
+                        displayText,
+                        key: ValueKey('checklist-item-${item.id}'),
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(displayText, key: ValueKey('checklist-item-${item.id}')),
+                  if (canExpand)
+                    Opacity(
+                      opacity: 0.7,
+                      child: AnimatedRotation(
+                        turns: isExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: SvgPicture.asset(
+                          'assets/icons/chevronDown.svg',
+                          width: 12,
+                          height: 12,
+                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (canExpand && isExpanded)
+            Padding(
+              padding: const EdgeInsets.only(left: 56, right: 16, bottom: 16),
+              child: Text(
+                item.message!,
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 13,
+                  height: 20 / 13,
+                  color: Color(0xFFB6B5B9),
                 ),
-                if (canExpand)
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 150),
-                    child: const Icon(Icons.keyboard_arrow_down, size: 18),
-                  ),
-              ],
+              ),
             ),
-          ),
-        ),
-        if (canExpand && isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 32, bottom: 8),
-            child: Text(
-              item.message!,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -157,4 +157,31 @@ class AppColors {
   static const smokyBlack = Color(0x8C131313); // rgba(19,19,19,0.55) VideoPreview overlay
   static const whiteTransparent90 = Color(0xE6FFFFFF); // rgba(255,255,255,0.9) VideoPreview play disc
   static const amber900 = Color(0xFFFF6F00); // RoleplayCasePlayer assessment notice text
+  // feedback parity (src/theme/colors.ts, src/theme/designSystem/colors.ts)
+  static const blue100 = Color(0xFFB7D7FF); // ds.blue[100]: debrief gradient middle stop
+  static const blueAlpha25 = Color(0x40E2F2FF); // ds.blueAlpha[25]: learner transcript row
+  static const blueAlpha50 = Color(0x80E2F2FF); // ds.blueAlpha[50]: citations header
+  static const deepPurpleAlpha25 = Color(0x40EDE7F6); // ds.deepPurpleAlpha[25]: AI transcript row
+  static const deepPurple800 = Color(0xFF4527A0); // ds.deepPurple[800]: AI speaker label
+  static const red50 = Color(0xFFFFD9D4); // ds.red[50]: chat error banner
+  static const red200 = Color(0xFFFFA79C); // ds.red[200]: missed checklist item border
+  static const green200 = Color(0xFFA5D6A7); // ds.green[200]: met checklist item border
+  static const lightGreen2 = Color(0x40E8F5E9); // rgba(232,245,233,0.25): met checklist item
+  static const lightRed = Color(0x40FFD9D4); // rgba(255,217,212,0.25): missed checklist item
+  static const starYellow = Color(0xFFFFB800); // StarRating / SessionRatingTrigger fill
+  static const grey900 = Color(0xFF212121); // ds.grey[900]: SummaryCard shadow
+  static const sendButtonIdle = Color(0xFFD1D5DC); // '#d1d5dc' literal: AskAI/Debrief send button
+  static const rankBadgeBorder = Color(0xFFBFD4F6); // '#BFD4F6' literal: Ally avatar ring
+  static const darkGray17 = Color(0xFF1A1A1A); // InfoTooltip bubble
+  // roleplay parity (SimulationAssistantScreen, components/ButtonGroup)
+  static const grey950 = Color(0xFF17181A); // ds.grey[950]: live call background
+  static const whiteAlpha50 = Color(0x0AFFFFFF); // ds.whiteAlpha[50]: participant tile
+  static const blackAlpha200 = Color(0x1F000000); // ds.blackAlpha[200]: controls bar
+  static const darkGray10 = Color(0xFF282B31); // ButtonItem background
+  static const darkGray5 = Color(0xFF1E2025); // ButtonItem active label
+  static const lightGray3 = Color(0xFF676767); // loader microphone prompt
+  static const coralRed = Color(0xFFFB6767); // End-session square icon
+  static const callDivider = Color(0xFF3D4045); // '#3D4045' literal: info tab rule, PiP border
+  static const infoTabInactive = Color(0xFF9CA3AF); // '#9CA3AF' literal: inactive info tab
+  static const callGreen = Color(0xFF57F646); // '#57f646' literal: info tab indicator, countdown ring
 }
