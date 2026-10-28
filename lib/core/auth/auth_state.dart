@@ -20,9 +20,8 @@ class AuthState {
   final bool isAuthenticated;
 
   /// False only until the stored session has been read at launch. The
-  /// router holds a blank splash meanwhile, so a returning user never
-  /// builds the login screen (and decodes its 7.9 MB splash animation)
-  /// on the way to Home.
+  /// router holds `/splash` meanwhile, so a returning user never builds
+  /// the login screen on the way to Home.
   final bool isRestored;
 
   static const unknown = AuthState(isAuthenticated: false, isRestored: false);
