@@ -1,9 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/learning_path_detail_view.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/start_simulation/start_simulation_controller.dart';
 
 import '../../../support/fake_translations.dart';
 import '../../../support/pump_app.dart';
@@ -41,10 +45,36 @@ SimulationPathDetails _details({
   scenarios: scenarios,
 );
 
-Future<void> _pump(WidgetTester tester, Widget child) =>
-    pumpApp(tester, child, overrides: [fixedTranslationsOverride()]);
+class MockSimulationsRepository extends Mock implements SimulationsRepository {}
+
+late MockSimulationsRepository repository;
+
+StartSimulationParams _params(PathScenario scenario, int? languageId) =>
+    StartSimulationParams(scenarioId: scenario.scenarioId, languageId: languageId);
+
+Future<void> _pump(WidgetTester tester, Widget child, {SimulationCredits? credits}) => pumpApp(
+  tester,
+  child,
+  overrides: [
+    fixedTranslationsOverride(),
+    simulationsRepositoryProvider.overrideWithValue(repository),
+    simulationCreditsProvider.overrideWith(
+      (ref) async => credits ?? SimulationCredits(creditLimit: 100, consumedCredits: 0, secondsAllowedPerCredit: 60),
+    ),
+  ],
+);
 
 void main() {
+  setUp(() {
+    repository = MockSimulationsRepository();
+    when(
+      () => repository.startScenarioSession(
+        scenarioId: any(named: 'scenarioId'),
+        languageId: any(named: 'languageId'),
+      ),
+    ).thenAnswer((_) async => SessionData(id: 'sess', accessToken: 'tok', liveKitServerUrl: 'wss://lk'));
+  });
+
   group('Start/Continue button', () {
     testWidgets('shows Start when no scenario has been completed yet', (
       tester,
@@ -61,7 +91,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_, {languageId}) async {},
+          startParamsFor: _params,
           onViewFeedback: (_) async {},
         ),
       );
@@ -92,7 +122,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_, {languageId}) async {},
+          startParamsFor: _params,
           onViewFeedback: (_) async {},
         ),
       );
@@ -121,7 +151,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_, {languageId}) async {},
+          startParamsFor: _params,
           onViewFeedback: (_) async {},
         ),
       );
@@ -132,7 +162,7 @@ void main() {
 
     testWidgets(
       'tapping it calls onEnsureSession then opens the preview modal, which calls '
-      'onStartScenario for the next scenario once Start Simulation is tapped',
+      'starts the next scenario once Start Simulation is tapped',
       (tester) async {
         final calls = <String>[];
         final details = _details(
@@ -149,8 +179,9 @@ void main() {
             onEnsureSession: () async {
               calls.add('ensure');
             },
-            onStartScenario: (scenario, {languageId}) async {
+            startParamsFor: (scenario, languageId) {
               calls.add('start:${scenario.id}');
+              return _params(scenario, languageId);
             },
             onViewFeedback: (_) async {},
           ),
@@ -163,6 +194,9 @@ void main() {
         expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget);
 
         await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+        await tester.pumpAndSettle();
+        // RN's NotificationModal ("Before you get started") comes next.
+        await tester.tap(find.text('Start Session'));
         await tester.pumpAndSettle();
 
         expect(calls, ['ensure', 'start:s1']);
@@ -194,8 +228,9 @@ void main() {
           LearningPathDetailView(
             details: details,
             onEnsureSession: () async {},
-            onStartScenario: (scenario, {languageId}) async {
+            startParamsFor: (scenario, languageId) {
               capturedLanguageId = languageId;
+              return _params(scenario, languageId);
             },
             onViewFeedback: (_) async {},
           ),
@@ -213,6 +248,9 @@ void main() {
         await tester.pumpAndSettle();
 
         await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+        await tester.pumpAndSettle();
+        // RN's NotificationModal ("Before you get started") comes next.
+        await tester.tap(find.text('Start Session'));
         await tester.pumpAndSettle();
 
         expect(capturedLanguageId, 2);
@@ -241,7 +279,10 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (scenario, {languageId}) async => startCalls++,
+          startParamsFor: (scenario, languageId) {
+            startCalls++;
+            return _params(scenario, languageId);
+          },
           onViewFeedback: (_) async {},
         ),
       );
@@ -257,18 +298,30 @@ void main() {
       expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
     });
 
-    testWidgets('a start failure shows the error inline inside the modal and keeps it open', (
+    testWidgets('a start failure closes the modal (RN\'s finally) and shows the error toast', (
       tester,
     ) async {
       final details = _details(scenarios: [_scenario(id: 's1', scenarioId: 1, order: 1)]);
+      when(() => repository.startScenarioSession(scenarioId: 1)).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/learn/scenario-session-start'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/learn/scenario-session-start'),
+            statusCode: 400,
+            data: {'message': 'network down'},
+          ),
+        ),
+      );
 
       await _pump(
         tester,
-        LearningPathDetailView(
-          details: details,
-          onEnsureSession: () async {},
-          onStartScenario: (scenario, {languageId}) async => throw Exception('network down'),
-          onViewFeedback: (_) async {},
+        Scaffold(
+          body: LearningPathDetailView(
+            details: details,
+            onEnsureSession: () async {},
+            startParamsFor: _params,
+            onViewFeedback: (_) async {},
+          ),
         ),
       );
 
@@ -277,9 +330,80 @@ void main() {
 
       await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Session'));
+      await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget, reason: 'stays open');
+      expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
       expect(find.textContaining('network down'), findsOneWidget);
+    });
+
+    testWidgets('a 429 opens the retry modal, an entityId the active-simulation modal', (tester) async {
+      final details = _details(
+        scenarios: [
+          _scenario(id: 's1', scenarioId: 1, order: 1),
+          _scenario(id: 's2', scenarioId: 2, order: 2),
+        ],
+      );
+      DioException error(int status, Map<String, dynamic> body) => DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        response: Response(requestOptions: RequestOptions(path: '/x'), statusCode: status, data: body),
+      );
+      when(() => repository.startScenarioSession(scenarioId: 1)).thenThrow(error(429, {}));
+      when(() => repository.startScenarioSession(scenarioId: 2)).thenThrow(error(409, {'entityId': 'running-9'}));
+
+      await _pump(
+        tester,
+        LearningPathDetailView(
+          details: details,
+          onEnsureSession: () async {},
+          startParamsFor: _params,
+          onViewFeedback: (_) async {},
+        ),
+      );
+
+      await tester.tap(find.text('Scenario 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Session'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('retry-session-modal')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('retry-session-modal-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
+
+      await tester.tap(find.text('Scenario 2'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Session'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('active-simulation-modal')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('active-simulation-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('active-simulation-modal')), findsNothing);
+      verifyNever(() => repository.endScenarioSession(any()));
+    });
+
+    testWidgets('low credits show the no-credits modal and disable Start', (tester) async {
+      final details = _details(scenarios: [_scenario(id: 's1', scenarioId: 1, order: 1)]);
+      await _pump(
+        tester,
+        LearningPathDetailView(
+          details: details,
+          onEnsureSession: () async {},
+          startParamsFor: _params,
+          onViewFeedback: (_) async {},
+        ),
+        credits: SimulationCredits(creditLimit: 5, consumedCredits: 5, secondsAllowedPerCredit: 60),
+      );
+
+      expect(find.byKey(const Key('low-credits-modal')), findsOneWidget);
+      expect(tester.widget<AppButton>(find.widgetWithText(AppButton, 'Start')).isDisabled, isTrue);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('low-credits-modal')), findsNothing);
     });
   });
 
@@ -297,7 +421,10 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (scenario, {languageId}) async => calls.add(scenario.id),
+          startParamsFor: (scenario, languageId) {
+            calls.add(scenario.id);
+            return _params(scenario, languageId);
+          },
           onViewFeedback: (_) async {},
         ),
       );
@@ -336,7 +463,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_, {languageId}) async {},
+          startParamsFor: _params,
           onViewFeedback: (scenario) async => calls.add(scenario.id),
         ),
       );
@@ -348,7 +475,7 @@ void main() {
       expect(calls, ['s1']);
     });
 
-    testWidgets('tapping a non-locked row calls onStartScenario for that specific scenario', (
+    testWidgets('tapping a non-locked row starts that specific scenario', (
       tester,
     ) async {
       final calls = <String>[];
@@ -364,7 +491,10 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (scenario, {languageId}) async => calls.add(scenario.id),
+          startParamsFor: (scenario, languageId) {
+            calls.add(scenario.id);
+            return _params(scenario, languageId);
+          },
           onViewFeedback: (_) async {},
         ),
       );
@@ -374,6 +504,9 @@ void main() {
       expect(calls, isEmpty, reason: 'the preview modal is open; not started yet');
 
       await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+      await tester.pumpAndSettle();
+      // RN's NotificationModal ("Before you get started") comes next.
+      await tester.tap(find.text('Start Session'));
       await tester.pumpAndSettle();
 
       expect(calls, ['s2']);
@@ -402,7 +535,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_, {languageId}) async {},
+          startParamsFor: _params,
           onViewFeedback: (_) async {},
         ),
       );

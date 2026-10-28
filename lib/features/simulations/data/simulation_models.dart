@@ -152,17 +152,51 @@ class SessionData {
     required this.id,
     required this.accessToken,
     required this.liveKitServerUrl,
+    this.scenario,
   });
 
-  factory SessionData.fromJson(Map<String, dynamic> json) => SessionData(
-    id: json['id'] as String,
-    accessToken: json['accessToken'] as String,
-    liveKitServerUrl: json['liveKitServerUrl'] as String,
-  );
+  /// ally-be's `scenario-session-start` returns `{scenarioSession: {id},
+  /// accessToken: {token, serverUrl}, scenario}` — RN's
+  /// `useStartSimulation` reads `startResp.scenarioSession.id`,
+  /// `startResp.accessToken.token` and `.serverUrl`. The flat
+  /// `{id, accessToken, liveKitServerUrl}` shape is still accepted.
+  factory SessionData.fromJson(Map<String, dynamic> json) {
+    final session = json['scenarioSession'];
+    final token = json['accessToken'];
+    return SessionData(
+      id: (session is Map ? session['id'] : json['id']) as String,
+      accessToken: (token is Map ? token['token'] : token) as String,
+      liveKitServerUrl:
+          (token is Map ? token['serverUrl'] : json['liveKitServerUrl'])
+              as String,
+      scenario: _scenarioFrom(json['scenario']),
+    );
+  }
+
+  /// RN navigates with `startResp.scenario`, keeping `reminders` only when
+  /// `remindersEnabled` is on. Best-effort: a shape this model can't read
+  /// leaves it null and the caller's own scenario is used instead.
+  static Scenario? _scenarioFrom(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    try {
+      return Scenario.fromJson({
+        ...raw,
+        'reminders': raw['remindersEnabled'] == true
+            ? (raw['reminders'] ?? const [])
+            : const [],
+      });
+    } catch (_) {
+      return null;
+    }
+  }
 
   final String id;
   final String accessToken;
   final String liveKitServerUrl;
+
+  /// The scenario as the start call returned it (timer, checklist,
+  /// reminders) — RN's `scenario` navigation param.
+  final Scenario? scenario;
 }
 
 /// `secondsAllowedPerCredit` + the `isLow` threshold mirror ally-mobile

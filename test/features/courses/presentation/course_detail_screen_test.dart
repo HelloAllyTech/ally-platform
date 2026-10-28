@@ -180,7 +180,7 @@ void main() {
       (tester) async {
     when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
       (_) async => _detail(items: [
-        _item(id: 'i1', type: TrackItemType.roleplay, status: TrackItemStatus.unlocked, title: 'Roleplay item'),
+        _item(id: 'i1', type: TrackItemType.unknown, status: TrackItemStatus.unlocked, title: 'Roleplay item'),
       ]),
     );
 

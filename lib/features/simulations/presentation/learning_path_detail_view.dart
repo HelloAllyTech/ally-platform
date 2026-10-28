@@ -8,6 +8,7 @@ import '../../../core/theme/app_fonts.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'simulation_details_modal.dart';
+import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/learning_path_widgets.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
@@ -27,17 +28,16 @@ import 'widgets/learning_path_widgets.dart';
 /// own `setSelectedSimulation` being shared by `handleStartPath` and
 /// `handleSimulationPress`.
 ///
-/// Not ported: the active-simulation-conflict modal and 429-rate-limit
-/// retry modal (`useStartSimulation`'s `showActiveSimulationModal`/
-/// `showRetryModal`) — those need the backend error body's `entityId`
-/// parsed out of a Dio exception, real further work; failures here just
-/// surface as a SnackBar. Low-credits warning modal also not ported.
+/// Starting goes through [StartSimulationController] (`useStartSimulation`):
+/// the modal's "Before you get started" step, then the start call with its
+/// 429-retry / active-simulation modals and error toast. The low-credits
+/// modal shows for 5 s when credits are low, as on both RN screens.
 class LearningPathDetailView extends ConsumerStatefulWidget {
   const LearningPathDetailView({
     super.key,
     required this.details,
     required this.onEnsureSession,
-    required this.onStartScenario,
+    required this.startParamsFor,
     required this.onViewFeedback,
     this.onRefresh,
   });
@@ -49,7 +49,12 @@ class LearningPathDetailView extends ConsumerStatefulWidget {
   /// not eagerly on screen load.
   final Future<void> Function() onEnsureSession;
 
-  final Future<void> Function(PathScenario scenario, {int? languageId}) onStartScenario;
+  /// What to start for a scenario — the path/case item link
+  /// (`scenarioPathSessionItemId`/`caseSessionItemId`) and the chosen
+  /// language. Given the freshest copy of the scenario (RN's
+  /// `freshScenario`): the item's `sessionId` can arrive with the refetch
+  /// that follows creating the path/case session.
+  final StartSimulationParams Function(PathScenario scenario, int? languageId) startParamsFor;
 
   /// Resolves a completed scenario's real session id and navigates to its
   /// feedback screen. Matches `handleFileIconPress`.
@@ -67,6 +72,13 @@ class _LearningPathDetailViewState
     extends ConsumerState<LearningPathDetailView> {
   bool _isStarting = false;
   String? _error;
+  late final StartSimulationController _start = StartSimulationController(ref);
+
+  @override
+  void dispose() {
+    _start.dispose();
+    super.dispose();
+  }
 
   bool get _isStarted => widget.details.completedScenarios > 0;
   bool get _isCompleted => widget.details.completedAt != null;
@@ -93,7 +105,10 @@ class _LearningPathDetailViewState
     await SimulationDetailsModal.show(
       context,
       scenario: scenario,
-      onStart: (languageId) => widget.onStartScenario(scenario, languageId: languageId),
+      onStart: (languageId, close) async {
+        final fresh = widget.details.scenarios.where((s) => s.id == scenario.id).firstOrNull;
+        await _start.start(context, widget.startParamsFor(fresh ?? scenario, languageId), onSettled: close);
+      },
     );
   }
 
@@ -114,6 +129,7 @@ class _LearningPathDetailViewState
     final details = widget.details;
     final next = details.nextScenario;
     final credits = ref.watch(simulationCreditsProvider).value;
+    _start.onCredits(context, credits);
     // RN: !nextSimulation || credits are running low.
     final isStartDisabled = next == null || (credits?.isLow ?? false);
 

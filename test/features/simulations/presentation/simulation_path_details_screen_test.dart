@@ -93,7 +93,7 @@ void main() {
     verify(() => repository.getSimulationPathDetails('path-1')).called(1);
   });
 
-  testWidgets('onStartScenario starts a session with scenarioPathSessionItemId and navigates to roleplay', (
+  testWidgets('Start starts a session with scenarioPathSessionItemId and navigates to roleplay', (
     tester,
   ) async {
     when(() => repository.getSimulationPathDetails('path-1')).thenAnswer(
@@ -127,6 +127,9 @@ void main() {
     // Tapping Start opens the preview modal first; its own Start Simulation
     // button is what actually starts the session.
     await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+    await tester.pumpAndSettle();
+    // RN's NotificationModal ("Before you get started") comes next.
+    await tester.tap(find.text('Start Session'));
     await tester.pumpAndSettle();
 
     verify(

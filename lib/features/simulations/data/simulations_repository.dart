@@ -89,6 +89,7 @@ class SimulationsRepository {
     required int scenarioId,
     String? scenarioPathSessionItemId,
     String? caseSessionItemId,
+    String? trackItemProgressId,
     int? languageId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
@@ -97,6 +98,9 @@ class SimulationsRepository {
         'scenarioId': scenarioId,
         'scenarioPathSessionItemId': ?scenarioPathSessionItemId,
         'caseSessionItemId': ?caseSessionItemId,
+        // Links the session to a Track 2.0 roleplay item's progress row
+        // (ally-be `start-scenario-session-request.dto.ts`).
+        'trackItemProgressId': ?trackItemProgressId,
         'languageId': ?languageId,
       },
     );
