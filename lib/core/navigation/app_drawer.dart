@@ -8,6 +8,7 @@ import '../../features/account/data/account_repository.dart';
 import '../../features/account/data/user_profile.dart';
 import '../../features/simulations/data/simulations_repository.dart';
 import '../auth/auth_state.dart';
+import '../config/app_config.dart';
 import '../localization/translate_ref.dart';
 import '../permissions/user_permissions.dart';
 import '../theme/app_colors.dart';
@@ -36,116 +37,132 @@ class AppDrawer extends ConsumerWidget {
     final userAsync = ref.watch(currentUserProvider);
     final tenantAsync = ref.watch(tenantInfoProvider);
     final hasCreditsPermission = permissions.contains(UserPermissions.editScenarioSession);
+    final rn = _RnVerticalScale.of(context);
+    final separator = _Separator(rn: rn);
 
     return Drawer(
       width: MediaQuery.of(context).size.width * 0.85,
       backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              tenantAsync.when(
-                data: (tenant) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _OrgLogo(tenant: tenant),
-                    const _Separator(),
-                  ],
-                ),
-                loading: () => const SizedBox.shrink(),
-                error: (_, _) => const SizedBox.shrink(),
+      // styles.container: paddingTop 50@mvs from the drawer's top edge (RN
+      // doesn't inset this for the status bar), 16pt sides.
+      child: Padding(
+        padding: EdgeInsets.only(top: rn.mvs(50), left: 16, right: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            tenantAsync.when(
+              data: (tenant) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [_OrgLogo(tenant: tenant), separator],
               ),
-              userAsync.when(
-                data: (user) => Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundImage: (user.profileImageUrl?.isNotEmpty ?? false)
-                          ? NetworkImage(user.profileImageUrl!)
-                          : null,
-                      child: (user.profileImageUrl?.isNotEmpty ?? false)
-                          ? null
-                          : Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?'),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+            ),
+            userAsync.when(
+              data: (user) => Row(
+                children: [
+                  _UserProfileAvatar(
+                    name: user.name,
+                    imageUrl: user.profileImageUrl,
+                    size: 32,
+                    textStyle: const TextStyle(fontSize: 16, height: 24 / 16, letterSpacing: 0.5),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(bottom: rn.mvs(2)),
+                          child: Text(
                             user.name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            // RN's styles.name: body.large size, but
-                            // REPLAY_PRO.HEADLINE family — not bodyLarge's
-                            // IBMPlexSerif-Regular default.
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyLarge
-                                ?.copyWith(fontFamily: AppFonts.replayProHeadline),
-                          ),
-                          if (user.email.isNotEmpty)
-                            Text(
-                              user.email,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: AppColors.mediumEmphasis),
+                            // styles.name: REPLAY_PRO.HEADLINE + body.large.
+                            style: const TextStyle(
+                              fontFamily: AppFonts.replayProHeadline,
+                              fontSize: 16,
+                              height: 24 / 16,
+                              letterSpacing: 0.5,
+                              color: AppColors.highEmphasis,
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        if (user.email.isNotEmpty)
+                          Text(
+                            user.email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            // styles.email (+ emailSmall past 30 chars).
+                            style: TextStyle(
+                              fontFamily: AppFonts.ibmPlexSerifRegular,
+                              fontSize: user.email.length > 30 ? 9 : 12,
+                              height: 16 / (user.email.length > 30 ? 9 : 12),
+                              letterSpacing: 0.2,
+                              color: AppColors.mediumEmphasis,
+                            ),
+                          ),
+                      ],
                     ),
-                  ],
-                ),
-                loading: () => const SizedBox(height: 32),
-                error: (_, _) => const SizedBox.shrink(),
+                  ),
+                ],
               ),
-              const _Separator(),
-              if (hasCreditsPermission) ...[
-                const _CreditsSection(),
-                const _Separator(),
-              ],
-              _MenuOption(
-                iconAsset: 'assets/icons/profileSettings.svg',
-                label: ref.t('profile.settings.title'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  context.push('/profile');
-                },
-              ),
-              _MenuOption(
-                iconAsset: 'assets/icons/help.svg',
-                label: ref.t('bugReport.menuLabel'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  context.push('/bug-report', extra: activeTabName);
-                },
-              ),
-              _MenuOption(
-                iconAsset: 'assets/icons/logout.svg',
-                label: ref.t('user.logout'),
-                onTap: () => _confirmLogout(context, ref),
-              ),
-              const Spacer(),
-              Center(child: _VersionFooter()),
-              const SizedBox(height: 8),
-              Container(
-                margin: const EdgeInsets.only(bottom: 30, top: 8),
-                padding: const EdgeInsets.all(12),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.strokePrimary, width: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: SvgPicture.asset('assets/icons/allyLogo.svg', height: 24),
-              ),
+              loading: () => const SizedBox(height: 32),
+              error: (_, _) => const SizedBox.shrink(),
+            ),
+            separator,
+            if (hasCreditsPermission) ...[
+              _CreditsSection(rn: rn),
+              separator,
             ],
-          ),
+            // styles.menuItemsWrapper (flex 1) + MenuOption (gap 8).
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _MenuOption(
+                    icon: SvgPicture.asset('assets/icons/profileSettings.svg', width: 24, height: 24),
+                    label: ref.t('profile.settings.title'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/profile');
+                    },
+                  ),
+                  _MenuOption(
+                    icon: SvgPicture.asset('assets/icons/help.svg', width: 24, height: 24),
+                    label: ref.t('bugReport.menuLabel'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/bug-report', extra: activeTabName);
+                    },
+                  ),
+                  // RN renders LogoutIcon at its intrinsic 16pt.
+                  _MenuOption(
+                    icon: SvgPicture.asset('assets/icons/logout.svg'),
+                    label: ref.t('user.logout'),
+                    onTap: () => _confirmLogout(context, ref),
+                  ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: Center(child: _VersionFooter()),
+            ),
+            // styles.logoContainer: 0.5pt stroke, radius lg (8), 12pt
+            // padding, 15pt sides, 8@mvs above, 30 below; logo at its
+            // intrinsic 72x35.
+            Container(
+              margin: EdgeInsets.only(left: 15, right: 15, top: rn.mvs(8), bottom: 30),
+              padding: const EdgeInsets.all(12),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SvgPicture.asset('assets/icons/allyLogo.svg'),
+            ),
+          ],
         ),
       ),
     );
@@ -208,7 +225,14 @@ class _OrgLogoState extends State<_OrgLogo> {
               child: Center(
                 child: Text(
                   widget.tenant.name.isNotEmpty ? widget.tenant.name[0].toUpperCase() : 'NA',
-                  style: const TextStyle(color: AppColors.mediumEmphasis),
+                  // styles.orgLogoPlaceholderText: IBM_PLEX_SERIF.MEDIUM, body.large.
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 16,
+                    height: 24 / 16,
+                    letterSpacing: 0.5,
+                    color: AppColors.mediumEmphasis,
+                  ),
                 ),
               ),
             ),
@@ -217,7 +241,17 @@ class _OrgLogoState extends State<_OrgLogo> {
 }
 
 class _CreditsSection extends ConsumerWidget {
-  const _CreditsSection();
+  const _CreditsSection({required this.rn});
+
+  final _RnVerticalScale rn;
+
+  static const _small = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 12,
+    height: 16 / 12,
+    letterSpacing: 0.2,
+    color: AppColors.mediumEmphasis,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -226,63 +260,63 @@ class _CreditsSection extends ConsumerWidget {
       data: (credits) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              SvgPicture.asset('assets/icons/bolt.svg', width: 16, height: 16),
-              const SizedBox(width: 8),
-              // RN's styles.creditTitle: label.large size, but
-              // IBM_PLEX_SERIF.REGULAR family — not labelLarge's Roboto.
-              Text(
-                ref.t('user.creditUsage'),
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifRegular),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      // RN's styles.creditConsumedText: body.large size, but
-                      // IBM_PLEX_SERIF.MEDIUM family — not bodyLarge's
-                      // Regular weight.
-                      text: '${credits.consumedCredits}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
-                    ),
-                    TextSpan(
-                      text: '/${credits.creditLimit}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.mediumEmphasis),
-                    ),
-                  ],
+          // styles.creditHeader: gap 18, 8@mvs below.
+          Padding(
+            padding: EdgeInsets.only(bottom: rn.mvs(8)),
+            child: Row(
+              children: [
+                SvgPicture.asset('assets/icons/bolt.svg', width: 16, height: 16),
+                const SizedBox(width: 18),
+                Text(
+                  ref.t('user.creditUsage'),
+                  // styles.creditTitle: label.large, IBM_PLEX_SERIF.REGULAR.
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 14,
+                    height: 22 / 14,
+                    letterSpacing: 0.2,
+                    color: AppColors.highEmphasis,
+                  ),
                 ),
-              ),
-              Text(
-                '${credits.usagePercentage}%',
-                style:
-                    Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mediumEmphasis),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.only(bottom: rn.mvs(8)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${credits.consumedCredits}',
+                        // styles.creditConsumedText: body.large, MEDIUM.
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                          fontSize: 16,
+                          height: 24 / 16,
+                          letterSpacing: 0.5,
+                          color: AppColors.highEmphasis,
+                        ),
+                      ),
+                      TextSpan(text: '/${credits.creditLimit}', style: _small),
+                    ],
+                  ),
+                ),
+                Text('${credits.usagePercentage}%', style: _small),
+              ],
+            ),
+          ),
+          // styles.progressBarContainer: 6@mvs, lightGray2, radius 4.
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: credits.usagePercentage / 100,
-              minHeight: 6,
+              minHeight: rn.mvs(6),
               backgroundColor: AppColors.lightGray2,
               color: credits.isLow ? AppColors.softCoralRed : AppColors.brandLogo,
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
         ],
@@ -293,24 +327,36 @@ class _CreditsSection extends ConsumerWidget {
   }
 }
 
+/// RN's `MenuOption` with `gap={8}`: a 24pt centred icon box, then
+/// IBM_PLEX_SERIF.REGULAR 14 / 18.2 / 0.15 in black, 16pt below each row.
 class _MenuOption extends StatelessWidget {
-  const _MenuOption({required this.iconAsset, required this.label, required this.onTap});
+  const _MenuOption({required this.icon, required this.label, required this.onTap});
 
-  final String iconAsset;
+  final Widget icon;
   final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.only(bottom: 16),
         child: Row(
           children: [
-            SvgPicture.asset(iconAsset, width: 24, height: 24),
+            SizedBox(width: 24, height: 24, child: Center(child: icon)),
             const SizedBox(width: 8),
-            Text(label, style: Theme.of(context).textTheme.bodyLarge),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 14,
+                height: 18.2 / 14,
+                letterSpacing: 0.15,
+                color: Colors.black,
+              ),
+            ),
           ],
         ),
       ),
@@ -318,7 +364,13 @@ class _MenuOption extends StatelessWidget {
   }
 }
 
+/// RN: `{t('common.version')}: {getAppVersion()} {env.ENVIRONMENT ===
+/// 'development' && t('drawer.dev')}` — e.g. "Version: 1.23.46 (Dev)";
+/// outside development the `false` renders nothing, leaving the trailing
+/// space. IBM_PLEX_SERIF.REGULAR body.small in mediumEmphasis.
 class _VersionFooter extends StatefulWidget {
+  const _VersionFooter();
+
   @override
   State<_VersionFooter> createState() => _VersionFooterState();
 }
@@ -331,8 +383,7 @@ class _VersionFooterState extends State<_VersionFooter> {
     super.initState();
     // RN's `getAppVersion()` (`react-native-version-check`'s
     // `getCurrentVersion`) returns only the marketing version — no build
-    // number appended. Previously showed "1.2.3+45"; the real drawer shows
-    // just "1.2.3".
+    // number appended.
     PackageInfo.fromPlatform().then((info) {
       if (mounted) setState(() => _version = info.version);
     });
@@ -342,21 +393,109 @@ class _VersionFooterState extends State<_VersionFooter> {
   Widget build(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) => Text(
-        '${ref.t('common.version')}: $_version',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mediumEmphasis),
+        drawerVersionLabel(
+          versionLabel: ref.t('common.version'),
+          version: _version,
+          environment: AppConfig.environment,
+          devLabel: ref.t('drawer.dev'),
+        ),
+        style: const TextStyle(
+          fontFamily: AppFonts.ibmPlexSerifRegular,
+          fontSize: 12,
+          height: 16 / 12,
+          letterSpacing: 0.2,
+          color: AppColors.mediumEmphasis,
+        ),
       ),
     );
   }
 }
 
+/// The drawer's version line, as RN builds it.
+@visibleForTesting
+String drawerVersionLabel({
+  required String versionLabel,
+  required String version,
+  required String environment,
+  required String devLabel,
+}) =>
+    '$versionLabel: $version ${environment == 'development' ? devLabel : ''}';
+
+/// styles.separator: 0.5@vs tall, strokePrimary, 12@mvs above and below.
 class _Separator extends StatelessWidget {
-  const _Separator();
+  const _Separator({required this.rn});
+
+  final _RnVerticalScale rn;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      child: Divider(height: 0.5, color: AppColors.strokePrimary),
+    return Container(
+      height: rn.vs(0.5),
+      margin: EdgeInsets.symmetric(vertical: rn.mvs(12)),
+      color: AppColors.strokePrimary,
+    );
+  }
+}
+
+/// react-native-size-matters' `verticalScale`/`moderateVerticalScale` in
+/// this app's units — RN sizes this drawer's vertical spacing with `@vs`/
+/// `@mvs`, which follow screen height (680pt guideline), not the width-based
+/// `ms()` that [RnScale] applies globally.
+class _RnVerticalScale {
+  _RnVerticalScale({required this.logicalHeight, required this.factor});
+
+  factory _RnVerticalScale.of(BuildContext context) => _RnVerticalScale(
+        logicalHeight: MediaQuery.sizeOf(context).height,
+        // RnScale multiplies devicePixelRatio by its factor; 1 without it.
+        factor: MediaQuery.devicePixelRatioOf(context) / View.of(context).devicePixelRatio,
+      );
+
+  final double logicalHeight;
+  final double factor;
+
+  double vs(double size) => size * logicalHeight / 680;
+  double mvs(double size) => 0.5 * size / factor + 0.5 * vs(size);
+}
+
+/// Port of RN's shared `UserProfileImage`: a circle with a 1pt lightGray17
+/// (#D2D2D2) border on lightGray, showing the image or the name's first
+/// letter in IBM_PLEX_SERIF.MEDIUM, black, upper-cased.
+class _UserProfileAvatar extends StatelessWidget {
+  const _UserProfileAvatar({
+    required this.name,
+    required this.imageUrl,
+    required this.size,
+    required this.textStyle,
+  });
+
+  final String? name;
+  final String? imageUrl;
+  final double size;
+
+  /// The `typography.body[textSize]` slot RN passes (size/line height).
+  final TextStyle textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+    final initial = (name ?? '').trim();
+    return Container(
+      key: const Key('user-profile-avatar'),
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.lightGray,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.strokePrimary),
+      ),
+      child: (url != null && url.isNotEmpty)
+          ? Image.network(url, width: size, height: size, fit: BoxFit.cover)
+          : Text(
+              initial.isEmpty ? '' : initial[0].toUpperCase(),
+              style: textStyle.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium, color: Colors.black),
+            ),
     );
   }
 }
