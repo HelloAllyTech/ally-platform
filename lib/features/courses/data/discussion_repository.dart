@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import 'discussion_models.dart';
+import '../../../core/providers/cache_for.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/discussionApi.ts`
 /// — course discussion learner/moderator APIs for a thread attached to a
@@ -79,6 +80,7 @@ final discussionRepositoryProvider = Provider<DiscussionRepository>((ref) {
   return DiscussionRepository(ref.watch(apiClientProvider));
 });
 
-final discussionProvider = FutureProvider.family<DiscussionResponse, String>((ref, itemId) {
+final discussionProvider = FutureProvider.autoDispose.family<DiscussionResponse, String>((ref, itemId) {
+  cacheFor(ref);
   return ref.watch(discussionRepositoryProvider).getDiscussion(itemId);
 });

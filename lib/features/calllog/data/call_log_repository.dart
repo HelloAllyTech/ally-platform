@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/network/api_client.dart';
 import 'custom_fields_filter.dart';
+import '../../../core/providers/cache_for.dart';
 
 /// Mirrors ally-be's `Tag` type (`src/chat/type/call.details.type.ts`) — a
 /// single AI-generated call tag plus its 1-5 positivity rating, read from
@@ -999,17 +1000,19 @@ final simulationLogsControllerProvider =
   SimulationLogsController.new,
 );
 
-final callSummaryProvider = FutureProvider.family<CallSummaryDetails, int>((
+final callSummaryProvider = FutureProvider.autoDispose.family<CallSummaryDetails, int>((
   ref,
   chatId,
 ) {
+  cacheFor(ref);
   return ref.watch(callLogRepositoryProvider).getCallSummary(chatId);
 });
 
-final chatMessagesProvider = FutureProvider.family<List<ChatMessage>, int>((
+final chatMessagesProvider = FutureProvider.autoDispose.family<List<ChatMessage>, int>((
   ref,
   chatId,
 ) async {
+  cacheFor(ref);
   // RN reads the call's provider off the summary to pick the sort key; only
   // that flag is watched, so a summary refetch doesn't refetch the transcript.
   var isWebrtc = false;

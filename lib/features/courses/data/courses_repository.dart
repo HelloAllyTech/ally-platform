@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import 'course_models.dart';
 import 'quiz_models.dart';
 import 'start_item_payload.dart';
+import '../../../core/providers/cache_for.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/coursesApi.ts` —
 /// same routes (`src/constants/general.ts`'s `API_ROUTES.TRACKS`), same
@@ -297,15 +298,17 @@ final learnTracksProvider = FutureProvider<List<TrackListItem>>((ref) {
   return ref.watch(coursesRepositoryProvider).getLearnTracks();
 });
 
-final trackDetailProvider = FutureProvider.family<TrackDetail, String>((
+final trackDetailProvider = FutureProvider.autoDispose.family<TrackDetail, String>((
   ref,
   trackId,
 ) {
+  cacheFor(ref);
   return ref.watch(coursesRepositoryProvider).getLearnTrackDetail(trackId);
 });
 
 final trackProgressProvider =
-    FutureProvider.family<TrackProgressDashboard, String>((ref, trackId) {
+    FutureProvider.autoDispose.family<TrackProgressDashboard, String>((ref, trackId) {
+      cacheFor(ref);
       return ref
           .watch(coursesRepositoryProvider)
           .getLearnTrackProgress(trackId);
