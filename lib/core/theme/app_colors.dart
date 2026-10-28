@@ -210,4 +210,11 @@ class AppColors {
   static const modalOverlay = Color(0x5E131313); // rgba(19,19,19,0.37): CustomModal overlay
   static const iceBlue = Color(0xFFEEF8FF); // colors.iceBlue: "transcription deleted" pill
   static const mediumGray2 = Color(0xFF9E9E9E); // colors.mediumGray2: summary ETA text
+  static const darkGray11 = Color(0xFF242529); // colors.darkGray11: dark SearchInput border
+  static const darkGray8 = Color(0xFF797C84); // colors.darkGray8: dark search icon/placeholder
+  static const darkGray4 = Color(0xFF292C33); // colors.darkGray4: dark SearchSuggestion border
+  static const darkGray9 = Color(0xFF5A5F6A); // colors.darkGray9: dark CustomTabs rule
+  static const lightGray15 = Color(0xFFBFBFBF); // colors.lightGray15: dark CustomTabs text
+  static const white2 = Color(0xFFE3E4E5); // colors.white2: dark ResourceArticleCard text
+  static const white3 = Color(0xFFFDFDFD); // colors.white3: dark ResourceArticleCard category chip
 }
