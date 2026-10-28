@@ -70,7 +70,7 @@ void main() {
     coursesRepositoryProvider.overrideWithValue(coursesRepository),
   ];
 
-  testWidgets('shows the scenario list and remaining credits once resolved', (
+  testWidgets('shows the scenario list and credits used of the limit once resolved', (
     tester,
   ) async {
     when(() => repository.getScenarios()).thenAnswer(
@@ -89,7 +89,9 @@ void main() {
 
     expect(find.text('First scenario'), findsOneWidget);
     expect(find.text('Second scenario'), findsOneWidget);
-    expect(find.text('6 credits'), findsOneWidget);
+    // RN's header credits: consumed (bold) + "/limit" (small), not remaining.
+    expect(find.text('4/10', findRichText: true), findsOneWidget);
+    expect(find.text('6 credits'), findsNothing);
   });
 
   testWidgets('shows an empty state when there are no scenarios', (tester) async {
@@ -105,7 +107,7 @@ void main() {
     expect(find.text('No simulations available'), findsOneWidget);
   });
 
-  testWidgets('shows an error message when loading scenarios fails', (
+  testWidgets('a failed scenarios query reads as empty, like RN (no error state)', (
     tester,
   ) async {
     when(() => repository.getScenarios()).thenThrow(Exception('boom'));
@@ -117,7 +119,8 @@ void main() {
       overrides: overrides(),
     );
 
-    expect(find.textContaining('Failed to load scenarios'), findsOneWidget);
+    expect(find.textContaining('Failed to load scenarios'), findsNothing);
+    expect(find.text('No simulations available'), findsOneWidget);
   });
 
   testWidgets(
@@ -162,7 +165,7 @@ void main() {
     expect(plain, isNot(contains('<blue>')));
   });
 
-  testWidgets('hides the tab bar but still shows the heading when only one tab has data', (
+  testWidgets('shows only the tabs with data (RN keeps the bar even for one tab)', (
     tester,
   ) async {
     when(() => repository.getScenarios()).thenAnswer(
@@ -266,5 +269,78 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('COURSE_DETAILS:t9'), findsOneWidget);
+  });
+
+  testWidgets('role-play cards show the Trigger warnings label, chips and the completed badge', (
+    tester,
+  ) async {
+    when(() => repository.getScenarios()).thenAnswer(
+      (_) async => [
+        Scenario.fromJson({
+          'id': 3,
+          'title': 'Warned scenario',
+          'triggerWarnings': [
+            {'name': 'Domestic conflict'},
+          ],
+          'completion': {'attemptCount': 11},
+        }),
+      ],
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations',
+      routes: _routes(),
+      overrides: overrides(),
+    );
+
+    expect(find.text('Trigger warnings:'), findsOneWidget);
+    expect(find.text('Domestic conflict'), findsOneWidget);
+    expect(find.text('Completed · 11×'), findsOneWidget);
+  });
+
+  testWidgets('course progress renders as a ring with done/total inside', (tester) async {
+    when(() => repository.getScenarios()).thenAnswer((_) async => []);
+    when(() => coursesRepository.getLearnTracks()).thenAnswer(
+      (_) async => [
+        TrackListItem(
+          id: 't1',
+          title: 'Done course',
+          description: null,
+          coverImageUrl: null,
+          totalItems: 1,
+          completedItems: 1,
+          enrolled: true,
+          trackEnrollmentId: 'e1',
+        ),
+        TrackListItem(
+          id: 't2',
+          title: 'Untouched course',
+          description: null,
+          coverImageUrl: null,
+          totalItems: 3,
+          completedItems: 0,
+          enrolled: false,
+          trackEnrollmentId: null,
+        ),
+      ],
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations',
+      routes: _routes(),
+      overrides: overrides(),
+    );
+
+    expect(find.text('Done course'), findsOneWidget);
+    expect(find.byKey(const Key('learn-progress-ring')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('learn-progress-ring')),
+        matching: find.text('1/1'),
+      ),
+      findsOneWidget,
+    );
   });
 }

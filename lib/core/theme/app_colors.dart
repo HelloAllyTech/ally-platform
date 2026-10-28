@@ -108,4 +108,23 @@ class AppColors {
   static const orange50 = Color(0xFFFFF3E0); // Scribe chip background
   static const orange400 = Color(0xFFFFA726); // ReviewNote callout border
   static const orange900 = Color(0xFFE65100); // Scribe chip text
+
+  // learn parity (src/theme/colors.ts + designSystem/colors.ts)
+  static const darkSlate = Color(0xFF292929); // Learn hero intro text
+  static const darkGray12 = Color(0xFF434343); // Learn "Choose your" title
+  static const darkGray = Color(0xB302060B); // rgba(2,6,11,0.7) credits "/limit"
+  static const darkCharcoal = Color(0xFF4D4D4D); // RichText paragraph
+  static const legacyBlue = Color(0xFF1480FB); // colors.blue, in-progress rings
+  static const green50 = Color(0xFFE8F5E9); // Completed chip background
+  static const green300 = Color(0xFF81C784); // tickRound.svg's own fill
+  static const green400 = Color(0xFF66BB6A); // completed rings / progress bar
+  static const green700 = Color(0xFF388E3C); // Completed badge text
+  static const grey50 = Color(0xFFFAFAFA); // trigger-warning chip background
+  static const grey100 = Color(0xFFF5F5F5); // ring track, card cover placeholder
+  static const grey200 = Color(0xFFEEEEEE); // progress-bar track, cover placeholder
+  static const grey300 = Color(0xFFE0E0E0); // trigger-warning chip border
+  static const grey400 = Color(0xFFBDBDBD); // locked course-item lock icon
+  static const lightBlue50 = Color(0xFFE1F5FE); // "Next" chip background
+  static const blackAlpha700 = Color(0x8A000000); // rgba(0,0,0,0.54) modal backdrop
+  static const blackAlpha800 = Color(0x99000000); // rgba(0,0,0,0.6) locked overlay
 }
