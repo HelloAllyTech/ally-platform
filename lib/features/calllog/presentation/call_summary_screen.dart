@@ -68,6 +68,30 @@ const _sectionLabelKeys = <SummarySection, String>{
   SummarySection.additionalNotes: 'summary.sections.additionalNotes',
 };
 
+/// Closest-matching Material icon per section, standing in for RN's
+/// `SECTION_LIST`'s custom per-section SVGs (`CallDetailsIcon`,
+/// `SessionSummaryIcon`, `FlowIcon`, ... — `src/constants/summary.ts`).
+const _sectionIcons = <SummarySection, IconData>{
+  SummarySection.featuresAndDemographics: Icons.call_outlined,
+  SummarySection.sessionSummary: Icons.auto_awesome_outlined,
+  SummarySection.flow: Icons.waves,
+  SummarySection.keyConcern: Icons.sentiment_dissatisfied_outlined,
+  SummarySection.objectiveObservations: Icons.visibility_outlined,
+  SummarySection.subjectiveObservations: Icons.search,
+  SummarySection.assessment: Icons.assignment_outlined,
+  SummarySection.dominantFeelings: Icons.sentiment_satisfied_outlined,
+  SummarySection.issuesWorkedOn: Icons.warning_amber_outlined,
+  SummarySection.keyTherapeuticTechniques: Icons.healing_outlined,
+  SummarySection.referralsProvided: Icons.volunteer_activism_outlined,
+  SummarySection.homeworkRecommended: Icons.library_books_outlined,
+  SummarySection.planForNextCall: Icons.headset_mic_outlined,
+  SummarySection.tags: Icons.label_outline,
+  SummarySection.metrics: Icons.storage_outlined,
+  SummarySection.intake: Icons.assignment_ind_outlined,
+  SummarySection.ongoingRisks: Icons.report_problem_outlined,
+  SummarySection.additionalNotes: Icons.note_add_outlined,
+};
+
 /// Maps each [SummaryFieldDef.key] to its real translation key, taken from
 /// ally-mobile (React Native)'s `src/constants/summary.ts` `FIELD_LABEL_KEYS`
 /// map — the authoritative key for every field label in this form. The
@@ -477,6 +501,14 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
         length: 2,
         child: Scaffold(
           appBar: AppBar(
+            // Mirrors RN's `Header.tsx`: a plain white header, not the blue
+            // chrome this screen inherited from Flutter's global
+            // `AppBarTheme` default. RN never uses a blue header anywhere —
+            // `RootNavigator` sets `headerShown: false` globally and every
+            // screen builds its own white custom header instead.
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.highEmphasis,
+            elevation: 0,
             // `PopScope(canPop: false)` makes `ModalRoute.canPop` report
             // false, which would otherwise make `AppBar` hide its
             // auto-implied back button entirely (it assumes "can't pop" ==
@@ -488,9 +520,41 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
               tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               onPressed: _handleBackPress,
             ),
-            title: Text(
-              widget.log.sessionName ??
-                  ref.t('calls.sessionNumber', {'id': widget.log.id}),
+            // "Session" (regular) + "Summary" (bold italic) title, then the
+            // real session code as a muted subtitle — `widget.log.sessionName`
+            // is RN's `callInfo.summaryName` (e.g. "CALL-1774-2026-07-16"),
+            // prefixed with "#" exactly like `Header.tsx`'s
+            // `summaryName ? '#'+summaryName : '-'`.
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(color: AppColors.highEmphasis),
+                    children: [
+                      TextSpan(text: '${ref.t('callSummary.header.title')} '),
+                      TextSpan(
+                        text: ref.t('callSummary.header.subtitle'),
+                        style: const TextStyle(
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  widget.log.sessionName != null
+                      ? '#${widget.log.sessionName}'
+                      : '-',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: AppColors.mediumEmphasis),
+                ),
+              ],
             ),
             actions: [
               if (showShareSwitch)
@@ -816,21 +880,48 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text(
-                    '${ref.t('calls.table.summaryStatus')}: ${widget.log.status}',
-                  ),
-                  Text(
-                    '${ref.t('callSummary.startedLabel')}: ${widget.log.startedAt}',
-                  ),
-                  if (widget.log.endedAt.isNotEmpty)
-                    Text(
-                      '${ref.t('callSummary.endedLabel')}: ${widget.log.endedAt}',
+                  // RN's `CallSummaryDetails.tsx` never shows raw
+                  // status/started/ended/score fields on this screen at all
+                  // — those were this app's own Phase 0 scaffold text,
+                  // leftover from before the real screen was built out, and
+                  // they never got cleaned up. What RN actually shows here
+                  // first is this AI-generated disclaimer banner
+                  // (`styles.alertContainer`/`alertIconContainer`/
+                  // `alertText`), always visible above the section list.
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.amber50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.orange400, width: 0.5),
                     ),
-                  if (widget.log.score != null)
-                    Text(
-                      '${ref.t('callSummary.scoreLabel')}: ${widget.log.score}',
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.orange400, width: 0.5),
+                          ),
+                          child: const Icon(
+                            Icons.shield_outlined,
+                            size: 18,
+                            color: AppColors.orange400,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            ref.t('callSummary.aiGeneratedWarning'),
+                            style: const TextStyle(color: AppColors.red700, fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 16),
+                  ),
                   for (final section in SummarySection.values)
                     _SectionCard(
                       section: section,
@@ -853,19 +944,21 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                   style: const TextStyle(color: AppColors.red400),
                 ),
               ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: AppButton(
-                  label: _hasDirtyChanges
-                      ? ref.t('callSummary.saveChanges')
-                      : ref.t('callSummary.noChanges'),
-                  isDisabled: !_hasDirtyChanges,
-                  isLoading: _isSaving,
-                  onPressed: _save,
+            // RN's `CallSummaryDetails.tsx` renders `showSaveButton && (...)`
+            // — the button is absent with nothing to save, not present and
+            // disabled with a relabeled "No changes" state (which was never
+            // RN's actual behaviour here).
+            if (_hasDirtyChanges)
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: AppButton(
+                    label: ref.t('common.save'),
+                    isLoading: _isSaving,
+                    onPressed: _save,
+                  ),
                 ),
               ),
-            ),
           ],
         );
       },
@@ -926,6 +1019,13 @@ class _SectionCard extends ConsumerWidget {
       child: AppCard(
         variant: AppCardVariant.flat,
         child: ExpansionTile(
+          // RN's `SectionHeader.tsx` shows a small per-section icon before
+          // the label (`SECTION_LIST`'s `icon` field, a distinct custom SVG
+          // per section) — approximated here with the closest-matching
+          // Material icon, same "closest matching, not pixel-identical"
+          // convention this app already uses for fonts (see `AppTheme`'s own
+          // doc comment).
+          leading: Icon(_sectionIcons[section] ?? Icons.article_outlined, size: 20),
           title: Text(ref.t(_sectionLabelKeys[section] ?? section.label)),
           children: [
             Padding(

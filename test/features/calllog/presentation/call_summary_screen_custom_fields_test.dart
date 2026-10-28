@@ -102,10 +102,10 @@ void main() {
       await tester.enterText(referralField, 'Walk-in');
       await tester.pumpAndSettle();
 
-      final saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Save changes'));
-      expect(saveButton.isDisabled, isFalse);
+      // Appears, labeled "Save" (RN's `common.save`).
+      expect(find.widgetWithText(AppButton, 'Save'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(AppButton, 'Save changes'));
+      await tester.tap(find.widgetWithText(AppButton, 'Save'));
       await tester.pumpAndSettle();
 
       // Only the dirty custom field is sent, through upsertValues — not
@@ -116,9 +116,10 @@ void main() {
           as List<({String fieldDefinitionId, String? value})>;
       expect(captured, [(fieldDefinitionId: 'cf-referral', value: 'Walk-in')]);
 
-      // After a successful save, back to "No changes" / disabled.
-      final savedButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'No changes'));
-      expect(savedButton.isDisabled, isTrue);
+      // After a successful save, Save disappears again (no more pending
+      // changes) — RN's `showSaveButton && (...)`, not a present-but-
+      // disabled "No changes" state.
+      expect(find.byType(AppButton), findsNothing);
     },
   );
 

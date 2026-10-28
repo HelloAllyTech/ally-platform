@@ -49,9 +49,11 @@ void main() {
       expect(find.text('Summary'), findsOneWidget);
       expect(find.text('Transcript'), findsOneWidget);
 
-      // Save starts disabled — nothing has been edited yet.
-      var saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'No changes'));
-      expect(saveButton.isDisabled, isTrue);
+      // Save is absent entirely — nothing has been edited yet. RN's
+      // `CallSummaryDetails.tsx` renders `showSaveButton && (...)`, so with
+      // no pending changes there's no button at all, not a present-but-
+      // disabled one.
+      expect(find.byType(AppButton), findsNothing);
 
       // Expand "Features & Demographics" — it's the first section, so it's
       // already materialized (the ListView is a Sliver: only materializes
@@ -111,19 +113,19 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('sessionSummary')), 'Edited summary text');
       await tester.pumpAndSettle();
 
-      saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Save changes'));
-      expect(saveButton.isDisabled, isFalse);
+      // Appears, labeled "Save" (RN's `common.save`, not a changing
+      // "Save changes"/"No changes" label this screen never actually had).
+      expect(find.widgetWithText(AppButton, 'Save'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(AppButton, 'Save changes'));
+      await tester.tap(find.widgetWithText(AppButton, 'Save'));
       await tester.pumpAndSettle();
 
       verify(() => repository.updateCallSummary(1001, {'sessionSummary': 'Edited summary text'})).called(1);
       expect(find.text('Call summary updated successfully'), findsOneWidget);
 
-      // After a successful save, Save goes back to disabled (no more
-      // pending changes) until something else is edited.
-      saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'No changes'));
-      expect(saveButton.isDisabled, isTrue);
+      // After a successful save, Save disappears again (no more pending
+      // changes) until something else is edited.
+      expect(find.byType(AppButton), findsNothing);
 
       // --- Scenario 2: changing a dropdown's value also marks it dirty, ---
       // --- and Save sends only that field, from a fresh mount.          ---
@@ -164,7 +166,7 @@ void main() {
       // just-closed dropdown's menu route can leave a stray overlay/absorber
       // sitting at the same screen position as the Save button for a frame,
       // making a real tap miss it unreliably.
-      final saveButton2 = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Save changes'));
+      final saveButton2 = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Save'));
       saveButton2.onPressed!();
       await tester.pumpAndSettle();
 
