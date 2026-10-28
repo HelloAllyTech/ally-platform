@@ -120,6 +120,31 @@ void main() {
       expect(find.text('00:05 '), findsOneWidget);
       expect(find.text('You'), findsOneWidget); // sender 7 is this user
 
+      // Streamed partials from the client: the live line is replaced in
+      // place, then a final chunk appends a new line, in timestamp order.
+      Map<String, dynamic> msg(int id, String content, String at, {bool isFinal = false}) => {
+        'payload': {
+          'type': MessageType.text,
+          'id': id,
+          'content': content,
+          'senderId': 9,
+          'createdAt': at,
+          'isFinal': isFinal,
+          'isSentenceComplete': isFinal,
+        },
+      };
+      callbacks[SocketEvent.messageReceived]!(msg(2, 'I feel', '2026-01-01T10:00:10.000Z'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('I feel'), findsOneWidget);
+      callbacks[SocketEvent.messageReceived]!(msg(2, 'I feel tired', '2026-01-01T10:00:10.000Z', isFinal: true));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('I feel tired'), findsOneWidget);
+      expect(find.text('Client'), findsOneWidget);
+      expect(find.text('00:10 '), findsOneWidget);
+      final helloY = tester.getTopLeft(find.textContaining('Hello, how can I help today?')).dy;
+      final tiredY = tester.getTopLeft(find.textContaining('I feel tired')).dy;
+      expect(tiredY, greaterThan(helloY));
+
       // Pause starts `true` (matching RN) — resume, then push a chunk and
       // confirm it's actually emitted with the real RN-shaped payload.
       // RN starts paused with the "Resume to let it listen" tooltip up.
