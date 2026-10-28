@@ -113,6 +113,57 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     }
   }
 
+  /// Mirrors RN's header share-switch `onToggle`, same pattern as
+  /// `CallSummaryScreen`'s own `_handleShareToggle`: turning it on with no
+  /// existing review opens the share-for-review flow; otherwise it's a
+  /// plain visibility toggle on the existing review. RN also reopens the
+  /// share sheet for a review created within the last few minutes
+  /// (`isMinutesPassed`) — not replicated here since `reviewCreatedAt`
+  /// isn't modeled on this screen's `SimulationSummary` (same scoped-port
+  /// gap as `feedbackTabs`/`shortSession` above).
+  Future<void> _handleShareToggle(bool isEnabled, SimulationSummary? summary) async {
+    final reviewId = summary?.reviewId;
+    if (isEnabled && reviewId == null) {
+      await context.push<void>(
+        '/share-for-review/${widget.scenarioSessionId}',
+        extra: (
+          reviewId: null,
+          note: null,
+          contextDateTime: summary?.startedAt,
+          contextDuration: summary?.endedAt == null
+              ? null
+              : DateTime.parse(summary!.endedAt!)
+                  .difference(DateTime.parse(summary.startedAt))
+                  .inSeconds
+                  .toString(),
+          isScribe: false,
+          contextTitle: null,
+        ),
+      );
+      ref.invalidate(simulationSummaryProvider(widget.scenarioSessionId));
+      return;
+    }
+    if (reviewId == null) return;
+    try {
+      await ref
+          .read(reviewsRepositoryProvider)
+          .updateReviewStatus(reviewId: reviewId, status: isEnabled ? 'IN_REVIEW' : 'HIDDEN');
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('simulationPage.privacyUpdated'))),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(ref.tr('simulationPage.errorUpdatePrivacy'))),
+        );
+      }
+    } finally {
+      ref.invalidate(simulationSummaryProvider(widget.scenarioSessionId));
+    }
+  }
+
   Future<void> _submit() async {
     if (_rating == 0) {
       setState(() => _error = ref.tr('postSim.feedback.ratingRequired'));
@@ -262,21 +313,52 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         if (!didPop) _confirmLeave();
       },
       child: Scaffold(
-        // RN's `SimulationFeedbackScreen.tsx` is a plain white
-        // `SafeAreaView` with a black back arrow
-        // (`<LeftArrowIcon color={colors.black} />`), not this app's global
-        // blue `AppBarTheme` default. RN's real title is also a composed
-        // "{{review.tabs.simulation}} {{subtitle}}" (the subtitle varies by
-        // `fromLogs`) plus a share switch next to it, rather than this
-        // screen's single `postSim.feedback.sessionFeedback` string —
-        // replicating that exact composition/switch is a content rebuild
-        // beyond this pass's color-only scope, so it's left as a separate,
-        // disclosed follow-up rather than rushed in here.
+        // RN's `SimulationFeedbackScreen.tsx` `renderTitle()`: a plain white
+        // `SafeAreaView` with a black back arrow, a composed
+        // "{{review.tabs.simulation}} {{subtitle}}" title (subtitle is
+        // "Summary" when reached `fromLogs`, else "End " — same
+        // `callSummary.header.subtitle`/`simulationPage.endDialog.titleNormal`
+        // keys, byte-identical to RN's own locale values), and a share
+        // switch next to it. RN gates the switch on
+        // `feedbackEnabled && !shortSession`; this scoped port has no
+        // `feedbackTabs` opt-out (both tabs always render, same documented
+        // gap as `showReviewButton`/`showTryAnotherButton` above) and no
+        // `callDuration` modeled to compute `shortSession` from, so both
+        // conditions are always satisfied here, same convention.
         appBar: AppBar(
           backgroundColor: Colors.white,
           foregroundColor: AppColors.highEmphasis,
           elevation: 0,
-          title: Text(ref.t('postSim.feedback.sessionFeedback')),
+          title: Text.rich(
+            TextSpan(
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.highEmphasis),
+              children: [
+                TextSpan(text: '${ref.t('review.tabs.simulation')} '),
+                TextSpan(
+                  text: widget.fromLogs
+                      ? ref.t('callSummary.header.subtitle')
+                      : ref.t('simulationPage.endDialog.titleNormal'),
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(ref.t('learn.scenario.share')),
+                  Switch(
+                    value: summary?.reviewId != null && summary?.reviewStatus != 'HIDDEN',
+                    onChanged: (value) => _handleShareToggle(value, summary),
+                  ),
+                ],
+              ),
+            ),
+          ],
           bottom: TabBar(
             controller: _tabController,
             tabs: [
