@@ -170,18 +170,32 @@ export class UxSignalsService {
   private async executeScan(scan: UxSignalScan): Promise<UxScanOutcome> {
     const { windowFrom, windowTo } = scan;
     const userId = scan.startedBy ?? null;
+    let failedDetectors: UxSignalKind[] = [];
 
     try {
-      const { signals, failedDetectors, totalDetectors } =
-        await this.detector.detect(windowFrom, windowTo);
+      const detectionResult = await this.detector.detect(windowFrom, windowTo);
+      failedDetectors = detectionResult.failedDetectors as UxSignalKind[];
+      const { signals, totalDetectors } = detectionResult;
 
       // Every detector failing means PostHog itself could not be read, not that
       // the week was quiet — recording that as a clean, zero-signal scan is
       // exactly the half-run-looks-clean failure this method exists to prevent.
       if (failedDetectors.length === totalDetectors) {
-        throw new ServiceUnavailableException(
-          `All ${totalDetectors} UX signal detectors failed; PostHog appears to be unreachable. No signals could be read for this window.`,
-        );
+        const errorMessage = `All ${totalDetectors} UX signal detectors failed; PostHog appears to be unreachable. No signals could be read for this window.`;
+        await this.scanRepository.update(scan.id, {
+          status: UxSignalScanStatus.FAILED,
+          error: errorMessage,
+          metadata: { failedDetectors },
+          finishedAt: new Date(),
+        });
+        return {
+          scanId: scan.id,
+          signalsDetected: 0,
+          findingsCreated: 0,
+          suggestionsCreated: 0,
+          skippedDuplicates: 0,
+          failedDetectors,
+        };
       }
 
       // Zero signals is a real, healthy answer — the week was quiet. Recording it
@@ -231,8 +245,16 @@ export class UxSignalsService {
           2000,
         ),
         finishedAt: new Date(),
+        metadata: { failedDetectors },
       });
-      throw error;
+      return {
+        scanId: scan.id,
+        signalsDetected: 0,
+        findingsCreated: 0,
+        suggestionsCreated: 0,
+        skippedDuplicates: 0,
+        failedDetectors,
+      };
     }
   }
 
