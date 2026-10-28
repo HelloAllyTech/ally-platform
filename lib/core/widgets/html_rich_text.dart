@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 ///
 /// Named `HtmlRichText`, not `RichText`, to avoid colliding with Flutter's
 /// own `material.dart` `RichText` widget.
-class HtmlRichText extends StatelessWidget {
+class HtmlRichText extends StatefulWidget {
   const HtmlRichText({super.key, required this.html, this.dark = false});
 
   final String? html;
@@ -21,16 +21,39 @@ class HtmlRichText extends StatelessWidget {
   final bool dark;
 
   @override
+  State<HtmlRichText> createState() => _HtmlRichTextState();
+}
+
+/// Parses once per distinct `html`/`dark`: parents such as the role-play
+/// screen rebuild often, and parsing in `build` redid the whole tree each
+/// time.
+class _HtmlRichTextState extends State<HtmlRichText> {
+  late List<Widget> _blocks;
+
+  @override
+  void initState() {
+    super.initState();
+    _blocks = _render();
+  }
+
+  @override
+  void didUpdateWidget(HtmlRichText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.html != widget.html || oldWidget.dark != widget.dark) _blocks = _render();
+  }
+
+  List<Widget> _render() {
+    final source = widget.html;
+    if (source == null || source.trim().isEmpty) return const [];
+    return _renderBlocks(_parseHtml(source).children, widget.dark);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final source = html;
-    if (source == null || source.trim().isEmpty) return const SizedBox.shrink();
-
-    final blocks = _renderBlocks(_parseHtml(source).children, dark);
-    if (blocks.isEmpty) return const SizedBox.shrink();
-
+    if (_blocks.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: blocks,
+      children: _blocks,
     );
   }
 }

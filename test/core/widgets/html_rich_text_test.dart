@@ -51,4 +51,13 @@ void main() {
     await pump(tester, '   ');
     expect(find.byType(RichText), findsNothing);
   });
+
+  testWidgets('re-renders when the html changes (it caches the parse per html)', (tester) async {
+    await pump(tester, '<p>First <b>version</b></p>');
+    expect(_allText(tester), contains('First version'));
+
+    await pump(tester, '<p>Second <b>version</b></p>');
+    expect(_allText(tester), contains('Second version'));
+    expect(_allText(tester), isNot(contains('First')));
+  });
 }

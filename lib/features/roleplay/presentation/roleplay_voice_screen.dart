@@ -119,7 +119,11 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   final _countdownTimers = <Timer>[];
 
   DateTime? _startTime;
-  Duration _elapsed = Duration.zero;
+  // A notifier, not screen state: the tick fires every second for the
+  // whole session, and a setState here rebuilt the entire screen
+  // (participant tiles, the scenario HTML, the checklist) just to change
+  // the duration label.
+  final _elapsed = ValueNotifier(Duration.zero);
   Timer? _tickTimer;
   bool _hasWarned = false;
   bool _showEndingSoon = false;
@@ -185,6 +189,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       timer.cancel();
     }
     _tickTimer?.cancel();
+    _elapsed.dispose();
     _remoteSpeakingDebounceTimer?.cancel();
     _controlAckTimer?.cancel();
     _dataSubscription?.cancel();
@@ -437,7 +442,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     }
     final elapsed = rawElapsed - pausedTotal;
     final maxTimeSec = _parseMaxTimeSec(widget.scenario?.maxTimeValue);
-    setState(() => _elapsed = elapsed);
+    _elapsed.value = elapsed;
 
     if (maxTimeSec - elapsed.inSeconds <= _warningThresholdSeconds &&
         !_hasWarned) {
@@ -639,8 +644,11 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                 if (_isConnected && !_isFocusMode)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '${ref.t('simulationPage.sessionDuration')} ${_formatDuration(_elapsed)}',
+                    child: ValueListenableBuilder<Duration>(
+                      valueListenable: _elapsed,
+                      builder: (context, elapsed, _) => Text(
+                        '${ref.t('simulationPage.sessionDuration')} ${_formatDuration(elapsed)}',
+                      ),
                     ),
                   ),
                 if (_isConnected && (widget.scenario?.showScoreMeter ?? true))
