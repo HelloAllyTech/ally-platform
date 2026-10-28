@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +10,13 @@ import 'core/app_update/force_update_modal.dart';
 import 'core/auth/auth_state.dart';
 import 'core/chat/active_chat_discovery.dart';
 import 'core/chat/cloud_telephony_listener.dart';
+import 'core/config/app_config.dart';
+import 'core/deeplink/deep_link_binding.dart';
 import 'core/errors/crash_reporting.dart';
 import 'core/errors/error_boundary.dart';
 import 'core/localization/localization_controller.dart';
+import 'core/migration/legacy_session_migration.dart';
+import 'core/network/token_storage.dart';
 import 'core/push/leaderboard_notification.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
@@ -48,7 +53,21 @@ Future<void> main() async {
   // this also covers iPad, whose Info.plist list Flutter keeps open.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  runApp(const ProviderScope(retry: appRetryPolicy, child: AllyApp()));
+  // The store build replaces the React Native app in place: carry its
+  // sign-in and preferences over once, before anything reads them.
+  if (AppConfig.isProdFlavor) await migrateFromReactNativeApp(TokenStorage());
+
+  // Universal / App Links (RN RootNavigator's Linking listener). Created
+  // before runApp so the link that cold-started the app isn't missed.
+  final deepLinks = AppLinks().uriLinkStream;
+
+  runApp(
+    ProviderScope(
+      retry: appRetryPolicy,
+      overrides: [deepLinkStreamProvider.overrideWithValue(deepLinks)],
+      child: const AllyApp(),
+    ),
+  );
 }
 
 class AllyApp extends ConsumerStatefulWidget {
@@ -94,6 +113,8 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     ref.watch(localizationControllerProvider);
     // Schedules/cancels RN's weekly leaderboard reminder on sign-in/out.
     ref.watch(leaderboardNotificationSyncProvider);
+    // Summary and course share links (core/deeplink).
+    ref.watch(deepLinkBindingProvider);
 
     // Mirrors RN's cold-launch discovery check, run once auth first
     // resolves to authenticated (no literal Splash screen exists here to

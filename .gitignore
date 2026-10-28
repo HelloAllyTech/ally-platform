@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Release config that never goes in git (docs/RELEASE.md): per-environment
+# Firebase files (CI pulls them from S3, as RN's workflows do) and the
+# dart-define env file CI writes from the ENV_VALUES_* secret.
+**/GoogleService-Info.plist
+**/google-services.json
+/.env
+/.env.*
+/env/*.env
+!/env/example.env

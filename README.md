@@ -1,6 +1,11 @@
 # ally_mobile_flutter
 
-A new Flutter project.
+The Flutter rewrite of the Ally mobile app (replacing `ally-platform/ally-mobile`).
+
+Build flavors, environment values, CI release workflows and the cutover from
+the React Native app: see [docs/RELEASE.md](docs/RELEASE.md). In short:
+`flutter run --dart-define-from-file=env/local.env` runs the `dev` (test)
+identity; `--flavor prod` is the store app.
 
 ## Getting Started
 

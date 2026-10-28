@@ -22,10 +22,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Overridden per flavor below.
         applicationId = "com.helloally.ally_mobile_flutter"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
@@ -36,11 +34,54 @@ android {
         versionName = flutter.versionName
     }
 
+    // Mirrors ally-mobile (React Native)'s android/app/build.gradle
+    // productFlavors. `prod` IS the store app: same applicationId, label and
+    // App Links host as RN's prod flavor, so a Play upload is an update to
+    // the existing listing. `dev` keeps this repo's own pre-cutover test id
+    // (not RN's `com.helloally.app.dev`), so a test build never replaces
+    // the real app or RN's own dev build on a tester's phone. See
+    // docs/RELEASE.md. Flutter passes the flavor to Dart as `appFlavor`.
+    flavorDimensions += "version"
+    productFlavors {
+        create("dev") {
+            dimension = "version"
+            applicationId = "com.helloally.ally_mobile_flutter"
+            resValue("string", "app_name", "Ally Flutter")
+            manifestPlaceholders["appLinkHost"] = "app.dev.helloally.ai"
+        }
+        create("prod") {
+            dimension = "version"
+            applicationId = "com.helloally.app"
+            resValue("string", "app_name", "Ally")
+            manifestPlaceholders["appLinkHost"] = "app.helloally.ai"
+        }
+    }
+
+    // RN's release signing: android/app/ally-release.keystore decoded from
+    // the ANDROID_RELEASE_KEYSTORE_BASE64 secret in CI, passwords from the
+    // environment. Play only accepts an update to com.helloally.app signed
+    // with this same upload key. Without the keystore (local builds) release
+    // falls back to the debug key so `flutter run --release` still works.
+    val releaseKeystore = file("ally-release.keystore")
+    signingConfigs {
+        create("release") {
+            if (releaseKeystore.exists()) {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (releaseKeystore.exists()) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
 }
@@ -53,6 +94,18 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// Firebase config is not in git (RN pulls it from S3 in CI; see
+// docs/RELEASE.md). Apply google-services only when CI has placed a
+// google-services.json, so local builds without one still work: the app
+// then runs without push/Crashlytics (main.dart tolerates a failed
+// Firebase.initializeApp()).
+val googleServicesJson =
+    listOf("google-services.json", "src/dev/google-services.json", "src/prod/google-services.json")
+        .any { file(it).exists() }
+if (googleServicesJson) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 dependencies {

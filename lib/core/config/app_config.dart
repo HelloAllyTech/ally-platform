@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/services.dart' show appFlavor;
 
 /// Mirrors ally-mobile (React Native)'s `src/config/env.ts`: fail fast on a
 /// missing required value rather than silently falling back to a wrong
@@ -7,10 +8,17 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 ///
 /// Values are supplied via `--dart-define-from-file` at build time (the
 /// Flutter equivalent of `react-native-config`'s `.env` file), not read from
-/// a checked-in file — see `README.md` in this directory once build flavors
-/// are wired up in Phase 0's CI port.
+/// a checked-in file. Release CI writes RN's own `ENV_VALUES_*` secret to
+/// `.env` and passes it as-is (Flutter reads `.env` syntax); see
+/// docs/RELEASE.md.
 class AppConfig {
   AppConfig._();
+
+  /// The build flavor (`dev` | `prod`), from `--flavor` (pubspec's
+  /// `default-flavor` is `dev`). `prod` is the store app with RN's identity.
+  static const String? flavor = appFlavor;
+
+  static const bool isProdFlavor = appFlavor == 'prod';
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -46,10 +54,16 @@ class AppConfig {
   /// Mirrors `env.I18N_BASE_URL` — the dynamic translation CDN this app's
   /// real counterpart polls at runtime (manifest.json + per-namespace JSON),
   /// with the bundled locale assets as the offline/zero-delay fallback only.
-  static const String i18nBaseUrl = String.fromEnvironment(
-    'I18N_BASE_URL',
-    defaultValue: 'https://api.helloally.dev/i18n',
-  );
+  ///
+  /// An unset or empty define falls back to the flavor default: production's
+  /// translation server for `prod` (`https://api.helloally.ai/i18n`, which
+  /// serves the live `manifest.json`; RN's production value lives only in
+  /// its ENV_VALUES_PRODUCTION secret), the old default otherwise.
+  static const String i18nBaseUrl = _i18nBaseUrlDefine != ''
+      ? _i18nBaseUrlDefine
+      : (isProdFlavor ? 'https://api.helloally.ai/i18n' : 'https://api.helloally.dev/i18n');
+
+  static const String _i18nBaseUrlDefine = String.fromEnvironment('I18N_BASE_URL');
 
   /// Mirrors `env.LANGUAGE_SELECTOR_FLAG` — gates the dynamic sync exactly
   /// like the RN app does, defaulting off until explicitly enabled.
@@ -89,9 +103,11 @@ class AppConfig {
   /// The drawer appends `drawer.dev` ("(Dev)") to the version when this is
   /// `development`, like RN's `CustomDrawerContent`. Debug builds default to
   /// `development` so a local run reads like RN's dev build; release builds
-  /// must pass `--dart-define=ENVIRONMENT=...` to say otherwise.
+  /// must pass `--dart-define=ENVIRONMENT=...` to say otherwise. A `dev`
+  /// flavor release build also defaults to `development` (it is never the
+  /// store app).
   static const String environment = String.fromEnvironment(
     'ENVIRONMENT',
-    defaultValue: kDebugMode ? 'development' : 'production',
+    defaultValue: (kDebugMode || appFlavor == 'dev') ? 'development' : 'production',
   );
 }

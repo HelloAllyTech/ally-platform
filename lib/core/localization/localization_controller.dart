@@ -24,6 +24,10 @@ const supportedLanguageOptions = [
 
 const _defaultLanguage = 'en';
 const _prefLanguageKey = 'ui_language';
+
+/// The SharedPreferences key holding the chosen UI language (RN's
+/// AsyncStorage `ally:ui:language`); public for the one-time RN migration.
+const String uiLanguagePrefsKey = _prefLanguageKey;
 const _prefI18nVersionKey = 'i18n_version';
 const _manifestRecheckInterval = Duration(seconds: 30);
 

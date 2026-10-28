@@ -25,7 +25,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:label="Ally"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -33,7 +33,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
@@ -52,6 +52,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- RN's App Links filter: summary and course share links on the
+                 flavor's web host (`appLinkHost`, set per flavor in
+                 app/build.gradle.kts like RN). Must match the paths the web
+                 app's .well-known/assetlinks.json claims. Handled in Dart by
+                 core/deeplink (app_links). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/summary" />
+                <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/course" />
+            </intent-filter>
+            <!-- Links are routed by core/deeplink, not by Flutter's built-in
+                 deep linking (which would push "/summary/1" into go_router,
+                 where no such route exists). -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
