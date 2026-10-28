@@ -137,10 +137,13 @@ class _TakingNotesRowState extends ConsumerState<TakingNotesRow> {
 /// 4-radius bubble above the lock with a downward arrow, kept [horizontalInset]
 /// from the screen edges (`tooltipDisplayInsets`). The bullets are system
 /// font 14/20 black (`styles.tooltipText` sets no font family), min 250 x 120.
+/// A caller with its own `tooltipContent` (e.g. the call-summary
+/// AddNotesSection) passes [content] instead of [items].
 Future<void> showPrivacyTooltip(
   BuildContext context, {
   required GlobalKey anchorKey,
-  required List<String> items,
+  List<String> items = const [],
+  Widget? content,
   double horizontalInset = 40,
 }) {
   final navigatorContext = Navigator.of(context).context;
@@ -156,7 +159,7 @@ Future<void> showPrivacyTooltip(
     transitionDuration: const Duration(milliseconds: 150),
     pageBuilder: (dialogContext, _, _) => CustomSingleChildLayout(
       delegate: _AboveAnchorLayout(anchor: anchor, inset: horizontalInset),
-      child: _PrivacyTooltipBubble(items: items, arrowX: anchor.center.dx),
+      child: _PrivacyTooltipBubble(items: items, content: content, arrowX: anchor.center.dx),
     ),
   );
 }
@@ -182,9 +185,10 @@ class _AboveAnchorLayout extends SingleChildLayoutDelegate {
 }
 
 class _PrivacyTooltipBubble extends StatelessWidget {
-  const _PrivacyTooltipBubble({required this.items, required this.arrowX});
+  const _PrivacyTooltipBubble({required this.items, required this.arrowX, this.content});
 
   final List<String> items;
+  final Widget? content;
   final double arrowX;
 
   @override
@@ -196,10 +200,10 @@ class _PrivacyTooltipBubble extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            constraints: const BoxConstraints(minWidth: 250, minHeight: 120),
+            constraints: content == null ? const BoxConstraints(minWidth: 250, minHeight: 120) : null,
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
-            child: Column(
+            child: content ?? Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

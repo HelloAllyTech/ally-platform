@@ -67,6 +67,33 @@ void main() {
       },
     );
 
+    // testWidgets for its fake clock (Timer) — no widget is pumped.
+    testWidgets('retries after RETRY_AFTER_FAILURE_MS when opening the socket fails, until disconnect()', (
+      tester,
+    ) async {
+      final retrying = SocketService(tokenStorage);
+      var calls = 0;
+      when(() => tokenStorage.accessToken).thenAnswer((_) {
+        calls++;
+        return calls == 1 ? Future<String?>.error(Exception('keychain locked')) : Future<String?>.value(null);
+      });
+
+      await retrying.connect(namespacePath: '/microphone-chat', userId: 'user-1');
+      expect(calls, 1);
+
+      await tester.pump(const Duration(milliseconds: 1999));
+      expect(calls, 1);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(calls, 2, reason: 'retried after 2s');
+
+      // A failure followed by disconnect() never retries.
+      calls = 0;
+      await retrying.connect(namespacePath: '/microphone-chat', userId: 'user-1');
+      retrying.disconnect();
+      await tester.pump(const Duration(seconds: 5));
+      expect(calls, 1);
+    });
+
     // NOTE: the `if (_socket != null) { ... }` idempotent-reconnect branch
     // (and everything past the null-token check: the real `io.io(...)`
     // call, auth-fn token refresh, event-callback registration) can't be

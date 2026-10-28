@@ -91,12 +91,12 @@ void main() {
 
       // Not yet editing this section: every field — including the genuinely
       // read-only Call ID — renders as plain text, not an editable control.
-      expect(find.text('Call ID'), findsOneWidget);
+      expect(find.text('Call ID:'), findsOneWidget);
       expect(find.text('1001'), findsOneWidget);
       expect(find.byKey(const ValueKey('callId')), findsNothing);
-      expect(find.text('Age'), findsOneWidget);
+      expect(find.text('Age:'), findsOneWidget);
       expect(find.text('25-34'), findsOneWidget);
-      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.byKey(const ValueKey('dropdown-age')), findsNothing);
 
       // Enter edit mode via the section's pencil button.
       await tester.tap(find.byKey(const ValueKey('section-edit-featuresAndDemographics')));
@@ -108,10 +108,8 @@ void main() {
       expect(find.text('1001'), findsOneWidget);
 
       // Age is now a real dropdown, pre-selected with its current value.
-      final ageDropdown = find.ancestor(
-        of: find.text('Age'),
-        matching: find.byType(DropdownButtonFormField<String>),
-      );
+      // RN `CustomDropdown` (not a Material dropdown) next to `Age:`.
+      final ageDropdown = find.byKey(const ValueKey('dropdown-age'));
       expect(ageDropdown, findsOneWidget);
       expect(find.text('25-34'), findsOneWidget, reason: 'current value shown when closed');
 
@@ -134,7 +132,7 @@ void main() {
       // this one is still mid-edit. Invoke onPressed directly rather than a
       // pixel-coordinate tap — the dropdown interaction above scrolled the
       // list, so this button's on-screen position has moved.
-      tester.widget<IconButton>(find.byKey(const ValueKey('section-close-featuresAndDemographics'))).onPressed!();
+      tester.widget<GestureDetector>(find.byKey(const ValueKey('section-close-featuresAndDemographics'))).onTap!();
       await tester.pumpAndSettle();
 
       // "Session Summary" is a later section — scroll the list until its
@@ -222,17 +220,20 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('section-edit-featuresAndDemographics')));
       await tester.pumpAndSettle();
 
-      final ageDropdown2 = find.ancestor(
-        of: find.text('Age'),
-        matching: find.byType(DropdownButtonFormField<String>),
-      );
+      final ageDropdown2 = find.byKey(const ValueKey('dropdown-age'));
       // The section is already fully materialized (it's the first one), so
       // `dragUntilVisible` sees the widget as "found" without actually
       // scrolling it into the viewport — a plain `drag` is needed to bring
       // it above the fold for a real hit-test.
+      // Far enough that the floating menu (up to 200pt tall) also fits.
       await tester.drag(find.byType(ListView).first, const Offset(0, -150));
       await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView).first, Offset(0, 200 - tester.getTopLeft(ageDropdown2).dy));
+      await tester.pumpAndSettle();
       await tester.tap(ageDropdown2);
+      await tester.pumpAndSettle();
+      // The menu scrolls past its 200pt cap; bring the option into view.
+      await tester.ensureVisible(find.text('35-44').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('35-44').last);
       await tester.pumpAndSettle();
@@ -342,6 +343,54 @@ void main() {
       await tester.enterText(field, 'Edited again');
       await tester.pump();
       expect(find.byType(AppButton), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'CallSummaryScreen: the AI wand writes the enhanced text into the open field, and RN section SVGs render',
+    (tester) async {
+      final repository = MockCallLogRepository();
+      final summary = CallSummaryDetails(
+        counselorId: 7,
+        fields: {'callId': 1001, 'sessionSummary': 'rough notes'},
+      );
+      when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+      when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+      when(() => repository.enhanceCallSummary('rough typed notes')).thenAnswer((_) async => 'Polished notes.');
+
+      await pumpApp(
+        tester,
+        CallSummaryScreen(log: _log),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          ..._editorOverrides(visibleFields: const ['sessionSummary']),
+        ],
+      );
+
+      // RN SECTION_LIST icons + carets instead of Material icons.
+      expect(find.descendant(of: find.byType(ListView).first, matching: find.byType(Icon)), findsNothing);
+      expect(find.byKey(const ValueKey('section-caret-sessionSummary')), findsOneWidget);
+      expect(find.byKey(const Key('ai-warning-shield')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('section-header-sessionSummary')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('section-edit-sessionSummary')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('sessionSummary'));
+      String fieldText() =>
+          tester.widget<TextField>(find.descendant(of: field, matching: find.byType(TextField))).controller!.text;
+      expect(fieldText(), 'rough notes');
+
+      // A typed edit (no rebuild) is what the wand sends.
+      await tester.enterText(field, 'rough typed notes');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('section-wand-sessionSummary')));
+      await tester.pump();
+      await tester.pump();
+      expect(fieldText(), 'Polished notes.');
+      expect(find.text('Polished notes.'), findsOneWidget);
+      expect(find.byType(AppButton), findsOneWidget, reason: 'the enhanced text is an unsaved change');
     },
   );
 }

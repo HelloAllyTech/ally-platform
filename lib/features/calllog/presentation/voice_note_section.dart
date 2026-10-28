@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
@@ -9,6 +11,7 @@ import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
@@ -66,9 +69,15 @@ class VoiceNoteSection extends ConsumerStatefulWidget {
     required this.chatId,
     required this.onValuesApplied,
     this.onCustomValuesApplied,
+    this.existingTranscript,
   });
 
   final int chatId;
+
+  /// RN `summaryData.details.transcript`: the note's previously saved
+  /// dictation, which seeds the accumulated transcript so re-dictating on a
+  /// later visit appends to it instead of replacing it.
+  final String? existingTranscript;
 
   /// Called with the extracted built-in field values to merge+persist. Must
   /// rethrow on a persistence failure (not swallow it) — [_handleGenerate]
@@ -89,12 +98,28 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
   late final VoiceNoteRecorder _recorder;
   bool _voiceOpen = false;
   bool _isGenerating = false;
+  /// RN `transcriptRef`: accumulates the dictation transcript across
+  /// recordings; the full text is re-sent on every save (the endpoint
+  /// replaces the stored transcript).
   String _transcript = '';
 
   @override
   void initState() {
     super.initState();
     _recorder = VoiceNoteRecorder()..addListener(_onRecorderChanged);
+    _seedTranscript();
+  }
+
+  @override
+  void didUpdateWidget(covariant VoiceNoteSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _seedTranscript();
+  }
+
+  /// RN's seed effect: `if (existingTranscript && !transcriptRef.current)`.
+  void _seedTranscript() {
+    final existing = widget.existingTranscript;
+    if (existing != null && existing.isNotEmpty && _transcript.isEmpty) _transcript = existing;
   }
 
   void _onRecorderChanged() {
@@ -253,19 +278,32 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
     if (ref.watch(customFieldsEnabledProvider).value != false) ref.watch(customFieldDefinitionsProvider);
 
     if (!_voiceOpen) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-        child: OutlinedButton.icon(
-          key: const Key('voice-note-record-cta'),
-          onPressed: _handleMicPress,
-          icon: const Icon(Icons.mic, size: 18),
-          label: Text(ref.t('calls.createNote.voice.record')),
+      // RN `styles.recordCta`: azureBlue-outlined row, MicIcon 18 + label.
+      return GestureDetector(
+        key: const Key('voice-note-record-cta'),
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleMicPress,
+        child: Container(
+          margin: EdgeInsets.only(left: RnSize.of(context).s(16), right: RnSize.of(context).s(16), top: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.azureBlue),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SvgPicture.asset('assets/icons/mic.svg', width: 18, height: 18),
+              const SizedBox(width: 6),
+              Text(ref.t('calls.createNote.voice.record'), style: _bodySmall.copyWith(color: AppColors.azureBlue)),
+            ],
+          ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: EdgeInsets.only(left: RnSize.of(context).s(16), right: RnSize.of(context).s(16), top: 10),
       child: _VoiceNotePanel(
         status: _recorder.status,
         durationMs: _recorder.durationMs,
@@ -361,14 +399,21 @@ class _VoiceNotePanelState extends ConsumerState<_VoiceNotePanel> {
       final messages = _generatingMessages;
       return _panel(
         key: 'voice-note-generating',
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-            const SizedBox(width: 10),
-            Text(messages[_messageIndex % messages.length]),
-          ],
-        ),
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CupertinoActivityIndicator(color: AppColors.azureBlue),
+                  const SizedBox(width: 10),
+                  Flexible(child: Text(messages[_messageIndex % messages.length], style: _statusText)),
+                ],
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -379,124 +424,166 @@ class _VoiceNotePanelState extends ConsumerState<_VoiceNotePanel> {
     if (isRecording || isPaused) {
       return _panel(
         key: 'voice-note-recording',
-        child: Row(
-          children: [
-            Expanded(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.circle, size: 10, color: isPaused ? AppColors.onSurfaceVariant : Colors.red),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          ref.t(isRecording ? 'calls.createNote.voice.listening' : 'calls.createNote.voice.paused'),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          _formatDuration(widget.durationMs),
-                          style: const TextStyle(color: AppColors.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isRecording)
-                  TextButton.icon(
-                    key: const Key('voice-note-pause'),
-                    onPressed: widget.onPause,
-                    icon: const Icon(Icons.pause, size: 16),
-                    label: Text(ref.t('calls.createNote.voice.pause')),
-                  )
-                else
-                  TextButton.icon(
-                    key: const Key('voice-note-resume'),
-                    onPressed: widget.onResume,
-                    icon: const Icon(Icons.play_arrow, size: 16),
-                    label: Text(ref.t('calls.createNote.voice.resume')),
-                  ),
-                TextButton.icon(
-                  key: const Key('voice-note-stop'),
-                  onPressed: widget.onStop,
-                  icon: const Icon(Icons.stop, size: 16, color: Colors.red),
-                  label: Text(ref.t('calls.createNote.voice.stop'), style: const TextStyle(color: Colors.red)),
+        children: [
+          Flexible(
+            child: _statusBlock(
+              leading: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: isPaused ? AppColors.ashGray : AppColors.red400,
+                  borderRadius: BorderRadius.circular(5),
                 ),
-              ],
+              ),
+              label: ref.t(isRecording ? 'calls.createNote.voice.listening' : 'calls.createNote.voice.paused'),
             ),
-          ],
-        ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isRecording)
+                _ctrlButton(
+                  key: 'voice-note-pause',
+                  onTap: widget.onPause,
+                  icon: SvgPicture.asset('assets/icons/pause.svg', width: 16, height: 16),
+                  label: ref.t('calls.createNote.voice.pause'),
+                )
+              else
+                _ctrlButton(
+                  key: 'voice-note-resume',
+                  onTap: widget.onResume,
+                  icon: SvgPicture.asset('assets/icons/play.svg', width: 16, height: 16),
+                  label: ref.t('calls.createNote.voice.resume'),
+                ),
+              const SizedBox(width: 8),
+              // RN `stopButton` + `stopSquare`: a red-outlined button with a
+              // 10pt rounded red square, not an icon.
+              _ctrlButton(
+                key: 'voice-note-stop',
+                onTap: widget.onStop,
+                borderColor: AppColors.red400,
+                icon: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: AppColors.red400, borderRadius: BorderRadius.circular(2)),
+                ),
+                label: ref.t('calls.createNote.voice.stop'),
+                textColor: AppColors.red400,
+              ),
+            ],
+          ),
+        ],
       );
     }
 
     if (isStopped) {
       return _panel(
         key: 'voice-note-ready',
-        child: Row(
-          children: [
-            Expanded(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.mic, size: 18),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(ref.t('calls.createNote.voice.ready'), overflow: TextOverflow.ellipsis),
-                        Text(
-                          _formatDuration(widget.durationMs),
-                          style: const TextStyle(color: AppColors.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        children: [
+          Flexible(
+            child: _statusBlock(
+              leading: SvgPicture.asset('assets/icons/mic.svg', width: 18, height: 18),
+              label: ref.t('calls.createNote.voice.ready'),
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ctrlButton(
+                key: 'voice-note-discard',
+                onTap: widget.onDiscard,
+                icon: SvgPicture.asset('assets/icons/delete.svg', width: 16, height: 16),
+                label: ref.t('calls.createNote.voice.discard'),
               ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton.icon(
-                  key: const Key('voice-note-discard'),
-                  onPressed: widget.onDiscard,
-                  icon: const Icon(Icons.delete_outline, size: 16),
-                  label: Text(ref.t('calls.createNote.voice.discard')),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  key: const Key('voice-note-generate'),
-                  onPressed: widget.onGenerate,
-                  child: Text(ref.t('calls.createNote.voice.generate')),
-                ),
-              ],
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              _ctrlButton(
+                key: 'voice-note-generate',
+                onTap: widget.onGenerate,
+                label: ref.t('calls.createNote.voice.generate'),
+                textColor: Colors.white,
+                borderColor: AppColors.azureBlue,
+                background: AppColors.azureBlue,
+              ),
+            ],
+          ),
+        ],
       );
     }
 
     return const SizedBox.shrink();
   }
 
-  Widget _panel({required String key, required Widget child}) {
+  /// RN `statusBlock` + `statusTextBlock`: leading dot/icon, status line
+  /// and the elapsed time under it.
+  Widget _statusBlock({required Widget leading, required String label}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        leading,
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: _statusText),
+              Text(_formatDuration(widget.durationMs), style: _bodySmall.copyWith(color: AppColors.ashGray)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// RN `styles.ctrlButton`: 1pt ashGray border, radius 6, padding 10×6,
+  /// 4pt gap between icon and label.
+  Widget _ctrlButton({
+    required String key,
+    required VoidCallback onTap,
+    required String label,
+    Widget? icon,
+    Color borderColor = AppColors.ashGray,
+    Color textColor = AppColors.darkSlate,
+    Color? background,
+  }) {
+    return GestureDetector(
+      key: Key(key),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: background,
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[icon, const SizedBox(width: 4)],
+            Text(label, style: _bodySmall.copyWith(color: textColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// RN `styles.panel`: lightGray5 border, white, radius 8, padding 12,
+  /// children spread apart.
+  Widget _panel({required String key, required List<Widget> children}) {
     return Container(
       key: Key(key),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.strokePrimary),
+        color: Colors.white,
+        border: Border.all(color: AppColors.lightGray5),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: child,
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: children),
     );
   }
 }
+
+/// RN `typography.body.small` with no fontFamily — the iOS system font.
+const _bodySmall = TextStyle(fontFamily: 'CupertinoSystemText', fontSize: 12, height: 16 / 12, letterSpacing: 0.2);
+final _statusText = _bodySmall.copyWith(color: AppColors.darkSlate);

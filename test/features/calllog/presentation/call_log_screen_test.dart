@@ -12,12 +12,16 @@ import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_empty_state.dart';
 import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
+import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_row.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
+import 'package:ally_mobile_flutter/features/scribe/data/chat_repository.dart';
 
 import '../../../support/fake_permission_platform.dart';
 import '../../../support/pump_router_app.dart';
 
 class MockCallLogRepository extends Mock implements CallLogRepository {}
+
+class MockChatRepository extends Mock implements ChatRepository {}
 
 CallLogItem _log({
   int id = 42,
@@ -211,6 +215,8 @@ void main() {
         Permission.microphone: PermissionStatus.granted,
       });
       final repository = _repository(realLogs: [_log()]);
+      final chatRepository = MockChatRepository();
+      when(() => chatRepository.getCounsellorChat()).thenAnswer((_) async => null);
 
       await pumpRouterApp(
         tester,
@@ -222,9 +228,11 @@ void main() {
             (ref) async => [
               UserPermissions.viewCallLogs,
               UserPermissions.startMicrophoneChat,
+              UserPermissions.viewCounselorChat,
             ],
           ),
           visibleChatTypesProvider.overrideWith((ref) async => const ['MICROPHONE_CHAT']),
+          chatRepositoryProvider.overrideWithValue(chatRepository),
         ],
       );
 
@@ -236,6 +244,8 @@ void main() {
       await tester.tap(find.text('Start Scribe Mode'));
       await tester.pumpAndSettle();
       expect(find.text('Scribe recording'), findsOneWidget);
+      // C33: RN `checkCounselorChat()` right before navigating to Listening.
+      verify(() => chatRepository.getCounsellorChat()).called(1);
     },
   );
 
@@ -694,5 +704,58 @@ void main() {
     expect(find.byType(AppEmptyState), findsOneWidget);
     expect(find.text('No call logs found'), findsOneWidget);
     expect(find.text('Your active call will be shown here.'), findsOneWidget);
+  });
+
+  testWidgets('C12: no tab permission at all shows RN FeatureNotAvailable with a Learn more link', (tester) async {
+    final repository = _repository();
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: _routes(),
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith((ref) async => const <String>[]),
+      ],
+    );
+
+    expect(find.byKey(const Key('call-log-feature-unavailable')), findsOneWidget);
+    expect(find.text('Oops !'), findsOneWidget);
+    expect(find.text('This app is currently for counsellors and learners only.'), findsOneWidget);
+    expect(find.text('Learn more'), findsOneWidget);
+
+    // No url_launcher plugin in tests: the open fails, so RN's alert shows.
+    await tester.tap(find.byKey(const Key('call-log-learn-more')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pumpAndSettle();
+    expect(find.text('Unable to open the link'), findsOneWidget);
+  });
+
+  testWidgets('C24: only one row is expanded at a time', (tester) async {
+    final repository = _repository(realLogs: [_log(id: 1, sessionName: 'First'), _log(id: 2, sessionName: 'Second')]);
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: _routes(),
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith((ref) async => [UserPermissions.viewCallLogs]),
+      ],
+    );
+
+    bool isExpanded(int index) =>
+        tester.widget<CallLogRow>(find.byType(CallLogRow).at(index)).expanded ?? false;
+    final toggles = find.byKey(const ValueKey('call-log-row-toggle'));
+
+    await tester.tap(toggles.at(0));
+    await tester.pumpAndSettle();
+    expect([isExpanded(0), isExpanded(1)], [true, false]);
+
+    await tester.tap(toggles.at(1));
+    await tester.pumpAndSettle();
+    expect([isExpanded(0), isExpanded(1)], [false, true], reason: 'opening a row closes the previous one');
+
+    await tester.tap(toggles.at(1));
+    await tester.pumpAndSettle();
+    expect([isExpanded(0), isExpanded(1)], [false, false]);
   });
 }
