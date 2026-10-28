@@ -146,7 +146,7 @@ void main() {
     testWidgets('a "See this moment" chip switches to the Transcript tab and outlines that row', (tester) async {
       h.stubSummary(summaryJson(note: _note, hasFeedback: true));
       when(
-        () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0),
+        () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0, languageCode: any(named: 'languageCode')),
       ).thenAnswer(
         (_) async => (
           messages: [
