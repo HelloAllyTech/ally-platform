@@ -10,10 +10,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/emoji_insert_picker.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
+import 'emoji_keyboard/emoji_keyboard.dart';
 import 'review_formatting.dart';
 import 'simulation_details_card.dart';
 
@@ -30,18 +30,11 @@ const _maxNoteLength = 250;
 /// matching `useShareScreenLogic`'s `handleEditNote`/`screenTitle`/
 /// `buttonLabel` branching exactly.
 ///
-/// The session/scenario context card ([SimulationDetailsCard] — cover
-/// media, title, description, date/duration rows, same shared widget
-/// [ReviewCard] uses) and the emoji-insert picker (RN's
-/// `rn-emoji-keyboard`, scoped down — see [EmojiInsertPicker]'s own doc
-/// comment) are both wired in, but the context fields are all optional:
-/// [contextTitle]/[contextDescription]/[contextCoverImageUrl] aren't
-/// available from this app's one real caller today
-/// (`SimulationFeedbackScreen` only has the session's own timing, not the
-/// scenario's title/description — that would need a separate scenario
-/// fetch this screen doesn't have a reason to add yet), so the card
-/// degrades to just its Date&time/Duration rows when they're absent,
-/// rather than requiring the caller to supply data it doesn't have.
+/// The session/scenario context card ([SimulationDetailsCard]: cover
+/// image/video, title, description, date/duration rows) is fed by the
+/// caller (`ShareSimulationForReviewArgs` for simulations, RN
+/// `scenarioData`); missing fields simply drop out. The add-reaction icon
+/// opens [EmojiKeyboard], the port of RN's `rn-emoji-keyboard`.
 class ShareForReviewScreen extends ConsumerStatefulWidget {
   const ShareForReviewScreen({
     super.key,
@@ -108,7 +101,8 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
   /// inserted at the cursor — and only while still under the character
   /// limit (a no-op past it, not a truncation).
   void _insertEmoji(String emoji) {
-    if (_noteController.text.characters.length >= _maxNoteLength) return;
+    // RN `Array.from(prev).length < MAX_NOTE_LENGTH` (code points).
+    if (_noteController.text.runes.length >= _maxNoteLength) return;
     _noteController.text += emoji;
   }
 
@@ -249,7 +243,16 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
         alignment: Alignment.centerLeft,
         child: GestureDetector(
           key: const ValueKey('add-emoji-button'),
-          onTap: () => EmojiInsertPicker.show(context, onEmojiSelected: _insertEmoji),
+          // RN ShareReviewLayout's <EmojiKeyboard allowMultipleSelections
+          // enableRecentlyUsed enableSearchBar hideHeader>.
+          onTap: () => EmojiKeyboard.show(
+            context,
+            onEmojiSelected: _insertEmoji,
+            allowMultipleSelections: true,
+            enableRecentlyUsed: true,
+            enableSearchBar: true,
+            hideHeader: true,
+          ),
           child: SvgPicture.asset('assets/icons/addReaction.svg', width: RnSize.of(context).raw(24), height: RnSize.of(context).raw(24)),
         ),
       ),

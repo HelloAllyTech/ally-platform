@@ -178,7 +178,10 @@ class _DashedBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomPaint(
       painter: _DashedBorderPainter(),
-      child: Padding(padding: const EdgeInsets.all(20), child: Center(child: child)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Center(child: child),
+      ),
     );
   }
 }
