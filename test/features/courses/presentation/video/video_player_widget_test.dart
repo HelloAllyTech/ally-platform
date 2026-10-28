@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 import 'package:ally_mobile_flutter/features/courses/presentation/video/video_player_widget.dart';
@@ -130,6 +131,45 @@ void main() {
     fakePlatform.calls.clear();
     await key.currentState!.resume();
     expect(fakePlatform.calls, contains('play'));
+
+    await unmount(tester);
+  });
+
+  testWidgets('stops sampling while paused, reports the pause once, and still samples a seek while paused',
+      (tester) async {
+    final key = GlobalKey<VideoPlayerWidgetState>();
+    final reported = <double>[];
+    var pauses = 0;
+    await pump(
+      tester,
+      VideoPlayerWidget(
+        key: key,
+        url: 'https://example.com/v.mp4',
+        onProgressTime: reported.add,
+        onPauseOrEnd: () => pauses++,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(reported, isNotEmpty);
+
+    await key.currentState!.pause();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(pauses, 1);
+    final afterPause = reported.length;
+
+    // Paused: the playhead doesn't move, so nothing is sampled.
+    await tester.pump(const Duration(seconds: 3));
+    expect(reported.length, afterPause);
+
+    // A seek while paused is still reported (interjection crossing checks
+    // depend on it).
+    await tester.tap(find.byType(VideoProgressIndicator));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(reported.length, afterPause + 1);
+    expect(reported.last, closeTo(50, 2), reason: 'tap at the middle of a 100s scrub bar');
+    expect(pauses, 1);
 
     await unmount(tester);
   });
