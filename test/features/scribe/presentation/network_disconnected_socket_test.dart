@@ -23,7 +23,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Something went wrong'), findsOneWidget);
+    // RN: the SOCKET title is the generic common.somethingWentWrong.
+    expect(find.text('Something went wrong!'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
 
     await tester.tap(find.text('Try again'));

@@ -116,11 +116,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Hello, how can I help today?'), findsOneWidget);
+      // RN: mm:ss since the chat started + the speaker label.
+      expect(find.text('00:05 '), findsOneWidget);
+      expect(find.text('You'), findsOneWidget); // sender 7 is this user
 
       // Pause starts `true` (matching RN) — resume, then push a chunk and
       // confirm it's actually emitted with the real RN-shaped payload.
+      // RN starts paused with the "Resume to let it listen" tooltip up.
+      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
+      // Debounced 500 ms (RN useDebounce).
       await tester.pump();
+      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
       chunkController.add(Uint8List.fromList(List.filled(10, 0)));
       await tester.pump();
 
@@ -153,7 +162,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('end-session-button')));
       await tester.pump(const Duration(milliseconds: 300)); // dialog entrance transition
-      await tester.tap(find.text('End Session').last);
+      await tester.tap(find.byKey(const ValueKey('call-illustrated-modal-action')));
       await tester.pump(const Duration(milliseconds: 300));
 
       verify(() => chatRepository.endCall(42)).called(1);

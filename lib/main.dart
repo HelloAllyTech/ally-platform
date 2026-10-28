@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/auth/auth_state.dart';
 import 'core/chat/active_chat_discovery.dart';
+import 'core/chat/cloud_telephony_listener.dart';
 import 'core/localization/localization_controller.dart';
 import 'core/push/leaderboard_notification.dart';
 import 'core/push/push_notification_service.dart';
@@ -68,6 +69,7 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       checkForActiveChat(ref, ref.read(appRouterProvider));
     }
+    ref.read(cloudTelephonyListenerProvider).onLifecycle(state);
   }
 
   @override
@@ -87,6 +89,13 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.isAuthenticated && !_wasAuthenticated) {
         checkForActiveChat(ref, ref.read(appRouterProvider));
+        // RN RootNavigator's app-wide cloud-telephony socket: an incoming
+        // conference call (USER_JOINED) opens Listening right away.
+        ref
+            .read(cloudTelephonyListenerProvider)
+            .start(userId: '', onUserJoined: () => checkForActiveChat(ref, ref.read(appRouterProvider)));
+      } else if (!next.isAuthenticated && _wasAuthenticated) {
+        ref.read(cloudTelephonyListenerProvider).stop();
       }
       _wasAuthenticated = next.isAuthenticated;
     });
