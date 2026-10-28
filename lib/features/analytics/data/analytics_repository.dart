@@ -64,6 +64,6 @@ final dashboardsProvider = FutureProvider<List<Dashboard>>((ref) async {
   return ref.watch(analyticsRepositoryProvider).getDashboards();
 });
 
-final dashboardUrlProvider = FutureProvider.family<String, String>((ref, dashboardId) {
+final dashboardUrlProvider = FutureProvider.autoDispose.family<String, String>((ref, dashboardId) {
   return ref.watch(analyticsRepositoryProvider).getDashboardUrl(dashboardId);
 });

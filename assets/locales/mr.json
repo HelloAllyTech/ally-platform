@@ -183,7 +183,9 @@
         "resend": "पुन्हा पाठवा",
         "resendWithCountdown": "पुन्हा पाठवा ({{seconds}})",
         "verify": "सत्यापित करा",
-        "signingIn": "साइन इन करत आहे..."
+        "signingIn": "साइन इन करत आहे...",
+        "emptyCodeError": "कोड प्रविष्ट करा.",
+        "useDifferentEmail": "वेगळा ईमेल वापरा"
       },
       "google": {
         "button": "Google सह सुरू ठेवा",
@@ -194,6 +196,10 @@
         "verifyOtp": "OTP सत्यापित करण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा.",
         "agreeTerms": "अटी आणि शर्तींशी सहमत होण्यास अयशस्वी",
         "sendOtpFailed": "OTP पाठवण्यात अयशस्वी"
+      },
+      "apple": {
+        "button": "Apple सह सुरू ठेवा",
+        "error": "Apple सह साइन इन करण्यात अयशस्वी"
       }
     },
     "sessionExpired": "तुमचे सत्र संपले आहे. कृपया पुन्हा साइन इन करा."
@@ -205,7 +211,9 @@
     "namePlaceholder": "तुमचे पूर्ण नाव प्रविष्ट करा",
     "submit": "सुरू ठेवा",
     "errorTitle": "काहीतरी चूक झाली",
-    "errorDescription": "आम्ही तुमचे प्रोफाइल सेव्ह करू शकलो नाही. कृपया पुन्हा प्रयत्न करा."
+    "errorDescription": "आम्ही तुमचे प्रोफाइल सेव्ह करू शकलो नाही. कृपया पुन्हा प्रयत्न करा.",
+    "phoneLabel": "फोन (पर्यायी)",
+    "required": "आवश्यक"
   },
   "boxBreathing": {
     "inhale": "आता श्वास आत घ्या",
@@ -213,7 +221,8 @@
     "exhale": "श्वास बाहेर सोडा",
     "phaseHold": "धरून ठेवा",
     "phaseInhale": "श्वास घ्या",
-    "phaseExhale": "श्वास सोडा"
+    "phaseExhale": "श्वास सोडा",
+    "title": "बॉक्स ब्रीदिंग"
   },
   "callFeedback": {
     "rateTitle": "AI-निर्मित सारांशाला रेट करा?",
@@ -437,7 +446,8 @@
           "populating": "फील्ड भरल्या जात आहेत…"
         }
       }
-    }
+    },
+    "sessionNumber": "सत्र #{{id}}"
   },
   "carousel": {
     "slides": {
@@ -538,7 +548,8 @@
     "unableToOpenLink": "लिंक उघडण्यात अक्षम",
     "checkInternet": "कृपया तुमचे इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
     "unknownError": "अज्ञात त्रुटी",
-    "practiceAgain": "पुन्हा सराव करा"
+    "practiceAgain": "पुन्हा सराव करा",
+    "backToHome": "होमवर परत जा"
   },
   "months": {
     "short": [
@@ -593,7 +604,9 @@
       "user": "वापरकर्ता",
       "totalDuration": "एकूण कालावधी",
       "badges": "बॅजेस्"
-    }
+    },
+    "yourRank": "तुमचा रँक",
+    "loadError": "लीडरबोर्ड लोड करण्यात अयशस्वी"
   },
   "learn": {
     "tabs": {
@@ -832,7 +845,13 @@
             ]
           }
         }
-      }
+      },
+      "ratingRequired": "कृपया रेटिंग निवडा.",
+      "ratingPrompt": "हे सत्र कसे झाले?",
+      "commentLabel": "काही टिप्पणी? (पर्यायी)",
+      "sessionDuration": "{{minutes}} मिनिटांचे सत्र",
+      "whatWentWell": "काय चांगले झाले",
+      "areasForImprovement": "सुधारणेची क्षेत्रे"
     },
     "common": {
       "tryAnother": "दुसरे सिमुलेशन करून पहा",
@@ -867,7 +886,8 @@
       "error_image_size": "चित्र २MB पेक्षा कमी आणि योग्य आस्पेक्ट रेशोचे असावे.",
       "upload_hint": "फक्त PNG किंवा JPG फाइल्स १:१ रेशो (जास्तीत जास्त २mb)",
       "language": "भाषा",
-      "leaderboardNotification": "लीडरबोर्ड सूचना"
+      "leaderboardNotification": "लीडरबोर्ड सूचना",
+      "nameNotSet": "(नाव सेट केलेले नाही)"
     }
   },
   "review": {
@@ -894,7 +914,11 @@
     "error": {
       "title": "पुनरावलोकने लोड करण्यात अक्षम",
       "description": "पुनरावलोकने लोड करताना काहीतरी चूक झाली. कृपया पुन्हा प्रयत्न करा.",
-      "retry": "पुन्हा प्रयत्न करा"
+      "retry": "पुन्हा प्रयत्न करा",
+      "loadReviewFailed": "पुनरावलोकन लोड करण्यात अयशस्वी",
+      "loadCommentsFailed": "टिप्पण्या लोड करण्यात अयशस्वी",
+      "loadThreadsFailed": "थ्रेड्स लोड करण्यात अयशस्वी",
+      "loadReactionsFailed": "प्रतिक्रिया लोड करण्यात अयशस्वी"
     },
     "privacy": {
       "private": "हे खाजगी ठेवा",
@@ -952,7 +976,12 @@
       "replyUpdateFailed": "प्रत्युत्तर अद्यतनित करण्यात अयशस्वी",
       "replyCreatedSuccessfully": "प्रत्युत्तर यशस्वीरित्या तयार केले",
       "replyCreateFailed": "प्रत्युत्तर तयार करण्यात अयशस्वी",
-      "callTitle": "CALL-{{id}}"
+      "callTitle": "CALL-{{id}}",
+      "threadsTab": "थ्रेड्स",
+      "clientSaid": "क्लायंट म्हणाले",
+      "learnerSaid": "शिकणारे म्हणाले",
+      "loadMoreRepliesOne": "आणखी 1 उत्तर लोड करा",
+      "loadMoreReplies": "आणखी {{count}} उत्तरे लोड करा"
     },
     "reactionsModal": {
       "title": "प्रतिक्रिया",
@@ -1002,7 +1031,9 @@
       "simulation": "सिमुलेशन"
     },
     "byAuthor": "{{name}} द्वारे",
-    "addNotePlaceholder": "एक टीप जोडा..."
+    "addNotePlaceholder": "एक टीप जोडा...",
+    "addNoteCaption": "तुमच्या समीक्षकासाठी एक टीप जोडा (पर्यायी):",
+    "shareFailed": "पुनरावलोकनासाठी शेअर करण्यात अयशस्वी"
   },
   "search": {
     "placeholder": "मार्गदर्शन हवे आहे? येथे शोधा..",
@@ -1514,7 +1545,12 @@
     "notesLabel": "टिपा",
     "notesPlaceholder": "पुढील कॉलसाठी टिपा घ्या (असल्यास)",
     "addConcern": "एक चिंता जोडा",
-    "enterNote": "टीप प्रविष्ट करा"
+    "enterNote": "टीप प्रविष्ट करा",
+    "startedLabel": "सुरू झाले",
+    "endedLabel": "संपले",
+    "scoreLabel": "स्कोअर",
+    "saveChanges": "बदल सेव्ह करा",
+    "noChanges": "कोणतेही बदल नाहीत"
   },
   "locationDropdown": {
     "placeholder": "स्थान निवडा",
@@ -1575,7 +1611,12 @@
     "completedChip_one": "एकदा पूर्ण",
     "completedChip_other": "{{count}} वेळा पूर्ण",
     "course": "कोर्स",
-    "courses": "कोर्सेस"
+    "courses": "कोर्सेस",
+    "failedToLoadCases": "केसेस लोड करण्यात अयशस्वी",
+    "failedToLoadScenarios": "परिस्थिती लोड करण्यात अयशस्वी",
+    "creditsRemaining": "{{count}} क्रेडिट्स",
+    "scenarioFallbackTitle": "परिस्थिती {{id}}",
+    "viewFeedback": "अभिप्राय पहा"
   },
   "replyBottomSheet": {
     "title": "प्रत्युत्तरे",
@@ -1611,7 +1652,8 @@
     "audioSession": "ऑडिओ सत्र कॉन्फिगर करण्यात अयशस्वी",
     "endSimulation": "सिमुलेशन समाप्त करण्यात अयशस्वी",
     "permission": "मायक्रोफोन परवानगी आवश्यक आहे",
-    "submitBugReport": "अहवाल सबमिट करण्यात अयशस्वी"
+    "submitBugReport": "अहवाल सबमिट करण्यात अयशस्वी",
+    "loadSession": "सत्र लोड करण्यात अयशस्वी"
   },
   "threadsBottomSheet": {
     "title": "टिप्पण्या",
@@ -1768,8 +1810,10 @@
         "title": "त्वरित तपासणी",
         "submit": "सबमिट करा",
         "continue": "सुरू ठेवा",
-        "continueBody": "व्हिडिओसह पुढे सुरू ठेवा."
-      }
+        "continueBody": "व्हिडिओसह पुढे सुरू ठेवा.",
+        "submitError": "सबमिट करण्यात अयशस्वी."
+      },
+      "loadFailed": "हा व्हिडिओ लोड करता आला नाही."
     },
     "journal": {
       "submit": "सबमिट करा",
@@ -1822,7 +1866,12 @@
         "wordCount_one": "{{count}}/{{min}} शब्द",
         "wordCount_other": "{{count}}/{{min}} शब्द",
         "aiGraded": "या उत्तराचे मूल्यांकन AI द्वारे केले जाते",
-        "likertHint": "प्रत्येक विधानासाठी एक प्रतिसाद निवडा"
+        "likertHint": "प्रत्येक विधानासाठी एक प्रतिसाद निवडा",
+        "answerAllError": "सबमिट करण्यापूर्वी कृपया प्रत्येक प्रश्नाचे उत्तर द्या.",
+        "submitError": "क्विझ सबमिट करण्यात अयशस्वी.",
+        "minWordsHint": "किमान {{min}} शब्द",
+        "unsupportedType": "हा प्रश्न प्रकार समर्थित नाही.",
+        "resultBanner": "{{status}} — {{awarded}}/{{possible}} गुण"
       },
       "results": {
         "title": "परिणाम",
@@ -1841,7 +1890,9 @@
         "notScored": "गुण दिले नाहीत",
         "correctAnswer": "बरोबर उत्तर",
         "yourResponses": "तुमचे प्रतिसाद",
-        "responsesSubmitted": "प्रतिसाद सबमिट झाले"
+        "responsesSubmitted": "प्रतिसाद सबमिट झाले",
+        "attemptsUsedNoMax": "प्रयत्न {{used}}",
+        "scoreSummary": "स्कोअर: {{score}}% (उत्तीर्ण: {{pass}}%)"
       }
     },
     "language": {
@@ -2005,6 +2056,14 @@
     "notAvailable": {
       "title": "हा कोर्स तुमच्या खात्यासाठी उपलब्ध नाही",
       "body": "तो तुमच्या संस्थेसाठी किंवा गटासाठी उपलब्ध करून दिलेला नाही. तो तुम्हाला मिळायला हवा असे वाटत असल्यास, तुमच्या संस्थेच्या ॲडमिनला विचारा."
+    },
+    "enroll": "नोंदणी करा",
+    "listLoadFailed": "तुमचे कोर्स लोड करता आले नाहीत.",
+    "breathing": {
+      "title": "श्वसन व्यायाम",
+      "defaultIntro": "तुमच्या श्वासोच्छवासावर नियंत्रण मिळवण्यासाठी थोडा वेळ थांबा.",
+      "start": "सुरू करा",
+      "cycleProgress": "चक्र {{total}} पैकी {{current}}"
     }
   },
   "bugReport": {
@@ -2014,6 +2073,71 @@
     "placeholder": "समस्या आली तेव्हा तुम्ही काय करत होता ते आम्हाला सांगा...",
     "submit": "सबमिट करा",
     "successMessage": "धन्यवाद — तुमचा अहवाल सबमिट झाला आहे.",
-    "rateLimitMessage": "तुम्ही अलीकडेच अनेक अहवाल सबमिट केले आहेत — कृपया थोड्या वेळाने पुन्हा प्रयत्न करा."
+    "rateLimitMessage": "तुम्ही अलीकडेच अनेक अहवाल सबमिट केले आहेत — कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.",
+    "emptyError": "कृपया समस्येचे वर्णन करा."
+  },
+  "preferences": {
+    "title": "प्राधान्ये",
+    "defaultLanguage": "डीफॉल्ट सिमुलेशन भाषा"
+  },
+  "home": {
+    "phase0Shell": "फेज 0 शेल — प्रमाणित.",
+    "courses": "फेज 2: कोर्स",
+    "profile": "फेज 2: प्रोफाइल",
+    "notifications": "फेज 2: सूचना",
+    "simulations": "फेज 3: सिमुलेशन्स",
+    "leaderboard": "फेज 4: लीडरबोर्ड",
+    "achievements": "फेज 4: कामगिरी",
+    "bugReport": "फेज 4: बगची तक्रार करा",
+    "search": "फेज 4: शोधा",
+    "reviews": "फेज 4: पुनरावलोकने",
+    "callLog": "फेज 4: कॉल लॉग",
+    "community": "फेज 4: समुदाय",
+    "boxBreathing": "फेज 4: बॉक्स ब्रीदिंग",
+    "cases": "फेज 4: केसेस",
+    "scribe": "फेज 1: स्क्राइब रेकॉर्डिंग",
+    "roleplay": "फेज 1: रोलप्ले व्हॉइस"
+  },
+  "notifications": {
+    "title": "सूचना",
+    "markAllRead": "सर्व वाचले म्हणून चिन्हांकित करा",
+    "empty": "तुम्ही सर्व पाहिले आहे — अद्याप कोणत्याही सूचना नाहीत.",
+    "loadError": "सूचना लोड करण्यात अयशस्वी"
+  },
+  "roleplayVoice": {
+    "title": "रोलप्ले व्हॉइस",
+    "connect": "कनेक्ट करा",
+    "disconnect": "डिस्कनेक्ट करा",
+    "connectedToRoom": "रूमशी कनेक्ट आहे",
+    "notConnected": "कनेक्ट नाही"
+  },
+  "scribe": {
+    "title": "स्क्राइब रेकॉर्डिंग (फेज 1)",
+    "notificationTitle": "सत्र रेकॉर्ड होत आहे",
+    "notificationText": "Ally हे सत्र रेकॉर्ड करत आहे.",
+    "recording": "रेकॉर्डिंग",
+    "notRecording": "रेकॉर्डिंग होत नाही",
+    "socketLabel": "सॉकेट",
+    "connected": "कनेक्टेड",
+    "disconnected": "डिस्कनेक्टेड",
+    "chunksSent": "पाठवलेले ऑडिओ चंक: {{count}}",
+    "startRecording": "रेकॉर्डिंग सुरू करा",
+    "stop": "थांबवा",
+    "testingHint": "रेकॉर्डिंग सुरू असताना स्क्रीन लॉक करा किंवा अ‍ॅप बदला, जेणेकरून फोरग्राउंड सर्व्हिस ऑडिओ चंक पाठवत राहते याची खात्री होईल — हा री-राइट नेमकी हीच समस्या सोडवण्यासाठी आहे."
+  },
+  "conferenceListening": {
+    "title": "कॉन्फरन्स कॉल (फेज 1)",
+    "connecting": "कॉलशी कनेक्ट होत आहे...",
+    "socketLabel": "सॉकेट",
+    "connected": "कनेक्टेड",
+    "disconnected": "डिस्कनेक्टेड",
+    "waitingForClient": "क्लायंट सामील होण्याची वाट पाहत आहे",
+    "clientJoined": "क्लायंट सामील झाले",
+    "audioChunksReceived": "मिळालेले ऑडिओ चंक: {{count}}",
+    "nudgesReceived": "मिळालेल्या सूचना: {{count}}",
+    "pause": "सूचना थांबवा",
+    "resume": "सूचना पुन्हा सुरू करा",
+    "endSession": "सत्र थांबवा",
+    "callEnded": "कॉल संपला आहे"
   }
 }

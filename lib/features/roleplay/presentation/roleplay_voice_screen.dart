@@ -23,6 +23,7 @@ import 'session_goal_timer.dart';
 import 'session_info_tabs.dart';
 import 'session_progress.dart';
 import 'session_score_meter.dart';
+import 'simulation_sound_player.dart';
 import 'turn_state.dart';
 
 /// Mirrors ally-mobile (React Native)'s `SESSION_AUTO_END_MINUTES` fallback
@@ -163,6 +164,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   StreamSubscription<void>? _participantSubscription;
   StreamSubscription<void>? _disconnectedSubscription;
   late final KeepAwake _keepAwake;
+  late final SimulationSoundPlayer _sound;
 
   int? _countdownStep;
   final _countdownTimers = <Timer>[];
@@ -232,6 +234,9 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     _liveKitService = ref.read(liveKitRoomServiceProvider);
     _keepAwake = ref.read(keepAwakeProvider);
     _keepAwake.activate();
+    // RN: `useEffect(() => playNotificationSound(sounds.startSimulation), [])`.
+    _sound = ref.read(simulationSoundPlayerProvider);
+    _sound.play(SimulationSound.start);
     // RN: the countdown and the connect both start on mount.
     _startCountdown();
     if (widget.accessToken.isNotEmpty) {
@@ -504,6 +509,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   /// ended the session, `cap-ended`, server teardown) — leave for Feedback.
   void _onRoomDisconnected() {
     if (!mounted || _status == RoleplayRoomStatus.disconnecting) return;
+    _sound.play(SimulationSound.end);
     _tickTimer?.cancel();
     setState(() {
       _status = RoleplayRoomStatus.disconnecting;
@@ -618,7 +624,12 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   /// (the warning dialog, the back-press confirmation) route through this
   /// same resolution, so neither ever silently no-ops.
   Future<void> _endCall() {
-    return widget.scenarioSessionId == null ? _disconnect() : _endSession();
+    if (widget.scenarioSessionId == null) {
+      // RN `handleDisconnect` plays the end sound before dropping the room.
+      _sound.play(SimulationSound.end);
+      return _disconnect();
+    }
+    return _endSession();
   }
 
   /// RN `handleDisconnect`: DISCONNECTING, drop the room, end the session,
@@ -631,6 +642,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     }
     _tickTimer?.cancel();
     setState(() => _status = RoleplayRoomStatus.disconnecting);
+    // RN `handleDisconnect`: `playNotificationSound(sounds.endSimulation)`.
+    _sound.play(SimulationSound.end);
     // The room is being closed on purpose: don't treat it as a remote end.
     _disconnectedSubscription?.cancel();
     _disconnectedSubscription = null;
