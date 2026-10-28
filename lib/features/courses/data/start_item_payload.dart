@@ -40,36 +40,96 @@ class JournalSavedResponse {
   final String response;
 }
 
+/// Mirrors RN's `ArticleQuestion` — a single-select MCQ anchored in the
+/// article body by `<div data-ally-question="<id>">`. [correctOptionId] and
+/// [explanation] arrive only once answered.
 class ArticleQuestion {
   ArticleQuestion({
     required this.id,
     required this.prompt,
+    this.promptHtml,
+    this.media,
     required this.options,
     required this.answeredOptionId,
+    this.answeredCorrect,
     required this.correctOptionId,
     required this.explanation,
   });
 
-  factory ArticleQuestion.fromJson(Map<String, dynamic> json) =>
-      ArticleQuestion(
-        id: json['id'] as String,
-        prompt: json['prompt'] as String,
-        options: (json['options'] as List<dynamic>? ?? [])
-            .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        answeredOptionId:
-            (json['answered'] as Map<String, dynamic>?)?['selectedOptionId']
-                as String?,
-        correctOptionId: json['correctOptionId'] as String?,
-        explanation: json['explanation'] as String?,
-      );
+  factory ArticleQuestion.fromJson(Map<String, dynamic> json) {
+    final answered = json['answered'] as Map<String, dynamic>?;
+    return ArticleQuestion(
+      id: json['id'] as String,
+      prompt: json['prompt'] as String? ?? '',
+      promptHtml: json['promptHtml'] as String?,
+      media: QuestionMedia.maybeFromJson(json['media']),
+      options: (json['options'] as List<dynamic>? ?? [])
+          .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      answeredOptionId: answered?['selectedOptionId'] as String?,
+      answeredCorrect: answered?['correct'] as bool?,
+      correctOptionId: json['correctOptionId'] as String?,
+      explanation: json['explanation'] as String?,
+    );
+  }
 
   final String id;
   final String prompt;
+  final String? promptHtml;
+  final QuestionMedia? media;
   final List<QuizOption> options;
+
+  /// Set when answered on an earlier visit.
   final String? answeredOptionId;
+  final bool? answeredCorrect;
   final String? correctOptionId;
   final String? explanation;
+
+  bool get isAnswered => answeredOptionId != null;
+}
+
+/// Mirrors RN's `SubmitArticleQuestionAnswerResult`.
+class ArticleQuestionAnswerResult {
+  ArticleQuestionAnswerResult({
+    required this.correct,
+    required this.selectedOptionId,
+    required this.correctOptionId,
+    this.explanation,
+    this.completion,
+  });
+
+  factory ArticleQuestionAnswerResult.fromJson(Map<String, dynamic> json) => ArticleQuestionAnswerResult(
+    correct: json['correct'] as bool? ?? false,
+    selectedOptionId: json['selectedOptionId'] as String? ?? '',
+    correctOptionId: json['correctOptionId'] as String?,
+    explanation: json['explanation'] as String?,
+    completion: json['completion'] is Map<String, dynamic>
+        ? TrackItemCompletionResult.fromJson(json['completion'] as Map<String, dynamic>)
+        : null,
+  );
+
+  final bool correct;
+  final String selectedOptionId;
+  final String? correctOptionId;
+  final String? explanation;
+
+  /// Non-null only when this answer completed the article.
+  final TrackItemCompletionResult? completion;
+}
+
+/// A curated external link shown after an article body (RN `ArticleResource`).
+class ArticleResource {
+  ArticleResource({required this.id, required this.title, required this.url});
+
+  factory ArticleResource.fromJson(Map<String, dynamic> json) => ArticleResource(
+    id: json['id'] as String? ?? json['url'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    url: json['url'] as String? ?? '',
+  );
+
+  final String id;
+  final String title;
+  final String url;
 }
 
 class VideoInterjection {
@@ -402,6 +462,7 @@ class StartItemPayload {
     this.html,
     this.minReadSeconds,
     this.articleQuestions,
+    this.articleResources,
     this.videoSource,
     this.videoUrl,
     this.durationSeconds,
@@ -454,6 +515,12 @@ class StartItemPayload {
       articleQuestions: type == 'ARTICLE'
           ? (json['questions'] as List<dynamic>? ?? [])
                 .map((e) => ArticleQuestion.fromJson(e as Map<String, dynamic>))
+                .toList()
+          : null,
+      articleResources: type == 'ARTICLE'
+          ? (json['resources'] as List<dynamic>? ?? [])
+                .map((e) => ArticleResource.fromJson(e as Map<String, dynamic>))
+                .where((r) => r.url.isNotEmpty)
                 .toList()
           : null,
       videoSource: type == 'VIDEO' ? json['source'] as String? : null,
@@ -580,6 +647,7 @@ class StartItemPayload {
   final String? html;
   final int? minReadSeconds;
   final List<ArticleQuestion>? articleQuestions;
+  final List<ArticleResource>? articleResources;
 
   // VIDEO
   /// 's3' gets real native playback; 'youtube'/'vimeo'/'loom' fall back to

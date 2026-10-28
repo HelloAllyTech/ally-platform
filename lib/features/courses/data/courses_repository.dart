@@ -71,6 +71,22 @@ class CoursesRepository {
     _invalidateTracks();
   }
 
+  /// RN `getTrackLanguages` (`GET /learn/tracks/:trackId/languages`): the
+  /// languages a track can be read in. No RN screen calls it (the language
+  /// sheet reads them off the track detail); ported for API parity.
+  Future<({List<TrackLanguageOption> languages, String? selectedLanguageCode})> getTrackLanguages(
+    String trackId,
+  ) async {
+    final response = await _dio.get<Map<String, dynamic>>('/learn/tracks/$trackId/languages');
+    final data = response.data ?? const <String, dynamic>{};
+    return (
+      languages: (data['languages'] as List<dynamic>? ?? const [])
+          .map((e) => TrackLanguageOption.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      selectedLanguageCode: data['selectedLanguageCode'] as String?,
+    );
+  }
+
   Future<TrackProgressDashboard> getLearnTrackProgress(String trackId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/learn/tracks/$trackId/progress',
@@ -134,8 +150,8 @@ class CoursesRepository {
     );
   }
 
-  Future<({bool correct, String correctOptionId, String? explanation})>
-  submitArticleQuestionAnswer({
+  /// RN `submitArticleQuestionAnswer`; the last answer completes the item.
+  Future<ArticleQuestionAnswerResult> submitArticleQuestionAnswer({
     required String itemId,
     required String questionId,
     required String selectedOptionId,
@@ -144,13 +160,9 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/article-questions/$questionId/answer',
       data: {'selectedOptionId': selectedOptionId},
     );
-    final completion = response.data?['completion'];
-    if (completion is Map && completion['completed'] == true) _invalidateTracks();
-    return (
-      correct: response.data!['correct'] as bool,
-      correctOptionId: response.data!['correctOptionId'] as String,
-      explanation: response.data!['explanation'] as String?,
-    );
+    final result = ArticleQuestionAnswerResult.fromJson(response.data!);
+    if (result.completion?.completed == true) _invalidateTracks();
+    return result;
   }
 
   Future<({bool? correct, int pointsAwarded, int pointsPossible})>
@@ -178,6 +190,19 @@ class CoursesRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       '/learn/tracks/items/$itemId/quiz-attempts',
       data: {'answers': answers.map((a) => a.toJson()).toList()},
+    );
+    _invalidateTracks();
+    return QuizAttemptResult.fromJson(response.data!);
+  }
+
+  /// RN `regradeQuizAttempt` — retries LLM grading of a PENDING_GRADING
+  /// attempt (`POST …/quiz-attempts/:attemptId/regrade`).
+  Future<QuizAttemptResult> regradeQuizAttempt({
+    required String itemId,
+    required String attemptId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/quiz-attempts/$attemptId/regrade',
     );
     _invalidateTracks();
     return QuizAttemptResult.fromJson(response.data!);

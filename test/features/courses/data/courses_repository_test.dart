@@ -678,4 +678,55 @@ void main() {
       ).called(1);
     });
   });
+
+  group('quiz regrade, track languages (RN coursesApi parity)', () {
+    test('regradeQuizAttempt POSTs …/quiz-attempts/:attemptId/regrade and parses `questions`', () async {
+      when(() => dio.post<Map<String, dynamic>>('/learn/tracks/items/i/quiz-attempts/a1/regrade')).thenAnswer(
+        (_) async => _response(<String, dynamic>{
+          'attemptId': 'a1',
+          'status': 'GRADED',
+          'scorePct': 80,
+          'passed': true,
+          'passScore': 70,
+          'attemptsUsed': 1,
+          'maxAttempts': null,
+          'itemCompleted': true,
+          'questions': [
+            {
+              'questionId': 'q',
+              'correct': false,
+              'graded': true,
+              'pointsAwarded': 0,
+              'pointsPossible': 1,
+              'llmFeedback': 'Try again',
+              'correctAnswer': {
+                'blanks': [
+                  {'blankId': 'b', 'acceptedAnswers': ['x', 'y']},
+                ],
+              },
+            },
+          ],
+        }),
+      );
+      final result = await repository.regradeQuizAttempt(itemId: 'i', attemptId: 'a1');
+      expect(result.itemCompleted, isTrue);
+      expect(result.questionResults.single.llmFeedback, 'Try again');
+      expect(result.questionResults.single.correctAnswer?.blanks?.single.acceptedAnswers, ['x', 'y']);
+      expect(invalidations, 1);
+    });
+
+    test('getTrackLanguages GETs /learn/tracks/:id/languages', () async {
+      when(() => dio.get<Map<String, dynamic>>('/learn/tracks/t/languages')).thenAnswer(
+        (_) async => _response(<String, dynamic>{
+          'languages': [
+            {'languageId': 1, 'languageCode': 'en', 'label': 'English', 'isSource': true},
+          ],
+          'selectedLanguageCode': 'en',
+        }),
+      );
+      final result = await repository.getTrackLanguages('t');
+      expect(result.languages.single.languageCode, 'en');
+      expect(result.selectedLanguageCode, 'en');
+    });
+  });
 }

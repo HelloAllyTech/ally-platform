@@ -11,10 +11,8 @@ import 'discussion_models.dart';
 /// callers re-fetch [getDiscussion] after a mutation to see the result,
 /// the Riverpod-idiomatic equivalent of RTK Query's `invalidatesTags`.
 ///
-/// Not ported: `getDiscussionModeratorTenants` — defined in RN's own
-/// `discussionApi.ts` but never actually consumed by `DiscussionThread.tsx`
-/// or any other RN screen (confirmed by grep), so there is no UI behavior
-/// to port it for.
+/// `getModeratorTenants` mirrors RN's `getDiscussionModeratorTenants`,
+/// which no RN screen renders yet; ported for API parity.
 class DiscussionRepository {
   DiscussionRepository(this._dio);
 
@@ -23,6 +21,17 @@ class DiscussionRepository {
   Future<DiscussionResponse> getDiscussion(String itemId) async {
     final response = await _dio.get<Map<String, dynamic>>('/learn/track-items/$itemId/discussion');
     return DiscussionResponse.fromJson(response.data!);
+  }
+
+  /// RN `getDiscussionModeratorTenants`
+  /// (`GET /learn/track-items/:itemId/discussion/tenants`): moderators'
+  /// list of tenants that have posts in this item's discussion.
+  Future<List<({String tenantId, String? tenantName})>> getModeratorTenants(String itemId) async {
+    final response = await _dio.get<List<dynamic>>('/learn/track-items/$itemId/discussion/tenants');
+    return (response.data ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((e) => (tenantId: '${e['tenantId']}', tenantName: e['tenantName'] as String?))
+        .toList();
   }
 
   Future<DiscussionPost> createPost({required String itemId, required String content}) async {
