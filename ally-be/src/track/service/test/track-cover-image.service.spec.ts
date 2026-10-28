@@ -18,7 +18,7 @@ describe('TrackCoverImageService', () => {
   let service: TrackCoverImageService;
 
   const mockProvider = {
-    getModel: jest.fn().mockReturnValue('gpt-image-1'),
+    getModel: jest.fn().mockReturnValue('dall-e-3'),
     assertConfigured: jest.fn(),
     generateImage: jest.fn(),
   };
@@ -94,7 +94,7 @@ describe('TrackCoverImageService', () => {
       expect.objectContaining({
         task: LlmTask.GENERATE_COURSE_COVER_IMAGE,
         unit: 'images',
-        model: 'gpt-image-1',
+        model: 'dall-e-3',
       }),
     );
   });
