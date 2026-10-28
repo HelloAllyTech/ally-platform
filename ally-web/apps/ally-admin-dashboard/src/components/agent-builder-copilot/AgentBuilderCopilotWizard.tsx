@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { CheckCircle, FailIcon } from "@icons";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, useWatch } from "react-hook-form";
 
 import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
 import { useGetAgentTestCasesQuery } from "@api";
@@ -87,6 +87,11 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [history, setHistory] = useState<ChatEntry[]>([]);
   const [description, setDescription] = useState("");
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+
+  const competency = useWatch({
+    control: formMethods.control,
+    name: "competency",
+  });
 
   const { data: goalsData, isLoading: isLoadingGoals } = useGetAgentTestCasesQuery();
   const goalOptions = goalsData?.data ?? [];
@@ -268,6 +273,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
               <Button
                 variant={ButtonVariant.PRIMARY}
                 onClick={handleCompetencyNext}
+                disabled={!competency?.name}
                 className="h-[40px] px-6"
               >
                 Next
