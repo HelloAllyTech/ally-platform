@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/push/leaderboard_notification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../data/account_repository.dart';
@@ -19,9 +20,7 @@ import 'profile_image_options_sheet.dart';
 /// flow, same as the RN app) and removal, and the app's real UI-language
 /// switcher.
 ///
-/// Not ported: the leaderboard-notification toggle (learner accounts
-/// only — this app has no push-notification-preferences backend client
-/// yet to back it), and the "discard unsaved image changes?" confirm
+/// Not ported: the "discard unsaved image changes?" confirm
 /// dialog on back (RN previews a picked image locally and only uploads on
 /// a separate Save tap; this scoped port uploads/removes immediately on
 /// selection instead, so there's never an unsaved local preview to lose).
@@ -146,6 +145,10 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
             label: ref.t('profile.settings.language'),
             onTap: () => LanguageSelectorSheet.show(context),
           ),
+          if (user.isLearner) ...[
+            const SizedBox(height: 24),
+            const LeaderboardNotificationToggleRow(),
+          ],
         ],
       ),
     );
@@ -244,6 +247,85 @@ class _LanguageField extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// RN's `notifToggleContainer` row (learners only): the field-label-styled
+/// "Leaderboard notification" text and a `CustomSwitch`, space-between.
+class LeaderboardNotificationToggleRow extends ConsumerWidget {
+  const LeaderboardNotificationToggleRow({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // RN's hook starts at `true` before AsyncStorage resolves.
+    final enabled = ref.watch(leaderboardNotificationEnabledProvider).value ?? true;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: Text(
+            ref.t('profile.settings.leaderboardNotification'),
+            style: _fieldLabelStyle,
+          ),
+        ),
+        RnCustomSwitch(
+          key: const ValueKey('leaderboard-notification-switch'),
+          value: enabled,
+          onToggle: (next) => ref.read(leaderboardNotificationEnabledProvider.notifier).toggle(next),
+        ),
+      ],
+    );
+  }
+}
+
+/// RN `typography.body.medium` + `IBM_PLEX_SERIF.REGULAR`, highEmphasis.
+const _fieldLabelStyle = TextStyle(
+  fontFamily: AppFonts.ibmPlexSerifRegular,
+  fontSize: 14,
+  height: 22 / 14,
+  letterSpacing: 0.2,
+  color: AppColors.highEmphasis,
+);
+
+/// Port of RN's `components/CustomSwitch`: a 32x18 pill (1pt padding,
+/// radius 9), grey[200] off / primary on, a 16pt white thumb sliding
+/// 14pt (spring ≈ easeOut here).
+class RnCustomSwitch extends StatelessWidget {
+  const RnCustomSwitch({super.key, required this.value, required this.onToggle});
+
+  final bool value;
+  final ValueChanged<bool> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      toggled: value,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onToggle(!value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          width: 32,
+          height: 18,
+          padding: const EdgeInsets.all(1),
+          decoration: BoxDecoration(
+            color: value ? AppColors.primary : AppColors.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

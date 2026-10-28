@@ -16,12 +16,8 @@ const String reminderNotificationType = 'ENGAGEMENT_REMINDER';
 const String _simulationsScreenHint = 'Simulations';
 
 /// RN's `LEADERBOARD_NOTIFICATION_ID` (`src/constants/leaderboard.ts`) — the
-/// fixed id RN's locally-scheduled weekly leaderboard reminder uses. Nothing
-/// in this app schedules that notification yet (a separate, large feature:
-/// weekly trigger scheduling, a settings toggle, and its own channel — see
-/// flutter-whole-app-status-2026-10-26.md), but the tap-routing rule itself
-/// is ported now so a future notification carrying this id already routes
-/// correctly, same as RN's own decision table.
+/// fixed id RN's locally-scheduled weekly leaderboard reminder uses (scheduled
+/// here by `leaderboard_notification.dart`, which puts it in the payload).
 const String leaderboardNotificationId = 'weekly-leaderboard';
 
 /// Is this notification payload a server-sent engagement reminder? Mirrors

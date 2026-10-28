@@ -7,6 +7,7 @@ class UserProfile {
     required this.phone,
     required this.profileImageUrl,
     required this.profileCompleted,
+    this.role,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
@@ -18,6 +19,7 @@ class UserProfile {
         // Same leniency RN's type comment calls for: a bulk-created account
         // predating this field should read as incomplete, not crash parsing.
         profileCompleted: json['profileCompleted'] as bool? ?? false,
+        role: json['role'] as String?,
       );
 
   final int id;
@@ -26,6 +28,11 @@ class UserProfile {
   final String phone;
   final String? profileImageUrl;
   final bool profileCompleted;
+
+  /// RN's `UserRole` (`LEARNER`, `COUNSELOR`, ...).
+  final String? role;
+
+  bool get isLearner => role == 'LEARNER';
 }
 
 /// Mirrors ally-mobile (React Native)'s `authApi.ts` `LogoUrlResponse` —

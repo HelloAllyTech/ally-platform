@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/auth/auth_state.dart';
 import 'core/chat/active_chat_discovery.dart';
 import 'core/localization/localization_controller.dart';
+import 'core/push/leaderboard_notification.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -75,6 +76,8 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     // lazily on first use by some screen — matches the RN app's own
     // eager-init-at-startup behavior.
     ref.watch(localizationControllerProvider);
+    // Schedules/cancels RN's weekly leaderboard reminder on sign-in/out.
+    ref.watch(leaderboardNotificationSyncProvider);
 
     // Mirrors RN's cold-launch discovery check, run once auth first
     // resolves to authenticated (no literal Splash screen exists here to
