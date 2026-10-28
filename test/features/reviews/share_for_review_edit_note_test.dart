@@ -10,7 +10,7 @@ import 'package:ally_mobile_flutter/features/reviews/presentation/share_for_revi
 
 class MockReviewsRepository extends Mock implements ReviewsRepository {}
 
-// One test per file — see `_review_details_test_fixtures.dart` for why.
+// One test per file — see `test/support/pump_app.dart` for why.
 void main() {
   testWidgets(
     'edit-note mode: real title/button, prefilled note, char counter, and a PATCH instead of a create',

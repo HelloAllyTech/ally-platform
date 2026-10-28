@@ -11,7 +11,7 @@ import 'package:ally_mobile_flutter/features/reviews/presentation/share_for_revi
 class MockReviewsRepository extends Mock implements ReviewsRepository {}
 
 // One test per file, same as the rest of this directory's widget tests —
-// see `_review_details_test_fixtures.dart` for the fuller explanation of
+// see `test/support/pump_app.dart` for the fuller explanation of
 // why pumping more than one `ref.t()`-dependent widget per file/isolate
 // isn't safe here. This scenario additionally needs a real `GoRouter`
 // ancestor since `ShareForReviewScreen` navigates via `context.go('/home')`
