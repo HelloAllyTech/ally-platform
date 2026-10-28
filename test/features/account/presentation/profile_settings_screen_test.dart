@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 // ignore: depend_on_referenced_packages
@@ -96,26 +97,38 @@ void main() {
 
         verifyNever(() => repository.uploadProfileImage(any()));
 
-        // --- Step 3: picking an image uploads it through the repository. ---
+        // --- Step 3: picking an image only previews it (RN's          ---
+        // --- previewImageUri) — nothing uploads until Save is tapped.  ---
         fakePicker.imagePathToReturn = '/tmp/fake-avatar.jpg';
         when(() => repository.uploadProfileImage(any())).thenAnswer((_) async {});
 
+        expect(find.text('Save'), findsNothing);
         await tester.tap(find.text('Upload Image'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Upload Image').last);
         await tester.pumpAndSettle();
 
+        verifyNever(() => repository.uploadProfileImage(any()));
+        expect(find.byKey(const ValueKey('profile-avatar-preview')), findsOneWidget);
+        expect(find.text('Save'), findsOneWidget);
+
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+
         final captured = verify(() => repository.uploadProfileImage(captureAny())).captured;
         expect(captured, hasLength(1));
         expect((captured.single as File).path, '/tmp/fake-avatar.jpg');
+        expect(find.text('Save'), findsNothing, reason: 'saved: preview follows the profile again');
 
-        // --- Step 4: an existing photo's sheet offers Change AND Remove, ---
-        // --- and Remove deletes that exact URL.                         ---
+        // --- Step 4: an existing photo's sheet offers Change AND Remove; ---
+        // --- Remove clears the preview, Save deletes that exact URL and  ---
+        // --- clears it on the profile (RN's remove action).            ---
         final repositoryWithPhoto = MockAccountRepository();
         when(() => repositoryWithPhoto.getUser()).thenAnswer(
           (_) async => _user(profileImageUrl: 'https://cdn.example.com/jane.png'),
         );
         when(() => repositoryWithPhoto.deleteProfileImage(any())).thenAnswer((_) async {});
+        when(() => repositoryWithPhoto.updateProfileImage(any())).thenAnswer((_) async {});
 
         await pumpRoutedApp(
           tester,
@@ -133,9 +146,16 @@ void main() {
         await tester.tap(find.text('Remove image'));
         await tester.pumpAndSettle();
 
+        verifyNever(() => repositoryWithPhoto.deleteProfileImage(any()));
+        expect(find.byKey(const ValueKey('profile-avatar-placeholder')), findsOneWidget);
+
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+
         verify(
           () => repositoryWithPhoto.deleteProfileImage('https://cdn.example.com/jane.png'),
         ).called(1);
+        verify(() => repositoryWithPhoto.updateProfileImage('')).called(1);
 
         // --- Step 5: tapping Language opens the language selector sheet. ---
         await tester.tap(find.text('English'));

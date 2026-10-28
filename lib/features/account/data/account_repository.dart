@@ -65,6 +65,12 @@ class AccountRepository {
     await _dio.patch<void>('/users/profile-image', data: {'profileImageUrl': profileImageUrl});
   }
 
+  /// RN's `updateProfileImage` mutation (`PATCH /users/profile-image`) —
+  /// on its own only for the remove flow, which sets it to `''`.
+  Future<void> updateProfileImage(String profileImageUrl) async {
+    await _dio.patch<void>('/users/profile-image', data: {'profileImageUrl': profileImageUrl});
+  }
+
   Future<void> deleteProfileImage(String profileImageUrl) async {
     await _dio.delete<void>('/users/profile-image', data: {'profileImageUrl': profileImageUrl});
   }

@@ -53,6 +53,8 @@ void main() {
     expect(find.text('Leaderboard Notification'), findsOneWidget);
     final switchFinder = find.byKey(const ValueKey('leaderboard-notification-switch'));
     expect(tester.widget<RnCustomSwitch>(switchFinder).value, isTrue);
+    await tester.ensureVisible(switchFinder);
+    await tester.pumpAndSettle();
 
     await tester.tap(switchFinder);
     await tester.pumpAndSettle();
