@@ -187,5 +187,31 @@ void main() {
         '/login',
       );
     });
+
+    test('RN plays the splash on every cold start: /splash holds until the animation ends', () {
+      for (final signedIn in [true, false]) {
+        expect(
+          computeRedirect(
+            isAuthenticated: signedIn,
+            matchedLocation: '/splash',
+            profileCompleted: true,
+            isSplashFinished: false,
+          ),
+          isNull,
+        );
+      }
+    });
+
+    test('signed in, /splash also waits for /users/me to settle, then moves on even if it failed', () {
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/splash', profileCompleted: null, isUserLoading: true),
+        isNull,
+      );
+      // A failed /users/me (not loading, no profile) still lands on Home.
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/splash', profileCompleted: null),
+        '/home',
+      );
+    });
   });
 }

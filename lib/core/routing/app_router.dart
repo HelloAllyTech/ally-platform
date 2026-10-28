@@ -41,6 +41,7 @@ import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 import '../navigation/app_shell_screen.dart';
 import '../navigation/home_tab_navigation.dart';
+import 'launch_splash.dart';
 import '../widgets/review_type_chip.dart';
 
 /// `extra` shape for `/share-for-review/:scenarioSessionId` — one record
@@ -68,10 +69,17 @@ String? computeRedirect({
   required String matchedLocation,
   required bool? profileCompleted,
   bool isRestored = true,
+  bool isSplashFinished = true,
+  bool isUserLoading = false,
 }) {
-  // Launch: wait on the blank splash until the stored session is read.
+  // Launch: RN's SplashScreen plays its animation on every cold start and
+  // only routes once it has ended (`isAnimationEnded`) and, signed in, once
+  // `/users/me` has settled (`isUserLoading`), so the profile-completion
+  // gate is known. A failed `/users/me` still moves on (no logout on
+  // network errors; a 401 is the auth interceptor's job).
   if (!isRestored) return matchedLocation == '/splash' ? null : '/splash';
   final isLaunching = matchedLocation == '/splash';
+  if (isLaunching && (!isSplashFinished || (isAuthenticated && isUserLoading))) return null;
   // Signed in, the splash leaves exactly like /login does (to Home or
   // complete-profile below); signed out, the generic rule sends it to /login.
   final isLoggingIn = matchedLocation == '/login' || (isLaunching && isAuthenticated);
@@ -118,16 +126,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Profile-completion status isn't known synchronously — read
       // whatever's currently cached (null while the very first fetch is
       // still in flight) rather than block routing on it.
-      final user = ref.read(currentUserProvider).value;
+      final userAsync = ref.read(currentUserProvider);
       return computeRedirect(
         isAuthenticated: isAuthenticated,
         matchedLocation: state.matchedLocation,
-        profileCompleted: user?.profileCompleted,
+        profileCompleted: userAsync.value?.profileCompleted,
         isRestored: auth.isRestored,
+        isSplashFinished: ref.read(launchSplashProvider).finished,
+        isUserLoading: !userAsync.hasValue && !userAsync.hasError,
       );
     },
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const _LaunchScreen()),
+      GoRoute(path: '/splash', builder: (context, state) => const LaunchSplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/home',
@@ -365,18 +375,13 @@ class _RouterRefreshListenable extends ChangeNotifier {
       }
     });
     ref.listen(currentUserProvider, (previous, next) {
-      if (previous?.value?.profileCompleted != next.value?.profileCompleted) {
+      bool settled(AsyncValue<Object?>? v) => v != null && (v.hasValue || v.hasError);
+      if (previous?.value?.profileCompleted != next.value?.profileCompleted || settled(previous) != settled(next)) {
         notifyListeners();
       }
     });
+    ref.listen(launchSplashProvider, (previous, next) {
+      if (previous?.finished != next.finished) notifyListeners();
+    });
   }
-}
-
-/// Shown for the moment it takes to read the stored session at launch;
-/// blank like the native launch screen it follows.
-class _LaunchScreen extends StatelessWidget {
-  const _LaunchScreen();
-
-  @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.white);
 }

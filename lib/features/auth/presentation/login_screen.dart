@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/routing/launch_splash.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/app_radius.dart';
@@ -35,13 +36,6 @@ const _defaultOtpExpiryMinutes = 10;
 /// renders in. Falls back to the platform default elsewhere.
 const _systemFont = 'CupertinoSystemText';
 
-/// splashAnimation.json is 360 frames at 120fps (3s). RN plays frames
-/// 0→200 (`lottieRef.play(0, 200)`), then re-renders the view with
-/// `progress={0.99}` once `onAnimationFinish` fires, so the hero settles
-/// on the animation's last frame.
-const _lottieDuration = Duration(milliseconds: 3000);
-const _lottiePlayToProgress = 200 / 360;
-const _lottieSettledProgress = 0.99;
 
 /// RN's `withTiming(-WINDOW_HEIGHT * 0.6, {duration: 1000})` — reanimated's
 /// default easing is `Easing.inOut(Easing.quad)`.
@@ -168,8 +162,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     _otpController.addListener(_keepOtpCaretAtEnd);
 
     _sheetController = AnimationController(vsync: this, duration: _sheetDuration);
-    _lottieController = AnimationController(vsync: this, duration: _lottieDuration);
-    _lottieController.animateTo(_lottiePlayToProgress).then((_) => _onAnimationFinish());
+    _lottieController = AnimationController(vsync: this, duration: kSplashLottieDuration);
+    if (ref.read(launchSplashProvider.notifier).takeLoginHandOff()) {
+      // Cold start: `/splash` already played the animation (RN's splash and
+      // login are one screen), so start settled and raise the sheet.
+      _lottieController.value = kSplashSettledProgress;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onAnimationFinish(fromLaunchSplash: true));
+    } else {
+      // A sign-out remounts RN's SplashScreen: status bar hidden, replay.
+      hideStatusBarForSplash();
+      _lottieController.animateTo(kSplashPlayToProgress).then((_) => _onAnimationFinish());
+    }
   }
 
   @override
@@ -202,9 +205,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   /// RN's `onAnimationFinish` + the effect that calls `displayBottomSheet`
   /// once the animation has ended and the user is not signed in (a signed-in
   /// user is routed away by the router's auth redirect instead).
-  void _onAnimationFinish() {
+  void _onAnimationFinish({bool fromLaunchSplash = false}) {
     if (!mounted) return;
-    _lottieController.value = _lottieSettledProgress;
+    _lottieController.value = kSplashSettledProgress;
+    if (!fromLaunchSplash) showStatusBarAfterSplash();
     if (ref.read(authControllerProvider).isAuthenticated || _isSheetVisible) return;
     setState(() => _isSheetVisible = true);
     _sheetController.forward().then((_) {
@@ -238,10 +242,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
   /// RN's `useGoogleLogin`/`useAppleLogin` error handling: a suspended
   /// account goes to SuspendedAccountScreen, any other backend error is a
-  /// toast with the backend's message (or the generic fallback).
+  /// toast with the backend's message (or the generic fallback). Anything
+  /// else (no id token, say) is only logged by RN: no toast.
   void _handleSocialLoginError(Object error, String fallbackKey) {
+    if (error is! DioException) return;
     if (_isSuspendedUserError(error)) {
-      if (mounted) context.push('/suspended');
+      // RN `navigation.replace(SUSPENDED_ACCOUNT)`: back can't return here.
+      if (mounted) context.go('/suspended');
       return;
     }
     _showToast(_apiErrorMessage(error) ?? ref.tr(fallbackKey));
@@ -273,8 +280,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       }
       tokens = await ref.read(authRepositoryProvider).loginWithGoogle(idToken);
     } on GoogleSignInException catch (e) {
+      // RN: cancel is silent; any other SDK error toasts the SDK's own
+      // message, else "Failed to sign in with Google".
       if (e.code != GoogleSignInExceptionCode.canceled) {
-        _showToast(ref.tr('auth.login.google.error'));
+        final description = e.description;
+        _showToast(description != null && description.isNotEmpty ? description : ref.tr('auth.login.google.error'));
       }
     } catch (e) {
       _handleSocialLoginError(e, 'auth.login.google.error');
@@ -304,8 +314,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             familyName: credential.familyName,
           );
     } on SignInWithAppleAuthorizationException catch (e) {
+      // RN: cancel is silent; others toast `err.message`, else the fallback.
       if (e.code != AuthorizationErrorCode.canceled) {
-        _showToast(ref.tr('auth.login.apple.error'));
+        _showToast(e.message.isNotEmpty ? e.message : ref.tr('auth.login.apple.error'));
       }
     } catch (e) {
       _handleSocialLoginError(e, 'auth.login.apple.error');
@@ -392,7 +403,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       if (!mounted) return;
       setState(() => _isVerifying = false);
       if (_isSuspendedUserError(e)) {
-        context.push('/suspended');
+        context.go('/suspended');
       } else {
         setState(() => _otpError = _apiErrorMessage(e) ?? ref.tr('common.somethingWentWrong'));
       }
@@ -457,7 +468,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                       child: Transform.translate(
                         offset: Offset(0, -translate * h),
                         child: Lottie.asset(
-                          'assets/animations/splashAnimation.json',
+                          kSplashAnimationAsset,
                           controller: _lottieController,
                           fit: BoxFit.cover,
                         ),
