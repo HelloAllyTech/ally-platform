@@ -24,15 +24,15 @@ class AppBottomTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // This bar sits in a `Positioned` inside the shell's full-bleed `Stack`,
-    // which paints behind the Android system nav bar (3-button or gesture
-    // pill) — `bottom: 30` alone measures from the absolute screen edge, so
-    // the pill ends up partly or fully hidden behind it. Shifting the whole
-    // pill up by the bottom inset (not padding its *inside*, which only grew
-    // the box downward into the unsafe zone while squeezing the icons) is
-    // what actually clears it, matching RN's `CustomTabBar`'s own
-    // `marginTop: insets.bottom` nudge on top of its fixed `marginBottom: 30`.
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    // RN's `CustomTabBar` is `position: absolute, bottom: 0` with a fixed
+    // `marginBottom: 30` and a fixed 60pt height; its `insets.bottom`
+    // padding/margin only shuffles the icons *inside* that 60pt box, so on
+    // iOS the pill sits 30pt above the screen edge, over the home
+    // indicator. Android keeps the inset shift: this Flutter shell paints
+    // edge-to-edge behind the system nav bar (3-button or gesture pill),
+    // which would otherwise hide the pill.
+    final isAndroid = Theme.of(context).platform == TargetPlatform.android;
+    final bottomInset = isAndroid ? MediaQuery.of(context).padding.bottom : 0.0;
     // RN's `< 3` narrows the pill with wider side margins when there are
     // only 1-2 visible tabs, so it doesn't stretch edge-to-edge.
     final horizontalMargin = visibleTabs.length < 3 ? 80.0 : 40.0;
@@ -47,8 +47,9 @@ class AppBottomTabBar extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(40),
           border: Border.all(color: AppColors.lightGray2, width: 0.5),
+          // shadowColor black, shadowOpacity 0.1, offset (0, 1), radius 4.
           boxShadow: const [
-            BoxShadow(color: Colors.black12, offset: Offset(0, 1), blurRadius: 4),
+            BoxShadow(color: Color(0x1A000000), offset: Offset(0, 1), blurRadius: 4),
           ],
         ),
         child: Row(
@@ -56,7 +57,9 @@ class AppBottomTabBar extends StatelessWidget {
           children: [
             for (var i = 0; i < visibleTabs.length; i++)
               Expanded(
-                child: InkWell(
+                // RN's TouchableOpacity: no Material ripple.
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => onTap(i),
                   child: Center(
                     child: _TabIcon(
