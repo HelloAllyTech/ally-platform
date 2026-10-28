@@ -292,25 +292,6 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
                   setState(() => _sort = sort);
                   _fetch(reset: true);
                 },
-                // RN's shared `Dropdown.tsx` base header style + `fieldValueText`.
-                headerDecoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.all(Radius.circular(4)),
-                ),
-                headerTextStyle: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifRegular,
-                  fontSize: 14,
-                  height: 22 / 14,
-                  letterSpacing: 0.2,
-                  color: AppColors.mediumEmphasis,
-                ),
-                itemTextStyle: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifRegular,
-                  fontSize: 14,
-                  height: 22 / 14,
-                  letterSpacing: 0.2,
-                  color: AppColors.highEmphasis,
-                ),
               ),
             ],
           ),
