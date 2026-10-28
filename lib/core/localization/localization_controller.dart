@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -72,6 +73,8 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
   LocalizationController({Dio? dio}) : _dio = dio ?? Dio();
 
   final Dio _dio;
+
+  static final bool _isFlutterTest = Platform.environment.containsKey('FLUTTER_TEST');
   String _language = _defaultLanguage;
   Timer? _pollTimer;
   Future<void>? _refreshInFlight;
@@ -104,7 +107,10 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
       }
     }
 
-    if (AppConfig.languageSelectorEnabled) {
+    // Widget tests build this provider through every translated screen;
+    // without the guard each one would hit the real CDN and leave Dio's
+    // timers pending at teardown. Tests drive [refresh] directly instead.
+    if (AppConfig.languageSelectorEnabled && !_isFlutterTest) {
       WidgetsBinding.instance.addObserver(this);
       ref.onDispose(() {
         WidgetsBinding.instance.removeObserver(this);
