@@ -17,11 +17,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/network/error_details.dart';
 import '../../../core/routing/launch_splash.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../data/auth_repository.dart';
 import 'terms_and_agreement_modal.dart';
 
@@ -46,22 +48,9 @@ const _sheetDuration = Duration(milliseconds: 1000);
 final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 bool _isValidEmail(String email) => _emailRegex.hasMatch(email);
 
-/// RN's `isSuspendedUserError` (`src/utils/error.ts`) — a 403 whose body
-/// carries `error: 'USER_SUSPENDED'` or the literal message `'User
-/// suspended'`. Checked after every sign-in method (OTP, Google, Apple) so a
-/// suspended account reaches SuspendedAccountScreen instead of a generic
-/// error, same as RN's OtpVerification/useGoogleLogin/useAppleLogin hooks.
-bool _isSuspendedUserError(Object error) {
-  if (error is! DioException) return false;
-  if (error.response?.statusCode != 403) return false;
-  final data = error.response?.data;
-  if (data is! Map) return false;
-  return data['error'] == 'USER_SUSPENDED' || data['message'] == 'User suspended';
-}
-
-/// RN's `getErrorDetails(error).message` (`src/utils/error.ts`): the
-/// backend body's `message`, else its `error`, else `null` (callers supply
-/// their own fallback, as RN's do).
+/// The backend body's `message`, else its `error`, else `null` — for
+/// EmailLogin's alert, which falls back to its own "Unknown error" rather
+/// than `getErrorDetails`' "Something went wrong!".
 String? _apiErrorMessage(Object error) {
   if (error is! DioException) return null;
   final data = error.response?.data;
@@ -71,6 +60,30 @@ String? _apiErrorMessage(Object error) {
     if (value is String && value.isNotEmpty) return value;
   }
   return null;
+}
+
+/// RN `useGoogleLogin`'s SDK-error switch: the toast text for [e], or
+/// `null` when RN stays silent (cancel). RN also silences IN_PROGRESS,
+/// which google_sign_in 7 has no code for. On Android, an unavailable
+/// auth provider is RN's PLAY_SERVICES_NOT_AVAILABLE, whose copy RN
+/// hard-codes in English.
+@visibleForTesting
+String? googleSignInErrorToast(GoogleSignInException e, {required String fallback, TargetPlatform? platform}) {
+  if (e.code == GoogleSignInExceptionCode.canceled) return null;
+  if (e.code == GoogleSignInExceptionCode.providerConfigurationError &&
+      (platform ?? defaultTargetPlatform) == TargetPlatform.android) {
+    return 'Google Play Services not available or outdated';
+  }
+  final description = e.description;
+  return description != null && description.isNotEmpty ? description : fallback;
+}
+
+/// RN `useAppleLogin`'s SDK-error switch: cancel is silent, every other
+/// code toasts the SDK's `message`, else "Failed to sign in with Apple".
+@visibleForTesting
+String? appleSignInErrorToast(SignInWithAppleAuthorizationException e, {required String fallback}) {
+  if (e.code == AuthorizationErrorCode.canceled) return null;
+  return e.message.isNotEmpty ? e.message : fallback;
 }
 
 /// Lower-cases and strips whitespace as the learner types — RN's
@@ -220,9 +233,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
   bool get _isOtpComplete => _otpController.text.length == _otpLength;
 
-  void _showToast(String message) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
-  }
+  /// Every login toast in RN is `showToast(message, 'error')`.
+  void _showToast(String message) => showToast(message, type: ToastType.error);
 
   void _startResendCountdown(int? expiresInSeconds) {
     _resendTimer?.cancel();
@@ -240,18 +252,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     });
   }
 
-  /// RN's `useGoogleLogin`/`useAppleLogin` error handling: a suspended
-  /// account goes to SuspendedAccountScreen, any other backend error is a
-  /// toast with the backend's message (or the generic fallback). Anything
-  /// else (no id token, say) is only logged by RN: no toast.
-  void _handleSocialLoginError(Object error, String fallbackKey) {
+  /// RN's `useGoogleLogin`/`useAppleLogin` backend-error handling: a
+  /// suspended account goes to SuspendedAccountScreen, any other API error
+  /// (RTK's FETCH_ERROR included, which has a status too) is a toast with
+  /// `getErrorDetails(error).message`. Anything else (no id token, say) is
+  /// only logged by RN: no toast.
+  void _handleSocialLoginError(Object error) {
     if (error is! DioException) return;
-    if (_isSuspendedUserError(error)) {
+    if (isSuspendedUserError(error)) {
       // RN `navigation.replace(SUSPENDED_ACCOUNT)`: back can't return here.
       if (mounted) context.go('/suspended');
       return;
     }
-    _showToast(_apiErrorMessage(error) ?? ref.tr(fallbackKey));
+    _showToast(getErrorDetails(error, t: ref.tr).message);
   }
 
   Future<void> _completeSocialLogin((String, String) tokens) async {
@@ -280,14 +293,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       }
       tokens = await ref.read(authRepositoryProvider).loginWithGoogle(idToken);
     } on GoogleSignInException catch (e) {
-      // RN: cancel is silent; any other SDK error toasts the SDK's own
-      // message, else "Failed to sign in with Google".
-      if (e.code != GoogleSignInExceptionCode.canceled) {
-        final description = e.description;
-        _showToast(description != null && description.isNotEmpty ? description : ref.tr('auth.login.google.error'));
-      }
+      final message = googleSignInErrorToast(e, fallback: ref.tr('auth.login.google.error'));
+      if (message != null) _showToast(message);
     } catch (e) {
-      _handleSocialLoginError(e, 'auth.login.google.error');
+      _handleSocialLoginError(e);
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
@@ -314,12 +323,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             familyName: credential.familyName,
           );
     } on SignInWithAppleAuthorizationException catch (e) {
-      // RN: cancel is silent; others toast `err.message`, else the fallback.
-      if (e.code != AuthorizationErrorCode.canceled) {
-        _showToast(e.message.isNotEmpty ? e.message : ref.tr('auth.login.apple.error'));
-      }
+      final message = appleSignInErrorToast(e, fallback: ref.tr('auth.login.apple.error'));
+      if (message != null) _showToast(message);
     } catch (e) {
-      _handleSocialLoginError(e, 'auth.login.apple.error');
+      _handleSocialLoginError(e);
     } finally {
       if (mounted) setState(() => _isAppleLoading = false);
     }
@@ -384,7 +391,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       _startResendCountdown(expiresIn);
       _otpFocusNode.requestFocus();
     } catch (e) {
-      if (mounted) _showToast(_apiErrorMessage(e) ?? ref.tr('common.somethingWentWrong'));
+      // RN OtpVerification `showToast(getErrorDetails(err).message, 'error')`.
+      if (mounted) _showToast(getErrorDetails(e, t: ref.tr).message);
     } finally {
       if (mounted) setState(() => _isResending = false);
     }
@@ -402,10 +410,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     } catch (e) {
       if (!mounted) return;
       setState(() => _isVerifying = false);
-      if (_isSuspendedUserError(e)) {
+      if (isSuspendedUserError(e)) {
         context.go('/suspended');
       } else {
-        setState(() => _otpError = _apiErrorMessage(e) ?? ref.tr('common.somethingWentWrong'));
+        setState(() => _otpError = getErrorDetails(e, t: ref.tr).message);
       }
       return;
     }

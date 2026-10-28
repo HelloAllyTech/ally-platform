@@ -9,7 +9,7 @@ import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/back_title_header.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../data/bug_report_repository.dart';
 
 const _maxDescriptionLength = 1000;
@@ -67,25 +67,17 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
           .read(bugReportRepositoryProvider)
           .createBugReport(_controller.text.trim(), screen: widget.screenName);
       if (!mounted) return;
-      // Shown via the root key, not this screen's own `ScaffoldMessenger` —
-      // `context.pop()` right after removes this Scaffold before an
-      // ordinary SnackBar could finish displaying.
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.tr('bugReport.successMessage'))),
-      );
+      // The app-root toast outlives the `pop()` right after, as RN's does.
+      showToast(ref.tr('bugReport.successMessage'));
       context.pop();
     } catch (e) {
       final isRateLimited = e is DioException && e.response?.statusCode == _httpTooManyRequests;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isRateLimited
-                  ? ref.tr('bugReport.rateLimitMessage')
-                  : '${ref.tr('errors.submitBugReport')}: $e',
-            ),
-          ),
-        );
+        if (isRateLimited) {
+          showToast(ref.tr('bugReport.rateLimitMessage'), type: ToastType.error);
+        } else {
+          showErrorToast(e, 'errors.submitBugReport', t: ref.tr);
+        }
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

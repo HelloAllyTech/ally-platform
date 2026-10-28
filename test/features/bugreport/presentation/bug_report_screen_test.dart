@@ -6,7 +6,6 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/core/widgets/back_title_header.dart';
-import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/bugreport/data/bug_report_repository.dart';
 import 'package:ally_mobile_flutter/features/bugreport/presentation/bug_report_screen.dart';
 
@@ -23,7 +22,7 @@ void main() {
   // comments.
   testWidgets(
     'BugReportScreen: disables Submit until non-empty, pops with a success '
-    'snackbar, surfaces a rate-limit-specific message, and the generic '
+    'toast, surfaces a rate-limit-specific message, and the generic '
     'failure message otherwise',
     (tester) async {
       final repository = MockBugReportRepository();
@@ -32,14 +31,10 @@ void main() {
         tester,
         initialLocation: '/home',
         routes: [
-          // Wrapped in a real `Scaffold` — `rootScaffoldMessengerKey`'s
-          // post-pop snackbar never actually appeared against a bare
-          // `Text` destination in an earlier version of this test.
           GoRoute(path: '/home', builder: (context, state) => const Scaffold(body: Text('HOME'))),
           GoRoute(path: '/bug-report', builder: (context, state) => const BugReportScreen()),
         ],
         overrides: [bugReportRepositoryProvider.overrideWithValue(repository)],
-        scaffoldMessengerKey: rootScaffoldMessengerKey,
       );
       router.push('/bug-report');
       await tester.pumpAndSettle();
@@ -74,12 +69,13 @@ void main() {
       await tester.tap(find.widgetWithText(AppButton, 'Submit'));
       await tester.pumpAndSettle();
 
+      // RN showErrorToast: the fallback plus getErrorDetails' reason, never
+      // the raw exception text.
       expect(find.textContaining('Failed to submit report'), findsOneWidget);
+      expect(find.textContaining('network down'), findsNothing);
       expect(find.text('Report a problem'), findsOneWidget, reason: 'still on the bug report screen');
 
-      // The still-showing SnackBar overlaps the Submit button at the
-      // bottom of the screen and would swallow the next tap — let its
-      // default 4s auto-dismiss clear it first.
+      // Let the 3s toast auto-dismiss before the next step.
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
 
@@ -101,15 +97,11 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
 
-      // --- Step 4: success pops back and shows a confirmation snackbar. ---
+      // --- Step 4: success pops back and shows a confirmation toast. ---
       when(() => repository.createBugReport('Something broke')).thenAnswer((_) async {});
       await tester.tap(find.widgetWithText(AppButton, 'Submit'));
-      // Not pumpAndSettle: it would fast-forward straight through the
-      // SnackBar's whole 4s show/auto-dismiss lifecycle (made worse here by
-      // the route-pop transition also needing frames to settle), leaving
-      // nothing to assert on by the time it returns — same gotcha
-      // `session_expired_snackbar_test.dart` documents for this exact
-      // pattern. A bounded pump catches it mid-display instead.
+      // A bounded pump catches the toast mid-display (pumpAndSettle could
+      // run past its 3s lifetime while the pop transition settles).
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 

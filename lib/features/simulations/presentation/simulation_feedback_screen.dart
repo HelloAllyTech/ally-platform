@@ -18,7 +18,7 @@ import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import '../../../core/widgets/review_type_chip.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../account/presentation/profile_settings_screen.dart' show RnCustomSwitch;
 import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/review_models.dart';
@@ -316,13 +316,9 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       );
       // RN toasts `callFeedback.submit` ("Submit") here — a copy slip for
       // the success message, which `callFeedback.submitted` is.
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.tr('callFeedback.submitted'))),
-      );
+      showToast(ref.tr('callFeedback.submitted'));
     } catch (_) {
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.tr('callFeedback.failSubmitFeedback'))),
-      );
+      showToast(ref.tr('callFeedback.failSubmitFeedback'), type: ToastType.error);
     }
     // With feedback off the popup is the only surface, so submitting it
     // leaves the screen (mirrors the dismiss path).
@@ -409,14 +405,10 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         reviewId: reviewId,
         status: enabled ? 'IN_REVIEW' : 'HIDDEN',
       );
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.tr('simulationPage.privacyUpdated'))),
-      );
+      showToast(ref.tr('simulationPage.privacyUpdated'));
       await _loadReview(reviewId);
     } catch (_) {
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.tr('simulationPage.errorUpdatePrivacy'))),
-      );
+      showToast(ref.tr('simulationPage.errorUpdatePrivacy'), type: ToastType.error);
     }
   }
 

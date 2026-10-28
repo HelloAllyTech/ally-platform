@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
@@ -106,10 +107,6 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
     _noteController.text += emoji;
   }
 
-  void _toast(String message) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
-  }
-
   /// RN's `useShareScreenLogic`: `handleEditNote` when editing, otherwise
   /// `handleShare` (which updates an existing review's status + note when a
   /// reviewId is known, or creates one). Success toasts and goes back —
@@ -132,7 +129,7 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
             note: note,
           );
           if (!mounted) return;
-          _toast(ref.tr('callFeedback.sharedForReview'));
+          showToast(ref.tr('callFeedback.sharedForReview'));
           context.pushReplacement('/reviews/$newReviewId', extra: ReviewType.scribe);
           return;
         }
@@ -145,14 +142,14 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
         }
       }
       if (!mounted) return;
-      _toast(ref.tr(widget.isEditNote ? 'callFeedback.editNoteSuccess' : 'callFeedback.sharedForReview'));
+      showToast(ref.tr(widget.isEditNote ? 'callFeedback.editNoteSuccess' : 'callFeedback.sharedForReview'));
       context.pop();
     } catch (error) {
       if (!mounted) return;
       final serverMessage = error is DioException && error.response?.data is Map
           ? (error.response!.data as Map)['message']?.toString()
           : null;
-      _toast(serverMessage ?? ref.tr('callFeedback.issues.editNoteExpired'));
+      showToast(serverMessage ?? ref.tr('callFeedback.issues.editNoteExpired'), type: ToastType.error);
       if (serverMessage != null) context.pop();
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

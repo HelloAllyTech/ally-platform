@@ -390,7 +390,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saver.saved, isEmpty);
-    expect(find.text('Failed to export file'), findsOneWidget);
+    // RN showErrorToast: "{fallback}: {getErrorDetails reason}".
+    expect(find.text('Failed to export file: Something went wrong!'), findsOneWidget);
   });
 
   testWidgets('3-dot menu: Data Policy opens the privacy URL externally', (tester) async {

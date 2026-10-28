@@ -8,7 +8,7 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/custom_dropdown.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../reviews/presentation/simulation_audio_player.dart';
 import '../../reviews/presentation/simulation_audio_player_controller.dart';
 import '../data/simulation_transcript_repository.dart';
@@ -214,9 +214,7 @@ class _SimulationTranscriptTabState extends ConsumerState<SimulationTranscriptTa
       // RN `showErrorToast(error, 'postSim.tabs.transcriptTranslationFailed')`.
       if (mounted) {
         _hasMore = false;
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('postSim.tabs.transcriptTranslationFailed'))),
-        );
+        showErrorToast(e, 'postSim.tabs.transcriptTranslationFailed', t: ref.tr);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -272,9 +270,7 @@ class _SimulationTranscriptTabState extends ConsumerState<SimulationTranscriptTa
     }
     if (_isLoading) return;
     _handledFocusRequest = focus.requestId;
-    rootScaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(content: Text(ref.tr('postSim.debrief.momentNotFound'))),
-    );
+    showToast(ref.tr('postSim.debrief.momentNotFound'), type: ToastType.error);
   }
 
   /// Rows are variable-height, so jump near the row's estimated offset to

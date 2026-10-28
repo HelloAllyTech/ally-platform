@@ -1,31 +1,9 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../data/call_log_repository.dart';
 import '../data/summary_file_export.dart';
-
-/// RN `useToast().showToast` — this app's toasts are root snackbars.
-void showCallSummaryToast(String message) {
-  rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(content: Text(message)));
-}
-
-/// RN `useErrorToast().showErrorToast(error, fallbackKey)`: an API error
-/// with a `message`/`error` body reads "{fallback}: {reason}"; anything
-/// else is the fallback alone.
-String callSummaryErrorMessage(Object error, String fallback) {
-  if (error is DioException) {
-    final data = error.response?.data;
-    if (data is Map) {
-      final reason = data['message'] ?? data['error'];
-      final text = reason is List ? reason.join(', ') : reason?.toString();
-      if (text != null && text.trim().isNotEmpty) return '$fallback: $text';
-    }
-  }
-  return fallback;
-}
 
 /// Port of RN `hooks/useCallSummaryActions.ts`' server actions — rename,
 /// export, archive/unarchive and delete — each with RN's toasts. Kept out
@@ -44,10 +22,10 @@ class CallSummaryActions {
   Future<bool> rename(String newName) async {
     try {
       await _repository.updateSummaryName(chatId, newName);
-      showCallSummaryToast(ref.tr('callSummary.info.summaryNameUpdateSuccess'));
+      showToast(ref.tr('callSummary.info.summaryNameUpdateSuccess'));
       return true;
     } catch (error) {
-      showCallSummaryToast(callSummaryErrorMessage(error, ref.tr('callSummary.info.summaryNameUpdateFailed')));
+      showErrorToast(error, 'callSummary.info.summaryNameUpdateFailed', t: ref.tr);
       return false;
     }
   }
@@ -61,19 +39,19 @@ class CallSummaryActions {
     try {
       final permission = await saver.checkAndRequestPermissions();
       if (permission != StoragePermissionResult.granted) {
-        showCallSummaryToast(ref.tr('callSummary.info.storagePermissionDenied'));
+        // RN useStoragePermissions.
+        showToast(ref.tr('callSummary.info.storagePermissionDenied'), type: ToastType.error);
         await saver.openSettings();
         return false;
       }
       final content = await _repository.exportCallSummary(chatId);
       await saver.saveFile(content: content, chatId: chatId);
-      showCallSummaryToast(ref.tr('callSummary.info.fileExportedSuccess'));
+      showToast(ref.tr('callSummary.info.fileExportedSuccess'));
       return true;
-    } on FormatException {
-      showCallSummaryToast(ref.tr('callSummary.info.invalidResponseFormat'));
-      return false;
     } catch (error) {
-      showCallSummaryToast(callSummaryErrorMessage(error, ref.tr('callSummary.info.fileExportFailed')));
+      // RN throws `invalidResponseFormat` as a plain Error into this same
+      // catch, so a bad body also reads "fileExportFailed: …".
+      showErrorToast(error, 'callSummary.info.fileExportFailed', t: ref.tr);
       return false;
     }
   }
@@ -83,10 +61,10 @@ class CallSummaryActions {
     final action = archive ? 'archive' : 'unarchive';
     try {
       await _repository.archiveCallLog(chatId, archive: archive);
-      showCallSummaryToast(ref.tr('callSummary.archiveActionModal.$action.success'));
+      showToast(ref.tr('callSummary.archiveActionModal.$action.success'));
       return true;
     } catch (error) {
-      showCallSummaryToast(callSummaryErrorMessage(error, ref.tr('callSummary.archiveActionModal.$action.failed')));
+      showErrorToast(error, 'callSummary.archiveActionModal.$action.failed', t: ref.tr);
       return false;
     }
   }
@@ -98,10 +76,12 @@ class CallSummaryActions {
   Future<bool> delete() async {
     try {
       await _repository.deleteCallSummary(chatId);
-      showCallSummaryToast(ref.tr('callSummary.info.summaryDeletedSuccess'));
+      showToast(ref.tr('callSummary.info.summaryDeletedSuccess'));
       return true;
     } catch (_) {
-      showCallSummaryToast(ref.tr('callSummary.info.summaryDeleteFailed'));
+      // RN omits the type here (so its default, success); a failure is
+      // shown as one.
+      showToast(ref.tr('callSummary.info.summaryDeleteFailed'), type: ToastType.error);
       return false;
     }
   }

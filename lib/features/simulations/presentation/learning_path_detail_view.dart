@@ -3,15 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/network/error_details.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
-import 'error_details.dart';
 import 'simulation_details_modal.dart';
 import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/learning_path_widgets.dart';
 import '../../../core/widgets/sized_network_image.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
 /// mobile (React Native)'s `useLearningPathDetails` hook backs both with
@@ -100,7 +101,7 @@ class _LearningPathDetailViewState
       await widget.onEnsureSession();
     } catch (e) {
       // RN: `showToast(getErrorDetails(err)?.message, 'error')`.
-      _toast(errorDetailsMessage(e, ref.tr('common.somethingWentWrong')));
+      _toast(getErrorDetails(e, t: ref.tr).message);
       return;
     } finally {
       if (mounted) setState(() => _isStarting = false);
@@ -117,10 +118,10 @@ class _LearningPathDetailViewState
     );
   }
 
-  /// RN `showToast(message, 'error')` — the app's snackbar for now.
+  /// RN `showToast(message, 'error')`.
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showToast(message, type: ToastType.error);
   }
 
   Future<void> _viewFeedback(PathScenario scenario) async {
@@ -128,7 +129,7 @@ class _LearningPathDetailViewState
       final found = await widget.onViewFeedback(scenario);
       if (!found) _toast(widget.sessionNotFoundMessage);
     } catch (e) {
-      _toast(errorDetailsMessage(e, ref.tr('common.somethingWentWrong')));
+      _toast(getErrorDetails(e, t: ref.tr).message);
     }
   }
 

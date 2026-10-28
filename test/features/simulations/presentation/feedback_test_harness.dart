@@ -7,7 +7,6 @@ import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/routing/app_router.dart';
 import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
-import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/reactions/data/reactions_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
@@ -134,7 +133,6 @@ class FeedbackHarness {
     return pumpRouterApp(
       tester,
       initialLocation: '/feedback',
-      scaffoldMessengerKey: rootScaffoldMessengerKey,
       routes: [
         GoRoute(
           path: '/feedback',

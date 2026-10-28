@@ -10,6 +10,7 @@ import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dar
 import 'package:ally_mobile_flutter/features/reviews/presentation/review_screen.dart';
 
 import '../../support/fake_translations.dart';
+import '../../support/pump_app.dart' show toastHostBuilder;
 
 class MockReviewsRepository extends Mock implements ReviewsRepository {}
 
@@ -24,7 +25,7 @@ class MockReviewsRepository extends Mock implements ReviewsRepository {}
 // cause. See also `review_screen_loading_test.dart`, which has the same
 // issue for a provider that never settles at all.
 void main() {
-  testWidgets('shows an error message when the fetch fails', (tester) async {
+  testWidgets('shows RN\'s review.error.title error toast when the fetch fails', (tester) async {
     final repository = MockReviewsRepository();
     // `.thenAnswer((_) async => throw ...)`, not `.thenThrow(...)` — the
     // latter makes the mocked (Future-returning) method throw
@@ -47,7 +48,7 @@ void main() {
             ],
           ),
         ],
-        child: const MaterialApp(home: ReviewScreen()),
+        child: const MaterialApp(home: ReviewScreen(), builder: toastHostBuilder),
       ),
     );
     await tester.pumpAndSettle();

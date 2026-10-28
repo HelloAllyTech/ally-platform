@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/realtime/connectivity.dart';
@@ -183,15 +184,10 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with 
         await ref.read(reviewsRepositoryProvider).updateReviewStatus(reviewId: widget.reviewId, status: status);
       }
       _refreshReview();
-      _toast(ref.tr('simulationPage.privacyUpdated'));
+      if (mounted) showToast(ref.tr('simulationPage.privacyUpdated'));
     } catch (_) {
-      _toast(ref.tr('simulationPage.errorUpdatePrivacy'));
+      if (mounted) showToast(ref.tr('simulationPage.errorUpdatePrivacy'), type: ToastType.error);
     }
-  }
-
-  void _toast(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _reactToReview(String? current, String unicode) async {

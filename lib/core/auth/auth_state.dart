@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/notifications/data/notifications_repository.dart';
 import '../localization/localization_controller.dart';
 import '../network/token_storage.dart';
 import '../push/push_notification_service.dart';
-import '../widgets/root_scaffold_messenger.dart';
+import '../widgets/toast/toast_controller.dart';
 
 /// Minimal auth session state for Phase 0. Mirrors the one thing
 /// `userSlice.handleLogout` + the API layer's `baseQueryWithReauth` actually
@@ -83,17 +82,17 @@ class AuthController extends Notifier<AuthState> {
   /// Called by the network layer when a 401 can't be recovered from (no
   /// stored tokens, or the refresh call itself failed) — same trigger as
   /// RN's `handleUserLogout`. Clears the session exactly like [logout], but
-  /// also surfaces why, via a snackbar, matching RN's `showToast`.
+  /// also surfaces why, via RN's `showToast(t('auth.sessionExpired'), 'error')`.
   ///
   /// Returns the same message so `AuthInterceptor` can swap it in for the
   /// original technical failure, instead of also forwarding that raw error
   /// to whatever screen's request lost this race — that still happened
-  /// after the snackbar alone was added (confirmed live: a 401 on Profile
+  /// after the toast alone was added (confirmed live: a 401 on Profile
   /// Settings kept rendering the multi-paragraph "RequestOptions.
   /// validateStatus..." dump even once the toast was showing), since
   /// nothing was actually removing it from the propagated error.
   ///
-  /// No snackbar when nobody was signed in: there was no session to expire,
+  /// No toast when nobody was signed in: there was no session to expire,
   /// and the login screen showing "Your session has expired" on a fresh
   /// install reads as a bug (it was one — see `currentUserProvider`).
   Future<String> sessionExpired() async {
@@ -105,9 +104,7 @@ class AuthController extends Notifier<AuthState> {
         ref.read(localizationControllerProvider).value?.t('auth.sessionExpired') ??
         'auth.sessionExpired';
     if (!wasAuthenticated) return message;
-    rootScaffoldMessengerKey.currentState
-      ?..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showToast(message, type: ToastType.error);
     return message;
   }
 }

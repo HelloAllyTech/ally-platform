@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/network/error_details.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
@@ -21,6 +22,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/custom_dropdown.dart';
 import '../../../core/widgets/review_type_chip.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../account/data/account_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/scribe_reviews_repository.dart';
@@ -378,9 +380,9 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
       await ref
           .read(scribeReviewsRepositoryProvider)
           .updateReviewStatus(reviewId: reviewId, status: isEnabled ? 'IN_REVIEW' : 'HIDDEN');
-      if (mounted) showCallSummaryToast(ref.tr('simulationPage.privacyUpdated'));
+      if (mounted) showToast(ref.tr('simulationPage.privacyUpdated'));
     } catch (_) {
-      if (mounted) showCallSummaryToast(ref.tr('simulationPage.errorUpdatePrivacy'));
+      if (mounted) showToast(ref.tr('simulationPage.errorUpdatePrivacy'), type: ToastType.error);
     } finally {
       ref.invalidate(callSummaryProvider(_chatId));
     }
@@ -532,9 +534,9 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
             issues: issues,
             tags: value.tags,
           );
-      showCallSummaryToast(ref.tr('callFeedback.submitted'));
+      showToast(ref.tr('callFeedback.submitted'));
     } catch (_) {
-      showCallSummaryToast(ref.tr('summaryLoading.summaryFeedbackSubmittedFailed'));
+      showToast(ref.tr('summaryLoading.summaryFeedbackSubmittedFailed'), type: ToastType.error);
     }
     if (!mounted) return;
     setState(() => _showFeedbackPopup = false);
@@ -946,9 +948,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       // Guard on the CONTENT, not the call succeeding — RN's own comment on
       // this exact check: a failed enhance can arrive as a truthy empty
       // response, which must not silently wipe the counsellor's text.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ref.tr('summary.enhanceFailed'))),
-      );
+      showToast(ref.tr('summary.enhanceFailed'), type: ToastType.error);
     } else {
       _onFieldChanged(field.key, enhanced);
     }
@@ -1043,7 +1043,10 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       return true;
     } catch (e) {
       if (mounted) {
-        setState(() => _error = '${ref.tr('callSummary.info.summaryUpdateFailed')}: $e');
+        setState(
+          () => _error = '${ref.tr('callSummary.info.summaryUpdateFailed')}: '
+              '${getErrorDetails(e, t: ref.tr).message}',
+        );
       }
       return false;
     }
@@ -1070,9 +1073,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       return true;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ref.tr('summary.customFieldSaveFailed'))),
-        );
+        showToast(ref.tr('summary.customFieldSaveFailed'), type: ToastType.error);
       }
       return false;
     }
@@ -1099,21 +1100,15 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
           .read(callLogRepositoryProvider)
           .retrySummary(_chatId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result.success
-                  ? ref.tr('summaryLoading.retryStarted')
-                  : result.message ?? ref.tr('summaryLoading.retryFailed'),
-            ),
-          ),
-        );
+        if (result.success) {
+          showToast(ref.tr('summaryLoading.retryStarted'));
+        } else {
+          showToast(result.message ?? ref.tr('summaryLoading.retryFailed'), type: ToastType.error);
+        }
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ref.tr('summaryLoading.retryFailed'))),
-        );
+        showToast(ref.tr('summaryLoading.retryFailed'), type: ToastType.error);
       }
     }
     ref.invalidate(callSummaryProvider(_chatId));
@@ -1194,7 +1189,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
           return _SummaryUnauthorizedView(onGoBack: widget.onGoBack);
         }
         return Center(
-          child: Text('${ref.t('common.somethingWentWrong')} $error'),
+          child: Text(getErrorDetails(error, t: ref.t).message),
         );
       },
       data: (summary) {

@@ -76,13 +76,8 @@ Future<void> continueCourse(BuildContext context, WidgetRef ref, String trackId)
     final result = await ref.read(coursesRepositoryProvider).getNextTrackItem(trackId);
     final next = result.nextItem;
     if (result.trackCompleted || next == null || !context.mounted) return;
-    if (isPlayableTrackItemType(next.type)) {
-      context.push('/courses/item/${next.id}', extra: (trackId: trackId, item: next));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ref.tr('courses.player.unsupportedBody'))),
-      );
-    }
+    // Any type: the player shows RN's UnsupportedItemCard for one it can't play.
+    context.push('/courses/item/${next.id}', extra: (trackId: trackId, item: next));
   } catch (_) {
     // Swallowed, as RN.
   }

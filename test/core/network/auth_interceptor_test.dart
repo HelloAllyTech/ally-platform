@@ -165,7 +165,7 @@ void main() {
 
         // Not `same(err)` — a screen whose request lost this race must not
         // render the original technical failure (confirmed live: it did,
-        // even once onUnrecoverable also started showing a snackbar).
+        // even once onUnrecoverable also started showing a toast).
         expect(handler.passedThroughError, isNot(same(err)));
         expect(
           handler.passedThroughError?.message,

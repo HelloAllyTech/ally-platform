@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
@@ -64,9 +65,7 @@ class _SimulationDetailsScreenState
       ClipboardData(text: '${AppConfig.allyWebUrl}scenario/${widget.scenarioId}'),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ref.tr('simulationPage.linkCopiedToClipboard'))),
-    );
+    showToast(ref.tr('simulationPage.linkCopiedToClipboard'));
   }
 
   void _onStartChanged() {

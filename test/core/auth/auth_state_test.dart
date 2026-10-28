@@ -23,9 +23,8 @@ class _RecordingPushService extends PushNotificationService {
 }
 
 void main() {
-  // `sessionExpired()` reads `rootScaffoldMessengerKey.currentState`, which
-  // needs a binding instance even just to report "no state" — these plain
-  // `test()`s (no `testWidgets`/`pumpWidget`) never initialize one otherwise.
+  // Kept from when `sessionExpired()` reached a ScaffoldMessenger key; the
+  // toast it calls now is a no-op with no `ToastHost`, binding or not.
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockTokenStorage tokenStorage;
@@ -180,11 +179,9 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(container.read(authControllerProvider).isAuthenticated, isTrue);
 
-      // No MaterialApp/ScaffoldMessenger is mounted in this container-only
-      // test, so `rootScaffoldMessengerKey.currentState` is null — the
-      // snackbar call is a guarded no-op here; see
-      // session_expired_snackbar_test.dart for the widget-level check that
-      // it actually shows one when a ScaffoldMessenger exists.
+      // No `ToastHost` is mounted in this container-only test, so the
+      // toast call is a no-op here; see session_expired_toast_test.dart for
+      // the widget-level check that it actually shows one.
       await container.read(authControllerProvider.notifier).sessionExpired();
 
       expect(container.read(authControllerProvider).isAuthenticated, isFalse);

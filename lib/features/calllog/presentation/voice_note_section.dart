@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -12,7 +11,8 @@ import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/rn_scale.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/network/error_details.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
@@ -126,16 +126,13 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
     if (!mounted) return;
     final error = _recorder.error;
     if (error != null) {
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: Text(
-            ref.t(
-              error == VoiceRecorderError.permission
-                  ? 'calls.createNote.voice.micDenied'
-                  : 'calls.createNote.voice.generateError',
-            ),
-          ),
+      showToast(
+        ref.tr(
+          error == VoiceRecorderError.permission
+              ? 'calls.createNote.voice.micDenied'
+              : 'calls.createNote.voice.generateError',
         ),
+        type: ToastType.error,
       );
       setState(() => _voiceOpen = false);
       unawaited(_recorder.reset());
@@ -219,35 +216,24 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
       await _recorder.reset();
       if (!mounted) return;
       setState(() => _voiceOpen = false);
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: Text(
-            ref.t(
-              filled > 0 ? 'calls.createNote.voice.generated' : 'calls.createNote.voice.nothingExtracted',
-            ),
-          ),
-        ),
-      );
+      if (filled > 0) {
+        showToast(ref.tr('calls.createNote.voice.generated'));
+      } else {
+        showToast(ref.tr('calls.createNote.voice.nothingExtracted'), type: ToastType.error);
+      }
     } catch (error) {
       // Leaves the recording/panel in place (voiceOpen stays true, the
       // recorder stays 'stopped' with its file intact) so the user can retry
       // Generate without re-recording — mirrors RN's `handleGenerate`, whose
       // reset()/setVoiceOpen(false) calls only run after a successful
       // apply+save, never inside the catch.
-      String? message;
-      if (error is DioException) {
-        final data = error.response?.data;
-        if (data is Map) message = data['message'] as String?;
-      }
+      final message = getErrorDetails(error).message;
       if (!mounted) return;
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: Text(
-            ref.t(
-              message == 'NO_SPEECH_DETECTED' ? 'calls.createNote.voice.noSpeech' : 'calls.createNote.voice.generateError',
-            ),
-          ),
+      showToast(
+        ref.tr(
+          message == 'NO_SPEECH_DETECTED' ? 'calls.createNote.voice.noSpeech' : 'calls.createNote.voice.generateError',
         ),
+        type: ToastType.error,
       );
     } finally {
       if (mounted) setState(() => _isGenerating = false);

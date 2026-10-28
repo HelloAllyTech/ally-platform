@@ -1,7 +1,7 @@
 import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
 import 'package:ally_mobile_flutter/core/localization/localization_controller.dart';
 import 'package:ally_mobile_flutter/core/network/token_storage.dart';
-import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
+import 'package:ally_mobile_flutter/core/widgets/toast/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,14 +11,13 @@ import '../../support/fake_translations.dart';
 
 class MockTokenStorage extends Mock implements TokenStorage {}
 
-/// `AuthController.sessionExpired()`'s snackbar only shows when a real
-/// `ScaffoldMessenger` is mounted at `rootScaffoldMessengerKey` — the
-/// `auth_state_test.dart` container-only tests can't see this (no
-/// MaterialApp, so `currentState` is null there), so it gets this one
-/// dedicated widget test instead.
+/// `AuthController.sessionExpired()`'s toast (RN api.ts
+/// `showToast(t('auth.sessionExpired'), 'error')`) only shows when a
+/// `ToastHost` is mounted — the `auth_state_test.dart` container-only tests
+/// can't see this, so it gets this one dedicated widget test instead.
 void main() {
   testWidgets(
-    'shows the real translated session-expired message via the root ScaffoldMessenger',
+    'shows the real translated session-expired message as an error toast',
     (tester) async {
       final tokenStorage = MockTokenStorage();
       when(() => tokenStorage.accessToken).thenAnswer((_) async => 'stored-access-token');
@@ -36,7 +35,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
-            scaffoldMessengerKey: rootScaffoldMessengerKey,
+            builder: (context, child) => ToastHost(child: child!),
             home: const Scaffold(body: SizedBox.shrink()),
           ),
         ),
@@ -55,17 +54,16 @@ void main() {
       expect(container.read(authControllerProvider).isAuthenticated, isTrue);
 
       await container.read(authControllerProvider.notifier).sessionExpired();
-      // The snackbar enters via an animation — a zero-duration pump() alone
-      // leaves it still transitioning in, not yet matched by find.text().
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 750));
 
       expect(find.text('Your session has expired. Please sign in again.'), findsOneWidget);
+      expect(toastController.current?.type, ToastType.error);
     },
   );
 
   testWidgets(
-    'shows no snackbar when nobody was signed in — there was no session to expire',
+    'shows no toast when nobody was signed in — there was no session to expire',
     (tester) async {
       final tokenStorage = MockTokenStorage();
       when(() => tokenStorage.accessToken).thenAnswer((_) async => null);
@@ -83,7 +81,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
-            scaffoldMessengerKey: rootScaffoldMessengerKey,
+            builder: (context, child) => ToastHost(child: child!),
             home: const Scaffold(body: SizedBox.shrink()),
           ),
         ),
@@ -100,7 +98,7 @@ void main() {
 
       // The interceptor still gets the message for its replaced error.
       expect(message, 'Your session has expired. Please sign in again.');
-      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppToast), findsNothing);
     },
   );
 }

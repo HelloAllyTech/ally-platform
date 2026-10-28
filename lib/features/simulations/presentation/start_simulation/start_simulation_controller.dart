@@ -8,7 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/realtime/microphone_permission.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../../core/network/error_details.dart';
+import '../../../../core/widgets/toast/toast_controller.dart';
 import '../../data/simulation_models.dart';
 import '../../data/simulations_repository.dart';
 import 'start_simulation_modals.dart';
@@ -276,7 +277,7 @@ class StartSimulationController extends ChangeNotifier {
       onEndSession: () async {
         try {
           await _repository.endScenarioSession(scenarioSessionId);
-          if (context.mounted) _toast(context, _ref.tr('common.simulationEndedSuccess'));
+          if (context.mounted) showToast(_ref.tr('common.simulationEndedSuccess'));
         } catch (e) {
           if (context.mounted) {
             _toast(context, _errorMessage('errors.endSimulation', StartSimulationError.from(e)));
@@ -329,15 +330,14 @@ class StartSimulationController extends ChangeNotifier {
 
   String _errorMessage(String fallbackKey, StartSimulationError error) {
     final fallback = _ref.tr(fallbackKey);
-    final message = error.message;
-    // RN's showErrorToast: "Failed to start simulation: {reason}".
-    return message == null ? fallback : '$fallback: $message';
+    // RN's showErrorToast: "Failed to start simulation: {reason}", where
+    // the reason is `getErrorDetails`' — the backend's, else "Something
+    // went wrong!".
+    return '$fallback: ${error.message ?? _ref.tr(somethingWentWrongKey)}';
   }
 
-  void _toast(BuildContext context, String message) {
-    final messenger = ScaffoldMessenger.maybeOf(context) ?? rootScaffoldMessengerKey.currentState;
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
-  }
+  /// RN `showErrorToast` / `showToast(…, 'error')`.
+  void _toast(BuildContext context, String message) => showToast(message, type: ToastType.error);
 
   @override
   void dispose() {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/navigation/screen_focus_listener.dart';
 import '../../../core/permissions/permissions_repository.dart';
@@ -239,7 +240,7 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
       if (!mounted || generation != _generation) return;
       setState(() => _hasMore = false);
       // RN: showToast(t('review.error.title'), 'error').
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(ref.tr('review.error.title'))));
+      showToast(ref.tr('review.error.title'), type: ToastType.error);
     } finally {
       if (mounted && generation == _generation) {
         setState(() {

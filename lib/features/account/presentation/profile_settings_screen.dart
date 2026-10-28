@@ -16,7 +16,8 @@ import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/back_title_header.dart';
 import '../../../core/widgets/confirmation_modal.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/network/error_details.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../data/account_repository.dart';
 import '../data/user_profile.dart';
 import 'language_selector_sheet.dart';
@@ -112,11 +113,9 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     _editedPreview = null;
   });
 
-  void _showErrorToast(String message) {
-    rootScaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(content: Text('${ref.tr('errors.uploadProfileImage')}: $message')),
-    );
-  }
+  /// RN `showErrorToast(error, 'errors.uploadProfileImage')`, given the
+  /// reason directly (RN wraps it in an `Error`).
+  void _showErrorToast(String message) => showErrorToast(message, 'errors.uploadProfileImage', t: ref.tr);
 
   /// RN's `handleImagePicker`: quality 0.8, max 800x800; rejects files over
   /// 2 MB and non-square images; otherwise only updates the preview.
@@ -216,7 +215,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       await ref.read(currentUserProvider.future);
       if (mounted) _resetToSavedState();
     } catch (e) {
-      if (mounted) _showErrorToast('$e');
+      if (mounted) showErrorToast(e, 'errors.uploadProfileImage', t: ref.tr);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -297,7 +296,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
   Widget _buildBody(BuildContext context, AsyncValue<UserProfile> userAsync) {
     return userAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
+      error: (error, _) => Center(child: Text(getErrorDetails(error, t: ref.t).message)),
       data: (user) {
         final preview = _previewFor(user);
         return SingleChildScrollView(

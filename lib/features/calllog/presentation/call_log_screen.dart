@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/network/error_details.dart';
 import '../../../core/navigation/screen_focus_listener.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
@@ -21,7 +22,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/illustrated_modal.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
+import '../../../core/widgets/toast/toast_controller.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../scribe/data/chat_repository.dart';
@@ -192,9 +193,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
         score: null,
       );
     } catch (_) {
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.t('calls.createNote.error'))),
-      );
+      showToast(ref.tr('calls.createNote.error'), type: ToastType.error);
       return null;
     }
   }
@@ -224,9 +223,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
       await _showMicrophoneSettingsAlert();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ref.t('common.somethingWentWrong'))),
-        );
+        showToast(ref.tr('common.somethingWentWrong'), type: ToastType.error);
       }
     } finally {
       if (mounted) setState(() => _isStartingScribe = false);
@@ -297,7 +294,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
 
     return permissionsAsync.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
+      error: (error, _) => Scaffold(body: Center(child: Text(getErrorDetails(error, t: ref.t).message))),
       data: (permissions) => _buildScreen(context, permissions),
     );
   }
@@ -497,9 +494,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                     if (isSessionTypeUnknown) {
                       if (canStartCall) ref.invalidate(visibleChatTypesProvider);
                       if (!canOfferAnySessionType) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(ref.t('common.somethingWentWrong'))),
-                        );
+                        showToast(ref.tr('common.somethingWentWrong'), type: ToastType.error);
                         return;
                       }
                     }

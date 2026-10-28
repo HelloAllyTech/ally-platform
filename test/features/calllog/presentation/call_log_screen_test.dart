@@ -10,7 +10,6 @@ import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_empty_state.dart';
-import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_row.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
@@ -365,11 +364,6 @@ void main() {
         tester,
         initialLocation: '/call-log',
         routes: _routes(),
-        // `_createNote`'s failure path shows its toast via the app-wide
-        // `rootScaffoldMessengerKey`, not a context-local ScaffoldMessenger
-        // (see that key's own doc comment on why) — this harness needs to be
-        // wired to that exact global key for the snackbar to show up here.
-        scaffoldMessengerKey: rootScaffoldMessengerKey,
         overrides: [
           callLogRepositoryProvider.overrideWithValue(repository),
           userPermissionsProvider.overrideWith(
