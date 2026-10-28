@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -29,6 +31,16 @@ class SocketService {
   io.Socket? _socket;
   bool _isConnecting = false;
 
+  /// RN `useSocket`'s `RETRY_AFTER_FAILURE_MS`: when opening the socket
+  /// throws (token read, client setup), try again after this long.
+  static const retryAfterFailure = Duration(milliseconds: 2000);
+  Timer? _retryTimer;
+
+  /// RN `generationRef`: bumped by [disconnect], so a connect that was
+  /// awaiting the token when the owner disconnected abandons itself
+  /// instead of installing a socket nobody holds.
+  int _generation = 0;
+
   bool get isConnected => _socket?.connected ?? false;
 
   /// [namespacePath] matches RN's `env.MICROPHONE_SOCKET_PATH` style config —
@@ -42,6 +54,8 @@ class SocketService {
     void Function(String? reason)? onDisconnect,
     void Function(Object? error)? onConnectionError,
   }) async {
+    _retryTimer?.cancel();
+    _retryTimer = null;
     // Already ours — never replace it, matching useSocket.ts exactly.
     if (_socket != null) {
       if (_socket!.connected != true) _socket!.connect();
@@ -49,9 +63,11 @@ class SocketService {
     }
     if (_isConnecting) return;
     _isConnecting = true;
+    final generation = _generation;
 
     try {
       final accessToken = await _tokenStorage.accessToken;
+      if (generation != _generation) return;
       if (accessToken == null) {
         return;
       }
@@ -90,12 +106,28 @@ class SocketService {
 
       _socket = socket;
       socket.connect();
+    } catch (_) {
+      if (generation != _generation) return;
+      _retryTimer = Timer(retryAfterFailure, () {
+        _retryTimer = null;
+        connect(
+          namespacePath: namespacePath,
+          userId: userId,
+          eventCallbacks: eventCallbacks,
+          onConnect: onConnect,
+          onDisconnect: onDisconnect,
+          onConnectionError: onConnectionError,
+        );
+      });
     } finally {
-      _isConnecting = false;
+      if (generation == _generation) _isConnecting = false;
     }
   }
 
   void disconnect() {
+    _generation++;
+    _retryTimer?.cancel();
+    _retryTimer = null;
     _isConnecting = false;
     final socket = _socket;
     _socket = null;

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/realtime/connectivity.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
@@ -25,8 +26,8 @@ const badgePollingInterval = Duration(milliseconds: 60000);
 ///
 /// While [active] (RN: the hosting screen is focused and the user has
 /// `VIEW_USER_BADGES`), polls `GET /badges/me?viewedStatus=UNVIEWED` now,
-/// every 60s and whenever the app comes back to the foreground (RTK's
-/// `refetchOnFocus`). Unviewed badges queue up: the first shows after 1s,
+/// every 60s, whenever the app comes back to the foreground (RTK's
+/// `refetchOnFocus`) and when the network comes back (`refetchOnReconnect`). Unviewed badges queue up: the first shows after 1s,
 /// each auto-closes after 5s (only once its image is laid out, so a badge
 /// with no image stays until closed, as in RN), and closing one marks it
 /// viewed (`PATCH /badges/me/:badgeId/viewed`) and shows the next 350ms
@@ -187,6 +188,11 @@ class BadgePopupHostState extends ConsumerState<BadgePopupHost> with WidgetsBind
 
   @override
   Widget build(BuildContext context) {
+    // RTK `refetchOnReconnect` (store.ts `setupListeners`): back online
+    // while active, fetch the unviewed badges straight away.
+    ref.listen<AsyncValue<bool>>(isOfflineProvider, (previous, next) {
+      if (previous?.value == true && next.value == false && widget.active) unawaited(_fetch());
+    });
     final badge = _current;
     if (badge == null) return const SizedBox.shrink();
     return Stack(

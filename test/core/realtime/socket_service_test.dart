@@ -67,6 +67,40 @@ void main() {
       },
     );
 
+    // testWidgets for its fake clock.
+    testWidgets('a failed open retries after RETRY_AFTER_FAILURE_MS (2s), until disconnect', (tester) async {
+      var calls = 0;
+      when(() => tokenStorage.accessToken).thenAnswer((_) async {
+        calls++;
+        throw Exception('keychain locked');
+      });
+
+      await service.connect(namespacePath: '/cloud-telephony-chat', userId: 'user-1');
+      expect(calls, 1);
+
+      await tester.pump(const Duration(milliseconds: 1999));
+      expect(calls, 1);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(calls, 2, reason: 'retried once the 2s timer fired');
+
+      service.disconnect();
+      await tester.pump(const Duration(seconds: 10));
+      expect(calls, 2, reason: 'disconnect cancels the retry');
+    });
+
+    test('a disconnect while the token is loading abandons that connect', () async {
+      final tokenCompleter = Completer<String?>();
+      when(() => tokenStorage.accessToken).thenAnswer((_) => tokenCompleter.future);
+
+      final pending = service.connect(namespacePath: '/microphone-chat', userId: 'user-1');
+      service.disconnect();
+      // Had it not bailed out, a real token would reach `io.io(...)`.
+      tokenCompleter.complete('token');
+      await pending;
+
+      expect(service.isConnected, isFalse);
+    });
+
     // NOTE: the `if (_socket != null) { ... }` idempotent-reconnect branch
     // (and everything past the null-token check: the real `io.io(...)`
     // call, auth-fn token refresh, event-callback registration) can't be
