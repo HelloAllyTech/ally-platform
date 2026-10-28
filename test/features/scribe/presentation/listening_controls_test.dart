@@ -37,6 +37,7 @@ void main() {
       expect(find.text('End Session'), findsOneWidget);
       expect(find.text('Your data is safe'), findsOneWidget);
       expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
+      expect(find.text("Need notes captured? AI can't hear you right now. Resume to let it listen."), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
       await tester.pump();
@@ -46,9 +47,14 @@ void main() {
       await tester.pump();
       expect(endedSession, isTrue);
 
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(find.byKey(const ValueKey('mute-tooltip-close')));
       await tester.pump();
       expect(dismissedTooltip, isTrue);
+
+      // RN CollapsibleButtonGroup: the chevron collapses the buttons.
+      await tester.tap(find.byKey(const ValueKey('listening-control-buttons-toggle')));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('pause-resume-button')), findsNothing);
     },
   );
 }

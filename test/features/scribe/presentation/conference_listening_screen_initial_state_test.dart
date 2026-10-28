@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +23,7 @@ class MockTokenStorage extends Mock implements TokenStorage {}
 // gives `pumpAndSettle()` a stable frame to land on). Replicated `pumpApp`'s
 // setup manually, with a bounded `pump()` instead.
 void main() {
-  testWidgets('auto-connects on mount and shows the waiting-for-client spinner state', (
+  testWidgets('auto-connects on mount and shows the Connecting state', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -44,7 +45,10 @@ void main() {
     // no-ops before ever creating a real socket (same gotcha documented on
     // scribe_recording_screen_initial_state_test.dart) — this screen should
     // degrade to the waiting state rather than crash.
-    expect(find.text('Waiting for the client to join'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // RN: "Connecting…" with the iOS spinner on the dark page (no Cancel on
+    // the conference screen).
+    expect(find.byKey(const ValueKey('listening-connecting')), findsOneWidget);
+    expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+    expect(find.byKey(const ValueKey('connecting-cancel')), findsNothing);
   });
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_fonts.dart';
+
 /// Direct port of RN's `Timer` (`src/screens/ListeningScreen/components/
 /// Timer/Timer.tsx`) — ticks every second from a fixed epoch anchor
 /// ([startTime], RN's `chatData.startedAt`), formatted `HH:MM:SS` (three
@@ -55,6 +57,17 @@ class _ElapsedTimerState extends State<ElapsedTimer> {
     final hours = _elapsed.inHours;
     final minutes = _elapsed.inMinutes.remainder(60);
     final seconds = _elapsed.inSeconds.remainder(60);
-    return Text('${pad(hours)}:${pad(minutes)}:${pad(seconds)}');
+    // RN `Timer` styles.timer: Plex Regular 16 / 20.8, white, centred.
+    return Text(
+      '${pad(hours)}:${pad(minutes)}:${pad(seconds)}',
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        fontFamily: AppFonts.ibmPlexSerifRegular,
+        fontSize: 16,
+        height: 20.8 / 16,
+        letterSpacing: 0,
+        color: Colors.white,
+      ),
+    );
   }
 }

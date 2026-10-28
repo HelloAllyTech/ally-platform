@@ -11,6 +11,8 @@ import 'package:ally_mobile_flutter/features/simulations/presentation/start_simu
 
 import '../../../support/fake_translations.dart';
 import '../../../support/pump_app.dart';
+import '../../../support/fake_permission_platform.dart';
+import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 PathScenario _scenario({
   required String id,
@@ -65,6 +67,10 @@ Future<void> _pump(WidgetTester tester, Widget child, {SimulationCredits? credit
 );
 
 void main() {
+  // The start flow asks for the microphone before creating the session
+  // (RN useStartSimulation); granted unless a test says otherwise.
+  setUp(() => PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({}));
+
   setUp(() {
     repository = MockSimulationsRepository();
     when(

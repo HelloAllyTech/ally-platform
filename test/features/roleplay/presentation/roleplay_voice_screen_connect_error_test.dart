@@ -12,26 +12,37 @@ import 'roleplay_test_mocks.dart';
 // See roleplay_voice_screen_initial_state_test.dart for why this screen's
 // tests are one-`testWidgets`-per-file.
 void main() {
-  testWidgets('a connect() failure surfaces the connect-error message', (tester) async {
-    PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({});
-    final liveKitService = MockLiveKitRoomService();
-    when(() => liveKitService.disconnect()).thenAnswer((_) async {});
-    when(
-      () => liveKitService.connect(
-        liveKitServerUrl: any(named: 'liveKitServerUrl'),
-        accessToken: any(named: 'accessToken'),
-      ),
-    ).thenThrow(Exception('boom'));
+  testWidgets(
+    'an automatic connect() failure surfaces the connect-error message',
+    (tester) async {
+      PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({});
+      final liveKitService = MockLiveKitRoomService();
+      when(() => liveKitService.disconnect()).thenAnswer((_) async {});
+      when(
+        () => liveKitService.connect(
+          liveKitServerUrl: any(named: 'liveKitServerUrl'),
+          accessToken: any(named: 'accessToken'),
+        ),
+      ).thenThrow(Exception('boom'));
 
-    await pumpApp(
-      tester,
-      const RoleplayVoiceScreen(liveKitServerUrl: 'wss://x', accessToken: 'tok'),
-      overrides: [liveKitRoomServiceProvider.overrideWithValue(liveKitService)],
-    );
+      await pumpApp(
+        tester,
+        const RoleplayVoiceScreen(
+          liveKitServerUrl: 'wss://x',
+          accessToken: 'tok',
+        ),
+        overrides: [
+          liveKitRoomServiceProvider.overrideWithValue(liveKitService),
+        ],
+      );
 
-    await tester.tap(find.text('Connect'));
-    await tester.pumpAndSettle();
+      // The screen connects by itself on mount (RN `handleConnect` effect).
+      await tester.pump(const Duration(seconds: 1));
 
-    expect(find.textContaining('Failed to connect to the room'), findsOneWidget);
-  });
+      expect(
+        find.textContaining('Failed to connect to the room'),
+        findsOneWidget,
+      );
+    },
+  );
 }

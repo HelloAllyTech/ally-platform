@@ -192,4 +192,17 @@ class AppColors {
   static const transcriptHighlight = Color(0x80FFF8E1); // rgba(255,248,225,0.5)
   static const whiteTransparent40 = Color(0x66FFFFFF); // thread card fade
   static const whiteTransparent60 = Color(0x99FFFFFF); // thread card fade
+  // live parity (SimulationAssistantScreen, ListeningScreen)
+  static const brightRed = Color(0xFFF93535); // colors.brightRed: IllustratedModal action
+  static const lightGray6B = Color(0xFF6B7280); // '#6B7280' literal: SessionProgress inactive label
+  static const darkGray7 = Color(0xFF17181A); // colors.darkGray7: listening screen background
+  static const darkGray3 = Color(0xFF191B1F); // colors.darkGray3: listening controls bar
+  static const lightBlue5 = Color(0xFFDAE9FC); // colors.lightBlue5: DismissableBanner
+  static const charcoal = Color(0xFF151321); // colors.charcoal: DismissableBanner text
+  static const gunmetal = Color(0xFF424242); // colors.gunmetal: NudgeSection border
+  static const charcoalBlue = Color(0xFF1C3C51); // colors.charcoalBlue: nudge skeleton
+  static const powderBlue = Color(0xFFB7D9FF); // colors.powderBlue: nudge thumbs
+  static const teal = Color(0xFF4D8779); // colors.teal: nudge feedback divider
+  static const paleBlue = Color(0xFFEAFEFE); // colors.paleBlue: nudge markdown text
+  static const lightCyan = Color(0xFFDAFFFF); // colors.lightCyan: nudge markdown title
 }

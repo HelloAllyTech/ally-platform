@@ -52,14 +52,13 @@ void main() {
       ],
     );
 
-    await tester.tap(find.text('Connect'));
-    await tester.pump();
     await tester.pump(const Duration(seconds: 3));
+      await joinAgent(tester, liveKitService);
       await expandRoleplayControls(tester);
     elapsed = const Duration(seconds: 1);
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('Session Ending Soon'), findsOneWidget);
+    expect(find.text('Session Ending Soon', findRichText: true), findsOneWidget);
     // Two "End session" buttons are on screen now: the screen's own
     // persistent destructive button, and the warning dialog's secondary
     // action — the dialog's is added last in the Stack.

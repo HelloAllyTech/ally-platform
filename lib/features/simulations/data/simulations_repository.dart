@@ -107,8 +107,12 @@ class SimulationsRepository {
     return SessionData.fromJson(response.data!);
   }
 
+  /// RN `endScenarioSession` posts `{enableRecommendations: true}`.
   Future<void> endScenarioSession(String scenarioSessionId) async {
-    await _dio.post<void>('/learn/scenario-session/$scenarioSessionId/end');
+    await _dio.post<void>(
+      '/learn/scenario-session/$scenarioSessionId/end',
+      data: {'enableRecommendations': true},
+    );
   }
 
   /// Cases (`/learn/cases`) are structurally identical to scenario paths in

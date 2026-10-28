@@ -49,23 +49,22 @@ void main() {
         overrides: [liveKitRoomServiceProvider.overrideWithValue(liveKitService)],
       );
 
-      await tester.tap(find.text('Connect'));
-      await tester.pump();
       await tester.pump(const Duration(seconds: 3));
+      await joinAgent(tester, liveKitService);
       await expandRoleplayControls(tester); // past the countdown
 
-      expect(find.text('Session Ending Soon'), findsNothing);
+      expect(find.text('Session Ending Soon', findRichText: true), findsNothing);
 
       elapsed = const Duration(seconds: 1);
       await tester.pump(const Duration(seconds: 1));
 
-      expect(find.text('Session Ending Soon'), findsOneWidget);
+      expect(find.text('Session Ending Soon', findRichText: true), findsOneWidget);
       expect(find.text('Your session will end in 30 seconds.'), findsOneWidget);
 
       await tester.tap(find.text('Continue'));
       await tester.pump();
 
-      expect(find.text('Session Ending Soon'), findsNothing);
+      expect(find.text('Session Ending Soon', findRichText: true), findsNothing);
       verifyNever(() => liveKitService.disconnect());
     },
   );

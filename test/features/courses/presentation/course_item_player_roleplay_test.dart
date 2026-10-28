@@ -13,6 +13,8 @@ import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
 
 import '../../../support/pump_router_app.dart';
+import '../../../support/fake_permission_platform.dart';
+import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 class MockCoursesRepository extends Mock implements CoursesRepository {}
 
@@ -59,6 +61,10 @@ TrackDetail _track({TrackItemStatus rpStatus = TrackItemStatus.unlocked, String?
 );
 
 void main() {
+  // The start flow asks for the microphone before creating the session
+  // (RN useStartSimulation); granted unless a test says otherwise.
+  setUp(() => PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({}));
+
   late MockCoursesRepository courses;
   late MockSimulationsRepository sims;
   late int trackFetches;

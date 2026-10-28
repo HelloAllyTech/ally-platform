@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 
-/// Direct port of RN's `DismissableBanner` — a one-shot info banner shown
-/// only on `ConferenceListeningScreen`'s focus-mode view (never on Scribe's
-/// own screen, confirmed from source), reminding the counsellor that
-/// AI note-taking stops once the call ends.
+/// Port of RN's `ListeningScreen/components/DismissableBanner` — shown on
+/// the conference Listening screen in focus mode only (and only for a
+/// conference-call provider): a `lightBlue5` 8-radius card 50vs from the
+/// top with the blue warning icon, "Scribe stops taking notes…" in Plex
+/// 14 `charcoal`, and an 18pt close.
 class DismissableBanner extends ConsumerWidget {
   const DismissableBanner({super.key, required this.onClose});
 
@@ -15,27 +19,40 @@ class DismissableBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final rn = RnSize.of(context);
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE3F2FD),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      key: const ValueKey('dismissable-banner'),
+      margin: EdgeInsets.only(left: rn.s(20), right: rn.s(20), top: rn.vs(50)),
+      padding: EdgeInsets.symmetric(horizontal: rn.s(12), vertical: rn.vs(10)),
+      decoration: BoxDecoration(color: AppColors.lightBlue5, borderRadius: BorderRadius.circular(rn.s(8))),
       child: Row(
         children: [
-          SvgPicture.asset('assets/icons/blueWarning.svg', width: 18, height: 16),
-          const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              ref.t('listeningScreen.scribeStopTakingNotesBanner'),
-              style: const TextStyle(fontSize: 14),
+            child: Padding(
+              padding: EdgeInsets.only(right: rn.s(8)),
+              child: Row(
+                children: [
+                  SvgPicture.asset('assets/icons/blueWarning.svg', width: 18, height: 16),
+                  SizedBox(width: rn.s(10)),
+                  Flexible(
+                    child: Text(
+                      ref.t('listeningScreen.scribeStopTakingNotesBanner'),
+                      style: const TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifRegular,
+                        fontSize: 14,
+                        color: AppColors.charcoal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
           GestureDetector(
+            key: const ValueKey('dismissable-banner-close'),
+            behavior: HitTestBehavior.opaque,
             onTap: onClose,
-            child: const Icon(Icons.close, size: 18),
+            child: SvgPicture.asset('assets/icons/close.svg', width: 18, height: 18),
           ),
         ],
       ),
