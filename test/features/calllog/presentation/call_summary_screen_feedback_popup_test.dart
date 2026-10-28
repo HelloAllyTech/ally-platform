@@ -82,7 +82,7 @@ void main() {
       await tester.pumpAndSettle();
 
       elapsed = const Duration(seconds: 31);
-      await tester.pageBack();
+      await tester.tap(find.byKey(const Key('call-summary-back')));
       await tester.pumpAndSettle();
 
       expect(find.text('Rate the AI-generated summary?'), findsOneWidget);
@@ -129,7 +129,7 @@ void main() {
     await _pump(tester, repository: repository, now: () => DateTime(2026, 1, 1).add(elapsed));
     await tester.pumpAndSettle();
     elapsed = const Duration(seconds: 31);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('call-summary-back')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('feedback-popup-star-3')));
@@ -163,7 +163,7 @@ void main() {
     await tester.pumpAndSettle();
 
     elapsed = const Duration(seconds: 31);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('call-summary-back')));
     await tester.pumpAndSettle();
 
     expect(find.text('Rate the AI-generated summary?'), findsOneWidget);
@@ -212,7 +212,7 @@ void main() {
     await tester.pump();
     expect(find.text('Setting up your summary screen'), findsNothing);
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('call-summary-back')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -228,7 +228,7 @@ void main() {
     await _pump(tester, repository: repository);
     await tester.pumpAndSettle();
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('call-summary-back')));
     await tester.pumpAndSettle();
 
     expect(find.text('Rate the AI-generated summary?'), findsNothing);
@@ -246,7 +246,7 @@ void main() {
     await tester.pumpAndSettle();
 
     elapsed = const Duration(seconds: 31);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('call-summary-back')));
     await tester.pumpAndSettle();
 
     expect(find.text('Rate the AI-generated summary?'), findsNothing);
@@ -268,7 +268,7 @@ void main() {
     await tester.pumpAndSettle();
 
     elapsed = const Duration(seconds: 31);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('call-summary-back')));
     await tester.pumpAndSettle();
 
     expect(find.text('Rate the AI-generated summary?'), findsNothing);
