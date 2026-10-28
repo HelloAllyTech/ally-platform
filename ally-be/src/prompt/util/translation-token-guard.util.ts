@@ -16,7 +16,7 @@
  */
 
 const PLACEHOLDER_RE = /\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}/g;
-const AUDIO_TAG_RE = /\[\s*([a-z][a-z0-9 _-]*)\s*\]/g;
+const AUDIO_TAG_RE = /\[\s*([a-z][a-z0-9_-]*)\s*\]/gi;
 
 export interface TokenDiff {
   /** Tokens present in source but missing (or under-represented) in output. */
@@ -45,7 +45,8 @@ export function extractPlaceholders(text: string): string[] {
 export function extractAudioTags(text: string): string[] {
   if (!text || typeof text !== 'string') return [];
   const tokens: string[] = [];
-  for (const m of text.matchAll(AUDIO_TAG_RE)) tokens.push(`[${m[1].trim()}]`);
+  for (const m of text.matchAll(AUDIO_TAG_RE))
+    tokens.push(`[${m[1].trim().toLowerCase()}]`);
   return tokens;
 }
 
@@ -111,5 +112,5 @@ export function normaliseTranslationTokens(output: string): string {
   if (!output || typeof output !== 'string') return output;
   return output
     .replace(PLACEHOLDER_RE, (_, name: string) => `{${name.trim()}}`)
-    .replace(AUDIO_TAG_RE, (_, tag: string) => `[${tag.trim()}]`);
+    .replace(AUDIO_TAG_RE, (_, tag: string) => `[${tag.trim().toLowerCase()}]`);
 }

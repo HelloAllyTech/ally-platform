@@ -103,6 +103,12 @@ describe('translation-token-guard', () => {
         output: 'ठीक है [ laughs ]',
         ok: true,
       },
+      {
+        name: 'capitalized audio tag is tolerated',
+        source: 'ok [laughs]',
+        output: 'ठीक है [Laughs]',
+        ok: true,
+      },
     ];
 
     cases.forEach((c) => {
