@@ -1686,7 +1686,9 @@
     "title": "ஆப் மொழி"
   },
   "accessibility": {
-    "openMenu": "மெனுவைத் திறக்கவும்"
+    "openMenu": "மெனுவைத் திறக்கவும்",
+    "filter": "வடிகட்டு",
+    "refresh": "புதுப்பி"
   },
   "courses": {
     "progress": "{{total}} இல் {{completed}}",

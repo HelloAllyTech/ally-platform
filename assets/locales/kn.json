@@ -1686,7 +1686,9 @@
     "title": "ಆ್ಯಪ್ ಭಾಷೆ"
   },
   "accessibility": {
-    "openMenu": "ಮೆನು ತೆರೆಯಿರಿ"
+    "openMenu": "ಮೆನು ತೆರೆಯಿರಿ",
+    "filter": "ಫಿಲ್ಟರ್",
+    "refresh": "ರಿಫ್ರೆಶ್ ಮಾಡಿ"
   },
   "courses": {
     "progress": "{{total}} ರಲ್ಲಿ {{completed}}",

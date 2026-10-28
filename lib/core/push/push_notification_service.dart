@@ -3,10 +3,11 @@ import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, visibleForTesting;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/notifications/data/notifications_repository.dart';
 import '../navigation/home_tab_navigation.dart';
@@ -105,8 +106,42 @@ Future<void> initializeLocalNotifications(GoRouter router) {
     }
     final launchDetails = await localNotificationsPlugin.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp != true) return;
-    navigateForNotificationPayload(launchDetails?.notificationResponse?.payload, router);
+    final payload = launchDetails?.notificationResponse?.payload;
+    if (!await claimColdStartNotificationTap(payload)) return;
+    navigateForNotificationPayload(payload, router);
   }();
+}
+
+/// RN AsyncStorage `LEADERBOARD_NOTIF_HANDLED_TS`.
+const leaderboardNotificationHandledKey = 'LEADERBOARD_NOTIF_HANDLED_TS';
+
+/// RN RootNavigator's initial-notification dedupe: a weekly leaderboard
+/// reminder that launched the app is acted on once per scheduled instance
+/// (its `scheduledAt`), so a launch notification the platform keeps
+/// reporting doesn't jump to the Leaderboard tab again on a later launch.
+/// Other notifications always pass.
+@visibleForTesting
+Future<bool> claimColdStartNotificationTap(String? payload) async {
+  if (payload == null) return true;
+  Map<String, dynamic> decoded;
+  try {
+    decoded = jsonDecode(payload) as Map<String, dynamic>;
+  } catch (_) {
+    return true;
+  }
+  if (decoded['id'] != leaderboardNotificationId) return true;
+  final scheduledAt = (decoded['data'] as Map?)?['scheduledAt']?.toString();
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (scheduledAt != null && prefs.getString(leaderboardNotificationHandledKey) == scheduledAt) return false;
+    await prefs.setString(
+      leaderboardNotificationHandledKey,
+      scheduledAt ?? DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+  } catch (_) {
+    // Storage unavailable: navigate rather than drop the tap.
+  }
+  return true;
 }
 
 /// Decodes a local notification's payload — `{"id": "...", "data":

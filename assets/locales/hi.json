@@ -1686,7 +1686,9 @@
     "title": "ऐप भाषा"
   },
   "accessibility": {
-    "openMenu": "मेन्यू खोलें"
+    "openMenu": "मेन्यू खोलें",
+    "filter": "फ़िल्टर",
+    "refresh": "रीफ़्रेश करें"
   },
   "courses": {
     "progress": "{{total}} में से {{completed}}",

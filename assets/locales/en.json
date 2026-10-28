@@ -2064,7 +2064,9 @@
     "title": "App Language"
   },
   "accessibility": {
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "filter": "Filter",
+    "refresh": "Refresh"
   },
   "bugReport": {
     "menuLabel": "Report a problem",

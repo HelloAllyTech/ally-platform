@@ -1686,7 +1686,9 @@
     "title": "अ‍ॅप भाषा"
   },
   "accessibility": {
-    "openMenu": "मेनू उघडा"
+    "openMenu": "मेनू उघडा",
+    "filter": "फिल्टर",
+    "refresh": "रिफ्रेश करा"
   },
   "courses": {
     "progress": "{{total}} पैकी {{completed}}",
