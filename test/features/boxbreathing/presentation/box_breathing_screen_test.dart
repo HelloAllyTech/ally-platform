@@ -85,7 +85,7 @@ Future<_Harness> _pump(WidgetTester tester, {bool skipOverlay = true}) async {
           return Text('summary ${state.pathParameters['id']}');
         },
       ),
-      GoRoute(path: '/home', builder: (_, _) => const Text('home shell')),
+      GoRoute(path: '/home', builder: (_, state) => Text('home shell ${state.uri.queryParameters['tab'] ?? ''}'.trim())),
     ],
   );
   await tester.pumpWidget(
@@ -207,7 +207,7 @@ void main() {
     expect(h.sound.calls, contains('pause'));
   });
 
-  testWidgets('back resets to the home shell and clears the current chat', (tester) async {
+  testWidgets('back resets to the home shell (Call Log tab) and clears the current chat', (tester) async {
     final h = await _pump(tester);
     h.container.read(currentChatProvider.notifier).set(
       Chat(chatId: 42, status: 'ENDED', provider: 'x', startedAt: '2026-10-28T10:00:00Z', messages: const []),
@@ -217,7 +217,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('home shell'), findsOneWidget);
+    // RN resets to the Call Log tab.
+    expect(find.text('home shell CallLog'), findsOneWidget);
     expect(h.container.read(currentChatProvider), isNull);
     expect(h.sound.calls, containsAllInOrder(['pause', 'stop']));
   });
