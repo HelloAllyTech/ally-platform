@@ -121,4 +121,5 @@ class AppColors {
   static const lightGray12 = Color(0xFFA5A5A5); // Search no-results text
   static const lightGray13 = Color(0xFF898989); // Search input placeholder
   static const darkSlate = Color(0xFF292929); // Search input text
+  static const lightGray1 = Color(0xFFF8F8F8); // AchievementCard icon background
 }

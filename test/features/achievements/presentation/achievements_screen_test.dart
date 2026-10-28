@@ -71,10 +71,12 @@ void main() {
         overrides: [achievementsRepositoryProvider.overrideWithValue(repository), _hasBadgesPermission],
       );
 
-      // No back arrow when this is the root route (nothing to pop to) —
-      // e.g. reached as the Achievements bottom tab, not pushed from
-      // elsewhere.
-      expect(find.byIcon(Icons.arrow_back), findsNothing);
+      // RN's own header always draws the back arrow, even as the
+      // reviewer-only Achievements tab (it's then a no-op here).
+      expect(find.byKey(const Key('back-title-header-back')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('back-title-header-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('Momentum'), findsOneWidget, reason: 'still on Achievements');
 
       // --- All tab (default): every badge from every category shows, ---
       // --- each with its RN-real translated category label (mapped   ---
@@ -132,7 +134,8 @@ void main() {
         overrides: [achievementsRepositoryProvider.overrideWithValue(failingRepository), _hasBadgesPermission],
       );
 
-      expect(find.textContaining('Unable to Load Achievements'), findsOneWidget);
+      // RN shows achievements.errors.description, not the title.
+      expect(find.textContaining('Something went wrong while loading achievements'), findsOneWidget);
     },
   );
 
@@ -152,7 +155,7 @@ void main() {
     router.push('/achievements');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.tap(find.byKey(const Key('back-title-header-back')));
     await tester.pumpAndSettle();
 
     expect(find.text('LEADERBOARD'), findsOneWidget);
