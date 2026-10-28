@@ -45,12 +45,21 @@ class CallLogItem {
     final details = json['details'] as Map<String, dynamic>?;
     final summary = details?['summary'] as Map<String, dynamic>?;
     final rawTags = summary?['tags'] as List<dynamic>? ?? [];
+    final callInfo = details?['callInfo'] as Map<String, dynamic>?;
     return CallLogItem(
       id: (json['id'] as num).toInt(),
       startedAt: json['startedAt'] as String,
       endedAt: json['endedAt'] as String? ?? '',
       status: json['status'] as String,
-      sessionName:
+      // RN's `CallLogItem.tsx` `logTitle`:
+      // `details.callInfo.summaryName || metadata.sessionName || ...` — this
+      // was reading only `metadata.sessionName`, missing the higher-priority
+      // `callInfo.summaryName`, which ally-be always sets
+      // (`ChatUtil.getSummaryName`: `CALL-${chat.id}-${date}`) and
+      // `metadata.sessionName` almost never is. In practice every ordinary
+      // call was falling through to this screen's own further fallback
+      // instead of showing its real "CALL-..." reference.
+      sessionName: callInfo?['summaryName'] as String? ??
           (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
       score: (json['score'] as num?)?.toDouble(),
       tags: rawTags.map((t) => CallTag.fromJson(t as Map<String, dynamic>)).toList(),
