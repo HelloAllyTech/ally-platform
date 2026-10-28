@@ -102,7 +102,8 @@ void main() {
       overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
     );
 
-    expect(find.textContaining('courses.progressDashboard.notFound'), findsOneWidget);
+    expect(find.byKey(const Key('course-progress-error')), findsOneWidget);
+    expect(find.textContaining('boom'), findsNothing);
   });
 
   testWidgets('renders a static header (not the track title) plus completion percentage and item counts', (
