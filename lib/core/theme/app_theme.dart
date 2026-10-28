@@ -65,6 +65,15 @@ class AppTheme {
         foregroundColor: AppColors.onPrimary,
       ),
       textTheme: _textTheme,
+      // ThemeData and Theme both merge the text theme over Material's
+      // typography geometry, which would refill bodyMedium's deliberately
+      // empty height/letterSpacing with M3's 20/14 and 0.25. Strip those two
+      // from the geometry's bodyMedium for every script category.
+      typography: Typography.material2021(
+        englishLike: _withoutBodyMetrics(Typography.englishLike2021),
+        dense: _withoutBodyMetrics(Typography.dense2021),
+        tall: _withoutBodyMetrics(Typography.tall2021),
+      ),
       // Material3's default Switch leans on `colorScheme.outline` for its
       // unselected thumb plus a visible track border — against this app's
       // blue AppBar (the share-toggle's only home, in
@@ -86,6 +95,24 @@ class AppTheme {
       ),
     );
   }
+
+  static TextTheme _withoutBodyMetrics(TextTheme geometry) {
+    final body = geometry.bodyMedium!;
+    return geometry.copyWith(
+      bodyMedium: TextStyle(
+        debugLabel: body.debugLabel,
+        inherit: body.inherit,
+        fontSize: body.fontSize,
+        fontWeight: body.fontWeight,
+        textBaseline: body.textBaseline,
+        leadingDistribution: body.leadingDistribution,
+      ),
+    );
+  }
+
+  /// RN `typography.body.medium` (14/22, 0.2) in IBM Plex Serif Regular.
+  static const rnBodyMedium = TextStyle(
+      fontSize: 14, height: 22 / 14, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular);
 
   static const _textTheme = TextTheme(
     // display + headline: REPLAY_PRO.HEADLINE, matching RN's headline.* tiers
@@ -109,8 +136,11 @@ class AppTheme {
         fontSize: 12, height: 16 / 12, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
     bodyLarge: TextStyle(
         fontSize: 16, height: 24 / 16, letterSpacing: 0.5, fontFamily: AppFonts.ibmPlexSerifRegular),
-    bodyMedium: TextStyle(
-        fontSize: 14, height: 22 / 14, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
+    // Material makes bodyMedium every screen's DefaultTextStyle, so it plays
+    // the part of RN's unstyled <Text>: no lineHeight (the font's own, 1.3em
+    // for IBM Plex) and no letterSpacing. RN's typography.body.medium tier is
+    // [rnBodyMedium], for the widgets that ask for it by name.
+    bodyMedium: TextStyle(fontSize: 14, fontFamily: AppFonts.ibmPlexSerifRegular),
     bodySmall: TextStyle(
         fontSize: 12, height: 16 / 12, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
     // label: ROBOTO.REGULAR, the next most common font (buttons/tags/labels)

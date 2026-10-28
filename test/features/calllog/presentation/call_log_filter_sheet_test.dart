@@ -11,6 +11,7 @@ import 'package:ally_mobile_flutter/features/calllog/data/custom_fields_reposito
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
 
 import '../../../support/pump_router_app.dart';
+import '../../../support/phone_viewport.dart';
 
 class MockCallLogRepository extends Mock implements CallLogRepository {}
 
@@ -24,6 +25,7 @@ void main() {
   testWidgets(
     'picking a Status chip and tapping Apply refetches with that filter and shows the active-count badge',
     (tester) async {
+      usePhoneViewport(tester);
       final repository = MockCallLogRepository();
       when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: any(named: 'filter')))
           .thenAnswer((_) async => []);
@@ -67,6 +69,7 @@ void main() {
   );
 
   testWidgets('Clear resets the draft before Apply, and the badge disappears', (tester) async {
+    usePhoneViewport(tester);
     final repository = MockCallLogRepository();
     when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: any(named: 'filter')))
         .thenAnswer((_) async => []);
@@ -107,6 +110,7 @@ void main() {
   testWidgets(
     'custom fields: a filterable definition renders and selecting it refetches with fieldFilters',
     (tester) async {
+      usePhoneViewport(tester);
       final repository = MockCallLogRepository();
       final customFieldsRepository = MockCustomFieldsRepository();
       when(() => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: any(named: 'filter')))

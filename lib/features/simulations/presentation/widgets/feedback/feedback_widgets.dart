@@ -373,12 +373,16 @@ class ShortSessionSummary extends ConsumerWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Text(
-                    formatDateTime(
-                      data.startedAt,
-                      ref.watch(localizationControllerProvider).value?.raw('months.full') as List<dynamic>?,
+                  // Flexible: a long localized date wraps, as RN's Text does
+                  // in a row, instead of overflowing it.
+                  Flexible(
+                    child: Text(
+                      formatDateTime(
+                        data.startedAt,
+                        ref.watch(localizationControllerProvider).value?.raw('months.full') as List<dynamic>?,
+                      ),
+                      style: _meta,
                     ),
-                    style: _meta,
                   ),
                   const SizedBox(width: 8),
                   const Text(
@@ -392,7 +396,7 @@ class ShortSessionSummary extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(_duration(data.startedAt, data.endedAt), style: _meta),
+                  Flexible(child: Text(_duration(data.startedAt, data.endedAt), style: _meta)),
                 ],
               ),
             ],

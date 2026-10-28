@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import '../theme/app_radius.dart';
 
 /// Ports two distinct RN text-input patterns found under
@@ -57,10 +58,8 @@ class AppTextField extends StatelessWidget {
   /// The real text style every input uses (`IBM_PLEX_SERIF.REGULAR`) —
   /// exposed so a `TextFormField` that needs `Form`/`validator` support
   /// (which this widget doesn't wrap) can still match the same look.
-  static TextStyle? textStyleFor(BuildContext context) => Theme.of(context)
-      .textTheme
-      .bodyMedium
-      ?.copyWith(color: AppColors.highEmphasis, fontFamily: 'IBMPlexSerif-Regular');
+  static TextStyle? textStyleFor(BuildContext context) =>
+      AppTheme.rnBodyMedium.copyWith(color: AppColors.highEmphasis);
 
   /// The real `InputDecoration` for a given [shape]/[isError] — see
   /// [textStyleFor]'s doc comment for why this is exposed separately from

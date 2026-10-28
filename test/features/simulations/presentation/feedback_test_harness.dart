@@ -16,6 +16,7 @@ import 'package:ally_mobile_flutter/features/simulations/data/simulations_reposi
 import 'package:ally_mobile_flutter/features/simulations/presentation/simulation_feedback_screen.dart';
 
 import '../../../support/pump_router_app.dart';
+import '../../../support/phone_viewport.dart';
 
 /// Shared setup for the `SimulationFeedbackScreen` widget tests.
 
@@ -130,6 +131,7 @@ class FeedbackHarness {
     String? caseId,
     List<String> permissions = allPermissions,
   }) {
+    usePhoneViewport(tester);
     return pumpRouterApp(
       tester,
       initialLocation: '/feedback',

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_radius.dart';
+import '../theme/app_theme.dart';
+import '../theme/rn_scale.dart';
 
 /// Direct port of ally-mobile (React Native)'s `src/components/Button/
 /// Button.tsx` — pill-shaped (`radius.full`), full-bleed-width button with
@@ -40,6 +42,8 @@ class AppButton extends StatelessWidget {
   final Widget? iconLeft;
   final Widget? iconRight;
 
+  // RN's Button styles are all `@vs` (height-scaled): '44@vs' is ~56pt on a
+  // 874pt-tall iPhone, not the ~47pt a plain (ms-scaled) 44 gives.
   static const Map<AppButtonSize, double> _minHeight = {
     AppButtonSize.sm: 32,
     AppButtonSize.md: 44,
@@ -55,6 +59,7 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = isDisabled || isLoading;
+    final rn = RnSize.of(context);
     final (background, textColor) = switch (variant) {
       AppButtonVariant.primary => (AppColors.primary, Colors.white),
       AppButtonVariant.secondary => (Colors.white, AppColors.highEmphasis),
@@ -70,9 +75,11 @@ class AppButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.full),
           onTap: disabled ? null : onPressed,
           child: Container(
-            constraints: BoxConstraints(minHeight: _minHeight[size]!),
+            constraints: BoxConstraints(minHeight: rn.vs(_minHeight[size]!)),
+            // styles.buttonLoading replaces the size's padding ('10@vs'),
+            // it doesn't add to it.
             padding: EdgeInsets.symmetric(
-              vertical: _verticalPadding[size]! + (isLoading ? 10 : 0),
+              vertical: rn.vs(isLoading ? 10 : _verticalPadding[size]!),
             ),
             decoration: variant == AppButtonVariant.secondary
                 ? BoxDecoration(
@@ -105,10 +112,7 @@ class AppButton extends StatelessWidget {
                           // in copyWith's own implementation), so that
                           // previously silently kept bodyMedium's
                           // IBMPlexSerif instead of resetting to Roboto.
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: textColor, fontFamily: AppFonts.robotoRegular),
+                          style: AppTheme.rnBodyMedium.copyWith(color: textColor, fontFamily: AppFonts.robotoRegular),
                         ),
                       ),
                       if (iconRight != null) ...[const SizedBox(width: 8), iconRight!],
