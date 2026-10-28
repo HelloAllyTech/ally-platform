@@ -68,7 +68,7 @@ void main() {
 
     await tester.tap(find.text('Features & Demographics'));
     await tester.pumpAndSettle();
-    expect(find.text('Age'), findsOneWidget);
-    expect(find.text('Gender'), findsNothing);
+    expect(find.text('Age:'), findsOneWidget);
+    expect(find.text('Gender:'), findsNothing);
   });
 }
