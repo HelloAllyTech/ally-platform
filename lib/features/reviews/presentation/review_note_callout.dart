@@ -1,28 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
+import 'review_styles.dart';
 
-/// Direct port of ally-mobile (React Native)'s `src/screens/
-/// ReviewDetailsScreen/components/ReviewNote.tsx` — an orange-tinted,
-/// left-bordered callout distinguishing the reviewer's free-text note from
-/// the rest of the screen, with a pencil edit affordance shown only when
-/// [onEditNote] is supplied (the caller is responsible for RN's own gating:
-/// `!isMinutesPassed(reviewData.createdAt) && userData?.id ===
-/// reviewData.createdBy?.id && reviewData.reviewStatus !== HIDDEN`). RN also
-/// shows a "+" button to add a note when none exists yet — not ported, since
-/// this widget (matching its call site) only renders when there's already a
-/// note to show.
+/// Direct port of ally-mobile (React Native)'s `ReviewDetailsScreen/
+/// components/ReviewNote.tsx`: an orange50 callout with a 1pt orange400
+/// left rule, a "NOTE" label (Roboto, orange900) and the note. With
+/// [onEditNote] (RN's gate: own review, not hidden, within 10 minutes) it
+/// shows a round edit button — or, when there's no note yet, a square "+".
 class ReviewNoteCallout extends ConsumerWidget {
   const ReviewNoteCallout({super.key, required this.note, this.onEditNote});
 
-  final String note;
+  final String? note;
   final VoidCallback? onEditNote;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final hasNote = note != null && note!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
@@ -33,38 +31,60 @@ class ReviewNoteCallout extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                ref.t('review.details.noteLabel'),
-                style: const TextStyle(
-                  fontFamily: AppFonts.robotoRegular,
-                  fontSize: 14,
-                  height: 22 / 14,
-                  letterSpacing: 0.2,
-                  color: AppColors.orange900,
+              Flexible(
+                child: Text(
+                  ref.t('review.details.noteLabel'),
+                  overflow: TextOverflow.ellipsis,
+                  style: ReviewText.style(RnType.bodyMedium, AppFonts.robotoRegular, AppColors.orange900),
                 ),
               ),
-              if (onEditNote != null)
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 16),
-                  tooltip: ref.t('review.details.editNote'),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onEditNote,
+              if (!hasNote && onEditNote != null) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  key: const Key('review-note-add'),
+                  onTap: onEditNote,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                    ),
+                    child: const Text(
+                      '+',
+                      style: TextStyle(
+                        fontFamily: systemFontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w300,
+                        color: AppColors.mediumEmphasis,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (hasNote && onEditNote != null)
+                GestureDetector(
+                  key: const Key('review-note-edit'),
+                  onTap: onEditNote,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                    ),
+                    child: SvgPicture.asset('assets/icons/editSquare.svg', width: 16, height: 16),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            note,
-            style: const TextStyle(
-              fontFamily: AppFonts.ibmPlexSerifRegular,
-              fontSize: 14,
-              height: 22 / 14,
-              letterSpacing: 0.2,
-              color: AppColors.highEmphasis,
-            ),
-          ),
+          Text(note ?? '', style: ReviewText.serif(RnType.bodyMedium, AppColors.highEmphasis)),
         ],
       ),
     );

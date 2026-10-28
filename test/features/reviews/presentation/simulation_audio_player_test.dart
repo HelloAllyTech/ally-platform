@@ -28,14 +28,14 @@ void main() {
   ) async {
     await pump(tester);
 
-    expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
+    expect(find.byKey(const ValueKey('simulation-audio-player-play')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('simulation-audio-player-toggle')));
     await tester.pumpAndSettle();
 
     expect(controller.sourceUrl, 'https://cdn.example.com/session.ogg');
     expect(controller.lastPlaybackRate, 1.0);
     expect(controller.resumeCalls, 1);
-    expect(find.byIcon(Icons.pause_circle_filled), findsOneWidget);
+    expect(find.byKey(const ValueKey('simulation-audio-player-pause')), findsOneWidget);
   });
 
   testWidgets('tapping pause while playing calls pause and does not reload the source', (
@@ -50,7 +50,7 @@ void main() {
 
     expect(controller.pauseCalls, 1);
     expect(controller.resumeCalls, 1, reason: 'pausing never calls resume again');
-    expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
+    expect(find.byKey(const ValueKey('simulation-audio-player-play')), findsOneWidget);
   });
 
   testWidgets('cycling the playback rate goes 1x -> 1.5x -> 2x -> 2.5x -> back to 1x', (
@@ -105,7 +105,8 @@ void main() {
     controller.emitPosition(const Duration(seconds: 30));
     await tester.pump();
 
-    expect(find.text('00:30 / 01:05'), findsOneWidget);
+    expect(find.text('00:30'), findsOneWidget);
+    expect(find.text('01:05'), findsOneWidget);
   });
 
   testWidgets('disposing the widget disposes the controller', (tester) async {

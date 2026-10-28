@@ -10,7 +10,7 @@ import 'package:ally_mobile_flutter/features/reviews/presentation/share_for_revi
 
 class MockReviewsRepository extends Mock implements ReviewsRepository {}
 
-// One test per file — see `_review_details_test_fixtures.dart` for why.
+// One test per file — see `test/support/pump_app.dart` for why.
 void main() {
   testWidgets(
     'edit-note mode: real title/button, prefilled note, char counter, and a PATCH instead of a create',
@@ -22,18 +22,18 @@ void main() {
 
       SharedPreferences.setMockInitialValues({});
       final router = GoRouter(
-        initialLocation: '/',
+        initialLocation: '/share',
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const ShareForReviewScreen(
+            builder: (context, state) => const Text('home-screen'),
+            routes: [GoRoute(path: 'share', builder: (context, state) => const ShareForReviewScreen(
               scenarioSessionId: 'sess-1',
               reviewId: 'rev-1',
               isEditNote: true,
               initialNote: 'original note',
-            ),
+            ))],
           ),
-          GoRoute(path: '/home', builder: (context, state) => const Text('home-screen')),
         ],
       );
       addTearDown(router.dispose);

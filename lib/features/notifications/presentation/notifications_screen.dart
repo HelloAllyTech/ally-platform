@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
-import '../../../core/widgets/tab_screen_header.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/back_title_header.dart';
 import '../data/notification_item.dart';
 import '../data/notifications_repository.dart';
 
@@ -81,6 +82,31 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  // RN's NotificationsScreen sets no fontFamily: iOS system font.
+  static const _system = 'CupertinoSystemText';
+  static const _titleStyle = TextStyle(
+    fontFamily: _system,
+    fontSize: 14,
+    height: 22 / 14,
+    letterSpacing: 0.2,
+    fontWeight: FontWeight.w600,
+    color: AppColors.highEmphasis,
+  );
+  static const _bodyStyle = TextStyle(
+    fontFamily: _system,
+    fontSize: 12,
+    height: 16 / 12,
+    letterSpacing: 0.2,
+    color: AppColors.mediumEmphasis,
+  );
+  static const _timeStyle = TextStyle(
+    fontFamily: _system,
+    fontSize: 10,
+    height: 14 / 10,
+    letterSpacing: 0.3,
+    color: AppColors.lowEmphasis,
+  );
+
   @override
   Widget build(BuildContext context) {
     final pageAsync = ref.watch(notificationsControllerProvider);
@@ -90,89 +116,128 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            TabScreenHeader(
-              title: ref.t('notifications.title'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
-              ),
-              // RN only shows "Mark all read" when there's something unread,
-              // else a blank spacer — not unconditionally.
-              trailing: hasUnread
-                  ? TextButton(
-                      onPressed: () async {
-                        await ref
-                            .read(notificationsRepositoryProvider)
-                            .markAllRead();
-                        ref.invalidate(notificationsControllerProvider);
-                      },
-                      child: Text(ref.t('notifications.markAllRead')),
-                    )
-                  : null,
-            ),
-            Expanded(
-              child: pageAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Center(
-                  child: Text('${ref.t('notifications.loadError')}: $error'),
-                ),
-                data: (page) {
-                  if (page.items.isEmpty) {
-                    return Center(child: Text(ref.t('notifications.empty')));
-                  }
-                  return RefreshIndicator(
-                    onRefresh: () =>
-                        ref.refresh(notificationsControllerProvider.future),
-                    child: ListView.separated(
-                      controller: _scrollController,
-                      itemCount:
-                          page.items.length + (page.isLoadingMore ? 1 : 0),
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        if (index >= page.items.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        final item = page.items[index];
-                        return ListTile(
-                          leading: Icon(
-                            item.isRead
-                                ? Icons.notifications_none
-                                : Icons.notifications_active,
-                            color: item.isRead
-                                ? null
-                                : Theme.of(context).colorScheme.primary,
-                          ),
-                          title: Text(
-                            item.title,
-                            style: TextStyle(
-                              fontWeight: item.isRead
-                                  ? FontWeight.normal
-                                  : FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(item.body),
-                              Text(
-                                _timeAgo(item.createdAt),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                          isThreeLine: true,
-                          onTap: () => _onItemTap(item),
-                        );
-                      },
+      backgroundColor: Colors.white,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // RN's styles.header: padding 21/16, 0.5 rule, back arrow
+          // marginRight 16, REPLAY_PRO display.small title, and "Mark all
+          // read" only while something is unread (else a 24pt spacer).
+          BackTitleHeader(
+            key: const Key('notifications-header'),
+            title: ref.t('notifications.title'),
+            margin: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 21, vertical: 16),
+            gap: 16,
+            borderColor: AppColors.strokePrimary,
+            trailing: hasUnread
+                ? GestureDetector(
+                    key: const Key('notifications-mark-all'),
+                    onTap: () async {
+                      await ref.read(notificationsRepositoryProvider).markAllRead();
+                      ref.invalidate(notificationsControllerProvider);
+                    },
+                    child: Text(
+                      ref.t('notifications.markAllRead'),
+                      style: const TextStyle(
+                        fontFamily: _system,
+                        fontSize: 12,
+                        height: 16 / 12,
+                        letterSpacing: 0.2,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  );
-                },
+                  )
+                : const SizedBox(width: 24),
+          ),
+          Expanded(
+            child: pageAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              error: (error, _) => _centered(ref.t('notifications.loadError')),
+              data: (page) {
+                if (page.items.isEmpty) return _centered(ref.t('notifications.empty'));
+                return RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () => ref.refresh(notificationsControllerProvider.future),
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+                    itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index >= page.items.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                        );
+                      }
+                      return _item(page.items[index]);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _centered(String text) => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontFamily: _system,
+          fontSize: 14,
+          height: 22 / 14,
+          letterSpacing: 0.2,
+          color: AppColors.mediumEmphasis,
+        ),
+      ),
+    ),
+  );
+
+  /// RN's `renderItem`: unread rows on grey50 with an 8pt primary dot; a
+  /// semibold title, up to three lines of body, then the time.
+  Widget _item(NotificationItem item) {
+    final isUnread = !item.isRead;
+    return GestureDetector(
+      key: const Key('notification-item'),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _onItemTap(item),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 21, vertical: 12),
+        decoration: BoxDecoration(
+          color: isUnread ? AppColors.grey50 : null,
+          border: const Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isUnread)
+              Container(
+                key: const Key('unread-dot'),
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(top: 6, right: 8),
+                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+              ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title, style: _titleStyle),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(item.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: _bodyStyle),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(_timeAgo(item.createdAt), style: _timeStyle),
+                  ),
+                ],
               ),
             ),
           ],

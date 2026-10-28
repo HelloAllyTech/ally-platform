@@ -184,4 +184,12 @@ class AppColors {
   static const callDivider = Color(0xFF3D4045); // '#3D4045' literal: info tab rule, PiP border
   static const infoTabInactive = Color(0xFF9CA3AF); // '#9CA3AF' literal: inactive info tab
   static const callGreen = Color(0xFF57F646); // '#57f646' literal: info tab indicator, countdown ring
+  // reviews parity (src/theme/colors.ts + designSystem/colors.ts)
+  static const lightGray9 = Color(0xFFFBFBFB); // ReviewScreen list background
+  static const lightGray11 = Color(0xFF6C6C6C); // ActionsMenu shadow
+  static const azureBlue = Color(0xFF0957D0); // ReactionFilterTabs indicator
+  static const amber500 = Color(0xFFFFC107); // transcript comment underline
+  static const transcriptHighlight = Color(0x80FFF8E1); // rgba(255,248,225,0.5)
+  static const whiteTransparent40 = Color(0x66FFFFFF); // thread card fade
+  static const whiteTransparent60 = Color(0x99FFFFFF); // thread card fade
 }

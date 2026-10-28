@@ -59,9 +59,9 @@ void main() {
   ) async {
     final reviewsRepository = MockReviewsRepository();
     final scribeRepository = MockScribeReviewsRepository();
-    when(() => reviewsRepository.getReviews()).thenAnswer((_) async => [_review(id: 's1', name: 'Sam')]);
-    when(() => scribeRepository.getScribeReviews())
-        .thenAnswer((_) async => [_review(id: 'r1', name: 'Robin')]);
+    when(() => reviewsRepository.getReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset'))).thenAnswer((_) async => (items: [_review(id: 's1', name: 'Sam')], count: 0));
+    when(() => scribeRepository.getScribeReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset')))
+        .thenAnswer((_) async => (items: [_review(id: 'r1', name: 'Robin')], count: 0));
 
     await _pump(
       tester,
@@ -91,8 +91,8 @@ void main() {
   ) async {
     final reviewsRepository = MockReviewsRepository();
     final scribeRepository = MockScribeReviewsRepository();
-    when(() => scribeRepository.getScribeReviews())
-        .thenAnswer((_) async => [_review(id: 'r1', name: 'Robin')]);
+    when(() => scribeRepository.getScribeReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset')))
+        .thenAnswer((_) async => (items: [_review(id: 'r1', name: 'Robin')], count: 0));
 
     await _pump(
       tester,
@@ -109,20 +109,18 @@ void main() {
     expect(find.text('Robin'), findsOneWidget);
 
     // VIEW_SCRIBE_REVIEWS (plural, list visibility) without VIEW_SCRIBE_REVIEW
-    // (singular, detail visibility) leaves the row disabled — same gating
-    // CallLogScreen/simulation reviews already use.
-    await tester.tap(find.text('Review Conversation'));
-    await tester.pumpAndSettle();
-    verifyNever(() => scribeRepository.markAsRead(any()));
+    // (singular, detail visibility) hides the "Review Conversation" link,
+    // RN's `onReviewPress` gate.
+    expect(find.text('Review Conversation'), findsNothing);
   });
 
-  testWidgets('with VIEW_SCRIBE_REVIEW too: tapping a scribe review marks it read and navigates', (
+  testWidgets('with VIEW_SCRIBE_REVIEW too: tapping Review Conversation opens the scribe review', (
     tester,
   ) async {
     final reviewsRepository = MockReviewsRepository();
     final scribeRepository = MockScribeReviewsRepository();
-    when(() => scribeRepository.getScribeReviews())
-        .thenAnswer((_) async => [_review(id: 'r1', name: 'Robin')]);
+    when(() => scribeRepository.getScribeReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset')))
+        .thenAnswer((_) async => (items: [_review(id: 'r1', name: 'Robin')], count: 0));
     when(() => scribeRepository.markAsRead('r1')).thenAnswer((_) async {});
 
     final router = GoRouter(
@@ -157,10 +155,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Review Conversation'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Review Conversation'));
     await tester.pumpAndSettle();
 
-    verify(() => scribeRepository.markAsRead('r1')).called(1);
     expect(find.text('review-detail-r1-${ReviewType.scribe}'), findsOneWidget);
   });
 
