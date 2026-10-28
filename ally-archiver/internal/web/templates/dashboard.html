@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+<p class="lead">Each week, private objects older than {{.MinAgeDays}} days are copied to the Storage Box, verified, then deleted from S3 in the following run.</p>
+{{if not .BoxReady}}<div class="note">The Storage Box isn't configured, so only dry runs are possible.</div>{{end}}
+<div class="cards">
+  <div class="card"><div class="label">Archived off S3</div><div class="value">{{bytes .ArchivedBytes}}</div></div>
+  <div class="card"><div class="label">Estimated S3 saving</div><div class="value">{{usd .SavingUSD}}/mo</div></div>
+  <div class="card"><div class="label">Next scheduled run</div><div class="value">{{if .Paused}}Paused{{else}}{{when .NextRun}}{{end}}</div>
+    <div>{{if .Paused}}<button hx-post="/schedule/resume">Resume schedule</button>{{else}}<button hx-post="/schedule/pause" hx-confirm="Pause the weekly run?">Pause schedule</button>{{end}}</div></div>
+</div>
+<div class="scroll">
+<table>
+  <thead><tr><th>Bucket</th><th>State</th><th class="num">On S3</th><th class="num">Older than {{.MinAgeDays}} days</th><th class="num">Awaiting delete</th><th class="num">Archived</th><th class="num">Failed</th><th>Last scan</th></tr></thead>
+  <tbody>
+  {{range .Buckets}}
+  <tr>
+    <td class="key">{{.Name}}</td>
+    <td>{{template "state" .}}</td>
+    <td class="num">{{if .Scanned}}{{bytes .S3Bytes}}{{else}}<span class="muted">not scanned</span>{{end}}</td>
+    <td class="num">{{if .Scanned}}{{bytes .EligibleBytes}}{{end}}</td>
+    <td class="num">{{bytes .AwaitDelete.Bytes}}</td>
+    <td class="num">{{bytes .Archived.Bytes}}</td>
+    <td class="num">{{if .Failed}}<span class="badge err">{{.Failed}}</span>{{else}}0{{end}}</td>
+    <td>{{when .ScannedAt}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="8" class="muted">No buckets configured. Add them to the buckets file and restart.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}

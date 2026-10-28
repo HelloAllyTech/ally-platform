@@ -1,0 +1,34 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Storage archive</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js"></script>
+</head>
+<body>
+{{if ne .Title "Sign in"}}
+<header>
+  <strong>Storage archive</strong>
+  <nav>
+    <a href="/" {{if eq .Title "Dashboard"}}class="on"{{end}}>Dashboard</a>
+    <a href="/buckets" {{if eq .Title "Buckets"}}class="on"{{end}}>Buckets</a>
+    <a href="/runs" {{if eq .Title "Runs"}}class="on"{{end}}>Runs</a>
+    <a href="/archive" {{if eq .Title "Archive"}}class="on"{{end}}>Archive</a>
+    <a href="/audit" {{if eq .Title "Audit log"}}class="on"{{end}}>Audit log</a>
+  </nav>
+  <div class="right">
+    {{if .Busy}}<span class="badge on">Running: {{.BusyLabel}}</span>{{end}}
+    {{if .Paused}}<span class="badge warn">Schedule paused</span>{{else}}<span>Next run {{when .NextRun}}</span>{{end}}
+    <button hx-post="/logout">Sign out</button>
+  </div>
+</header>
+{{end}}
+<main>
+{{template "content" .}}
+</main>
+</body>
+</html>{{end}}
+
+{{define "state"}}{{if .Enabled}}<span class="badge on">enabled</span>{{else}}<span class="badge">disabled</span>{{end}}{{if .Armed}}<span class="badge on">armed</span>{{end}}{{if .BlockedReason}}<span class="badge err" title="{{.BlockedReason}}">deletes blocked</span>{{end}}{{end}}
