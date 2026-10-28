@@ -237,63 +237,75 @@ class _CourseItemPlayerScreenState
     final isTrackLoadPending = trackAsync.isLoading && detail == null;
     final isTrackError = trackAsync.hasError && detail == null;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _PlayerTopBar(
-                  sectionTitle: current?.sectionTitle ?? '',
-                  itemTitle: current?.item.title ?? '',
-                  description: current?.item.description,
-                  sectionItems: sectionItems,
-                  currentItemId: _currentItemId,
-                  overallPct: overallPct,
-                  onExit: _exitToOverview,
-                ),
-                Expanded(
-                  child: _buildBody(
-                    isTrackError: isTrackError,
-                    isTrackLoadPending: isTrackLoadPending,
-                    current: current,
+    // The celebration overlay handles back itself (its own PopScope); this
+    // closure keeps the value it was built with, so dismissing the overlay
+    // from the same back press doesn't also leave the player.
+    final celebrationShown = _celebration != null;
+    // RN RootNavigator: `gestureEnabled: false` — no iOS swipe-back. Android
+    // back is RN's default goBack (no hardware-back handler on this screen).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !celebrationShown) _exitToOverview();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  _PlayerTopBar(
+                    sectionTitle: current?.sectionTitle ?? '',
+                    itemTitle: current?.item.title ?? '',
+                    description: current?.item.description,
+                    sectionItems: sectionItems,
+                    currentItemId: _currentItemId,
+                    overallPct: overallPct,
+                    onExit: _exitToOverview,
                   ),
-                ),
-                if (current?.item.hasDiscussion ?? false)
-                  DiscussionThread(
-                    key: ValueKey('discussion-$_currentItemId'),
-                    itemId: _currentItemId,
-                    highlightPostId: widget.highlightPostId,
+                  Expanded(
+                    child: _buildBody(
+                      isTrackError: isTrackError,
+                      isTrackLoadPending: isTrackLoadPending,
+                      current: current,
+                    ),
                   ),
-                _PlayerBottomNav(
-                  hasPrev: hasPrev,
-                  isLastItem: !hasNext,
-                  canAdvance: canAdvance,
-                  onPrev: () {
-                    if (hasPrev) _goToItem(flat[currentIndex - 1].item.id);
-                  },
-                  onNext: _goNextOrOverview,
-                ),
-              ],
-            ),
-          ),
-          if (_celebration != null)
-            Positioned.fill(
-              child: CelebrationModal(
-                kind: _celebration!,
-                completedCount: completedCount,
-                onContinue: () {
-                  setState(() => _celebration = null);
-                  _goNextOrOverview();
-                },
-                onBackToLearn: () {
-                  setState(() => _celebration = null);
-                  goToHomeTab(GoRouter.of(context), kTabLearn);
-                },
+                  if (current?.item.hasDiscussion ?? false)
+                    DiscussionThread(
+                      key: ValueKey('discussion-$_currentItemId'),
+                      itemId: _currentItemId,
+                      highlightPostId: widget.highlightPostId,
+                    ),
+                  _PlayerBottomNav(
+                    hasPrev: hasPrev,
+                    isLastItem: !hasNext,
+                    canAdvance: canAdvance,
+                    onPrev: () {
+                      if (hasPrev) _goToItem(flat[currentIndex - 1].item.id);
+                    },
+                    onNext: _goNextOrOverview,
+                  ),
+                ],
               ),
             ),
-        ],
+            if (_celebration != null)
+              Positioned.fill(
+                child: CelebrationModal(
+                  kind: _celebration!,
+                  completedCount: completedCount,
+                  onContinue: () {
+                    setState(() => _celebration = null);
+                    _goNextOrOverview();
+                  },
+                  onBackToLearn: () {
+                    setState(() => _celebration = null);
+                    goToHomeTab(GoRouter.of(context), kTabLearn);
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

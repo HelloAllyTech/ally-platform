@@ -495,8 +495,9 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     return ScreenFocusListener(
       onFocus: _onRefocus,
       child: PopScope(
-      // A path/case session always goes through `_handleBack` (RN reset).
-      canPop: !_popupVisible && !_shouldAskOnLeave && widget.pathId == null && widget.caseId == null,
+      // RN RootNavigator: `gestureEnabled: false` — no iOS swipe-back; Android
+      // back is `handleFeedbackAndNavigate` (useHardwareBackPressHandler).
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBackPressed();
       },

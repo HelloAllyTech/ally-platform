@@ -207,4 +207,25 @@ void main() {
 
     expect(find.text('OVERVIEW'), findsOneWidget);
   });
+
+  testWidgets(
+    'iOS swipe-back is disabled (RN gestureEnabled:false); Android back leaves for the overview',
+    (tester) async {
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/courses/item/item1',
+        routes: routes(),
+        overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      final route = ModalRoute.of(tester.element(find.byType(CourseItemPlayerScreen)))!;
+      expect(route.popGestureEnabled, isFalse);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('OVERVIEW'), findsOneWidget);
+      expect(find.byType(CourseItemPlayerScreen), findsNothing);
+    },
+  );
 }

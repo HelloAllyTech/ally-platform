@@ -724,7 +724,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   void _handleBackPress() {
     if (_isConnected) {
       setState(() => _showEndConfirmation = true);
-    } else if (mounted) {
+    } else if (mounted && context.canPop()) {
       context.pop();
     }
   }
@@ -738,8 +738,10 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   @override
   Widget build(BuildContext context) {
     final inProgress = _isConnected;
+    // RN RootNavigator: `gestureEnabled: false` — no iOS swipe-back in any
+    // state; Android back goes through `_handleBackPress`.
     return PopScope(
-      canPop: !_isConnected,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _handleBackPress();
       },

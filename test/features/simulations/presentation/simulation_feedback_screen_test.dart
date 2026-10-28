@@ -6,6 +6,7 @@ import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/simulation_feedback_screen.dart';
 
 import 'feedback_test_harness.dart';
 
@@ -321,6 +322,19 @@ void main() {
       await tester.tap(find.byKey(const Key('simulation-feedback-back')));
       await tester.pumpAndSettle();
       expect(find.text('CASE_DETAILS:c1'), findsOneWidget);
+    });
+
+    testWidgets('a plain rated session: no iOS swipe-back (RN gestureEnabled:false); Android back goes to Learn',
+        (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      await h.pump(tester);
+
+      final route = ModalRoute.of(tester.element(find.byType(SimulationFeedbackScreen)))!;
+      expect(route.popGestureEnabled, isFalse);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
     });
 
     testWidgets('an already-rated session leaves without asking', (tester) async {
