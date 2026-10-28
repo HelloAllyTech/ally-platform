@@ -149,15 +149,19 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
       );
     } else {
       final thread = data!;
+      final postIndex = {for (var i = 0; i < thread.posts.length; i++) thread.posts[i].id: i};
+      // A shrink-wrapped sliver list (sizes to its content up to the panel
+      // cap, like the old SingleChildScrollView) so only the posts in view
+      // are built; tiles mid-reply/edit keep themselves alive.
       body = Flexible(
-        child: SingleChildScrollView(
+        child: CustomScrollView(
           key: const Key('keyboard-aware-scroll-view'),
+          shrinkWrap: true,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (thread.posts.isEmpty)
-                Padding(
+          slivers: [
+            if (thread.posts.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
                   key: const Key('discussion-empty-state'),
                   padding: EdgeInsets.symmetric(vertical: size.mvs(20)),
                   child: Column(
@@ -183,10 +187,16 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
                       ),
                     ],
                   ),
-                )
-              else
-                for (final post in thread.posts)
-                  DiscussionPostTile(
+                ),
+              )
+            else
+              SliverList.builder(
+                itemCount: thread.posts.length,
+                // Keeps a tile's state with its post when posts shift.
+                findChildIndexCallback: (key) => key is ValueKey<String> ? postIndex[key.value] : null,
+                itemBuilder: (context, index) {
+                  final post = thread.posts[index];
+                  return DiscussionPostTile(
                     key: ValueKey(post.id),
                     post: post,
                     maxLength: thread.viewer.maxLength,
@@ -197,44 +207,53 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
                     onEdit: _handleEdit,
                     onDelete: _handleDelete,
                     onToggleLock: _handleToggleLock,
-                  ),
-              if (isFetching)
-                Padding(
-                  key: const Key('discussion-refreshing'),
-                  padding: EdgeInsets.symmetric(vertical: size.mvs(8)),
-                  child: Center(child: primarySpinner),
-                ),
-              if (_mutationError != null)
-                Text(
-                  _mutationError!,
-                  key: const Key('discussion-mutation-error'),
-                  style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 12, color: AppColors.red400),
-                ),
-              if (thread.isLocked)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: size.mvs(8)),
-                  child: Text(
-                    ref.t('courses.discussion.discussionLocked'),
-                    key: const Key('discussion-locked-note'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontFamily: AppFonts.ibmPlexSerifRegular,
-                      fontSize: 13,
-                      color: AppColors.mediumEmphasis,
+                  );
+                },
+              ),
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isFetching)
+                    Padding(
+                      key: const Key('discussion-refreshing'),
+                      padding: EdgeInsets.symmetric(vertical: size.mvs(8)),
+                      child: Center(child: primarySpinner),
                     ),
-                  ),
-                )
-              else if (thread.viewer.canPost)
-                DiscussionPostInput(
-                  testId: 'discussion-composer',
-                  controller: _draftController,
-                  onSubmit: _handleSubmitPost,
-                  maxLength: thread.viewer.maxLength,
-                  isSubmitting: _isPosting,
-                  submitLabel: ref.t('courses.discussion.post'),
-                ),
-            ],
-          ),
+                  if (_mutationError != null)
+                    Text(
+                      _mutationError!,
+                      key: const Key('discussion-mutation-error'),
+                      style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 12, color: AppColors.red400),
+                    ),
+                  if (thread.isLocked)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: size.mvs(8)),
+                      child: Text(
+                        ref.t('courses.discussion.discussionLocked'),
+                        key: const Key('discussion-locked-note'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 13,
+                          color: AppColors.mediumEmphasis,
+                        ),
+                      ),
+                    )
+                  else if (thread.viewer.canPost)
+                    DiscussionPostInput(
+                      testId: 'discussion-composer',
+                      controller: _draftController,
+                      onSubmit: _handleSubmitPost,
+                      maxLength: thread.viewer.maxLength,
+                      isSubmitting: _isPosting,
+                      submitLabel: ref.t('courses.discussion.post'),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
