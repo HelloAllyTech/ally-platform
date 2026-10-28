@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
-import '../../../core/widgets/app_button.dart';
+import '../../../core/theme/app_colors.dart';
+import 'course_button.dart';
+import 'course_styles.dart';
 
 enum CelebrationKind { section, track }
 
@@ -15,11 +17,7 @@ enum CelebrationKind { section, track }
 /// "reduce motion" enabled (`MediaQuery.disableAnimations`, this
 /// platform's equivalent of RN's `AccessibilityInfo.isReduceMotionEnabled`).
 ///
-/// [completedCount] is optional, matching RN's own contract (the stats
-/// pill only renders when it's supplied) — this scoped port's
-/// `CourseItemPlayerScreen` has no track-wide item list to compute it from
-/// (see the full-app audit's "track-level navigation" item), so callers
-/// here never pass it; the pill simply doesn't show.
+/// [completedCount] drives the track-complete stats pill.
 class CelebrationModal extends ConsumerStatefulWidget {
   const CelebrationModal({
     super.key,
@@ -64,6 +62,7 @@ class _CelebrationModalState extends ConsumerState<CelebrationModal> {
   Widget build(BuildContext context) {
     final isTrack = widget.kind == CelebrationKind.track;
     final onPrimary = isTrack ? widget.onBackToLearn : widget.onContinue;
+    final count = widget.completedCount;
 
     return PopScope(
       canPop: false,
@@ -73,34 +72,41 @@ class _CelebrationModalState extends ConsumerState<CelebrationModal> {
       child: Stack(
         alignment: Alignment.topCenter,
         children: [
+          // styles.overlay: 50% black, centred, paddingHorizontal 24.
           Container(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: AppColors.blackTransparent50,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 360),
+              // styles.card: white, radius 20, padding 24, gap 4.
               child: Container(
+                key: const Key('celebration-card'),
+                width: double.infinity,
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      isTrack ? '🎉' : '✨',
-                      style: const TextStyle(fontSize: 28),
+                    Container(
+                      width: 64,
+                      height: 64,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(color: AppColors.lightBlue50, shape: BoxShape.circle),
+                      child: Text(
+                        isTrack ? '🎉' : '✨',
+                        style: const TextStyle(fontFamily: courseSystemFont, fontSize: 28),
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 8 + 4),
                     Text(
                       ref.t(
                         isTrack
                             ? 'courses.celebration.trackCompleteTitle'
                             : 'courses.celebration.sectionCompleteTitle',
                       ),
-                      style: Theme.of(context).textTheme.titleMedium,
                       textAlign: TextAlign.center,
+                      style: CourseText.serifMedium(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -110,38 +116,31 @@ class _CelebrationModalState extends ConsumerState<CelebrationModal> {
                             : 'courses.celebration.sectionCompleteBody',
                       ),
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: CourseText.roboto(CourseType.bodySmall, AppColors.mediumEmphasis),
                     ),
-                    if (isTrack && widget.completedCount != null) ...[
-                      const SizedBox(height: 16),
+                    const SizedBox(height: 12 + 4),
+                    if (isTrack && count != null) ...[
                       Container(
+                        key: const Key('celebration-stats'),
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        decoration: BoxDecoration(color: AppColors.grey50, borderRadius: BorderRadius.circular(12)),
                         child: Text(
                           ref.t(
-                            widget.completedCount == 1
+                            count == 1
                                 ? 'courses.celebration.itemsCompleted_one'
                                 : 'courses.celebration.itemsCompleted_other',
-                            {'count': widget.completedCount},
+                            {'count': count},
                           ),
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: CourseText.serifMedium(CourseType.bodySmall, AppColors.highEmphasis, weight: FontWeight.w500),
                         ),
                       ),
+                      const SizedBox(height: 16 + 4),
                     ],
-                    const SizedBox(height: 16),
-                    AppButton(
-                      label: ref.t(
-                        isTrack
-                            ? 'courses.celebration.backToLearn'
-                            : 'courses.celebration.continue',
-                      ),
+                    CourseButton(
+                      key: const Key('celebration-cta'),
+                      label: ref.t(isTrack ? 'courses.celebration.backToLearn' : 'courses.celebration.continue'),
                       onPressed: onPrimary,
                     ),
                   ],
@@ -153,7 +152,7 @@ class _CelebrationModalState extends ConsumerState<CelebrationModal> {
             confettiController: _confettiController,
             blastDirection: pi / 2,
             emissionFrequency: 0,
-            numberOfParticles: isTrack ? 40 : 24,
+            numberOfParticles: isTrack ? 80 : 45,
             maxBlastForce: 20,
             minBlastForce: 8,
             gravity: 0.3,
