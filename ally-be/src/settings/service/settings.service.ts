@@ -260,7 +260,7 @@ export class SettingsService {
       [PERMISSIONS.SYSTEM_ACCESS],
     );
     const tenantId = hasSystemAccess
-      ? selectedTenantId
+      ? (selectedTenantId ?? ExecutionManager.getTenantId())
       : ExecutionManager.getTenantId();
     if (!tenantId) {
       throw new BadRequestException('Tenant ID is required');
