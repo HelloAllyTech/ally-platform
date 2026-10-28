@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
@@ -23,6 +24,7 @@ import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
+import '../data/summary_display_format.dart';
 import '../data/summary_form_state.dart';
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/navigation/home_tab_navigation.dart';
@@ -1459,6 +1461,27 @@ class _SectionCard extends ConsumerWidget {
   }
 }
 
+/// RN `formatDisplay` for the computed Call Duration / Date / Time fields;
+/// null for every other field (shown as stored).
+String? _computedDisplay(WidgetRef ref, String key, Object? value) {
+  switch (key) {
+    case 'callDuration':
+      return formatSummaryCallDuration(value, ref.t);
+    case 'callDate':
+      final months =
+          (ref.watch(localizationControllerProvider).value?.raw('months.full') as List<dynamic>?)
+              ?.map((e) => '$e')
+              .toList();
+      if (months == null || months.length != 12) return null;
+      final language = ref.read(localizationControllerProvider.notifier).currentLanguage;
+      return formatSummaryCallDate(value, months: months, isEnglish: language.startsWith('en'));
+    case 'callTime':
+      final parts = value is String ? value.split(' - ') : const <String>[];
+      return parts.length == 2 ? formatSummaryCallTime(parts[0], parts[1]) : '-';
+  }
+  return null;
+}
+
 class _FieldEditor extends ConsumerWidget {
   const _FieldEditor({
     required this.field,
@@ -1484,9 +1507,8 @@ class _FieldEditor extends ConsumerWidget {
     final label = ref.t(_fieldLabelKeys[field.key] ?? field.label);
 
     if (!field.editable || !isEditing) {
-      final display = value == null || value.toString().trim().isEmpty
-          ? '—'
-          : value.toString();
+      final display = _computedDisplay(ref, field.key, value) ??
+          (value == null || value.toString().trim().isEmpty ? '—' : value.toString());
       return Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Column(
@@ -1653,6 +1675,8 @@ class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
             ? ref.t('common.no')
             : (value ?? '—'),
         CustomFieldType.multiSelect => _parseMultiSelect(value).isEmpty ? '—' : _parseMultiSelect(value).join(', '),
+        // RN `formatCustomFieldDate`.
+        CustomFieldType.date => formatCustomFieldDate(value),
         _ => value == null || value.trim().isEmpty ? '—' : value,
       };
       return Padding(
@@ -1735,7 +1759,8 @@ class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
           padding: const EdgeInsets.only(top: 8),
           child: TextFormField(
             key: ValueKey(def.id),
-            initialValue: value ?? '',
+            // RN `normalizeCustomFieldDate` for the edited DATE value.
+            initialValue: def.fieldType == CustomFieldType.date ? (normalizeCustomFieldDate(value) ?? value ?? '') : value ?? '',
             keyboardType: def.fieldType == CustomFieldType.number ? TextInputType.number : TextInputType.text,
             decoration: InputDecoration(
               labelText: label,
