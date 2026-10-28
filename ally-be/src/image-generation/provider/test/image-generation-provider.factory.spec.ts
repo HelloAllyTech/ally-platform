@@ -9,7 +9,7 @@ describe('ImageGenerationProviderFactory', () => {
   let factory: ImageGenerationProviderFactory;
 
   const mockConfig = {
-    openai: { apiKey: 'openai-key', imageModel: 'gpt-image-1' },
+    openai: { apiKey: 'openai-key', imageModel: 'dall-e-3' },
     gemini: { apiKey: 'gemini-key', imageModel: 'gemini-2.5-flash-image' },
     characterImage: { defaultProvider: 'openai' },
   };
@@ -38,7 +38,7 @@ describe('ImageGenerationProviderFactory', () => {
 
     const { provider, providerType } = factory.getProvider();
     expect(providerType).toBe('openai');
-    expect(provider.getModel()).toBe('gpt-image-1');
+    expect(provider.getModel()).toBe('dall-e-3');
   });
 
   it('rejects unknown providers with a 400', async () => {
@@ -67,7 +67,7 @@ describe('ImageGenerationProviderFactory', () => {
   it('rejects when the default provider key is missing and none requested', async () => {
     factory = await build({
       ...mockConfig,
-      openai: { apiKey: undefined, imageModel: 'gpt-image-1' },
+      openai: { apiKey: undefined, imageModel: 'dall-e-3' },
     });
 
     expect(() => factory.getProvider()).toThrow(BadRequestException);

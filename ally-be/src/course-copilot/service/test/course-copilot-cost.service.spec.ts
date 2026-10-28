@@ -380,7 +380,7 @@ describe('CourseCopilotCostService', () => {
       usageRows = [
         row({
           task: LlmTask.COURSE_COPILOT_IMAGE,
-          model: 'gpt-image-1',
+          model: 'dall-e-3',
           calls: '4',
           prompt: '999999',
         }),
