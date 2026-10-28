@@ -50,8 +50,11 @@ class SimulationTranscriptRepository {
 
   static const pageSize = 10;
 
+  /// [languageCode] is RN's transcript-translation choice
+  /// (`TRANSCRIPT_LANGUAGE_OPTIONS`): the backend returns the turns
+  /// translated into it.
   Future<({List<SimulationTranscriptMessage> messages, int count})>
-  getMessages({required String scenarioSessionId, required int offset}) async {
+  getMessages({required String scenarioSessionId, required int offset, String? languageCode}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/learn/scenario-session/$scenarioSessionId/messages',
       queryParameters: {
@@ -59,6 +62,7 @@ class SimulationTranscriptRepository {
         'offset': offset,
         'sortBy': 'startSeconds',
         'sortOrder': 'ASC',
+        'languageCode': ?languageCode,
       },
     );
     final messages = (response.data?['messages'] as List<dynamic>? ?? [])
@@ -71,6 +75,24 @@ class SimulationTranscriptRepository {
       messages: messages,
       count: (response.data?['count'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// RN `useSimulationSessionRecordingUrl`: `GET
+  /// /learn/scenario-session/:id/recording` → `presignedUrl`. Returns null
+  /// when the session has no recording (404 or an empty URL); a transient
+  /// failure is retried once (RN `MAX_LOAD_ATTEMPTS = 2`) before giving up
+  /// with null too.
+  Future<String?> getRecordingUrl(String scenarioSessionId) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await _dio.get<Map<String, dynamic>>('/learn/scenario-session/$scenarioSessionId/recording');
+        final url = (response.data?['presignedUrl'] as String?)?.trim();
+        return (url == null || url.isEmpty) ? null : url;
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) return null;
+      }
+    }
+    return null;
   }
 }
 

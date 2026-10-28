@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/realtime/microphone_permission.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/root_scaffold_messenger.dart';
 import '../../data/simulation_models.dart';
@@ -108,8 +109,9 @@ void _pushRoleplay(BuildContext context, SessionData session, StartSimulationPar
 /// the course RoleplayCasePlayer). One per screen state; listen to it for
 /// [isCreatingRoom].
 ///
-/// Not ported: RN's microphone-permission request before the start call —
-/// `RoleplayVoiceScreen` already requests it when it connects.
+/// The microphone is checked BEFORE the session is created, as RN does, so
+/// a denied mic never spends a simulation credit: blocked → "Allow
+/// microphone" settings alert, denied → error toast.
 class StartSimulationController extends ChangeNotifier {
   StartSimulationController(this._ref, {StartSimulationLauncher? launch})
     : _launch = launch ?? _pushRoleplay;
@@ -173,6 +175,8 @@ class StartSimulationController extends ChangeNotifier {
     VoidCallback? onSettled,
   }) async {
     if (_isCreatingRoom) return false;
+    if (!await _ensureMicrophone(context)) return false;
+    if (!context.mounted) return false;
     _setCreatingRoom(true);
     SessionData session;
     try {
@@ -188,6 +192,26 @@ class StartSimulationController extends ChangeNotifier {
     if (!context.mounted) return false;
     _launch(context, session, params);
     return true;
+  }
+
+  /// RN `startSimulation`'s permission block (`request(MICROPHONE)`).
+  Future<bool> _ensureMicrophone(BuildContext context) async {
+    final result = await requestMicrophonePermission();
+    if (result == MicrophonePermissionResult.granted) return true;
+    if (!context.mounted) return false;
+    if (result == MicrophonePermissionResult.blocked) {
+      await showPermissionSettingsAlert(
+        context,
+        title: _ref.tr('simulationPage.allowMicrophone'),
+        message: _ref.tr('simulationPage.microphonePrompt'),
+        cancelLabel: _ref.tr('common.cancel'),
+        settingsLabel: _ref.tr('common.ok'),
+      );
+    } else {
+      // RN: showErrorToast(new Error(microphonePrompt), 'errors.permission').
+      _toast(context, '${_ref.tr('errors.permission')}: ${_ref.tr('simulationPage.microphonePrompt')}');
+    }
+    return false;
   }
 
   Future<bool> _handleStartError(

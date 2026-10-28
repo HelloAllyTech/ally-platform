@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
@@ -440,8 +441,22 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     if (tab != _activeTab) setState(() => _activeTab = tab);
   }
 
+  /// RN re-runs `fetchSimulationDetailsWithRetry` when `activeLanguageCode`
+  /// changes, so a learner who switches the app language gets the debrief
+  /// in that language without reopening the screen.
+  String? _pollingLanguage;
+
+  void _restartPollingOnLanguageChange() {
+    final language = ref.read(localizationControllerProvider.notifier).currentLanguage;
+    final previous = _pollingLanguage;
+    _pollingLanguage = language;
+    if (previous != null && previous != language) _restartPolling();
+  }
+
   @override
   Widget build(BuildContext context) {
+    _pollingLanguage ??= ref.read(localizationControllerProvider.notifier).currentLanguage;
+    ref.listen(localizationControllerProvider, (_, _) => _restartPollingOnLanguageChange());
     _syncTabs();
     final rn = RnSize.of(context);
     final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];

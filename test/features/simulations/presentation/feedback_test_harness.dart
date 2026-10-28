@@ -81,8 +81,10 @@ class FeedbackHarness {
       () => transcript.getMessages(
         scenarioSessionId: any(named: 'scenarioSessionId'),
         offset: any(named: 'offset'),
+        languageCode: any(named: 'languageCode'),
       ),
     ).thenAnswer((_) async => (messages: <SimulationTranscriptMessage>[], count: 0));
+    when(() => transcript.getRecordingUrl(any())).thenAnswer((_) async => null);
     when(() => reviews.getThreads(any(), limit: any(named: 'limit')))
         .thenAnswer((_) async => (threads: const <ReviewThread>[], count: 0));
     when(() => reactions.getReactionsCount(any())).thenAnswer((_) async => <String, int>{});

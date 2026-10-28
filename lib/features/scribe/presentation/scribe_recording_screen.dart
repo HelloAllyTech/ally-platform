@@ -4,65 +4,70 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
+import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/realtime/connectivity.dart';
 import '../../../core/realtime/foreground_recording_service.dart';
+import '../../../core/realtime/keep_awake.dart';
+import '../../../core/realtime/microphone_permission.dart';
 import '../../../core/realtime/socket_events.dart';
 import '../../../core/realtime/socket_service.dart';
 import '../../../core/settings/settings_repository.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/illustrated_modal.dart';
-import '../../../core/widgets/tab_screen_header.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
+import '../../roleplay/presentation/call_modals.dart';
 import '../data/chat_models.dart';
 import '../data/chat_repository.dart';
 import '../data/transcript_logic.dart';
 import 'audio_waveform.dart';
 import 'call_transcript_item.dart';
 import 'elapsed_timer.dart';
+import 'listening_chrome.dart';
 import 'listening_controls.dart';
 import 'network_disconnected.dart';
 import 'nudge_section.dart';
 
-/// Real port of ally-mobile (React Native)'s `MicrophoneListeningScreen.tsx`
-/// — Scribe's live recording screen: mic permission, the foreground service
-/// (the actual Android 14+ reliability fix this whole migration exists
-/// for), Socket.IO streaming, a real amplitude-driven waveform, the live
-/// transcript, AI nudges with thumbs-up/down feedback, pause/resume (which
-/// only gates audio emission, not the session clock or local recording),
-/// and the three-way network-disconnected state machine.
+/// Port of ally-mobile (React Native)'s `MicrophoneListeningScreen.tsx` +
+/// `hooks/useListeningCommon.ts` + `hooks/useLiveAudioStream.ts` — Scribe's
+/// live recording screen.
 ///
-/// Auto-starts in `initState` with no separate "Start recording" button —
-/// matching RN exactly (there is no join action on this screen; by the
-/// time a counsellor reaches it, `call_log_screen.dart`'s own consent/
-/// mic-permission flow has already run) and matching this session's
-/// `ConferenceListeningScreen`, which auto-connects the same way.
+/// Look: RN's full-bleed dark page with a light status bar and no header;
+/// focus mode (default) centres lock + "Taking notes", the HH:MM:SS timer,
+/// the large waveform and the microphone note; non-focus mode puts the
+/// label/timer beside a compact waveform, then the nudge and the live
+/// transcript (mm:ss + You/Client, auto-scrolling); [ListeningControls]
+/// floats at the bottom.
 ///
-/// Not ported (scoped out, not silently missing):
-/// - RN's `Search` resource-search widget in non-focus mode — a whole
-///   separate feature (`SearchScreen`'s components), disproportionate to
-///   pull into a recording screen's own scope.
-/// - `CustomMarkdown` rendering of nudge content — plain text instead (see
-///   `nudge_section.dart`).
-/// - A real network-connectivity check distinguishing RN's `NETWORK` vs
-///   `SOCKET` disconnected types — both map to [DisconnectedType.socket]
-///   here; adding a connectivity-monitoring dependency just to pick between
-///   two near-identical copy variants isn't proportionate on its own.
-///   [DisconnectedType.microphoneFailure] (the 5s no-chatId timeout) is
-///   wired for real, same as RN.
-/// - `SocketService`'s AppState-driven reconnect-on-foreground/
-///   disconnect-on-background lifecycle, and a cross-platform (iOS)
-///   keep-awake — both are changes to shared infrastructure beyond this
-///   screen, left for their own pass.
-/// - The diagnostic telemetry block (`SCRIBE_START_DIAGNOSTIC`) — RN's own
-///   comments call it a stopgap to delete once its root cause is known, not
-///   real user-facing behavior.
+/// Behaviour, as RN:
+/// - The socket connects on mount whatever the microphone says; the mic is
+///   requested separately, and a refusal shows the "Allow microphone"
+///   settings alert (Cancel leaves). Permission granted later in Settings is
+///   picked up when the app returns to the foreground.
+/// - `USER_JOINED` carries the chat id: it is used at once (RN fixed a race
+///   where waiting for the GET left a live session showing "Microphone
+///   failure" at 5 s), then the chat is hydrated from
+///   `GET /chats/counsellor-chat`.
+/// - The session starts PAUSED with the "Resume to let it listen" tooltip
+///   on the controls; pause/resume is debounced 500 ms.
+/// - Offline (connectivity_plus) shows the NETWORK view; a socket drop is
+///   NETWORK when offline, SOCKET otherwise. The socket reconnects when the
+///   app returns to the foreground, which also re-checks the chat: if it
+///   ended meanwhile the counsellor goes to box breathing.
+/// - A web-microphone session (started on the web app) is shown but not
+///   streamed: no local audio, pause disabled, no disconnect states.
+/// - Ending goes to box breathing whether or not `POST /chats/:id/end`
+///   succeeds; leaving without a live session clears the current chat.
+/// - The screen is kept awake throughout (RN `activateKeepAwake`).
+///
+/// Not ported: the reference-document `Search` panel in non-focus mode, and
+/// the temporary `SCRIBE_START_DIAGNOSTIC` telemetry.
 class ScribeRecordingScreen extends ConsumerStatefulWidget {
   const ScribeRecordingScreen({super.key, required this.userId});
 
@@ -72,26 +77,35 @@ class ScribeRecordingScreen extends ConsumerStatefulWidget {
   ConsumerState<ScribeRecordingScreen> createState() => _ScribeRecordingScreenState();
 }
 
-class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
+class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> with WidgetsBindingObserver {
+  static const _chatIdTimeout = Duration(seconds: 5);
+  static const _pauseDebounce = Duration(milliseconds: 500);
+  static const _foregroundCheckDelay = Duration(milliseconds: 500);
+
   final AudioRecorder _recorder = AudioRecorder();
+  final ScrollController _transcriptScroll = ScrollController();
 
   // Resolved once up front rather than via `ref.read(...)` inside
   // `dispose()` — same fix, for the same reason, as
   // `roleplay_voice_screen.dart`'s `_liveKitService`.
   late final SocketService _socketService;
+  late final KeepAwake _keepAwake;
 
   bool _isMicrophoneModeSessionCreated = false;
   bool _isAudioChatEmitted = false;
   bool _isIntentionalDisconnect = false;
+  bool _isPermissionGranted = false;
+  bool _hasRequestedPermission = false;
 
+  /// RN `chatData` (`state.chat.currentChat`): seeded from the current chat
+  /// when one is already known (e.g. active-chat discovery opened this
+  /// screen), then updated by `USER_JOINED`.
   int? _chatId;
-  DateTime? _startedAt;
+  Chat? _chat;
 
-  // Mirrors RN's `isCallPaused` starting `true` — pausing only gates audio
-  // emission, not the session clock (`ElapsedTimer` has no pause awareness)
-  // or local recording.
   bool _isCallPaused = true;
-  bool _isMuteTooltipOpen = false;
+  bool _isMuteTooltipOpen = true;
+  Timer? _pauseDebounceTimer;
 
   List<Transcription> _myTranscriptions = [];
   List<Transcription> _speakerTranscriptions = [];
@@ -102,74 +116,103 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
   DisconnectedType? _disconnectedType;
   Timer? _chatIdTimeoutTimer;
 
-  // Mirrors RN's `useListeningCommon`'s own `useState(true)` default.
   bool _isFocusMode = true;
 
   final ValueNotifier<List<double>> _amplitudes = ValueNotifier(const []);
   int? _numBars;
 
-  // Not resolved via `ref.tr()` into a stored string — this runs from
-  // `initState`, before the localization controller's bundled-asset load
-  // has necessarily finished, unlike the old Phase-1-proof screen's
-  // permission check (gated behind a button tap the user could only reach
-  // well after translations had loaded). Resolved live in `build()`
-  // instead, via `ref.t()`, so it always reflects the current translation
-  // state regardless of how early this fires.
-  bool _permissionDenied = false;
-  String? _error;
   bool _isEnding = false;
   bool _hasStartedRecording = false;
+  bool _hasLeft = false;
+  bool _isOffline = false;
+  ProviderSubscription<AsyncValue<bool>>? _offlineSubscription;
+
+  bool get _isWebMicrophoneMode => _chat?.isWebMicrophoneMode ?? false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _socketService = ref.read(socketServiceProvider);
-    _start();
+    _keepAwake = ref.read(keepAwakeProvider);
+    _keepAwake.activate();
+
+    final current = ref.read(currentChatProvider);
+    if (current != null && current.provider == ChatProvider.microphone) {
+      _chat = current;
+      _chatId = current.chatId;
+      _rehydrate(current);
+    }
+
+    _offlineSubscription = ref.listenManual<AsyncValue<bool>>(isOfflineProvider, (_, next) {
+      final offline = next.value ?? false;
+      _isOffline = offline;
+      if (offline && !_isWebMicrophoneMode && mounted) {
+        setState(() => _disconnectedType = DisconnectedType.network);
+      }
+    }, fireImmediately: true);
+
+    if (_chatId == null) _armChatIdTimeout();
+    _connectSocket();
+    if (!_isWebMicrophoneMode) _requestMicrophone();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Minus 32: the waveform renders inside `_buildBody()`'s
-    // `SingleChildScrollView(padding: EdgeInsets.all(16))` (16px each
-    // side) — sizing bars from the full screen width instead of the
-    // actual padded content width overflows by exactly that margin.
-    _numBars ??= numWaveformBars(MediaQuery.sizeOf(context).width - 32);
+    // RN NUM_BARS: sized to the screen width (the strip clips the rest).
+    _numBars ??= numWaveformBars(MediaQuery.sizeOf(context).width);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _offlineSubscription?.close();
+    _keepAwake.deactivate();
     _chatIdTimeoutTimer?.cancel();
+    _pauseDebounceTimer?.cancel();
     _isIntentionalDisconnect = true;
     if (_hasStartedRecording) _recorder.stop();
     _recorder.dispose();
     _socketService.disconnect();
     ForegroundRecordingService.stop();
     _amplitudes.dispose();
+    _transcriptScroll.dispose();
     super.dispose();
   }
 
-  Future<void> _start() async {
-    final micStatus = await Permission.microphone.request();
-    if (!micStatus.isGranted) {
-      setState(() => _permissionDenied = true);
-      return;
-    }
-    // Required on Android 13+ for the foreground service's own persistent
-    // notification; without it the service can still start but the user
-    // gets no visible indicator that recording is active.
-    await Permission.notification.request();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    // RN useSocketConnection: reconnect on foreground (the mic socket is
+    // never dropped on background, but it may have died meanwhile).
+    _connectSocket();
+    // RN useLiveAudioStream: permission granted from Settings meanwhile.
+    if (!_isPermissionGranted && !_isWebMicrophoneMode) _checkMicrophone(request: false);
+    // RN useListeningCommon: a session that ended while backgrounded.
+    Timer(_foregroundCheckDelay, _checkChatStillActive);
+  }
 
-    await _socketService.connect(
+  void _armChatIdTimeout() {
+    _chatIdTimeoutTimer?.cancel();
+    _chatIdTimeoutTimer = Timer(_chatIdTimeout, () {
+      if (mounted && _chatId == null) {
+        setState(() => _disconnectedType = DisconnectedType.microphoneFailure);
+      }
+    });
+  }
+
+  Future<void> _connectSocket() {
+    return _socketService.connect(
       namespacePath: AppConfig.microphoneSocketPath,
       userId: widget.userId,
       onConnect: () {},
       onDisconnect: (reason) {
-        if (!mounted || _isIntentionalDisconnect) return;
-        setState(() => _disconnectedType = DisconnectedType.socket);
+        if (!mounted || _isIntentionalDisconnect || _isWebMicrophoneMode) return;
+        setState(() => _disconnectedType = _isOffline ? DisconnectedType.network : DisconnectedType.socket);
       },
       onConnectionError: (error) {
-        if (!mounted) return;
+        if (!mounted || _isWebMicrophoneMode) return;
         setState(() => _disconnectedType = DisconnectedType.socket);
       },
       eventCallbacks: {
@@ -178,61 +221,87 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
           setState(() => _isMicrophoneModeSessionCreated = true);
           _maybeEmitStartAudioChat();
         },
-        SocketEvent.userJoined: (_) => _onUserJoined(),
-        SocketEvent.chatEnded: (_) => _onCallEndedByServer(),
-        SocketEvent.nudge: (data) => _onNudge(data),
-        SocketEvent.messageReceived: (data) => _onMessageReceived(data),
-        SocketEvent.utteranceEnded: (data) => _onUtteranceEnded(data),
+        SocketEvent.userJoined: _onUserJoined,
+        SocketEvent.chatEnded: (_) => _goToBreathing(),
+        SocketEvent.nudge: _onNudge,
+        SocketEvent.messageReceived: _onMessageReceived,
+        SocketEvent.utteranceEnded: _onUtteranceEnded,
       },
     );
+  }
 
-    _chatIdTimeoutTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && _chatId == null) {
-        setState(() => _disconnectedType = DisconnectedType.microphoneFailure);
-      }
-    });
+  Future<void> _requestMicrophone() => _checkMicrophone(request: true);
 
+  /// RN `useLiveAudioStream.checkPermission`: granted → start streaming;
+  /// otherwise (first time only) request, and on refusal show the settings
+  /// alert whose Cancel leaves the screen.
+  Future<void> _checkMicrophone({required bool request}) async {
+    final status = await Permission.microphone.status;
+    if (!mounted) return;
+    if (status.isGranted) {
+      await _startStreaming();
+      return;
+    }
+    if (!request || _hasRequestedPermission) return;
+    _hasRequestedPermission = true;
+    final result = await requestMicrophonePermission();
+    if (!mounted) return;
+    if (result == MicrophonePermissionResult.granted) {
+      await _startStreaming();
+      return;
+    }
+    await showPermissionSettingsAlert(
+      context,
+      title: ref.tr('simulationPage.allowMicrophone'),
+      message: ref.tr('simulationPage.microphonePrompt'),
+      cancelLabel: ref.tr('common.cancel'),
+      settingsLabel: ref.tr('common.ok'),
+      onCancel: _handleGoBack,
+    );
+  }
+
+  Future<void> _startStreaming() async {
+    if (_hasStartedRecording || _isWebMicrophoneMode) return;
+    _hasStartedRecording = true;
+    setState(() => _isPermissionGranted = true);
+    _maybeEmitStartAudioChat();
+    // Required on Android 13+ for the foreground service's own persistent
+    // notification.
+    await Permission.notification.request();
+    if (!mounted) return;
     await ForegroundRecordingService.start(
       notificationTitle: ref.tr('scribe.notificationTitle'),
       notificationText: ref.tr('scribe.notificationText'),
     );
-
-    // Matches MICROPHONE_AUDIO_SAMPLE_RATE / channels / bitsPerSample in
-    // ally-mobile's src/constants/general.ts exactly — the backend's audio
-    // pipeline expects this specific format.
+    if (!mounted) return;
+    // MICROPHONE_AUDIO_SAMPLE_RATE / channels / bitsPerSample in RN's
+    // constants/general.ts — the backend's audio pipeline expects this.
     final stream = await _recorder.startStream(
       const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: 16000, numChannels: 1),
     );
-    _hasStartedRecording = true;
-
     stream.listen(_onAudioChunk);
   }
 
   void _onAudioChunk(Uint8List chunk) {
-    // Computed unconditionally on every chunk, independent of pause —
-    // mirrors RN's `handleAudioData` exactly (`latestAmplitudesRef.current
-    // = recorderAudioToAmplitudes(base64Wav)` runs before the pause check).
+    // Computed on every chunk, independent of pause — RN's `handleAudioData`.
     _amplitudes.value = pcmBytesToAmplitudes(
       chunk,
       numBars: _numBars ?? numWaveformBars(360),
       platformGain: defaultTargetPlatform == TargetPlatform.iOS ? 3.0 : 1.0,
     );
-
-    // Deliberately NOT gated on the socket's own connected state: socket.io buffers
-    // frames during a transient disconnect and flushes them on reconnect —
-    // gating here would silently drop audio during normal connection
-    // blips, the exact bug RN's own comment warns against repeating.
+    // Deliberately NOT gated on the socket's connected state: socket.io
+    // buffers frames across a transient disconnect (RN's own warning).
     final chatId = _chatId;
-    if (!_isCallPaused && chatId != null) {
-      _socketService.emit(SocketEvent.audioMessage, {
-        'audioData': base64Encode(chunk),
-        'chatId': chatId,
-      });
+    if (!_isCallPaused && !_isWebMicrophoneMode && chatId != null) {
+      _socketService.emit(SocketEvent.audioMessage, {'audioData': base64Encode(chunk), 'chatId': chatId});
     }
   }
 
+  /// RN `isAudioSessionReady && !isAudioChatEmitted`.
   void _maybeEmitStartAudioChat() {
-    if (!_isMicrophoneModeSessionCreated || _isAudioChatEmitted) return;
+    if (!_isPermissionGranted || !_isMicrophoneModeSessionCreated || _isWebMicrophoneMode || _isAudioChatEmitted) {
+      return;
+    }
     _isAudioChatEmitted = true;
     _socketService.emit(SocketEvent.startAudioChat, {
       'isLinear16Encoded': true,
@@ -242,21 +311,62 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
     });
   }
 
-  Future<void> _onUserJoined() async {
-    final chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+  /// RN `USER_JOINED`: take `payload.chatId` straight away
+  /// (`setCurrentChatId`), then hydrate via `checkCounselorChat()`.
+  Future<void> _onUserJoined(dynamic data) async {
+    final payload = data is Map ? data['payload'] : null;
+    final joinedChatId = payload is Map ? (payload['chatId'] as num?)?.toInt() : null;
+    if (joinedChatId != null && mounted) {
+      _chatIdTimeoutTimer?.cancel();
+      setState(() => _chatId = joinedChatId);
+    }
+    Chat? chat;
+    try {
+      chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+    } catch (_) {
+      chat = null;
+    }
+    // An empty response doesn't clear the id USER_JOINED just gave us (RN
+    // runs this check as the Listening route, which preserves the chat).
     if (!mounted || chat == null) return;
     _chatIdTimeoutTimer?.cancel();
-    final rehydrated = rehydrateTranscriptions(chat.messages, int.tryParse(widget.userId) ?? -1);
+    ref.read(currentChatProvider.notifier).set(chat);
     setState(() {
-      _chatId = chat.chatId;
-      _startedAt = DateTime.tryParse(chat.startedAt) ?? DateTime.now();
-      _myTranscriptions = rehydrated.mine;
-      _speakerTranscriptions = rehydrated.theirs;
+      _chat = chat;
+      _chatId = chat!.chatId;
     });
+    _rehydrate(chat);
+  }
+
+  void _rehydrate(Chat chat) {
+    if (chat.messages.isEmpty) return;
+    final rehydrated = rehydrateTranscriptions(chat.messages, _userIdAsInt ?? -1);
+    _myTranscriptions = rehydrated.mine;
+    _speakerTranscriptions = rehydrated.theirs;
+    _scrollTranscriptToEnd();
+  }
+
+  /// RN `useListeningCommon` AppState effect: back in the foreground, a
+  /// chat that's gone means the session ended — go to box breathing.
+  Future<void> _checkChatStillActive() async {
+    if (!mounted || _hasLeft) return;
+    final permissions = ref.read(userPermissionsProvider).value ?? const <String>[];
+    if (!_isWebMicrophoneMode &&
+        !_isPermissionGranted &&
+        !permissions.contains(UserPermissions.viewCounselorChat)) {
+      return;
+    }
+    Chat? chat;
+    try {
+      chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+    } catch (_) {
+      return;
+    }
+    if (chat == null) _goToBreathing();
   }
 
   void _onNudge(dynamic data) {
-    final payload = data is Map ? data['payload'] ?? data : null;
+    final payload = data is Map ? data['payload'] : null;
     if (payload is! Map) return;
     setState(() => _isNudgeLoading = true);
     Future<void>.delayed(const Duration(milliseconds: 500), () {
@@ -281,6 +391,7 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
         _speakerTranscriptions = processTranscription(_speakerTranscriptions, transcription);
       }
     });
+    _scrollTranscriptToEnd();
   }
 
   void _onUtteranceEnded(dynamic data) {
@@ -295,245 +406,259 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
     });
   }
 
-  void _onCallEndedByServer() {
-    if (!mounted) return;
-    _navigateToBreathingExercise();
-  }
-
-  void _togglePauseResume() {
-    setState(() {
-      _isCallPaused = !_isCallPaused;
-      if (!_isCallPaused) _isMuteTooltipOpen = false;
+  /// RN ScrollView `onContentSizeChange → scrollToEnd({animated: true})`.
+  void _scrollTranscriptToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_transcriptScroll.hasClients) return;
+      _transcriptScroll.animateTo(
+        _transcriptScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
     });
   }
 
-  Future<void> _showEndConfirmation() async {
-    await IllustratedModal.show(
-      context,
-      titleMain: ref.t('audioCall.endDialog.titleNormal'),
-      titleItalic: ref.t('audioCall.endDialog.titleItalic'),
-      description: ref.t('audioCall.endDialog.content'),
-      actionButtonText: ref.t('audioCall.endDialog.endSession'),
-      // `IllustratedModal`'s own action button already pops the dialog
-      // itself after this runs — no second pop needed here (unlike
-      // `app_drawer.dart`'s logout flow, which pops a *different* thing,
-      // the drawer, not the dialog).
-      onActionPressed: _endSession,
-    );
+  /// RN `useDebounce(..., {delay: 500})` (trailing): the toggle lands 500 ms
+  /// after the last tap, so rapid taps don't flip it back and forth.
+  void _onPauseResumePressed() {
+    _pauseDebounceTimer?.cancel();
+    _pauseDebounceTimer = Timer(_pauseDebounce, () {
+      if (!mounted) return;
+      setState(() {
+        _isCallPaused = !_isCallPaused;
+        if (!_isCallPaused) _isMuteTooltipOpen = false;
+      });
+    });
   }
 
+  bool _showEndConfirmation = false;
+
+  /// RN `handleEndCall`: stop the stream, `POST /chats/:id/end`, and go to
+  /// box breathing on success AND on error.
   Future<void> _endSession() async {
+    final chatId = _chatId;
+    if (chatId == null || _isEnding) return;
     setState(() => _isEnding = true);
+    _isIntentionalDisconnect = true;
     try {
-      final chatId = _chatId;
-      _isIntentionalDisconnect = true;
-      if (_hasStartedRecording) await _recorder.stop();
-      await ForegroundRecordingService.stop();
-      if (chatId != null) {
-        await ref.read(chatRepositoryProvider).endCall(chatId);
+      if (_hasStartedRecording && !_isWebMicrophoneMode) {
+        await _recorder.stop();
+        _hasStartedRecording = false;
       }
-      _socketService.disconnect();
-      if (mounted) _navigateToBreathingExercise();
-    } catch (e) {
-      if (mounted) setState(() => _error = '${ref.tr('errors.endSimulation')}: $e');
+      await ForegroundRecordingService.stop();
+      await ref.read(chatRepositoryProvider).endCall(chatId);
+    } catch (_) {
+      // RN redirects on `isEndCallError` too.
     } finally {
-      if (mounted) setState(() => _isEnding = false);
+      _socketService.disconnect();
+      _goToBreathing();
     }
   }
 
-  void _navigateToBreathingExercise() {
-    if (!mounted) return;
+  /// RN `handleCallEndRedirection`: replace with Breathing.
+  void _goToBreathing() {
+    if (!mounted || _hasLeft) return;
+    _hasLeft = true;
     final chatId = _chatId;
-    context.go(chatId != null ? '/box-breathing?chatId=$chatId' : '/box-breathing');
+    GoRouter.maybeOf(context)?.go(chatId != null ? '/box-breathing?chatId=$chatId' : '/box-breathing');
+  }
+
+  /// RN `handleGoBack`: clear the current chat, then go back.
+  void _handleGoBack() {
+    if (!mounted || _hasLeft) return;
+    _hasLeft = true;
+    ref.read(currentChatProvider.notifier).set(null);
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      GoRouter.maybeOf(context)?.go('/home');
+    }
   }
 
   void _handleTryAgain() {
     setState(() => _disconnectedType = null);
-    if (mounted) Navigator.of(context).pop();
+    _handleGoBack();
   }
 
   bool get _hasLiveSession => _chatId != null && _disconnectedType == null;
 
+  /// RN `handleHardwareBackPress`.
   void _handleBackPress() {
-    if (_hasLiveSession) {
-      _showEndConfirmation();
-    } else if (mounted) {
-      Navigator.of(context).pop();
+    if (!_hasLiveSession) {
+      _handleGoBack();
+    } else if (!_showEndConfirmation) {
+      setState(() => _showEndConfirmation = true);
     }
-  }
-
-  void _showPrivacyInfo() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(ref.t('listeningScreen.takingNotes')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('• ${ref.t('listeningScreen.dataSafeTooltip.noAudioRecordings')}'),
-            Text('• ${ref.t('listeningScreen.dataSafeTooltip.dataEncrypted')}'),
-            Text('• ${ref.t('listeningScreen.dataSafeTooltip.noTrainingData')}'),
-            Text('• ${ref.t('listeningScreen.dataSafeTooltip.personalInfoRemoved')}'),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(ref.t('common.close'))),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !_hasLiveSession,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _handleBackPress();
       },
-      child: Scaffold(
-        body: Column(
+      child: ListeningPage(child: _buildBody()),
+    );
+  }
+
+  Widget _buildBody() {
+    final disconnected = _disconnectedType;
+    if (disconnected != null) {
+      return NetworkDisconnected(type: disconnected, onTryAgain: _handleTryAgain, onGoBack: _handleGoBack);
+    }
+    if (_chatId == null) {
+      return ListeningConnectingView(onCancel: _handleGoBack);
+    }
+
+    final canToggleFocusMode =
+        ref.watch(userPermissionsProvider).value?.contains(UserPermissions.viewReferenceDocument) ?? false;
+    return Stack(
+      children: [
+        Positioned.fill(child: _isFocusMode ? _buildFocusMode() : _buildNonFocusMode()),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: ListeningControls(
+            isCallPaused: _isCallPaused,
+            onPauseResumePress: _onPauseResumePressed,
+            onCallEndPress: () => setState(() => _showEndConfirmation = true),
+            showFocusModeButton: canToggleFocusMode,
+            isFocusMode: _isFocusMode,
+            onFocusModeButtonPress: () => setState(() => _isFocusMode = !_isFocusMode),
+            showMuteTooltip: _isCallPaused && !_isWebMicrophoneMode && _isMuteTooltipOpen,
+            onDismissMuteTooltip: () => setState(() => _isMuteTooltipOpen = false),
+            isPauseResumeDisabled: _isWebMicrophoneMode,
+            isEnding: _isEnding,
+          ),
+        ),
+        // RN `CallEndConfirmationModal` (microphone copy).
+        if (_showEndConfirmation)
+          CallIllustratedModal(
+            titleMain: ref.t('audioCall.endDialog.titleNormal'),
+            titleItalic: ref.t('audioCall.endDialog.titleItalic'),
+            description: ref.t('audioCall.endDialog.content'),
+            illustrationAsset: 'assets/icons/endSession.svg',
+            actionLabel: ref.t('audioCall.endDialog.endSession'),
+            onAction: _endSession,
+            onClose: () => setState(() => _showEndConfirmation = false),
+          ),
+      ],
+    );
+  }
+
+  DateTime get _startTime => DateTime.tryParse(_chat?.startedAt ?? '') ?? _mountedAt;
+  final DateTime _mountedAt = DateTime.now();
+
+  /// RN `renderFocusMode` (`styles.focusModeLayout`: centred, 100vs bottom
+  /// padding; waveform 96% wide, 40vs below the timer).
+  Widget _buildFocusMode() {
+    final rn = RnSize.of(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: rn.vs(100)),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            TabScreenHeader(
-              title: ref.t('scribe.title'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _handleBackPress,
+            TakingNotesRow(isFocusMode: _isFocusMode),
+            ElapsedTimer(startTime: _startTime),
+            Padding(
+              padding: EdgeInsets.only(top: rn.vs(40)),
+              child: FractionallySizedBox(
+                widthFactor: 0.96,
+                child: AudioWaveformContainer(amplitudes: _amplitudes, isPaused: _isCallPaused, isFocusMode: true),
               ),
             ),
-            Expanded(child: _buildBody()),
+            if (!_isWebMicrophoneMode)
+              Padding(
+                padding: EdgeInsets.only(top: rn.vs(15), left: rn.s(25), right: rn.s(25)),
+                child: Text(
+                  ref.t('listeningScreen.microphoneModeNote'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 14, color: Colors.white),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_disconnectedType != null) {
-      return NetworkDisconnected(
-        type: _disconnectedType!,
-        isOffline: false,
-        onTryAgain: _handleTryAgain,
-        onGoBack: () => Navigator.of(context).pop(),
-      );
-    }
-
-    if (_permissionDenied || _error != null) {
-      final message = _permissionDenied ? ref.t('errors.permission') : _error!;
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(message, style: const TextStyle(color: AppColors.red400), textAlign: TextAlign.center),
-        ),
-      );
-    }
-
-    if (_chatId == null || _startedAt == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(ref.t('listeningScreen.connecting')),
-          ],
-        ),
-      );
-    }
-
-    final canToggleFocusMode =
-        ref.watch(userPermissionsProvider).value?.contains(UserPermissions.viewReferenceDocument) ??
-        false;
-
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                InkWell(
-                  onTap: _showPrivacyInfo,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+  /// RN `renderNonFocusMode` (`styles.nonFocusModeLayout`: 40vs from the
+  /// top, 20s side padding): label + timer beside a half-width waveform,
+  /// the nudge, then the transcript.
+  Widget _buildNonFocusMode() {
+    final rn = RnSize.of(context);
+    final all = [..._myTranscriptions, ..._speakerTranscriptions]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final showNudge = (ref.watch(nudgeStatusProvider).value ?? false) && _currentNudge != null;
+    return Padding(
+      padding: EdgeInsets.only(top: rn.vs(40), left: rn.s(20), right: rn.s(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: rn.s(10)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SvgPicture.asset('assets/icons/lock.svg', width: 16, height: 16),
-                      const SizedBox(width: 4),
-                      Text(ref.t('listeningScreen.takingNotes')),
+                      TakingNotesRow(isFocusMode: _isFocusMode),
+                      ElapsedTimer(startTime: _startTime),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                ElapsedTimer(startTime: _startedAt!),
-                const SizedBox(height: 16),
-                AudioWaveformContainer(
-                  amplitudes: _amplitudes,
-                  isPaused: _isCallPaused,
-                  isFocusMode: _isFocusMode,
-                ),
-                if (_isFocusMode) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    ref.t('listeningScreen.microphoneModeNote'),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ] else ...[
-                  const SizedBox(height: 16),
-                  // Tenant gate: mirrors RN's `!!nudgeStatus && currentNudge`
-                  // — nudge content itself still arrives over the socket
-                  // stream regardless of this flag (see
-                  // `nudge_status_provider`'s doc comment); only whether it's
-                  // shown is gated here, same as RN.
-                  if ((ref.watch(nudgeStatusProvider).value ?? false) &&
-                      (_currentNudge != null || _isNudgeLoading))
-                    NudgeSection(nudge: _currentNudge, isLoading: _isNudgeLoading),
-                  const SizedBox(height: 16),
-                  ..._buildTranscript(),
+              ),
+              Expanded(
+                child: AudioWaveformContainer(amplitudes: _amplitudes, isPaused: _isCallPaused, isFocusMode: false),
+              ),
+            ],
+          ),
+          if (showNudge)
+            NudgeSection(
+              nudge: _currentNudge,
+              isLoading: _isNudgeLoading,
+              onFeedbackSuccess: (feedback) =>
+                  setState(() => _currentNudge = _currentNudge?.copyWithFeedback(feedback)),
+            ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(top: rn.vs(15)),
+              child: ListView(
+                key: const ValueKey('live-transcript'),
+                controller: _transcriptScroll,
+                padding: EdgeInsets.only(bottom: rn.vs(20)),
+                children: [
+                  for (final t in all)
+                    CallTranscriptItem(
+                      time: _elapsedLabel(t.timestamp),
+                      message: t.message,
+                      counselor: t.senderId == _userIdAsInt,
+                      speakerLabel: ref.t(
+                        t.senderId == _userIdAsInt ? 'transcription.youLabel' : 'transcription.clientLabel',
+                      ),
+                    ),
                 ],
-                const SizedBox(height: 24),
-                ListeningControls(
-                  isCallPaused: _isCallPaused,
-                  onPauseResumePress: _togglePauseResume,
-                  onCallEndPress: _showEndConfirmation,
-                  showFocusModeButton: canToggleFocusMode,
-                  isFocusMode: _isFocusMode,
-                  onFocusModeButtonPress: () => setState(() => _isFocusMode = !_isFocusMode),
-                  showMuteTooltip: _isCallPaused && _isMuteTooltipOpen,
-                  onDismissMuteTooltip: () => setState(() => _isMuteTooltipOpen = false),
-                  isEnding: _isEnding,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  List<Widget> _buildTranscript() {
-    final all = [..._myTranscriptions, ..._speakerTranscriptions]
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    if (all.isEmpty) return const [];
-
-    return [
-      for (final t in all)
-        CallTranscriptItem(
-          time: _elapsedLabel(t.timestamp),
-          message: t.message,
-          counselor: t.senderId == _userIdAsInt,
-        ),
-    ];
-  }
-
+  /// RN `getElapsedSeconds`: mm:ss since `chat.startedAt` ("00:00" without
+  /// one); minutes aren't capped at 59.
   String _elapsedLabel(String timestamp) {
-    final start = _startedAt;
+    final startedAt = DateTime.tryParse(_chat?.startedAt ?? '');
     final messageTime = DateTime.tryParse(timestamp);
-    if (start == null || messageTime == null) return '';
-    final elapsed = messageTime.difference(start);
-    final seconds = elapsed.inSeconds < 0 ? 0 : elapsed.inSeconds;
+    if (startedAt == null || messageTime == null) return '00:00';
+    final diff = messageTime.difference(startedAt).inSeconds;
+    final seconds = diff < 0 ? 0 : diff;
     String pad(int n) => n.toString().padLeft(2, '0');
-    return '${pad(seconds ~/ 3600)}:${pad((seconds ~/ 60) % 60)}:${pad(seconds % 60)}';
+    return '${pad(seconds ~/ 60)}:${pad(seconds % 60)}';
   }
 }

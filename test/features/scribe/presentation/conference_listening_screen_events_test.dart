@@ -83,7 +83,7 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
       await tester.pump();
 
-      expect(find.text('Waiting for the client to join'), findsOneWidget);
+      expect(find.byKey(const ValueKey('listening-connecting')), findsOneWidget);
 
       // Bounded `pump()` from here on, not `pumpAndSettle()`: this screen's
       // waveform is never "paused" (there's no pause concept for a
@@ -100,6 +100,8 @@ void main() {
       // an oversight: a conference call can't be paused/ended from here.
       expect(find.byKey(const ValueKey('pause-resume-button')), findsNothing);
       expect(find.byKey(const ValueKey('end-session-button')), findsNothing);
+      // Conference provider → the focus-mode banner shows.
+      expect(find.byKey(const ValueKey('dismissable-banner')), findsOneWidget);
 
       callbacks[SocketEvent.audioStream]!({
         'payload': {'audioData': base64Encode(List.filled(20, 200))},
@@ -122,6 +124,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(find.text('Try an open question.'), findsOneWidget);
+
+      // RN: CHAT_ENDED replaces the screen with box breathing (no router in
+      // this harness, so it must simply not throw).
+      callbacks[SocketEvent.chatEnded]!(null);
+      await tester.pump();
     },
   );
 }

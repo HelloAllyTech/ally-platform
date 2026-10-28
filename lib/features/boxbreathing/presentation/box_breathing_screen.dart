@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
@@ -183,10 +185,11 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
     if (!_isMuted && _phaseIndex == _inhalePhase && _isPlaying) _sound?.replay();
   }
 
+  /// RN: hardware back resets the stack to the Call Log tab.
   void _resetToCallLog() {
     ref.read(currentChatProvider.notifier).set(null);
     _setPlaying(false);
-    context.go('/home');
+    goToHomeTab(GoRouter.of(context), kTabCallLog);
   }
 
   Future<void> _viewCallSummary() async {

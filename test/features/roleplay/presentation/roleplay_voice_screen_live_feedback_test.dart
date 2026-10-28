@@ -42,8 +42,6 @@ void main() {
         overrides: [liveKitRoomServiceProvider.overrideWithValue(liveKitService)],
       );
 
-      await tester.tap(find.text('Connect'));
-      await tester.pump();
       await tester.pump(const Duration(seconds: 3));
       await expandRoleplayControls(tester);
 

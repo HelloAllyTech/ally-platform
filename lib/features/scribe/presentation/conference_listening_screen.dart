@@ -1,81 +1,56 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/realtime/keep_awake.dart';
 import '../../../core/realtime/socket_events.dart';
 import '../../../core/realtime/socket_service.dart';
 import '../../../core/settings/settings_repository.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/tab_screen_header.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../data/chat_models.dart';
 import '../data/chat_repository.dart';
 import 'audio_waveform.dart';
 import 'dismissable_banner.dart';
 import 'elapsed_timer.dart';
+import 'listening_chrome.dart';
 import 'listening_controls.dart';
 import 'nudge_section.dart';
 
-/// Real port of ally-mobile (React Native)'s `ConferenceListeningScreen` —
-/// the companion screen for a cloud-telephony (Exotel/Ozonetel) conference
-/// call. Confirmed by reading the real RN screen and its backend: this is
-/// **not** a telephony SDK integration. The actual phone call happens
-/// entirely over the carrier network, between the client and the
-/// counsellor's real registered phone number; the backend only relays
-/// lifecycle events (`USER_JOINED`, `NUDGE`, `AUDIO_STREAM`, `CHAT_ENDED`)
-/// over Socket.IO once the call connects. So this screen needs no vendor
-/// SDK — it's the same `SocketService` Scribe's recording screen uses,
-/// pointed at [AppConfig.cloudTelephonyPath] instead of
-/// [AppConfig.microphoneSocketPath].
+/// Port of ally-mobile (React Native)'s `ConferenceListeningScreen` — the
+/// companion screen for a cloud-telephony (Exotel/Ozonetel) conference
+/// call. The call itself runs over the carrier network; the backend relays
+/// `USER_JOINED`, `NUDGE`, `AUDIO_STREAM` and `CHAT_ENDED` over Socket.IO on
+/// [AppConfig.cloudTelephonyPath], so no telephony SDK is involved.
 ///
-/// Reuses the same real, tested shared pieces built for Scribe's recording
-/// screen (`ElapsedTimer`, `AudioWaveformContainer`, `NudgeSection`,
-/// `ListeningControls`) — confirmed from source that RN's own
-/// `ConferenceListeningScreen` shares those exact same components with
-/// `MicrophoneListeningScreen`, not conference-specific equivalents. Real
-/// differences from Scribe, all confirmed from source rather than assumed:
-/// - The waveform is fed by the server's `AUDIO_STREAM` event, through
-///   [exotelBytesToAmplitudes] — a genuinely different, simpler function
-///   from Scribe's local-PCM [pcmBytesToAmplitudes] (raw unsigned-byte
-///   averaging, no WAV/PCM16 decode, no rescale/gain/floor). Note: per
-///   earlier research, the current backend doesn't appear to ever actually
-///   emit a live `AUDIO_STREAM` for a real conference call — ported for
-///   parity/completeness, not validated against a live payload.
-/// - No transcript UI at all (RN's own screen has none).
-/// - [DismissableBanner] shown only in focus mode — conference-only, no
-///   Scribe equivalent.
-/// - No [NetworkDisconnected] state machine — RN's own conference screen
-///   has none either, just the plain "Connecting…" spinner until a chat id
-///   arrives (no 5s timeout, no offline listener).
-/// - `ListeningControls`'s pause/resume and end-session buttons are BOTH
-///   hidden (`showPauseResumeButton`/`showEndSessionButton: false`),
-///   confirmed to match RN's own real configuration exactly — a conference
-///   call cannot be paused or ended from this screen in RN either; it ends
-///   only when the carrier call itself ends and the backend pushes
-///   `CHAT_ENDED`. Deliberately not "improved on" here.
+/// Same dark page as Scribe's screen (`listening_chrome.dart`): focus mode
+/// shows the "Scribe stops taking notes" banner (conference providers only,
+/// dismissable), the lock + "Taking notes" row with its privacy tooltip, the
+/// timer and the large waveform; non-focus mode the compact row and the
+/// nudge. No transcript. Pause/resume and End session are hidden, as in RN:
+/// the call ends when the carrier call ends and the server sends
+/// `CHAT_ENDED`, which — like the microphone screen — replaces this screen
+/// with box breathing.
 ///
-/// Not ported: RN's active-chat auto-discovery
-/// (`useCounselorChat`/`useNavigationAwareCounselorChat` — polling
-/// `GET /chats/counsellor-chat` on app foreground and force-navigating
-/// here). Confirmed this is genuinely cross-cutting app infrastructure (a
-/// `WidgetsBindingObserver`-style mechanism wired once at the navigation
-/// root in RN, not anything screen-specific) that also covers Scribe's own
-/// backgrounded/killed-session recovery — scoped as its own separate pass
-/// rather than bundled into this screen's UI work. For now this screen is
-/// reached with an already-known [chatId] rather than discovered on its own.
+/// The waveform is fed by `AUDIO_STREAM` ([exotelBytesToAmplitudes]) and
+/// fades back to rest when no audio has arrived for 2 s (RN
+/// `AUDIO_INACTIVE_TIMEOUT`). The socket is dropped in the background and
+/// reconnected in the foreground (RN `useSocketConnection` default), and on
+/// returning the chat is re-checked: if it ended meanwhile, box breathing.
+/// The screen is kept awake throughout.
+///
+/// Not ported: the reference-document `Search` panel in non-focus mode.
 class ConferenceListeningScreen extends ConsumerStatefulWidget {
   const ConferenceListeningScreen({super.key, required this.chatId, required this.userId});
 
-  /// Not read by this screen's own logic today — `endCall`/pause are both
-  /// unreachable (see the class doc), and chat identity otherwise comes
-  /// from whatever `getCounsellorChat()` currently returns, not this id.
-  /// Kept as the route parameter it already is, for the active-chat
-  /// auto-discovery pass and any future need to confirm the discovered
-  /// chat matches what was expected.
+  /// The chat active-chat discovery routed here for; used as the current
+  /// chat until `USER_JOINED` hydrates it.
   final int chatId;
   final String userId;
 
@@ -83,50 +58,68 @@ class ConferenceListeningScreen extends ConsumerStatefulWidget {
   ConsumerState<ConferenceListeningScreen> createState() => _ConferenceListeningScreenState();
 }
 
-class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningScreen> {
-  // Resolved once up front rather than via `ref.read(...)` inside
-  // `dispose()` — same fix, for the same reason, as
-  // `scribe_recording_screen.dart`'s `_socketService`.
-  late final SocketService _socketService;
+class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningScreen> with WidgetsBindingObserver {
+  static const _audioInactiveTimeout = Duration(seconds: 2);
 
-  DateTime? _startedAt;
+  late final SocketService _socketService;
+  late final KeepAwake _keepAwake;
+
+  /// RN `chatData` (`state.chat.currentChat`).
+  Chat? _chat;
+  final DateTime _mountedAt = DateTime.now();
+
   bool _isFocusMode = true;
   bool _isBannerDismissed = false;
+  bool _hasLeft = false;
 
   Nudge? _currentNudge;
   bool _isNudgeLoading = false;
 
   final ValueNotifier<List<double>> _amplitudes = ValueNotifier(const []);
   int? _numBars;
-
-  String? _error;
+  Timer? _audioInactiveTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _socketService = ref.read(socketServiceProvider);
+    _keepAwake = ref.read(keepAwakeProvider);
+    _keepAwake.activate();
+    final current = ref.read(currentChatProvider);
+    if (current != null) _chat = current;
     _connect();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Minus 32: the content renders inside this screen's own
-    // `SingleChildScrollView(padding: EdgeInsets.all(16))` (16px each
-    // side) — same overflow class this session already found and fixed on
-    // Scribe's own waveform sizing.
-    _numBars ??= numWaveformBars(MediaQuery.sizeOf(context).width - 32);
+    _numBars ??= numWaveformBars(MediaQuery.sizeOf(context).width);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _keepAwake.deactivate();
+    _audioInactiveTimer?.cancel();
     _socketService.disconnect();
     _amplitudes.dispose();
     super.dispose();
   }
 
-  Future<void> _connect() async {
-    await _socketService.connect(
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    if (state == AppLifecycleState.resumed) {
+      _connect();
+      Timer(const Duration(milliseconds: 500), _checkChatStillActive);
+    } else if (state == AppLifecycleState.paused) {
+      _socketService.disconnect();
+    }
+  }
+
+  Future<void> _connect() {
+    return _socketService.connect(
       namespacePath: AppConfig.cloudTelephonyPath,
       userId: widget.userId,
       onConnect: () {},
@@ -135,28 +128,51 @@ class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningS
         SocketEvent.userJoined: (_) => _onUserJoined(),
         SocketEvent.audioStream: _onAudioStream,
         SocketEvent.nudge: _onNudge,
-        SocketEvent.chatEnded: (_) => _onCallEnded(),
+        SocketEvent.chatEnded: (_) => _goToBreathing(),
       },
     );
   }
 
+  /// RN `checkCounselorChat()`.
   Future<void> _onUserJoined() async {
-    final chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+    Chat? chat;
+    try {
+      chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+    } catch (_) {
+      return;
+    }
     if (!mounted || chat == null) return;
-    setState(() => _startedAt = DateTime.tryParse(chat.startedAt) ?? DateTime.now());
+    ref.read(currentChatProvider.notifier).set(chat);
+    setState(() => _chat = chat);
+  }
+
+  Future<void> _checkChatStillActive() async {
+    if (!mounted || _hasLeft) return;
+    Chat? chat;
+    try {
+      chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+    } catch (_) {
+      return;
+    }
+    if (chat == null) _goToBreathing();
   }
 
   void _onAudioStream(dynamic data) {
     final payload = data is Map ? data['payload'] ?? data : null;
     final audioData = payload is Map ? payload['audioData'] : null;
     final numBars = _numBars;
-    if (audioData is! String || numBars == null) return;
-    try {
-      _amplitudes.value = exotelBytesToAmplitudes(base64Decode(audioData), numBars: numBars);
-    } catch (_) {
-      // A malformed/undecodable chunk is skipped rather than crashing this
-      // listener — the next chunk just redraws the waveform as usual.
+    if (audioData is String && numBars != null && (_chat?.isConferenceCall ?? true)) {
+      try {
+        _amplitudes.value = exotelBytesToAmplitudes(base64Decode(audioData), numBars: numBars);
+      } catch (_) {
+        // A malformed chunk is skipped; the next one redraws.
+      }
     }
+    // RN: no audio for AUDIO_INACTIVE_TIMEOUT → clear (the bars fade out).
+    _audioInactiveTimer?.cancel();
+    _audioInactiveTimer = Timer(_audioInactiveTimeout, () {
+      if (mounted) _amplitudes.value = const [];
+    });
   }
 
   void _onNudge(dynamic data) {
@@ -172,84 +188,34 @@ class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningS
     });
   }
 
-  void _onCallEnded() {
-    if (!mounted) return;
-    setState(() => _error = ref.tr('conferenceListening.callEnded'));
-    _socketService.disconnect();
+  /// RN `handleCallEndRedirection`: replace with Breathing.
+  void _goToBreathing() {
+    if (!mounted || _hasLeft) return;
+    _hasLeft = true;
+    final chatId = _chat?.chatId ?? widget.chatId;
+    GoRouter.maybeOf(context)?.go('/box-breathing?chatId=$chatId');
   }
+
+  DateTime get _startTime => DateTime.tryParse(_chat?.startedAt ?? '') ?? _mountedAt;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          TabScreenHeader(title: ref.t('conferenceListening.title')),
-          Expanded(child: _buildBody()),
-        ],
-      ),
-    );
+    return ListeningPage(child: _buildBody());
   }
 
   Widget _buildBody() {
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            style: const TextStyle(color: AppColors.red400),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    if (_startedAt == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(ref.t('conferenceListening.waitingForClient')),
-          ],
-        ),
-      );
-    }
+    if (_chat == null) return const ListeningConnectingView();
 
     final canToggleFocusMode =
-        ref.watch(userPermissionsProvider).value?.contains(UserPermissions.viewReferenceDocument) ??
-        false;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          if (_isFocusMode && !_isBannerDismissed)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: DismissableBanner(onClose: () => setState(() => _isBannerDismissed = true)),
-            ),
-          Text(ref.t('listeningScreen.takingNotes')),
-          const SizedBox(height: 8),
-          ElapsedTimer(startTime: _startedAt!),
-          const SizedBox(height: 16),
-          AudioWaveformContainer(
-            amplitudes: _amplitudes,
-            isPaused: false,
-            isFocusMode: _isFocusMode,
-          ),
-          // Tenant gate: mirrors RN's `!!nudgeStatus && currentNudge` — see
-          // `nudgeStatusProvider`'s doc comment for why nudge content itself
-          // isn't separately gated (it arrives over the socket regardless).
-          if (!_isFocusMode &&
-              (ref.watch(nudgeStatusProvider).value ?? false) &&
-              (_currentNudge != null || _isNudgeLoading)) ...[
-            const SizedBox(height: 16),
-            NudgeSection(nudge: _currentNudge, isLoading: _isNudgeLoading),
-          ],
-          const SizedBox(height: 24),
-          ListeningControls(
+        ref.watch(userPermissionsProvider).value?.contains(UserPermissions.viewReferenceDocument) ?? false;
+    return Stack(
+      children: [
+        Positioned.fill(child: _isFocusMode ? _buildFocusMode() : _buildNonFocusMode()),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: ListeningControls(
             isCallPaused: false,
             onPauseResumePress: () {},
             onCallEndPress: () {},
@@ -259,6 +225,76 @@ class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningS
             isFocusMode: _isFocusMode,
             onFocusModeButtonPress: () => setState(() => _isFocusMode = !_isFocusMode),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFocusMode() {
+    final rn = RnSize.of(context);
+    return Column(
+      children: [
+        if ((_chat?.isConferenceCall ?? false) && !_isBannerDismissed)
+          DismissableBanner(onClose: () => setState(() => _isBannerDismissed = true)),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: rn.vs(100)),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TakingNotesRow(isFocusMode: _isFocusMode),
+                  ElapsedTimer(startTime: _startTime),
+                  Padding(
+                    padding: EdgeInsets.only(top: rn.vs(40)),
+                    child: FractionallySizedBox(
+                      widthFactor: 0.96,
+                      child: AudioWaveformContainer(amplitudes: _amplitudes, isPaused: false, isFocusMode: true),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNonFocusMode() {
+    final rn = RnSize.of(context);
+    final showNudge = (ref.watch(nudgeStatusProvider).value ?? false) && _currentNudge != null;
+    return Padding(
+      padding: EdgeInsets.only(top: rn.vs(40), left: rn.s(20), right: rn.s(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: rn.s(10)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TakingNotesRow(isFocusMode: _isFocusMode),
+                      ElapsedTimer(startTime: _startTime),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: AudioWaveformContainer(amplitudes: _amplitudes, isPaused: false, isFocusMode: false),
+              ),
+            ],
+          ),
+          if (showNudge)
+            NudgeSection(
+              nudge: _currentNudge,
+              isLoading: _isNudgeLoading,
+              onFeedbackSuccess: (feedback) =>
+                  setState(() => _currentNudge = _currentNudge?.copyWithFeedback(feedback)),
+            ),
         ],
       ),
     );

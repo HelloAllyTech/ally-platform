@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
-import 'package:ally_mobile_flutter/core/theme/app_colors.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/scribe/data/chat_models.dart';
 import 'package:ally_mobile_flutter/features/scribe/data/chat_repository.dart';
@@ -51,13 +51,19 @@ void main() {
       verify(
         () => dio.post<Map<String, dynamic>>('/chats/messages/5/feedback', data: {'rating': 1}),
       ).called(1);
-      final icon = tester.widget<Icon>(
-        find.descendant(
-          of: find.byKey(const ValueKey('nudge-thumb-up')),
-          matching: find.byType(Icon),
-        ),
+      final icon = tester.widget<SvgPicture>(
+        find.descendant(of: find.byKey(const ValueKey('nudge-thumb-up')), matching: find.byType(SvgPicture)),
       );
-      expect(icon.color, AppColors.primary);
+      // RN: a chosen thumb turns white (powderBlue otherwise).
+      expect(icon.colorFilter, const ColorFilter.mode(Colors.white, BlendMode.srcIn));
+      // RN always shows "Is this helpful?".
+      expect(find.text('Is this helpful'), findsOneWidget);
+
+      // Re-tapping the same rating is a no-op (RN skips the same rating).
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.tap(find.byKey(const ValueKey('nudge-thumb-up')));
+      await tester.pumpAndSettle();
+      verifyNever(() => dio.patch<Map<String, dynamic>>(any(), data: any(named: 'data')));
     },
   );
 }
