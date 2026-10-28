@@ -355,7 +355,7 @@ describe('CharacterInterviewOrchestratorService — truncated turns', () => {
     // Not reported as an empty turn — the two are indistinguishable from the
     // response alone but need different advice.
     expect(error?.data.message).toContain('could not read');
-    expect(streamMock).toHaveBeenCalledTimes(3);
+    expect(streamMock).toHaveBeenCalledTimes(5);
     expect(appendMessage.mock.calls[1][1].metadata.errored).toBe(true);
   });
 
