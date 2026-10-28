@@ -7,27 +7,34 @@
 library;
 
 enum SummarySection {
-  featuresAndDemographics('Features & Demographics'),
-  sessionSummary('Session Summary'),
-  flow('Flow'),
-  keyConcern('Key Concern'),
-  objectiveObservations('Objective Observations'),
-  subjectiveObservations('Subjective Observations'),
-  assessment('Assessment'),
-  dominantFeelings('Dominant Feelings'),
-  issuesWorkedOn('Issues Worked On'),
-  keyTherapeuticTechniques('Key Therapeutic Techniques'),
-  referralsProvided('Referrals Provided'),
-  homeworkRecommended('Homework Recommended'),
-  planForNextCall('Plans for Next Call'),
-  tags('Tags'),
-  metrics('Metrics'),
-  intake('Intake'),
-  ongoingRisks('Risk Assessment'),
-  additionalNotes('Additional Notes');
+  // canEdit/canEnhance mirror RN's `SECTION_LIST` (`src/constants/
+  // summary.ts`) exactly — `canEdit` gates whether the section's pencil/
+  // edit-mode toggle appears at all (further gated by admin/counsellor
+  // permission at the call site); `canEnhance` additionally gates the
+  // AI-enhance wand button while editing.
+  featuresAndDemographics('Features & Demographics', canEdit: true, canEnhance: false),
+  sessionSummary('Session Summary', canEdit: true, canEnhance: true),
+  flow('Flow', canEdit: true, canEnhance: true),
+  keyConcern('Key Concern', canEdit: true, canEnhance: true),
+  objectiveObservations('Objective Observations', canEdit: true, canEnhance: true),
+  subjectiveObservations('Subjective Observations', canEdit: true, canEnhance: true),
+  assessment('Assessment', canEdit: true, canEnhance: true),
+  dominantFeelings('Dominant Feelings', canEdit: true, canEnhance: true),
+  issuesWorkedOn('Issues Worked On', canEdit: true, canEnhance: true),
+  keyTherapeuticTechniques('Key Therapeutic Techniques', canEdit: true, canEnhance: true),
+  referralsProvided('Referrals Provided', canEdit: true, canEnhance: true),
+  homeworkRecommended('Homework Recommended', canEdit: true, canEnhance: true),
+  planForNextCall('Plans for Next Call', canEdit: true, canEnhance: true),
+  tags('Tags', canEdit: true, canEnhance: false),
+  metrics('Metrics', canEdit: false, canEnhance: false),
+  intake('Intake', canEdit: true, canEnhance: false),
+  ongoingRisks('Risk Assessment', canEdit: true, canEnhance: false),
+  additionalNotes('Additional Notes', canEdit: false, canEnhance: false);
 
-  const SummarySection(this.label);
+  const SummarySection(this.label, {required this.canEdit, required this.canEnhance});
   final String label;
+  final bool canEdit;
+  final bool canEnhance;
 }
 
 enum SummaryFieldType { text, multilineText, inlineText, dropdown }

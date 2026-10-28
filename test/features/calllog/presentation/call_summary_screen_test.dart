@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+// `Override` isn't re-exported from the main `flutter_riverpod.dart` barrel
+// in this version — only from `misc.dart` (see `pump_app.dart`'s own
+// comment on this).
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
+import 'package:ally_mobile_flutter/features/account/data/user_profile.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
@@ -18,6 +25,19 @@ final _log = CallLogItem(
   sessionName: 'Walk-in #1',
   score: 88,
 );
+
+UserProfile _user(int id) =>
+    UserProfile(id: id, email: 'me@example.com', name: 'Me', phone: '', profileImageUrl: null, profileCompleted: true);
+
+/// Every summary below has `counselorId: 7` — RN's `SectionWrapper.tsx`
+/// gates a section's whole edit-mode toggle on
+/// `sectionConfig.canEdit && (isAdmin || isCounsellorForCall)`, so a test
+/// user must be the call's counsellor (or an admin) to ever see the pencil
+/// button at all.
+List<Override> _editorOverrides() => [
+  userPermissionsProvider.overrideWith((ref) async => const <String>[]),
+  currentUserProvider.overrideWith((ref) async => _user(7)),
+];
 
 void main() {
   testWidgets(
@@ -43,7 +63,7 @@ void main() {
       await pumpApp(
         tester,
         CallSummaryScreen(log: _log),
-        overrides: [callLogRepositoryProvider.overrideWithValue(repository)],
+        overrides: [callLogRepositoryProvider.overrideWithValue(repository), ..._editorOverrides()],
       );
 
       expect(find.text('Summary'), findsOneWidget);
@@ -61,14 +81,25 @@ void main() {
       await tester.tap(find.text('Features & Demographics'));
       await tester.pumpAndSettle();
 
-      // Read-only field: shows its value as plain text, not an editable
-      // control (no TextFormField/DropdownButtonFormField keyed to it).
+      // Not yet editing this section: every field — including the genuinely
+      // read-only Call ID — renders as plain text, not an editable control.
       expect(find.text('Call ID'), findsOneWidget);
       expect(find.text('1001'), findsOneWidget);
       expect(find.byKey(const ValueKey('callId')), findsNothing);
+      expect(find.text('Age'), findsOneWidget);
+      expect(find.text('25-34'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
 
-      // Dropdown field: renders as a dropdown, pre-selected with its
-      // current value, and opens to show its full option list.
+      // Enter edit mode via the section's pencil button.
+      await tester.tap(find.byKey(const ValueKey('section-edit-featuresAndDemographics')));
+      await tester.pumpAndSettle();
+
+      // Call ID stays plain text even while editing — it's genuinely
+      // non-editable, unlike Age below.
+      expect(find.byKey(const ValueKey('callId')), findsNothing);
+      expect(find.text('1001'), findsOneWidget);
+
+      // Age is now a real dropdown, pre-selected with its current value.
       final ageDropdown = find.ancestor(
         of: find.text('Age'),
         matching: find.byType(DropdownButtonFormField<String>),
@@ -90,18 +121,44 @@ void main() {
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
 
+      // Close this section without saving (nothing was actually changed) —
+      // the accordion is exclusive, so another section can't open while
+      // this one is still mid-edit. Invoke onPressed directly rather than a
+      // pixel-coordinate tap — the dropdown interaction above scrolled the
+      // list, so this button's on-screen position has moved.
+      tester.widget<IconButton>(find.byKey(const ValueKey('section-close-featuresAndDemographics'))).onPressed!();
+      await tester.pumpAndSettle();
+
       // "Session Summary" is a later section — scroll the list until its
-      // (not-yet-materialized) header exists, then expand it.
+      // (not-yet-materialized) header exists, then expand it. Using the
+      // header's own key rather than its text avoids any ambiguity with the
+      // field inside it that shares the same display label once expanded.
       final summaryList = find.byType(ListView).first;
-      await tester.dragUntilVisible(find.text('Session Summary'), summaryList, const Offset(0, -300));
+      final sessionSummaryHeader = find.byKey(const ValueKey('section-header-sessionSummary'));
+      await tester.dragUntilVisible(sessionSummaryHeader, summaryList, const Offset(0, -300));
       // `dragUntilVisible` only guarantees the widget's bounds intersect the
       // viewport, not that it's fully clear of the edge — taller field-label
       // rows above it (now IBMPlexSerif body.medium, not labelMedium) shift
       // exactly where it lands, so a direct tap can miss. `ensureVisible`
       // scrolls it fully into view first.
-      await tester.ensureVisible(find.text('Session Summary'));
+      await tester.ensureVisible(sessionSummaryHeader);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Session Summary'));
+      await tester.tap(sessionSummaryHeader);
+      await tester.pumpAndSettle();
+      // Tapping this header also collapses "Features & Demographics" (the
+      // accordion is exclusive), which shrinks a lot of now-hidden content
+      // above the current scroll position — the list doesn't auto-reanchor,
+      // so the just-tapped header (and everything below it) can end up
+      // scrolled out of view, in the opposite direction `dragUntilVisible`
+      // below searches. Reset to the top first so that search starts fresh.
+      await tester.drag(summaryList, const Offset(0, 5000));
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('section-edit-sessionSummary')),
+        summaryList,
+        const Offset(0, -300),
+      );
+      await tester.tap(find.byKey(const ValueKey('section-edit-sessionSummary')));
       await tester.pumpAndSettle();
 
       // Editing the (multiline) text field marks it dirty and enables Save.
@@ -140,11 +197,19 @@ void main() {
 
       await pumpApp(
         tester,
-        CallSummaryScreen(log: _log),
-        overrides: [callLogRepositoryProvider.overrideWithValue(repository2)],
+        // A distinct key from Scenario 1's instance: without one, this
+        // structurally-identical widget tree makes Flutter's element
+        // reconciliation treat this `pumpApp` call as an *update* of the
+        // same tree rather than a fresh mount, preserving (not resetting)
+        // `_SummaryTabState`'s instance state — including which section is
+        // expanded/mid-edit — from Scenario 1.
+        CallSummaryScreen(key: const ValueKey('scenario-2'), log: _log),
+        overrides: [callLogRepositoryProvider.overrideWithValue(repository2), ..._editorOverrides()],
       );
 
       await tester.tap(find.text('Features & Demographics'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('section-edit-featuresAndDemographics')));
       await tester.pumpAndSettle();
 
       final ageDropdown2 = find.ancestor(
@@ -195,8 +260,16 @@ void main() {
 
       await pumpApp(
         tester,
-        CallSummaryScreen(log: _log),
-        overrides: [callLogRepositoryProvider.overrideWithValue(repository3)],
+        CallSummaryScreen(key: const ValueKey('scenario-3'), log: _log),
+        // Same override *shape* as Scenarios 1/2 (just a different
+        // repository instance) — Riverpod's `ProviderScope` forbids
+        // changing the number of overrides across rebuilds of what it
+        // treats as the same scope (`pump_app.dart`'s own `ProviderScope`
+        // isn't itself given a fresh key per `pumpApp` call, only
+        // `CallSummaryScreen` is here), so every call in this test must
+        // pass the same override list shape even where a scenario doesn't
+        // otherwise need `_editorOverrides()`.
+        overrides: [callLogRepositoryProvider.overrideWithValue(repository3), ..._editorOverrides()],
       );
 
       await tester.tap(find.text('Transcript'));
