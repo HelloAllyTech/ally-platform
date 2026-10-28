@@ -41,13 +41,12 @@ class TermsAndAgreementModal extends ConsumerStatefulWidget {
       barrierDismissible: false,
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, _, _) => const PopScope(
-        canPop: false,
-        child: TermsAndAgreementModal(),
-      ),
+      pageBuilder: (context, _, _) => const PopScope(canPop: false, child: TermsAndAgreementModal()),
       transitionBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+        position: Tween(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
         child: child,
       ),
     );
@@ -105,57 +104,49 @@ class _TermsAndAgreementModalState extends ConsumerState<TermsAndAgreementModal>
   }
 
   TapGestureRecognizer _linkTo(String url) => _linkRecognizers.putIfAbsent(
-        url,
-        () => TapGestureRecognizer()
-          ..onTap = () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-      );
+    url,
+    () => TapGestureRecognizer()..onTap = () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
     // styles.container padding 20 → SafeAreaView → contentContainer
-    // maxHeight '80%' of the safe area.
-    final safeHeight = media.size.height - 40 - media.padding.vertical;
+    // maxHeight '80%', centred. Per the RN device screenshot, the
+    // SafeAreaView inside this statusBarTranslucent Modal applies no insets:
+    // the card is 80% of (H - 40) and centred in the padded screen.
+    final maxHeight = (MediaQuery.sizeOf(context).height - 40) * 0.8;
 
     return Material(
       type: MaterialType.transparency,
       child: Container(
         color: const Color(0x80000000), // rgba(0,0,0,0.5)
         padding: const EdgeInsets.all(20),
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: safeHeight * 0.8),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      ref.t('terms.title'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.replayProHeadline,
-                        fontSize: 24,
-                        height: 32 / 24,
-                        letterSpacing: 0,
-                        color: AppColors.highEmphasis,
-                      ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: Container(
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    ref.t('terms.title'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: AppFonts.replayProHeadline,
+                      fontSize: 24,
+                      height: 32 / 24,
+                      letterSpacing: 0,
+                      color: AppColors.highEmphasis,
                     ),
-                    Flexible(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildContent(context),
-                      ),
-                    ),
-                    _buildFooter(context),
-                  ],
-                ),
+                  ),
+                  Flexible(
+                    child: Padding(padding: const EdgeInsets.only(bottom: 10), child: _buildContent(context)),
+                  ),
+                  _buildFooter(context),
+                ],
               ),
             ),
           ),
@@ -207,9 +198,7 @@ class _TermsAndAgreementModalState extends ConsumerState<TermsAndAgreementModal>
                 child: Row(
                   children: [
                     _TermsCheckbox(checked: _isAgreed),
-                    Expanded(
-                      child: Text(ref.t('terms.agreeLabel'), style: _bodyStyle),
-                    ),
+                    Expanded(child: Text(ref.t('terms.agreeLabel'), style: _bodyStyle)),
                   ],
                 ),
               ),
@@ -278,8 +267,7 @@ class _TermsAndAgreementModalState extends ConsumerState<TermsAndAgreementModal>
                                         TextSpan(text: ref.t(bullet.textKey)),
                                         if (bullet.boldTextKey != null)
                                           TextSpan(text: ref.t(bullet.boldTextKey!), style: _boldStyle),
-                                        if (bullet.suffixTextKey != null)
-                                          TextSpan(text: ref.t(bullet.suffixTextKey!)),
+                                        if (bullet.suffixTextKey != null) TextSpan(text: ref.t(bullet.suffixTextKey!)),
                                         if (bullet.link != null)
                                           TextSpan(
                                             text: ref.t(bullet.link!.textKey),
