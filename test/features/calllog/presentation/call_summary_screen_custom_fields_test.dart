@@ -94,8 +94,8 @@ void main() {
 
       // Both custom fields render under their tenant-configured name, in the
       // section their sectionKey maps to.
-      expect(find.text('Referral Source'), findsOneWidget);
-      expect(find.text('Billing Code'), findsOneWidget);
+      expect(find.text('Referral Source:'), findsOneWidget);
+      expect(find.text('Billing Code:'), findsOneWidget);
 
       // Not yet editing this section: both fields show as plain text,
       // regardless of their own per-field permission.
@@ -110,15 +110,15 @@ void main() {
       await tester.pumpAndSettle();
 
       // ADMIN_ONLY, current user is the counsellor but not an admin: stays
-      // read-only (no TextFormField) even while the section is editing.
+      // read-only (no text input) even while the section is editing.
       expect(find.byKey(const ValueKey('cf-billing-code')), findsNothing);
       expect(find.text('BC-42'), findsOneWidget);
 
-      // BOTH permission: renders as a real, editable TextFormField seeded
+      // BOTH permission: renders as a real, editable text input seeded
       // with its current value.
       final referralField = find.byKey(const ValueKey('cf-referral'));
       expect(referralField, findsOneWidget);
-      expect(tester.widget<TextFormField>(referralField).initialValue, 'Phone');
+      expect(tester.widget<TextField>(find.descendant(of: referralField, matching: find.byType(TextField))).controller!.text, 'Phone');
 
       await tester.enterText(referralField, 'Walk-in');
       await tester.pumpAndSettle();
@@ -133,10 +133,10 @@ void main() {
       // this file's sibling test, focusing the text field above scrolled
       // the list to keep it visible, which can carry the tick button
       // off-screen for a real hit-test.
-      final tickButton = tester.widget<IconButton>(
+      final tickButton = tester.widget<GestureDetector>(
         find.byKey(const ValueKey('section-tick-featuresAndDemographics')),
       );
-      tickButton.onPressed!();
+      tickButton.onTap!();
       await tester.pumpAndSettle();
 
       // Only the dirty custom field is sent, through upsertValues — not

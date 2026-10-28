@@ -75,7 +75,7 @@ void main() {
   // that now-freshly-started load a real-zone window of its own. Any other
   // widget gating its *first* `ref.t()`/`ref.tr()` call behind another async
   // provider will hit this same trap.
-  testWidgets('record -> pause/resume -> stop -> generate applies values and saves the transcript', (tester) async {
+  testWidgets('record -> pause/resume -> stop -> generate applies values and appends to the saved transcript', (tester) async {
     when(() => platform.hasPermission(any(), request: any(named: 'request'))).thenAnswer((_) async => true);
     when(() => platform.start(any(), any(), path: any(named: 'path'))).thenAnswer((_) async {});
     when(() => platform.pause(any())).thenAnswer((_) async {});
@@ -102,6 +102,8 @@ void main() {
       Scaffold(
         body: VoiceNoteSection(
           chatId: 42,
+          // S44: a note that already has a saved dictation.
+          existingTranscript: 'Earlier dictation.',
           onValuesApplied: (updates) async {
             appliedValues = updates;
           },
@@ -137,6 +139,7 @@ void main() {
     // 4. Stop -> the "ready" panel (discard/generate).
     await tester.tap(find.byKey(const Key('voice-note-stop')));
     await tester.pump();
+    await tester.pump();
     expect(find.byKey(const Key('voice-note-ready')), findsOneWidget);
     expect(find.byKey(const Key('voice-note-generate')), findsOneWidget);
 
@@ -150,7 +153,8 @@ void main() {
 
     expect(appliedValues, {'sessionSummary': 'Discussed anxiety'});
     verify(
-      () => repository.saveNoteTranscript(chatId: 42, transcript: 'Client discussed anxiety.'),
+      // RN `transcriptRef`: seeded from the saved transcript, then appended.
+      () => repository.saveNoteTranscript(chatId: 42, transcript: 'Earlier dictation.\nClient discussed anxiety.'),
     ).called(1);
 
     // `VoiceNoteRecorder.reset()` (called once generation succeeds) does

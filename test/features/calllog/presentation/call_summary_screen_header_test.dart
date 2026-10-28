@@ -450,7 +450,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.byKey(const Key('call-summary-view-review')), findsNothing);
   });
 
   testWidgets('the floating review button shows for a non-private review, and navigates to it', (
@@ -465,9 +465,9 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    expect(find.byType(FloatingActionButton), findsOneWidget);
+    expect(find.byKey(const Key('call-summary-view-review')), findsOneWidget);
 
-    await tester.tap(find.byType(FloatingActionButton));
+    await tester.tap(find.byKey(const Key('call-summary-view-review')));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('REVIEW_DETAILS:rev-1'), findsOneWidget);
@@ -497,7 +497,7 @@ void main() {
         scribeReactionsRepository: scribeReactionsRepository,
       );
 
-      expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(find.byKey(const Key('call-summary-view-review')), findsOneWidget);
     },
   );
 }

@@ -48,6 +48,7 @@ void main() {
       router.push('/call-log/1001');
       await tester.pumpAndSettle();
 
+      expect(find.byKey(const Key('summary-unauthorized-image')), findsOneWidget); // RN summaryFailed.png
       expect(find.text('Summary Not Found'), findsOneWidget);
       expect(find.text('The summary you are looking for does not exist.'), findsOneWidget);
 

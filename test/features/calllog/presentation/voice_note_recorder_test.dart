@@ -137,4 +137,24 @@ void main() {
 
     expect(notifications, greaterThanOrEqualTo(2));
   });
+
+  testWidgets('auto-stops once the recording reaches the upload cap (RN MAX_RECORDING_BYTES)', (tester) async {
+    when(() => platform.hasPermission(any(), request: any(named: 'request'))).thenAnswer((_) async => true);
+    when(() => platform.start(any(), any(), path: any(named: 'path'))).thenAnswer((_) async {});
+    when(() => platform.stop(any())).thenAnswer((_) async => null);
+    expect(VoiceNoteRecorder.defaultMaxRecordingBytes, 24 * 1024 * 1024);
+
+    // 3 seconds of 16kHz/16-bit mono.
+    final capped = VoiceNoteRecorder(recorder: AudioRecorder(), maxRecordingBytes: 3 * VoiceNoteRecorder.bytesPerSecond);
+    addTearDown(capped.dispose);
+    await capped.start();
+    expect(capped.status, VoiceRecorderStatus.recording);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(capped.status, VoiceRecorderStatus.recording);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(capped.status, VoiceRecorderStatus.stopped);
+    verify(() => platform.stop(any())).called(1);
+  });
 }

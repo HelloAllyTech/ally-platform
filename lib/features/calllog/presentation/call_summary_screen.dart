@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -14,9 +15,11 @@ import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirmation_modal.dart';
+import '../../../core/widgets/custom_dropdown.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../account/data/account_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
@@ -81,28 +84,27 @@ const _sectionLabelKeys = <SummarySection, String>{
   SummarySection.additionalNotes: 'summary.sections.additionalNotes',
 };
 
-/// Closest-matching Material icon per section, standing in for RN's
-/// `SECTION_LIST`'s custom per-section SVGs (`CallDetailsIcon`,
-/// `SessionSummaryIcon`, `FlowIcon`, ... — `src/constants/summary.ts`).
-const _sectionIcons = <SummarySection, IconData>{
-  SummarySection.featuresAndDemographics: Icons.call_outlined,
-  SummarySection.sessionSummary: Icons.auto_awesome_outlined,
-  SummarySection.flow: Icons.waves,
-  SummarySection.keyConcern: Icons.sentiment_dissatisfied_outlined,
-  SummarySection.objectiveObservations: Icons.visibility_outlined,
-  SummarySection.subjectiveObservations: Icons.search,
-  SummarySection.assessment: Icons.assignment_outlined,
-  SummarySection.dominantFeelings: Icons.sentiment_satisfied_outlined,
-  SummarySection.issuesWorkedOn: Icons.warning_amber_outlined,
-  SummarySection.keyTherapeuticTechniques: Icons.healing_outlined,
-  SummarySection.referralsProvided: Icons.volunteer_activism_outlined,
-  SummarySection.homeworkRecommended: Icons.library_books_outlined,
-  SummarySection.planForNextCall: Icons.headset_mic_outlined,
-  SummarySection.tags: Icons.label_outline,
-  SummarySection.metrics: Icons.storage_outlined,
-  SummarySection.intake: Icons.assignment_ind_outlined,
-  SummarySection.ongoingRisks: Icons.report_problem_outlined,
-  SummarySection.additionalNotes: Icons.note_add_outlined,
+/// RN `SECTION_LIST[].icon` (`src/constants/summary.ts`): each section's
+/// own SVG, drawn at its intrinsic size like RN's `<Icon />`.
+const _sectionIcons = <SummarySection, String>{
+  SummarySection.featuresAndDemographics: 'assets/icons/callDetails.svg',
+  SummarySection.sessionSummary: 'assets/icons/sessionSummary.svg',
+  SummarySection.flow: 'assets/icons/flow.svg',
+  SummarySection.keyConcern: 'assets/icons/keyConcern.svg',
+  SummarySection.objectiveObservations: 'assets/icons/tableEye.svg',
+  SummarySection.subjectiveObservations: 'assets/icons/magnifyEye.svg',
+  SummarySection.assessment: 'assets/icons/assessment.svg',
+  SummarySection.dominantFeelings: 'assets/icons/smile.svg',
+  SummarySection.issuesWorkedOn: 'assets/icons/brightnessAlert.svg',
+  SummarySection.keyTherapeuticTechniques: 'assets/icons/prescriptions.svg',
+  SummarySection.referralsProvided: 'assets/icons/handShare.svg',
+  SummarySection.homeworkRecommended: 'assets/icons/newsStand.svg',
+  SummarySection.planForNextCall: 'assets/icons/headsetMic.svg',
+  SummarySection.tags: 'assets/icons/tag.svg',
+  SummarySection.metrics: 'assets/icons/database.svg',
+  SummarySection.intake: 'assets/icons/intake.svg',
+  SummarySection.ongoingRisks: 'assets/icons/ongoingRisks.svg',
+  SummarySection.additionalNotes: 'assets/icons/notes.svg',
 };
 
 /// Maps each [SummaryFieldDef.key] to its real translation key, taken from
@@ -673,16 +675,35 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
               ],
             ),
           ),
+          // RN `styles.reviewIconButton`: a 56pt white circle with a 0.5pt
+          // stroke and soft shadow holding the 20pt chatBubble icon, 20pt
+          // in from the right (the Scaffold already insets FABs by 16).
           floatingActionButton: showReviewButton
-              ? FloatingActionButton(
-                  key: const Key('call-summary-view-review'),
-                  onPressed: () => _pushAndRefresh(
-                    context.push(
-                      '/reviews/${summary!.reviewId}',
-                      extra: ReviewType.scribe,
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 4, bottom: 4),
+                  child: GestureDetector(
+                    key: const Key('call-summary-view-review'),
+                    onTap: () => _pushAndRefresh(
+                      context.push(
+                        '/reviews/${summary!.reviewId}',
+                        extra: ReviewType.scribe,
+                      ),
+                    ),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x1AA09E9E), offset: Offset(8.52, 11.36), blurRadius: 14.2),
+                        ],
+                      ),
+                      child: SvgPicture.asset('assets/icons/chatBubble.svg', width: 20, height: 20),
                     ),
                   ),
-                  child: const Icon(Icons.comment_outlined),
                 )
               : null,
           body: Stack(
@@ -1221,52 +1242,54 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                 chatId: _chatId,
                 onValuesApplied: _applyVoiceValues,
                 onCustomValuesApplied: _reseedCustomFields,
+                existingTranscript: summary.transcript,
               ),
             Expanded(
               // Builder, not `children:` — sections are only built as they
               // scroll in. Index 0 is the AI disclaimer banner.
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                // RN `contentContainer` paddingBottom 70; the banner and the
+                // section card carry their own horizontal spacing.
+                padding: const EdgeInsets.only(bottom: 70),
                 itemCount: sections.length + 1,
                 itemBuilder: (context, index) {
+                  final size = RnSize.of(context);
                   if (index == 0) {
-                    // RN's `CallSummaryDetails.tsx` never shows raw
-                    // status/started/ended/score fields on this screen at all
-                    // — those were this app's own Phase 0 scaffold text,
-                    // leftover from before the real screen was built out, and
-                    // they never got cleaned up. What RN actually shows here
-                    // first is this AI-generated disclaimer banner
-                    // (`styles.alertContainer`/`alertIconContainer`/
-                    // `alertText`), always visible above the section list.
+                    // RN `CallSummaryDetails.tsx` `alertContainer`: the
+                    // AI-generated disclaimer above the section card, with
+                    // RN's goldenShield SVG in a carrotOrange ring.
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(10),
+                      margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
+                      padding: EdgeInsets.all(size.s(10)),
                       decoration: BoxDecoration(
                         color: AppColors.amber50,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(size.s(8)),
                         border: Border.all(color: AppColors.orange400, width: 0.5),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Container(
-                            width: 32,
-                            height: 32,
-                            margin: const EdgeInsets.only(right: 10),
+                            width: size.s(32),
+                            height: size.s(32),
+                            margin: EdgeInsets.only(right: size.s(10)),
+                            alignment: Alignment.center,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.orange400, width: 0.5),
+                              border: Border.all(color: AppColors.carrotOrange, width: 0.5),
                             ),
-                            child: const Icon(
-                              Icons.shield_outlined,
-                              size: 18,
-                              color: AppColors.orange400,
-                            ),
+                            child: SvgPicture.asset('assets/icons/goldenShield.svg', key: const Key('ai-warning-shield')),
                           ),
                           Expanded(
                             child: Text(
                               ref.t('callSummary.aiGeneratedWarning'),
-                              style: const TextStyle(color: AppColors.red700, fontSize: 12),
+                              style: const TextStyle(
+                                fontFamily: AppFonts.ibmPlexSerifRegular,
+                                fontSize: 12,
+                                height: 16 / 12,
+                                letterSpacing: 0.2,
+                                color: AppColors.red700,
+                              ),
                             ),
                           ),
                         ],
@@ -1274,7 +1297,10 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                     );
                   }
                   final section = sections[index - 1];
-                  return _SectionCard(
+                  // RN `styles.card`: paddingHorizontal 16@s, paddingTop 8.
+                  return Padding(
+                    padding: EdgeInsets.only(left: size.s(16), right: size.s(16), top: index == 1 ? 8 : 0),
+                    child: _SectionCard(
                     key: ValueKey(section),
                     section: section,
                     visibleFields: visibleFields,
@@ -1295,6 +1321,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                     onWandPress: () => _onWandPress(section),
                     onTickPress: () => _onTickPress(section),
                     onClosePress: () => _onClosePress(section),
+                    ),
                   );
                 },
               ),
@@ -1352,11 +1379,13 @@ bool _canEditCustomField(CustomFieldDefinition def, {required bool isAdmin, requ
 /// header (not Flutter's `ExpansionTile`, whose own expand/collapse state
 /// can't be driven externally the way RN's exclusive, edit-aware accordion
 /// needs: one section open at a time, and toggling blocked while another
-/// section is mid-edit). The header's right side is a pencil ("edit this
-/// section") that swaps for a wand ("AI-enhance", only when [canEnhance])
-/// plus a checkmark ("save") and a close icon ("cancel, reset this
-/// section's fields") once editing — RN's `editSquare.svg`/`wandStars.svg`/
-/// `check.svg`/`closeCircle.svg`, same assets this app already has.
+/// section is mid-edit). Layout per RN `SectionHeader.tsx`: a 10pt
+/// arrowRight/arrowDown caret (hidden while editing), the section's own SVG
+/// (`SECTION_LIST[].icon`), the IBM Plex Serif Medium title, and on the
+/// right a 24pt circled pencil that swaps for wand/check/close once editing.
+/// The section box is RN `SectionWrapper`'s `sectionBox` (0.5pt lightGray5
+/// rule under every section but the last) or `sectionBoxEditing` (0.5pt
+/// grey rounded box while expanded and editing).
 class _SectionCard extends ConsumerWidget {
   const _SectionCard({
     super.key,
@@ -1420,100 +1449,482 @@ class _SectionCard extends ConsumerWidget {
     final sectionCustomFields = customFieldDefs.where((d) => d.sectionKey == section.name).toList();
     // RN's `canEdit={sectionConfig.canEdit && (isAdmin || isCounsellorForCall)}`.
     final canEdit = section.canEdit && (isAdmin || isCounsellorForCall);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
-        variant: AppCardVariant.flat,
-        child: Column(
-          children: [
-            InkWell(
-              key: ValueKey('section-header-${section.name}'),
-              onTap: onToggle,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                child: Row(
-                  children: [
-                    Icon(_sectionIcons[section] ?? Icons.article_outlined, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        ref.t(_sectionLabelKeys[section] ?? section.label),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+    final isLast = section == SummarySection.values.last;
+    final BoxDecoration? box;
+    if (isEditing && isExpanded) {
+      box = BoxDecoration(
+        border: Border.all(color: AppColors.rnGray, width: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      );
+    } else if (!isLast) {
+      box = const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.lightGray5, width: 0.5)));
+    } else {
+      box = null;
+    }
+
+    return Container(
+      margin: EdgeInsets.only(top: isEditing && isExpanded ? 8 : 0),
+      decoration: box,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GestureDetector(
+            key: ValueKey('section-header-${section.name}'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(right: 14),
+                            child: isEditing
+                                ? null
+                                : SizedBox(
+                                    width: 24,
+                                    child: Center(
+                                      child: SvgPicture.asset(
+                                        isExpanded ? 'assets/icons/arrowDown.svg' : 'assets/icons/arrowRight.svg',
+                                        key: ValueKey('section-caret-${section.name}'),
+                                        width: 10,
+                                        height: 10,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: SvgPicture.asset(_sectionIcons[section]!),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Text(
+                                ref.t(_sectionLabelKeys[section] ?? section.label),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: AppFonts.ibmPlexSerifMedium,
+                                  fontSize: 14,
+                                  height: 22 / 14,
+                                  letterSpacing: 0.2,
+                                  color: AppColors.highEmphasis,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (isExpanded && canEdit)
-                      if (!isEditing)
-                        IconButton(
-                          key: ValueKey('section-edit-${section.name}'),
-                          icon: SvgPicture.asset('assets/icons/editSquare.svg', width: 20, height: 20),
-                          onPressed: onEditPress,
-                        )
-                      else ...[
-                        if (section.canEnhance)
-                          isEnhancing
-                              ? const Padding(
-                                  padding: EdgeInsets.all(8),
-                                  child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                )
-                              : IconButton(
-                                  key: ValueKey('section-wand-${section.name}'),
-                                  icon: SvgPicture.asset('assets/icons/wandStars.svg', width: 20, height: 20),
-                                  onPressed: onWandPress,
-                                ),
-                        IconButton(
-                          key: ValueKey('section-tick-${section.name}'),
-                          icon: SvgPicture.asset('assets/icons/check.svg', width: 20, height: 20),
-                          onPressed: onTickPress,
-                        ),
-                        IconButton(
-                          key: ValueKey('section-close-${section.name}'),
-                          icon: SvgPicture.asset('assets/icons/closeCircle.svg', width: 20, height: 20),
-                          onPressed: onClosePress,
-                        ),
-                      ]
-                    else
-                      Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
-                  ],
-                ),
+                  ),
+                  if (isExpanded && canEdit)
+                    if (!isEditing)
+                      _HeaderIconButton(
+                        buttonKey: ValueKey('section-edit-${section.name}'),
+                        asset: 'assets/icons/editSquare.svg',
+                        onTap: onEditPress,
+                        margin: EdgeInsets.zero,
+                      )
+                    else ...[
+                      if (section.canEnhance)
+                        isEnhancing
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 4),
+                                child: SizedBox(width: 24, height: 24, child: CupertinoActivityIndicator(radius: 8)),
+                              )
+                            : _HeaderIconButton(
+                                buttonKey: ValueKey('section-wand-${section.name}'),
+                                asset: 'assets/icons/wandStars.svg',
+                                onTap: onWandPress,
+                              ),
+                      _HeaderIconButton(
+                        buttonKey: ValueKey('section-tick-${section.name}'),
+                        asset: 'assets/icons/check.svg',
+                        onTap: onTickPress,
+                      ),
+                      _HeaderIconButton(
+                        buttonKey: ValueKey('section-close-${section.name}'),
+                        asset: 'assets/icons/closeCircle.svg',
+                        onTap: onClosePress,
+                      ),
+                    ],
+                ],
               ),
             ),
-            if (isExpanded)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final field in fields)
-                      _FieldEditor(
-                        field: field,
-                        formValues: formValues,
-                        onChanged: onFieldChanged,
-                        onTyped: onFieldTyped ?? onFieldChanged,
-                        isEditing: isEditing,
-                      ),
-                    for (final def in sectionCustomFields)
-                      _CustomFieldEditor(
-                        definition: def,
-                        value: customFieldValues[def.id],
-                        onChanged: onCustomFieldChanged,
-                        onTyped: onCustomFieldTyped ?? onCustomFieldChanged,
-                        canEdit: isEditing &&
-                            _canEditCustomField(def, isAdmin: isAdmin, isCounsellorForCall: isCounsellorForCall),
-                      ),
-                  ],
-                ),
+          ),
+          if (isExpanded)
+            // RN `styles.sectionContent`: paddingLeft 30.
+            Padding(
+              padding: const EdgeInsets.only(left: 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final field in fields)
+                    _FieldEditor(
+                      field: field,
+                      formValues: formValues,
+                      onChanged: onFieldChanged,
+                      onTyped: onFieldTyped ?? onFieldChanged,
+                      isEditing: isEditing,
+                      isEnhancing: isEnhancing,
+                    ),
+                  for (final def in sectionCustomFields)
+                    _CustomFieldEditor(
+                      definition: def,
+                      value: customFieldValues[def.id],
+                      onChanged: onCustomFieldChanged,
+                      onTyped: onCustomFieldTyped ?? onCustomFieldChanged,
+                      canEdit: isEditing &&
+                          _canEditCustomField(def, isAdmin: isAdmin, isCounsellorForCall: isCounsellorForCall),
+                    ),
+                ],
               ),
-          ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN `SectionHeader` `editButton` / `buttonContainer`: a 24pt circle with
+/// a 0.3pt lightGray4 ring around the icon at its intrinsic size.
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.buttonKey,
+    required this.asset,
+    required this.onTap,
+    this.margin = const EdgeInsets.symmetric(horizontal: 4),
+  });
+
+  final Key buttonKey;
+  final String asset;
+  final VoidCallback onTap;
+  final EdgeInsets margin;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: buttonKey,
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 24,
+        height: 24,
+        margin: margin,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.lightGray4, width: 0.3),
+        ),
+        child: SvgPicture.asset(asset),
+      ),
+    );
+  }
+}
+
+/// RN `FieldRow` `styles.label` (+ `:`), IBM Plex Serif body.medium, low
+/// emphasis.
+const _fieldRowLabelStyle = TextStyle(
+  fontFamily: AppFonts.ibmPlexSerifRegular,
+  fontSize: 14,
+  height: 22 / 14,
+  letterSpacing: 0.2,
+  color: AppColors.lowEmphasis,
+);
+
+/// RN `commonStyles.fieldValueText`: IBM Plex Serif body.medium, medium
+/// emphasis.
+const _fieldValueTextStyle = TextStyle(
+  fontFamily: AppFonts.ibmPlexSerifRegular,
+  fontSize: 14,
+  height: 22 / 14,
+  letterSpacing: 0.2,
+  color: AppColors.mediumEmphasis,
+);
+
+/// RN `Dropdown.tsx` `styles.itemText`.
+const _dropdownItemTextStyle = TextStyle(
+  fontFamily: AppFonts.ibmPlexSerifRegular,
+  fontSize: 14,
+  height: 22 / 14,
+  letterSpacing: 0.2,
+  color: AppColors.highEmphasis,
+);
+
+/// RN `FieldRow`: `Label:` then the value (or [edit], RN's `renderEdit`)
+/// on one row, `marginBottom: 5@vs`.
+class _FieldRow extends StatelessWidget {
+  const _FieldRow({required this.label, required this.value, this.edit});
+
+  final String label;
+  final String value;
+  final Widget? edit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: RnSize.of(context).vs(5)),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text('$label:', style: _fieldRowLabelStyle),
+          ),
+          edit ?? Expanded(child: Text(value, style: _fieldValueTextStyle)),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN `fieldRenderer`'s `dropdownContainer` (`flex: 1, maxWidth: 200`)
+/// holding a `CustomDropdown`, whose header hugs its own content.
+class _SummaryDropdown extends StatelessWidget {
+  const _SummaryDropdown({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onSelect,
+    required this.placeholder,
+  });
+
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onSelect;
+
+  /// RN `placeholder` (`Select` by default), shown in `charcoal2` at 0.5
+  /// opacity while there's no value.
+  final String placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpty = value.isEmpty;
+    return Flexible(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 200),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: CustomDropdown(
+            value: isEmpty ? placeholder : value,
+            options: options,
+            onSelect: onSelect,
+            alignRight: false,
+            headerTextStyle: isEmpty
+                ? _fieldValueTextStyle.copyWith(color: AppColors.charcoal2.withValues(alpha: 0.5))
+                : _fieldValueTextStyle,
+            itemTextStyle: _dropdownItemTextStyle,
+          ),
         ),
       ),
     );
   }
 }
+
+/// A text input that owns a [TextEditingController] and re-syncs it when
+/// the value it's given changes from outside (the AI wand, voice dictation,
+/// a reseed) — RN's controlled `TextInput value={...}`. Keystrokes only
+/// report through [onChanged]; the parent records them without a rebuild,
+/// so on any later rebuild the incoming value already equals the
+/// controller's text and nothing is touched.
+class _SyncedTextField extends StatefulWidget {
+  const _SyncedTextField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.style,
+    this.hintText,
+    this.multiline = false,
+    this.autofocus = false,
+    this.keyboardType,
+    this.textCapitalization = TextCapitalization.sentences,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+  final TextStyle style;
+  final String? hintText;
+  final bool multiline;
+  final bool autofocus;
+  final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+
+  @override
+  State<_SyncedTextField> createState() => _SyncedTextFieldState();
+}
+
+class _SyncedTextFieldState extends State<_SyncedTextField> {
+  late final TextEditingController _controller = TextEditingController(text: widget.value);
+
+  @override
+  void didUpdateWidget(covariant _SyncedTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      autofocus: widget.autofocus,
+      style: widget.style,
+      maxLines: widget.multiline ? null : 1,
+      keyboardType: widget.keyboardType ?? (widget.multiline ? TextInputType.multiline : TextInputType.text),
+      textInputAction: widget.multiline ? TextInputAction.newline : TextInputAction.done,
+      textCapitalization: widget.textCapitalization,
+      decoration: InputDecoration.collapsed(
+        hintText: widget.hintText,
+        hintStyle: widget.style.copyWith(color: AppColors.lightGray3),
+      ),
+      onChanged: widget.onChanged,
+    );
+  }
+}
+
+/// RN `EditableField.tsx`: the multiline value with no label — a
+/// scrollable (max 200) lightGray3 text, or while editing a focused
+/// multiline input; both pulse while the wand is enhancing.
+class _EditableField extends StatelessWidget {
+  const _EditableField({
+    required this.fieldKey,
+    required this.value,
+    required this.onChanged,
+    required this.isEditing,
+    this.isEnhancing = false,
+    this.placeholder = '-',
+    this.keyboardType,
+  });
+
+  final String fieldKey;
+  final String? value;
+  final ValueChanged<String> onChanged;
+  final bool isEditing;
+  final bool isEnhancing;
+  final String placeholder;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget child;
+    if (isEditing) {
+      child = Padding(
+        padding: const EdgeInsets.only(right: 20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: _SyncedTextField(
+            key: ValueKey(fieldKey),
+            value: value ?? '',
+            onChanged: onChanged,
+            multiline: true,
+            autofocus: true,
+            keyboardType: keyboardType,
+            style: _dropdownItemTextStyle,
+          ),
+        ),
+      );
+    } else {
+      child = ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 200),
+        child: SingleChildScrollView(
+          child: Text(
+            value != null && value!.isNotEmpty ? value! : placeholder,
+            style: TextStyle(
+              fontFamily: AppFonts.ibmPlexSerifRegular,
+              fontSize: 14,
+              height: RnSize.of(context).mvs(20) / 14,
+              color: AppColors.lightGray3,
+            ),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(bottom: RnSize.of(context).vs(16)),
+      child: _Pulse(active: isEnhancing, child: child),
+    );
+  }
+}
+
+/// RN `EditableField`'s enhancing animation: opacity 1 → 0.5 → 1 every
+/// 800ms while [active]; back to 1 when it stops.
+class _Pulse extends StatefulWidget {
+  const _Pulse({required this.active, required this.child});
+
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+    value: 1,
+    lowerBound: 0.5,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _Pulse oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) _sync();
+  }
+
+  void _sync() {
+    if (widget.active) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.animateTo(1, duration: const Duration(milliseconds: 300));
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(opacity: _controller, child: widget.child);
+}
+
+/// RN's InlineTextInput placeholders (`summary.ts` `placeholder:
+/// 'Add note'`); every other inline field falls back to `Enter detail`.
+const _addNotePlaceholderKeys = {
+  'intakeNotes',
+  'riskSelfHarmNotes',
+  'riskSuicidalThoughtsNotes',
+  'riskRunningAwayNotes',
+  'traumaNotes',
+  'assessmentPsychologicalDiagnosisNotes',
+  'assessmentUseOfPsychotropicMedicationsNotes',
+  'assessmentHallucinationsNotes',
+  'ongoingRiskSelfHarmNotes',
+  'ongoingRiskSuicidalThoughtsNotes',
+};
+
 
 /// RN `formatDisplay` for the computed Call Duration / Date / Time fields;
 /// null for every other field (shown as stored).
@@ -1536,6 +1947,7 @@ String? _computedDisplay(WidgetRef ref, String key, Object? value) {
   return null;
 }
 
+/// RN `fieldRenderer.renderField` for one built-in summary field.
 class _FieldEditor extends ConsumerWidget {
   const _FieldEditor({
     required this.field,
@@ -1543,6 +1955,7 @@ class _FieldEditor extends ConsumerWidget {
     required this.onChanged,
     required this.onTyped,
     required this.isEditing,
+    this.isEnhancing = false,
   });
 
   final SummaryFieldDef field;
@@ -1558,97 +1971,92 @@ class _FieldEditor extends ConsumerWidget {
   /// otherwise it's always plain read-only text, same as a genuinely
   /// non-editable field like Call ID.
   final bool isEditing;
+  final bool isEnhancing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = formValues[field.key];
     final label = ref.t(_fieldLabelKeys[field.key] ?? field.label);
+    // RN `formatFieldValue`: the field's own formatter, else `-` for null.
+    final display = _computedDisplay(ref, field.key, value) ?? (value == null ? '-' : value.toString());
 
-    if (!field.editable || !isEditing) {
-      final display = _computedDisplay(ref, field.key, value) ??
-          (value == null || value.toString().trim().isEmpty ? '—' : value.toString());
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // RN's FieldRow styles.label: IBM_PLEX_SERIF.REGULAR +
-            // typography.body.medium — bodyMedium already matches both
-            // exactly; labelMedium would wrongly render it in Roboto.
-            Text(label, style: Theme.of(context).textTheme.bodyMedium),
-            Text(display),
-          ],
-        ),
-      );
+    switch (field.type) {
+      case SummaryFieldType.text:
+        return _FieldRow(label: label, value: display);
+
+      case SummaryFieldType.inlineText:
+        return _FieldRow(
+          label: label,
+          value: display,
+          edit: isEditing && field.editable
+              ? Flexible(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _SyncedTextField(
+                        key: ValueKey(field.key),
+                        value: value?.toString() ?? '',
+                        onChanged: (text) => onTyped(field.key, text),
+                        hintText: _addNotePlaceholderKeys.contains(field.key) ? 'Add note' : 'Enter detail',
+                        textCapitalization: TextCapitalization.words,
+                        style: _fieldValueTextStyle.copyWith(color: AppColors.highEmphasis),
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+        );
+
+      case SummaryFieldType.multilineText:
+        return _EditableField(
+          fieldKey: field.key,
+          value: value is String ? value : value?.toString(),
+          onChanged: (text) => onTyped(field.key, text),
+          isEditing: isEditing && field.editable,
+          isEnhancing: isEnhancing,
+        );
+
+      case SummaryFieldType.dropdown:
+        final options = field.options ?? const <String>[];
+        String labelFor(String option) => ref.t(_fieldOptionLabelKeys[option] ?? option);
+        return _FieldRow(
+          label: label,
+          value: display,
+          edit: isEditing
+              ? _SummaryDropdown(
+                  key: ValueKey('dropdown-${field.key}'),
+                  value: value is String && value.isNotEmpty ? labelFor(value) : '',
+                  options: [for (final option in options) labelFor(option)],
+                  placeholder: 'Select',
+                  onSelect: (selected) {
+                    final option = options.firstWhere((o) => labelFor(o) == selected, orElse: () => selected);
+                    onChanged(field.key, option);
+                  },
+                )
+              : null,
+        );
+
+      case SummaryFieldType.searchableDropdown:
+        // RN `fieldRenderer` SearchableDropdown: the places picker in the
+        // same 200-wide `dropdownContainer`.
+        return _FieldRow(
+          label: label,
+          value: display,
+          edit: isEditing
+              ? Flexible(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: SearchableLocationDropdown(
+                      key: ValueKey('location-${field.key}'),
+                      value: value?.toString() ?? '',
+                      onSelect: (selected) => onChanged(field.key, selected),
+                    ),
+                  ),
+                )
+              : null,
+        );
     }
-
-    if (field.type == SummaryFieldType.searchableDropdown) {
-      // RN `fieldRenderer` SearchableDropdown: the label, then the places
-      // picker capped at 200 wide (`dropdownContainer`).
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodyMedium),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 200),
-              child: SearchableLocationDropdown(
-                key: ValueKey('location-${field.key}'),
-                value: value?.toString() ?? '',
-                onSelect: (selected) => onChanged(field.key, selected),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (field.type == SummaryFieldType.dropdown) {
-      final options = field.options ?? const [];
-      final currentValue = options.contains(value) ? value as String : null;
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: DropdownButtonFormField<String>(
-          initialValue: currentValue,
-          // `labelText`, not `decorationFor`'s `placeholder`/hint — unlike a
-          // one-shot input, this field's label must stay visible once a
-          // value is picked, same as every other field in this long form.
-          decoration: InputDecoration(
-            labelText: label,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.strokePrimary),
-            ),
-          ),
-          items: [
-            for (final option in options)
-              DropdownMenuItem(
-                value: option,
-                child: Text(ref.t(_fieldOptionLabelKeys[option] ?? option)),
-              ),
-          ],
-          onChanged: (selected) => onChanged(field.key, selected),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: TextFormField(
-        key: ValueKey(field.key),
-        initialValue: value?.toString() ?? '',
-        maxLines: field.type == SummaryFieldType.multilineText ? 4 : 1,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.strokePrimary),
-          ),
-        ),
-        onChanged: (text) => onTyped(field.key, text),
-      ),
-    );
   }
 }
 
@@ -1656,7 +2064,7 @@ class _FieldEditor extends ConsumerWidget {
 /// rendered per its [CustomFieldDefinition.fieldType]. [value] is always the
 /// raw stored string (see [CustomFieldValue]'s own doc comment on the
 /// select-types' label-vs-id quirk this faithfully reproduces).
-class _CustomFieldEditor extends ConsumerStatefulWidget {
+class _CustomFieldEditor extends ConsumerWidget {
   const _CustomFieldEditor({
     required this.definition,
     required this.value,
@@ -1671,18 +2079,15 @@ class _CustomFieldEditor extends ConsumerStatefulWidget {
 
   /// Free-text keystrokes (see `_SummaryTabState._onCustomFieldTyped`).
   final void Function(String fieldDefinitionId, String? value)? onTyped;
+
+  /// RN `isEditing && fieldIsEditable`.
   final bool canEdit;
 
-  @override
-  ConsumerState<_CustomFieldEditor> createState() => _CustomFieldEditorState();
-}
-
-class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
   /// RN's `parseMultiSelectValue` — a MULTI_SELECT value is stored as a
   /// JSON-encoded array of option *labels*; a bare non-JSON string (an old
   /// single-select-shaped value, or simply malformed) is treated as a
   /// one-item selection instead of discarded.
-  List<String> _parseMultiSelect(String? value) {
+  static List<String> _parseMultiSelect(String? value) {
     if (value == null || value.isEmpty) return const [];
     try {
       final decoded = jsonDecode(value);
@@ -1692,155 +2097,209 @@ class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
     }
   }
 
-  Future<void> _pickMultiSelect(List<String> options, List<String> selected) async {
-    var draft = List<String>.from(selected);
-    final result = await showModalBottomSheet<List<String>>(
+  Future<void> _pickMultiSelect(BuildContext context, List<String> options, List<String> selected) async {
+    final result = await showDialog<List<String>>(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+      barrierColor: const Color(0x66000000),
+      builder: (context) => _MultiSelectModal(options: options, selected: selected),
+    );
+    if (result != null) {
+      onChanged?.call(definition.id, result.isEmpty ? null : jsonEncode(result));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final def = definition;
+    final label = def.name;
+    void typed(String text) => (onTyped ?? onChanged)?.call(def.id, text.isEmpty ? null : text);
+
+    switch (def.fieldType) {
+      case CustomFieldType.text:
+      case CustomFieldType.number:
+        return _FieldRow(
+          label: label,
+          value: value ?? '-',
+          edit: canEdit
+              ? Expanded(
+                  child: _EditableField(
+                    fieldKey: def.id,
+                    value: value,
+                    onChanged: typed,
+                    isEditing: true,
+                    keyboardType: def.fieldType == CustomFieldType.number ? TextInputType.number : null,
+                  ),
+                )
+              : null,
+        );
+
+      case CustomFieldType.date:
+        return _FieldRow(
+          label: label,
+          // RN `formatCustomFieldDate`.
+          value: formatCustomFieldDate(value),
+          edit: canEdit
+              ? Expanded(
+                  child: _EditableField(
+                    fieldKey: def.id,
+                    // RN `normalizeCustomFieldDate` for the edited value.
+                    value: normalizeCustomFieldDate(value) ?? value,
+                    onChanged: typed,
+                    isEditing: true,
+                    placeholder: 'YYYY-MM-DD',
+                  ),
+                )
+              : null,
+        );
+
+      case CustomFieldType.singleSelect:
+        final options = def.sortedOptions.map((o) => o.label).toList();
+        return _FieldRow(
+          label: label,
+          value: value ?? '-',
+          edit: canEdit
+              ? _SummaryDropdown(
+                  key: ValueKey('dropdown-${def.id}'),
+                  value: value ?? '',
+                  options: options,
+                  placeholder: ref.t('common.select'),
+                  onSelect: (selected) => onChanged?.call(def.id, selected),
+                )
+              : null,
+        );
+
+      case CustomFieldType.boolean:
+        final yes = ref.t('common.yes');
+        final no = ref.t('common.no');
+        final display = value == 'true' ? yes : value == 'false' ? no : (value ?? '-');
+        return _FieldRow(
+          label: label,
+          value: display,
+          edit: canEdit
+              ? _SummaryDropdown(
+                  key: ValueKey('dropdown-${def.id}'),
+                  value: display == '-' ? '' : display,
+                  options: [yes, no],
+                  placeholder: ref.t('common.select'),
+                  onSelect: (selected) => onChanged?.call(def.id, selected == yes ? 'true' : 'false'),
+                )
+              : null,
+        );
+
+      case CustomFieldType.multiSelect:
+        final options = def.sortedOptions.map((o) => o.label).toList();
+        final selected = _parseMultiSelect(value);
+        final display = selected.isEmpty ? '-' : selected.join(', ');
+        return _FieldRow(
+          label: label,
+          value: display,
+          edit: canEdit
+              ? Expanded(
+                  child: GestureDetector(
+                    key: ValueKey('multiselect-${def.id}'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _pickMultiSelect(context, options, selected),
+                    child: Text(display, style: _dropdownItemTextStyle),
+                  ),
+                )
+              : null,
+        );
+    }
+  }
+}
+
+/// RN `CustomFieldsSection`'s `MultiSelectModal`: a centred white card (80%
+/// wide, radius 12) of square checkboxes over a 40% black scrim, with a
+/// dark Done button.
+class _MultiSelectModal extends ConsumerStatefulWidget {
+  const _MultiSelectModal({required this.options, required this.selected});
+
+  final List<String> options;
+  final List<String> selected;
+
+  @override
+  ConsumerState<_MultiSelectModal> createState() => _MultiSelectModalState();
+}
+
+class _MultiSelectModalState extends ConsumerState<_MultiSelectModal> {
+  late final List<String> _selected = List.of(widget.selected);
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width * 0.8;
+    return Center(
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: width,
+          constraints: const BoxConstraints(maxHeight: 400),
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final option in options)
-                  CheckboxListTile(
-                    title: Text(option),
-                    value: draft.contains(option),
-                    onChanged: (checked) => setSheetState(() {
-                      if (checked ?? false) {
-                        draft.add(option);
-                      } else {
-                        draft.remove(option);
-                      }
+                for (final option in widget.options)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() {
+                      _selected.contains(option) ? _selected.remove(option) : _selected.add(option);
                     }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: AppColors.lightGray5, width: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 18,
+                            height: 18,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              color: _selected.contains(option) ? AppColors.darkSlate : null,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: _selected.contains(option) ? AppColors.darkSlate : AppColors.rnGray,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Text(option, style: _dropdownItemTextStyle)),
+                        ],
+                      ),
+                    ),
                   ),
-                AppButton(label: ref.t('common.done'), onPressed: () => Navigator.of(context).pop(draft)),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    key: const Key('multiselect-done'),
+                    onTap: () => Navigator.of(context).pop(_selected),
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(color: AppColors.darkSlate, borderRadius: BorderRadius.circular(8)),
+                      // RN `typography.label.medium`, system font.
+                      child: Text(
+                        ref.t('common.done'),
+                        style: const TextStyle(
+                          fontFamily: 'CupertinoSystemText',
+                          fontSize: 12,
+                          height: 20 / 12,
+                          letterSpacing: 0.2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
     );
-    if (result != null) {
-      widget.onChanged?.call(widget.definition.id, result.isEmpty ? null : jsonEncode(result));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final def = widget.definition;
-    final value = widget.value;
-    final label = def.name;
-
-    if (!widget.canEdit) {
-      final display = switch (def.fieldType) {
-        CustomFieldType.boolean => value == 'true'
-            ? ref.t('common.yes')
-            : value == 'false'
-            ? ref.t('common.no')
-            : (value ?? '—'),
-        CustomFieldType.multiSelect => _parseMultiSelect(value).isEmpty ? '—' : _parseMultiSelect(value).join(', '),
-        // RN `formatCustomFieldDate`.
-        CustomFieldType.date => formatCustomFieldDate(value),
-        _ => value == null || value.trim().isEmpty ? '—' : value,
-      };
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodyMedium),
-            Text(display),
-          ],
-        ),
-      );
-    }
-
-    switch (def.fieldType) {
-      case CustomFieldType.singleSelect:
-        final options = def.sortedOptions.map((o) => o.label).toList();
-        final currentValue = options.contains(value) ? value : null;
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: DropdownButtonFormField<String>(
-            initialValue: currentValue,
-            decoration: InputDecoration(
-              labelText: label,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.strokePrimary),
-              ),
-            ),
-            items: [for (final option in options) DropdownMenuItem(value: option, child: Text(option))],
-            onChanged: (selected) => widget.onChanged?.call(def.id, selected),
-          ),
-        );
-
-      case CustomFieldType.boolean:
-        final currentValue = value == 'true' ? ref.t('common.yes') : value == 'false' ? ref.t('common.no') : null;
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: DropdownButtonFormField<String>(
-            initialValue: currentValue,
-            decoration: InputDecoration(
-              labelText: label,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.strokePrimary),
-              ),
-            ),
-            items: [
-              DropdownMenuItem(value: ref.t('common.yes'), child: Text(ref.t('common.yes'))),
-              DropdownMenuItem(value: ref.t('common.no'), child: Text(ref.t('common.no'))),
-            ],
-            onChanged: (selected) => widget.onChanged?.call(def.id, selected == ref.t('common.yes') ? 'true' : 'false'),
-          ),
-        );
-
-      case CustomFieldType.multiSelect:
-        final options = def.sortedOptions.map((o) => o.label).toList();
-        final selected = _parseMultiSelect(value);
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: InkWell(
-            onTap: () => _pickMultiSelect(options, selected),
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: label,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.strokePrimary),
-                ),
-              ),
-              child: Text(selected.isEmpty ? '—' : selected.join(', ')),
-            ),
-          ),
-        );
-
-      case CustomFieldType.date:
-      case CustomFieldType.number:
-      case CustomFieldType.text:
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: TextFormField(
-            key: ValueKey(def.id),
-            // RN `normalizeCustomFieldDate` for the edited DATE value.
-            initialValue: def.fieldType == CustomFieldType.date ? (normalizeCustomFieldDate(value) ?? value ?? '') : value ?? '',
-            keyboardType: def.fieldType == CustomFieldType.number ? TextInputType.number : TextInputType.text,
-            decoration: InputDecoration(
-              labelText: label,
-              hintText: def.fieldType == CustomFieldType.date ? 'YYYY-MM-DD' : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.strokePrimary),
-              ),
-            ),
-            onChanged: (text) => (widget.onTyped ?? widget.onChanged)?.call(def.id, text.isEmpty ? null : text),
-          ),
-        );
-    }
   }
 }
 
@@ -1857,31 +2316,49 @@ class _SummaryUnauthorizedView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.lock_outline,
-              size: 48,
-              color: AppColors.mediumEmphasis,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              ref.t('summary.notFoundTitle'),
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(ref.t('summary.notFoundDesc'), textAlign: TextAlign.center),
-            const SizedBox(height: 24),
-            AppButton(
-              label: ref.t('achievements.backAria'),
-              onPressed: onGoBack,
-            ),
-          ],
+    // RN `SummaryUnauthorized.tsx`: the summaryFailed.png illustration,
+    // a 24pt IBM Plex Serif Medium title, a 16pt darkGray2 subtitle and a
+    // 70%-wide Back button.
+    return LayoutBuilder(
+      builder: (context, constraints) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/images/summaryFailed.png', key: const Key('summary-unauthorized-image')),
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: Text(
+                  ref.t('summary.notFoundTitle'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 24,
+                    height: RnSize.of(context).mvs(32) / 24,
+                    color: AppColors.darkSlate,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 24),
+                child: Text(
+                  ref.t('summary.notFoundDesc'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 16,
+                    height: RnSize.of(context).mvs(24) / 16,
+                    color: AppColors.darkGray2,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: (constraints.maxWidth - 48) * 0.7,
+                child: AppButton(label: ref.t('achievements.backAria'), onPressed: onGoBack),
+              ),
+            ],
+          ),
         ),
       ),
     );

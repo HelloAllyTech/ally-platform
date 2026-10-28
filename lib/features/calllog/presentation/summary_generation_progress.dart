@@ -9,6 +9,7 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
+import '../../scribe/presentation/listening_chrome.dart' show showPrivacyTooltip;
 
 /// RN `constants/summary.ts` `SummaryGenerationStep` (English literals in
 /// RN too, never translated).
@@ -314,6 +315,7 @@ class AddNotesSection extends ConsumerStatefulWidget {
 
 class _AddNotesSectionState extends ConsumerState<AddNotesSection> {
   bool _isExpanded = false;
+  final _infoKey = GlobalKey();
   late final TextEditingController _controller = TextEditingController(text: widget.savedNotes);
   final _focusNode = FocusNode();
 
@@ -378,20 +380,29 @@ class _AddNotesSectionState extends ConsumerState<AddNotesSection> {
                     ),
                   ),
                 ),
-                Tooltip(
+                // RN `PrivacyTooltip` (walkthrough tooltip above the (i),
+                // 40pt display insets) holding `tooltipContainer`: plain
+                // system-font text, min 280 x 50.
+                GestureDetector(
                   key: const Key('add-notes-info'),
-                  triggerMode: TooltipTriggerMode.tap,
-                  showDuration: const Duration(seconds: 5),
-                  margin: const EdgeInsets.symmetric(horizontal: 40),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 8)],
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => showPrivacyTooltip(
+                    context,
+                    anchorKey: _infoKey,
+                    content: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 280, minHeight: 50),
+                      child: Text(
+                        ref.t('summaryLoading.notesTooltip'),
+                        style: const TextStyle(fontFamily: 'CupertinoSystemText', fontSize: 14, color: Colors.black),
+                      ),
+                    ),
                   ),
-                  textStyle: const TextStyle(color: Colors.black, fontSize: 14),
-                  message: ref.t('summaryLoading.notesTooltip'),
-                  child: Padding(padding: const EdgeInsets.all(8), child: SvgPicture.asset('assets/icons/info.svg')),
+                  // RN `hitSlop={20}`, minus the right side so the icon
+                  // keeps RN's place at the row's right edge.
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 0, 16),
+                    child: SvgPicture.asset('assets/icons/info.svg', key: _infoKey),
+                  ),
                 ),
               ],
             ),
