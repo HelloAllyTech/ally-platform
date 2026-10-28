@@ -9,6 +9,7 @@ import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
+import 'package:ally_mobile_flutter/features/account/presentation/profile_settings_screen.dart' show RnCustomSwitch;
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/summary_file_export.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
@@ -76,6 +77,7 @@ CallSummaryDetails _summary({
   String? reviewNote,
   String? reviewCreatedAt,
   bool hasTranscript = true,
+  String? summaryName,
 }) => CallSummaryDetails.fromJson({
   'id': 1001,
   'summaryStatus': 'SUCCESS',
@@ -86,7 +88,7 @@ CallSummaryDetails _summary({
   'reviewCreatedAt': reviewCreatedAt,
   'details': {
     'summary': {'sessionSummary': 'All good'},
-    'callInfo': <String, dynamic>{},
+    'callInfo': <String, dynamic>{'summaryName': ?summaryName},
     if (hasTranscript) 'transcript': 'the transcript text',
   },
 });
@@ -165,7 +167,7 @@ void main() {
     );
 
     expect(find.text('Share'), findsOneWidget);
-    expect(find.byType(Switch), findsOneWidget);
+    expect(find.byType(RnCustomSwitch), findsOneWidget);
   });
 
   testWidgets('the share switch is hidden when there is no transcript yet', (tester) async {
@@ -178,7 +180,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    expect(find.byType(Switch), findsNothing);
+    expect(find.byType(RnCustomSwitch), findsNothing);
   });
 
   testWidgets('the share switch is hidden once the session is archived', (tester) async {
@@ -191,7 +193,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    expect(find.byType(Switch), findsNothing);
+    expect(find.byType(RnCustomSwitch), findsNothing);
   });
 
   testWidgets('toggling share ON with no existing review opens the scribe share screen', (
@@ -205,7 +207,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(RnCustomSwitch));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('SHARE_SCREEN:1001'), findsOneWidget);
@@ -234,7 +236,7 @@ void main() {
         scribeReactionsRepository: scribeReactionsRepository,
       );
 
-      await tester.tap(find.byType(Switch));
+      await tester.tap(find.byType(RnCustomSwitch));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('SHARE_SCREEN:1001'), findsOneWidget);
@@ -268,7 +270,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(RnCustomSwitch));
     await tester.pumpAndSettle();
 
     expect(find.text('CALL_LOG'), findsNothing, reason: 'should still be on CallSummaryScreen');
@@ -297,7 +299,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(RnCustomSwitch));
     await tester.pumpAndSettle();
 
     verify(
@@ -331,6 +333,40 @@ void main() {
     expect(find.text('Summary name updated successfully'), findsOneWidget);
     // The header shows the new name at once.
     expect(find.text('#New name'), findsOneWidget);
+  });
+
+  testWidgets('RN Header: back arrow, "Session Summary" title, #name, share switch, menu and tab strip', (
+    tester,
+  ) async {
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary(summaryName: 'Walk-in #1'));
+    await _pump(tester, repository: repository, scribeReviewsRepository: scribeReviewsRepository, scribeReactionsRepository: scribeReactionsRepository);
+
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(TabBar), findsNothing);
+    expect(find.byKey(const Key('call-summary-back')), findsOneWidget);
+    expect(find.text('Session Summary', findRichText: true), findsOneWidget);
+    expect(find.text('#Walk-in #1'), findsOneWidget);
+    expect(find.byKey(const Key('call-summary-share-switch')), findsOneWidget);
+    expect(find.byKey(const Key('call-summary-menu')), findsOneWidget);
+    expect(find.byKey(const Key('call-summary-tab-0')), findsOneWidget);
+  });
+
+  testWidgets('Rename is not undone by a refetch that still carries the old name (S5)', (tester) async {
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary(summaryName: 'Old name'));
+    when(() => repository.updateSummaryName(1001, 'New name')).thenAnswer((_) async {});
+    await _pump(tester, repository: repository, scribeReviewsRepository: scribeReviewsRepository, scribeReactionsRepository: scribeReactionsRepository);
+    expect(find.text('#Old name'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('call-summary-modal-input')), 'New name');
+    await tester.tap(find.byKey(const Key('call-summary-modal-primary')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('#New name'), findsOneWidget);
+    expect(find.text('#Old name'), findsNothing);
   });
 
   testWidgets('3-dot menu: Rename cancel sends nothing', (tester) async {
