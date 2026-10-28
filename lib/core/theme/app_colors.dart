@@ -216,4 +216,5 @@ class AppColors {
   static const deepPurple300 = Color(0xFF9575CD); // ds.deepPurple[300]: matching pair border
   static const black = Color(0xFF000000); // colors.black: question-media video frame
   static const lightboxScrim = Color(0xE6000000); // rgba(0,0,0,0.9): QuestionMedia lightbox
+  static const iosPlaceholder = Color(0x4D3C3C43); // iOS default TextInput placeholder (no placeholderTextColor)
 }

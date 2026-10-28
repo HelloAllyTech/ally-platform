@@ -10,6 +10,7 @@ class JournalPrompt {
   JournalPrompt({
     required this.id,
     required this.prompt,
+    this.promptHtml,
     required this.required,
     required this.placeholder,
   });
@@ -17,12 +18,14 @@ class JournalPrompt {
   factory JournalPrompt.fromJson(Map<String, dynamic> json) => JournalPrompt(
     id: json['id'] as String,
     prompt: json['prompt'] as String,
+    promptHtml: json['promptHtml'] as String?,
     required: json['required'] as bool? ?? false,
     placeholder: json['placeholder'] as String?,
   );
 
   final String id;
   final String prompt;
+  final String? promptHtml;
   final bool required;
   final String? placeholder;
 }

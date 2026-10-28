@@ -5,12 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
-import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_card.dart';
-import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/html_rich_text.dart';
 import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
+import '../course_button.dart';
+import '../course_styles.dart';
 
 /// Port of ally-mobile (React Native)'s `JournalPlayer` — one card per
 /// prompt with a debounced draft autosave and a Submit that completes the
@@ -136,17 +137,26 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
     }
   }
 
-  Color _autosaveColor(BuildContext context) {
-    if (_submitted) return Colors.green;
-    if (_autosaveStatus == _AutosaveStatus.failed) return Colors.red;
-    return Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey;
+  /// RN autosaveDefault / autosaveSubmitted / autosaveFailed.
+  Color get _autosaveColor {
+    if (_submitted) return AppColors.green700;
+    if (_autosaveStatus == _AutosaveStatus.failed) return AppColors.red400;
+    return AppColors.lowEmphasis;
   }
 
   @override
   Widget build(BuildContext context) {
+    final inputStyle = CourseType.bodyMedium.copyWith(fontFamily: courseSystemFont, color: AppColors.highEmphasis);
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AppColors.strokePrimary),
+    );
+    final requiredTag = CourseType.bodyTiny.copyWith(fontFamily: courseSystemFont, color: AppColors.red400);
     return Column(
       children: [
         Expanded(
+          // styles.scrollContent: padding 16, gap 16; each card adds its
+          // own marginBottom 16.
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -154,94 +164,126 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                 alignment: Alignment.centerRight,
                 child: Text(
                   _autosaveLabel,
-                  style: TextStyle(
-                    color: _autosaveColor(context),
-                    fontSize: 12,
-                  ),
+                  key: const Key('journal-autosave-status'),
+                  style: CourseType.bodyTiny.copyWith(fontFamily: courseSystemFont, color: _autosaveColor),
                 ),
               ),
-              const SizedBox(height: 8),
               for (var i = 0; i < _prompts.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: AppCard(
-                    variant: AppCardVariant.flat,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
+                Container(
+                  key: Key('journal-card-${_prompts[i].id}'),
+                  margin: const EdgeInsets.only(top: 16, bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppColors.strokePrimary),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(radius: 14, child: Text('${i + 1}')),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: DefaultTextStyle.of(context).style,
-                                    children: [
-                                      TextSpan(text: _prompts[i].prompt),
-                                      if (_prompts[i].required)
-                                        TextSpan(
-                                          text:
-                                              ' (${ref.t('courses.journal.required')})',
-                                          style: const TextStyle(
-                                            color: Colors.red,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _controllers[_prompts[i].id],
-                            onChanged: _onChanged,
-                            maxLines: 4,
-                            enabled: !_submitted,
-                            style: AppTextField.textStyleFor(context),
-                            decoration: AppTextField.decorationFor(
-                              context,
-                              placeholder:
-                                  _prompts[i].placeholder ??
-                                  ref.t('courses.journal.placeholder'),
+                          Container(
+                            width: 28,
+                            height: 28,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                            child: Text(
+                              '${i + 1}',
+                              style: CourseText.serifMedium(CourseType.bodySmall, Colors.white, weight: FontWeight.w500),
                             ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: (_prompts[i].promptHtml ?? '').isNotEmpty
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      HtmlRichText(html: _prompts[i].promptHtml),
+                                      if (_prompts[i].required)
+                                        Text('(${ref.t('courses.journal.required')})', style: requiredTag),
+                                    ],
+                                  )
+                                : Text.rich(
+                                    TextSpan(
+                                      style: CourseText.serif(
+                                        CourseType.bodyMedium,
+                                        AppColors.highEmphasis,
+                                        weight: FontWeight.w500,
+                                      ),
+                                      children: [
+                                        TextSpan(text: _prompts[i].prompt),
+                                        if (_prompts[i].required)
+                                          TextSpan(
+                                            text: ' (${ref.t('courses.journal.required')})',
+                                            style: requiredTag.copyWith(fontWeight: FontWeight.w400),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 96),
+                        child: TextField(
+                          key: Key('journal-response-${_prompts[i].id}'),
+                          controller: _controllers[_prompts[i].id],
+                          onChanged: _onChanged,
+                          minLines: 4,
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                          enabled: !_submitted,
+                          style: inputStyle,
+                          cursorColor: AppColors.primary,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: _prompts[i].placeholder ?? ref.t('courses.journal.placeholder'),
+                            hintStyle: inputStyle.copyWith(color: AppColors.iosPlaceholder),
+                            contentPadding: const EdgeInsets.all(10),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder,
+                            disabledBorder: inputBorder,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
           ),
         ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: _submitted
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/checkCircle.svg',
-                        width: 24,
-                        height: 24,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(ref.t('courses.journal.submitted')),
-                    ],
-                  )
-                : AppButton(
-                    label: ref.t('courses.journal.submit'),
-                    isDisabled: !_allRequiredAnswered,
-                    isLoading: _submitting,
-                    onPressed: _allRequiredAnswered ? _submit : null,
-                  ),
+        // styles.footer: borderTop 0.5, padding 16, centred.
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
           ),
+          child: _submitted
+              ? Row(
+                  key: const Key('journal-submitted-chip'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgPicture.asset('assets/icons/tickRound.svg', width: 16, height: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      ref.t('courses.journal.submitted'),
+                      style: const TextStyle(fontFamily: courseSystemFont, fontSize: 14, color: AppColors.green700),
+                    ),
+                  ],
+                )
+              : CourseButton(
+                  key: const Key('journal-submit'),
+                  label: ref.t('courses.journal.submit'),
+                  isDisabled: !_allRequiredAnswered,
+                  isLoading: _submitting,
+                  onPressed: _submit,
+                ),
         ),
       ],
     );

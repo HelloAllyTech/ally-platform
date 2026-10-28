@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../course_button.dart';
+import '../course_styles.dart';
 import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
@@ -180,19 +181,19 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
       padding: const EdgeInsets.all(16),
       children: [
         if (_data.intro != null) ...[
-          Text(_data.intro!, style: const TextStyle(color: AppColors.mediumEmphasis)),
+          Text(_data.intro!, style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis)),
           const SizedBox(height: 12),
         ],
         if (!finished && current != null) ...[
           Text(
             ref.t('courses.bucketSort.progress', {'placed': _placedCount, 'total': _items.length}),
             key: const Key('bucket-sort-progress'),
-            style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
           ),
           const SizedBox(height: 4),
           Text(
             ref.t('courses.bucketSort.whereDoesItGo'),
-            style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis, weight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
           Container(
@@ -205,14 +206,14 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
             ),
             child: Text(
               current.text,
-              style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.highEmphasis),
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis, weight: FontWeight.w500),
             ),
           ),
           if (reviewing == null) ...[
             const SizedBox(height: 8),
             Text(
               ref.t('courses.bucketSort.tapHint'),
-              style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+              style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
             ),
           ],
           const SizedBox(height: 12),
@@ -223,7 +224,7 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
           Text(
             ref.t('courses.bucketSort.placeFailed'),
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
           ),
         ],
         if (reviewing != null && feedback != null) _buildFeedback(feedback),
@@ -270,12 +271,12 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
             children: [
               Text(
                 bucket.label,
-                style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.highEmphasis),
+                style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis, weight: FontWeight.w500),
               ),
               if (bucket.description != null)
                 Text(
                   bucket.description!,
-                  style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                  style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
                 ),
               if (isTarget && current != null) _settledChip(current.text, active: true),
               // The red card is the wrong pick for THIS item, not for the
@@ -298,15 +299,16 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
         key: misplaced ? const Key('bucket-sort-misplaced') : null,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: active ? Colors.white : AppColors.lightGray2,
+          color: active ? Colors.white : AppColors.grey100,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           text,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: active ? FontWeight.w500 : FontWeight.normal,
-            color: AppColors.highEmphasis,
+          style: CourseText.serif(
+            CourseType.bodySmall,
+            misplaced ? AppColors.onErrorContainer : AppColors.highEmphasis,
+            weight: active ? FontWeight.w500 : FontWeight.w400,
+          ).copyWith(
             decoration: misplaced ? TextDecoration.lineThrough : null,
             decorationColor: AppColors.onErrorContainer,
           ),
@@ -329,22 +331,22 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
         children: [
           Text(
             feedback.correct ? ref.t('courses.bucketSort.correct') : ref.t('courses.bucketSort.notQuite'),
-            style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.highEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis, weight: FontWeight.w500),
           ),
           if (!feedback.correct) ...[
             const SizedBox(height: 6),
             Text(
               '${ref.t('courses.bucketSort.youChose', {'bucket': _bucketName[feedback.placedBucketId]})} '
               '${ref.t('courses.bucketSort.belongsIn', {'bucket': _bucketName[feedback.correctBucketId]})}',
-              style: const TextStyle(color: AppColors.highEmphasis),
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis),
             ),
           ],
           if (feedback.explanation != null) ...[
             const SizedBox(height: 6),
-            Text(feedback.explanation!, style: const TextStyle(color: AppColors.highEmphasis)),
+            Text(feedback.explanation!, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
           ],
           const SizedBox(height: 10),
-          AppButton(
+          CourseButton(
             key: const Key('bucket-sort-next'),
             label: _placedCount == _items.length
                 ? ref.t('courses.bucketSort.seeResults')
@@ -370,31 +372,31 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
         children: [
           Text(
             ref.t('courses.bucketSort.resultsHeading'),
-            style: Theme.of(context).textTheme.titleMedium,
+            style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
           ),
           const SizedBox(height: 10),
           Text(
             ref.t('courses.bucketSort.firstTry', {'pct': firstTryPct}),
-            style: const TextStyle(color: AppColors.highEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis),
           ),
           if (_data.bestFirstTryPct != null)
             Text(
               ref.t('courses.bucketSort.best', {'pct': _data.bestFirstTryPct}),
-              style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+              style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
             ),
           if (missed.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 ref.t('courses.bucketSort.allRight'),
-                style: const TextStyle(color: AppColors.highEmphasis),
+                style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis),
               ),
             )
           else ...[
             const SizedBox(height: 4),
             Text(
               ref.t('courses.bucketSort.reviewHeading'),
-              style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.mediumEmphasis),
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis, weight: FontWeight.w500),
             ),
             for (final item in missed)
               Container(
@@ -407,33 +409,33 @@ class _BucketSortPlayerState extends ConsumerState<BucketSortPlayer> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.text, style: const TextStyle(color: AppColors.highEmphasis)),
+                    Text(item.text, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
                     Text(
                       ref.t('courses.bucketSort.belongsIn', {
                         'bucket': _bucketName[_answered[item.id]!.correctBucketId],
                       }),
-                      style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                      style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
                     ),
                     if (_answered[item.id]!.explanation != null)
                       Text(
                         _answered[item.id]!.explanation!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                        style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
                       ),
                   ],
                 ),
               ),
           ],
           const SizedBox(height: 16),
-          AppButton(
+          CourseButton(
             key: const Key('bucket-sort-continue'),
             label: ref.t('courses.bucketSort.continue'),
             onPressed: widget.onRequestNext,
           ),
           const SizedBox(height: 10),
-          AppButton(
+          CourseButton(
             key: const Key('bucket-sort-restart'),
             label: ref.t('courses.bucketSort.practiceAgain'),
-            variant: AppButtonVariant.secondary,
+            variant: CourseButtonVariant.secondary,
             isLoading: _isRestarting,
             onPressed: _handleRestart,
           ),
