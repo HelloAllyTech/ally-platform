@@ -669,7 +669,17 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         labelStyle: label,
         unselectedLabelStyle: label,
         overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        tabs: [for (final tab in _tabs) Tab(height: 48, text: _tabTitle(tab))],
+        // Plain `Tab(text: ...)` hard-clips its label with no ellipsis under
+        // a larger system font-scale setting, rendering "Debrief" as
+        // "Debrie" with no visual indication it's truncated — `FittedBox`
+        // shrinks the text to fit instead.
+        tabs: [
+          for (final tab in _tabs)
+            Tab(
+              height: 48,
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(_tabTitle(tab))),
+            ),
+        ],
       ),
     );
   }
