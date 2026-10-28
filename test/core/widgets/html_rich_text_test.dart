@@ -60,4 +60,12 @@ void main() {
     expect(_allText(tester), contains('Second version'));
     expect(_allText(tester), isNot(contains('First')));
   });
+
+  testWidgets('paragraphs use RN RichText\'s serif font, not the platform default', (tester) async {
+    await pump(tester, '<p>Serif body</p><h2>Serif heading</h2>');
+    final paragraph = tester.widget<RichText>(find.textContaining('Serif body', findRichText: true));
+    expect(paragraph.text.style?.fontFamily, 'IBMPlexSerif-Regular');
+    final heading = tester.widget<RichText>(find.textContaining('Serif heading', findRichText: true));
+    expect(heading.text.style?.fontFamily, 'IBMPlexSerif-Medium');
+  });
 }

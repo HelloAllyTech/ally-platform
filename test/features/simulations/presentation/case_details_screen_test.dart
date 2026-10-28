@@ -201,7 +201,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.byIcon(Icons.description_outlined));
+    await tester.tap(find.byKey(const Key('path-item-feedback')));
     await tester.pumpAndSettle();
 
     verify(() => repository.getScenarioSessionByCaseItem('item-1')).called(1);

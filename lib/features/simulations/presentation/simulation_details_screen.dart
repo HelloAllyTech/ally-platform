@@ -12,6 +12,7 @@ import '../../../core/widgets/html_rich_text.dart';
 import '../../../core/widgets/back_title_header.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
+import 'widgets/scenario_language_dropdown.dart';
 
 /// Shared-link base for a scenario — RN's `env.ALLY_WEB_URL` (no equivalent
 /// env config exists in this app yet; hardcoded the same way LoginScreen's
@@ -24,14 +25,19 @@ const _allyWebUrl = 'https://app.helloally.ai/';
 /// url/token to RoleplayVoiceScreen (Phase 1), closing the real
 /// scenario → live session → feedback loop end to end.
 ///
-/// Not ported: the video cover preview (RN's `VideoPreview`, shown instead
+/// Not ported: the "ready to begin?" NotificationModal RN shows before
+/// starting, the video cover preview (RN's `VideoPreview`, shown instead
 /// of the image when `coverVideoUrl` is set — no video-preview widget
 /// exists yet, only the full course-item video player), the low-credits
 /// illustrated modal, the active-simulation-conflict modal, and the
 /// 429-rate-limit retry modal — same scope line `LearningPathDetailView`
 /// already draws for the equivalent path/case flows.
 class SimulationDetailsScreen extends ConsumerStatefulWidget {
-  const SimulationDetailsScreen({super.key, required this.scenarioId, this.initialScenario});
+  const SimulationDetailsScreen({
+    super.key,
+    required this.scenarioId,
+    this.initialScenario,
+  });
 
   final int scenarioId;
 
@@ -77,12 +83,14 @@ class _SimulationDetailsScreenState
       _error = null;
     });
     try {
-      final session = await ref.read(simulationsRepositoryProvider).startScenarioSession(
-        scenarioId: widget.scenarioId,
-        languageId: scenario.availableLanguages.isNotEmpty
-            ? _selectedLanguage?.languageId
-            : null,
-      );
+      final session = await ref
+          .read(simulationsRepositoryProvider)
+          .startScenarioSession(
+            scenarioId: widget.scenarioId,
+            languageId: scenario.availableLanguages.isNotEmpty
+                ? _selectedLanguage?.languageId
+                : null,
+          );
       if (mounted) {
         context.push(
           '/roleplay',
@@ -123,7 +131,9 @@ class _SimulationDetailsScreenState
             child: scenarioAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
-                child: Text('${ref.t('learn.details.loadingDetailsError')}: $error'),
+                child: Text(
+                  '${ref.t('learn.details.loadingDetailsError')}: $error',
+                ),
               ),
               data: (scenario) {
                 _ensureLanguageInitialized(scenario);
@@ -137,89 +147,142 @@ class _SimulationDetailsScreenState
   }
 
   Widget _buildBody(BuildContext context, Scenario scenario) {
+    final imageUrl = scenario.coverImageUrl;
+    final credits = ref.watch(simulationCreditsProvider).value;
+    // RN's isStartSimulationDisabled: credits loaded and running low.
+    final isStartDisabled = credits?.isLow ?? false;
+
     return Stack(
       children: [
+        // RN's styles.container: paddingHorizontal 16, paddingBottom 90.
         ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
           children: [
-            if (scenario.availableLanguages.isNotEmpty) ...[
-              _LanguageDropdown(
-                options: scenario.availableLanguages,
-                selected: _selectedLanguage,
-                enabled: !_isStarting,
-                onSelected: (lang) => setState(() => _selectedLanguage = lang),
-              ),
-              const SizedBox(height: 12),
-            ],
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: scenario.coverImageUrl != null
-                  ? Image.network(
-                      scenario.coverImageUrl!,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(height: 180, color: AppColors.lightGray2),
-                    )
-                  : Container(height: 180, color: AppColors.lightGray2),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  // RN's styles.cardTitle: IBM_PLEX_SERIF.MEDIUM at 20px —
-                  // not headlineSmall's ReplayPro-Headline at 24px (that's
-                  // the screen's own pageTitle, a different element).
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 18, bottom: 16),
-                    child: Text(
-                      scenario.title,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.ibmPlexSerifMedium,
-                        fontSize: 20,
-                        color: AppColors.highEmphasis,
-                      ),
-                    ),
+            if (scenario.availableLanguages.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ScenarioLanguageDropdown<ScenarioLanguageOption>(
+                    options: scenario.availableLanguages,
+                    selected: _selectedLanguage,
+                    labelOf: (lang) => lang.label,
+                    placeholder: ref.t('nav.language.label'),
+                    enabled: !_isStarting,
+                    onSelected: (lang) =>
+                        setState(() => _selectedLanguage = lang),
                   ),
                 ),
-                IconButton(
-                  icon: SvgPicture.asset('assets/icons/share.svg', width: 20, height: 20),
-                  onPressed: _copyLink,
-                ),
-              ],
-            ),
-            if (scenario.completedAttemptCount > 0) ...[
-              _CompletedChip(count: scenario.completedAttemptCount),
-              const SizedBox(height: 8),
-            ],
-            Text(
-              ref.t('learn.scenario.scenarioLabel'),
-              style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 14),
-            ),
-            const SizedBox(height: 2),
-            HtmlRichText(html: scenario.description),
-            if (scenario.triggerWarnings.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                '${ref.t('common.triggerWarnings')}:',
-                style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 14),
               ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final warning in scenario.triggerWarnings)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGray,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: AppColors.lightGray2, width: 0.5),
+            // styles.imageContainer (marginBottom 12) — empty when the
+            // scenario has no cover. The video cover isn't ported yet.
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: imageUrl == null || imageUrl.isEmpty
+                  ? const SizedBox.shrink()
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageUrl,
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            Container(height: 180, color: AppColors.lightGray4),
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                            ? child
+                            : Container(
+                                height: 180,
+                                color: AppColors.lightGray4,
+                              ),
                       ),
-                      child: Text(warning, style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis)),
                     ),
-                ],
+            ),
+            // styles.row: title (max 85% wide) and the share icon, centred.
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * 0.85,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 18, bottom: 16),
+                        // styles.cardTitle: IBM_PLEX_SERIF.MEDIUM 20, black.
+                        child: Text(
+                          scenario.title,
+                          style: const TextStyle(
+                            fontFamily: AppFonts.ibmPlexSerifMedium,
+                            fontSize: 20,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // <ShareIcon /> at its intrinsic 16x19.
+                    GestureDetector(
+                      key: const Key('simulation-details-share'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _copyLink,
+                      child: SvgPicture.asset('assets/icons/share.svg'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (scenario.completedAttemptCount > 0)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _CompletedChip(count: scenario.completedAttemptCount),
+              ),
+            _FieldLabel(ref.t('learn.scenario.scenarioLabel')),
+            // RichText style={styles.description}: marginBottom 6.
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: HtmlRichText(html: scenario.description),
+            ),
+            if (scenario.triggerWarnings.isNotEmpty) ...[
+              // RN appends ':' to a value that already ends in one
+              // ("Trigger warnings::"); show it once.
+              _FieldLabel(ref.t('common.triggerWarnings')),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final warning in scenario.triggerWarnings)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.grey50,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppColors.grey300,
+                            width: 0.5,
+                          ),
+                        ),
+                        // styles.chipText: IBM_PLEX_SERIF.REGULAR + label.large.
+                        child: Text(
+                          warning,
+                          style: const TextStyle(
+                            fontFamily: AppFonts.ibmPlexSerifRegular,
+                            fontSize: 14,
+                            height: 22 / 14,
+                            letterSpacing: 0.2,
+                            color: AppColors.mediumEmphasis,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
             if (_error != null) ...[
@@ -228,6 +291,7 @@ class _SimulationDetailsScreenState
             ],
           ],
         ),
+        // styles.ctaWrapper: absolute, 24 from the sides, 40 from the bottom.
         Positioned(
           left: 24,
           right: 24,
@@ -237,6 +301,7 @@ class _SimulationDetailsScreenState
                 ? ref.t('common.practiceAgain')
                 : '${ref.t('common.start')} ${ref.t('common.simulation')}',
             isLoading: _isStarting,
+            isDisabled: isStartDisabled,
             onPressed: () => _startSimulation(scenario),
           ),
         ),
@@ -245,8 +310,31 @@ class _SimulationDetailsScreenState
   }
 }
 
-/// RN's `ScenarioCompletion`-driven pill — completing a scenario never
-/// locks it; this is an invitation to run it again, not a status badge.
+/// styles.fieldLabel: IBM_PLEX_SERIF.MEDIUM 14, black, 2px below.
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontFamily: AppFonts.ibmPlexSerifMedium,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
+      ),
+    );
+  }
+}
+
+/// RN's `styles.completedChip` — completing a scenario never locks it; this
+/// is an invitation to run it again, not a status badge.
 class _CompletedChip extends ConsumerWidget {
   const _CompletedChip({required this.count});
 
@@ -255,77 +343,33 @@ class _CompletedChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
+      key: const Key('simulation-details-completed-chip'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6F4EA),
+        color: AppColors.green50,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.check_circle, size: 14, color: Colors.green),
+          // TickRoundIcon 14x14 (its #81C784 fill is baked into the SVG).
+          SvgPicture.asset('assets/icons/tickRound.svg', width: 14, height: 14),
           const SizedBox(width: 4),
           Text(
             count == 1
                 ? ref.t('simulations.completedChip_one')
                 : ref.t('simulations.completedChip_other', {'count': count}),
+            // styles.completedChipText: IBM_PLEX_SERIF.MEDIUM + label.large.
             style: const TextStyle(
               fontFamily: AppFonts.ibmPlexSerifMedium,
-              fontSize: 12,
-              color: Colors.green,
+              fontSize: 14,
+              height: 22 / 14,
+              letterSpacing: 0.2,
+              color: AppColors.green700,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// RN's `CustomDropdown` as used here — a pill header (selected label +
-/// chevron) opening a popup list. Not a pixel port of the original's
-/// custom animated modal-positioned dropdown, but the same selectable-pill
-/// affordance and behavior.
-class _LanguageDropdown extends StatelessWidget {
-  const _LanguageDropdown({
-    required this.options,
-    required this.selected,
-    required this.enabled,
-    required this.onSelected,
-  });
-
-  final List<ScenarioLanguageOption> options;
-  final ScenarioLanguageOption? selected;
-  final bool enabled;
-  final ValueChanged<ScenarioLanguageOption> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: PopupMenuButton<ScenarioLanguageOption>(
-        enabled: enabled,
-        onSelected: onSelected,
-        itemBuilder: (context) => [
-          for (final option in options)
-            PopupMenuItem(value: option, child: Text(option.label)),
-        ],
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: AppColors.lightGray2, width: 0.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(selected?.label ?? ''),
-              const SizedBox(width: 8),
-              SvgPicture.asset('assets/icons/arrowDown.svg', width: 8, height: 8),
-            ],
-          ),
-        ),
       ),
     );
   }

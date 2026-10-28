@@ -201,7 +201,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.byIcon(Icons.description_outlined));
+    await tester.tap(find.byKey(const Key('path-item-feedback')));
     await tester.pumpAndSettle();
 
     verify(() => repository.getScenarioSessionByPathItem('item-1')).called(1);
@@ -225,5 +225,27 @@ void main() {
     );
 
     expect(find.textContaining('Failed to load path details'), findsOneWidget);
+  });
+
+  testWidgets('header shows the Track title and RN\'s used/limit credits read-out', (tester) async {
+    when(() => repository.getSimulationCredits()).thenAnswer(
+      (_) async => SimulationCredits(creditLimit: 120, consumedCredits: 23),
+    );
+    when(() => repository.getSimulationPathDetails('path-1')).thenAnswer(
+      (_) async => _pathDetails(
+        scenarioPathSessionId: 'path-session-1',
+        scenarios: [_scenario(id: 's1', scenarioId: 1)],
+      ),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulation-paths/path-1',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('Track'), findsOneWidget);
+    expect(find.text('23/120', findRichText: true), findsOneWidget);
   });
 }

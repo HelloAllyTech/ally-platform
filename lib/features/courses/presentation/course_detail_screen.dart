@@ -1,43 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
-import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_card.dart';
-import '../../../core/widgets/tab_screen_header.dart';
+import '../../../core/widgets/html_rich_text.dart';
+import '../../simulations/presentation/widgets/circular_progress.dart';
+import '../../simulations/presentation/widgets/learning_path_widgets.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import 'course_language_sheet.dart';
 
-IconData _iconForType(TrackItemType type) {
-  switch (type) {
-    case TrackItemType.article:
-      return Icons.article_outlined;
-    case TrackItemType.video:
-      return Icons.play_circle_outline;
-    case TrackItemType.quiz:
-      return Icons.quiz_outlined;
-    case TrackItemType.roleplay:
-      return Icons.forum_outlined;
-    case TrackItemType.caseItem:
-      return Icons.folder_outlined;
-    case TrackItemType.journal:
-      return Icons.edit_note_outlined;
-    case TrackItemType.game:
-      return Icons.videogame_asset_outlined;
-    case TrackItemType.branchingScenario:
-      return Icons.call_split_outlined;
-    case TrackItemType.bucketSort:
-      return Icons.move_to_inbox_outlined;
-    case TrackItemType.unknown:
-      return Icons.help_outline;
-  }
-}
-
+/// Port of ally-mobile (React Native)'s `CourseOverviewScreen` (header,
+/// language row, LearningPathListHeader, CourseSectionBlock/CourseItemRow).
 /// Track detail — sections + items, with entry into each item. ARTICLE,
 /// VIDEO, QUIZ, JOURNAL, GAME, BRANCHING_SCENARIO, and BUCKET_SORT items
 /// open the real ported player;
@@ -55,7 +33,6 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
 
 class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   bool _isStarting = false;
-  String? _error;
 
   void _openItem(TrackDetailItem item) {
     if (isPlayableTrackItemType(item.type)) {
@@ -71,10 +48,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   }
 
   Future<void> _startOrContinue(TrackDetail detail) async {
-    setState(() {
-      _isStarting = true;
-      _error = null;
-    });
+    setState(() => _isStarting = true);
     try {
       if (!detail.enrolled) {
         await ref.read(coursesRepositoryProvider).enrollTrack(detail.id);
@@ -87,8 +61,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
       final next = result.nextItem;
       if (result.trackCompleted || next == null) return;
       if (mounted) _openItem(next);
-    } catch (e) {
-      setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
+    } catch (_) {
+      // Swallowed, as RN does — the learner stays on the overview and can
+      // retry.
     } finally {
       if (mounted) setState(() => _isStarting = false);
     }
@@ -99,19 +74,25 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
     final detailAsync = ref.watch(trackDetailProvider(widget.trackId));
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Column(
         children: [
-          TabScreenHeader(
-            // RN's CourseOverviewScreen header is always the static
-            // "Course" label (`learn.choose.course`) — the track's own
-            // title renders in the body banner below, not here.
-            title: ref.t('learn.choose.course'),
-          ),
+          // RN's CourseOverviewScreen header is always the static "Course"
+          // label (`learn.choose.course`) with no credits — the track's own
+          // title renders in the body below.
+          LearningPathHeader(title: ref.t('learn.choose.course')),
           Expanded(
             child: detailAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const LearningPathLoading(),
+              // 403 = the course exists but isn't assigned to this learner's
+              // org/group (typically a shared link): say so, as RN does.
               error: (error, _) =>
-                  Center(child: Text('${ref.t('courses.notFound')}: $error')),
+                  error is DioException && error.response?.statusCode == 403
+                  ? LearningPathLoadError(
+                      title: ref.t('courses.notAvailable.title'),
+                      description: ref.t('courses.notAvailable.body'),
+                    )
+                  : LearningPathLoadError(title: ref.t('courses.notFound')),
               data: (detail) => _buildBody(context, detail),
             ),
           ),
@@ -137,146 +118,201 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         ? current.label
         : getCourseLanguageLabel(detail.languageCode ?? 'en');
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            ref.t('courses.language.readingIn', {'language': label}),
-            style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+    // styles.languageRowText / languageRowAction: ROBOTO.REGULAR body.small.
+    const textStyle = TextStyle(
+      fontFamily: AppFonts.robotoRegular,
+      fontSize: 12,
+      height: 16 / 12,
+      letterSpacing: 0.2,
+      color: AppColors.mediumEmphasis,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              ref.t('courses.language.readingIn', {'language': label}),
+              style: textStyle,
+            ),
           ),
-        ),
-        TextButton(
-          key: const Key('course-language-change'),
-          onPressed: () => CourseLanguageSheet.show(
-            context,
-            trackId: detail.id,
-            options: options,
-            currentLanguageCode: detail.languageCode ?? 'en',
+          GestureDetector(
+            key: const Key('course-language-change'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => CourseLanguageSheet.show(
+              context,
+              trackId: detail.id,
+              options: options,
+              currentLanguageCode: detail.languageCode ?? 'en',
+            ),
+            child: Text(
+              ref.t('courses.language.change'),
+              style: textStyle.copyWith(color: AppColors.primary),
+            ),
           ),
-          child: Text(ref.t('courses.language.change')),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildBody(BuildContext context, TrackDetail detail) {
     final isCompleted =
-        detail.totalItems > 0 && detail.completedItems >= detail.totalItems;
-    final showProgress = detail.completedItems > 0 && detail.totalItems > 0;
+        detail.completedAt != null ||
+        (detail.totalItems > 0 && detail.completedItems >= detail.totalItems);
     final languageRow = _buildLanguageRow(detail);
+    final sections = [...detail.sections]..sort((a, b) => a.order.compareTo(b.order));
+    final nextItemId = findNextTrackItemId(sections);
 
     return RefreshIndicator(
       onRefresh: () => ref.refresh(trackDetailProvider(widget.trackId).future),
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        // styles.scrollContent + ListHeaderComponentStyle paddingTop 4.
+        padding: const EdgeInsets.only(left: 21, right: 21, top: 4, bottom: 32),
         children: [
-          if (languageRow != null) ...[languageRow, const SizedBox(height: 12)],
-          if (detail.coverImageUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                detail.coverImageUrl!,
-                height: 177,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    Container(height: 177, color: AppColors.lightGray2),
-              ),
-            )
-          else
-            Container(
-              height: 177,
-              decoration: BoxDecoration(
-                color: AppColors.lightGray2,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          const SizedBox(height: 12),
-          // RN's LearningPathListHeader styles.pathTitle: display.small size,
-          // but IBM_PLEX_SERIF.MEDIUM family — not displaySmall's
-          // ReplayPro-Headline (that's a different, larger element).
-          Text(
-            detail.title,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displaySmall
-                ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+          ?languageRow,
+          LearningPathListHeader(
+            title: detail.title,
+            description: detail.description,
+            coverImageUrl: detail.coverImageUrl,
+            completed: detail.completedItems,
+            total: detail.totalItems,
+            isCompleted: isCompleted,
+            startButtonLabel: (!detail.enrolled || detail.completedItems == 0)
+                ? ref.t('common.start')
+                : ref.t('common.continue'),
+            onStart: () => _startOrContinue(detail),
+            isStartDisabled: _isStarting,
+            isLoading: _isStarting,
+            onProgressTap: detail.enrolled
+                ? () => context.push('/courses/${widget.trackId}/progress')
+                : null,
           ),
-          if (detail.description != null) ...[
-            const SizedBox(height: 4),
-            Text(detail.description!),
-          ],
-          if (showProgress) ...[
-            const SizedBox(height: 12),
-            _ProgressSection(
-              detail: detail,
-              onTap: detail.enrolled
-                  ? () => context.push('/courses/${widget.trackId}/progress')
-                  : null,
+          for (var i = 0; i < sections.length; i++)
+            _CourseSectionBlock(
+              section: sections[i],
+              sectionIndex: i,
+              nextItemId: nextItemId,
+              onItemTap: _openItem,
             ),
-          ],
-          if (!isCompleted) ...[
-            const SizedBox(height: 12),
-            AppButton(
-              label: (!detail.enrolled || detail.completedItems == 0)
-                  ? ref.t('common.start')
-                  : ref.t('common.continue'),
-              isLoading: _isStarting,
-              onPressed: () => _startOrContinue(detail),
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: AppColors.red400)),
-          ],
-          const SizedBox(height: 16),
-          for (final section in detail.sections) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              // RN's CourseSectionBlock styles.sectionTitle:
-              // IBM_PLEX_SERIF.MEDIUM at body.large size (16/24/0.5)
-              // — bodyLarge already matches that size exactly.
-              child: Text(
-                section.title,
-                style: Theme.of(context).textTheme.bodyLarge
-                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
-              ),
-            ),
-            for (final item in section.items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: AppCard(
-                  variant: AppCardVariant.flat,
-                  child: ListTile(
-                    leading: Icon(_iconForType(item.type)),
-                    title: Text(item.title),
-                    trailing: item.status == TrackItemStatus.completed
-                        ? SvgPicture.asset(
-                            'assets/icons/checkCircle.svg',
-                            key: const ValueKey('trailing-completed'),
-                            width: 24,
-                            height: 24,
-                          )
-                        : item.status == TrackItemStatus.locked
-                        ? SvgPicture.asset(
-                            'assets/icons/lock.svg',
-                            key: const ValueKey('trailing-locked'),
-                            width: 20,
-                            height: 20,
-                          )
-                        : SvgPicture.asset(
-                            'assets/icons/arrowRight.svg',
-                            key: const ValueKey('trailing-unlocked'),
-                            width: 16,
-                            height: 16,
-                          ),
-                    enabled: item.status != TrackItemStatus.locked,
-                    onTap: item.status == TrackItemStatus.locked
-                        ? null
-                        : () => _openItem(item),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN's `utils/trackNavigation.ts` `findNextItemId`: the first in-progress
+/// item (UNLOCKED and started) in section/item order, else the first
+/// UNLOCKED one.
+String? findNextTrackItemId(List<TrackSection> sortedSections) {
+  List<TrackDetailItem> sorted(TrackSection s) =>
+      [...s.items]..sort((a, b) => a.order.compareTo(b.order));
+  for (final section in sortedSections) {
+    for (final item in sorted(section)) {
+      if (item.status == TrackItemStatus.unlocked && item.startedAt != null) return item.id;
+    }
+  }
+  for (final section in sortedSections) {
+    for (final item in sorted(section)) {
+      if (item.status == TrackItemStatus.unlocked) return item.id;
+    }
+  }
+  return null;
+}
+
+/// RN's `CourseOverviewScreen/components/CourseSectionBlock.tsx`: a 44px
+/// progress ring with the section number, title + subtitle (plain-text
+/// description, else "x of y"), then the item rows 8 apart.
+class _CourseSectionBlock extends ConsumerWidget {
+  const _CourseSectionBlock({
+    required this.section,
+    required this.sectionIndex,
+    required this.nextItemId,
+    required this.onItemTap,
+  });
+
+  final TrackSection section;
+  final int sectionIndex;
+  final String? nextItemId;
+  final ValueChanged<TrackDetailItem> onItemTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = [...section.items]..sort((a, b) => a.order.compareTo(b.order));
+    final completedCount = items.where((i) => i.status == TrackItemStatus.completed).length;
+    final subtitle = htmlToPlainText(section.description);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              CircularProgress(
+                progress: completedCount,
+                max: items.isEmpty ? 1 : items.length,
+                size: 44,
+                strokeWidth: 3,
+                progressColor: AppColors.primary,
+                // styles.indexText: IBM_PLEX_SERIF.MEDIUM + body.medium.
+                child: Text(
+                  '${sectionIndex + 1}',
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 14,
+                    height: 22 / 14,
+                    letterSpacing: 0.2,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.highEmphasis,
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // styles.sectionTitle: IBM_PLEX_SERIF.MEDIUM + body.large.
+                    Text(
+                      section.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifMedium,
+                        fontSize: 16,
+                        height: 24 / 16,
+                        letterSpacing: 0.5,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.highEmphasis,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // styles.sectionSubtitle: ROBOTO.REGULAR + body.small.
+                    Text(
+                      subtitle.isNotEmpty
+                          ? subtitle
+                          : ref.t('courses.progress', {
+                              'completed': completedCount,
+                              'total': items.length,
+                            }),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: _robotoSmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          for (var i = 0; i < items.length; i++) ...[
+            SizedBox(height: i == 0 ? 10 : 8),
+            _CourseItemRow(
+              item: items[i],
+              isNext: items[i].id == nextItemId,
+              onTap: () => onItemTap(items[i]),
+            ),
           ],
         ],
       ),
@@ -284,60 +320,242 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   }
 }
 
-/// RN's `ProgressBar` — a track+fill bar (green once complete, primary
-/// while in progress) with "X of Y completed" text, optionally tappable
-/// with a chevron + hint when a progress dashboard exists to jump to.
-class _ProgressSection extends ConsumerWidget {
-  const _ProgressSection({required this.detail, required this.onTap});
+const _robotoSmall = TextStyle(
+  fontFamily: AppFonts.robotoRegular,
+  fontSize: 12,
+  height: 16 / 12,
+  letterSpacing: 0.2,
+  color: AppColors.mediumEmphasis,
+);
 
-  final TrackDetail detail;
-  final VoidCallback? onTap;
+const _robotoTiny = TextStyle(
+  fontFamily: AppFonts.robotoRegular,
+  fontSize: 10,
+  height: 14 / 10,
+  letterSpacing: 0.3,
+  color: AppColors.mediumEmphasis,
+);
+
+/// RN's `CourseItemRow` TYPE_BADGE_LABEL.
+String _typeBadge(TrackItemType type) => switch (type) {
+  TrackItemType.roleplay => 'R',
+  TrackItemType.caseItem => 'C',
+  TrackItemType.quiz => 'Q',
+  TrackItemType.article => 'A',
+  TrackItemType.video => 'V',
+  TrackItemType.journal => 'J',
+  TrackItemType.game => 'G',
+  TrackItemType.branchingScenario => 'B',
+  TrackItemType.bucketSort => 'S',
+  TrackItemType.unknown => '',
+};
+
+/// RN's `utils/trackItemMeta.ts` `getTrackItemMeta` — the type-specific
+/// meta line under each item's title.
+String trackItemMeta(TrackDetailItem item, String Function(String, [Map<String, Object?>?]) t) {
+  final meta = item.contentMeta;
+  final criteria = item.completionCriteria;
+  String plural(String key, int count, Map<String, Object?> params) =>
+      t('${key}_${count == 1 ? 'one' : 'other'}', params);
+  String fmt(num n) => n == n.roundToDouble() ? n.toInt().toString() : n.toString();
+
+  switch (item.type) {
+    case TrackItemType.quiz:
+      final parts = <String>[];
+      final count = meta?.questionCount;
+      if (count != null && count > 0) {
+        parts.add(plural('courses.meta.questions', count, {'count': count}));
+      }
+      // A quiz passScore of 0 is a real threshold, so it isn't dropped.
+      final passScore = meta?.passScore ?? criteria?.passScore;
+      if (passScore != null) parts.add(t('courses.meta.passScore', {'score': fmt(passScore)}));
+      return parts.isNotEmpty ? parts.join(' · ') : t('courses.meta.quiz');
+    case TrackItemType.video:
+      final seconds = meta?.durationSeconds;
+      if (seconds != null && seconds > 0) {
+        final minutes = (seconds / 60).round().clamp(1, 1 << 30);
+        return plural('courses.meta.videoDuration', minutes, {'count': minutes, 'minutes': minutes});
+      }
+      return t('courses.meta.video');
+    case TrackItemType.journal:
+      final prompts = meta?.promptCount;
+      if (prompts != null && prompts > 0) {
+        return plural('courses.meta.prompts', prompts, {'count': prompts});
+      }
+      return t('courses.meta.journal');
+    case TrackItemType.article:
+      return t('courses.meta.article');
+    case TrackItemType.roleplay:
+      // A minScore of 0 is the unconfigured default and gates nothing.
+      final minScore = criteria?.minScore ?? 0;
+      if (minScore > 0) {
+        return '${t('courses.meta.roleplay')} · ${t('courses.meta.minScore', {'score': fmt(minScore)})}';
+      }
+      return t('courses.meta.roleplay');
+    case TrackItemType.caseItem:
+      return t('courses.meta.case');
+    case TrackItemType.game:
+      return t('courses.meta.game');
+    case TrackItemType.branchingScenario:
+      return t('courses.meta.branchingScenario');
+    case TrackItemType.bucketSort:
+      return t('courses.meta.bucketSort');
+    case TrackItemType.unknown:
+      return '';
+  }
+}
+
+/// RN's `CourseOverviewScreen/components/CourseItemRow.tsx`: a bordered row
+/// (primary 1.5px border when it's the current item, greyed when locked)
+/// with a 40px type-letter badge (filled when completed, lock when locked),
+/// title + tick / status chip, the meta line, and optional captions.
+class _CourseItemRow extends ConsumerWidget {
+  const _CourseItemRow({required this.item, required this.isNext, required this.onTap});
+
+  final TrackDetailItem item;
+  final bool isNext;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fraction = detail.completedItems / detail.totalItems;
-    final isComplete = detail.completedItems >= detail.totalItems;
+    final isLocked = item.status == TrackItemStatus.locked;
+    final isCompleted = item.status == TrackItemStatus.completed;
+    final isInProgress = item.status == TrackItemStatus.unlocked && item.startedAt != null;
+    final isCurrent = isNext || isInProgress;
+    final statusLabel = isCompleted
+        ? ref.t('courses.status.completed')
+        : isInProgress
+        ? ref.t('courses.status.inProgress')
+        : isNext
+        ? ref.t('common.next')
+        : null;
 
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(
-            value: fraction.clamp(0, 1),
-            minHeight: 6,
-            backgroundColor: AppColors.lightGray2,
-            color: isComplete ? Colors.green : AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              ref.t('simulations.progressCompleted', {
-                'current': detail.completedItems,
-                'total': detail.totalItems,
-              }),
-            ),
-            if (onTap != null)
-              const Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: AppColors.mediumEmphasis,
+    final row = Material(
+      color: isLocked ? AppColors.grey50 : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: !isLocked && isCurrent
+            ? const BorderSide(color: AppColors.primary, width: 1.5)
+            : const BorderSide(color: AppColors.strokePrimary),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('course-item-${item.id}'),
+        onTap: isLocked ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isLocked
+                      ? AppColors.grey100
+                      : isCompleted
+                      ? AppColors.primary
+                      : null,
+                  border: Border.all(
+                    color: isLocked ? AppColors.strokePrimary : AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+                child: isLocked
+                    ? SvgPicture.asset(
+                        'assets/icons/lock.svg',
+                        key: const ValueKey('item-badge-locked'),
+                        width: 16,
+                        height: 16,
+                        colorFilter: const ColorFilter.mode(AppColors.grey400, BlendMode.srcIn),
+                      )
+                    // styles.badgeText: IBM_PLEX_SERIF.MEDIUM + body.medium.
+                    : Text(
+                        _typeBadge(item.type),
+                        style: TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                          fontSize: 14,
+                          height: 22 / 14,
+                          letterSpacing: 0.2,
+                          fontWeight: FontWeight.w500,
+                          color: isCompleted ? Colors.white : AppColors.primary,
+                        ),
+                      ),
               ),
-          ],
-        ),
-        if (onTap != null)
-          Text(
-            ref.t('courses.progressDashboard.tapHint'),
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: AppColors.mediumEmphasis),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // styles.title: IBM_PLEX_SERIF.REGULAR + body.medium.
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: AppFonts.ibmPlexSerifRegular,
+                              fontSize: 14,
+                              height: 22 / 14,
+                              letterSpacing: 0.2,
+                              color: AppColors.highEmphasis,
+                            ),
+                          ),
+                        ),
+                        if (isCompleted) ...[
+                          const SizedBox(width: 8),
+                          SvgPicture.asset(
+                            'assets/icons/tickRound.svg',
+                            key: const ValueKey('item-completed-tick'),
+                            width: 16,
+                            height: 16,
+                          ),
+                        ],
+                        if (!isCompleted && statusLabel != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.lightBlue50,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              statusLabel,
+                              style: _robotoTiny.copyWith(color: AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(trackItemMeta(item, ref.t), style: _robotoSmall),
+                    if (item.languageFallbackReason != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        ref.t('courses.language.fallback.${item.languageFallbackReason}'),
+                        style: _robotoTiny,
+                      ),
+                    ],
+                    if (isLocked) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        ref.t('courses.lockedTooltip'),
+                        style: _robotoTiny.copyWith(color: AppColors.lowEmphasis),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
 
-    if (onTap == null) return content;
-    return InkWell(onTap: onTap, child: content);
+    // styles.rowLocked: opacity 0.7.
+    return isLocked ? Opacity(opacity: 0.7, child: row) : row;
   }
 }

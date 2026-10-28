@@ -11,6 +11,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_detail_screen.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/learning_path_widgets.dart';
 
 import '../../../support/fake_network_image.dart';
 import '../../../support/pump_app.dart';
@@ -103,7 +104,7 @@ void main() {
     expect(find.textContaining('courses.notFound'), findsOneWidget);
   });
 
-  testWidgets('renders section/item titles and status icons per item', (tester) async {
+  testWidgets('renders section/item titles and RN CourseItemRow states per item', (tester) async {
     when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
       (_) async => _detail(items: [
         _item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.completed, title: 'Done item'),
@@ -119,9 +120,15 @@ void main() {
     expect(find.text('Locked item'), findsOneWidget);
     expect(find.text('Open item'), findsOneWidget);
 
-    expect(find.byKey(const ValueKey('trailing-completed')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trailing-locked')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trailing-unlocked')), findsOneWidget);
+    // Completed: tick beside the title; locked: lock badge + caption;
+    // the first unlocked item is "Next" with its type letter in the badge.
+    expect(find.byKey(const ValueKey('item-completed-tick')), findsOneWidget);
+    expect(find.byKey(const ValueKey('item-badge-locked')), findsOneWidget);
+    expect(find.text('courses.lockedTooltip'), findsOneWidget);
+    expect(find.text('common.next'), findsOneWidget);
+    expect(find.text('Q'), findsOneWidget);
+    expect(find.text('A'), findsOneWidget);
+    expect(find.text('courses.meta.quiz'), findsOneWidget);
   });
 
   testWidgets('a locked item cannot be tapped', (tester) async {
@@ -133,9 +140,8 @@ void main() {
 
     await pump(tester);
 
-    final tile = tester.widget<ListTile>(find.byType(ListTile));
-    expect(tile.enabled, isFalse);
-    expect(tile.onTap, isNull);
+    final row = tester.widget<InkWell>(find.byKey(const ValueKey('course-item-i1')));
+    expect(row.onTap, isNull);
   });
 
   testWidgets('tapping an unlocked playable item navigates to the item player route', (tester) async {
@@ -219,7 +225,7 @@ void main() {
 
       expect(find.byIcon(Icons.bar_chart), findsNothing, reason: 'no separate header icon');
 
-      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.tap(find.byKey(const Key('learning-path-progress-bar')));
       await tester.pumpAndSettle();
 
       expect(find.text('progress:t1'), findsOneWidget);
@@ -250,8 +256,8 @@ void main() {
 
     await pump(tester);
 
-    expect(find.text('A short course description'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('A short course description', findRichText: true), findsOneWidget);
+    expect(find.byType(LearningPathProgressBar), findsOneWidget);
     expect(find.textContaining('1'), findsWidgets);
   });
 
@@ -264,7 +270,7 @@ void main() {
 
     await pump(tester);
 
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(LearningPathProgressBar), findsNothing);
   });
 
   testWidgets('Start/Continue button label reflects enrollment and progress', (tester) async {
@@ -472,4 +478,78 @@ void main() {
     verifyNever(() => repository.setTrackLanguage(trackId: any(named: 'trackId'), languageCode: any(named: 'languageCode')));
     expect(find.byKey(const Key('course-language-option-en')), findsNothing);
   });
+
+  group('trackItemMeta (RN getTrackItemMeta)', () {
+    String t(String key, [Map<String, Object?>? params]) =>
+        params == null ? key : '$key${params.values.toList()}';
+
+    TrackDetailItem withMeta(TrackItemType type, Map<String, dynamic> json) =>
+        TrackDetailItem.fromJson({'id': 'x', 'type': '', 'title': 'x', ...json})
+            .copyWithType(type);
+
+    test('quiz joins question count and pass score; 0 pass score is kept', () {
+      final item = withMeta(TrackItemType.quiz, {
+        'contentMeta': {'questionCount': 5, 'passScore': 0},
+      });
+      expect(trackItemMeta(item, t), 'courses.meta.questions_other[5] · courses.meta.passScore[0]');
+    });
+
+    test('roleplay shows min score only when above zero', () {
+      expect(
+        trackItemMeta(withMeta(TrackItemType.roleplay, {'completionCriteria': {'minScore': 0}}), t),
+        'courses.meta.roleplay',
+      );
+      expect(
+        trackItemMeta(withMeta(TrackItemType.roleplay, {'completionCriteria': {'minScore': 70}}), t),
+        'courses.meta.roleplay · courses.meta.minScore[70]',
+      );
+    });
+
+    test('video rounds to at least one minute', () {
+      expect(
+        trackItemMeta(withMeta(TrackItemType.video, {'contentMeta': {'durationSeconds': 20}}), t),
+        'courses.meta.videoDuration_one[1, 1]',
+      );
+    });
+  });
+
+  test('findNextTrackItemId prefers an in-progress item over the first unlocked one', () {
+    TrackDetailItem item(String id, int order, TrackItemStatus status, {String? startedAt}) =>
+        TrackDetailItem(
+          id: id,
+          type: TrackItemType.article,
+          order: order,
+          title: id,
+          description: null,
+          status: status,
+          score: null,
+          maxWatchedPct: null,
+          startedAt: startedAt,
+        );
+    final sections = [
+      TrackSection(id: 's', title: 's', order: 0, items: [
+        item('a', 0, TrackItemStatus.completed),
+        item('b', 1, TrackItemStatus.unlocked),
+        item('c', 2, TrackItemStatus.unlocked, startedAt: '2026-10-01'),
+      ]),
+    ];
+    expect(findNextTrackItemId(sections), 'c');
+  });
+}
+
+extension on TrackDetailItem {
+  TrackDetailItem copyWithType(TrackItemType type) => TrackDetailItem(
+    id: id,
+    type: type,
+    order: order,
+    title: title,
+    description: description,
+    status: status,
+    score: score,
+    maxWatchedPct: maxWatchedPct,
+    startedAt: startedAt,
+    contentMeta: contentMeta,
+    completionCriteria: completionCriteria,
+    languageFallbackReason: languageFallbackReason,
+  );
 }

@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
-import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_tab_view.dart';
-import '../../../core/widgets/html_rich_text.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../courses/data/course_models.dart';
 import '../../courses/data/courses_repository.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
+import 'widgets/circular_progress.dart';
+import 'widgets/credits_display.dart';
+import 'widgets/learn_tab_view.dart';
+import 'widgets/simulation_card.dart';
+import 'widgets/simulations_skeleton.dart';
 
 enum _LearnTab { courses, cases, simulations, paths }
 
@@ -40,7 +44,6 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
     final casesAsync = ref.watch(casesProvider);
     final scenariosAsync = ref.watch(scenariosProvider);
     final pathsAsync = ref.watch(scenarioPathsProvider);
-    final creditsAsync = ref.watch(simulationCreditsProvider);
 
     bool show<T>(AsyncValue<List<T>> async) =>
         async.isLoading || (async.value?.isNotEmpty ?? false);
@@ -58,77 +61,41 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
         : (visibleTabs.isNotEmpty ? visibleTabs.first : _requestedTab);
 
     return Scaffold(
+      // RN's styles.container: white, not the app's off-white background.
+      backgroundColor: Colors.white,
       body: Column(
         children: [
           TabScreenHeader(
             title: ref.t('common.appName'),
             subtitle: ref.t('nav.tabs.learn'),
             italicSubtitle: true,
-            trailing: creditsAsync.when(
-              // RN's styles.creditText: display.small size, but
-              // IBM_PLEX_SERIF.MEDIUM family — not the ambient default.
-              data: (credits) => Text(
-                ref.t('simulations.creditsRemaining', {
-                  'count': credits.remaining,
-                }),
-                style: Theme.of(context).textTheme.displaySmall
-                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
-              ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 21),
-            child: Column(
-              children: [
-                const SizedBox(height: 22),
-                _LearnIntro(ref: ref),
-                const SizedBox(height: 16),
-                if (visibleTabs.length > 1)
-                  AppTabView<_LearnTab>(
-                    tabs: [
-                      for (final tab in visibleTabs)
-                        AppTabViewItem(key: tab, label: ref.t(_tabLabelKey(tab))),
-                    ],
-                    activeTab: activeTab,
-                    onTabChange: (tab) => setState(() => _requestedTab = tab),
-                  ),
-              ],
-            ),
+            trailing: const CreditsDisplay(),
           ),
           Expanded(
+            // styles.marginH21
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 21),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // RN's listTitle: "Choose your" + an italic noun that
-                  // changes with the active tab (e.g. "Choose your Course").
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text.rich(
-                      TextSpan(
-                        style: const TextStyle(
-                          fontFamily: AppFonts.replayProHeadline,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w300,
-                          color: AppColors.highEmphasis,
-                        ),
-                        children: [
-                          TextSpan(text: '${ref.t('learn.choose.prefix')} '),
-                          TextSpan(
-                            text: ref.t(_tabNoun(activeTab)),
-                            style: const TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
+                  // styles.introWrapper
+                  const SizedBox(height: 22),
+                  _LearnIntro(ref: ref),
+                  // styles.tabMargin: marginVertical 16. RN renders the
+                  // TabView even when only one tab is visible.
+                  const SizedBox(height: 16),
+                  if (visibleTabs.isNotEmpty) ...[
+                    LearnTabView<_LearnTab>(
+                      tabs: [
+                        for (final tab in visibleTabs)
+                          AppTabViewItem(key: tab, label: ref.t(_tabLabelKey(tab))),
+                      ],
+                      activeTab: activeTab,
+                      onTabChange: (tab) => setState(() => _requestedTab = tab),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                  ],
+                  _ListTitle(noun: ref.t(_tabNoun(activeTab)), ref: ref),
                   Expanded(
                     child: _buildTabContent(
                       activeTab,
@@ -161,6 +128,51 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
     _LearnTab.paths => 'simulations.tracks',
   };
 
+  String _emptyKey(_LearnTab tab) => switch (tab) {
+    _LearnTab.courses => 'simulationPage.noCoursesAvailable',
+    _LearnTab.cases => 'simulationPage.noCasesAvailable',
+    _LearnTab.simulations => 'simulationPage.noSimulationsAvailable',
+    _LearnTab.paths => 'simulationPage.noPathsAvailable',
+  };
+
+  /// RN's per-tab `FlatList`: pull-to-refresh, the skeleton while the query
+  /// is fetching with nothing to show yet, and the "No … available" title
+  /// otherwise. RN has no separate error state — a failed query just has no
+  /// data, so it reads as empty.
+  Widget _list<T>(
+    _LearnTab tab,
+    AsyncValue<List<T>> async,
+    Widget Function(T item) itemBuilder,
+    VoidCallback onRefresh,
+  ) {
+    final items = async.value ?? <T>[];
+    Widget body;
+    if (items.isEmpty) {
+      body = ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          if (async.isLoading)
+            const SimulationsSkeleton(count: 4)
+          else
+            _EmptyTitle(text: ref.t(_emptyKey(tab))),
+        ],
+      );
+    } else {
+      body = ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // styles.list
+        padding: const EdgeInsets.only(top: 10, bottom: 360),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (context, index) => itemBuilder(items[index]),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: body,
+    );
+  }
+
   Widget _buildTabContent(
     _LearnTab activeTab,
     AsyncValue<List<TrackListItem>> tracksAsync,
@@ -170,140 +182,159 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
   ) {
     switch (activeTab) {
       case _LearnTab.courses:
-        return tracksAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) =>
-              Center(child: Text('${ref.t('courses.listLoadFailed')}: $error')),
-          data: (tracks) => tracks.isEmpty
-              ? Center(child: Text(ref.t('simulationPage.noCoursesAvailable')))
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 10, bottom: 100),
-                  itemCount: tracks.length,
-                  itemBuilder: (context, index) {
-                    final track = tracks[index];
-                    final showProgress =
-                        track.completedItems > 0 && track.totalItems > 0;
-                    return _LearnListCard(
-                      title: track.title,
-                      description: track.description,
-                      coverImageUrl: track.coverImageUrl,
-                      onTap: () => context.push('/courses/${track.id}'),
-                      trailing: showProgress
-                          ? _ProgressBadge(
-                              current: track.completedItems,
-                              total: track.totalItems,
-                            )
-                          : null,
-                    );
-                  },
-                ),
+        return _list<TrackListItem>(
+          activeTab,
+          tracksAsync,
+          (track) => SimulationCard(
+            title: track.title,
+            description: track.description,
+            coverImageUrl: track.coverImageUrl,
+            onTap: () => context.push('/courses/${track.id}'),
+            rightAccessory: _progressRing(track.completedItems, track.totalItems),
+          ),
+          () => ref.invalidate(learnTracksProvider),
         );
       case _LearnTab.cases:
-        return casesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Text('${ref.t('simulations.failedToLoadCases')}: $error'),
-          ),
-          data: (cases) => cases.isEmpty
-              ? Center(child: Text(ref.t('simulationPage.noCasesAvailable')))
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 10, bottom: 100),
-                  itemCount: cases.length,
-                  itemBuilder: (context, index) {
-                    final caseItem = cases[index];
-                    final showProgress =
-                        caseItem.completedScenarios > 0 &&
-                        caseItem.totalScenarios > 0;
-                    return _LearnListCard(
-                      title: caseItem.title,
-                      description:
-                          '${caseItem.totalScenarios} ${ref.t('calls.table.scenario')}',
-                      coverImageUrl: caseItem.coverImageUrl,
-                      onTap: () => context.push('/cases/${caseItem.id}'),
-                      trailing: showProgress
-                          ? _ProgressBadge(
-                              current: caseItem.completedScenarios,
-                              total: caseItem.totalScenarios,
-                            )
-                          : null,
-                    );
-                  },
-                ),
-        );
-      case _LearnTab.simulations:
-        return scenariosAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Text(
-              '${ref.t('simulations.failedToLoadScenarios')}: $error',
+        return _list<SimulationPath>(
+          activeTab,
+          casesAsync,
+          (caseItem) => SimulationCard(
+            title: caseItem.title,
+            description: '${caseItem.totalScenarios} ${ref.t('calls.table.scenario')}',
+            coverImageUrl: caseItem.coverImageUrl,
+            onTap: () => context.push('/cases/${caseItem.id}'),
+            rightAccessory: _progressRing(
+              caseItem.completedScenarios,
+              caseItem.totalScenarios,
             ),
           ),
-          data: (scenarios) => scenarios.isEmpty
-              ? Center(
-                  child: Text(ref.t('simulationPage.noSimulationsAvailable')),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 10, bottom: 100),
-                  itemCount: scenarios.length,
-                  itemBuilder: (context, index) {
-                    final scenario = scenarios[index];
-                    return _LearnListCard(
-                      title: scenario.title,
-                      description: scenario.description,
-                      coverImageUrl: scenario.coverImageUrl,
-                      triggerWarnings: scenario.triggerWarnings,
-                      // RN's SimulationDetailsScreen never fetches by id at
-                      // all — it just reads `route.params.scenario`, trusting
-                      // this already-fetched list item completely. Passing
-                      // it through here instead of re-fetching via a
-                      // `scenarios/:id` call RN's own UI never exercises
-                      // matches that exactly, and was the prime suspect for
-                      // why no scenario ever showed a language dropdown on a
-                      // real device (reported live) even though the by-id
-                      // endpoint looks logically equivalent on paper.
-                      onTap: () =>
-                          context.push('/simulations/${scenario.id}', extra: scenario),
-                      trailing: scenario.completedAttemptCount > 0
-                          ? _CompletedBadge(
-                              count: scenario.completedAttemptCount,
-                            )
-                          : null,
-                    );
-                  },
-                ),
+          () => ref.invalidate(casesProvider),
+        );
+      case _LearnTab.simulations:
+        return _list<Scenario>(
+          activeTab,
+          scenariosAsync,
+          (scenario) => SimulationCard(
+            title: scenario.title,
+            description: scenario.description,
+            coverImageUrl: scenario.coverImageUrl,
+            triggerWarnings: scenario.triggerWarnings,
+            // RN's SimulationDetailsScreen never fetches by id at all — it
+            // just reads `route.params.scenario`, trusting this
+            // already-fetched list item completely; passing it through
+            // matches that (and is what made the language dropdown appear).
+            onTap: () => context.push('/simulations/${scenario.id}', extra: scenario),
+            rightAccessory: scenario.completedAttemptCount > 0
+                ? _CompletedBadge(count: scenario.completedAttemptCount)
+                : null,
+          ),
+          () => ref.invalidate(scenariosProvider),
         );
       case _LearnTab.paths:
-        return pathsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Text('${ref.t('common.somethingWentWrong')} $error'),
+        return _list<SimulationPath>(
+          activeTab,
+          pathsAsync,
+          (path) => SimulationCard(
+            title: path.title,
+            description: '${path.totalScenarios} ${ref.t('calls.table.scenario')}',
+            coverImageUrl: path.coverImageUrl,
+            onTap: () => context.push('/simulation-paths/${path.id}'),
+            rightAccessory: _progressRing(path.completedScenarios, path.totalScenarios),
           ),
-          data: (paths) => paths.isEmpty
-              ? Center(child: Text(ref.t('simulationPage.noPathsAvailable')))
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 10, bottom: 100),
-                  itemCount: paths.length,
-                  itemBuilder: (context, index) {
-                    final path = paths[index];
-                    final showProgress =
-                        path.completedScenarios > 0 && path.totalScenarios > 0;
-                    return _LearnListCard(
-                      title: path.title,
-                      description:
-                          '${path.totalScenarios} ${ref.t('calls.table.scenario')}',
-                      coverImageUrl: path.coverImageUrl,
-                      onTap: () => context.push('/simulation-paths/${path.id}'),
-                      trailing: showProgress
-                          ? _ProgressBadge(
-                              current: path.completedScenarios,
-                              total: path.totalScenarios,
-                            )
-                          : null,
-                    );
-                  },
-                ),
+          () => ref.invalidate(scenarioPathsProvider),
         );
     }
+  }
+
+  /// RN's course/case/path `rightAccessory`: a 33px ring with "done/total"
+  /// inside, green once complete, `colors.blue` while in progress. Hidden
+  /// until at least one item is done (`!!progress && !!total`).
+  Widget? _progressRing(int progress, int total) {
+    if (progress == 0 || total == 0) return null;
+    final isCompleted = progress >= total;
+    return CircularProgress(
+      key: const Key('learn-progress-ring'),
+      progress: progress,
+      max: total,
+      size: 33,
+      strokeWidth: 3,
+      progressColor: isCompleted ? AppColors.green400 : AppColors.legacyBlue,
+      // styles.progressText: IBM_PLEX_SERIF.MEDIUM + body.nano.
+      child: Text(
+        '$progress/$total',
+        style: const TextStyle(
+          fontFamily: AppFonts.ibmPlexSerifMedium,
+          fontSize: 8,
+          height: 10 / 8,
+          letterSpacing: 0.08,
+          fontWeight: FontWeight.w500,
+          color: AppColors.mediumEmphasis,
+        ),
+      ),
+    );
+  }
+}
+
+/// RN's `styles.listTitle`: "Choose your" + an italic noun that changes with
+/// the active tab (e.g. "Choose your Course").
+class _ListTitle extends StatelessWidget {
+  const _ListTitle({required this.noun, required this.ref});
+
+  final String noun;
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text.rich(
+        TextSpan(
+          style: const TextStyle(
+            fontFamily: AppFonts.replayProHeadline,
+            fontSize: 18,
+            height: 24 / 18,
+            letterSpacing: 0.18,
+            fontWeight: FontWeight.w500,
+            color: AppColors.darkGray12,
+          ),
+          text: '${ref.t('learn.choose.prefix')} ',
+          children: [
+            // styles.pageTitleItalic
+            TextSpan(
+              text: noun,
+              style: const TextStyle(
+                fontFamily: AppFonts.replayProBoldItalic,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+/// RN's `ListEmptyElement` (styles.empty / styles.emptyTitle).
+class _EmptyTitle extends StatelessWidget {
+  const _EmptyTitle({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontFamily: AppFonts.replayProHeadline,
+          fontSize: 16,
+          color: AppColors.darkGray12,
+        ),
+      ),
+    );
   }
 }
 
@@ -317,15 +348,18 @@ class _LearnIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // styles.introText: REPLAY_PRO.HEADLINE + display.small, light, darkSlate.
     const baseStyle = TextStyle(
       fontFamily: AppFonts.replayProHeadline,
-      fontSize: 24,
+      fontSize: 18,
+      height: 24 / 18,
+      letterSpacing: 0.18,
       fontWeight: FontWeight.w300,
-      color: Color(0xFF292929),
-      height: 1.2,
+      color: AppColors.darkSlate,
     );
+    // styles.blueBold: REPLAY_PRO.BOLD, medium, azureBlue.
     const blueStyle = TextStyle(
-      fontFamily: AppFonts.replayProHeadline,
+      fontFamily: AppFonts.replayProBold,
       fontWeight: FontWeight.w500,
       color: AppColors.primary,
     );
@@ -350,153 +384,8 @@ class _LearnIntro extends StatelessWidget {
   }
 }
 
-/// RN's shared `SimulationCard` — full-width cover image banner (not a
-/// thumbnail), title, plain-text description (HTML stripped, same as the
-/// card's own `htmlToPlainText`; the detail screen is where HTML renders
-/// structurally), optional trigger-warning chips, and a trailing accessory.
-class _LearnListCard extends StatelessWidget {
-  const _LearnListCard({
-    required this.title,
-    required this.description,
-    required this.coverImageUrl,
-    required this.onTap,
-    this.trailing,
-    this.triggerWarnings = const [],
-  });
-
-  final String title;
-  final String? description;
-  final String? coverImageUrl;
-  final VoidCallback onTap;
-  final Widget? trailing;
-  final List<String> triggerWarnings;
-
-  @override
-  Widget build(BuildContext context) {
-    final plainDescription = htmlToPlainText(description);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (coverImageUrl != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      coverImageUrl!,
-                      height: 150,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          Container(height: 150, color: AppColors.lightGray2),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title.isEmpty ? '-' : title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: AppFonts.ibmPlexSerifMedium,
-                              fontSize: 16,
-                              color: AppColors.highEmphasis,
-                            ),
-                          ),
-                          if (plainDescription.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              plainDescription,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: AppFonts.ibmPlexSerifRegular,
-                                fontSize: 13,
-                                color: AppColors.mediumEmphasis,
-                              ),
-                            ),
-                          ],
-                          if (triggerWarnings.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [
-                                for (final warning in triggerWarnings)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.lightGray,
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
-                                        color: AppColors.lightGray2,
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      warning,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppColors.mediumEmphasis,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (trailing != null) ...[
-                      const SizedBox(width: 8),
-                      trailing!,
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressBadge extends StatelessWidget {
-  const _ProgressBadge({required this.current, required this.total});
-
-  final int current;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$current/$total',
-      style: const TextStyle(
-        fontFamily: AppFonts.ibmPlexSerifMedium,
-        fontSize: 12,
-        color: AppColors.mediumEmphasis,
-      ),
-    );
-  }
-}
-
+/// RN's role-play `rightAccessory`: tick + "Completed · N×", beside the
+/// card text (not pinned to the top corner).
 class _CompletedBadge extends ConsumerWidget {
   const _CompletedBadge({required this.count});
 
@@ -507,16 +396,22 @@ class _CompletedBadge extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.check_circle, size: 14, color: Colors.green),
+        // TickRoundIcon 16x16; its fill (#81C784) is baked into the SVG, so
+        // RN's `color` prop has no effect on it.
+        SvgPicture.asset('assets/icons/tickRound.svg', width: 16, height: 16),
         const SizedBox(width: 4),
         Text(
           count == 1
               ? ref.t('simulations.completed_one')
               : ref.t('simulations.completed_other', {'count': count}),
+          // styles.completedBadgeText: IBM_PLEX_SERIF.MEDIUM + body.nano.
           style: const TextStyle(
             fontFamily: AppFonts.ibmPlexSerifMedium,
-            fontSize: 11,
-            color: Colors.green,
+            fontSize: 8,
+            height: 10 / 8,
+            letterSpacing: 0.08,
+            fontWeight: FontWeight.w500,
+            color: AppColors.green700,
           ),
         ),
       ],
