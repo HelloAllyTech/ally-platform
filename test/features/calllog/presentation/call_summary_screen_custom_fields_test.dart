@@ -73,9 +73,17 @@ void main() {
           callLogRepositoryProvider.overrideWithValue(repository),
           customFieldsRepositoryProvider.overrideWithValue(customFieldsRepository),
           customFieldsEnabledProvider.overrideWith((ref) async => true),
-          // Neither an admin nor the call's own counsellor (counselorId: 7).
+          // The call's own counsellor (counselorId: 7), but not an admin —
+          // RN's `SectionWrapper.tsx` gates the section's whole edit-mode
+          // toggle on `sectionConfig.canEdit && (isAdmin || isCounsellorForCall)`;
+          // a custom field's own BOTH/ADMIN_ONLY/COUNSELLOR_ONLY permission
+          // only decides which fields become editable INSIDE an
+          // already-unlocked section, it can never unlock edit mode by
+          // itself for a user who is neither admin nor the call's
+          // counsellor. Needs counsellor-or-admin access to prove the
+          // ADMIN_ONLY-vs-BOTH distinction below at all.
           userPermissionsProvider.overrideWith((ref) async => const <String>[]),
-          currentUserProvider.overrideWith((ref) async => _user(99)),
+          currentUserProvider.overrideWith((ref) async => _user(7)),
         ],
       );
 
@@ -87,8 +95,20 @@ void main() {
       expect(find.text('Referral Source'), findsOneWidget);
       expect(find.text('Billing Code'), findsOneWidget);
 
-      // ADMIN_ONLY, current user is neither admin nor the call's counsellor:
-      // renders read-only (no TextFormField), its value as plain text.
+      // Not yet editing this section: both fields show as plain text,
+      // regardless of their own per-field permission.
+      expect(find.byKey(const ValueKey('cf-referral')), findsNothing);
+      expect(find.byKey(const ValueKey('cf-billing-code')), findsNothing);
+      expect(find.text('Phone'), findsOneWidget);
+      expect(find.text('BC-42'), findsOneWidget);
+
+      // Enter edit mode via the section's pencil button (counsellor-for-call
+      // grants section-level edit access).
+      await tester.tap(find.byKey(const ValueKey('section-edit-featuresAndDemographics')));
+      await tester.pumpAndSettle();
+
+      // ADMIN_ONLY, current user is the counsellor but not an admin: stays
+      // read-only (no TextFormField) even while the section is editing.
       expect(find.byKey(const ValueKey('cf-billing-code')), findsNothing);
       expect(find.text('BC-42'), findsOneWidget);
 
@@ -98,14 +118,23 @@ void main() {
       expect(referralField, findsOneWidget);
       expect(tester.widget<TextFormField>(referralField).initialValue, 'Phone');
 
-      // Editing it marks the form dirty and enables Save.
       await tester.enterText(referralField, 'Walk-in');
       await tester.pumpAndSettle();
 
-      // Appears, labeled "Save" (RN's `common.save`).
-      expect(find.widgetWithText(AppButton, 'Save'), findsOneWidget);
-
-      await tester.tap(find.widgetWithText(AppButton, 'Save'));
+      // Custom fields save exclusively through the section's own
+      // tick/checkmark — RN's global Save button never touches them
+      // (`CallSummaryDetails.tsx`'s `onSubmitButtonPress` is built-in-field
+      // `handleSubmit()` only; only `SectionWrapper`'s `onTickPress` also
+      // calls `handleCustomFieldSave`).
+      expect(find.byType(AppButton), findsNothing, reason: 'no built-in field is dirty');
+      // Invoke onPressed directly rather than a pixel-coordinate tap — like
+      // this file's sibling test, focusing the text field above scrolled
+      // the list to keep it visible, which can carry the tick button
+      // off-screen for a real hit-test.
+      final tickButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('section-tick-featuresAndDemographics')),
+      );
+      tickButton.onPressed!();
       await tester.pumpAndSettle();
 
       // Only the dirty custom field is sent, through upsertValues — not
@@ -116,10 +145,9 @@ void main() {
           as List<({String fieldDefinitionId, String? value})>;
       expect(captured, [(fieldDefinitionId: 'cf-referral', value: 'Walk-in')]);
 
-      // After a successful save, Save disappears again (no more pending
-      // changes) — RN's `showSaveButton && (...)`, not a present-but-
-      // disabled "No changes" state.
-      expect(find.byType(AppButton), findsNothing);
+      // The tick exits edit mode — fields show as plain text again.
+      expect(find.byKey(const ValueKey('cf-referral')), findsNothing);
+      expect(find.text('Walk-in'), findsOneWidget);
     },
   );
 

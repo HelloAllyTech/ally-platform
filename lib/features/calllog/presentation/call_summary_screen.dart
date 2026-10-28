@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -660,11 +661,25 @@ class _SummaryTab extends ConsumerStatefulWidget {
 
 class _SummaryTabState extends ConsumerState<_SummaryTab> {
   final Map<String, dynamic> _formValues = {};
+
+  /// Last-known-saved baseline for built-in fields — mirrors RN's
+  /// `savedFormData`, used by `handleSectionFieldsReset` (the section
+  /// close/X button) to reset just that section's fields back to their
+  /// real last-saved values, not merely clear the dirty flag.
+  final Map<String, dynamic> _savedFormValues = {};
   final Set<String> _dirtyKeys = {};
   String? _seededForChatId;
   bool _isSaving = false;
   bool _isRetrying = false;
   String? _error;
+
+  // Per-section accordion/edit-mode state — mirrors RN's
+  // `CallSummaryDetails.tsx` `expanded`/`isEditing` state maps. Absence
+  // means false/collapsed/not-editing, same default RN seeds every section
+  // to.
+  final Map<SummarySection, bool> _expandedSections = {};
+  final Map<SummarySection, bool> _editingSections = {};
+  final Set<SummarySection> _enhancingSections = {};
 
   // Tenant-configured custom fields (see custom_fields_repository.dart) —
   // kept in their own map/dirty-set rather than merged into _formValues/
@@ -682,6 +697,9 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     _formValues
       ..clear()
       ..addAll(summary.fields);
+    _savedFormValues
+      ..clear()
+      ..addAll(summary.fields);
     _dirtyKeys.clear();
     _seededForChatId = key;
   }
@@ -691,6 +709,95 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       _formValues[fieldKey] = value;
       _dirtyKeys.add(fieldKey);
     });
+  }
+
+  /// Mirrors RN's `SectionHeader`/`toggleSection` (`CallSummaryDetails.tsx`):
+  /// the accordion is exclusive (opening one section closes every other),
+  /// and toggling is blocked entirely while a DIFFERENT section is mid-edit
+  /// — only the section currently being edited may be collapsed (which also
+  /// exits its edit mode).
+  void _toggleSection(SummarySection section) {
+    final isAnyEditing = _editingSections.values.any((editing) => editing);
+    final isCurrentEditing = _editingSections[section] ?? false;
+    if (isAnyEditing && !isCurrentEditing) return;
+    setState(() {
+      if (isCurrentEditing) _editingSections[section] = false;
+      final wasExpanded = _expandedSections[section] ?? false;
+      _expandedSections.clear();
+      if (!wasExpanded) _expandedSections[section] = true;
+    });
+  }
+
+  void _onEditPress(SummarySection section) {
+    setState(() => _editingSections[section] = true);
+  }
+
+  /// RN's `handleSectionFieldsReset` — resets only this section's editable
+  /// built-in fields back to their last-saved values. Custom field edits
+  /// are deliberately left untouched: RN's own `onClosePress` never resets
+  /// them either (only `handleSectionFieldsReset`, built-in fields only),
+  /// so a closed-without-saving custom field edit stays dirty until the
+  /// section is reopened and actually saved — a faithfully-ported quirk,
+  /// not something to silently "fix" here.
+  void _resetSectionFields(SummarySection section) {
+    for (final field in summaryFieldDefs.where((f) => f.section == section && f.editable)) {
+      _formValues[field.key] = _savedFormValues[field.key];
+      _dirtyKeys.remove(field.key);
+    }
+  }
+
+  void _onClosePress(SummarySection section) {
+    setState(() {
+      _editingSections[section] = false;
+      _resetSectionFields(section);
+    });
+  }
+
+  /// RN's `onTickPress`: exits edit mode immediately (optimistic, before the
+  /// saves resolve — same as RN), then saves all dirty built-in fields
+  /// (shared `handleSubmit`, not scoped to this section — RN's tick calls
+  /// the exact same submit the global bottom button does) plus this
+  /// section's own dirty custom fields specifically.
+  Future<void> _onTickPress(SummarySection section) async {
+    setState(() => _editingSections[section] = false);
+    await _saveBuiltinFields();
+    await _saveCustomFieldsForSection(section);
+  }
+
+  /// RN's `onWandPress` (`SectionWrapper.tsx`): AI-rewrites the section's
+  /// one editable text field in place. Guards exactly as RN does: no
+  /// matching/editable field, or empty content, is a silent no-op.
+  Future<void> _onWandPress(SummarySection section) async {
+    SummaryFieldDef? field;
+    for (final f in summaryFieldDefs) {
+      if (f.section == section) {
+        field = f;
+        break;
+      }
+    }
+    if (field == null || !field.editable) return;
+    final content = _formValues[field.key];
+    if (content is! String || content.trim().isEmpty) return;
+
+    setState(() => _enhancingSections.add(section));
+    String? enhanced;
+    try {
+      enhanced = await ref.read(callLogRepositoryProvider).enhanceCallSummary(content);
+    } catch (_) {
+      enhanced = null;
+    }
+    if (!mounted) return;
+    if (enhanced == null) {
+      // Guard on the CONTENT, not the call succeeding — RN's own comment on
+      // this exact check: a failed enhance can arrive as a truthy empty
+      // response, which must not silently wipe the counsellor's text.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ref.tr('summary.enhanceFailed'))),
+      );
+    } else {
+      _onFieldChanged(field.key, enhanced);
+    }
+    if (mounted) setState(() => _enhancingSections.remove(section));
   }
 
   /// Mirrors RN's `CallSummaryDetails.tsx` seed effect: seeds local edit
@@ -727,7 +834,65 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, updates);
   }
 
-  bool get _hasDirtyChanges => _dirtyKeys.isNotEmpty || _dirtyCustomFieldIds.isNotEmpty;
+  // RN's global bottom Save button only ever shows/acts on built-in-field
+  // changes (`useCallSummaryForm`'s `hasChanges`) — custom fields have no
+  // global save path in RN at all, only the per-section tick
+  // (`handleCustomFieldSave(sectionKey)`). Before per-section edit mode
+  // existed, this app's one Save button covered both as the only way to
+  // persist a custom field; now that the real per-section tick exists,
+  // custom fields are only ever editable inside a section's edit mode
+  // (gated the same way built-in fields are), so this reverts to RN's
+  // actual scope.
+  bool get _hasDirtyChanges => _dirtyKeys.isNotEmpty;
+
+  /// RN's `handleSubmit` — saves every dirty built-in field across the
+  /// whole form (not scoped to one section), shared by both the global
+  /// Save button and each section's own tick/checkmark.
+  Future<bool> _saveBuiltinFields() async {
+    if (_dirtyKeys.isEmpty) return true;
+    final patch = {for (final key in _dirtyKeys) key: _formValues[key]};
+    try {
+      await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, patch);
+      _savedFormValues.addAll(patch);
+      _dirtyKeys.clear();
+      ref.invalidate(callSummaryProvider(widget.log.id));
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = '${ref.tr('callSummary.info.summaryUpdateFailed')}: $e');
+      }
+      return false;
+    }
+  }
+
+  /// RN's `handleCustomFieldSave(sectionKey)` — saves only the dirty custom
+  /// fields belonging to [section], independent of the built-in save's
+  /// outcome. On failure the dirty set is NOT cleared, or the edit would
+  /// look saved with no way to detect or retry it even though the write
+  /// never reached the backend.
+  Future<bool> _saveCustomFieldsForSection(SummarySection section) async {
+    final sectionDefIds = _customFieldDefs
+        .where((d) => d.sectionKey == section.name)
+        .map((d) => d.id)
+        .toSet();
+    final changed = _dirtyCustomFieldIds.where(sectionDefIds.contains).toList();
+    if (changed.isEmpty) return true;
+    try {
+      await ref.read(customFieldsRepositoryProvider).upsertValues(
+        widget.log.id,
+        [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
+      );
+      if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
+      return true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ref.tr('summary.customFieldSaveFailed'))),
+        );
+      }
+      return false;
+    }
+  }
 
   Future<void> _save() async {
     if (!_hasDirtyChanges) return;
@@ -735,54 +900,15 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       _isSaving = true;
       _error = null;
     });
-    var builtinSucceeded = true;
-    try {
-      if (_dirtyKeys.isNotEmpty) {
-        final patch = {for (final key in _dirtyKeys) key: _formValues[key]};
-        await ref
-            .read(callLogRepositoryProvider)
-            .updateCallSummary(widget.log.id, patch);
-        _dirtyKeys.clear();
-        ref.invalidate(callSummaryProvider(widget.log.id));
+    final succeeded = await _saveBuiltinFields();
+    if (mounted) {
+      if (succeeded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ref.tr('callSummary.info.summaryUpdatedSuccess'))),
+        );
       }
-    } catch (e) {
-      builtinSucceeded = false;
-      setState(
-        () => _error = '${ref.tr('callSummary.info.summaryUpdateFailed')}: $e',
-      );
+      setState(() => _isSaving = false);
     }
-
-    // Independent of the built-in save above: mirrors RN's
-    // `handleCustomFieldSave`, which sends its own PUT regardless of the
-    // main summary's own save outcome, and — on failure — must NOT clear
-    // the dirty set, or the edit looks saved with no way to detect or retry
-    // it even though the write never reached the backend.
-    var customFieldsSucceeded = true;
-    if (_dirtyCustomFieldIds.isNotEmpty) {
-      final changed = [
-        for (final id in _dirtyCustomFieldIds) (fieldDefinitionId: id, value: _customFieldValues[id]),
-      ];
-      try {
-        await ref.read(customFieldsRepositoryProvider).upsertValues(widget.log.id, changed);
-        _dirtyCustomFieldIds.clear();
-      } catch (_) {
-        customFieldsSucceeded = false;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(ref.tr('summary.customFieldSaveFailed'))),
-          );
-        }
-      }
-    }
-
-    if (mounted && builtinSucceeded && customFieldsSucceeded && _error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ref.tr('callSummary.info.summaryUpdatedSuccess')),
-        ),
-      );
-    }
-    if (mounted) setState(() => _isSaving = false);
   }
 
   Future<void> _retrySummary() async {
@@ -932,6 +1058,14 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                       onCustomFieldChanged: _onCustomFieldChanged,
                       isAdmin: isAdmin,
                       isCounsellorForCall: isCounsellorForCall,
+                      isExpanded: _expandedSections[section] ?? false,
+                      isEditing: _editingSections[section] ?? false,
+                      isEnhancing: _enhancingSections.contains(section),
+                      onToggle: () => _toggleSection(section),
+                      onEditPress: () => _onEditPress(section),
+                      onWandPress: () => _onWandPress(section),
+                      onTickPress: () => _onTickPress(section),
+                      onClosePress: () => _onClosePress(section),
                     ),
                 ],
               ),
@@ -978,11 +1112,28 @@ bool _canEditCustomField(CustomFieldDefinition def, {required bool isAdmin, requ
   }
 }
 
+/// Mirrors RN's `SectionWrapper` + `SectionHeader` — a custom accordion
+/// header (not Flutter's `ExpansionTile`, whose own expand/collapse state
+/// can't be driven externally the way RN's exclusive, edit-aware accordion
+/// needs: one section open at a time, and toggling blocked while another
+/// section is mid-edit). The header's right side is a pencil ("edit this
+/// section") that swaps for a wand ("AI-enhance", only when [canEnhance])
+/// plus a checkmark ("save") and a close icon ("cancel, reset this
+/// section's fields") once editing — RN's `editSquare.svg`/`wandStars.svg`/
+/// `check.svg`/`closeCircle.svg`, same assets this app already has.
 class _SectionCard extends ConsumerWidget {
   const _SectionCard({
     required this.section,
     required this.formValues,
     required this.onFieldChanged,
+    required this.isExpanded,
+    required this.isEditing,
+    required this.isEnhancing,
+    required this.onToggle,
+    required this.onEditPress,
+    required this.onWandPress,
+    required this.onTickPress,
+    required this.onClosePress,
     this.customFieldDefs = const [],
     this.customFieldValues = const {},
     this.onCustomFieldChanged,
@@ -993,6 +1144,14 @@ class _SectionCard extends ConsumerWidget {
   final SummarySection section;
   final Map<String, dynamic> formValues;
   final void Function(String fieldKey, dynamic value) onFieldChanged;
+  final bool isExpanded;
+  final bool isEditing;
+  final bool isEnhancing;
+  final VoidCallback onToggle;
+  final VoidCallback onEditPress;
+  final VoidCallback onWandPress;
+  final VoidCallback onTickPress;
+  final VoidCallback onClosePress;
 
   /// All of the tenant's custom fields (unfiltered) — this widget filters to
   /// its own [section] internally, mirroring RN's `CustomFieldsSection`'s own
@@ -1009,6 +1168,8 @@ class _SectionCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fields = summaryFieldDefs.where((f) => f.section == section).toList();
     final sectionCustomFields = customFieldDefs.where((d) => d.sectionKey == section.name).toList();
+    // RN's `canEdit={sectionConfig.canEdit && (isAdmin || isCounsellorForCall)}`.
+    final canEdit = section.canEdit && (isAdmin || isCounsellorForCall);
     // The RN screen also hides a section with no tenant-configured
     // "visible fields" (a backend-driven per-org form config, Redux
     // `selectSummaryVisibleFields`) — not ported, so every section in the
@@ -1018,37 +1179,88 @@ class _SectionCard extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: AppCard(
         variant: AppCardVariant.flat,
-        child: ExpansionTile(
-          // RN's `SectionHeader.tsx` shows a small per-section icon before
-          // the label (`SECTION_LIST`'s `icon` field, a distinct custom SVG
-          // per section) — approximated here with the closest-matching
-          // Material icon, same "closest matching, not pixel-identical"
-          // convention this app already uses for fonts (see `AppTheme`'s own
-          // doc comment).
-          leading: Icon(_sectionIcons[section] ?? Icons.article_outlined, size: 20),
-          title: Text(ref.t(_sectionLabelKeys[section] ?? section.label)),
+        child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final field in fields)
-                    _FieldEditor(
-                      field: field,
-                      formValues: formValues,
-                      onChanged: onFieldChanged,
+            InkWell(
+              key: ValueKey('section-header-${section.name}'),
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                child: Row(
+                  children: [
+                    Icon(_sectionIcons[section] ?? Icons.article_outlined, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        ref.t(_sectionLabelKeys[section] ?? section.label),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  for (final def in sectionCustomFields)
-                    _CustomFieldEditor(
-                      definition: def,
-                      value: customFieldValues[def.id],
-                      onChanged: onCustomFieldChanged,
-                      canEdit: _canEditCustomField(def, isAdmin: isAdmin, isCounsellorForCall: isCounsellorForCall),
-                    ),
-                ],
+                    if (isExpanded && canEdit)
+                      if (!isEditing)
+                        IconButton(
+                          key: ValueKey('section-edit-${section.name}'),
+                          icon: SvgPicture.asset('assets/icons/editSquare.svg', width: 20, height: 20),
+                          onPressed: onEditPress,
+                        )
+                      else ...[
+                        if (section.canEnhance)
+                          isEnhancing
+                              ? const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                )
+                              : IconButton(
+                                  key: ValueKey('section-wand-${section.name}'),
+                                  icon: SvgPicture.asset('assets/icons/wandStars.svg', width: 20, height: 20),
+                                  onPressed: onWandPress,
+                                ),
+                        IconButton(
+                          key: ValueKey('section-tick-${section.name}'),
+                          icon: SvgPicture.asset('assets/icons/check.svg', width: 20, height: 20),
+                          onPressed: onTickPress,
+                        ),
+                        IconButton(
+                          key: ValueKey('section-close-${section.name}'),
+                          icon: SvgPicture.asset('assets/icons/closeCircle.svg', width: 20, height: 20),
+                          onPressed: onClosePress,
+                        ),
+                      ]
+                    else
+                      Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+                  ],
+                ),
               ),
             ),
+            if (isExpanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final field in fields)
+                      _FieldEditor(
+                        field: field,
+                        formValues: formValues,
+                        onChanged: onFieldChanged,
+                        isEditing: isEditing,
+                      ),
+                    for (final def in sectionCustomFields)
+                      _CustomFieldEditor(
+                        definition: def,
+                        value: customFieldValues[def.id],
+                        onChanged: onCustomFieldChanged,
+                        canEdit: isEditing &&
+                            _canEditCustomField(def, isAdmin: isAdmin, isCounsellorForCall: isCounsellorForCall),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -1061,18 +1273,26 @@ class _FieldEditor extends ConsumerWidget {
     required this.field,
     required this.formValues,
     required this.onChanged,
+    required this.isEditing,
   });
 
   final SummaryFieldDef field;
   final Map<String, dynamic> formValues;
   final void Function(String fieldKey, dynamic value) onChanged;
 
+  /// RN's `renderField`: a field only gets its editable control
+  /// (`isEditing && field.isEditable` for an inline input,
+  /// `isEditing` alone for a dropdown) while the section is in edit mode —
+  /// otherwise it's always plain read-only text, same as a genuinely
+  /// non-editable field like Call ID.
+  final bool isEditing;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = formValues[field.key];
     final label = ref.t(_fieldLabelKeys[field.key] ?? field.label);
 
-    if (!field.editable) {
+    if (!field.editable || !isEditing) {
       final display = value == null || value.toString().trim().isEmpty
           ? '—'
           : value.toString();
