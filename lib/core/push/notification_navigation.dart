@@ -6,6 +6,9 @@
 /// or Riverpod context.
 library;
 
+import '../navigation/home_tab_navigation.dart';
+import '../navigation/tab_config.dart' show kTabLeaderboard;
+
 /// RN's `REMINDER_NOTIFICATION_TYPE` (`src/constants/notifications.ts`) — the
 /// backend's literal value for a server-sent engagement-reminder push.
 const String reminderNotificationType = 'ENGAGEMENT_REMINDER';
@@ -39,8 +42,12 @@ String reminderRouteFor(Map<String, dynamic>? data) =>
 /// The single decision point every notification-tap handler (foreground,
 /// background-but-not-killed, and cold-start) calls into. `null` means
 /// "nothing to navigate for this tap."
+///
+/// The weekly leaderboard reminder jumps to the Leaderboard *tab*, like
+/// RN's `navigateToLeaderboard` (`TabActions.jumpTo`), not a standalone
+/// Leaderboard screen without the tab bar.
 String? routeForNotificationTap({String? notificationId, Map<String, dynamic>? data}) {
-  if (notificationId == leaderboardNotificationId) return '/leaderboard';
+  if (notificationId == leaderboardNotificationId) return homeTabLocation(kTabLeaderboard);
   if (isReminderNotification(data)) return reminderRouteFor(data);
   return null;
 }

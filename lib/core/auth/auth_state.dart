@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/notifications/data/notifications_repository.dart';
 import '../localization/localization_controller.dart';
 import '../network/token_storage.dart';
+import '../push/push_notification_service.dart';
 import '../widgets/root_scaffold_messenger.dart';
 
 /// Minimal auth session state for Phase 0. Mirrors the one thing
@@ -63,7 +65,18 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState(isAuthenticated: true);
   }
 
+  /// RN `useUser.handleUserLogout` (the drawer's Logout): deregister this
+  /// device for push first, while the access token still authorises the
+  /// DELETE, then clear the session. A 401 that ends the session
+  /// ([sessionExpired]) skips the push step, as RN's `api.ts` does.
   Future<void> logout() async {
+    if (state.isAuthenticated) {
+      try {
+        await ref.read(pushNotificationServiceProvider).unregister(ref.read(notificationsRepositoryProvider));
+      } catch (_) {
+        // Best-effort; never blocks signing out.
+      }
+    }
     await _tokenStorage.clear();
     state = const AuthState(isAuthenticated: false);
   }

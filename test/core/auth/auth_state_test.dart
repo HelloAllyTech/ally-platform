@@ -4,8 +4,23 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
 import 'package:ally_mobile_flutter/core/network/token_storage.dart';
+import 'package:ally_mobile_flutter/core/push/push_notification_service.dart';
+import 'package:ally_mobile_flutter/features/notifications/data/notifications_repository.dart';
 
 class MockTokenStorage extends Mock implements TokenStorage {}
+
+class MockNotificationsRepository extends Mock implements NotificationsRepository {}
+
+/// Records `unregister` calls into the shared [log] so ordering against the
+/// token clear can be asserted.
+class _RecordingPushService extends PushNotificationService {
+  _RecordingPushService(this.log);
+
+  final List<String> log;
+
+  @override
+  Future<void> unregister(NotificationsRepository repository) async => log.add('unregister');
+}
 
 void main() {
   // `sessionExpired()` reads `rootScaffoldMessengerKey.currentState`, which
@@ -104,6 +119,55 @@ void main() {
 
       expect(container.read(authControllerProvider).isAuthenticated, isFalse);
       verify(() => tokenStorage.clear()).called(1);
+    });
+  });
+
+  group('AuthController.logout push deregistration (RN handleUserLogout)', () {
+    late List<String> log;
+    late ProviderContainer pushContainer;
+
+    setUp(() {
+      log = [];
+      pushContainer = ProviderContainer(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(tokenStorage),
+          pushNotificationServiceProvider.overrideWithValue(_RecordingPushService(log)),
+          notificationsRepositoryProvider.overrideWithValue(MockNotificationsRepository()),
+        ],
+      );
+      addTearDown(pushContainer.dispose);
+      when(() => tokenStorage.clear()).thenAnswer((_) async => log.add('clear'));
+    });
+
+    test('deregisters the device before clearing the session', () async {
+      when(() => tokenStorage.accessToken).thenAnswer((_) async => 'stored-access-token');
+      pushContainer.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await pushContainer.read(authControllerProvider.notifier).logout();
+
+      expect(log, ['unregister', 'clear']);
+      expect(pushContainer.read(authControllerProvider).isAuthenticated, isFalse);
+    });
+
+    test('skips deregistration when nobody is signed in', () async {
+      when(() => tokenStorage.accessToken).thenAnswer((_) async => null);
+      pushContainer.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await pushContainer.read(authControllerProvider.notifier).logout();
+
+      expect(log, ['clear']);
+    });
+
+    test('a 401 session expiry does not deregister (RN api.ts)', () async {
+      when(() => tokenStorage.accessToken).thenAnswer((_) async => 'stored-access-token');
+      pushContainer.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await pushContainer.read(authControllerProvider.notifier).sessionExpired();
+
+      expect(log, ['clear']);
     });
   });
 

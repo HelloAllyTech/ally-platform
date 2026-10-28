@@ -37,10 +37,10 @@ void main() {
     });
 
     test('the leaderboard notification id routes to Leaderboard regardless of data', () {
-      expect(routeForNotificationTap(notificationId: leaderboardNotificationId), '/leaderboard');
+      expect(routeForNotificationTap(notificationId: leaderboardNotificationId), '/home?tab=Leaderboard');
       expect(
         routeForNotificationTap(notificationId: leaderboardNotificationId, data: {'type': 'ENGAGEMENT_REMINDER'}),
-        '/leaderboard',
+        '/home?tab=Leaderboard',
       );
     });
 
