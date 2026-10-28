@@ -16,7 +16,9 @@ from app.schemas.common import ChatMessage
 
 
 # Helper to create a long chat history
-def _create_long_chat_history(num_messages: int, words_per_message: int) -> List[ChatMessage]:
+def _create_long_chat_history(
+    num_messages: int, words_per_message: int
+) -> List[ChatMessage]:
     long_content = "word " * words_per_message
     return [
         ChatMessage(id=f"msg-{i}", role="client", content=long_content)
@@ -145,4 +147,3 @@ class TestOpenAITextGenerationServiceFixLongInput:
         # and effective.
         # It also tests that _condense_for_summary was called by
         # generate_scenario_evaluation.
-
