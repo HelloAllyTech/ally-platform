@@ -672,7 +672,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   /// with the tab bar's hairline shadow.
   Widget _buildTabBar() {
     const label = TextStyle(
-      fontFamily: AppFonts.ibmPlexSerifRegular,
+      fontFamily: AppFonts.ibmPlexSerifMedium,
       fontSize: 12,
       height: 16 / 12,
       letterSpacing: 0.2,

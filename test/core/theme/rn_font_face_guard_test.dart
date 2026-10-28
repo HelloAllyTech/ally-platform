@@ -2,12 +2,13 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// On iOS, RN's RCTFont treats a `fontFamily` like 'ReplayPro-Headline' as a
-/// font name, takes its CoreText family ("Replay Pro": Headline -0.115,
-/// Bold 0.4, Bold Italic 0.4) and, when a `fontWeight` is given, switches to
-/// the family member whose weight is closest. So Headline at 500 renders as
-/// Replay Pro Bold, IBM Plex Serif Regular at 500 as Medium, and Medium at
-/// 400 as Regular. It never synthesizes a bolder face. Flutter declares each
+/// On iOS, RN (Fabric's RCTFontWithFontProperties) treats a `fontFamily` like
+/// 'ReplayPro-Headline' as a font name, takes its UIKit family ("Replay Pro":
+/// Headline -0.115, Bold 0.4, Bold Italic 0.4) and, when a non-regular
+/// `fontWeight` is given, switches to the family member whose weight is
+/// closest. So Headline at 500 renders as Replay Pro Bold and IBM Plex Serif
+/// Regular at 500 as Medium, while Medium at 400 stays Medium (400 reads as
+/// "no weight"). It never synthesizes a bolder face. Flutter declares each
 /// file as its own family and fakes bold from w600 up instead, so a ported
 /// style must name the face RN actually lands on, at a weight that doesn't
 /// trigger synthetic bold.
@@ -38,6 +39,10 @@ const _uiWeight = {
 String _rnFace(String token, String weight) {
   final (family, _) = _faceWeights[token]!;
   final target = _uiWeight[weight]!;
+  // Fabric's RCTFontWithFontProperties: `fontWeight ?: weightOf(namedFont)`.
+  // UIFontWeightRegular is 0, so 400/normal means "unspecified" and the
+  // named face is kept (IBM Plex Medium at 400 stays Medium).
+  if (target == 0) return token;
   String? best;
   var bestDistance = double.infinity;
   for (final MapEntry(key: candidate, value: (candidateFamily, candidateWeight)) in _faceWeights.entries) {

@@ -176,7 +176,7 @@ class CallSummaryTabBar extends StatelessWidget {
   final List<String> labels;
 
   static const _labelStyle = TextStyle(
-    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontFamily: AppFonts.ibmPlexSerifMedium,
     fontSize: 12,
     height: 16 / 12,
     letterSpacing: 0.2,
