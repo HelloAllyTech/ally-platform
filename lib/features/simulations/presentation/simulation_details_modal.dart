@@ -10,6 +10,7 @@ import '../../../core/widgets/cover_video_preview.dart';
 import '../data/simulation_models.dart';
 import 'start_simulation/start_simulation_modals.dart';
 import 'widgets/scenario_language_dropdown.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Direct port of ally-mobile (React Native)'s `SimulationDetailsModal` — the
 /// pre-start preview shown when a learner taps a scenario card (or the path/
@@ -251,7 +252,7 @@ class _SimulationDetailsModalState
                                 ? const SizedBox.shrink()
                                 : ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
+                                    child: SizedNetworkImage(
                                       cover,
                                       height: 180,
                                       width: double.infinity,

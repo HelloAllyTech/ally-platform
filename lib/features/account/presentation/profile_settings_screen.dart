@@ -20,6 +20,7 @@ import '../data/account_repository.dart';
 import '../data/user_profile.dart';
 import 'language_selector_sheet.dart';
 import 'profile_image_options_sheet.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// RN's `MAX_PROFILE_IMAGE_SIZE` (2 MB).
 const _maxProfileImageBytes = 2 * 1024 * 1024;
@@ -326,7 +327,7 @@ class _ProfileImageSection extends ConsumerWidget {
     );
     final image = switch (preview) {
       null => placeholder,
-      _NetworkPreview(:final url) => Image.network(
+      _NetworkPreview(:final url) => SizedNetworkImage(
         url,
         key: const ValueKey('profile-avatar-network'),
         fit: BoxFit.cover,

@@ -66,10 +66,21 @@ class DiscussionPostTile extends ConsumerStatefulWidget {
   ConsumerState<DiscussionPostTile> createState() => _DiscussionPostTileState();
 }
 
-class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
+class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> with AutomaticKeepAliveClientMixin {
   bool _isReplying = false;
   late final _replyController = TextEditingController();
   bool _isEditing = false;
+
+  /// The thread builds posts lazily; a tile with an open reply/edit
+  /// composer (or one of its nested replies with one) must survive being
+  /// scrolled out of the panel, as it did when every post was built.
+  @override
+  bool get wantKeepAlive => _isReplying || _isEditing;
+
+  void _setComposer(VoidCallback change) {
+    setState(change);
+    updateKeepAlive();
+  }
   late final _editController = TextEditingController(text: widget.post.content ?? '');
 
   @override
@@ -108,17 +119,18 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
     final ok = await widget.onReply(widget.post.id, _replyController.text.trim());
     if (ok && mounted) {
       _replyController.clear();
-      setState(() => _isReplying = false);
+      _setComposer(() => _isReplying = false);
     }
   }
 
   Future<void> _submitEdit() async {
     final ok = await widget.onEdit(widget.post.id, _editController.text.trim());
-    if (ok && mounted) setState(() => _isEditing = false);
+    if (ok && mounted) _setComposer(() => _isEditing = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final post = widget.post;
     final size = RnSize.of(context);
     final indent = (post.depth - 1).clamp(0, _maxIndentDepth - 1) * _indentStep;
@@ -208,7 +220,7 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
               autoFocus: true,
               onCancel: () {
                 _editController.text = post.content ?? '';
-                setState(() => _isEditing = false);
+                _setComposer(() => _isEditing = false);
               },
             )
           else
@@ -226,13 +238,13 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
                   if (post.canReply)
                     _Tap(
                       key: Key('discussion-post-${post.id}-reply-toggle'),
-                      onTap: () => setState(() => _isReplying = !_isReplying),
+                      onTap: () => _setComposer(() => _isReplying = !_isReplying),
                       child: Text(ref.t('courses.discussion.reply'), style: actionStyle),
                     ),
                   if (post.canEdit)
                     _Tap(
                       key: Key('discussion-post-${post.id}-edit-toggle'),
-                      onTap: () => setState(() => _isEditing = true),
+                      onTap: () => _setComposer(() => _isEditing = true),
                       child: SvgPicture.asset('assets/icons/edit.svg', width: size.raw(14), height: size.raw(14)),
                     ),
                   if (post.canDelete)
@@ -268,7 +280,7 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
                 autoFocus: true,
                 onCancel: () {
                   _replyController.clear();
-                  setState(() => _isReplying = false);
+                  _setComposer(() => _isReplying = false);
                 },
               ),
             ),

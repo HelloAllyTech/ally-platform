@@ -11,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../data/achievements_repository.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// RN `constants/badgePopup.ts`.
 const badgeAutoCloseDelay = Duration(milliseconds: 5000);
@@ -325,7 +326,7 @@ class _BadgeImage extends StatelessWidget {
         errorBuilder: (_, _, _) => const SizedBox.shrink(),
       );
     }
-    return Image.network(
+    return SizedNetworkImage(
       url,
       fit: BoxFit.contain,
       width: double.infinity,

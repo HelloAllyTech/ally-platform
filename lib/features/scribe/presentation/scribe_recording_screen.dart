@@ -114,6 +114,23 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
   List<Transcription> _myTranscriptions = [];
   List<Transcription> _speakerTranscriptions = [];
 
+  /// Both buckets merged in timestamp order — the one list the live
+  /// transcript renders. A notifier, so a streamed partial rebuilds only
+  /// the transcript list, not the waveform/nudge/search/controls (and
+  /// nothing at all in focus mode, where the transcript isn't shown).
+  final ValueNotifier<List<Transcription>> _transcript = ValueNotifier(const []);
+
+  /// [_elapsedLabel] results by message timestamp, for [_elapsedLabelsFor]
+  /// (the chat's `startedAt`) — each label is parsed once, not on every
+  /// partial for every line.
+  final Map<String, String> _elapsedLabels = {};
+  String? _elapsedLabelsFor;
+
+  void _publishTranscript() {
+    _transcript.value = [..._myTranscriptions, ..._speakerTranscriptions]
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  }
+
   Nudge? _currentNudge;
   bool _isNudgeLoading = false;
 
@@ -222,6 +239,7 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     ForegroundRecordingService.stop();
     _amplitudes.dispose();
     _transcriptScroll.dispose();
+    _transcript.dispose();
     super.dispose();
   }
 
@@ -389,6 +407,7 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     final rehydrated = rehydrateTranscriptions(chat.messages, _userIdAsInt ?? -1);
     _myTranscriptions = rehydrated.mine;
     _speakerTranscriptions = rehydrated.theirs;
+    _publishTranscript();
     _scrollTranscriptToEnd();
   }
 
@@ -430,26 +449,24 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     final payload = data is Map ? data['payload'] ?? data : null;
     if (payload is! Map || payload['type'] != MessageType.text) return;
     final transcription = Transcription.fromJson(Map<String, dynamic>.from(payload));
-    setState(() {
-      if (transcription.senderId == _userIdAsInt) {
-        _myTranscriptions = processTranscription(_myTranscriptions, transcription);
-      } else {
-        _speakerTranscriptions = processTranscription(_speakerTranscriptions, transcription);
-      }
-    });
+    if (transcription.senderId == _userIdAsInt) {
+      _myTranscriptions = processTranscription(_myTranscriptions, transcription);
+    } else {
+      _speakerTranscriptions = processTranscription(_speakerTranscriptions, transcription);
+    }
+    _publishTranscript();
     _scrollTranscriptToEnd();
   }
 
   void _onUtteranceEnded(dynamic data) {
     final payload = data is Map ? data['payload'] ?? data : null;
     final senderId = payload is Map ? (payload['senderId'] as num?)?.toInt() : null;
-    setState(() {
-      if (senderId == _userIdAsInt) {
-        _myTranscriptions = markLastTranscriptionComplete(_myTranscriptions);
-      } else {
-        _speakerTranscriptions = markLastTranscriptionComplete(_speakerTranscriptions);
-      }
-    });
+    if (senderId == _userIdAsInt) {
+      _myTranscriptions = markLastTranscriptionComplete(_myTranscriptions);
+    } else {
+      _speakerTranscriptions = markLastTranscriptionComplete(_speakerTranscriptions);
+    }
+    _publishTranscript();
   }
 
   /// RN ScrollView `onContentSizeChange → scrollToEnd({animated: true})`.
@@ -637,7 +654,6 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
   /// the nudge, then the transcript.
   Widget _buildNonFocusMode() {
     final rn = RnSize.of(context);
-    final all = [..._myTranscriptions, ..._speakerTranscriptions]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
     final showNudge = (ref.watch(nudgeStatusProvider).value ?? false) && _currentNudge != null;
     return Padding(
       padding: EdgeInsets.only(top: rn.vs(40), left: rn.s(20), right: rn.s(20)),
@@ -675,21 +691,27 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(top: rn.vs(15)),
-              child: ListView(
-                key: const ValueKey('live-transcript'),
-                controller: _transcriptScroll,
-                padding: EdgeInsets.only(bottom: rn.vs(20)),
-                children: [
-                  for (final t in all)
-                    CallTranscriptItem(
+              child: ValueListenableBuilder<List<Transcription>>(
+                valueListenable: _transcript,
+                // Builder: only the lines in view are built per partial.
+                builder: (context, all, _) => ListView.builder(
+                  key: const ValueKey('live-transcript'),
+                  controller: _transcriptScroll,
+                  padding: EdgeInsets.only(bottom: rn.vs(20)),
+                  itemCount: all.length,
+                  itemBuilder: (context, index) {
+                    final t = all[index];
+                    return CallTranscriptItem(
+                      key: ValueKey(t.id),
                       time: _elapsedLabel(t.timestamp),
                       message: t.message,
                       counselor: t.senderId == _userIdAsInt,
                       speakerLabel: ref.t(
                         t.senderId == _userIdAsInt ? 'transcription.youLabel' : 'transcription.clientLabel',
                       ),
-                    ),
-                ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -701,6 +723,15 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
   /// RN `getElapsedSeconds`: mm:ss since `chat.startedAt` ("00:00" without
   /// one); minutes aren't capped at 59.
   String _elapsedLabel(String timestamp) {
+    final startedAtRaw = _chat?.startedAt;
+    if (_elapsedLabelsFor != startedAtRaw) {
+      _elapsedLabels.clear();
+      _elapsedLabelsFor = startedAtRaw;
+    }
+    return _elapsedLabels[timestamp] ??= _computeElapsedLabel(timestamp);
+  }
+
+  String _computeElapsedLabel(String timestamp) {
     final startedAt = DateTime.tryParse(_chat?.startedAt ?? '');
     final messageTime = DateTime.tryParse(timestamp);
     if (startedAt == null || messageTime == null) return '00:00';

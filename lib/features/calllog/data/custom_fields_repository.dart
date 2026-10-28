@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/providers/cache_for.dart';
 
 /// Port of ally-mobile (React Native)'s `src/services/customFieldsApi.types.ts`
 /// `CustomFieldType` enum — the backend's literal string values, so
@@ -170,6 +171,7 @@ final customFieldDefinitionsProvider = FutureProvider<List<CustomFieldDefinition
   return ref.watch(customFieldsRepositoryProvider).getDefinitions();
 });
 
-final customFieldValuesProvider = FutureProvider.family<List<CustomFieldValue>, int>((ref, chatId) {
+final customFieldValuesProvider = FutureProvider.autoDispose.family<List<CustomFieldValue>, int>((ref, chatId) {
+  cacheFor(ref);
   return ref.watch(customFieldsRepositoryProvider).getValues(chatId);
 });

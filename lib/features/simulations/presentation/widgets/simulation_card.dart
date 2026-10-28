@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_fonts.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/widgets/html_rich_text.dart';
+import '../../../../core/widgets/sized_network_image.dart';
 
 /// Port of ally-mobile (React Native)'s `src/components/SimulationCard/
 /// SimulationCard.tsx` — the Learn tab's course / case / role-play /
@@ -81,7 +82,7 @@ class SimulationCard extends ConsumerWidget {
                     padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.xl2),
-                      child: Image.network(
+                      child: SizedNetworkImage(
                         cover,
                         height: 180,
                         fit: BoxFit.cover,

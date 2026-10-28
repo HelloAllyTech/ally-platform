@@ -15,6 +15,7 @@ import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/scenario_language_dropdown.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationDetailsScreen` — scenario
 /// detail + "start simulation": the "Before you get started" confirmation,
@@ -184,7 +185,7 @@ class _SimulationDetailsScreenState
                   ? const SizedBox.shrink()
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
+                      child: SizedNetworkImage(
                         imageUrl,
                         height: 180,
                         width: double.infinity,

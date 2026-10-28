@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/localization/cached_date_format.dart';
 
 /// Ports of ally-mobile (React Native)'s `src/utils/date.ts` formatters used
 /// by `ReviewCard` — exact thresholds/formats, not approximations.
@@ -16,7 +16,7 @@ String _plural(WidgetRef ref, String baseKey, int count) =>
 /// "February 18, 2025 11:05 AM" — RN's `formatDateTime`.
 String formatReviewDateTime(String iso) {
   final date = DateTime.parse(iso).toLocal();
-  return DateFormat('MMMM d, yyyy h:mm a').format(date);
+  return cachedDateFormat('MMMM d, yyyy h:mm a').format(date);
 }
 
 const _secondsInYear = 365 * 24 * 60 * 60;
@@ -85,8 +85,14 @@ String formatReviewDuration(String? secondsValue) {
 String htmlToPlainText(String? value) {
   if (value == null || value.isEmpty) return '';
   final stripped = value
-      .replaceAll(RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), ' ')
-      .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
-      .replaceAll(RegExp('<[^>]*>'), ' ');
-  return stripped.replaceAll(RegExp(r'\s+'), ' ').trim();
+      .replaceAll(_scriptBlock, ' ')
+      .replaceAll(_styleBlock, ' ')
+      .replaceAll(_anyTag, ' ');
+  return stripped.replaceAll(_whitespaceRun, ' ').trim();
 }
+
+// Compiled once, not on every review card build.
+final _scriptBlock = RegExp(r'<script[\s\S]*?</script>', caseSensitive: false);
+final _styleBlock = RegExp(r'<style[\s\S]*?</style>', caseSensitive: false);
+final _anyTag = RegExp('<[^>]*>');
+final _whitespaceRun = RegExp(r'\s+');

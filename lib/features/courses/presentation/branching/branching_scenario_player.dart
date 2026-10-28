@@ -11,6 +11,7 @@ import '../course_styles.dart';
 import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
+import '../../../../core/widgets/sized_network_image.dart';
 
 /// The server refuses a finished run once the attempts are gone.
 bool _isAttemptsExhaustedError(Object error) {
@@ -443,7 +444,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
         if (scene.image != null)
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(
+            child: SizedNetworkImage(
               scene.image!.url,
               height: 180,
               width: double.infinity,

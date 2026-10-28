@@ -15,9 +15,12 @@ import '../../../../core/localization/translate_ref.dart';
 /// responsibility as the RN original.
 ///
 /// `video_player` has no onProgress event stream (unlike
-/// `react-native-video`), so this polls `controller.value.position` on a
-/// short timer instead — functionally equivalent, just a different
-/// mechanism for the same signal.
+/// `react-native-video`), so this samples `controller.value.position` on a
+/// 500ms timer instead — functionally equivalent, just a different
+/// mechanism for the same signal. The timer only runs while the video is
+/// playing (a paused video's playhead doesn't move); a controller listener
+/// starts/stops it and takes one sample on pause and on a seek while
+/// paused, so the caller still sees every position change.
 class VideoPlayerWidget extends ConsumerStatefulWidget {
   const VideoPlayerWidget({
     super.key,
@@ -38,6 +41,7 @@ class VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget> {
   late final VideoPlayerController _controller;
   Timer? _progressPoll;
   bool _wasPlaying = false;
+  Duration? _lastSampledPosition;
   bool _initError = false;
 
   @override
@@ -51,12 +55,32 @@ class VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget> {
       }).catchError((_) {
         if (mounted) setState(() => _initError = true);
       });
-    _progressPoll = Timer.periodic(const Duration(milliseconds: 500), (_) => _poll());
+    _controller.addListener(_onControllerValue);
+  }
+
+  /// Runs the 500ms sampler only while playing. The controller notifies
+  /// on every internal position update (~100ms) while playing, so this
+  /// does no sampling itself then — it only flips the timer, samples once
+  /// when playback stops (the pause/end transition), and samples a seek
+  /// made while paused (the only way a paused playhead moves).
+  void _onControllerValue() {
+    final value = _controller.value;
+    if (!value.isInitialized) return;
+    if (value.isPlaying) {
+      _progressPoll ??= Timer.periodic(const Duration(milliseconds: 500), (_) => _poll());
+    } else if (_progressPoll != null) {
+      _progressPoll!.cancel();
+      _progressPoll = null;
+      _poll();
+    } else if (value.position != _lastSampledPosition) {
+      _poll();
+    }
   }
 
   void _poll() {
     final value = _controller.value;
     if (!value.isInitialized) return;
+    _lastSampledPosition = value.position;
     widget.onProgressTime(value.position.inMilliseconds / 1000);
     final isPlaying = value.isPlaying;
     if (_wasPlaying && (!isPlaying || value.isCompleted)) {
@@ -73,6 +97,7 @@ class VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget> {
   @override
   void dispose() {
     _progressPoll?.cancel();
+    _controller.removeListener(_onControllerValue);
     _controller.dispose();
     super.dispose();
   }
@@ -146,15 +171,15 @@ class _ScrubBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // `VideoProgressIndicator` listens to the controller itself; wrapping
+    // it in a ValueListenableBuilder only rebuilt it a second time on every
+    // ~100ms position update.
     return Align(
       alignment: Alignment.bottomCenter,
-      child: ValueListenableBuilder<VideoPlayerValue>(
-        valueListenable: controller,
-        builder: (context, value, _) => VideoProgressIndicator(
-          controller,
-          allowScrubbing: true,
-          padding: const EdgeInsets.all(8),
-        ),
+      child: VideoProgressIndicator(
+        controller,
+        allowScrubbing: true,
+        padding: const EdgeInsets.all(8),
       ),
     );
   }

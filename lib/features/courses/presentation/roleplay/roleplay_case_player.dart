@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -14,12 +13,13 @@ import '../../../simulations/presentation/widgets/scenario_language_dropdown.dar
 import '../../../simulations/presentation/widgets/simulation_card.dart';
 import '../../data/course_models.dart';
 import '../../data/start_item_payload.dart';
+import '../../../../core/localization/cached_date_format.dart';
 
 /// System font — RN's `<Text>`s here set no `fontFamily`.
 const _systemStyle = TextStyle(fontFamily: 'CupertinoSystemText', fontSize: 14, color: AppColors.mediumEmphasis);
 
 /// RN's `formatDate`: short month + two-digit day ("Oct 05").
-String _formatDate(String iso) => DateFormat('MMM dd').format(DateTime.parse(iso).toLocal());
+String _formatDate(String iso) => cachedDateFormat('MMM dd').format(DateTime.parse(iso).toLocal());
 
 /// Port of ally-mobile (React Native)'s `CourseItemPlayerScreen/components/
 /// players/RoleplayCasePlayer.tsx` — the pre-launch card for ROLEPLAY and

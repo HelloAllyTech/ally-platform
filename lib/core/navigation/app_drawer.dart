@@ -15,6 +15,7 @@ import '../theme/app_colors.dart';
 import '../theme/rn_scale.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/illustrated_modal.dart';
+import '../widgets/sized_network_image.dart';
 
 /// Port of ally-mobile (React Native)'s `CustomDrawerContent.tsx` (exported
 /// there as `DrawerContent`) — org logo, user profile block, simulation
@@ -208,7 +209,7 @@ class _OrgLogoState extends State<_OrgLogo> {
       width: 40,
       height: 40,
       child: (logoUrl != null && logoUrl.isNotEmpty && !_logoError)
-          ? Image.network(
+          ? SizedNetworkImage(
               logoUrl,
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) {
@@ -472,7 +473,7 @@ class _UserProfileAvatar extends StatelessWidget {
         border: Border.all(color: AppColors.strokePrimary),
       ),
       child: (url != null && url.isNotEmpty)
-          ? Image.network(url, width: size, height: size, fit: BoxFit.cover)
+          ? SizedNetworkImage(url, width: size, height: size, fit: BoxFit.cover)
           : Text(
               initial.isEmpty ? '' : initial[0].toUpperCase(),
               style: textStyle.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium, color: Colors.black),

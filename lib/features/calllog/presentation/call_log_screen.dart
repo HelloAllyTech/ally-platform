@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/chat/current_chat_provider.dart';
@@ -23,17 +22,18 @@ import '../../../core/widgets/tab_screen_header.dart';
 import '../data/call_log_repository.dart';
 import 'call_log_filter_sheet.dart';
 import 'call_log_row.dart';
+import '../../../core/localization/cached_date_format.dart';
 
 /// `formatDate`/`formatTime`/`calculateDuration` from ally-mobile (React
 /// Native)'s `src/utils/date.ts`, ported exactly: local time, "MMM d" dates,
 /// 12-hour clock times, and a plain "X mins Y secs" duration string (only
 /// the "Duration:"/"Session points:" labels around it are translated, same
 /// as the real component).
-String _formatDate(String iso) => DateFormat('MMM d').format(DateTime.parse(iso).toLocal());
+String _formatDate(String iso) => cachedDateFormat('MMM d').format(DateTime.parse(iso).toLocal());
 
 String _formatDateTimeLine(String iso) {
   final date = DateTime.parse(iso).toLocal();
-  return '${DateFormat('MMM d').format(date)} • ${DateFormat('h:mm a').format(date)}';
+  return '${cachedDateFormat('MMM d').format(date)} • ${cachedDateFormat('h:mm a').format(date)}';
 }
 
 String? _durationText(WidgetRef ref, String startedAt, String endedAt) {

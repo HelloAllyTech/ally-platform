@@ -220,4 +220,31 @@ void main() {
     expect(find.byKey(const Key('discussion-composer')), findsNothing);
     expect(find.byKey(const Key('discussion-locked-note')), findsNothing);
   });
+
+  testWidgets('long threads build posts lazily and an open reply draft survives scrolling away', (tester) async {
+    final posts = [for (var i = 0; i < 40; i++) _post(id: 'p$i', content: 'Post number $i')];
+    when(() => repository.getDiscussion('item-1')).thenAnswer((_) async => _response(posts: posts));
+    await pump(tester);
+
+    expect(find.byKey(const Key('discussion-post-p0')), findsOneWidget);
+    expect(find.byKey(const Key('discussion-post-p39'), skipOffstage: false), findsNothing);
+
+    await tester.tap(find.byKey(const Key('discussion-post-p0-reply-toggle')));
+    await tester.pump();
+    await tester.enterText(find.byKey(const Key('discussion-post-p0-reply')), 'Half-written reply');
+    // Unfocused: a focused EditableText keeps itself alive on its own.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+
+    final list = find.byKey(const Key('keyboard-aware-scroll-view'));
+    await tester.dragUntilVisible(find.byKey(const Key('discussion-post-p39')), list, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('discussion-post-p39')), findsOneWidget);
+    // p0 is scrolled out but kept alive (offstage) because its composer is open.
+    expect(find.byKey(const Key('discussion-post-p1'), skipOffstage: false), findsNothing);
+
+    await tester.dragUntilVisible(find.byKey(const Key('discussion-post-p0')), list, const Offset(0, 300));
+    await tester.pumpAndSettle();
+    expect(find.text('Half-written reply'), findsOneWidget);
+  });
 }

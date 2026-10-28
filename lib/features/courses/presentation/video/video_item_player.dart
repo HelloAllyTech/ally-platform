@@ -124,8 +124,10 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
   /// so any further interjections between it and the current position are
   /// still caught once the learner resumes.
   void _handleProgressTime(double timeSeconds) {
+    final shownPct = _tracker.watchedPct;
     _tracker.recordTime(timeSeconds);
-    if (mounted) setState(() {}); // Reflect the tracker's updated watchedPct.
+    // Rebuild only when the progress bar would change, not on every sample.
+    if (mounted && _tracker.watchedPct != shownPct) setState(() {});
 
     if (_activeInterjection != null) return;
 

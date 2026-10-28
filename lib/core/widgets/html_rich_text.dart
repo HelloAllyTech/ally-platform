@@ -67,14 +67,18 @@ class _HtmlRichTextState extends State<HtmlRichText> {
 String htmlToPlainText(String? html) {
   if (html == null || html.trim().isEmpty) return '';
   final stripped = html
-      .replaceAll(
-        RegExp(r'<script[\s\S]*?</script>', caseSensitive: false),
-        ' ',
-      )
-      .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
-      .replaceAll(RegExp('<[^>]*>'), ' ');
-  return _decodeHtmlEntities(stripped).replaceAll(RegExp(r'\s+'), ' ').trim();
+      .replaceAll(_scriptBlock, ' ')
+      .replaceAll(_styleBlock, ' ')
+      .replaceAll(_anyTag, ' ');
+  return _decodeHtmlEntities(stripped).replaceAll(_whitespaceRun, ' ').trim();
 }
+
+// Compiled once, not on every card build that previews a description.
+final _scriptBlock = RegExp(r'<script[\s\S]*?</script>', caseSensitive: false);
+final _styleBlock = RegExp(r'<style[\s\S]*?</style>', caseSensitive: false);
+final _anyTag = RegExp('<[^>]*>');
+final _whitespaceRun = RegExp(r'\s+');
+final _htmlEntity = RegExp(r'&(#x?[0-9a-f]+|[a-z]+);', caseSensitive: false);
 
 class _HtmlTextNode {
   _HtmlTextNode(this.value);
@@ -157,7 +161,7 @@ String _decodeHtmlEntities(String input) {
     'nbsp': ' ',
   };
   return input.replaceAllMapped(
-    RegExp(r'&(#x?[0-9a-f]+|[a-z]+);', caseSensitive: false),
+    _htmlEntity,
     (match) {
       final body = match.group(1)!;
       if (body.startsWith('#')) {
@@ -179,7 +183,7 @@ List<InlineSpan> _renderInline(List<Object> nodes, TextStyle baseStyle) {
     if (node is _HtmlTextNode) {
       spans.add(
         TextSpan(
-          text: _decodeHtmlEntities(node.value).replaceAll(RegExp(r'\s+'), ' '),
+          text: _decodeHtmlEntities(node.value).replaceAll(_whitespaceRun, ' '),
         ),
       );
       continue;
@@ -371,7 +375,7 @@ String _plainInline(List<Object> nodes) => nodes
           : _plainInline((n as _HtmlElementNode).children),
     )
     .join()
-    .replaceAll(RegExp(r'\s+'), ' ')
+    .replaceAll(_whitespaceRun, ' ')
     .trim();
 
 List<Widget> _renderBlocks(List<Object> nodes, bool dark) {

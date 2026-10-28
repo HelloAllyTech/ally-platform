@@ -8,6 +8,7 @@ import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import 'review_styles.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of ally-mobile (React Native)'s `components/SimulationDetailsCard`:
 /// a bordered, rounded box (padding 8, gap 16) holding a fixed 180pt cover
@@ -67,7 +68,7 @@ class _SimulationDetailsCardState extends ConsumerState<SimulationDetailsCard> {
       child: isScribe
           ? SvgPicture.asset('assets/icons/scribeReview.svg', width: double.infinity, height: height)
           : (image != null && image.isNotEmpty)
-          ? Image.network(
+          ? SizedNetworkImage(
               image,
               height: height,
               width: double.infinity,

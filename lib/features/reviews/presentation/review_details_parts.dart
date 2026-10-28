@@ -15,6 +15,7 @@ import 'comment_list_controller.dart';
 import 'review_formatting.dart';
 import 'review_styles.dart';
 import 'review_widgets.dart';
+import '../../../core/widgets/sized_network_image.dart';
 
 /// Port of RN's `ReviewTranscriptDetails/ReviewTranscriptHeader`: type chip,
 /// one-line title and (simulation) a help icon opening the scenario's
@@ -209,7 +210,7 @@ class _ScenarioDetailsDialog extends ConsumerWidget {
                           padding: const EdgeInsets.all(12),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
+                            child: SizedNetworkImage(
                               cover,
                               height: 180,
                               width: double.infinity,

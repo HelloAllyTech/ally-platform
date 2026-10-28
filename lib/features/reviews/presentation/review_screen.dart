@@ -307,41 +307,48 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
               onRefresh: () => _fetch(reset: true),
               child: NotificationListener<ScrollNotification>(
                 onNotification: _onScroll,
-                child: ListView(
+                // Builder: review cards are only constructed as they scroll
+                // in (the list pages without bound); the empty state and
+                // paging footer follow the cards.
+                child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.only(left: rn.s(16), right: rn.s(16), top: 10, bottom: 360),
-                  children: [
-                    for (final (i, review) in _reviews.indexed) ...[
+                  itemCount: _reviews.length + (isEmpty ? 1 : 0) + (showFooter ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index < _reviews.length) {
+                      final review = _reviews[index];
                       // contentContainerStyle gap 10 + ItemSeparator 8@s.
-                      if (i > 0) SizedBox(height: 10 + rn.s(8)),
-                      ReviewCard(
-                        key: ValueKey(review.id),
-                        review: review,
-                        reviewType: widget.reviewType,
-                        onOpenReview: widget.canViewReview ? () => _openReview(review) : null,
-                      ),
-                    ],
-                    if (isEmpty)
-                      AppEmptyState(
+                      return Padding(
+                        padding: EdgeInsets.only(top: index == 0 ? 0 : 10 + rn.s(8)),
+                        child: ReviewCard(
+                          key: ValueKey(review.id),
+                          review: review,
+                          reviewType: widget.reviewType,
+                          onOpenReview: widget.canViewReview ? () => _openReview(review) : null,
+                        ),
+                      );
+                    }
+                    if (isEmpty && index == _reviews.length) {
+                      return AppEmptyState(
                         iconAsset: 'assets/icons/emptyReviews.svg',
                         title: ref.t('review.empty.title'),
                         description: ref.t('review.empty.description'),
-                      ),
-                    if (showFooter)
-                      Padding(
-                        padding: EdgeInsets.only(top: _reviews.isEmpty ? 0 : 10, bottom: 0),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: rn.s(16)),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                            ),
+                      );
+                    }
+                    return Padding(
+                      padding: EdgeInsets.only(top: _reviews.isEmpty ? 0 : 10, bottom: 0),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: rn.s(16)),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                           ),
                         ),
                       ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
