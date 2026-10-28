@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -66,8 +66,14 @@ String? computeRedirect({
   required bool isAuthenticated,
   required String matchedLocation,
   required bool? profileCompleted,
+  bool isRestored = true,
 }) {
-  final isLoggingIn = matchedLocation == '/login';
+  // Launch: wait on the blank splash until the stored session is read.
+  if (!isRestored) return matchedLocation == '/splash' ? null : '/splash';
+  final isLaunching = matchedLocation == '/splash';
+  // Signed in, the splash leaves exactly like /login does (to Home or
+  // complete-profile below); signed out, the generic rule sends it to /login.
+  final isLoggingIn = matchedLocation == '/login' || (isLaunching && isAuthenticated);
   final isCompletingProfile = matchedLocation == '/complete-profile';
   // RN keeps SuspendedAccountScreen as a sibling of the login screen inside
   // the same "not authenticated" stack branch (RootNavigator.tsx's `else`
@@ -103,10 +109,11 @@ String? computeRedirect({
 /// same as RootNavigator does. Previously a documented TODO; now wired.
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     refreshListenable: _RouterRefreshListenable(ref),
     redirect: (context, state) {
-      final isAuthenticated = ref.read(authControllerProvider).isAuthenticated;
+      final auth = ref.read(authControllerProvider);
+      final isAuthenticated = auth.isAuthenticated;
       // Profile-completion status isn't known synchronously — read
       // whatever's currently cached (null while the very first fetch is
       // still in flight) rather than block routing on it.
@@ -115,9 +122,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         isAuthenticated: isAuthenticated,
         matchedLocation: state.matchedLocation,
         profileCompleted: user?.profileCompleted,
+        isRestored: auth.isRestored,
       );
     },
     routes: [
+      GoRoute(path: '/splash', builder: (context, state) => const _LaunchScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/home',
@@ -319,7 +328,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 class _RouterRefreshListenable extends ChangeNotifier {
   _RouterRefreshListenable(Ref ref) {
     ref.listen(authControllerProvider, (previous, next) {
-      if (previous?.isAuthenticated != next.isAuthenticated) {
+      if (previous?.isAuthenticated != next.isAuthenticated || previous?.isRestored != next.isRestored) {
         notifyListeners();
       }
     });
@@ -329,4 +338,13 @@ class _RouterRefreshListenable extends ChangeNotifier {
       }
     });
   }
+}
+
+/// Shown for the moment it takes to read the stored session at launch;
+/// blank like the native launch screen it follows.
+class _LaunchScreen extends StatelessWidget {
+  const _LaunchScreen();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.white);
 }

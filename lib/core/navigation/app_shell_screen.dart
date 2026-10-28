@@ -27,6 +27,12 @@ class AppShellScreen extends ConsumerStatefulWidget {
 class _AppShellScreenState extends ConsumerState<AppShellScreen> {
   String? _selectedTabName;
 
+  // Tabs mount the first time they're opened and then stay mounted, like
+  // react-navigation's bottom tabs (`lazy: true` by default). Building all
+  // of them up front fired every tab's fetches at launch, competing with
+  // the first tab for network and CPU.
+  final Set<String> _visitedTabNames = {};
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +55,7 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
         _selectedTabName ??= getFirstVisibleTab(permissions);
         var currentIndex = visibleTabs.indexWhere((t) => t.name == _selectedTabName);
         if (currentIndex == -1) currentIndex = 0;
+        if (visibleTabs.isNotEmpty) _visitedTabNames.add(visibleTabs[currentIndex].name);
 
         final hasUnreadReviews = ref.watch(unreadReviewCountProvider).maybeWhen(
               data: (count) => count > 0,
@@ -79,10 +86,12 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
                         // isFirstTab` — only the first visible tab's header
                         // carries the drawer-menu button.
                         for (final (i, tab) in visibleTabs.indexed)
-                          DrawerMenuScope(
-                            onOpenDrawer: i == 0 ? Scaffold.of(context).openDrawer : null,
-                            child: tab.screenBuilder(context),
-                          ),
+                          _visitedTabNames.contains(tab.name)
+                              ? DrawerMenuScope(
+                                  onOpenDrawer: i == 0 ? Scaffold.of(context).openDrawer : null,
+                                  child: tab.screenBuilder(context),
+                                )
+                              : const SizedBox.shrink(),
                       ],
                     ),
                   ),

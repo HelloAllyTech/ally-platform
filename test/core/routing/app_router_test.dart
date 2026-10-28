@@ -157,4 +157,35 @@ void main() {
       },
     );
   });
+
+  group('computeRedirect at launch', () {
+    test('holds every location on /splash until the stored session is read', () {
+      expect(
+        computeRedirect(isAuthenticated: false, matchedLocation: '/splash', profileCompleted: null, isRestored: false),
+        isNull,
+      );
+      expect(
+        computeRedirect(isAuthenticated: false, matchedLocation: '/login', profileCompleted: null, isRestored: false),
+        '/splash',
+      );
+    });
+
+    test('a returning user goes from /splash straight to Home, never via /login', () {
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/splash', profileCompleted: null),
+        '/home',
+      );
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/splash', profileCompleted: false),
+        '/complete-profile',
+      );
+    });
+
+    test('a signed-out user goes from /splash to /login', () {
+      expect(
+        computeRedirect(isAuthenticated: false, matchedLocation: '/splash', profileCompleted: null),
+        '/login',
+      );
+    });
+  });
 }

@@ -13,11 +13,17 @@ import '../widgets/root_scaffold_messenger.dart';
 /// same split RN has (`handleLogout` vs. `handleUserLogout`'s extra
 /// `showToast` call), now that the UI shell this needed exists.
 class AuthState {
-  const AuthState({required this.isAuthenticated});
+  const AuthState({required this.isAuthenticated, this.isRestored = true});
 
   final bool isAuthenticated;
 
-  static const unknown = AuthState(isAuthenticated: false);
+  /// False only until the stored session has been read at launch. The
+  /// router holds a blank splash meanwhile, so a returning user never
+  /// builds the login screen (and decodes its 7.9 MB splash animation)
+  /// on the way to Home.
+  final bool isRestored;
+
+  static const unknown = AuthState(isAuthenticated: false, isRestored: false);
 }
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
@@ -42,7 +48,7 @@ class AuthController extends Notifier<AuthState> {
       // or — in tests — no plugin registered at all). Falls back to
       // "not authenticated", same as `build()`'s initial state, rather
       // than leaving an unhandled rejection floating in the zone.
-      state = AuthState.unknown;
+      state = const AuthState(isAuthenticated: false);
     }
   }
 
