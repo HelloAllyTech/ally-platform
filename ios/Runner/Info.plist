@@ -26,6 +26,13 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Call summary export: Documents/CallSummary shows in the Files app (RN fileOperations.saveFile). -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
 	<!-- iOS's side of the same fix as the Android foreground-service
 	     declaration below: without the "audio" background mode, both Scribe
 	     recording and LiveKit roleplay voice would be suspended the moment
