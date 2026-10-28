@@ -9,6 +9,7 @@ import 'core/chat/active_chat_discovery.dart';
 import 'core/localization/localization_controller.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
+import 'core/network/retry_policy.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/rn_scale.dart';
 import 'core/widgets/root_scaffold_messenger.dart';
@@ -32,7 +33,7 @@ Future<void> main() async {
     // Expected until this app's own Firebase config files are added.
   }
 
-  runApp(const ProviderScope(child: AllyApp()));
+  runApp(const ProviderScope(retry: appRetryPolicy, child: AllyApp()));
 }
 
 class AllyApp extends ConsumerStatefulWidget {
