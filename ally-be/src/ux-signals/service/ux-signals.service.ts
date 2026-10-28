@@ -176,12 +176,26 @@ export class UxSignalsService {
         await this.detector.detect(windowFrom, windowTo);
 
       // Every detector failing means PostHog itself could not be read, not that
-      // the week was quiet — recording that as a clean, zero-signal scan is
-      // exactly the half-run-looks-clean failure this method exists to prevent.
-      if (failedDetectors.length === totalDetectors) {
-        throw new ServiceUnavailableException(
+      // the week was quiet. Record it as a failure, but do not let it surface as
+      // an unhandled exception for what is a routine external service outage.
+      if (failedDetectors.length === totalDetectors && totalDetectors > 0) {
+        const error = new ServiceUnavailableException(
           `All ${totalDetectors} UX signal detectors failed; PostHog appears to be unreachable. No signals could be read for this window.`,
         );
+        await this.scanRepository.update(scan.id, {
+          status: UxSignalScanStatus.FAILED,
+          error: String(error.message).slice(0, 2000),
+          finishedAt: new Date(),
+          metadata: { failedDetectors },
+        });
+        return {
+          scanId: scan.id,
+          signalsDetected: 0,
+          findingsCreated: 0,
+          suggestionsCreated: 0,
+          skippedDuplicates: 0,
+          failedDetectors,
+        };
       }
 
       // Zero signals is a real, healthy answer — the week was quiet. Recording it

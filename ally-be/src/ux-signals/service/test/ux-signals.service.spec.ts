@@ -149,27 +149,30 @@ describe('UxSignalsService', () => {
     );
   });
 
-  it('fails the scan, rather than recording a clean run, when every detector failed', async () => {
+  it('fails the scan gracefully, rather than throwing, when every detector failed', async () => {
     // A total PostHog outage must not look like a quiet night: zero signals here
     // means the scan could not look at anything, not that nothing was wrong.
+    // The run should be marked as a failure, but it must not throw an unhandled
+    // exception for what is a routine external service outage.
+    const failedDetectors = [
+      UxSignalDetector.API_ERROR_SPIKE,
+      UxSignalDetector.ERROR_LOOP,
+      UxSignalDetector.RAGE_CLICK_CLUSTER,
+      UxSignalDetector.DEAD_CLICK_CLUSTER,
+      UxSignalDetector.ROUTE_ABANDONMENT,
+      UxSignalDetector.ZERO_RESULT_SEARCH,
+      UxSignalDetector.FUNNEL_DROPOFF,
+    ];
     detect.mockResolvedValue({
       signals: [],
-      failedDetectors: [
-        UxSignalDetector.API_ERROR_SPIKE,
-        UxSignalDetector.ERROR_LOOP,
-        UxSignalDetector.RAGE_CLICK_CLUSTER,
-        UxSignalDetector.DEAD_CLICK_CLUSTER,
-        UxSignalDetector.ROUTE_ABANDONMENT,
-        UxSignalDetector.ZERO_RESULT_SEARCH,
-        UxSignalDetector.FUNNEL_DROPOFF,
-      ],
+      failedDetectors,
       totalDetectors: 7,
     });
 
-    await expect(
-      service.runScan(UxSignalScanTrigger.SCHEDULED),
-    ).rejects.toThrow(ServiceUnavailableException);
+    const outcome = await service.runScan(UxSignalScanTrigger.SCHEDULED);
 
+    expect(outcome.signalsDetected).toBe(0);
+    expect(outcome.failedDetectors).toEqual(failedDetectors);
     expect(triage).not.toHaveBeenCalled();
     expect(updateScan).toHaveBeenCalledWith(
       'scan-1',
