@@ -118,7 +118,7 @@ final reactionsRepositoryProvider = Provider<ReactionsRepository>((ref) {
 });
 
 
-final reactionsCountProvider = FutureProvider.family<Map<String, int>, String>((
+final reactionsCountProvider = FutureProvider.autoDispose.family<Map<String, int>, String>((
   ref,
   reviewId,
 ) {
@@ -192,7 +192,7 @@ final scribeReactionsRepositoryProvider = Provider<ScribeReactionsRepository>((
 });
 
 final scribeReactionsCountProvider =
-    FutureProvider.family<Map<String, int>, String>((ref, reviewId) {
+    FutureProvider.autoDispose.family<Map<String, int>, String>((ref, reviewId) {
       return ref
           .watch(scribeReactionsRepositoryProvider)
           .getReactionsCount(reviewId);
