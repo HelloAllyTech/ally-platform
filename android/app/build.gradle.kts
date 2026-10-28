@@ -21,6 +21,12 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
+    // AGP disables resValue() by default — needed for the per-flavor
+    // app_name below (dev/prod flavors each set their own).
+    buildFeatures {
+        resValues = true
+    }
+
     defaultConfig {
         // Overridden per flavor below.
         applicationId = "com.helloally.ally_mobile_flutter"
