@@ -110,6 +110,25 @@ dev_dependencies:
   # MockPlatformInterfaceMixin, the sanctioned way to satisfy a
   # PlatformInterface's token check from a mocktail Mock in tests.
   plugin_platform_interface: ^2.1.8
+  # Generates the real Android/iOS launcher icons from assets/icon/icon.png
+  # (ally-mobile's own 1024x1024 App Store icon, RN's real icon asset) —
+  # this app was still shipping Flutter's default template icon.
+  flutter_launcher_icons: ^0.14.4
+
+# flutter_launcher_icons config — run `dart run flutter_launcher_icons`
+# after changing assets/icon/icon.png. RN's own Android icons
+# (ally-mobile/android/app/src/main/res/mipmap-*) are plain legacy
+# launcher icons with no adaptive-icon layers, so this mirrors that
+# exactly rather than adding an adaptive foreground/background this app's
+# real icon was never designed for.
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: "ic_launcher"
+  ios: true
+  # The source PNG's alpha channel is fully opaque already (no real
+  # transparency), but App Store Connect rejects an icon that even
+  # technically carries an alpha channel.
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

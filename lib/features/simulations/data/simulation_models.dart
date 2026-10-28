@@ -154,11 +154,25 @@ class SessionData {
     required this.liveKitServerUrl,
   });
 
-  factory SessionData.fromJson(Map<String, dynamic> json) => SessionData(
-    id: json['id'] as String,
-    accessToken: json['accessToken'] as String,
-    liveKitServerUrl: json['liveKitServerUrl'] as String,
-  );
+  // The response is NOT the flat `{id, accessToken, liveKitServerUrl}`
+  // shape this used to assume — ally-be's `startScenarioSession` returns
+  // `{scenarioSession, accessToken, scenario}` (confirmed directly in
+  // `scenario-session.service.ts`'s own return statement), where
+  // `scenarioSession.id` is the real session id and `accessToken` is
+  // itself an object (`{token, roomName, serverUrl}`, matching RN's own
+  // `ScenarioSessionStartResponse` type exactly) — not a bare JWT string.
+  // Parsing the old (wrong) shape meant `json['id']` was always null,
+  // crashing immediately with "type 'Null' is not a subtype of type
+  // 'String' in type cast" the instant a user tried to start any roleplay.
+  factory SessionData.fromJson(Map<String, dynamic> json) {
+    final scenarioSession = json['scenarioSession'] as Map<String, dynamic>;
+    final accessToken = json['accessToken'] as Map<String, dynamic>;
+    return SessionData(
+      id: scenarioSession['id'] as String,
+      accessToken: accessToken['token'] as String,
+      liveKitServerUrl: accessToken['serverUrl'] as String,
+    );
+  }
 
   final String id;
   final String accessToken;

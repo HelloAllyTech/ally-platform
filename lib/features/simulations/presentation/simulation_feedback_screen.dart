@@ -361,9 +361,23 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           ],
           bottom: TabBar(
             controller: _tabController,
+            // Plain `Tab(text: ...)` hard-clips its label with no ellipsis
+            // under a larger system font-scale setting, rendering "Debrief"
+            // as "Debrie" with no visual indication it's truncated —
+            // `FittedBox` shrinks the text to fit instead.
             tabs: [
-              Tab(text: ref.t('postSim.tabs.debrief')),
-              Tab(text: ref.t('postSim.tabs.transcript')),
+              Tab(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(ref.t('postSim.tabs.debrief')),
+                ),
+              ),
+              Tab(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(ref.t('postSim.tabs.transcript')),
+                ),
+              ),
             ],
           ),
         ),
