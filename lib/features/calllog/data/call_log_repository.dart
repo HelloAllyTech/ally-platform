@@ -209,6 +209,7 @@ class CallSummaryDetails {
     this.isSummaryAvailable = true,
     this.isSummaryFeedbackAdded = false,
     this.hasTranscript = false,
+    this.transcript,
     this.archivedAt,
     this.reviewId,
     this.reviewStatus,
@@ -269,6 +270,7 @@ class CallSummaryDetails {
       // from `summaryData.details.transcript` (not the live messages list —
       // this is a flag on the summary response itself).
       hasTranscript: details?['transcript'] != null,
+      transcript: details?['transcript'] is String ? details!['transcript'] as String : null,
       archivedAt: json['archivedAt'] as String?,
       reviewId: json['reviewId'] as String?,
       reviewStatus: json['reviewStatus'] as String?,
@@ -287,6 +289,10 @@ class CallSummaryDetails {
       callMode: callInfo?['mode'] as String?,
     );
   }
+
+  /// RN `details.transcript` — a manual note's saved dictation text, which
+  /// `VoiceNoteSection` seeds from so a second dictation appends to it.
+  final String? transcript;
 
   /// RN `details.callInfo.summaryName` — the header's `#name` and the
   /// rename modal's prefill (`useCallSummaryActions`' `summaryName`).

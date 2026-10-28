@@ -28,9 +28,23 @@ enum VoiceRecorderError { permission, generic }
 /// Sample rate/channels match RN's `MICROPHONE_AUDIO_SAMPLE_RATE` (16000,
 /// mono) exactly — the backend's transcription endpoint expects this format.
 class VoiceNoteRecorder extends ChangeNotifier {
-  VoiceNoteRecorder({AudioRecorder? recorder}) : _recorder = recorder ?? AudioRecorder();
+  VoiceNoteRecorder({AudioRecorder? recorder, this.maxRecordingBytes = defaultMaxRecordingBytes})
+    : _recorder = recorder ?? AudioRecorder();
 
   final AudioRecorder _recorder;
+
+  /// RN `BYTES_PER_SECOND`: 16 kHz, 16-bit, mono PCM.
+  static const bytesPerSecond = 16000 * 2;
+
+  /// RN `MAX_RECORDING_BYTES`: the backend caps the multipart upload at
+  /// 25MB, so the recording stops itself just under it (~13 minutes).
+  static const defaultMaxRecordingBytes = 24 * 1024 * 1024;
+
+  final int maxRecordingBytes;
+
+  /// PCM bytes recorded so far (RN `dataBytesRef`), derived from the
+  /// recorded time since `record` writes the file itself.
+  int get recordedBytes => durationMs * bytesPerSecond ~/ 1000;
 
   VoiceRecorderStatus status = VoiceRecorderStatus.idle;
   int durationMs = 0;
@@ -53,6 +67,11 @@ class VoiceNoteRecorder extends ChangeNotifier {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       durationMs += 1000;
       notifyListeners();
+      if (recordedBytes >= maxRecordingBytes) {
+        // RN: hit the upload cap — finish the recording instead of
+        // dropping audio.
+        unawaited(stop());
+      }
     });
   }
 

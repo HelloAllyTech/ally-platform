@@ -1221,6 +1221,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                 chatId: _chatId,
                 onValuesApplied: _applyVoiceValues,
                 onCustomValuesApplied: _reseedCustomFields,
+                existingTranscript: summary.transcript,
               ),
             Expanded(
               // Builder, not `children:` — sections are only built as they
