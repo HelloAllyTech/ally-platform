@@ -257,9 +257,11 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
   Widget build(BuildContext context) {
     final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
     final isCounselor = permissions.contains(UserPermissions.counselorAccess);
+    // RN `useScribeVoiceNoteEnabled`: `skip: !isCounsellor` — the
+    // counsellor-only setting is never requested for anyone else (it 403s).
+    if (!isCounselor) return const SizedBox.shrink();
     final voiceEnabled = ref.watch(scribeVoiceNoteEnabledProvider).value ?? false;
-    final canUseVoice = isCounselor && voiceEnabled;
-    if (!canUseVoice) return const SizedBox.shrink();
+    if (!voiceEnabled) return const SizedBox.shrink();
     // Loaded up front (RN's hooks) so Generate has the custom-field list.
     if (ref.watch(customFieldsEnabledProvider).value != false) ref.watch(customFieldDefinitionsProvider);
 
