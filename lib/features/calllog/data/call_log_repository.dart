@@ -549,6 +549,22 @@ class CallLogRepository {
     return CallSummaryDetails.fromJson(response.data!);
   }
 
+  /// Mirrors RN's `useEnhanceCallSummaryMutation` (`POST /chats/enhance`) —
+  /// an AI rewrite of one section's text, triggered by the "wand" button
+  /// while editing. Returns null on a response with no `enhanced_content`:
+  /// a 200 with an empty body is "nothing to apply", not an error — same
+  /// guard RN's own `SectionWrapper.tsx` uses
+  /// (`if (!enhancedResponse?.enhanced_content)`), since treating a truthy-
+  /// but-empty response as success would overwrite the field with nothing.
+  Future<String?> enhanceCallSummary(String content) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/chats/enhance',
+      data: {'content': content},
+    );
+    final enhanced = response.data?['enhanced_content'] as String?;
+    return (enhanced == null || enhanced.isEmpty) ? null : enhanced;
+  }
+
   /// Regenerates a failed/stuck summary — mirrors RN's `retrySummary`
   /// mutation (the backend re-transcribes from stored audio when no
   /// transcript exists yet).
