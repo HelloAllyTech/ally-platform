@@ -89,6 +89,7 @@ class SimulationsRepository {
     required int scenarioId,
     String? scenarioPathSessionItemId,
     String? caseSessionItemId,
+    String? trackItemProgressId,
     int? languageId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
@@ -97,6 +98,9 @@ class SimulationsRepository {
         'scenarioId': scenarioId,
         'scenarioPathSessionItemId': ?scenarioPathSessionItemId,
         'caseSessionItemId': ?caseSessionItemId,
+        // Links the session to a Track 2.0 roleplay item's progress row
+        // (ally-be `start-scenario-session-request.dto.ts`).
+        'trackItemProgressId': ?trackItemProgressId,
         'languageId': ?languageId,
       },
     );
@@ -139,6 +143,17 @@ class SimulationsRepository {
       '/learn/scenario-session/case-session-item/$caseSessionItemId',
     );
     return response.data?['id'] as String?;
+  }
+
+  /// RN `simulationsApi.getEventChecklist` (ally-be `learn.controller.ts`
+  /// `scenario-session/:id/event-checklist`).
+  Future<List<EventChecklistItem>> getEventChecklist(String scenarioSessionId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-session/$scenarioSessionId/event-checklist',
+    );
+    return (response.data?['eventChecklist'] as List<dynamic>? ?? const [])
+        .map((e) => EventChecklistItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> addSimulationFeedback({
@@ -200,3 +215,11 @@ final simulationSummaryProvider =
           .watch(simulationsRepositoryProvider)
           .getSimulationDetails(scenarioSessionId);
     });
+
+/// RN `useGetEventChecklistQuery({scenarioSessionId})`.
+final eventChecklistProvider = FutureProvider.autoDispose.family<List<EventChecklistItem>, String>((
+  ref,
+  scenarioSessionId,
+) {
+  return ref.watch(simulationsRepositoryProvider).getEventChecklist(scenarioSessionId);
+});

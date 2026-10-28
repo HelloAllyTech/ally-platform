@@ -152,31 +152,51 @@ class SessionData {
     required this.id,
     required this.accessToken,
     required this.liveKitServerUrl,
+    this.scenario,
   });
 
-  // The response is NOT the flat `{id, accessToken, liveKitServerUrl}`
-  // shape this used to assume — ally-be's `startScenarioSession` returns
-  // `{scenarioSession, accessToken, scenario}` (confirmed directly in
-  // `scenario-session.service.ts`'s own return statement), where
-  // `scenarioSession.id` is the real session id and `accessToken` is
-  // itself an object (`{token, roomName, serverUrl}`, matching RN's own
-  // `ScenarioSessionStartResponse` type exactly) — not a bare JWT string.
-  // Parsing the old (wrong) shape meant `json['id']` was always null,
-  // crashing immediately with "type 'Null' is not a subtype of type
-  // 'String' in type cast" the instant a user tried to start any roleplay.
+  /// ally-be's `scenario-session-start` returns `{scenarioSession: {id},
+  /// accessToken: {token, serverUrl}, scenario}` — RN's
+  /// `useStartSimulation` reads `startResp.scenarioSession.id`,
+  /// `startResp.accessToken.token` and `.serverUrl`. The flat
+  /// `{id, accessToken, liveKitServerUrl}` shape is still accepted.
   factory SessionData.fromJson(Map<String, dynamic> json) {
-    final scenarioSession = json['scenarioSession'] as Map<String, dynamic>;
-    final accessToken = json['accessToken'] as Map<String, dynamic>;
+    final session = json['scenarioSession'];
+    final token = json['accessToken'];
     return SessionData(
-      id: scenarioSession['id'] as String,
-      accessToken: accessToken['token'] as String,
-      liveKitServerUrl: accessToken['serverUrl'] as String,
+      id: (session is Map ? session['id'] : json['id']) as String,
+      accessToken: (token is Map ? token['token'] : token) as String,
+      liveKitServerUrl:
+          (token is Map ? token['serverUrl'] : json['liveKitServerUrl'])
+              as String,
+      scenario: _scenarioFrom(json['scenario']),
     );
+  }
+
+  /// RN navigates with `startResp.scenario`, keeping `reminders` only when
+  /// `remindersEnabled` is on. Best-effort: a shape this model can't read
+  /// leaves it null and the caller's own scenario is used instead.
+  static Scenario? _scenarioFrom(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    try {
+      return Scenario.fromJson({
+        ...raw,
+        'reminders': raw['remindersEnabled'] == true
+            ? (raw['reminders'] ?? const [])
+            : const [],
+      });
+    } catch (_) {
+      return null;
+    }
   }
 
   final String id;
   final String accessToken;
   final String liveKitServerUrl;
+
+  /// The scenario as the start call returned it (timer, checklist,
+  /// reminders) — RN's `scenario` navigation param.
+  final Scenario? scenario;
 }
 
 /// `secondsAllowedPerCredit` + the `isLow` threshold mirror ally-mobile
@@ -330,11 +350,14 @@ class PathScenario {
   final List<SimulationLanguageOption>? availableLanguages;
 }
 
-/// Mirrors ally-mobile (React Native)'s `SimulationSummaryData` —
-/// the post-session debrief ally-be's AI judge generates. Only the fields
-/// SessionSummaryScreen renders; `events` (turn-by-turn transcript) and
-/// `metadata` are not modeled in this pass — a full transcript view is
-/// separate, substantial work (ally-mobile's own `TranscriptTab.tsx`).
+/// Mirrors ally-mobile (React Native)'s `SimulationSummaryData`
+/// (`src/types/simulations.ts`) — `GET /learn/scenario-session/:id`. Models
+/// what `SimulationFeedbackScreen` reads: the scenario (title, cover,
+/// client name, experience mode, which feedback tabs are on), the
+/// `details` block (call length, Ally's `supervisorNote`, a generation
+/// `errorMessage`), the learner's own rating, and the review it was shared
+/// as. `score` / `whatWentWell` / `areasForImprovement` are older top-level
+/// fields RN still types but no longer renders.
 class SimulationSummary {
   SimulationSummary({
     required this.id,
@@ -347,24 +370,50 @@ class SimulationSummary {
     required this.feedbackRating,
     required this.reviewId,
     required this.reviewStatus,
+    this.createdAt,
+    this.sessionName,
+    this.scenario,
+    this.callDuration,
+    this.hasSummaryFeedback = false,
+    this.supervisorNote,
+    this.errorMessage,
+    this.sessionFeedback,
   });
 
-  factory SimulationSummary.fromJson(Map<String, dynamic> json) =>
-      SimulationSummary(
-        id: json['id'] as String,
-        score: (json['score'] as num?)?.toDouble(),
-        startedAt: json['startedAt'] as String,
-        endedAt: json['endedAt'] as String?,
-        whatWentWell:
-            (json['whatWentWell'] as List<dynamic>?)?.cast<String>() ?? [],
-        areasForImprovement:
-            (json['areasForImprovement'] as List<dynamic>?)?.cast<String>() ??
-            [],
-        hasFeedback: json['hasFeedback'] as bool? ?? false,
-        feedbackRating: (json['feedbackRating'] as num?)?.toInt(),
-        reviewId: json['reviewId'] as String?,
-        reviewStatus: json['reviewStatus'] as String?,
-      );
+  factory SimulationSummary.fromJson(Map<String, dynamic> json) {
+    final details = json['details'] as Map<String, dynamic>?;
+    final summary = details?['summary'] as Map<String, dynamic>?;
+    final feedback = summary?['feedback'] as Map<String, dynamic>?;
+    final sessionFeedback = json['sessionFeedback'] as Map<String, dynamic>?;
+    return SimulationSummary(
+      id: json['id'] as String,
+      score: (json['score'] as num?)?.toDouble(),
+      startedAt: json['startedAt'] as String,
+      endedAt: json['endedAt'] as String?,
+      whatWentWell: (json['whatWentWell'] as List<dynamic>?)?.cast<String>() ?? [],
+      areasForImprovement: (json['areasForImprovement'] as List<dynamic>?)?.cast<String>() ?? [],
+      hasFeedback: json['hasFeedback'] as bool? ?? false,
+      feedbackRating: (json['feedbackRating'] as num?)?.toInt(),
+      reviewId: json['reviewId'] as String?,
+      reviewStatus: json['reviewStatus'] as String?,
+      createdAt: json['createdAt'] as String?,
+      sessionName: (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
+      scenario: json['scenario'] == null
+          ? null
+          : SimulationSummaryScenario.fromJson(json['scenario'] as Map<String, dynamic>),
+      callDuration: (details?['callDuration'] as num?)?.toDouble(),
+      hasSummaryFeedback: feedback != null,
+      supervisorNote: feedback?['supervisorNote'] as String?,
+      errorMessage: summary?['errorMessage'] as String?,
+      sessionFeedback: sessionFeedback == null
+          ? null
+          : (
+              rating: (sessionFeedback['rating'] as num?)?.toInt(),
+              tags: (sessionFeedback['tags'] as List<dynamic>?)?.cast<String>() ?? const <String>[],
+              comment: sessionFeedback['feedback'] as String? ?? '',
+            ),
+    );
+  }
 
   final String id;
   final double? score;
@@ -385,6 +434,101 @@ class SimulationSummary {
   /// RN — `'HIDDEN'`/`'IN_REVIEW'`/etc., kept as a raw string here the same
   /// way `CallSummaryDetails.reviewStatus` already does).
   final String? reviewStatus;
+
+  final String? createdAt;
+
+  /// `metadata.sessionName`, shown as "ID: …" (falls back to [id]).
+  final String? sessionName;
+  final SimulationSummaryScenario? scenario;
+
+  /// `details.callDuration` in seconds; RN's `isShortSession` reads it.
+  final double? callDuration;
+
+  /// Whether `details.summary.feedback` has landed — RN's poll loop stops
+  /// once it has.
+  final bool hasSummaryFeedback;
+
+  /// Ally's debrief (`details.summary.feedback.supervisorNote`), anchoring
+  /// transcript moments as `[[msg:<messageId>]]`.
+  final String? supervisorNote;
+
+  /// `details.summary.errorMessage` — set when generation failed.
+  final String? errorMessage;
+
+  /// The learner's own rating (`sessionFeedback`), when already given.
+  final ({int? rating, List<String> tags, String comment})? sessionFeedback;
+
+  /// RN `isShortSession`: 30s or less; unknown length is not short.
+  bool get isShortSession => callDuration != null && callDuration! <= 30;
+
+  /// RN `feedbackTabs ?? DEFAULT_FEEDBACK_TABS` (both on).
+  bool get showDebriefTab => scenario?.feedbackDebrief ?? true;
+  bool get showTranscriptTab => scenario?.feedbackTranscript ?? true;
+
+  /// RN `feedbackEnabled`: both tabs off is the wholesale opt-out.
+  bool get feedbackEnabled => showDebriefTab || showTranscriptTab;
+
+  bool get isChecklistMode => scenario?.experienceMode == 'CHECKLIST';
+}
+
+/// RN `SimulationSummaryData.scenario` (+ the `metadata` fields the
+/// feedback screen reads).
+class SimulationSummaryScenario {
+  SimulationSummaryScenario({
+    this.title,
+    this.description,
+    this.coverImageUrl,
+    this.coverVideoUrl,
+    this.clientName,
+    this.experienceMode,
+    this.feedbackDebrief,
+    this.feedbackTranscript,
+  });
+
+  factory SimulationSummaryScenario.fromJson(Map<String, dynamic> json) {
+    final metadata = json['metadata'] as Map<String, dynamic>?;
+    final tabs = metadata?['feedbackTabs'] as Map<String, dynamic>?;
+    return SimulationSummaryScenario(
+      title: json['title'] as String?,
+      description: json['description'] as String?,
+      coverImageUrl: json['coverImageUrl'] as String?,
+      coverVideoUrl: json['coverVideoUrl'] as String?,
+      clientName: metadata?['name'] as String?,
+      experienceMode: metadata?['experienceMode'] as String?,
+      feedbackDebrief: tabs == null ? null : tabs['debrief'] as bool? ?? true,
+      feedbackTranscript: tabs == null ? null : tabs['transcript'] as bool? ?? true,
+    );
+  }
+
+  final String? title;
+  final String? description;
+  final String? coverImageUrl;
+  final String? coverVideoUrl;
+
+  /// `metadata.name` — the simulated client, e.g. "Asha (AI client)".
+  final String? clientName;
+  final String? experienceMode;
+  final bool? feedbackDebrief;
+  final bool? feedbackTranscript;
+
+  /// Whether the backend sent `feedbackTabs` at all (RN's poll loop stops
+  /// early when it did and both are off).
+  bool get hasFeedbackTabs => feedbackDebrief != null;
+}
+
+/// One row of `GET /learn/scenario-session/:id/event-checklist`.
+class EventChecklistItem {
+  EventChecklistItem({required this.id, required this.name, required this.hasOccurred});
+
+  factory EventChecklistItem.fromJson(Map<String, dynamic> json) => EventChecklistItem(
+    id: '${json['id']}',
+    name: json['name'] as String? ?? '',
+    hasOccurred: json['hasOccurred'] as bool? ?? false,
+  );
+
+  final String id;
+  final String name;
+  final bool hasOccurred;
 }
 
 class SimulationPathDetails {

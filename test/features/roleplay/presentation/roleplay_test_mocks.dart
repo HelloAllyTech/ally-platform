@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+
 import 'package:livekit_client/livekit_client.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -33,3 +36,19 @@ class MockLiveKitRoomService extends Mock implements LiveKitRoomService {
 }
 
 class MockSimulationsRepository extends Mock implements SimulationsRepository {}
+
+/// The live-call controls start collapsed behind a chevron, as RN's
+/// `CollapsibleButtonGroup` does; open them before tapping a control.
+Future<void> expandRoleplayControls(WidgetTester tester) async {
+  final toggle = find.byKey(const ValueKey('simulation-control-buttons-toggle'));
+  if (toggle.evaluate().isEmpty) return;
+  if (find.byKey(const ValueKey('simulation-control-buttons')).evaluate().isNotEmpty &&
+      find.descendant(
+        of: find.byKey(const ValueKey('simulation-control-buttons')),
+        matching: find.byType(Text),
+      ).evaluate().isNotEmpty) {
+    return;
+  }
+  await tester.tap(toggle);
+  await tester.pump();
+}

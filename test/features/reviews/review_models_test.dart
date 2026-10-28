@@ -65,36 +65,6 @@ void main() {
     });
   });
 
-  group('ReviewComment.fromJson', () {
-    test('parses all fields', () {
-      final comment = ReviewComment.fromJson({
-        'id': 'c-1',
-        'content': 'Great work',
-        'createdAt': '2026-01-02T00:00:00Z',
-        'createdBy': {'name': 'Jamie'},
-      });
-
-      expect(comment.id, 'c-1');
-      expect(comment.content, 'Great work');
-      expect(comment.createdAt, '2026-01-02T00:00:00Z');
-      expect(comment.authorName, 'Jamie');
-    });
-
-    test('defaults content to empty, createdAt to null, authorName to Unknown', () {
-      final comment = ReviewComment.fromJson({'id': 'c-2'});
-
-      expect(comment.content, '');
-      expect(comment.createdAt, isNull);
-      expect(comment.authorName, 'Unknown');
-    });
-
-    test('defaults authorName to Unknown when createdBy has no name', () {
-      final comment = ReviewComment.fromJson({'id': 'c-3', 'createdBy': <String, dynamic>{}});
-
-      expect(comment.authorName, 'Unknown');
-    });
-  });
-
   group('ReviewThreadMessage.fromJson', () {
     test('parses all fields', () {
       final message = ReviewThreadMessage.fromJson({

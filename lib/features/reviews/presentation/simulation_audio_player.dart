@@ -1,7 +1,10 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import 'simulation_audio_player_controller.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationAudioPlayer` — shown
@@ -17,10 +20,23 @@ import 'simulation_audio_player_controller.dart';
 /// auto-scroll sync only exists on a *different* screen (the self-debrief
 /// `SimulationFeedbackScreen`), confirmed directly from source, so this
 /// deliberately doesn't invent that for the reviewer flow either.
+///
+/// Look: RN's `styles.container` card (white, 0.5 stroke border, radius 8,
+/// padding 16/12, margin 0 25 16) with a blue50 32pt play button, a blue50
+/// speed pill, and "mm:ss  ━━━━  mm:ss" (6pt grey200 track). Callers pass
+/// RN's `containerStyle` overrides as [margin] / [verticalPadding].
 class SimulationAudioPlayer extends StatefulWidget {
-  const SimulationAudioPlayer({super.key, required this.audioUrl, this.controller});
+  const SimulationAudioPlayer({
+    super.key,
+    required this.audioUrl,
+    this.controller,
+    this.margin = const EdgeInsets.only(left: 25, right: 25, bottom: 16),
+    this.verticalPadding = 16,
+  });
 
   final String audioUrl;
+  final EdgeInsets margin;
+  final double verticalPadding;
 
   /// Overridable for tests — defaults to a real [AudioPlayer]-backed
   /// controller. See `simulation_audio_player_controller.dart`'s doc
@@ -98,8 +114,15 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
     return '$minutes:$seconds';
   }
 
+  // RN's formatPlaybackRate: `${rate}x` (JS prints 1 and 2 without ".0").
   String _rateLabel(double rate) =>
       rate == rate.roundToDouble() ? '${rate.toInt()}x' : '${rate}x';
+
+  static const _timeStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 10,
+    color: AppColors.lowEmphasis,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -107,75 +130,96 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
         ? 0.0
         : (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+    return Container(
+      margin: widget.margin,
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: widget.verticalPadding),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+      ),
       child: Row(
         children: [
-          IconButton(
+          GestureDetector(
             key: const ValueKey('simulation-audio-player-toggle'),
-            iconSize: 36,
-            padding: EdgeInsets.zero,
-            onPressed: _isLoading ? null : _togglePlay,
-            icon: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) => GestureDetector(
-                    key: const ValueKey('simulation-audio-player-progress'),
-                    onTapDown: (details) => _seekToFraction(
-                      details.localPosition.dx / constraints.maxWidth,
+            onTap: _isLoading ? null : _togglePlay,
+            child: Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: AppColors.blue50, shape: BoxShape.circle),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    )
+                  : SvgPicture.asset(
+                      _isPlaying ? 'assets/icons/pausePlayer.svg' : 'assets/icons/playWhite.svg',
+                      key: ValueKey(_isPlaying ? 'simulation-audio-player-pause' : 'simulation-audio-player-play'),
+                      width: 16,
+                      height: 16,
+                      colorFilter: const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
                     ),
-                    child: Container(
-                      // An explicit width is required here: without it, a
-                      // plain `Container` with no intrinsic size of its own
-                      // sizes itself to its child's resulting size — and
-                      // the child below (`FractionallySizedBox`) shrinks
-                      // itself to `progress` of the available width, which
-                      // would make the *track* shrink to match the *fill*
-                      // instead of spanning the full bar underneath it.
-                      width: constraints.maxWidth,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGray2,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: progress,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${_formatTime(_position)} / ${_formatTime(_duration)}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
-                ),
-              ],
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
+          GestureDetector(
             key: const ValueKey('simulation-audio-player-rate'),
-            onPressed: _cyclePlaybackRate,
-            child: Text(_rateLabel(_rates[_rateIndex])),
+            onTap: _cyclePlaybackRate,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 34),
+              height: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: AppColors.blue50, borderRadius: BorderRadius.circular(12)),
+              child: Text(
+                _rateLabel(_rates[_rateIndex]),
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifMedium,
+                  fontSize: 10,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
           ),
+          const SizedBox(width: 10),
+          Text(_formatTime(_position), style: _timeStyle),
+          const SizedBox(width: 6),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) => GestureDetector(
+                key: const ValueKey('simulation-audio-player-progress'),
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) => _seekToFraction(details.localPosition.dx / constraints.maxWidth),
+                child: SizedBox(
+                  height: 20,
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey200,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      Container(
+                        height: 6,
+                        width: constraints.maxWidth * progress,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(_formatTime(_duration), style: _timeStyle),
         ],
       ),
     );

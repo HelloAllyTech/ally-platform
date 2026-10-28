@@ -433,6 +433,10 @@ class StartItemPayload {
     this.bucketSortAnswered,
     this.bucketSortRounds,
     this.bucketSortBestFirstTryPct,
+    this.scenarioId,
+    this.roleplayAssessmentMode = false,
+    this.assessmentSubmittedAt,
+    this.caseId,
   });
 
   factory StartItemPayload.fromJson(Map<String, dynamic> json) {
@@ -543,11 +547,29 @@ class StartItemPayload {
       bucketSortBestFirstTryPct: type == 'BUCKET_SORT'
           ? (json['bestFirstTryPct'] as num?)?.toInt()
           : null,
+      scenarioId: type == 'ROLEPLAY' ? (json['scenarioId'] as num?)?.toInt() : null,
+      roleplayAssessmentMode:
+          type == 'ROLEPLAY' &&
+          (json['completionCriteria'] as Map<String, dynamic>?)?['assessmentMode'] == true,
+      assessmentSubmittedAt: type == 'ROLEPLAY' ? json['assessmentSubmittedAt'] as String? : null,
+      caseId: type == 'CASE' ? json['caseId'] as String? : null,
     );
   }
 
   final String trackItemProgressId;
   final String type;
+
+  // ROLEPLAY (RN's `StartRoleplayItemPayload`)
+  final int? scenarioId;
+
+  /// `completionCriteria.assessmentMode`: one attempt, locked once submitted.
+  final bool roleplayAssessmentMode;
+
+  /// Assessment roleplay: when the one attempt was submitted; null while open.
+  final String? assessmentSubmittedAt;
+
+  // CASE (RN's `StartCaseItemPayload`)
+  final String? caseId;
 
   // QUIZ
   final SanitizedQuiz? quiz;

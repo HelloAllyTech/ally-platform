@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 import 'learning_path_detail_view.dart';
+import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/learning_path_widgets.dart';
 
 /// Port of ally-mobile (React Native)'s `CaseDetailsScreen`. Cases are
@@ -51,25 +52,11 @@ class CaseDetailsScreen extends ConsumerWidget {
                       .createCaseSession(caseId);
                   ref.invalidate(caseDetailsProvider(caseId));
                 },
-                onStartScenario: (scenario, {languageId}) async {
-                  final session = await ref
-                      .read(simulationsRepositoryProvider)
-                      .startScenarioSession(
-                        scenarioId: scenario.scenarioId,
-                        caseSessionItemId: scenario.sessionId,
-                        languageId: languageId,
-                      );
-                  if (context.mounted) {
-                    context.push(
-                      '/roleplay',
-                      extra: {
-                        'liveKitServerUrl': session.liveKitServerUrl,
-                        'accessToken': session.accessToken,
-                        'scenarioSessionId': session.id,
-                      },
-                    );
-                  }
-                },
+                startParamsFor: (scenario, languageId) => StartSimulationParams(
+                  scenarioId: scenario.scenarioId,
+                  caseSessionItemId: scenario.sessionId,
+                  languageId: languageId,
+                ),
                 onViewFeedback: (scenario) async {
                   final sessionId = await ref
                       .read(simulationsRepositoryProvider)

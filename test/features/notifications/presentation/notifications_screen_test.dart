@@ -108,8 +108,8 @@ void main() {
 
     expect(find.text('Unread title'), findsOneWidget);
     expect(find.text('Read title'), findsOneWidget);
-    expect(find.byIcon(Icons.notifications_active), findsOneWidget);
-    expect(find.byIcon(Icons.notifications_none), findsOneWidget);
+    // RN marks unread rows with an 8pt primary dot (and a grey50 row).
+    expect(find.byKey(const Key('unread-dot')), findsOneWidget);
   });
 
   testWidgets('tapping an unread notification marks it read and refreshes', (tester) async {
@@ -215,7 +215,7 @@ void main() {
     router.push('/notifications');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.tap(find.byKey(const Key('back-title-header-back')));
     await tester.pumpAndSettle();
 
     expect(find.text('HOME'), findsOneWidget);
@@ -247,6 +247,8 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.list(limit: 25, offset: 20)).called(1);
+    await tester.drag(find.byType(ListView), const Offset(0, -20000));
+    await tester.pumpAndSettle();
     expect(find.text('Title 20'), findsOneWidget);
   });
 

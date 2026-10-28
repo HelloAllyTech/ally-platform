@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
@@ -49,8 +50,9 @@ void main() {
       // `pumpAndSettle()` would wait on indefinitely (same class of issue
       // as this codebase's other indefinite-animation gotchas).
       await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester);
 
-      expect(find.text('Connected to room'), findsOneWidget);
+      expect(find.byKey(const ValueKey('participant-tile-remote')), findsOneWidget);
       expect(find.text('Mute'), findsOneWidget);
       expect(find.text('Disconnect'), findsOneWidget);
       verify(() => liveKitService.connect(liveKitServerUrl: 'wss://x', accessToken: 'tok')).called(1);
@@ -73,7 +75,7 @@ void main() {
       await tester.tap(find.text('Disconnect'));
       await tester.pump();
 
-      expect(find.text('Not connected'), findsOneWidget);
+      expect(find.text('Connecting to session...'), findsOneWidget);
       verify(() => liveKitService.disconnect()).called(1);
     },
   );

@@ -1,15 +1,17 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/emoji_insert_picker.dart';
 import '../../../core/widgets/review_type_chip.dart';
-import '../../../core/widgets/tab_screen_header.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
 import 'review_formatting.dart';
@@ -80,11 +82,8 @@ class ShareForReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
-  late final _noteController = TextEditingController(
-    text: widget.initialNote ?? '',
-  );
+  late final _noteController = TextEditingController(text: widget.initialNote ?? '');
   bool _isSubmitting = false;
-  String? _error;
 
   @override
   void initState() {
@@ -105,197 +104,201 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
   /// inserted at the cursor — and only while still under the character
   /// limit (a no-op past it, not a truncation).
   void _insertEmoji(String emoji) {
-    if (_noteController.text.length >= _maxNoteLength) return;
+    if (_noteController.text.characters.length >= _maxNoteLength) return;
     _noteController.text += emoji;
   }
 
+  void _toast(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// RN's `useShareScreenLogic`: `handleEditNote` when editing, otherwise
+  /// `handleShare` (which updates an existing review's status + note when a
+  /// reviewId is known, or creates one). Success toasts and goes back —
+  /// except a fresh scribe share, which opens the new review
+  /// (`ShareCallLogScreen.onShareSuccess`). Failure toasts the server's
+  /// message, falling back to the edit-window copy.
   Future<void> _submit() async {
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    final note = _noteController.text;
     try {
-      final note = _noteController.text.trim();
-      // RN's `handleShare`: a reviewId (edit mode or otherwise) always
-      // updates the existing review's status+note instead of creating a
-      // new one — `onCreateReview` only ever fires with neither.
-      //
-      // Scribe reviews are a genuinely separate backend resource
-      // (`/scribe-session-reviews`, confirmed from RN's real
-      // `ShareCallLogScreen.tsx` — it calls `createScribeReview`/
-      // `updateScribeReviewStatus`, never the simulation-review mutations)
-      // — a real, previously-unfixed bug here silently hit the simulation
-      // endpoint for scribe sessions too; fixed by branching on
-      // `widget.isScribe`.
+      final reviewId = widget.reviewId;
       if (widget.isScribe) {
-        if (widget.reviewId != null) {
-          await ref
-              .read(scribeReviewsRepositoryProvider)
-              .updateReviewStatus(
-                reviewId: widget.reviewId!,
-                status: 'IN_REVIEW',
-                note: note,
-              );
-          if (mounted) context.pop();
+        final repository = ref.read(scribeReviewsRepositoryProvider);
+        if (reviewId != null) {
+          await repository.updateReviewStatus(reviewId: reviewId, status: 'IN_REVIEW', note: note);
         } else {
-          // RN's `ShareCallLogScreen.onShareSuccess`: a fresh create lands
-          // on the new review's own details screen (replacing this one),
-          // not just "go back" — there's nothing to go back TO showing the
-          // share yet.
-          final newReviewId = await ref
-              .read(scribeReviewsRepositoryProvider)
-              .createReview(
-                scribeSessionId: int.parse(widget.scenarioSessionId),
-                note: note,
-              );
-          if (mounted) {
-            context.pushReplacement('/reviews/$newReviewId', extra: ReviewType.scribe);
-          }
+          final newReviewId = await repository.createReview(
+            scribeSessionId: int.parse(widget.scenarioSessionId),
+            note: note,
+          );
+          if (!mounted) return;
+          _toast(ref.tr('callFeedback.sharedForReview'));
+          context.pushReplacement('/reviews/$newReviewId', extra: ReviewType.scribe);
+          return;
         }
-      } else if (widget.reviewId != null) {
-        await ref
-            .read(reviewsRepositoryProvider)
-            .updateReviewStatus(
-              reviewId: widget.reviewId!,
-              status: 'IN_REVIEW',
-              note: note,
-            );
-        if (mounted) context.go('/home');
       } else {
-        await ref
-            .read(reviewsRepositoryProvider)
-            .createReview(
-              scenarioSessionId: widget.scenarioSessionId,
-              note: note,
-            );
-        if (mounted) context.go('/home');
+        final repository = ref.read(reviewsRepositoryProvider);
+        if (reviewId != null) {
+          await repository.updateReviewStatus(reviewId: reviewId, status: 'IN_REVIEW', note: note);
+        } else {
+          await repository.createReview(scenarioSessionId: widget.scenarioSessionId, note: note);
+        }
       }
-    } catch (e) {
-      setState(() => _error = '${ref.tr('review.shareFailed')}: $e');
+      if (!mounted) return;
+      _toast(ref.tr(widget.isEditNote ? 'callFeedback.editNoteSuccess' : 'callFeedback.sharedForReview'));
+      context.pop();
+    } catch (error) {
+      if (!mounted) return;
+      final serverMessage = error is DioException && error.response?.data is Map
+          ? (error.response!.data as Map)['message']?.toString()
+          : null;
+      _toast(serverMessage ?? ref.tr('callFeedback.issues.editNoteExpired'));
+      if (serverMessage != null) context.pop();
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
+  List<Widget> _detailRows() => [
+    if (widget.contextDateTime != null)
+      ReviewDetailRow(
+        label: ref.t('review.details.dateAndTime'),
+        value: formatReviewDateTime(widget.contextDateTime!),
+      ),
+    if (widget.contextDuration != null)
+      ReviewDetailRow(label: ref.t('review.feedCard.duration'), value: formatReviewDuration(widget.contextDuration)),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final screenTitle = widget.isEditNote
         ? ref.t('review.details.editNote')
-        : ref.t('simulationPage.shareScreenTitle');
-    final buttonLabel = widget.isEditNote
-        ? ref.t('common.save')
-        : ref.t('common.share');
-    final length = _noteController.text.length;
-
+        : ref.t(widget.isScribe ? 'review.details.shareModalHeader' : 'simulationPage.shareScreenTitle');
+    final buttonLabel = widget.isEditNote ? ref.t('common.save') : ref.t('common.share');
     final hasContext =
-        widget.contextTitle != null ||
-        widget.contextDateTime != null ||
-        widget.contextDuration != null;
+        widget.contextTitle != null || widget.contextDateTime != null || widget.contextDuration != null;
     final reviewType = widget.isScribe ? ReviewType.scribe : ReviewType.simulation;
-    final typeLabel = ref.t('review.feedCard.reviewType', {
-      'reviewType': widget.isScribe ? 'Scribe' : 'Simulation',
-    });
+    final typeLabel = ref.t('review.feedCard.reviewType', {'reviewType': widget.isScribe ? 'Scribe' : 'Simulation'});
+    final insets = MediaQuery.paddingOf(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
+    final children = <Widget>[
+      // styles.screenHeader: close icon + IBM Plex Serif Medium headline.tiny.
+      Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Row(
           children: [
-            TabScreenHeader(title: screenTitle),
+            GestureDetector(
+              key: const Key('share-review-close'),
+              onTap: () => context.pop(),
+              child: SvgPicture.asset('assets/icons/close.svg', width: RnSize.of(context).raw(24), height: RnSize.of(context).raw(24)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(screenTitle, style: _titleStyle)),
+          ],
+        ),
+      ),
+      // RN's LineTextInput: a borderless multiline field over a 0.5 rule.
+      Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+        ),
+        child: TextField(
+          controller: _noteController,
+          minLines: 1,
+          maxLines: null,
+          inputFormatters: [LengthLimitingTextInputFormatter(_maxNoteLength)],
+          style: _inputStyle,
+          cursorColor: AppColors.primary,
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: const EdgeInsets.all(12),
+            hintText: ref.t('review.addNotePlaceholder'),
+            hintStyle: _inputStyle.copyWith(color: AppColors.mediumEmphasis),
+          ),
+        ),
+      ),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Text('${_noteController.text.characters.length}/$_maxNoteLength', style: _lengthStyle),
+      ),
+      if (hasContext) ...[
+        if (!widget.isScribe)
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: _detailRows()),
+        SimulationDetailsCard(
+          typeLabel: typeLabel,
+          reviewType: reviewType,
+          title: widget.contextTitle,
+          coverImageUrl: widget.isScribe ? null : widget.contextCoverImageUrl,
+          descriptionText: widget.isScribe ? null : htmlToPlainText(widget.contextDescription),
+          descriptionWidget: widget.isScribe
+              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: _detailRows())
+              : null,
+        ),
+      ],
+      Align(
+        alignment: Alignment.centerLeft,
+        child: GestureDetector(
+          key: const ValueKey('add-emoji-button'),
+          onTap: () => EmojiInsertPicker.show(context, onEmojiSelected: _insertEmoji),
+          child: SvgPicture.asset('assets/icons/addReaction.svg', width: RnSize.of(context).raw(24), height: RnSize.of(context).raw(24)),
+        ),
+      ),
+    ];
+
+    // RN pins the button with `marginTop: 'auto'` inside the scroll
+    // content; here it sits under the scroll view, which looks the same
+    // whenever the content is shorter than the screen.
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Padding(
+        padding: EdgeInsets.only(top: insets.top),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (hasContext) ...[
-                      if (!widget.isScribe) ...[
-                        if (widget.contextDateTime != null)
-                          ReviewDetailRow(
-                            label: ref.t('review.details.dateAndTime'),
-                            value: formatReviewDateTime(widget.contextDateTime!),
-                          ),
-                        if (widget.contextDuration != null)
-                          ReviewDetailRow(
-                            label: ref.t('review.feedCard.duration'),
-                            value: formatReviewDuration(widget.contextDuration),
-                          ),
-                        const SizedBox(height: 8),
-                      ],
-                      SimulationDetailsCard(
-                        typeLabel: typeLabel,
-                        reviewType: reviewType,
-                        title: widget.contextTitle,
-                        coverImageUrl: widget.isScribe ? null : widget.contextCoverImageUrl,
-                        illustrationAsset: widget.isScribe ? 'assets/icons/scribeReview.svg' : null,
-                        descriptionText: widget.isScribe
-                            ? null
-                            : htmlToPlainText(widget.contextDescription),
-                        descriptionWidget: !widget.isScribe
-                            ? null
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (widget.contextDateTime != null)
-                                    ReviewDetailRow(
-                                      label: ref.t('review.details.dateAndTime'),
-                                      value: formatReviewDateTime(widget.contextDateTime!),
-                                    ),
-                                  if (widget.contextDuration != null)
-                                    ReviewDetailRow(
-                                      label: ref.t('review.feedCard.duration'),
-                                      value: formatReviewDuration(widget.contextDuration),
-                                    ),
-                                ],
-                              ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Text(ref.t('review.addNoteCaption')),
-                    const SizedBox(height: 12),
-                    AppTextField(
-                      controller: _noteController,
-                      maxLines: 5,
-                      maxLength: _maxNoteLength,
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          key: const ValueKey('add-emoji-button'),
-                          onPressed: () => EmojiInsertPicker.show(context, onEmojiSelected: _insertEmoji),
-                          icon: SvgPicture.asset(
-                            'assets/icons/smile.svg',
-                            width: 24,
-                            height: 24,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '$length/$_maxNoteLength',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.mediumEmphasis),
-                        ),
-                      ],
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: AppColors.red400),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    AppButton(
-                      label: buttonLabel,
-                      isLoading: _isSubmitting,
-                      onPressed: _submit,
-                    ),
+                    for (final (i, child) in children.indexed) ...[if (i > 0) const SizedBox(height: 16), child],
                   ],
                 ),
               ),
+            ),
+            Padding(
+              padding: EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 32 + insets.bottom),
+              child: AppButton(label: buttonLabel, isLoading: _isSubmitting, onPressed: _submit),
             ),
           ],
         ),
       ),
     );
   }
+
+  static const _titleStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifMedium,
+    fontSize: 18,
+    height: 24 / 18,
+    color: AppColors.highEmphasis,
+  );
+  static const _inputStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 14,
+    height: 22 / 14,
+    letterSpacing: 0.2,
+    color: AppColors.highEmphasis,
+  );
+  static const _lengthStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 10,
+    height: 14 / 10,
+    letterSpacing: 0.3,
+    color: AppColors.lowEmphasis,
+  );
 }

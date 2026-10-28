@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
@@ -46,24 +47,31 @@ void main() {
     await tester.tap(find.text('Connect'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester);
 
-    expect(find.text('A difficult conversation'), findsNothing);
+    // The title is always on the AI tile's name label (RN: name falls back
+    // to the scenario title); the panel adds a second copy.
+    expect(find.text('A difficult conversation'), findsOneWidget);
+    expect(find.text('Self-harm • Grief'), findsNothing);
 
     // The new participant tiles push this button below this test's 600px
     // viewport — scroll it into view (the body is a `SingleChildScrollView`).
-    await tester.ensureVisible(find.text('Details'));
+    await tester.ensureVisible(find.byKey(const ValueKey('scenario-info-toggle')));
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('Details'));
+    await tester.tap(find.byKey(const ValueKey('scenario-info-toggle')));
     await tester.pump();
 
-    expect(find.text('A difficult conversation'), findsOneWidget);
+    expect(find.text('A difficult conversation'), findsNWidgets(2));
     expect(find.text('Self-harm • Grief'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Details'));
+    await tester.ensureVisible(find.byKey(const ValueKey('scenario-info-toggle')));
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('Details'));
+    await tester.tap(find.byKey(const ValueKey('scenario-info-toggle')));
     await tester.pump();
 
-    expect(find.text('A difficult conversation'), findsNothing);
+    // The title is always on the AI tile's name label (RN: name falls back
+    // to the scenario title); the panel adds a second copy.
+    expect(find.text('A difficult conversation'), findsOneWidget);
+    expect(find.text('Self-harm • Grief'), findsNothing);
   });
 }

@@ -12,6 +12,7 @@ import '../config/app_config.dart';
 import '../localization/translate_ref.dart';
 import '../permissions/user_permissions.dart';
 import '../theme/app_colors.dart';
+import '../theme/rn_scale.dart';
 import '../theme/app_fonts.dart';
 import '../widgets/illustrated_modal.dart';
 
@@ -37,7 +38,7 @@ class AppDrawer extends ConsumerWidget {
     final userAsync = ref.watch(currentUserProvider);
     final tenantAsync = ref.watch(tenantInfoProvider);
     final hasCreditsPermission = permissions.contains(UserPermissions.editScenarioSession);
-    final rn = _RnVerticalScale.of(context);
+    final rn = RnSize.of(context);
     final separator = _Separator(rn: rn);
 
     return Drawer(
@@ -243,7 +244,7 @@ class _OrgLogoState extends State<_OrgLogo> {
 class _CreditsSection extends ConsumerWidget {
   const _CreditsSection({required this.rn});
 
-  final _RnVerticalScale rn;
+  final RnSize rn;
 
   static const _small = TextStyle(
     fontFamily: AppFonts.ibmPlexSerifRegular,
@@ -425,7 +426,7 @@ String drawerVersionLabel({
 class _Separator extends StatelessWidget {
   const _Separator({required this.rn});
 
-  final _RnVerticalScale rn;
+  final RnSize rn;
 
   @override
   Widget build(BuildContext context) {
@@ -435,26 +436,6 @@ class _Separator extends StatelessWidget {
       color: AppColors.strokePrimary,
     );
   }
-}
-
-/// react-native-size-matters' `verticalScale`/`moderateVerticalScale` in
-/// this app's units — RN sizes this drawer's vertical spacing with `@vs`/
-/// `@mvs`, which follow screen height (680pt guideline), not the width-based
-/// `ms()` that [RnScale] applies globally.
-class _RnVerticalScale {
-  _RnVerticalScale({required this.logicalHeight, required this.factor});
-
-  factory _RnVerticalScale.of(BuildContext context) => _RnVerticalScale(
-        logicalHeight: MediaQuery.sizeOf(context).height,
-        // RnScale multiplies devicePixelRatio by its factor; 1 without it.
-        factor: MediaQuery.devicePixelRatioOf(context) / View.of(context).devicePixelRatio,
-      );
-
-  final double logicalHeight;
-  final double factor;
-
-  double vs(double size) => size * logicalHeight / 680;
-  double mvs(double size) => 0.5 * size / factor + 0.5 * vs(size);
 }
 
 /// Port of RN's shared `UserProfileImage`: a circle with a 1pt lightGray17

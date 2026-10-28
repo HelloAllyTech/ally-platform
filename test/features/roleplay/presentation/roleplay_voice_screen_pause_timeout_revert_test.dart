@@ -49,6 +49,7 @@ void main() {
       await tester.tap(find.text('Connect'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester);
 
       await tester.ensureVisible(find.byKey(const ValueKey('pause-resume-button')));
       await tester.pump(const Duration(milliseconds: 500));

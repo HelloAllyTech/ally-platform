@@ -25,6 +25,7 @@ import 'discussion/discussion_thread.dart';
 import 'game/game_player.dart';
 import 'journal/journal_player.dart';
 import 'quiz/quiz_player.dart';
+import 'roleplay/roleplay_case_player.dart';
 import 'video/video_item_player.dart';
 
 /// Full port of ally-mobile (React Native)'s `CourseItemPlayerScreen`
@@ -34,8 +35,11 @@ import 'video/video_item_player.dart';
 /// interjections, the complete 8-question-type quiz engine, debounced
 /// journal autosave, the same HTML5 game bundles the RN and web apps embed,
 /// a locally-walked branching-scenario story graph, and a tap-to-place
-/// bucket-sort game. ROLEPLAY/CASE route elsewhere via the existing
-/// Simulations/Cases screens, same as the RN app.
+/// bucket-sort game. ROLEPLAY/CASE show RN's `RoleplayCasePlayer`, which
+/// launches the live role play (linked by `trackItemProgressId`) or opens
+/// the case screen; when this screen is back on top afterwards it refetches
+/// the track so the item's out-of-band completion shows (RN's
+/// `useFocusEffect` + `getActiveTrackContext`).
 ///
 /// In-player Prev/Next navigation and the per-section progress rail (RN's
 /// `useTrackPlayerNavigation` + `PlayerTopBar`/`SegmentedProgressRail`/
@@ -113,6 +117,25 @@ class _CourseItemPlayerScreenState
   /// server's own `TrackItemStatus.completed` wherever "is this item done"
   /// is asked, same as RN's `justCompletedItemIds` set.
   final Set<String> _justCompleted = {};
+
+  /// Set when a roleplay/case was launched from here — RN's stashed
+  /// `ActiveTrackContext`. Consumed on the next return to the top.
+  bool _refetchTrackOnReturn = false;
+  bool _wasCurrent = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    if (isCurrent && !_wasCurrent && _refetchTrackOnReturn) {
+      _refetchTrackOnReturn = false;
+      // Not during build: invalidating notifies the provider scope.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.invalidate(trackDetailProvider(widget.trackId));
+      });
+    }
+    _wasCurrent = isCurrent;
+  }
 
   @override
   void initState() {
@@ -362,6 +385,20 @@ class _CourseItemPlayerScreenState
           itemId: _currentItemId,
           onCompleted: _handleCompletion,
           onRequestNext: _goNextOrOverview,
+        );
+      case 'ROLEPLAY':
+      case 'CASE':
+        final detail = ref.watch(trackDetailProvider(widget.trackId)).value;
+        final current = detail == null
+            ? null
+            : _flattenTrackItems(detail).where((f) => f.item.id == _currentItemId).firstOrNull?.item;
+        final item = current ?? widget.item;
+        return RoleplayCasePlayer(
+          key: key,
+          payload: payload,
+          item: item,
+          alreadyCompleted: _isItemCompleted(item),
+          onLaunched: () => _refetchTrackOnReturn = true,
         );
       default:
         return Center(child: Text(ref.t('courses.player.unsupportedTitle')));

@@ -63,4 +63,29 @@ void main() {
     // The painted rect, not the layout rect, is what the screen shows.
     expect(tester.getRect(find.text('c')).top, closeTo(200 * rnScaleFactor(402), 0.5));
   });
+
+  testWidgets('RnSize renders @s/@vs/@mvs and raw values at RN\'s physical size', (tester) async {
+    tester.view.physicalSize = const Size(402, 874);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    late RnSize rn;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => RnScale(child: child!),
+        home: Builder(builder: (context) {
+          rn = RnSize.of(context);
+          return const SizedBox.shrink();
+        }),
+      ),
+    );
+
+    // What the screen shows is the logical value times RnScale's factor;
+    // that must equal react-native-size-matters' own result for 402x874.
+    final f = rnScaleFactor(402);
+    expect(rn.s(10) * f, closeTo(10 * 402 / 350, 1e-6));
+    expect(rn.vs(10) * f, closeTo(10 * 874 / 680, 1e-6));
+    expect(rn.mvs(10) * f, closeTo(10 + (10 * 874 / 680 - 10) * 0.5, 1e-6));
+    expect(rn.raw(16) * f, closeTo(16, 1e-6));
+  });
 }

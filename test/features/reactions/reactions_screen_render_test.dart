@@ -9,7 +9,7 @@ import '../../support/pump_app.dart';
 class MockReactionsRepository extends Mock implements ReactionsRepository {}
 
 // One test per file, same as the review-feature widget tests in this
-// directory — see `_review_details_test_fixtures.dart` for why.
+// directory — see `test/support/pump_app.dart` for why.
 void main() {
   testWidgets(
     'renders the who-reacted list with avatars, filter tabs, and re-fetches filtered when a tab is tapped',

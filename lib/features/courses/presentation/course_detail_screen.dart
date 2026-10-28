@@ -17,11 +17,9 @@ import 'course_language_sheet.dart';
 /// Port of ally-mobile (React Native)'s `CourseOverviewScreen` (header,
 /// language row, LearningPathListHeader, CourseSectionBlock/CourseItemRow).
 /// Track detail — sections + items, with entry into each item. ARTICLE,
-/// VIDEO, QUIZ, JOURNAL, GAME, BRANCHING_SCENARIO, and BUCKET_SORT items
-/// open the real ported player;
-/// ROLEPLAY/CASE route through the existing Simulations/Cases screens
-/// instead (not wired from here yet), shown as not-yet-available rather
-/// than a broken tap.
+/// VIDEO, QUIZ, JOURNAL, GAME, BRANCHING_SCENARIO, BUCKET_SORT, ROLEPLAY and
+/// CASE items open the real ported player (ROLEPLAY/CASE via RN's
+/// `RoleplayCasePlayer`).
 class CourseDetailScreen extends ConsumerStatefulWidget {
   const CourseDetailScreen({super.key, required this.trackId});
 

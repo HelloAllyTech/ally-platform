@@ -435,7 +435,7 @@ void main() {
   ) async {
     when(() => repository.startTrackItem('item1')).thenAnswer(
       (_) async =>
-          StartItemPayload(trackItemProgressId: 'p1', type: 'ROLEPLAY'),
+          StartItemPayload(trackItemProgressId: 'p1', type: 'SOMETHING_NEW'),
     );
 
     await pump(tester);

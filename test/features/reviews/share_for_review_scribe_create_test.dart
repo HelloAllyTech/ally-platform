@@ -11,7 +11,7 @@ import 'package:ally_mobile_flutter/features/reviews/presentation/share_for_revi
 class MockScribeReviewsRepository extends Mock implements ScribeReviewsRepository {}
 
 // One test per file, same discipline as `share_for_review_success_test.dart`
-// (see `_review_details_test_fixtures.dart`). Regression test for a real
+// (see `test/support/pump_app.dart`). Regression test for a real
 // bug found while porting CallSummaryScreen's header: this screen used to
 // always call the SIMULATION review endpoints even with `isScribe: true`.
 void main() {

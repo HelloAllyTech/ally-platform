@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
@@ -53,7 +54,7 @@ void main() {
 
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('1'), findsNothing, reason: 'countdown overlay gone once it reaches 0');
-    expect(find.text('Connected to room'), findsOneWidget);
+    expect(find.byKey(const ValueKey('participant-tile-remote')), findsOneWidget);
     expect(find.textContaining('Session Duration:'), findsOneWidget);
 
     // The session timer (a live Timer.periodic) is now running — bounded

@@ -9,7 +9,7 @@ import '../../support/pump_app.dart';
 
 class MockReviewsRepository extends Mock implements ReviewsRepository {}
 
-// One test per file — see `_review_details_test_fixtures.dart` for why.
+// One test per file — see `test/support/pump_app.dart` for why.
 void main() {
   testWidgets('shows an error message and re-enables the button when createReview fails',
       (tester) async {
@@ -28,7 +28,8 @@ void main() {
     await tester.tap(find.text('Share'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Failed to share for review'), findsOneWidget);
+    // RN toasts the server message, else the edit-window copy.
+    expect(find.textContaining('Editing time has expired'), findsOneWidget);
     // The button is interactable again (not stuck in its submitting state).
     final button = tester.widget<AppButton>(find.byType(AppButton));
     expect(button.isLoading, isFalse);

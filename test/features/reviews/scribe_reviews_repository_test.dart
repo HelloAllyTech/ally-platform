@@ -23,7 +23,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/scribe-session-reviews',
-          queryParameters: {'sortBy': 'LATEST', 'limit': 25, 'offset': 0},
+          queryParameters: {'sortBy': 'LATEST', 'limit': 10, 'offset': 0},
         ),
       ).thenAnswer(
         (_) async => _response({
@@ -41,9 +41,9 @@ void main() {
 
       final reviews = await repository.getScribeReviews();
 
-      expect(reviews, hasLength(1));
-      expect(reviews.first.id, 'rev-1');
-      expect(reviews.first.createdBy.name, 'Alex');
+      expect(reviews.items, hasLength(1));
+      expect(reviews.items.first.id, 'rev-1');
+      expect(reviews.items.first.createdBy.name, 'Alex');
     });
 
     test('forwards the readFilter query parameter and a non-default sortBy when provided', () async {
@@ -52,7 +52,7 @@ void main() {
           '/scribe-session-reviews',
           queryParameters: {
             'sortBy': 'MOST_VIEWED',
-            'limit': 25,
+            'limit': 10,
             'offset': 0,
             'readFilter': 'UNREAD',
           },
@@ -66,7 +66,7 @@ void main() {
           '/scribe-session-reviews',
           queryParameters: {
             'sortBy': 'MOST_VIEWED',
-            'limit': 25,
+            'limit': 10,
             'offset': 0,
             'readFilter': 'UNREAD',
           },
@@ -84,7 +84,7 @@ void main() {
 
       final reviews = await repository.getScribeReviews();
 
-      expect(reviews, isEmpty);
+      expect(reviews.items, isEmpty);
     });
   });
 
@@ -117,52 +117,6 @@ void main() {
     });
   });
 
-  group('getGeneralComments', () {
-    test('fetches and parses the flat comment list from the comments endpoint', () async {
-      when(() => dio.get<Map<String, dynamic>>('/scribe-session-reviews/rev-1/comments'))
-          .thenAnswer(
-        (_) async => _response({
-          'data': [
-            {'id': 'c-1', 'content': 'hello', 'createdBy': {'name': 'A'}},
-          ],
-        }),
-      );
-
-      final result = await repository.getGeneralComments('rev-1');
-
-      expect(result, hasLength(1));
-      expect(result.first.content, 'hello');
-    });
-
-    test('returns an empty list when data is absent', () async {
-      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer((_) async => _response({}));
-
-      final result = await repository.getGeneralComments('rev-1');
-
-      expect(result, isEmpty);
-    });
-  });
-
-  group('addGeneralComment', () {
-    test('posts the content body (no threadId) to the comments endpoint', () async {
-      when(
-        () => dio.post<void>(
-          '/scribe-session-reviews/rev-1/comments',
-          data: {'content': 'nice job'},
-        ),
-      ).thenAnswer((_) async => _response<void>(null));
-
-      await repository.addGeneralComment(reviewId: 'rev-1', content: 'nice job');
-
-      verify(
-        () => dio.post<void>(
-          '/scribe-session-reviews/rev-1/comments',
-          data: {'content': 'nice job'},
-        ),
-      ).called(1);
-    });
-  });
-
   group('getThreads', () {
     test('always sends includeMessage: true along with offset/limit', () async {
       when(
@@ -189,49 +143,6 @@ void main() {
 
       expect(result.threads, hasLength(1));
       expect(result.count, 1);
-    });
-  });
-
-  group('getCommentReplies', () {
-    test('fetches paginated replies for a comment', () async {
-      when(
-        () => dio.get<Map<String, dynamic>>(
-          '/scribe-session-reviews/comments/c-1/replies',
-          queryParameters: {'offset': 0, 'limit': 20},
-        ),
-      ).thenAnswer(
-        (_) async => _response({
-          'data': [
-            {'id': 'r-1', 'content': 'reply', 'createdBy': {'name': 'B'}, 'reactions': <String, dynamic>{}},
-          ],
-          'count': 3,
-        }),
-      );
-
-      final result = await repository.getCommentReplies('c-1');
-
-      expect(result.replies, hasLength(1));
-      expect(result.count, 3);
-    });
-  });
-
-  group('addThreadReply', () {
-    test('posts threadId and content to the comments endpoint', () async {
-      when(
-        () => dio.post<void>(
-          '/scribe-session-reviews/rev-1/comments',
-          data: {'threadId': 'th-1', 'content': 'me too'},
-        ),
-      ).thenAnswer((_) async => _response<void>(null));
-
-      await repository.addThreadReply(reviewId: 'rev-1', threadId: 'th-1', content: 'me too');
-
-      verify(
-        () => dio.post<void>(
-          '/scribe-session-reviews/rev-1/comments',
-          data: {'threadId': 'th-1', 'content': 'me too'},
-        ),
-      ).called(1);
     });
   });
 

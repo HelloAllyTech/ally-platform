@@ -46,7 +46,7 @@ void main() {
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'LATEST',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
             },
           )).thenAnswer(
@@ -57,13 +57,13 @@ void main() {
 
       final result = await repository.getReviews();
 
-      expect(result, hasLength(1));
-      expect(result.first.id, 'rev-1');
+      expect(result.items, hasLength(1));
+      expect(result.items.first.id, 'rev-1');
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'LATEST',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
             },
           )).called(1);
@@ -74,7 +74,7 @@ void main() {
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'MOST_COMMENTED',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
               'readFilter': 'UNREAD',
             },
@@ -82,12 +82,12 @@ void main() {
 
       final result = await repository.getReviews(readFilter: 'UNREAD', sortBy: 'MOST_COMMENTED');
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews',
             queryParameters: {
               'sortBy': 'MOST_COMMENTED',
-              'limit': 25,
+              'limit': 10,
               'offset': 0,
               'readFilter': 'UNREAD',
             },
@@ -102,7 +102,7 @@ void main() {
 
       final result = await repository.getReviews();
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
     });
   });
 
@@ -192,49 +192,6 @@ void main() {
     });
   });
 
-  group('getGeneralComments', () {
-    test('fetches and parses the flat comment list', () async {
-      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/rev-1/comments'))
-          .thenAnswer(
-        (_) async => _response({
-          'data': [
-            {'id': 'c-1', 'content': 'hello', 'createdBy': {'name': 'A'}},
-          ],
-        }),
-      );
-
-      final result = await repository.getGeneralComments('rev-1');
-
-      expect(result, hasLength(1));
-      expect(result.first.content, 'hello');
-    });
-
-    test('returns an empty list when data is absent', () async {
-      when(() => dio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => _response(<String, dynamic>{}));
-
-      final result = await repository.getGeneralComments('rev-1');
-
-      expect(result, isEmpty);
-    });
-  });
-
-  group('addGeneralComment', () {
-    test('posts the content body (no threadId) to the comments endpoint', () async {
-      when(() => dio.post<void>(
-            '/scenario-session-reviews/rev-1/comments',
-            data: {'content': 'nice job'},
-          )).thenAnswer((_) async => _response<void>(null));
-
-      await repository.addGeneralComment(reviewId: 'rev-1', content: 'nice job');
-
-      verify(() => dio.post<void>(
-            '/scenario-session-reviews/rev-1/comments',
-            data: {'content': 'nice job'},
-          )).called(1);
-    });
-  });
-
   group('getThreads', () {
     test('always sends includeMessage: true along with offset/limit', () async {
       when(() => dio.get<Map<String, dynamic>>(
@@ -276,58 +233,6 @@ void main() {
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews/rev-1/threads',
             queryParameters: {'offset': 40, 'limit': 10, 'includeMessage': true},
-          )).called(1);
-    });
-  });
-
-  group('getCommentReplies', () {
-    test('fetches paginated replies for a comment', () async {
-      when(() => dio.get<Map<String, dynamic>>(
-            '/scenario-session-reviews/comments/c-1/replies',
-            queryParameters: {'offset': 0, 'limit': 20},
-          )).thenAnswer(
-        (_) async => _response({
-          'data': [
-            {'id': 'r-1', 'content': 'reply', 'createdBy': {'name': 'B'}, 'reactions': <String, dynamic>{}},
-          ],
-          'count': 3,
-        }),
-      );
-
-      final result = await repository.getCommentReplies('c-1');
-
-      expect(result.replies, hasLength(1));
-      expect(result.replies.first.content, 'reply');
-      expect(result.count, 3);
-    });
-
-    test('forwards custom offset/limit', () async {
-      when(() => dio.get<Map<String, dynamic>>(
-            '/scenario-session-reviews/comments/c-1/replies',
-            queryParameters: {'offset': 10, 'limit': 50},
-          )).thenAnswer((_) async => _response({'data': <dynamic>[], 'count': 0}));
-
-      await repository.getCommentReplies('c-1', offset: 10, limit: 50);
-
-      verify(() => dio.get<Map<String, dynamic>>(
-            '/scenario-session-reviews/comments/c-1/replies',
-            queryParameters: {'offset': 10, 'limit': 50},
-          )).called(1);
-    });
-  });
-
-  group('addThreadReply', () {
-    test('posts threadId and content to the comments endpoint', () async {
-      when(() => dio.post<void>(
-            '/scenario-session-reviews/rev-1/comments',
-            data: {'threadId': 'th-1', 'content': 'me too'},
-          )).thenAnswer((_) async => _response<void>(null));
-
-      await repository.addThreadReply(reviewId: 'rev-1', threadId: 'th-1', content: 'me too');
-
-      verify(() => dio.post<void>(
-            '/scenario-session-reviews/rev-1/comments',
-            data: {'threadId': 'th-1', 'content': 'me too'},
           )).called(1);
     });
   });

@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/cover_video_preview.dart';
 import '../../../core/widgets/html_rich_text.dart';
 import '../../../core/widgets/back_title_header.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
+import 'start_simulation/start_simulation_controller.dart';
 import 'widgets/scenario_language_dropdown.dart';
 
 /// Shared-link base for a scenario — RN's `env.ALLY_WEB_URL` (no equivalent
@@ -20,18 +21,12 @@ import 'widgets/scenario_language_dropdown.dart';
 const _allyWebUrl = 'https://app.helloally.ai/';
 
 /// Port of ally-mobile (React Native)'s `SimulationDetailsScreen` — scenario
-/// detail + "start simulation", which calls the real
-/// `scenario-session-start` endpoint and hands the resulting LiveKit
-/// url/token to RoleplayVoiceScreen (Phase 1), closing the real
-/// scenario → live session → feedback loop end to end.
-///
-/// Not ported: the "ready to begin?" NotificationModal RN shows before
-/// starting, the video cover preview (RN's `VideoPreview`, shown instead
-/// of the image when `coverVideoUrl` is set — no video-preview widget
-/// exists yet, only the full course-item video player), the low-credits
-/// illustrated modal, the active-simulation-conflict modal, and the
-/// 429-rate-limit retry modal — same scope line `LearningPathDetailView`
-/// already draws for the equivalent path/case flows.
+/// detail + "start simulation": the "Before you get started" confirmation,
+/// then the real `scenario-session-start` call via
+/// [StartSimulationController] (`useStartSimulation`), which opens
+/// RoleplayVoiceScreen or shows the 429-retry / active-simulation modals.
+/// The low-credits modal shows for 5 s when credits are low, and the cover
+/// is RN's `VideoPreview` when the scenario has a `coverVideoUrl`.
 class SimulationDetailsScreen extends ConsumerStatefulWidget {
   const SimulationDetailsScreen({
     super.key,
@@ -54,8 +49,8 @@ class SimulationDetailsScreen extends ConsumerStatefulWidget {
 
 class _SimulationDetailsScreenState
     extends ConsumerState<SimulationDetailsScreen> {
-  bool _isStarting = false;
-  String? _error;
+  late final StartSimulationController _start = StartSimulationController(ref)
+    ..addListener(_onStartChanged);
   ScenarioLanguageOption? _selectedLanguage;
   bool _languageInitialized = false;
 
@@ -77,36 +72,32 @@ class _SimulationDetailsScreenState
     );
   }
 
+  void _onStartChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _start
+      ..removeListener(_onStartChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  bool get _isStarting => _start.isCreatingRoom;
+
+  /// RN's `startSimulationPress` → NotificationModal → `handleConfirmSimulation`.
   Future<void> _startSimulation(Scenario scenario) async {
-    setState(() {
-      _isStarting = true;
-      _error = null;
-    });
-    try {
-      final session = await ref
-          .read(simulationsRepositoryProvider)
-          .startScenarioSession(
-            scenarioId: widget.scenarioId,
-            languageId: scenario.availableLanguages.isNotEmpty
-                ? _selectedLanguage?.languageId
-                : null,
-          );
-      if (mounted) {
-        context.push(
-          '/roleplay',
-          extra: {
-            'liveKitServerUrl': session.liveKitServerUrl,
-            'accessToken': session.accessToken,
-            'scenarioSessionId': session.id,
-            'scenario': scenario,
-          },
-        );
-      }
-    } catch (e) {
-      setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
-    } finally {
-      if (mounted) setState(() => _isStarting = false);
-    }
+    await _start.confirmAndStart(
+      context,
+      StartSimulationParams(
+        scenarioId: widget.scenarioId,
+        languageId: scenario.availableLanguages.isNotEmpty
+            ? _selectedLanguage?.languageId
+            : null,
+        scenario: scenario,
+      ),
+    );
   }
 
   @override
@@ -119,28 +110,34 @@ class _SimulationDetailsScreenState
     return Scaffold(
       // RN's `safe` style: white, not the app's off-white background.
       backgroundColor: Colors.white,
-      body: Column(
+      body: Stack(
         children: [
-          // RN's own renderHeader(): back arrow, then "Start" plain +
-          // "Role play" italic.
-          BackTitleHeader(
-            title: ref.t('common.start'),
-            italicTitle: ref.t('common.simulation'),
-          ),
-          Expanded(
-            child: scenarioAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(
-                child: Text(
-                  '${ref.t('learn.details.loadingDetailsError')}: $error',
+          Column(
+            children: [
+              // RN's own renderHeader(): back arrow, then "Start" plain +
+              // "Role play" italic.
+              BackTitleHeader(
+                title: ref.t('common.start'),
+                italicTitle: ref.t('common.simulation'),
+              ),
+              Expanded(
+                child: scenarioAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => Center(
+                    child: Text(
+                      '${ref.t('learn.details.loadingDetailsError')}: $error',
+                    ),
+                  ),
+                  data: (scenario) {
+                    _ensureLanguageInitialized(scenario);
+                    return _buildBody(context, scenario);
+                  },
                 ),
               ),
-              data: (scenario) {
-                _ensureLanguageInitialized(scenario);
-                return _buildBody(context, scenario);
-              },
-            ),
+            ],
           ),
+          if (_isStarting) const _CreatingRoomOverlay(),
         ],
       ),
     );
@@ -148,7 +145,10 @@ class _SimulationDetailsScreenState
 
   Widget _buildBody(BuildContext context, Scenario scenario) {
     final imageUrl = scenario.coverImageUrl;
+    final videoUrl = scenario.coverVideoUrl;
     final credits = ref.watch(simulationCreditsProvider).value;
+    // RN's lowCreditsDescription style (14) on this screen.
+    _start.onCredits(context, credits, largeDescription: true);
     // RN's isStartSimulationDisabled: credits loaded and running low.
     final isStartDisabled = credits?.isLow ?? false;
 
@@ -174,11 +174,17 @@ class _SimulationDetailsScreenState
                   ),
                 ),
               ),
-            // styles.imageContainer (marginBottom 12) — empty when the
-            // scenario has no cover. The video cover isn't ported yet.
+            // styles.imageContainer (marginBottom 12): the VideoPreview when
+            // there's a cover video, else the image, else empty.
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: imageUrl == null || imageUrl.isEmpty
+              child: videoUrl != null && videoUrl.isNotEmpty
+                  ? CoverVideoPreview(
+                      key: const Key('scenario-video-preview'),
+                      url: videoUrl,
+                      thumbnailUrl: imageUrl,
+                    )
+                  : imageUrl == null || imageUrl.isEmpty
                   ? const SizedBox.shrink()
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(8),
@@ -285,10 +291,6 @@ class _SimulationDetailsScreenState
                 ),
               ),
             ],
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(_error!, style: const TextStyle(color: AppColors.red400)),
-            ],
           ],
         ),
         // styles.ctaWrapper: absolute, 24 from the sides, 40 from the bottom.
@@ -306,6 +308,39 @@ class _SimulationDetailsScreenState
           ),
         ),
       ],
+    );
+  }
+}
+
+/// RN's renderLoadingOverlay: the whole screen dimmed 50% with a large
+/// white spinner and "Creating room..." (IBM_PLEX_SERIF.REGULAR 14, white).
+class _CreatingRoomOverlay extends ConsumerWidget {
+  const _CreatingRoomOverlay();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Positioned.fill(
+      child: ColoredBox(
+        key: const Key('simulation-details-creating-room'),
+        color: AppColors.blackTransparent50,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                ref.t('simulationPage.creatingRoom'),
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

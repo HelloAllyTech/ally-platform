@@ -32,7 +32,7 @@ void main() {
     // leaves Riverpod's `FutureProvider` wedged in an intermediate
     // `AsyncLoading(error: ..., stackTrace: ...)` state that no amount of
     // `pump()`/`pumpAndSettle()` ever flushes to a proper `AsyncError`.
-    when(() => repository.getReviews()).thenAnswer((_) async => throw Exception('network down'));
+    when(() => repository.getReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset'))).thenAnswer((_) async => throw Exception('network down'));
 
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(

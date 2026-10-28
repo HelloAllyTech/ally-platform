@@ -28,8 +28,8 @@ class MockReviewsRepository extends Mock implements ReviewsRepository {}
 void main() {
   testWidgets('shows a loading indicator while reviews are fetching', (tester) async {
     final repository = MockReviewsRepository();
-    final completer = Completer<List<ReviewItem>>();
-    when(() => repository.getReviews()).thenAnswer((_) => completer.future);
+    final completer = Completer<ReviewsPage>();
+    when(() => repository.getReviews(readFilter: any(named: 'readFilter'), sortBy: any(named: 'sortBy'), limit: any(named: 'limit'), offset: any(named: 'offset'))).thenAnswer((_) => completer.future);
 
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
@@ -50,6 +50,6 @@ void main() {
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    completer.complete(<ReviewItem>[]);
+    completer.complete((items: <ReviewItem>[], count: 0));
   });
 }

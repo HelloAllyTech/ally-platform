@@ -1,6 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show FutureProviderFamily;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
@@ -8,25 +10,21 @@ import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
-import '../../../core/widgets/app_tab_view.dart';
-import '../../../core/widgets/custom_dropdown.dart';
+import '../../../core/theme/rn_scale.dart';
+import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
 import 'review_card.dart';
+import 'review_styles.dart';
 
-/// Port of ally-mobile (React Native)'s `ReviewScreen` — one screen, not
-/// two tabs/routes. The Scribe/Simulation switcher only renders when the
-/// signed-in user holds *both* `VIEW_SIMULATION_REVIEWS` and
-/// `VIEW_SCRIBE_REVIEWS`; with only one, that permission's list renders
-/// directly with no switcher — same `showTypeTabs`/`reviewTypeTabs` logic
-/// as the real screen. Confirmed from source this switcher is a genuinely
-/// different widget from the generic pill `AppTabView` used elsewhere
-/// (CallLogScreen, the read-filter row below): `react-native-tab-view`'s
-/// `TabBar`, an underline indicator over plain text, not a pill — see
-/// [_UnderlineTabRow].
+/// Port of ally-mobile (React Native)'s `ReviewScreen`: the tab header,
+/// then — when the user holds both `VIEW_SIMULATION_REVIEWS` and
+/// `VIEW_SCRIBE_REVIEWS` — a Scribe/Simulation `react-native-tab-view`
+/// `TabBar` (Scribe first, `REVIEW_TYPE_TABS`); with only one, that list
+/// renders directly. Each list is RN's `ReviewList`.
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key});
 
@@ -34,10 +32,8 @@ class ReviewScreen extends ConsumerStatefulWidget {
   ConsumerState<ReviewScreen> createState() => _ReviewScreenState();
 }
 
-enum _ReviewTab { scribe, simulation }
-
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
-  _ReviewTab? _activeTab;
+  ReviewType? _activeTab;
 
   @override
   Widget build(BuildContext context) {
@@ -45,101 +41,67 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
     return permissionsAsync.when(
       loading: () => const Scaffold(
-        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+        backgroundColor: Colors.white,
+        body: SafeArea(child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
       ),
-      error: (error, _) => Scaffold(
-        body: SafeArea(child: Center(child: Text('$error'))),
-      ),
-      data: (permissions) => _buildScreen(permissions),
+      error: (error, _) => Scaffold(body: SafeArea(child: Center(child: Text('$error')))),
+      data: _buildScreen,
     );
   }
 
   Widget _buildScreen(List<String> permissions) {
-    final hasSimulation = permissions.contains(
-      UserPermissions.viewSimulationReviews,
-    );
+    final hasSimulation = permissions.contains(UserPermissions.viewSimulationReviews);
     final hasScribe = permissions.contains(UserPermissions.viewScribeReviews);
-    final canViewSimulationDetail = permissions.contains(
-      UserPermissions.viewSimulationReview,
-    );
-    final canViewScribeDetail = permissions.contains(
-      UserPermissions.viewScribeReview,
-    );
+    final tabs = [if (hasScribe) ReviewType.scribe, if (hasSimulation) ReviewType.simulation];
+    final active = tabs.contains(_activeTab) ? _activeTab! : (tabs.isEmpty ? ReviewType.simulation : tabs.first);
 
-    // Scribe listed first, matching the real REVIEW_TYPE_TABS order.
-    if (hasScribe && hasSimulation) {
-      _activeTab ??= _ReviewTab.scribe;
-    } else if (hasScribe) {
-      _activeTab = _ReviewTab.scribe;
-    } else if (hasSimulation) {
-      _activeTab = _ReviewTab.simulation;
-    } else {
-      _activeTab = null;
-    }
-
-    final showTabs = hasScribe && hasSimulation;
+    Widget list(ReviewType type) => _ReviewList(
+      key: ValueKey(type),
+      reviewType: type,
+      canViewReview: permissions.contains(
+        type == ReviewType.scribe ? UserPermissions.viewScribeReview : UserPermissions.viewSimulationReview,
+      ),
+    );
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceContainerLow,
+      backgroundColor: Colors.white,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            Container(
-              color: Colors.white,
-              child: Column(
-                children: [
-                  TabScreenHeader(title: ref.t('review.title')),
-                  if (showTabs)
-                    _UnderlineTabRow<_ReviewTab>(
-                      tabs: [
-                        AppTabViewItem(
-                          key: _ReviewTab.scribe,
-                          label: ref.t('review.tabs.scribe'),
-                        ),
-                        AppTabViewItem(
-                          key: _ReviewTab.simulation,
-                          label: ref.t('review.tabs.simulation'),
-                        ),
-                      ],
-                      activeTab: _activeTab!,
-                      onTabChange: (tab) => setState(() => _activeTab = tab),
-                    ),
-                ],
-              ),
-            ),
+            TabScreenHeader(title: ref.t('review.title')),
             Expanded(
-              child: _activeTab == null
-                  ? Center(child: Text(ref.t('review.empty.title')))
-                  : _activeTab == _ReviewTab.simulation
-                  ? _ReviewList(
-                      key: const ValueKey('simulation'),
-                      familyProvider: reviewsListProvider,
-                      reviewType: ReviewType.simulation,
-                      canViewDetails: canViewSimulationDetail,
-                      onReviewTapped: (review) async {
-                        await ref
-                            .read(reviewsRepositoryProvider)
-                            .markAsRead(review.id);
-                        if (mounted) context.push('/reviews/${review.id}');
-                      },
-                    )
-                  : _ReviewList(
-                      key: const ValueKey('scribe'),
-                      familyProvider: scribeReviewsListProvider,
-                      reviewType: ReviewType.scribe,
-                      canViewDetails: canViewScribeDetail,
-                      onReviewTapped: (review) async {
-                        await ref
-                            .read(scribeReviewsRepositoryProvider)
-                            .markAsRead(review.id);
-                        if (mounted) {
-                          context.push(
-                            '/reviews/${review.id}',
-                            extra: ReviewType.scribe,
-                          );
-                        }
-                      },
+              child: ColoredBox(
+                color: AppColors.lightGray9,
+                child: Column(
+                  children: [
+                    if (tabs.length > 1)
+                      _ReviewTypeTabBar(
+                        tabs: [for (final tab in tabs) (key: tab, label: ref.t('review.tabs.${tab.name}'))],
+                        active: active,
+                        onChange: (tab) => setState(() => _activeTab = tab),
+                      ),
+                    Expanded(
+                      child: tabs.isEmpty
+                          // Neither list permission: RN would still mount a
+                          // ReviewList; showing its empty state avoids a
+                          // request the backend would refuse.
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 26),
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: AppEmptyState(
+                                  iconAsset: 'assets/icons/emptyReviews.svg',
+                                  title: ref.t('review.empty.title'),
+                                  description: ref.t('review.empty.description'),
+                                ),
+                              ),
+                            )
+                          : list(active),
                     ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -148,122 +110,187 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   }
 }
 
-/// Port of ally-mobile (React Native)'s `react-native-tab-view` `TabBar` as
-/// configured on `ReviewScreen` — plain text (medium weight + primary color
-/// when active, regular + low-emphasis otherwise) over a 2px bottom
-/// indicator, equal-width tabs. Distinct from the pill-style [AppTabView].
-class _UnderlineTabRow<T> extends StatelessWidget {
-  const _UnderlineTabRow({required this.tabs, required this.activeTab, required this.onTabChange});
+/// RN's `react-native-tab-view` `TabBar` as `ReviewScreen` styles it: white,
+/// padding 4, equal-width tabs (padding 10, min height 48) with IBM Plex
+/// Serif Medium body.small labels (primary when active, low emphasis
+/// otherwise), a 2pt primary indicator, and the library's hairline shadow.
+class _ReviewTypeTabBar extends StatelessWidget {
+  const _ReviewTypeTabBar({required this.tabs, required this.active, required this.onChange});
 
-  final List<AppTabViewItem<T>> tabs;
-  final T activeTab;
-  final ValueChanged<T> onTabChange;
+  final List<({ReviewType key, String label})> tabs;
+  final ReviewType active;
+  final ValueChanged<ReviewType> onChange;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            for (final tab in tabs)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => onTabChange(tab.key),
-                  behavior: HitTestBehavior.opaque,
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Color(0x1A000000), offset: Offset(0, 0.5), blurRadius: 0.5)],
+      ),
+      child: Row(
+        children: [
+          for (final tab in tabs)
+            Expanded(
+              child: GestureDetector(
+                key: ValueKey('review-type-tab-${tab.key.name}'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChange(tab.key),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  padding: const EdgeInsets.all(10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: tab.key == active ? AppColors.primary : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.all(4),
                     child: Text(
                       tab.label,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: AppFonts.ibmPlexSerifMedium,
-                        color: tab.key == activeTab ? AppColors.primary : AppColors.lowEmphasis,
+                      style: ReviewText.style(
+                        RnType.bodySmall,
+                        AppFonts.ibmPlexSerifMedium,
+                        tab.key == active ? AppColors.primary : AppColors.lowEmphasis,
+                        weight: FontWeight.w400,
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
-        ),
-        Row(
-          children: [
-            for (final tab in tabs)
-              Expanded(
-                child: Container(
-                  height: 2,
-                  color: tab.key == activeTab ? AppColors.primary : Colors.transparent,
-                ),
-              ),
-          ],
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 }
 
+/// Port of RN's `ReviewScreen/components/ReviewList.tsx` + `useReviews`:
+/// the All/Read/Unread pill tabs and the sort dropdown, then an infinite
+/// list (10 per page) of [ReviewCard]s with pull-to-refresh, the
+/// `EmptyState` illustration when empty, and a footer spinner while more
+/// remain. Opening a review is gated on [canViewReview]; marking it read
+/// happens on the details screen (RN marks it after 10s there, not on tap).
 class _ReviewList extends ConsumerStatefulWidget {
-  const _ReviewList({
-    super.key,
-    required this.familyProvider,
-    required this.reviewType,
-    required this.canViewDetails,
-    required this.onReviewTapped,
-  });
+  const _ReviewList({super.key, required this.reviewType, required this.canViewReview});
 
-  final FutureProviderFamily<List<ReviewItem>, ReviewListQuery> familyProvider;
   final ReviewType reviewType;
-  final bool canViewDetails;
-  final Future<void> Function(ReviewItem review) onReviewTapped;
+  final bool canViewReview;
 
   @override
   ConsumerState<_ReviewList> createState() => _ReviewListState();
 }
 
 class _ReviewListState extends ConsumerState<_ReviewList> {
-  ReviewListQuery _query = defaultReviewListQuery;
+  static const _limit = 10;
+
+  ReviewReadFilter _readFilter = ReviewReadFilter.all;
+  ReviewSortBy _sort = ReviewSortBy.latest;
+  final List<ReviewItem> _reviews = [];
+  bool _isFetching = false;
+  bool _hasMore = true;
+  bool _loadedOnce = false;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch(reset: true);
+  }
+
+  Future<ReviewsPage> _getPage(int offset) {
+    final readFilter = _readFilter.apiValue;
+    final sortBy = _sort.apiValue;
+    return widget.reviewType == ReviewType.scribe
+        ? ref
+              .read(scribeReviewsRepositoryProvider)
+              .getScribeReviews(readFilter: readFilter, sortBy: sortBy, limit: _limit, offset: offset)
+        : ref
+              .read(reviewsRepositoryProvider)
+              .getReviews(readFilter: readFilter, sortBy: sortBy, limit: _limit, offset: offset);
+  }
+
+  Future<void> _fetch({required bool reset}) async {
+    if (!reset && (_isFetching || !_hasMore)) return;
+    if (reset) {
+      _generation++;
+      _reviews.clear();
+      _hasMore = true;
+    }
+    final generation = _generation;
+    final offset = _reviews.length;
+    setState(() => _isFetching = true);
+    try {
+      final page = await _getPage(offset);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _reviews.addAll(page.items);
+        _hasMore = page.items.length == _limit && offset + page.items.length < page.count;
+      });
+    } catch (_) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _hasMore = false);
+      // RN: showToast(t('review.error.title'), 'error').
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(ref.tr('review.error.title'))));
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _isFetching = false;
+          _loadedOnce = true;
+        });
+      }
+    }
+  }
+
+  void _openReview(ReviewItem review) {
+    context.push('/reviews/${review.id}', extra: widget.reviewType);
+  }
+
+  bool _onScroll(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    // FlatList onEndReachedThreshold 0.5.
+    if (metrics.extentAfter < metrics.viewportDimension * 0.5) unawaited(_fetch(reset: false));
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final reviewsAsync = ref.watch(widget.familyProvider(_query));
+    final rn = RnSize.of(context);
+    final showFooter = _isFetching || _hasMore;
+    final isEmpty = _loadedOnce && !_isFetching && _reviews.isEmpty;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.only(top: 16, left: rn.s(16), right: rn.s(16)),
           child: Row(
             children: [
-              // Not `IntrinsicWidth` around `AppTabView`: its internal
-              // `Row` uses `Expanded` tabs, and `Expanded`/`Flexible`
-              // children have no well-defined intrinsic width in Flutter —
-              // wrapping it that way overflowed instead of sizing to
-              // content. `Expanded` here instead (fill the space the
-              // dropdown doesn't need) is the closest content-preserving
-              // fix without a bespoke content-width tab widget.
               Expanded(
-                child: AppTabView<ReviewReadFilter>(
-                  tabs: [
-                    for (final filter in ReviewReadFilter.values)
-                      AppTabViewItem(key: filter, label: ref.t(filter.labelKey)),
-                  ],
-                  activeTab: _query.readFilter,
-                  onTabChange: (filter) => setState(() => _query = (readFilter: filter, sortBy: _query.sortBy)),
+                child: _ContentWidthTabs<ReviewReadFilter>(
+                  tabs: [for (final f in ReviewReadFilter.values) (key: f, label: ref.t(f.labelKey))],
+                  active: _readFilter,
+                  onChange: (filter) {
+                    if (filter == _readFilter) return;
+                    setState(() => _readFilter = filter);
+                    _fetch(reset: true);
+                  },
                 ),
               ),
-              const SizedBox(width: 8),
-              // RN's `CustomDropdown` here gets no `fixedWidth` (only
-              // `alignModalRight`) — its header sizes to the current
-              // selection only (RN's `alignSelf: 'flex-start'`), not to the
-              // widest option. `AppDropdown` (Material's `DropdownMenu`)
-              // can't do that — it always sizes its closed field to the
-              // widest possible entry, which is why this filter used to
-              // render as wide as "Most commented" even while showing the
-              // short "Latest".
-              CustomDropdown(
-                value: ref.t(_query.sortBy.labelKey),
+              SizedBox(width: rn.s(8)),
+              _SortDropdown(
+                value: ref.t(_sort.labelKey),
                 options: [for (final sort in ReviewSortBy.values) ref.t(sort.labelKey)],
                 onSelect: (label) {
-                  final sort = ReviewSortBy.values.firstWhere((s) => ref.t(s.labelKey) == label);
-                  setState(() => _query = (readFilter: _query.readFilter, sortBy: sort));
+                  final sort = ReviewSortBy.values.firstWhere((s) => ref.tr(s.labelKey) == label);
+                  if (sort == _sort) return;
+                  setState(() => _sort = sort);
+                  _fetch(reset: true);
                 },
                 // RN's shared `Dropdown.tsx` base header style + `fieldValueText`.
                 headerDecoration: const BoxDecoration(
@@ -289,32 +316,244 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
           ),
         ),
         Expanded(
-          child: reviewsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) =>
-                Center(child: Text('${ref.t('review.error.title')}: $error')),
-            data: (reviews) {
-              if (reviews.isEmpty) {
-                return Center(child: Text(ref.t('review.empty.title')));
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                itemCount: reviews.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 16),
-                itemBuilder: (context, index) {
-                  final review = reviews[index];
-                  return ReviewCard(
-                    review: review,
-                    reviewType: widget.reviewType,
-                    canViewDetails: widget.canViewDetails,
-                    onOpenReview: () => widget.onReviewTapped(review),
-                  );
-                },
-              );
-            },
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => _fetch(reset: true),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onScroll,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(left: rn.s(16), right: rn.s(16), top: 10, bottom: 360),
+                children: [
+                  for (final (i, review) in _reviews.indexed) ...[
+                    // contentContainerStyle gap 10 + ItemSeparator 8@s.
+                    if (i > 0) SizedBox(height: 10 + rn.s(8)),
+                    ReviewCard(
+                      key: ValueKey(review.id),
+                      review: review,
+                      reviewType: widget.reviewType,
+                      onOpenReview: widget.canViewReview ? () => _openReview(review) : null,
+                    ),
+                  ],
+                  if (isEmpty)
+                    AppEmptyState(
+                      iconAsset: 'assets/icons/emptyReviews.svg',
+                      title: ref.t('review.empty.title'),
+                      description: ref.t('review.empty.description'),
+                    ),
+                  if (showFooter)
+                    Padding(
+                      padding: EdgeInsets.only(top: _reviews.isEmpty ? 0 : 10, bottom: 0),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: rn.s(16)),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// RN's shared pill `TabView` in `tabWidthMode="content"`: each tab is as
+/// wide as its label (padding 12/4) plus an equal share of the leftover
+/// width (`flexGrow: 1, flexShrink: 0`), unlike [AppTabView]'s equal tabs.
+class _ContentWidthTabs<T> extends StatelessWidget {
+  const _ContentWidthTabs({required this.tabs, required this.active, required this.onChange});
+
+  final List<({T key, String label})> tabs;
+  final T active;
+  final ValueChanged<T> onChange;
+
+  static final _label = ReviewText.serif(RnType.labelMedium, AppColors.mediumEmphasis);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final widths = [
+          for (final tab in tabs)
+            (TextPainter(
+                  text: TextSpan(text: tab.label, style: _label),
+                  textDirection: TextDirection.ltr,
+                  maxLines: 1,
+                  textScaler: scaler,
+                )..layout())
+                .width
+                .ceilToDouble() +
+                8 +
+                2,
+        ];
+        final total = widths.fold(0.0, (a, b) => a + b);
+        final available = constraints.maxWidth - 1;
+        // Labels wider than the row (long translations) shrink
+        // proportionally instead of overflowing.
+        if (total > available && total > 0) {
+          for (var i = 0; i < widths.length; i++) {
+            widths[i] = widths[i] * available / total;
+          }
+        }
+        final free = (available - total).clamp(0.0, double.infinity);
+        final extra = tabs.isEmpty ? 0.0 : free / tabs.length;
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.lightGray19,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.lightGray4, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              for (final (i, tab) in tabs.indexed)
+                GestureDetector(
+                  key: ValueKey('read-filter-${tab.label}'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChange(tab.key),
+                  child: Container(
+                    width: widths[i] + extra,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                    alignment: Alignment.center,
+                    decoration: tab.key == active
+                        ? BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(7),
+                            border: Border.all(color: AppColors.lightGray2, width: 0.5),
+                          )
+                        : null,
+                    child: Text(
+                      tab.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      style: tab.key == active ? _label.copyWith(color: AppColors.highEmphasis) : _label,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Port of RN's `CustomDropdown` with `alignModalRight`: a white header
+/// (value + 6pt arrow) that opens an absolutely positioned option card under
+/// it, right-aligned, at least as wide as the longest option + 36.
+class _SortDropdown extends StatefulWidget {
+  const _SortDropdown({required this.value, required this.options, required this.onSelect});
+
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onSelect;
+
+  @override
+  State<_SortDropdown> createState() => _SortDropdownState();
+}
+
+class _SortDropdownState extends State<_SortDropdown> {
+  final _controller = OverlayPortalController();
+  final _link = LayerLink();
+
+  static final _headerStyle = ReviewText.serif(RnType.bodyMedium, AppColors.mediumEmphasis);
+  static final _itemStyle = ReviewText.serif(RnType.bodyMedium, AppColors.highEmphasis);
+
+  @override
+  Widget build(BuildContext context) {
+    final longest = widget.options.fold('', (a, b) => a.length >= b.length ? a : b);
+    final longestWidth =
+        (TextPainter(
+              text: TextSpan(text: longest, style: _itemStyle),
+              textDirection: TextDirection.ltr,
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout())
+            .width;
+
+    return CompositedTransformTarget(
+      link: _link,
+      child: OverlayPortal(
+        controller: _controller,
+        overlayChildBuilder: (context) => Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _controller.hide),
+            ),
+            CompositedTransformFollower(
+              link: _link,
+              targetAnchor: Alignment.bottomRight,
+              followerAnchor: Alignment.topRight,
+              offset: const Offset(0, -2),
+              child: Align(
+                alignment: Alignment.topRight,
+                widthFactor: 1,
+                heightFactor: 1,
+                child: Container(
+                  key: const Key('sort-dropdown-menu'),
+                  constraints: BoxConstraints(minWidth: (longestWidth + 36).ceilToDouble(), maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.lightGray7),
+                    boxShadow: const [BoxShadow(color: Color(0x33000000), offset: Offset(0, 2), blurRadius: 4)],
+                  ),
+                  child: SingleChildScrollView(
+                    child: IntrinsicWidth(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final option in widget.options)
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                _controller.hide();
+                                widget.onSelect(option);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                                child: Text(
+                                  option,
+                                  style: option == widget.value
+                                      ? _itemStyle.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)
+                                      : _itemStyle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        child: GestureDetector(
+          key: const Key('sort-dropdown'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _controller.isShowing ? _controller.hide() : _controller.show()),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(widget.value, style: _headerStyle),
+                const SizedBox(width: 8),
+                SvgPicture.asset('assets/icons/arrowDown.svg', width: RnSize.of(context).raw(6), height: RnSize.of(context).raw(6)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
