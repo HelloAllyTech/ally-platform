@@ -465,7 +465,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             onTap: () => FocusScope.of(context).unfocus(),
             child: AnimatedBuilder(
               animation: _sheetController,
-              builder: (context, _) {
+              // Built once per State.build() (a `setState` from text/step/
+              // loading changes), NOT on every one of the sheet animation's
+              // ~60 ticks. Passing it as `child` instead of building the
+              // email/OTP form (TextField, SVG buttons, rich-text footer)
+              // inline in `builder` was the difference between the sheet
+              // gliding up and visibly stuttering: rebuilding that whole
+              // subtree every frame, on top of the Lottie still compositing
+              // underneath, was enough work per frame to miss 60fps in
+              // debug — RN's Reanimated equivalent runs the whole gesture on
+              // the UI thread and never re-renders the form at all.
+              child: _step == _Step.email ? _buildEmailStep(context, size) : _buildOtpStep(context, size),
+              builder: (context, sheetContent) {
                 final eased = Curves.easeInOutQuad.transform(_sheetController.value);
                 // animationTranslateY.value, as a fraction of WINDOW_HEIGHT.
                 final translate = 0.6 * eased;
@@ -483,7 +494,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                       ),
                     ),
                     if (_isSheetFullyOpen) _buildHeroGradient(h),
-                    if (_isSheetVisible) _buildSheet(context, size, translate),
+                    if (_isSheetVisible) _buildSheet(context, size, translate, sheetContent!),
                     _buildTitle(context, size, translate),
                     if (_step == _Step.otp) _buildBackButton(size),
                   ],
@@ -526,7 +537,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
   /// styles.authContainer + `authContentStyle`: rises from below the screen
   /// to 40% (minus the -18@vs margin), fading in over the first half.
-  Widget _buildSheet(BuildContext context, Size size, double translate) {
+  Widget _buildSheet(BuildContext context, Size size, double translate, Widget content) {
     final h = size.height;
     return Positioned(
       top: -_vs(size, 18) + h - translate * h,
@@ -541,7 +552,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: _step == _Step.email ? _buildEmailStep(context, size) : _buildOtpStep(context, size),
+          child: content,
         ),
       ),
     );

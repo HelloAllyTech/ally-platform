@@ -150,8 +150,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const LaunchSplashScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // No page transition here: RN's splash and login are ONE screen (the
+      // Lottie just keeps playing underneath as the login sheet rises), so
+      // the default MaterialPage fade/zoom between these two routes made the
+      // frozen splash frame visibly "pop in" again right before the sheet
+      // animation started — a second, un-RN-like motion that didn't happen
+      // in the real app.
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (context, state) => const NoTransitionPage(child: LaunchSplashScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) => const NoTransitionPage(child: LoginScreen()),
+      ),
       GoRoute(
         path: '/home',
         builder: (context, state) => AppShellScreen(
