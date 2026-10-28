@@ -133,15 +133,38 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
   }
 }
 
-class _DashboardWebView extends ConsumerWidget {
+class _DashboardWebView extends ConsumerStatefulWidget {
   const _DashboardWebView({required this.dashboard});
 
   final Dashboard dashboard;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final urlAsync = ref.watch(dashboardUrlProvider(dashboard.externalId));
-    final width = MediaQuery.of(context).size.width - 50;
+  ConsumerState<_DashboardWebView> createState() => _DashboardWebViewState();
+}
+
+/// One WebView controller for the dashboard's lifetime, loading only when
+/// the signed URL changes. Creating the controller in `build` reloaded the
+/// whole Metabase dashboard on every rebuild (any inset/keyboard change
+/// rebuilt it via `MediaQuery.of`, even with this tab off screen).
+class _DashboardWebViewState extends ConsumerState<_DashboardWebView> {
+  // Created on the first URL, not up front: until the signed URL arrives
+  // there's nothing to show, and the platform view isn't needed.
+  WebViewController? _controller;
+  String? _loadedUrl;
+
+  WebViewController _load(String url) {
+    final controller = _controller ??= WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted);
+    if (url != _loadedUrl) {
+      _loadedUrl = url;
+      controller.loadRequest(Uri.parse(url));
+    }
+    return controller;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final urlAsync = ref.watch(dashboardUrlProvider(widget.dashboard.externalId));
+    final width = MediaQuery.sizeOf(context).width - 50;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
@@ -151,11 +174,7 @@ class _DashboardWebView extends ConsumerWidget {
         child: urlAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => Center(child: Text('$error')),
-          data: (url) => WebViewWidget(
-            controller: WebViewController()
-              ..setJavaScriptMode(JavaScriptMode.unrestricted)
-              ..loadRequest(Uri.parse(url)),
-          ),
+          data: (url) => WebViewWidget(controller: _load(url)),
         ),
       ),
     );

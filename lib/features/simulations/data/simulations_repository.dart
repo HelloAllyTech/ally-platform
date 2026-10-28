@@ -227,7 +227,7 @@ final simulationCreditsProvider = FutureProvider<SimulationCredits>((ref) {
   return ref.watch(simulationsRepositoryProvider).getSimulationCredits();
 });
 
-final scenarioByIdProvider = FutureProvider.family<Scenario, int>((ref, id) {
+final scenarioByIdProvider = FutureProvider.autoDispose.family<Scenario, int>((ref, id) {
   return ref.watch(simulationsRepositoryProvider).getScenarioById(id);
 });
 
@@ -236,7 +236,7 @@ final scenarioPathsProvider = FutureProvider<List<SimulationPath>>((ref) {
 });
 
 final simulationPathDetailsProvider =
-    FutureProvider.family<SimulationPathDetails, String>((ref, pathId) {
+    FutureProvider.autoDispose.family<SimulationPathDetails, String>((ref, pathId) {
       return ref
           .watch(simulationsRepositoryProvider)
           .getSimulationPathDetails(pathId);
@@ -247,12 +247,12 @@ final casesProvider = FutureProvider<List<SimulationPath>>((ref) {
 });
 
 final caseDetailsProvider =
-    FutureProvider.family<SimulationPathDetails, String>((ref, caseId) {
+    FutureProvider.autoDispose.family<SimulationPathDetails, String>((ref, caseId) {
       return ref.watch(simulationsRepositoryProvider).getCaseDetails(caseId);
     });
 
 final simulationSummaryProvider =
-    FutureProvider.family<SimulationSummary, String>((ref, scenarioSessionId) {
+    FutureProvider.autoDispose.family<SimulationSummary, String>((ref, scenarioSessionId) {
       return ref
           .watch(simulationsRepositoryProvider)
           .getSimulationDetails(scenarioSessionId);

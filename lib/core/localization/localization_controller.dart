@@ -86,8 +86,7 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
     final prefs = await SharedPreferences.getInstance();
     _language = prefs.getString(_prefLanguageKey) ?? _defaultLanguage;
 
-    final bundled = await _loadBundledAsset(_language);
-    var translations = Translations(bundled);
+    var translations = await _loadBundled(_language);
 
     // Apply whatever dynamic resource was cached from a previous launch,
     // if any, before kicking off a fresh network check — same ordering as
@@ -126,8 +125,7 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefLanguageKey, languageCode);
 
-    final bundled = await _loadBundledAsset(languageCode);
-    state = AsyncData(Translations(bundled));
+    state = AsyncData(await _loadBundled(languageCode));
     _appliedResourceKey = null;
     if (AppConfig.languageSelectorEnabled) await refresh();
   }
@@ -187,9 +185,17 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
   Future<void> _apply(String version, String language, Map<String, dynamic> resource) async {
     final key = '$version/$language';
     if (_appliedResourceKey == key) return;
-    final bundled = await _loadBundledAsset(language);
-    state = AsyncData(Translations(bundled).mergedWith(resource));
+    state = AsyncData((await _loadBundled(language)).mergedWith(resource));
     _appliedResourceKey = key;
+  }
+
+  /// The bundled locale file over the English one — RN's i18next
+  /// `fallbackLng: 'en'`: a key a language file lacks shows English, not
+  /// the raw key.
+  Future<Translations> _loadBundled(String language) async {
+    final english = Translations(await _loadBundledAsset(_defaultLanguage), language: language);
+    if (language == _defaultLanguage) return english;
+    return english.mergedWith(await _loadBundledAsset(language));
   }
 
   Future<Map<String, dynamic>> _loadBundledAsset(String language) async {
