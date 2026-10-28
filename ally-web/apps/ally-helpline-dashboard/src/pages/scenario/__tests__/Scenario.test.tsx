@@ -17,6 +17,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
+import React from "react";
 
 import { Scenario } from "../Scenario";
 
@@ -235,7 +236,7 @@ vi.mock("@components", () => ({
       <div data-testid="confirmation-dialog" style={{ display: isOpen ? "block" : "none" }}>
         <div data-testid="dialog-title">{JSON.stringify(title)}</div>
         <div data-testid="dialog-content">{content}</div>
-        <div data-testid="dialog-icon">{icon}</div>
+        <div data-testid="dialog-icon">{typeof icon === 'function' ? React.createElement(icon) : icon}</div>
         <button data-testid="dialog-primary-btn" onClick={onButtonClick}>
           {buttonText}
         </button>
@@ -250,7 +251,7 @@ vi.mock("@components", () => ({
   ),
   FallbackUI: vi.fn(({ icon, isLoading, mainMessage, description, button }: any) => (
     <div data-testid="fallback-ui">
-      <div data-testid="fallback-image">{icon}</div>
+      <div data-testid="fallback-image">{typeof icon === 'function' ? React.createElement(icon) : icon}</div>
       <div data-testid="fallback-loading">{isLoading ? "true" : "false"}</div>
       <div data-testid="fallback-message">{mainMessage}</div>
       <div data-testid="fallback-description">{description}</div>
@@ -588,7 +589,7 @@ describe("Scenario Component", () => {
    * Verifies dialog state management
    */
   describe("Dialog Management", () => {
-    it("should not start simulation when access token is missing", async () => {
+    it("should not start simulation when access token is missing", () => {
       (window.localStorage.getItem as any).mockReturnValue(null);
 
       render(
@@ -598,7 +599,7 @@ describe("Scenario Component", () => {
       );
 
       const startButton = screen.getByTestId("start-simulation-btn");
-      startButton.click();
+      fireEvent.click(startButton);
 
       // Simulation should not be started when not authenticated
       expect(mockStartSimulation).not.toHaveBeenCalled();

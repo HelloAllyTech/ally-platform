@@ -111,7 +111,12 @@ vi.mock("@components", () => ({
     </button>
   ),
   ButtonVariant: { ICON: "icon", PRIMARY: "primary", SECONDARY: "secondary" },
-  ShareForReview: (props: any) => <div data-testid="share-for-review" {...props} />,
+    ShareForReview: ({
+    isOpen,
+    summaryDetails,
+    onNoteChange,
+    ...rest
+  }: any) => <div data-testid="share-for-review" {...rest} />,
   ToggleSwitch: (props: any) => <input type="checkbox" data-testid="toggle-switch" {...props} />,
   ActionDialog: ({ open, onClose, primaryButton, secondaryButton, title, children }: any) => (
     <div data-testid="action-dialog" style={{ display: open ? "block" : "none" }}>
@@ -142,7 +147,15 @@ vi.mock("@components", () => ({
       </button>
     </div>
   ),
-  TranscriptListing: (props: any) => <div data-testid="transcript-listing" {...props} />,
+    TranscriptListing: ({
+    transcriptList,
+    handleLoadMore,
+    isLoading,
+    hasMore,
+    agentName,
+    counsellorName,
+    ...rest
+  }: any) => <div data-testid="transcript-listing" {...rest} />,
 }));
 
 // Mock containers

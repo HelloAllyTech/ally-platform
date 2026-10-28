@@ -328,11 +328,13 @@ describe("CommentCard Component", () => {
     const emojiButton = await screen.findByTestId("emoji-thumb-up");
     fireEvent.click(emojiButton);
 
-    expect(addCommentReactionMock).toHaveBeenCalledWith({
-      commentId: mockComment.id,
-      reaction: { reaction: "1f44d", action: "ADD" },
+    await waitFor(() => {
+      expect(addCommentReactionMock).toHaveBeenCalledWith({
+        commentId: mockComment.id,
+        reaction: { reaction: "1f44d", action: "ADD" },
+      });
+      expect(addCommentReactionUnwrap).toHaveBeenCalledTimes(1);
     });
-    expect(addCommentReactionUnwrap).toHaveBeenCalledTimes(1);
   });
 
   // --- Reply Count Tests ---
@@ -782,11 +784,13 @@ describe("CommentCard Component", () => {
       fireEvent.click(menuButton);
       const hideButton = await screen.findByText("Hide");
       fireEvent.click(hideButton);
-      expect(toggleCommentVisibilityMock).toHaveBeenCalledWith({
-        commentId: commentToHide.id,
-        hidden: true,
+      await waitFor(() => {
+        expect(toggleCommentVisibilityMock).toHaveBeenCalledWith({
+          commentId: commentToHide.id,
+          hidden: true,
+        });
+        expect(toggleCommentVisibilityUnwrap).toHaveBeenCalledTimes(1);
       });
-      expect(toggleCommentVisibilityUnwrap).toHaveBeenCalledTimes(1);
     });
 
     it("should call onToggleHide callback after successful visibility toggle", async () => {
@@ -833,9 +837,11 @@ describe("CommentCard Component", () => {
       fireEvent.click(menuButton);
       const unhideButton = await screen.findByText("Unhide");
       fireEvent.click(unhideButton);
-      expect(toggleCommentVisibilityMock).toHaveBeenCalledWith({
-        commentId: hiddenComment.id,
-        hidden: false,
+      await waitFor(() => {
+        expect(toggleCommentVisibilityMock).toHaveBeenCalledWith({
+          commentId: hiddenComment.id,
+          hidden: false,
+        });
       });
     });
 

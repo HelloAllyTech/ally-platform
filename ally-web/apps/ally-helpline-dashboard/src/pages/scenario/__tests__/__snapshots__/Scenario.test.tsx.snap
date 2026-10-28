@@ -112,7 +112,13 @@ exports[`Scenario Component > Snapshot Testing > should match snapshot with scen
             </div>
             <div
               data-testid="dialog-icon"
-            />
+            >
+              <div
+                data-testid="existing-call"
+              >
+                ExistingCall
+              </div>
+            </div>
             <button
               data-testid="dialog-primary-btn"
             >

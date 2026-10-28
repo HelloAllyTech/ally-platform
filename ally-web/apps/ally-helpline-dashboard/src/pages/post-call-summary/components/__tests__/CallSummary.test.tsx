@@ -540,7 +540,7 @@ describe("CallSummary — custom field save does not revert fields the user didn
     vi.useRealTimers();
   });
 
-  it("only submits the field the user edited, even if another field's server value drifted afterwards", () => {
+  it("only submits the field the user edited, even if another field's server value drifted afterwards", async () => {
     mockGetCustomFieldValues.mockReturnValue({
       data: [sessionNoField("5"), topicField("Anxiety")],
     });
@@ -566,7 +566,9 @@ describe("CallSummary — custom field save does not revert fields the user didn
     // flush fake timers to observe the call.
     fireEvent.click(screen.getByRole("button", { name: "Save report" }));
 
-    expect(mockUpsertCustomFieldValues).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mockUpsertCustomFieldValues).toHaveBeenCalledTimes(1);
+    });
     const [{ values }] = mockUpsertCustomFieldValues.mock.calls[0];
     expect(values).toEqual([{ fieldDefinitionId: "cf-topic", value: "Depression" }]);
   });
@@ -681,11 +683,12 @@ describe("CallSummary — built-in summary save sends a patch, not the whole sum
     expect("keyConcerns" in data.summary).toBe(true);
   });
 
-  it("does not send a summary patch at all when nothing was edited", () => {
+  it("does not send a summary patch at all when nothing was edited", async () => {
     render(<CallSummary chatId={1} callSummary={summaryCall} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Save report" }));
 
+    await vi.advanceTimersByTimeAsync(100); // give autosave time to NOT fire
     expect(mockUpdateCallSummary).not.toHaveBeenCalled();
   });
 });
@@ -817,7 +820,7 @@ describe("CallSummary — switching sessions must not carry the previous one's s
     expect(screen.getByLabelText("Key Concerns")).toHaveValue("session B value");
   });
 
-  it("drops an unsaved edit made against the previous session instead of saving it onto the new one", () => {
+  it("drops an unsaved edit made against the previous session instead of saving it onto the new one", async () => {
     const { rerender } = render(<CallSummary chatId={1} callSummary={sessionA} />);
     fireEvent.change(screen.getByLabelText("Key Concerns"), { target: { value: "typed into A" } });
 
@@ -826,6 +829,7 @@ describe("CallSummary — switching sessions must not carry the previous one's s
 
     // A's dirty key must not survive the switch: saving right after landing on
     // B must write nothing, rather than writing A's text under B's id.
+    await vi.advanceTimersByTimeAsync(100);
     expect(mockUpdateCallSummary).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Key Concerns")).toHaveValue("session B value");
   });

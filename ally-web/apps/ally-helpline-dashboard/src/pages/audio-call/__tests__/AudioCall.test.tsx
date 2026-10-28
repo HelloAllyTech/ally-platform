@@ -82,7 +82,7 @@ vi.mock("@api", () => ({
 // Mock assets
 vi.mock("@assets", () => ({
   NoResults: () => <div data-testid="no-results">No Results</div>,
-  MindfullnessVideo: () => <div data-testid="mindfulness-video">Mindfulness Video</div>,
+    MindfullnessVideo: "mindfulness.mp4",
   EndSessionIllustration: () => <div data-testid="end-session-illustration">End Session</div>,
   // Referenced by the real ../components/constants error-content map, which is
   // now imported rather than stubbed out wholesale.
@@ -320,7 +320,7 @@ describe("AudioCall Component", () => {
    * Verifies the component renders without crashing
    */
   describe("Basic Rendering", () => {
-    it("should render successfully", () => {
+    it("should render successfully", async () => {
       const store = createMockStore({
         user: {
           user: mockUser,
@@ -334,10 +334,10 @@ describe("AudioCall Component", () => {
         </TestWrapper>,
       );
 
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
 
-    it("should render without throwing errors", () => {
+    it("should render without throwing errors", async () => {
       const store = createMockStore({
         user: {
           user: mockUser,
@@ -345,16 +345,15 @@ describe("AudioCall Component", () => {
         },
       });
 
-      expect(() => {
-        render(
-          <TestWrapper store={store}>
-            <AudioCall />
-          </TestWrapper>,
-        );
-      }).not.toThrow();
+      render(
+        <TestWrapper store={store}>
+          <AudioCall />
+        </TestWrapper>,
+      );
+      await expect(screen.findByTestId("browser-router")).resolves.toBeInTheDocument();
     });
 
-    it("should render a non-empty component", () => {
+    it("should render a non-empty component", async () => {
       const store = createMockStore({
         user: {
           user: mockUser,
@@ -368,6 +367,7 @@ describe("AudioCall Component", () => {
         </TestWrapper>,
       );
 
+      await screen.findByTestId("browser-router");
       expect(container.firstChild).not.toBeNull();
     });
   });
@@ -377,7 +377,7 @@ describe("AudioCall Component", () => {
    * Verifies the component handles different URL parameters correctly
    */
   describe("URL Parameter Handling", () => {
-    it("should handle microphone mode", () => {
+    it("should handle microphone mode", async () => {
       mockSearchParams.get.mockReturnValue("microphone");
       const store = createMockStore({
         user: {
@@ -393,10 +393,10 @@ describe("AudioCall Component", () => {
       );
 
       // Component should render without errors in microphone mode
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
 
-    it("should handle cloud telephony mode", () => {
+    it("should handle cloud telephony mode", async () => {
       mockSearchParams.get.mockReturnValue("cloud-telephony");
       const store = createMockStore({
         user: {
@@ -412,10 +412,10 @@ describe("AudioCall Component", () => {
       );
 
       // Component should render without errors in cloud telephony mode
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
 
-    it("should refuse to start a retired dictation session even if the org still lists it", () => {
+    it("should refuse to start a retired dictation session even if the org still lists it", async () => {
       mockSearchParams.get.mockReturnValue("dictation");
       const store = createMockStore({
         user: {
@@ -435,13 +435,13 @@ describe("AudioCall Component", () => {
       );
 
       // Component should render without errors in dictation mode
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
       // ...but never hand the counselor a live session.
       expect(screen.queryByTestId("call-interface")).not.toBeInTheDocument();
       expect(screen.queryByTestId("call-sidebar")).not.toBeInTheDocument();
     });
 
-    it("should handle no mode parameter", () => {
+    it("should handle no mode parameter", async () => {
       // No mode parameter set
       const store = createMockStore({
         user: {
@@ -457,7 +457,7 @@ describe("AudioCall Component", () => {
       );
 
       // Component should render without errors
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
   });
 
@@ -466,7 +466,7 @@ describe("AudioCall Component", () => {
    * Verifies the component integrates with Redux store correctly
    */
   describe("Redux Integration", () => {
-    it("should access user data from Redux store", () => {
+    it("should access user data from Redux store", async () => {
       const store = createMockStore({
         user: {
           user: mockUser,
@@ -481,10 +481,10 @@ describe("AudioCall Component", () => {
       );
 
       // Component should render without errors when accessing Redux state
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
 
-    it("should handle missing user data", () => {
+    it("should handle missing user data", async () => {
       const store = createMockStore({
         user: {
           user: null,
@@ -499,7 +499,7 @@ describe("AudioCall Component", () => {
       );
 
       // Component should handle missing user data gracefully
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
   });
 
@@ -508,7 +508,7 @@ describe("AudioCall Component", () => {
    * Verifies API integration and data fetching
    */
   describe("API Integration", () => {
-    it("should call getCounsellorChat when needed", () => {
+    it("should call getCounsellorChat when needed", async () => {
       const store = createMockStore({
         user: {
           user: mockUser,
@@ -523,10 +523,10 @@ describe("AudioCall Component", () => {
       );
 
       // The component should render without errors
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
 
-    it("should handle API loading states", () => {
+    it("should handle API loading states", async () => {
       mockUseLazyGetCounsellorChatQuery.mockReturnValue({
         data: null,
         isLoading: true,
@@ -547,10 +547,10 @@ describe("AudioCall Component", () => {
       );
 
       // Component should handle loading state
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
 
-    it("should handle API errors", () => {
+    it("should handle API errors", async () => {
       mockUseLazyGetCounsellorChatQuery.mockReturnValue({
         data: null,
         isLoading: false,
@@ -571,7 +571,7 @@ describe("AudioCall Component", () => {
       );
 
       // Component should handle error state
-      expect(screen.getByTestId("browser-router")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-router")).toBeInTheDocument();
     });
   });
 

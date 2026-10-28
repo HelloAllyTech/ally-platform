@@ -46,7 +46,11 @@ vi.mock("@assets", () => ({
   Badge: () => <svg data-testid="badge-icon" />,
   ReviewNavIcon: () => <svg data-testid="review-nav-icon" />,
 }));
-vi.mock("@components", () => ({ TextField: (props: any) => <input {...props} /> }));
+vi.mock("@components", () => ({
+  TextField: ({ inputRef, inputStyles, showBorder, ...rest }: any) => (
+    <input {...rest} ref={inputRef} />
+  ),
+}));
 
 describe("SummaryHeader", () => {
   const chatId = 1;
