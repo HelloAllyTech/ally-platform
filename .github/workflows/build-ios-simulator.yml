@@ -59,7 +59,7 @@ jobs:
 
       - name: Build iOS (Simulator, debug, unsigned)
         run: |
-          flutter build ios --debug --simulator --verbose \
+          flutter build ios --debug --simulator --flavor dev --verbose \
             --dart-define=API_BASE_URL=https://api.helloally.dev \
             --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
 

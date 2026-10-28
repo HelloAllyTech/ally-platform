@@ -93,7 +93,9 @@ jobs:
           # logs for an in-progress job — verbose Gradle/task-level output
           # is the only way to tell real (if slow) progress from an actual
           # hang if this happens again.
-          flutter build apk --debug --target-platform android-arm64 --verbose \
+          # --flavor dev: the test identity (pubspec's default-flavor too);
+          # see docs/RELEASE.md.
+          flutter build apk --debug --flavor dev --target-platform android-arm64 --verbose \
             --dart-define=API_BASE_URL=https://api.helloally.dev \
             --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
 
@@ -101,5 +103,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ally-mobile-flutter-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-dev-debug.apk
           retention-days: 14

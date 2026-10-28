@@ -1,0 +1,9 @@
+#include "Release.xcconfig"
+#include "dev.xcconfig"
+
+// App Store signing for the dev identity's own TestFlight app. The profile
+// is a separate one from RN's (different bundle id); CI installs it from the
+// PROVISION_PROFILE_DEV_BASE64 secret (docs/RELEASE.md).
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*] = Ally Flutter AppStore Distribution

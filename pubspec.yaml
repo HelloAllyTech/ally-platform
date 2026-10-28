@@ -16,7 +16,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+# Marketing version 2.0.0 sits above every React Native release (1.23.x), so
+# the store accepts this app as an update to RN's listing. The build number
+# here is a placeholder: release workflows pass --build-number (scheme in
+# docs/RELEASE.md) so it always exceeds RN's.
+version: 2.0.0+1
 
 environment:
   sdk: ^3.13.5
@@ -69,6 +73,8 @@ dependencies:
   flutter_markdown_plus: ^1.0.12
   wakelock_plus: ^1.8.2
   connectivity_plus: ^7.3.2
+  app_links: ^7.2.2
+  crypto: ^3.0.8
 
 dev_dependencies:
   flutter_test:
@@ -138,6 +144,10 @@ flutter_launcher_icons:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # Build flavors (docs/RELEASE.md): `dev` = the pre-cutover test identity,
+  # `prod` = the store app (RN's identity). Plain `flutter run`/`build` use
+  # dev, so nothing builds the store identity by accident.
+  default-flavor: dev
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

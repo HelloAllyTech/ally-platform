@@ -1,3 +1,16 @@
+// google-services is applied by app/build.gradle.kts only when a
+// google-services.json is present, so it goes on the classpath here (an
+// `apply(plugin = ...)` by id needs it there), as RN's root build.gradle does.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.google.gms:google-services:4.4.2")
+    }
+}
+
 allprojects {
     repositories {
         google()

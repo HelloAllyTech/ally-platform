@@ -1,0 +1,15 @@
+// Identity of the `prod` flavor: the store app. Same bundle id, display
+// name and Google Sign-In client as ally-mobile (React Native)'s
+// ios/ally.xcodeproj + ios/ally/Info.plist, so an upload is an update to the
+// existing App Store / TestFlight app. See docs/RELEASE.md.
+APP_FLAVOR = prod
+PRODUCT_BUNDLE_IDENTIFIER = com.helloally.app
+APP_DISPLAY_NAME = Ally
+
+// RN ios/ally/Info.plist: GIDClientID and both reversed-client-id schemes.
+GOOGLE_IOS_CLIENT_ID = 168892399692-hmu1u4mghka0eu17s97tmnnbdu7bo5t0.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.168892399692-hmu1u4mghka0eu17s97tmnnbdu7bo5t0
+GOOGLE_REVERSED_CLIENT_ID_2 = com.googleusercontent.apps.168892399692-i5g20jnljvcddis0s5o7kp9linmvt376
+
+// RN's Apple team (ios/ally.xcodeproj DEVELOPMENT_TEAM).
+DEVELOPMENT_TEAM = W3ZL4N9N9J
