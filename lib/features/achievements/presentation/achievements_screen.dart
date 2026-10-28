@@ -27,12 +27,9 @@ const _badgeCategorySlugs = {
 /// grouped by category, each category with a translated label + an info
 /// tooltip explaining how it's earned, rendered as RN's `AchievementCard`
 /// (a horizontal icon+title+description row, not a grid of bare icons),
-/// plus the same All/Unlocked filter tabs. Tap-to-mark-viewed is wired as
-/// a deliberate substitute for the RN screen's unlock-celebration popup
-/// (`useBadgePopup`, a separate app-wide polling feature, not a filter on
-/// this screen, and not ported) — RN itself doesn't mark badges viewed
-/// from a tap here, only from dismissing that popup, but with no popup
-/// system in this app a badge would otherwise never leave "unviewed".
+/// plus the same All/Unlocked filter tabs. Cards aren't tappable: as in RN,
+/// a badge is marked viewed only by closing its unlock popup
+/// (`badge_popup.dart`).
 class AchievementsScreen extends ConsumerStatefulWidget {
   const AchievementsScreen({super.key});
 
@@ -246,76 +243,73 @@ class _AchievementCard extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: () => ref.read(achievementsRepositoryProvider).markBadgeAsViewed(badge.id),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isLocked ? AppColors.lightGray2 : AppColors.strokePrimary, width: 0.5),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  margin: const EdgeInsets.only(right: 16),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isLocked ? Colors.transparent : AppColors.lightGray1,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: isLocked
-                      // AchievementLockedIcon at its intrinsic 60x60.
-                      ? SvgPicture.asset('assets/icons/achievementLocked.svg')
-                      : (badge.imageUrl.isNotEmpty
-                          ? Image.network(
-                              badge.imageUrl,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                            )
-                          : const SizedBox.shrink()),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isLocked ? AppColors.lightGray2 : AppColors.strokePrimary, width: 0.5),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                margin: const EdgeInsets.only(right: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isLocked ? Colors.transparent : AppColors.lightGray1,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          badge.name,
-                          style: TextStyle(
-                            fontFamily: AppFonts.ibmPlexSerifMedium,
-                            fontSize: 14,
-                            height: 18 / 14,
-                            letterSpacing: 0,
-                            fontWeight: FontWeight.w500,
-                            color: isLocked ? AppColors.lowEmphasis : AppColors.highEmphasis,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        badge.description,
+                clipBehavior: Clip.antiAlias,
+                child: isLocked
+                    // AchievementLockedIcon at its intrinsic 60x60.
+                    ? SvgPicture.asset('assets/icons/achievementLocked.svg')
+                    : (badge.imageUrl.isNotEmpty
+                        ? Image.network(
+                            badge.imageUrl,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          )
+                        : const SizedBox.shrink()),
+              ),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        badge.name,
                         style: TextStyle(
-                          fontFamily: AppFonts.ibmPlexSerifRegular,
-                          fontSize: 13,
-                          height: 18 / 13,
+                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                          fontSize: 14,
+                          height: 18 / 14,
                           letterSpacing: 0,
-                          color: isLocked ? AppColors.lowEmphasis : AppColors.mediumEmphasis,
+                          fontWeight: FontWeight.w500,
+                          color: isLocked ? AppColors.lowEmphasis : AppColors.highEmphasis,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Text(
+                      badge.description,
+                      style: TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifRegular,
+                        fontSize: 13,
+                        height: 18 / 13,
+                        letterSpacing: 0,
+                        color: isLocked ? AppColors.lowEmphasis : AppColors.mediumEmphasis,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
