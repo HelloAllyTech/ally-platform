@@ -203,6 +203,9 @@ void main() {
 
     expect(find.text('Self-harm'), findsOneWidget);
     expect(find.text('Violence'), findsOneWidget);
+    // RN renders "Trigger warnings::" (value already ends in ':'); one colon.
+    expect(find.text('Trigger warnings:'), findsOneWidget);
+    expect(find.text('Trigger warnings::'), findsNothing);
   });
 
   testWidgets('tapping share copies the scenario link and shows a confirmation', (tester) async {
@@ -227,7 +230,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.byType(IconButton));
+    await tester.tap(find.byKey(const Key('simulation-details-share')));
     await tester.pump();
 
     expect(copied, 'https://app.helloally.ai/scenario/5');
