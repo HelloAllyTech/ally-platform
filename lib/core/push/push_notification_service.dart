@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/notifications/data/notifications_repository.dart';
+import '../navigation/home_tab_navigation.dart';
 import 'notification_navigation.dart';
 
 /// RN's `REMINDERS_CHANNEL_ID` (`src/constants/notifications.ts`) — same
@@ -122,7 +124,7 @@ void navigateForNotificationPayload(String? payload, GoRouter router) {
     return;
   }
   final target = routeForNotificationTap(notificationId: notificationId, data: data);
-  if (target != null) router.go(target);
+  if (target != null) goToLocation(router, target);
 }
 
 /// FCM's background-message handler: fires in a separate background isolate
@@ -182,6 +184,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// app startup.
 class PushNotificationService {
   bool _initialized = false;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
 
   Future<void> initializeAndRegister(NotificationsRepository repository, GoRouter router) async {
     // Local notifications (tap routing, the cold-start check) don't depend
@@ -212,7 +216,7 @@ class PushNotificationService {
 
       if (!_initialized) {
         _initialized = true;
-        messaging.onTokenRefresh.listen((newToken) {
+        _tokenRefreshSubscription = messaging.onTokenRefresh.listen((newToken) {
           repository.registerDeviceToken(token: newToken, platform: _platform);
         });
 
@@ -221,12 +225,38 @@ class PushNotificationService {
         // mirrors RN's split between `subscribeToForegroundMessages`
         // (RootNavigator effect) and `setBackgroundMessageHandler`
         // (`index.js`, module scope).
-        FirebaseMessaging.onMessage.listen(displayReminderNotification);
+        _foregroundSubscription = FirebaseMessaging.onMessage.listen(displayReminderNotification);
       }
     } catch (error) {
       // A real Firebase project but a still-rejected token request (e.g.
       // permission denied) shouldn't be fatal either — same reasoning.
       return;
+    }
+  }
+
+  /// RN `unregisterDeviceForPush` (`pushNotificationService.ts`), run by
+  /// `useUser.handleUserLogout` while the session is still valid: delete
+  /// this device's token server-side (`DELETE /notifications/device-tokens/
+  /// :token`), then drop it locally (`deleteToken`), so a logged-out device
+  /// stops getting the previous user's reminders. Also undoes the
+  /// token-refresh and foreground listeners, as RootNavigator's push effect
+  /// cleanup does when `isAuthenticated` goes false; the next sign-in's
+  /// [initializeAndRegister] sets them up again. Best-effort like RN: any
+  /// failure (including no Firebase project yet) is swallowed.
+  Future<void> unregister(NotificationsRepository repository) async {
+    await _tokenRefreshSubscription?.cancel();
+    await _foregroundSubscription?.cancel();
+    _tokenRefreshSubscription = null;
+    _foregroundSubscription = null;
+    _initialized = false;
+    try {
+      if (Firebase.apps.isEmpty) return;
+      final messaging = FirebaseMessaging.instance;
+      final token = await messaging.getToken();
+      if (token != null) await repository.deleteDeviceToken(token);
+      await messaging.deleteToken();
+    } catch (_) {
+      // RN logs and carries on with the logout.
     }
   }
 

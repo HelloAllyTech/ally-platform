@@ -40,6 +40,7 @@ import '../../features/simulations/presentation/simulation_path_details_screen.d
 import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 import '../navigation/app_shell_screen.dart';
+import '../navigation/home_tab_navigation.dart';
 import '../widgets/review_type_chip.dart';
 
 /// `extra` shape for `/share-for-review/:scenarioSessionId` — one record
@@ -130,7 +131,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const AppShellScreen(),
+        builder: (context, state) => AppShellScreen(
+          tabRequest: state.extra is HomeTabRequest ? state.extra as HomeTabRequest : null,
+        ),
       ),
       GoRoute(
         path: '/complete-profile',
