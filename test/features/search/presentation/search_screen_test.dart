@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/core/theme/rn_scale.dart';
 import 'package:ally_mobile_flutter/features/search/data/search_repository.dart';
 import 'package:ally_mobile_flutter/features/search/presentation/resource_article_card.dart';
 import 'package:ally_mobile_flutter/features/search/presentation/search_screen.dart';
@@ -358,5 +361,37 @@ void main() {
     // Still the results view, not the launch view with the Ally logo.
     expect(find.byType(ResourceArticleCard), findsNothing);
     expect(allyLogo, findsNothing);
+  });
+
+  testWidgets('launch view sits where RN puts it on a 402x874 iPhone, ignoring the status-bar inset', (tester) async {
+    tester.view.physicalSize = const Size(402, 874);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 62, bottom: 34);
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues({});
+
+    await preWarmTranslations(tester);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(builder: (context, child) => RnScale(child: child!), home: const SearchScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // RN, in screen points: searchContainer paddingTop 44@vs, SearchHeader
+    // marginTop 80@mvs, TabScreenHeader 16@ms margin + 12@ms padding around
+    // a 24@ms title, then SearchInput's 10@mvs top margin.
+    double vs(double v) => v * 874 / 680;
+    double mvs(double v) => v + (vs(v) - v) * 0.5;
+    final ms = rnScaleFactor(402);
+    final rnBarTop = vs(44) + mvs(80) + (16 + 12 + 24 + 12) * ms + mvs(10);
+    expect(tester.getRect(find.byKey(const Key('search-bar'))).top, closeTo(rnBarTop, 0.5));
+
+    // Suggestion chips: RN's `<SearchIcon width={16} height={16} />` is
+    // unscaled, so 16 screen points.
+    final chip = find.ancestor(of: find.text('Suicide assessment'), matching: find.byType(GestureDetector)).first;
+    final icon = find.descendant(of: chip, matching: find.byType(SvgPicture));
+    expect(tester.getRect(icon).width, closeTo(16, 0.01));
   });
 }

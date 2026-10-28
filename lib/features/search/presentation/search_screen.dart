@@ -15,12 +15,7 @@ import 'resource_article_card.dart';
 /// RN's `searchConfig.ts` `trySuggestions` — shown as the launch-screen
 /// suggestion list, as the no-results empty-state suggestions, and as the
 /// source list `filteredSuggestions` substring-matches while typing.
-const _trySuggestions = [
-  'Violence safety plan',
-  'Suicide assessment',
-  'Survivors of abuse',
-  "Client's resistance",
-];
+const _trySuggestions = ['Violence safety plan', 'Suicide assessment', 'Survivors of abuse', "Client's resistance"];
 
 /// Port of ally-mobile (React Native)'s `SearchScreen` + `useSearch` hook.
 /// Category tabs built from the response's per-category counts ("All (12)",
@@ -107,9 +102,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 250), () {
       if (!mounted) return;
       setState(() {
-        _filteredSuggestions = _trySuggestions
-            .where((s) => s.toLowerCase().contains(text.toLowerCase()))
-            .toList();
+        _filteredSuggestions = _trySuggestions.where((s) => s.toLowerCase().contains(text.toLowerCase())).toList();
       });
     });
   }
@@ -166,7 +159,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (_loading || !_hasMore || _lastSearchedText.isEmpty) return;
     setState(() => _loading = true);
     try {
-      final result = await ref.read(searchRepositoryProvider).search(
+      final result = await ref
+          .read(searchRepositoryProvider)
+          .search(
             _lastSearchedText,
             category: _selectedCategory == 'All' ? null : _selectedCategory,
             excludedIds: [for (final r in _resources) r.id],
@@ -227,9 +222,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       onTap: () => _focusNode.unfocus(),
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SafeArea(
-          child: _showSearchResults ? _buildDetailSearch(tabs, searchBar) : _buildSearchLaunch(searchBar),
-        ),
+        // RN's launch view isn't inset for the status bar (its 44@vs top
+        // padding sits under it), so only the results view keeps the top
+        // safe area.
+        body: _showSearchResults
+            ? SafeArea(child: _buildDetailSearch(tabs, searchBar))
+            : SafeArea(top: false, child: _buildSearchLaunch(searchBar)),
       ),
     );
   }
@@ -237,10 +235,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   /// RN `renderSearchLaunch`: `styles.searchContainer` (paddingTop 44@vs,
   /// 24pt sides), `SearchHeader`, the search input, then — while unfocused —
   /// the "Try now:" label and left-aligned suggestion chips. Focusing slides
-  /// the header up 60 and the input up 50 over 300ms, like RN's
+  /// the header up 60 and the input up 50 (unscaled) over 300ms, like RN's
   /// `titleAnimStyle`/`searchAnimStyle`.
   Widget _buildSearchLaunch(Widget searchBar) {
-    final rn = _RnVerticalScale.of(context);
+    final rn = RnSize.of(context);
     return TweenAnimationBuilder<double>(
       tween: Tween(end: _focused ? 1 : 0),
       duration: const Duration(milliseconds: 300),
@@ -249,12 +247,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // RN's screen isn't inset for the status bar; this one is, so
-            // take the inset back out of RN's top spacing.
-            SizedBox(height: (rn.vs(44) - rn.statusBarTop).clamp(0, double.infinity)),
-            Transform.translate(offset: Offset(0, -60 * t), child: const _SearchHeader()),
+            // styles.searchContainer paddingTop 44@vs, from the top of the
+            // screen (it used to sit below the status-bar inset, clamped,
+            // which put the whole view ~5pt lower than RN).
+            SizedBox(height: rn.vs(44)),
+            Transform.translate(offset: Offset(0, rn.raw(-60) * t), child: const _SearchHeader()),
             Transform.translate(
-              offset: Offset(0, -50 * t),
+              offset: Offset(0, rn.raw(-50) * t),
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: rn.mvs(10)),
                 child: searchBar,
@@ -276,7 +275,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       for (final suggestion in _trySuggestions)
-                        _SuggestionChip(text: suggestion, iconSize: 16, onTap: () => _search(suggestion)),
+                        // RN `<SearchIcon width={16} height={16} />`: unscaled.
+                        _SuggestionChip(text: suggestion, iconSize: rn.raw(16), onTap: () => _search(suggestion)),
                     ],
                   ),
                 ),
@@ -311,8 +311,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                   )
                 : _resources.isNotEmpty
-                    ? _buildResultsList(rn)
-                    : _buildEmpty(),
+                ? _buildResultsList(rn)
+                : _buildEmpty(),
           ),
         ],
       ),
@@ -345,7 +345,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   /// RN `SearchEmpty` (light): 32@vs top/bottom, everything 16pt in; the
   /// "No results" line only when there was a query (not after Clear).
   Widget _buildEmpty() {
-    final rn = _RnVerticalScale.of(context);
+    final rn = RnSize.of(context);
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(vertical: rn.vs(32)),
       child: Column(
@@ -422,7 +422,9 @@ class _CategoryTabs extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 10, right: 10, bottom: 3),
                   alignment: Alignment.bottomCenter,
                   decoration: key == activeKey
-                      ? const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.black, width: 2)))
+                      ? const BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.black, width: 2)),
+                        )
                       : null,
                   child: Text(
                     title,
@@ -445,33 +447,6 @@ class _CategoryTabs extends StatelessWidget {
   }
 }
 
-/// react-native-size-matters' `verticalScale`/`moderateVerticalScale` in
-/// this app's units. RN uses them (`@vs`/`@mvs`) for this screen's vertical
-/// spacing; they scale with screen *height* (680pt guideline) rather than
-/// width, so they can't be written as raw numbers under [RnScale] like
-/// `@ms` values.
-class _RnVerticalScale {
-  _RnVerticalScale({required this.logicalHeight, required this.factor, required this.statusBarTop});
-
-  factory _RnVerticalScale.of(BuildContext context) {
-    final view = View.of(context);
-    // RnScale multiplies devicePixelRatio by its factor; 1 without it.
-    final factor = MediaQuery.devicePixelRatioOf(context) / view.devicePixelRatio;
-    return _RnVerticalScale(
-      logicalHeight: MediaQuery.sizeOf(context).height,
-      factor: factor,
-      statusBarTop: MediaQueryData.fromView(view).padding.top / factor,
-    );
-  }
-
-  final double logicalHeight;
-  final double factor;
-  final double statusBarTop;
-
-  double vs(double size) => size * logicalHeight / 680;
-  double mvs(double size) => 0.5 * size / factor + 0.5 * vs(size);
-}
-
 /// RN's `SearchHeader`: `marginTop: 80@mvs`, then a borderless
 /// `TabScreenHeader` (marginTop 16, 12pt top/bottom padding) whose title is
 /// empty and whose right content is the Ally logo + tagline. That content
@@ -486,7 +461,7 @@ class _SearchHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rn = _RnVerticalScale.of(context);
+    final rn = RnSize.of(context);
     return Padding(
       padding: EdgeInsets.only(top: rn.mvs(80) + 16),
       child: Padding(
@@ -544,9 +519,12 @@ class _SearchBar extends ConsumerWidget {
     // styles.searchBar: white, 0.5pt lightGray4 border, radius 20, 12pt
     // sides, capped at 40pt tall; 14pt SearchIcon in an 18pt box; 14pt
     // IBM Plex Serif input in darkSlate with a lightGray13 placeholder.
+    // RN sizes its SVG icons with plain numbers, so those use [RnSize.raw].
+    final rn = RnSize.of(context);
     return Column(
       children: [
         Container(
+          key: const Key('search-bar'),
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
@@ -561,7 +539,9 @@ class _SearchBar extends ConsumerWidget {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: Center(child: SvgPicture.asset('assets/icons/search.svg', width: 14, height: 14)),
+                child: Center(
+                  child: SizedBox.square(dimension: rn.raw(14), child: SvgPicture.asset('assets/icons/search.svg')),
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -601,8 +581,8 @@ class _SearchBar extends ConsumerWidget {
                     margin: const EdgeInsets.only(left: 8),
                     alignment: Alignment.center,
                     child: SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: rn.raw(16),
+                      height: rn.raw(16),
                       child: SvgPicture.asset(
                         'assets/icons/close.svg',
                         colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
@@ -616,7 +596,8 @@ class _SearchBar extends ConsumerWidget {
         if (showDropdown)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(bottom: 8),
+            // styles.suggestionsWrapper: paddingBottom 8@vs.
+            padding: EdgeInsets.only(bottom: rn.vs(8)),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: AppColors.lightGray4, width: 0.5),
@@ -629,11 +610,13 @@ class _SearchBar extends ConsumerWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onSuggestionTap(suggestion),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      // styles.suggestionRow (16@s / 10@vs), an unscaled
+                      // 16pt SearchIcon, suggestionText marginLeft 12@s.
+                      padding: EdgeInsets.symmetric(horizontal: rn.s(16), vertical: rn.vs(10)),
                       child: Row(
                         children: [
-                          SvgPicture.asset('assets/icons/search.svg', width: 16, height: 16),
-                          const SizedBox(width: 12),
+                          SizedBox.square(dimension: rn.raw(16), child: SvgPicture.asset('assets/icons/search.svg')),
+                          SizedBox(width: rn.s(12)),
                           Expanded(
                             child: Text(
                               suggestion,
@@ -668,7 +651,7 @@ class _SuggestionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rn = _RnVerticalScale.of(context);
+    final rn = RnSize.of(context);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -677,17 +660,13 @@ class _SuggestionChip extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 8, vertical: rn.mvs(7)),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: AppColors.lightGray14, width: 0.5),
+          border: Border.all(color: AppColors.lightGray14, width: rn.raw(0.5)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: iconSize,
-              height: iconSize,
-              child: SvgPicture.asset('assets/icons/search.svg'),
-            ),
+            SizedBox(width: iconSize, height: iconSize, child: SvgPicture.asset('assets/icons/search.svg')),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
