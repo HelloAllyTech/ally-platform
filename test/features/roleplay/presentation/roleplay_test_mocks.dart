@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/realtime/keep_awake.dart';
 import 'package:ally_mobile_flutter/core/realtime/livekit_room_service.dart';
+import 'package:ally_mobile_flutter/features/roleplay/presentation/simulation_sound_player.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
 
 /// `dataMessages`/`activeSpeakers` are implemented concretely (not left to
@@ -101,4 +102,12 @@ Future<void> joinAgent(
   service.emitParticipantConnected();
   await tester.pump();
   await tester.pump();
+}
+
+/// Records RN `playNotificationSound(sounds.startSimulation|endSimulation)`.
+class FakeSimulationSoundPlayer implements SimulationSoundPlayer {
+  final played = <SimulationSound>[];
+
+  @override
+  Future<void> play(SimulationSound sound) async => played.add(sound);
 }
