@@ -108,10 +108,17 @@ class LiveKitRoomService {
     );
   }
 
+  /// Ends the session and releases the room. This service is keep-alive,
+  /// so a room that was only disconnected stayed allocated after every
+  /// role-play, and the next session reused it; LiveKit expects a fresh
+  /// [Room] per connection, which [room] creates on next use.
   Future<void> disconnect() async {
     await _listener?.dispose();
     _listener = null;
-    await _room?.disconnect();
+    final room = _room;
+    _room = null;
+    await room?.disconnect();
+    await room?.dispose();
   }
 
   Future<void> dispose() async {
