@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
+import '../../../core/permissions/permissions_repository.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/level_indicator.dart';
@@ -20,6 +24,8 @@ class ProgressScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(progressDashboardProvider);
+    // Kept warm for the rank link's tab check.
+    ref.watch(userPermissionsProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -27,8 +33,13 @@ class ProgressScreen extends ConsumerWidget {
           children: [
             TabScreenHeader(title: ref.t('progress.title'), hideProgressWidget: true),
             Expanded(
+              // RN renderContent: error first, then the spinner while the
+              // gate or the data loads, else whatever exists (no hero or
+              // stats when the gate is closed) plus both link cards.
               child: dashboardAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
                 error: (error, _) => Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -39,35 +50,43 @@ class ProgressScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                data: (dashboard) => dashboard == null
-                    ? const SizedBox.shrink()
-                    : RefreshIndicator(
-                        onRefresh: () => ref.refresh(progressDashboardProvider.future),
-                        child: ListView(
-                          padding: const EdgeInsets.all(24),
-                          children: [
-                            _Hero(dashboard: dashboard),
-                            const SizedBox(height: 16),
-                            _StatsGrid(dashboard: dashboard),
-                            const SizedBox(height: 16),
-                            _LinkCard(
-                              label: ref.t('progress.rank.link'),
-                              onTap: () => context.push('/leaderboard'),
-                            ),
-                            const SizedBox(height: 16),
-                            _LinkCard(
-                              label: ref.t('progress.badges.link'),
-                              onTap: () => context.push('/achievements'),
-                            ),
-                          ],
-                        ),
-                      ),
+                data: (dashboard) => ListView(
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    if (dashboard != null) ...[
+                      _Hero(dashboard: dashboard),
+                      const SizedBox(height: 16),
+                      _StatsGrid(dashboard: dashboard),
+                      const SizedBox(height: 16),
+                    ],
+                    _LinkCard(
+                      key: const Key('progress-leaderboard-link'),
+                      label: ref.t('progress.rank.link'),
+                      onTap: () => _goToLeaderboard(context, ref),
+                    ),
+                    const SizedBox(height: 16),
+                    _LinkCard(
+                      key: const Key('progress-badges-link'),
+                      label: ref.t('progress.badges.link'),
+                      onTap: () => context.push('/achievements'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// RN `navigation.navigate(LEADERBOARD)`: Leaderboard is only a bottom
+  /// tab, so this jumps to it, and does nothing for a user who has no
+  /// Leaderboard tab.
+  void _goToLeaderboard(BuildContext context, WidgetRef ref) {
+    final permissions = ref.read(userPermissionsProvider).value ?? const <String>[];
+    if (!permissions.contains(UserPermissions.viewCommunityLeaderboard)) return;
+    goToHomeTab(GoRouter.of(context), kTabLeaderboard);
   }
 }
 
@@ -216,7 +235,7 @@ class _StatCard extends StatelessWidget {
 }
 
 class _LinkCard extends StatelessWidget {
-  const _LinkCard({required this.label, required this.onTap});
+  const _LinkCard({super.key, required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;

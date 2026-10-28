@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:ally_mobile_flutter/core/navigation/home_tab_navigation.dart';
+import 'package:ally_mobile_flutter/core/navigation/tab_config.dart';
+import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/progress/data/progress_repository.dart';
 import 'package:ally_mobile_flutter/features/progress/presentation/progress_screen.dart';
 
@@ -73,26 +77,55 @@ void main() {
     );
   });
 
-  testWidgets('tapping the leaderboard/badges link cards navigates there', (tester) async {
+  testWidgets('rank link jumps to the Leaderboard tab; badges link pushes Achievements', (tester) async {
     final router = await pumpRouterApp(
       tester,
       initialLocation: '/progress',
       routes: [
         GoRoute(path: '/progress', builder: (context, state) => const ProgressScreen()),
-        GoRoute(path: '/leaderboard', builder: (context, state) => const Text('LEADERBOARD')),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => Text('HOME ${(state.extra as HomeTabRequest?)?.tabName}'),
+        ),
         GoRoute(path: '/achievements', builder: (context, state) => const Text('ACHIEVEMENTS')),
       ],
-      overrides: [progressDashboardProvider.overrideWith((ref) async => _dashboard())],
+      overrides: [
+        progressDashboardProvider.overrideWith((ref) async => _dashboard()),
+        userPermissionsProvider.overrideWith((ref) async => [UserPermissions.viewCommunityLeaderboard]),
+      ],
     );
+
+    await tester.tap(find.byKey(const Key('progress-badges-link')));
+    await tester.pumpAndSettle();
+    expect(find.text('ACHIEVEMENTS'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('See where you rank'));
     await tester.pumpAndSettle();
-    expect(find.text('LEADERBOARD'), findsOneWidget);
+    expect(find.text('HOME $kTabLeaderboard'), findsOneWidget);
+  });
 
-    router.pop();
+  testWidgets('without the leaderboard permission the rank link does nothing; closed gate still shows both links', (
+    tester,
+  ) async {
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/progress',
+      routes: [
+        GoRoute(path: '/progress', builder: (context, state) => const ProgressScreen()),
+        GoRoute(path: '/home', builder: (context, state) => const Text('HOME')),
+      ],
+      overrides: [
+        progressDashboardProvider.overrideWith((ref) async => null),
+        userPermissionsProvider.overrideWith((ref) async => const <String>[]),
+      ],
+    );
+
+    expect(find.text('See all your badges'), findsOneWidget);
+    await tester.tap(find.text('See where you rank'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('See all your badges'));
-    await tester.pumpAndSettle();
-    expect(find.text('ACHIEVEMENTS'), findsOneWidget);
+    expect(find.text('HOME'), findsNothing);
+    expect(find.byType(ProgressScreen), findsOneWidget);
   });
 }

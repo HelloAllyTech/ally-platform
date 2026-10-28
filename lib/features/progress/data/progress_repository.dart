@@ -152,7 +152,9 @@ final progressSummaryProvider = FutureProvider<ProgressSummary?>((ref) async {
   return ref.watch(progressRepositoryProvider).getProgressSummary();
 });
 
-final progressDashboardProvider = FutureProvider<ProgressDashboard?>((ref) async {
+/// RN `refetchOnMountOrArgChange: true`: dropped when the Progress screen
+/// closes, so every visit fetches fresh.
+final progressDashboardProvider = FutureProvider.autoDispose<ProgressDashboard?>((ref) async {
   final canView = await ref.watch(canViewProgressProvider.future);
   if (!canView) return null;
   return ref.watch(progressRepositoryProvider).getProgress();
