@@ -12,6 +12,7 @@ import '../../../core/realtime/livekit_room_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
+import '../../../core/widgets/toast/toast.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
 import '../../simulations/presentation/simulation_feedback_location.dart';
@@ -153,7 +154,6 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
 
   RoleplayRoomStatus _status = RoleplayRoomStatus.disconnected;
   bool _isMicEnabled = false;
-  String? _error;
 
   /// RN `isSimulationInProgress`: CONNECTED or AGENT_JOINED.
   bool get _isConnected =>
@@ -416,7 +416,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         _pauseStartedAt = widget.now();
         _isPaused = true;
       });
-      await _liveKitService.publishData({'type': SimControl.pause});
+      await _publishControl(SimControl.pause);
       _armControlAck(revert);
     } else {
       final pausedAt = _pauseStartedAt;
@@ -440,8 +440,23 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         _isPaused = false;
         _showEndingSoon = false;
       });
-      await _liveKitService.publishData({'type': SimControl.resume});
+      await _publishControl(SimControl.resume);
       _armControlAck(revert);
+    }
+  }
+
+  /// RN `useErrorToast().showErrorToast(error, fallbackKey)`: every live
+  /// role-play failure is a transient error toast, never inline text.
+  void _showErrorToast(Object? error, String fallbackKey) =>
+      showErrorToast(error, fallbackKey, t: ref.tr);
+
+  /// RN `publishControl`: a failed publish toasts `errors.toggleMic` (as RN
+  /// does); the ack timer is still armed by the caller.
+  Future<void> _publishControl(String type) async {
+    try {
+      await _liveKitService.publishData({'type': type});
+    } catch (e) {
+      if (mounted) _showErrorToast(e, 'errors.toggleMic');
     }
   }
 
@@ -450,7 +465,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     _controlAckTimer = Timer(controlAckTimeout, () {
       _controlAckTimer = null;
       revert();
-      if (mounted) setState(() => _error = ref.tr('errors.pauseControl'));
+      if (mounted) _showErrorToast(null, 'errors.pauseControl');
     });
   }
 
@@ -476,7 +491,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     try {
       await _audioSession.configure();
     } catch (e) {
-      if (mounted) setState(() => _error = ref.tr('errors.audioSession'));
+      if (mounted) _showErrorToast(e, 'errors.audioSession');
     }
     if (!mounted) return;
     try {
@@ -485,7 +500,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         accessToken: widget.accessToken,
       );
     } catch (e) {
-      if (mounted) setState(() => _error = ref.tr('errors.connect'));
+      if (mounted) _showErrorToast(e, 'errors.connect');
       return;
     }
     if (!mounted || _status == RoleplayRoomStatus.disconnecting) return;
@@ -495,7 +510,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       await _liveKitService.setMicrophoneEnabled(true);
       if (mounted) setState(() => _isMicEnabled = true);
     } catch (e) {
-      if (mounted) setState(() => _error = ref.tr('errors.attachListeners'));
+      if (mounted) _showErrorToast(e, 'errors.attachListeners');
     }
   }
 
@@ -665,8 +680,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     try {
       await _liveKitService.setMicrophoneEnabled(next);
       if (mounted) setState(() => _isMicEnabled = next);
-    } catch (_) {
-      if (mounted) setState(() => _error = ref.tr('errors.toggleMic'));
+    } catch (e) {
+      if (mounted) _showErrorToast(e, 'errors.toggleMic');
     }
   }
 
@@ -822,15 +837,6 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                                   bottom: 20,
                                 ),
                                 child: SessionScoreMeter(score: _score),
-                              ),
-                            ),
-                          if (_error != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: AppColors.red400),
                               ),
                             ),
                         ],

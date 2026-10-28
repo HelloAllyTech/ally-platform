@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 import 'package:ally_mobile_flutter/core/realtime/livekit_room_service.dart';
+import 'package:ally_mobile_flutter/core/widgets/toast/toast.dart';
 import 'package:ally_mobile_flutter/features/roleplay/presentation/roleplay_voice_screen.dart';
 
 import '../../../support/fake_permission_platform.dart';
@@ -13,7 +14,7 @@ import 'roleplay_test_mocks.dart';
 // tests are one-`testWidgets`-per-file.
 void main() {
   testWidgets(
-    'an automatic connect() failure surfaces the connect-error message',
+    'an automatic connect() failure shows RN\'s connect-error toast, not inline text',
     (tester) async {
       PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({});
       final liveKitService = MockLiveKitRoomService();
@@ -39,10 +40,19 @@ void main() {
       // The screen connects by itself on mount (RN `handleConnect` effect).
       await tester.pump(const Duration(seconds: 1));
 
+      // RN `showErrorToast(error, 'errors.connect')`: a toast, not inline text.
       expect(
-        find.textContaining('Failed to connect to the room'),
+        find.descendant(
+          of: find.byType(AppToast),
+          matching: find.textContaining('Failed to connect to the room'),
+        ),
         findsOneWidget,
       );
+
+      // Transient: gone once the toast's 3s run is over.
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.textContaining('Failed to connect to the room'), findsNothing);
     },
   );
 }

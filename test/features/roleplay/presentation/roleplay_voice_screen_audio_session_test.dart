@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 import 'package:ally_mobile_flutter/core/realtime/livekit_room_service.dart';
+import 'package:ally_mobile_flutter/core/widgets/toast/toast.dart';
 import 'package:ally_mobile_flutter/features/roleplay/presentation/roleplay_audio_session.dart';
 import 'package:ally_mobile_flutter/features/roleplay/presentation/roleplay_voice_screen.dart';
 import 'package:ally_mobile_flutter/features/roleplay/presentation/simulation_sound_player.dart';
@@ -64,7 +65,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 200));
       expect(log, ['configure', 'connect']);
-      expect(find.text('Failed to configure audio session'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(AppToast), matching: find.textContaining('Failed to configure audio session')),
+        findsOneWidget,
+      );
 
       await tester.pump(const Duration(seconds: 3));
       expect(sound.stopCount, 0);
