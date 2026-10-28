@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/discussion_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/discussion_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/discussion/discussion_thread.dart';
@@ -87,13 +86,9 @@ void main() {
     );
   }
 
-  // Taps the submit AppButton scoped to one composer's key — not a nested
-  // InkWell lookup, since a reply/edit composer's Cancel button is itself
-  // an earlier InkWell-backed TextButton in the same subtree, making
-  // `.first` pick the wrong one.
-  Future<void> tapSubmit(WidgetTester tester, String composerKey) => tester.tap(
-    find.descendant(of: find.byKey(Key(composerKey)), matching: find.byType(AppButton)),
-  );
+  // RN PostInput testIDs: `<testID>-submit`.
+  Future<void> tapSubmit(WidgetTester tester, String composerKey) =>
+      tester.tap(find.byKey(Key('$composerKey-submit')));
 
   testWidgets('the full empty-state, post, reply, edit, delete, lock flow', (tester) async {
     // 1. Empty state: no posts yet, composer visible since the viewer can post.
@@ -156,10 +151,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('discussion-post-p1-delete')));
     await tester.pumpAndSettle();
-    // ConfirmationModal renders its title via Text.rich, not a bare Text.
-    expect(find.textContaining('Delete this post?', findRichText: true), findsOneWidget);
+    // RN Alert.alert → a Cupertino alert with a destructive Delete.
+    expect(find.text('Delete this post?'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(AppButton, 'Delete'));
+    await tester.tap(find.byKey(const Key('discussion-delete-confirm')));
     await tester.pumpAndSettle();
 
     verify(() => repository.deletePost('p1')).called(1);
