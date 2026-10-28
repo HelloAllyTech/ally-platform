@@ -363,7 +363,7 @@ void main() {
     expect(allyLogo, findsNothing);
   });
 
-  testWidgets('launch view sits where RN puts it on a 402x874 iPhone, ignoring the status-bar inset', (tester) async {
+  testWidgets('launch view sits where RN puts it on a 402x874 iPhone, inside the tab shell\'s safe area', (tester) async {
     tester.view.physicalSize = const Size(402, 874);
     tester.view.devicePixelRatio = 1;
     tester.view.padding = const FakeViewPadding(top: 62, bottom: 34);
@@ -374,7 +374,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [searchRepositoryProvider.overrideWithValue(repository)],
-        child: MaterialApp(builder: (context, child) => RnScale(child: child!), home: const SearchScreen()),
+        // The tab shell lays every tab out below the status bar (SafeArea).
+        child: MaterialApp(
+          builder: (context, child) => RnScale(child: child!),
+          home: const SafeArea(bottom: false, child: SearchScreen()),
+        ),
       ),
     );
     await tester.pumpAndSettle();

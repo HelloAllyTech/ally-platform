@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -239,19 +240,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   /// `titleAnimStyle`/`searchAnimStyle`.
   Widget _buildSearchLaunch(Widget searchBar) {
     final rn = RnSize.of(context);
+    final top = rn.vs(44) - _statusBarInset(context);
     return TweenAnimationBuilder<double>(
       tween: Tween(end: _focused ? 1 : 0),
       duration: const Duration(milliseconds: 300),
-      builder: (context, t, _) => Padding(
+      builder: (context, t, _) => Transform.translate(
+        offset: Offset(0, math.min(0, top)),
+        child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // styles.searchContainer paddingTop 44@vs, from the top of the
-            // screen (it used to sit below the status-bar inset, clamped,
-            // which put the whole view ~5pt lower than RN).
-            SizedBox(height: rn.vs(44)),
-            Transform.translate(offset: Offset(0, rn.raw(-60) * t), child: const _SearchHeader()),
+            // styles.searchContainer paddingTop 44@vs is measured from the
+            // top of the screen, but the tab shell already lays this tab out
+            // below the status bar. Take the inset back out; on a notched
+            // phone that goes negative (RN's content starts inside the
+            // status-bar band), so shift up rather than clamp at 0.
+            SizedBox(height: math.max(0, top)),
+            Transform.translate(
+              offset: Offset(0, rn.raw(-60) * t),
+              child: const _SearchHeader(),
+            ),
             Transform.translate(
               offset: Offset(0, rn.raw(-50) * t),
               child: Padding(
@@ -285,6 +294,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               const Spacer(),
           ],
         ),
+      ),
       ),
     );
   }
@@ -686,4 +696,13 @@ class _SuggestionChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The device's top inset in this tree's logical units (RnScale divides the
+/// logical size by its factor; the shell's SafeArea has already consumed the
+/// inset, so read it from the View).
+double _statusBarInset(BuildContext context) {
+  final view = View.of(context);
+  final factor = MediaQuery.devicePixelRatioOf(context) / view.devicePixelRatio;
+  return MediaQueryData.fromView(view).padding.top / factor;
 }
