@@ -38,6 +38,13 @@ class MockLiveKitRoomService extends Mock implements LiveKitRoomService {
   /// The room closed from the other side.
   void emitDisconnected() => _disconnectedController.add(null);
 
+  /// No real room in tests: the tiles' audio-level monitors stay idle.
+  @override
+  Participant? get localParticipant => null;
+
+  @override
+  Participant? get remoteParticipant => null;
+
   @override
   Stream<LiveKitDataMessage> get dataMessages => _dataController.stream;
 
@@ -110,4 +117,9 @@ class FakeSimulationSoundPlayer implements SimulationSoundPlayer {
 
   @override
   Future<void> play(SimulationSound sound) async => played.add(sound);
+
+  int stopCount = 0;
+
+  @override
+  Future<void> stop() async => stopCount++;
 }
