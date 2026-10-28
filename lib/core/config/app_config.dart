@@ -17,6 +17,15 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// Mirrors `env.ALLY_WEB_URL` — the web app's origin, with a trailing
+  /// slash as RN's env files have it (SimulationDetails copies
+  /// `${ALLY_WEB_URL}scenario/<id>`). RN requires it; this defaults to the
+  /// production web app so an unconfigured build still copies working links.
+  static const String allyWebUrl = String.fromEnvironment(
+    'ALLY_WEB_URL',
+    defaultValue: 'https://app.helloally.ai/',
+  );
+
   /// Mirrors `env.MICROPHONE_SOCKET_PATH` — the Socket.IO namespace Scribe's
   /// live recording connects to (ally-be's CLAUDE.md lists it as
   /// `/microphone-chat`), configurable rather than hardcoded for the same

@@ -5,9 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/app_update/force_update_modal.dart';
 import 'core/auth/auth_state.dart';
 import 'core/chat/active_chat_discovery.dart';
 import 'core/chat/cloud_telephony_listener.dart';
+import 'core/errors/crash_reporting.dart';
+import 'core/errors/error_boundary.dart';
 import 'core/localization/localization_controller.dart';
 import 'core/push/leaderboard_notification.dart';
 import 'core/push/push_notification_service.dart';
@@ -29,12 +32,21 @@ Future<void> main() async {
   // same graceful-degradation reason `PushNotificationService` already
   // documents — this app has no Firebase config files of its own yet.
   WidgetsFlutterBinding.ensureInitialized();
+  var firebaseReady = false;
   try {
     await Firebase.initializeApp();
+    firebaseReady = true;
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (_) {
     // Expected until this app's own Firebase config files are added.
   }
+  // RN App.tsx's ErrorBoundary + Crashlytics; reporting no-ops without
+  // Firebase.
+  installErrorHandling(firebaseReady: firebaseReady);
+  // RN is portrait-only (Info.plist UISupportedInterfaceOrientations,
+  // manifest screenOrientation="portrait"); the native files say the same,
+  // this also covers iPad, whose Info.plist list Flutter keeps open.
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   runApp(const ProviderScope(retry: appRetryPolicy, child: AllyApp()));
 }
@@ -112,7 +124,14 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
       // login hero's light bar the clock was white-on-white on Home.
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
-        child: RnScale(child: child!),
+        child: RnScale(
+          child: AppErrorBoundary(
+            // RN re-mounts the navigator: back to Splash, which routes on
+            // from the current auth state.
+            onReset: () => router.go('/splash'),
+            child: ForceUpdateGate(child: child!),
+          ),
+        ),
       ),
       // Flutter's own built-in widget strings (date pickers, dialog button
       // labels) localized across the same 5 languages the app's own

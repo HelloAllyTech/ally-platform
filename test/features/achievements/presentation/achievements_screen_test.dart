@@ -105,11 +105,12 @@ void main() {
       expect(find.text('Contribution'), findsNothing, reason: 'category with nothing unlocked is dropped');
       expect(find.text('Helper'), findsNothing);
 
-      // --- Tapping a badge marks it viewed, regardless of filter. ---
+      // --- Cards aren't tappable: as in RN, only closing the unlock ---
+      // --- popup marks a badge viewed.                               ---
       await tester.tap(find.text('Streak 7'));
       await tester.pumpAndSettle();
 
-      verify(() => repository.markBadgeAsViewed('b1')).called(1);
+      verifyNever(() => repository.markBadgeAsViewed(any()));
 
       // --- Back to All: everything reappears. ---
       await tester.tap(find.text('All'));

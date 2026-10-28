@@ -28,10 +28,17 @@ void main() {
 
   group('SessionData.fromJson', () {
     test('parses the LiveKit connection pair', () {
+      // ally-be's real response shape: {scenarioSession, accessToken,
+      // scenario} — `scenarioSession.id` is the session id, and
+      // `accessToken` is itself an object ({token, roomName, serverUrl}),
+      // not a bare string. Matches RN's own `ScenarioSessionStartResponse`.
       final session = SessionData.fromJson({
-        'id': 'session-1',
-        'accessToken': 'token-abc',
-        'liveKitServerUrl': 'wss://livekit.example.com',
+        'scenarioSession': {'id': 'session-1'},
+        'accessToken': {
+          'token': 'token-abc',
+          'roomName': 'room-1',
+          'serverUrl': 'wss://livekit.example.com',
+        },
       });
 
       expect(session.id, 'session-1');

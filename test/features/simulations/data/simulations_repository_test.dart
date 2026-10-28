@@ -197,9 +197,8 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => _response({
-          'id': 'sess-1',
-          'accessToken': 'tok',
-          'liveKitServerUrl': 'wss://lk',
+          'scenarioSession': {'id': 'sess-1'},
+          'accessToken': {'token': 'tok', 'serverUrl': 'wss://lk'},
         }),
       );
 
@@ -231,9 +230,8 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => _response({
-          'id': 'sess-2',
-          'accessToken': 'tok2',
-          'liveKitServerUrl': 'wss://lk2',
+          'scenarioSession': {'id': 'sess-2'},
+          'accessToken': {'token': 'tok2', 'serverUrl': 'wss://lk2'},
         }),
       );
 
@@ -265,9 +263,8 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => _response({
-          'id': 'sess-3',
-          'accessToken': 'tok3',
-          'liveKitServerUrl': 'wss://lk3',
+          'scenarioSession': {'id': 'sess-3'},
+          'accessToken': {'token': 'tok3', 'serverUrl': 'wss://lk3'},
         }),
       );
 
@@ -296,9 +293,8 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => _response({
-          'id': 'sess-4',
-          'accessToken': 'tok4',
-          'liveKitServerUrl': 'wss://lk4',
+          'scenarioSession': {'id': 'sess-4'},
+          'accessToken': {'token': 'tok4', 'serverUrl': 'wss://lk4'},
         }),
       );
 
