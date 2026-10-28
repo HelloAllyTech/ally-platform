@@ -41,7 +41,7 @@ export const CHARACTER_INTERVIEW_MAX_TRUNCATION_RETRIES = 2;
  * partial result, so the fix is to send the identical request again rather
  * than to tell the model anything: two retries put a turn's odds past 95%.
  */
-export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 2;
+export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 4;
 
 /**
  * Per-tenant interview caps. These bound LLM spend now that the agent is
