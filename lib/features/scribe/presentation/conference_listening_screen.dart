@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/realtime/keep_awake.dart';
@@ -200,9 +202,32 @@ class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningS
 
   DateTime get _startTime => DateTime.tryParse(_chat?.startedAt ?? '') ?? _mountedAt;
 
+  /// Android back / iOS swipe. RN keeps the stack [CallLog, Listening]
+  /// (RootNavigator.tsx `navigationRef.reset`) and leaves conference mode on
+  /// the default back behaviour (`gestureEnabled: !isMicrophoneMode`,
+  /// useListeningCommon.ts; no hardware-back handler, no confirmation, the
+  /// chat is not cleared), so back lands on Call Logs. Active-chat discovery
+  /// reaches this screen with `go()`, so when there is nothing to pop the
+  /// Call Log tab is opened instead of leaving the app.
+  void _handleBack() {
+    if (!mounted || _hasLeft) return;
+    final router = GoRouter.maybeOf(context);
+    if (router == null) return;
+    _hasLeft = true;
+    goToHomeTab(router, kTabCallLog);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListeningPage(child: _buildBody());
+    // A page underneath (pushed here): the system pop (and iOS swipe) is
+    // RN's goBack as-is. Otherwise intercept it so the app doesn't exit.
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleBack();
+      },
+      child: ListeningPage(child: _buildBody()),
+    );
   }
 
   Widget _buildBody() {
