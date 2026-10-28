@@ -35,15 +35,22 @@ class LeaderboardEntry {
 /// `LeaderboardPeriod`. Labels match the RN screen's own
 /// `getPeriodLabel` (last-N-days framing, not literal "weekly/monthly").
 enum LeaderboardWindow {
-  lastWeek('LAST_WEEK', 'Last 7 days'),
-  lastMonth('LAST_MONTH', 'Last 28 days'),
-  lastYear('LAST_YEAR', 'Last 364 days'),
-  allTime('ALL_TIME', 'All time');
+  lastWeek('LAST_WEEK', 'Last 7 days', 'community.filters.last7days'),
+  lastMonth('LAST_MONTH', 'Last 28 days', 'community.filters.last28days'),
+  lastYear('LAST_YEAR', 'Last 364 days', 'community.filters.last364days'),
+  allTime('ALL_TIME', 'All time', 'community.filters.allTime');
 
-  const LeaderboardWindow(this.apiValue, this.label);
+  const LeaderboardWindow(this.apiValue, this.label, this.labelKey);
 
   final String apiValue;
+
+  /// English fallback only — `LeaderboardScreen` renders [labelKey] through
+  /// `ref.t()` instead. RN's own `getPeriodLabel` (`LeaderboardScreen.tsx`)
+  /// translates this dropdown too; this enum used to render [label]
+  /// verbatim, the one place on an otherwise fully-localized screen that
+  /// always showed English regardless of the user's selected language.
   final String label;
+  final String labelKey;
 }
 
 /// Mirrors RN's `MyRankResponse` — a superset of `LeaderboardEntry` with the

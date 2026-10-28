@@ -208,14 +208,20 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 child: SizedBox(
                   width: 160,
                   child: AppDropdown(
-                    value: selectedWindow.label,
+                    // RN's `getPeriodLabel` (`LeaderboardScreen.tsx`)
+                    // translates this dropdown via `t()` — it was rendering
+                    // the enum's bare English `label` verbatim, the one
+                    // untranslated spot on an otherwise fully-localized
+                    // screen, even though `community.filters.*` already has
+                    // real translations in every locale file.
+                    value: ref.t(selectedWindow.labelKey),
                     options: [
                       for (final window in LeaderboardWindow.values)
-                        window.label,
+                        ref.t(window.labelKey),
                     ],
                     onSelect: (label) {
                       final window = LeaderboardWindow.values.firstWhere(
-                        (w) => w.label == label,
+                        (w) => ref.t(w.labelKey) == label,
                       );
                       ref
                           .read(leaderboardWindowProvider.notifier)
