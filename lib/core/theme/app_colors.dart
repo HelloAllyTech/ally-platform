@@ -108,4 +108,12 @@ class AppColors {
   static const orange50 = Color(0xFFFFF3E0); // Scribe chip background
   static const orange400 = Color(0xFFFFA726); // ReviewNote callout border
   static const orange900 = Color(0xFFE65100); // Scribe chip text
+
+  // tabs parity
+  static const darkCharcoal = Color(0xFF4D4D4D); // CallLogItem scenarioName
+  static const ashGray = Color(0xFFEAEAEA); // CallLog FAB with nothing to offer
+  static const lightGray8 = Color(0xFFF6F6F6); // CallLogSkeleton blocks
+  static const lightGray6 = Color(0x33E5E7EB); // CallLogSkeleton status dot/text
+  static const darkGray = Color(0xB302060B); // rgba(2,6,11,0.7) analytics error text
+  static const deepPurple500 = Color(0xFF673AB7); // CallLogItem "Live Session" label
 }
