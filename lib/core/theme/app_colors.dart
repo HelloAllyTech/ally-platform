@@ -93,6 +93,10 @@ class AppColors {
   static const amber50 = Color(0xFFFFF8E1); // Warning banner background
   static const red700 = Color(0xFF97413A); // Warning banner text
 
+  // SimulationsScreen's credit display (src/theme/colors.ts's legacy
+  // `darkGray` — the "/{{limit}}" suffix text color).
+  static const darkGray = Color(0xB3020B0B); // rgba(2,6,11,0.7)
+
   // StatusBadge (src/screens/CallLog/components/StatusBadge + colors.ts)
   static const creamYellow = Color(0xFFF8E6BA); // Processing/Pending background
   static const amberOrange = Color(0xFFFFAD0D); // Processing dot
@@ -107,4 +111,11 @@ class AppColors {
   static const orange50 = Color(0xFFFFF3E0); // Scribe chip background
   static const orange400 = Color(0xFFFFA726); // ReviewNote callout border
   static const orange900 = Color(0xFFE65100); // Scribe chip text
+
+  // CourseItemRow (src/screens/CourseOverviewScreen/components/CourseItemRow
+  // + designSystem/colors.ts's `grey`/`lightBlue` scales). `grey[100]` and
+  // `green[700]` match this file's existing `lightGray`/`success` exactly —
+  // reuse those instead of adding duplicate tokens for the same hex.
+  static const grey400 = Color(0xFFBDBDBD); // Locked badge's lock icon
+  static const lightBlue50 = Color(0xFFE1F5FE); // "In progress"/"Next" status chip
 }

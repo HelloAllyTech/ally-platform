@@ -89,7 +89,9 @@ void main() {
 
     expect(find.text('First scenario'), findsOneWidget);
     expect(find.text('Second scenario'), findsOneWidget);
-    expect(find.text('6 credits'), findsOneWidget);
+    // RN's renderCreditsDisplay shows "consumed/limit" (e.g. "4/10"), not a
+    // "remaining" count — matches `creditLimit: 10, consumedCredits: 4` above.
+    expect(find.text('4/10'), findsOneWidget);
   });
 
   testWidgets('shows an empty state when there are no scenarios', (tester) async {

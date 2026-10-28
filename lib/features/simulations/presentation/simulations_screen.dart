@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
@@ -64,15 +65,42 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
             title: ref.t('common.appName'),
             subtitle: ref.t('nav.tabs.learn'),
             italicSubtitle: true,
+            // RN's `renderCreditsDisplay` (`SimulationsScreen.tsx`): a bolt
+            // icon + "consumed/limit" fraction (e.g. "1048/10000"), colored
+            // red when `getCreditsInfo.isLow`. This was instead showing
+            // "{{remaining}} credits" — a different number (credits left,
+            // not consumed-over-limit) with no icon and no low-credit
+            // color treatment; `SimulationCredits` already had both
+            // `consumedCredits`/`creditLimit` and an `isLow` getter ported
+            // correctly, this was purely a display bug.
             trailing: creditsAsync.when(
-              // RN's styles.creditText: display.small size, but
-              // IBM_PLEX_SERIF.MEDIUM family — not the ambient default.
-              data: (credits) => Text(
-                ref.t('simulations.creditsRemaining', {
-                  'count': credits.remaining,
-                }),
-                style: Theme.of(context).textTheme.displaySmall
-                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+              data: (credits) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset('assets/icons/bolt.svg', width: 14, height: 14),
+                  const SizedBox(width: 4),
+                  // RN's styles.creditText: display.small size, but
+                  // IBM_PLEX_SERIF.MEDIUM family — not the ambient default.
+                  Text.rich(
+                    TextSpan(
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontFamily: AppFonts.ibmPlexSerifMedium,
+                        color: credits.isLow ? AppColors.softCoralRed : null,
+                      ),
+                      children: [
+                        TextSpan(text: '${credits.consumedCredits}'),
+                        TextSpan(
+                          text: '/${credits.creditLimit}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.normal,
+                            color: AppColors.darkGray,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               loading: () => const SizedBox.shrink(),
               error: (_, _) => const SizedBox.shrink(),
