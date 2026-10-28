@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/screen_focus_listener.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
@@ -265,83 +266,88 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
     final showFooter = _isFetching || _hasMore;
     final isEmpty = _loadedOnce && !_isFetching && _reviews.isEmpty;
 
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.only(top: 16, left: rn.s(16), right: rn.s(16)),
-          child: Row(
-            children: [
-              Expanded(
-                child: _ContentWidthTabs<ReviewReadFilter>(
-                  tabs: [for (final f in ReviewReadFilter.values) (key: f, label: ref.t(f.labelKey))],
-                  active: _readFilter,
-                  onChange: (filter) {
-                    if (filter == _readFilter) return;
-                    setState(() => _readFilter = filter);
+    // RN ReviewList `useFocusEffect`: every return to the list (not the
+    // first focus) refreshes it from page 0.
+    return ScreenFocusListener(
+      onFocus: () => _fetch(reset: true),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: 16, left: rn.s(16), right: rn.s(16)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ContentWidthTabs<ReviewReadFilter>(
+                    tabs: [for (final f in ReviewReadFilter.values) (key: f, label: ref.t(f.labelKey))],
+                    active: _readFilter,
+                    onChange: (filter) {
+                      if (filter == _readFilter) return;
+                      setState(() => _readFilter = filter);
+                      _fetch(reset: true);
+                    },
+                  ),
+                ),
+                SizedBox(width: rn.s(8)),
+                _SortDropdown(
+                  value: ref.t(_sort.labelKey),
+                  options: [for (final sort in ReviewSortBy.values) ref.t(sort.labelKey)],
+                  onSelect: (label) {
+                    final sort = ReviewSortBy.values.firstWhere((s) => ref.tr(s.labelKey) == label);
+                    if (sort == _sort) return;
+                    setState(() => _sort = sort);
                     _fetch(reset: true);
                   },
                 ),
-              ),
-              SizedBox(width: rn.s(8)),
-              _SortDropdown(
-                value: ref.t(_sort.labelKey),
-                options: [for (final sort in ReviewSortBy.values) ref.t(sort.labelKey)],
-                onSelect: (label) {
-                  final sort = ReviewSortBy.values.firstWhere((s) => ref.tr(s.labelKey) == label);
-                  if (sort == _sort) return;
-                  setState(() => _sort = sort);
-                  _fetch(reset: true);
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () => _fetch(reset: true),
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _onScroll,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(left: rn.s(16), right: rn.s(16), top: 10, bottom: 360),
-                children: [
-                  for (final (i, review) in _reviews.indexed) ...[
-                    // contentContainerStyle gap 10 + ItemSeparator 8@s.
-                    if (i > 0) SizedBox(height: 10 + rn.s(8)),
-                    ReviewCard(
-                      key: ValueKey(review.id),
-                      review: review,
-                      reviewType: widget.reviewType,
-                      onOpenReview: widget.canViewReview ? () => _openReview(review) : null,
-                    ),
-                  ],
-                  if (isEmpty)
-                    AppEmptyState(
-                      iconAsset: 'assets/icons/emptyReviews.svg',
-                      title: ref.t('review.empty.title'),
-                      description: ref.t('review.empty.description'),
-                    ),
-                  if (showFooter)
-                    Padding(
-                      padding: EdgeInsets.only(top: _reviews.isEmpty ? 0 : 10, bottom: 0),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: rn.s(16)),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => _fetch(reset: true),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScroll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(left: rn.s(16), right: rn.s(16), top: 10, bottom: 360),
+                  children: [
+                    for (final (i, review) in _reviews.indexed) ...[
+                      // contentContainerStyle gap 10 + ItemSeparator 8@s.
+                      if (i > 0) SizedBox(height: 10 + rn.s(8)),
+                      ReviewCard(
+                        key: ValueKey(review.id),
+                        review: review,
+                        reviewType: widget.reviewType,
+                        onOpenReview: widget.canViewReview ? () => _openReview(review) : null,
+                      ),
+                    ],
+                    if (isEmpty)
+                      AppEmptyState(
+                        iconAsset: 'assets/icons/emptyReviews.svg',
+                        title: ref.t('review.empty.title'),
+                        description: ref.t('review.empty.description'),
+                      ),
+                    if (showFooter)
+                      Padding(
+                        padding: EdgeInsets.only(top: _reviews.isEmpty ? 0 : 10, bottom: 0),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: rn.s(16)),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
