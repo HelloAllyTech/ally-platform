@@ -14,8 +14,8 @@ import '../../../core/widgets/app_empty_state.dart';
 /// "Go to login" pill below it, the pair centred vertically on white.
 ///
 /// RN resets navigation to Splash (the login screen). Here the button
-/// clears any session and goes to /login: the login screen pushes this
-/// route while still signed out, so a logout alone wouldn't change auth
+/// clears any session and goes to /login: the login screen replaces itself
+/// with this route while still signed out, so a logout alone wouldn't change auth
 /// state and the router would have nothing to redirect on.
 class SuspendedAccountScreen extends ConsumerWidget {
   const SuspendedAccountScreen({super.key});

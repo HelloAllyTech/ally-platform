@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/back_title_header.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../data/bug_report_repository.dart';
 
@@ -35,6 +37,7 @@ class BugReportScreen extends ConsumerStatefulWidget {
 
 class _BugReportScreenState extends ConsumerState<BugReportScreen> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   bool _isSubmitting = false;
 
   @override
@@ -47,6 +50,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
   void dispose() {
     _controller.removeListener(_onDescriptionChanged);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -88,46 +92,104 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
     }
   }
 
+  static const _bodyMedium = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 14,
+    height: 22 / 14,
+    letterSpacing: 0.2,
+  );
+
   @override
   Widget build(BuildContext context) {
+    final rn = RnSize.of(context);
+    final insets = MediaQuery.paddingOf(context);
+    // RN's KeyboardAvoidingView wraps only the scroll view: the footer stays
+    // at the bottom (behind the keyboard) while the content gains room.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return Scaffold(
-      // RN's `BugReportScreen.tsx` is a plain white header with a black
-      // back arrow (`<LeftArrowIcon color={colors.black} />`), not this
-      // app's global blue `AppBarTheme` default.
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.highEmphasis,
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: Text(ref.t('bugReport.title')),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(ref.t('bugReport.prompt')),
-            const SizedBox(height: 12),
-            AppTextField(
-              controller: _controller,
-              maxLines: 6,
-              maxLength: _maxDescriptionLength,
-              placeholder: ref.t('bugReport.placeholder'),
-              enabled: !_isSubmitting,
+      backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // styles.header: 16 padding all round, 16 after the arrow, 0.5
+          // ds.stroke.primary bottom border; ReplayPro display.small light.
+          BackTitleHeader(
+            title: ref.t('bugReport.title'),
+            margin: EdgeInsets.zero,
+            padding: const EdgeInsets.all(16),
+            gap: 16,
+            borderColor: AppColors.strokePrimary,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+              padding: EdgeInsets.only(left: 24, right: 24, top: rn.mvs(24), bottom: keyboard),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    ref.t('bugReport.prompt'),
+                    style: _bodyMedium.copyWith(color: AppColors.highEmphasis),
+                  ),
+                  SizedBox(height: rn.mvs(12)),
+                  // styles.textArea: minHeight 160@vs, 0.5 stroke, radius 8,
+                  // padding 12; a tap anywhere in the box focuses the input.
+                  GestureDetector(
+                    onTap: _focusNode.requestFocus,
+                    child: Container(
+                      constraints: BoxConstraints(minHeight: rn.vs(160)),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                      ),
+                      child: TextField(
+                        key: const Key('bug-report-input'),
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        enabled: !_isSubmitting,
+                        maxLines: null,
+                        maxLength: _maxDescriptionLength,
+                        buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                        style: _bodyMedium.copyWith(color: Colors.black),
+                        decoration: InputDecoration.collapsed(
+                          hintText: ref.t('bugReport.placeholder'),
+                          hintStyle: _bodyMedium.copyWith(color: AppColors.lowEmphasis),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: rn.mvs(8)),
+                  Text(
+                    '${_controller.text.length}/$_maxDescriptionLength',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 12,
+                      height: 16 / 12,
+                      letterSpacing: 0.2,
+                      color: AppColors.lowEmphasis,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text('${_controller.text.length}/$_maxDescriptionLength'),
-            ),
-            const SizedBox(height: 16),
-            AppButton(
+          ),
+          // styles.footer, pinned under the scroll view (RN container's
+          // paddingBottom: insets.bottom).
+          Padding(
+            padding: EdgeInsets.only(left: 24, right: 24, top: rn.mvs(16), bottom: rn.mvs(24) + insets.bottom),
+            child: AppButton(
+              key: const Key('bug-report-submit-button'),
               label: ref.t('bugReport.submit'),
               isLoading: _isSubmitting,
               isDisabled: !_canSubmit,
               onPressed: _submit,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

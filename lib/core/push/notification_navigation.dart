@@ -32,10 +32,8 @@ bool isReminderNotification(Map<String, dynamic>? data) => data?['type'] == remi
 /// anything else (including no hint) lands on the Notifications feed.
 ///
 /// Unlike RN's `handleReminderNavigation`, this does not wait for a
-/// navigator to leave a Splash route first — matching
-/// `active_chat_discovery.dart`'s documented precedent that an imperative
-/// `router.go(...)` works identically regardless of Flutter's current route
-/// (there is no literal Splash screen to wait past here either).
+/// navigator to leave a Splash route first: the cold-start tap is read from
+/// the home shell's `initState`, which only mounts after `/splash`.
 String reminderRouteFor(Map<String, dynamic>? data) =>
     data?['screen'] == _simulationsScreenHint ? '/simulations' : '/notifications';
 

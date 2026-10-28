@@ -8,7 +8,7 @@ import '../../../core/theme/app_fonts.dart';
 
 /// Direct port of ally-mobile (React Native)'s `LanguageSelectorSheet` — a
 /// bottom sheet picking the app's UI language (distinct from
-/// `preferences_repository.dart`'s default *simulation* language). Scoped
+/// the default *simulation* language). Scoped
 /// to the one real RTK Query side effect that matters here (switching
 /// `localizationControllerProvider`'s language, which every `ref.t()` call
 /// already watches); RN's extra `I18nManager.forceRTL` call is a no-op for

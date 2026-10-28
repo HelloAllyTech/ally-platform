@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/realtime/connectivity.dart';
 import 'package:ally_mobile_flutter/features/achievements/data/achievements_repository.dart';
 import 'package:ally_mobile_flutter/features/achievements/presentation/badge_popup.dart';
 
@@ -27,12 +30,13 @@ void main() {
     when(() => repository.markBadgeAsViewed(any())).thenAnswer((_) async {});
   });
 
-  Future<void> pumpHost(WidgetTester tester, {required bool active}) async {
+  Future<void> pumpHost(WidgetTester tester, {required bool active, Stream<bool>? offline}) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           fixedTranslationsOverride(),
           achievementsRepositoryProvider.overrideWithValue(repository),
+          isOfflineProvider.overrideWith((ref) => offline ?? Stream.value(false)),
         ],
         child: MaterialApp(home: Scaffold(body: BadgePopupHost(active: active))),
       ),
@@ -98,6 +102,22 @@ void main() {
     await pumpHost(tester, active: true);
     verify(() => repository.getUnviewedBadges()).called(1);
     await tester.pump(badgePollingInterval);
+    verify(() => repository.getUnviewedBadges()).called(1);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('refetches as soon as the network comes back (refetchOnReconnect)', (tester) async {
+    when(() => repository.getUnviewedBadges()).thenAnswer((_) async => []);
+    final offline = StreamController<bool>();
+    addTearDown(offline.close);
+    await pumpHost(tester, active: true, offline: offline.stream);
+    verify(() => repository.getUnviewedBadges()).called(1);
+
+    offline.add(true);
+    await tester.pump();
+    verifyNever(() => repository.getUnviewedBadges());
+    offline.add(false);
+    await tester.pump();
     verify(() => repository.getUnviewedBadges()).called(1);
     await tester.pumpWidget(const SizedBox());
   });

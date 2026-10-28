@@ -27,6 +27,9 @@ void main() {
         ),
       ],
     );
+    when(() => repository.getDashboardUrl(any())).thenAnswer((_) async => 'https://metabase.example/call-1');
+    debugDashboardWebViewOverride = (url) => Text('WEBVIEW $url');
+    addTearDown(() => debugDashboardWebViewOverride = null);
     final accountRepository = MockAccountRepository();
     when(() => accountRepository.getUser()).thenAnswer(
       (_) async => UserProfile(
@@ -55,6 +58,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AppTabView<AnalyticsType>), findsNothing);
-    expect(find.byType(ClipRRect), findsOneWidget);
+    expect(find.text('WEBVIEW https://metabase.example/call-1'), findsOneWidget);
   });
 }

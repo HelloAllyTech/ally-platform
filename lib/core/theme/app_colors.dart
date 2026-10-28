@@ -236,4 +236,9 @@ class AppColors {
   static const green500 = Color(0xFF4CAF50); // ds.green[500]: demonstrated skill ring
   static const orange500 = Color(0xFFFF9800); // ds.orange[500]: needs-practice skill ring
   static const orange800 = Color(0xFFEF6C00); // ds.orange[800]: needs-practice badge text
+  // w5shell parity (src/theme/colors.ts)
+  static const white4 = Color(0xFFECECEC); // ResourceArticleCard light category chip
+  static const darkGray14 = Color(0xFF535353); // ResourceArticleCard light category text
+  static const darkGray15 = Color(0xFF616161); // ResourceArticleCard light tag text
+  static const darkGray6 = Color(0xFF525252); // ResourceArticleCard light content / View more
 }

@@ -529,7 +529,7 @@ class _FilterButton extends ConsumerWidget {
     final activeCount = ref.watch(callLogFilterProvider).activeCount;
     return Semantics(
       button: true,
-      label: 'Filter',
+      label: ref.t('accessibility.filter'),
       child: GestureDetector(
         key: const Key('call-log-filter'),
         behavior: HitTestBehavior.opaque,
@@ -578,17 +578,17 @@ class _FilterButton extends ConsumerWidget {
 
 /// RN `CallLogHeader`'s refresh button: a 16pt `ReplayIcon` that spins one
 /// full turn over 600ms when a fetch starts.
-class _RefreshButton extends StatefulWidget {
+class _RefreshButton extends ConsumerStatefulWidget {
   const _RefreshButton({required this.isFetching, required this.onRefresh});
 
   final bool isFetching;
   final VoidCallback onRefresh;
 
   @override
-  State<_RefreshButton> createState() => _RefreshButtonState();
+  ConsumerState<_RefreshButton> createState() => _RefreshButtonState();
 }
 
-class _RefreshButtonState extends State<_RefreshButton> with SingleTickerProviderStateMixin {
+class _RefreshButtonState extends ConsumerState<_RefreshButton> with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
 
   @override
@@ -607,7 +607,7 @@ class _RefreshButtonState extends State<_RefreshButton> with SingleTickerProvide
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Refresh',
+      label: ref.t('accessibility.refresh'),
       child: GestureDetector(
         key: const Key('call-log-refresh'),
         behavior: HitTestBehavior.opaque,

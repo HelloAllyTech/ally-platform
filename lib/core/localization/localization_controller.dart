@@ -82,7 +82,7 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
 
   /// The currently-applied UI language code — for Profile Settings' real
   /// "Language" field (RN's `i18nInstance.resolvedLanguage`), distinct from
-  /// `preferences_repository.dart`'s default *simulation* language.
+  /// the default *simulation* language.
   String get currentLanguage => _language;
 
   @override

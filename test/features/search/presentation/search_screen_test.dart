@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/features/search/data/search_repository.dart';
+import 'package:ally_mobile_flutter/features/search/presentation/resource_article_card.dart';
 import 'package:ally_mobile_flutter/features/search/presentation/search_screen.dart';
 
 import '../../../support/pump_app.dart';
@@ -51,7 +53,7 @@ void main() {
     expect(find.text('Heading d2'), findsOneWidget);
   });
 
-  testWidgets('tapping a category chip re-queries with that category filter', (tester) async {
+  testWidgets('tapping a category tab re-queries with RN\'s lowercased tab key as the filter', (tester) async {
     when(() => repository.search('anxiety')).thenAnswer(
       (_) async => SearchResult(
         documents: [_article('d1'), _article('d2', category: 'Stress')],
@@ -59,7 +61,7 @@ void main() {
         total: 6,
       ),
     );
-    when(() => repository.search('anxiety', category: 'Stress')).thenAnswer(
+    when(() => repository.search('anxiety', category: 'stress')).thenAnswer(
       (_) async => SearchResult(
         documents: [_article('d2', category: 'Stress')],
         categoryCounts: {'Anxiety': 4, 'Stress': 2},
@@ -81,7 +83,7 @@ void main() {
     await tester.tap(find.text('Stress (2)'));
     await tester.pumpAndSettle();
 
-    verify(() => repository.search('anxiety', category: 'Stress')).called(1);
+    verify(() => repository.search('anxiety', category: 'stress')).called(1);
     expect(find.text('Heading d1'), findsNothing);
     expect(find.text('Heading d2'), findsOneWidget);
   });
@@ -103,7 +105,6 @@ void main() {
     );
     when(() => repository.search(
           'anxiety',
-          category: 'All',
           excludedIds: [for (final a in firstPage) a.id],
         )).thenAnswer(
       (_) async => SearchResult(
@@ -132,7 +133,6 @@ void main() {
 
     verify(() => repository.search(
           'anxiety',
-          category: 'All',
           excludedIds: [for (final a in firstPage) a.id],
         )).called(1);
 
@@ -144,7 +144,7 @@ void main() {
     expect(find.text('Heading d20'), findsOneWidget);
   });
 
-  testWidgets('shows an error message when the search fails', (tester) async {
+  testWidgets('a failed search shows the empty state, not the error', (tester) async {
     when(() => repository.search('anxiety')).thenThrow(Exception('network down'));
 
     await preWarmTranslations(tester);
@@ -158,7 +158,10 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Error fetching search results'), findsOneWidget);
+    // RN only logs a failed search: no raw error text, the empty state.
+    expect(find.textContaining('Error fetching search results'), findsNothing);
+    expect(find.textContaining('network down'), findsNothing);
+    expect(find.text('Try now:'), findsOneWidget);
   });
 
   testWidgets('shows the no-results message for an empty response', (tester) async {
@@ -282,5 +285,78 @@ void main() {
     expect(find.text('No results found for "anxiety"'), findsOneWidget);
     expect(find.text('Try now:'), findsOneWidget);
     expect(find.text('Violence safety plan'), findsOneWidget);
+  });
+
+  testWidgets('result cards show tag chips and expand with View more; tabs are RN underline tabs', (tester) async {
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(
+        documents: [
+          ResourceArticle(
+            id: 'd1',
+            heading: 'Heading d1',
+            content: 'Long content ' * 40,
+            category: 'Anxiety',
+            tags: const ['grounding', 'breathing'],
+          ),
+        ],
+        categoryCounts: {'Anxiety': 1},
+        total: 1,
+      ),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChoiceChip), findsNothing);
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.byKey(const ValueKey('search-tab-all')), findsOneWidget);
+    expect(find.text('grounding'), findsOneWidget);
+    expect(find.text('breathing'), findsOneWidget);
+
+    final collapsed = tester.widget<Text>(find.textContaining('Long content').first);
+    expect(collapsed.maxLines, 3);
+    await tester.tap(find.byKey(const Key('resource-article-view-more')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('resource-article-view-more')), findsNothing);
+    expect(tester.widget<Text>(find.textContaining('Long content').first).maxLines, isNull);
+  });
+
+  testWidgets('Clear (X) keeps the results view, emptied to the suggestions (RN resetSearch)', (tester) async {
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(documents: [_article('d1')], categoryCounts: {'Anxiety': 1}, total: 1),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+    final allyLogo = find.byWidgetPredicate(
+      (w) => w is SvgPicture && w.bytesLoader is SvgAssetLoader &&
+          (w.bytesLoader as SvgAssetLoader).assetName.endsWith('allyLogo.svg'),
+    );
+    expect(allyLogo, findsOneWidget, reason: 'launch view');
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('Heading d1'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('search-clear')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Heading d1'), findsNothing);
+    expect(find.textContaining('No results found'), findsNothing, reason: 'no query to report');
+    expect(find.text('Try now:'), findsOneWidget);
+    // Still the results view, not the launch view with the Ally logo.
+    expect(find.byType(ResourceArticleCard), findsNothing);
+    expect(allyLogo, findsNothing);
   });
 }

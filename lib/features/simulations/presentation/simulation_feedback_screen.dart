@@ -29,6 +29,8 @@ import 'simulation_transcript_tab.dart';
 import 'widgets/feedback/debrief_tab.dart';
 import 'widgets/feedback/feedback_popup.dart';
 import 'widgets/feedback/feedback_widgets.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 
 /// RN `SimulationSummaryTabKey`.
 enum FeedbackTab { summary, debrief, transcript }
@@ -249,7 +251,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       // where RN's details screen sends a back with nothing to go back to.
       final router = GoRouter.of(context);
       final details = pathId != null ? '/simulation-paths/$pathId' : '/cases/$caseId';
-      router.go('/home');
+      goToHomeTab(router, kTabLearn);
       // `push` builds on the delegate's current stack, which `go` only
       // replaces once the new location is parsed — push on the next frame.
       WidgetsBinding.instance.addPostFrameCallback((_) => router.push(details));
@@ -259,7 +261,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       if (context.canPop()) context.pop();
       return;
     }
-    context.go('/home');
+    goToHomeTab(GoRouter.of(context), kTabLearn);
   }
 
   bool get _feedbackEnabled => _summary?.feedbackEnabled ?? true;

@@ -498,6 +498,8 @@ void main() {
 
       expect(find.text('Suspended Screen'), findsOneWidget);
       expect(authController.signInCalls, 0);
+      // RN replaces the login screen: nothing to go back to.
+      expect(GoRouter.of(tester.element(find.text('Suspended Screen'))).canPop(), isFalse);
     });
 
     testWidgets('shows a 60s resend countdown that disables Resend, then re-enables it', (tester) async {

@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import 'package:ally_mobile_flutter/features/community/presentation/community_screen.dart';
 
+import '../../../support/fake_translations.dart';
+
 /// Fakes the platform side of `url_launcher` so `launchUrl()` doesn't hit a
-/// real (unregistered-in-tests) platform channel. `CommunityScreen` has no
-/// Riverpod/translation dependency at all (see its own doc comment: it's
-/// deliberately just a redirect, no UI), so this doesn't need `pumpApp` or
-/// `preWarmTranslations` — only a real `GoRouter` ancestor, for
-/// `context.canPop()`/`context.pop()`.
+/// real (unregistered-in-tests) platform channel. The every-tap behaviour
+/// lives in the shell (see app_shell_screen_test.dart).
 class _FakeUrlLauncherPlatform extends UrlLauncherPlatform {
   final List<String> launchedUrls = [];
 
@@ -36,31 +35,16 @@ void main() {
     UrlLauncherPlatform.instance = fakeLauncher;
   });
 
-  testWidgets('renders nothing, pops, and opens the community URL externally', (tester) async {
-    final router = GoRouter(
-      initialLocation: '/home',
-      routes: [
-        GoRoute(path: '/home', builder: (context, state) => const Scaffold(body: Text('home'))),
-        GoRoute(path: '/community', builder: (context, state) => const CommunityScreen()),
-      ],
+  testWidgets('when it is the first tab: shows the title and opens the community URL once', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [fixedTranslationsOverride()],
+        child: const MaterialApp(home: Scaffold(body: CommunityScreen())),
+      ),
     );
-
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
-    router.push('/community');
-    await tester.pump();
-
-    // The real behavior described in community_screen.dart's doc comment:
-    // it renders no UI of its own.
-    expect(find.text('home'), findsNothing);
-    expect(find.byType(CommunityScreen), findsOneWidget);
-
-    // Flush the addPostFrameCallback that pops and launches the URL.
-    await tester.pump();
-    await tester.pump();
-
-    expect(find.text('home'), findsOneWidget, reason: 'should have popped back');
+    expect(find.text('Community'), findsOneWidget);
     expect(fakeLauncher.launchedUrls, ['https://community.helloally.ai/']);
   });
 }

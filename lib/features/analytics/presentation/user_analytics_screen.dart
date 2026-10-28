@@ -37,7 +37,7 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
     if (dashboardsAsync.isLoading && !dashboardsAsync.hasValue) {
       return const Scaffold(
         backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: Center(child: CircularProgressIndicator(color: AppColors.azureBlue)),
       );
     }
     if (dashboardsAsync.hasError && !dashboardsAsync.hasValue) {
@@ -86,7 +86,15 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
 
                     final presentTypes = dashboards.map((d) => d.analyticsType).toSet();
                     final effectiveTab = presentTypes.length == 1 ? presentTypes.first : _selectedTab;
-                    final filtered = dashboards.where((d) => d.analyticsType == effectiveTab).toList();
+                    // RN keeps only the signed URLs that resolved: a failed
+                    // one is silently left out, and until at least one has
+                    // resolved the list area is one large spinner.
+                    final urls = <String, String>{
+                      for (final d in dashboards) d.externalId: ?ref.watch(dashboardUrlProvider(d.externalId)).value,
+                    };
+                    final filtered = dashboards
+                        .where((d) => d.analyticsType == effectiveTab && urls.containsKey(d.externalId))
+                        .toList();
 
                     return Column(
                       children: [
@@ -109,16 +117,19 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
                             ),
                           ),
                         Expanded(
-                          child: ListView(
-                            padding: const EdgeInsets.all(16),
-                            children: [
-                              for (final dashboard in filtered)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _DashboardWebView(dashboard: dashboard),
+                          child: urls.isEmpty
+                              ? const Center(child: CircularProgressIndicator(color: AppColors.azureBlue))
+                              : ListView(
+                                  padding: const EdgeInsets.all(16),
+                                  children: [
+                                    for (final dashboard in filtered)
+                                      Padding(
+                                        key: ValueKey('dashboard-${dashboard.externalId}'),
+                                        padding: const EdgeInsets.only(bottom: 16),
+                                        child: _DashboardWebView(url: urls[dashboard.externalId]!),
+                                      ),
+                                  ],
                                 ),
-                            ],
-                          ),
                         ),
                       ],
                     );
@@ -133,29 +144,52 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
   }
 }
 
-class _DashboardWebView extends ConsumerStatefulWidget {
-  const _DashboardWebView({required this.dashboard});
+class _DashboardWebView extends StatefulWidget {
+  const _DashboardWebView({required this.url});
 
-  final Dashboard dashboard;
+  final String url;
+
+  /// Tests have no WebView platform; they swap in a stand-in.
+  @visibleForTesting
+  static Widget Function(String url)? debugWebViewOverride;
 
   @override
-  ConsumerState<_DashboardWebView> createState() => _DashboardWebViewState();
+  State<_DashboardWebView> createState() => _DashboardWebViewState();
 }
 
 /// One WebView controller for the dashboard's lifetime, loading only when
 /// the signed URL changes. Creating the controller in `build` reloaded the
 /// whole Metabase dashboard on every rebuild (any inset/keyboard change
 /// rebuilt it via `MediaQuery.of`, even with this tab off screen).
-class _DashboardWebViewState extends ConsumerState<_DashboardWebView> {
-  // Created on the first URL, not up front: until the signed URL arrives
-  // there's nothing to show, and the platform view isn't needed.
+///
+/// RN `startInLoadingState`: react-native-webview's default loading view
+/// (a small activity indicator, centred) covers the page until it loads.
+class _DashboardWebViewState extends State<_DashboardWebView> {
   WebViewController? _controller;
   String? _loadedUrl;
+  bool _isPageLoading = true;
 
   WebViewController _load(String url) {
-    final controller = _controller ??= WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted);
+    final controller = _controller ??= WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            if (mounted) setState(() => _isPageLoading = true);
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _isPageLoading = false);
+          },
+          onWebResourceError: (error) {
+            if (error.isForMainFrame ?? true) {
+              if (mounted) setState(() => _isPageLoading = false);
+            }
+          },
+        ),
+      );
     if (url != _loadedUrl) {
       _loadedUrl = url;
+      _isPageLoading = true;
       controller.loadRequest(Uri.parse(url));
     }
     return controller;
@@ -163,20 +197,33 @@ class _DashboardWebViewState extends ConsumerState<_DashboardWebView> {
 
   @override
   Widget build(BuildContext context) {
-    final urlAsync = ref.watch(dashboardUrlProvider(widget.dashboard.externalId));
     final width = MediaQuery.sizeOf(context).width - 50;
+    final override = _DashboardWebView.debugWebViewOverride;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
         width: width,
         height: width,
-        child: urlAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(child: Text('$error')),
-          data: (url) => WebViewWidget(controller: _load(url)),
-        ),
+        child: override != null
+            ? override(widget.url)
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  WebViewWidget(controller: _load(widget.url)),
+                  if (_isPageLoading)
+                    const ColoredBox(
+                      color: Colors.white,
+                      child: Center(child: CircularProgressIndicator.adaptive()),
+                    ),
+                ],
+              ),
       ),
     );
   }
 }
+
+/// Test seam for [_DashboardWebView].
+@visibleForTesting
+set debugDashboardWebViewOverride(Widget Function(String url)? builder) =>
+    _DashboardWebView.debugWebViewOverride = builder;

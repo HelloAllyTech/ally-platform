@@ -8,7 +8,9 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/navigation/drawer_menu_button.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../data/search_repository.dart';
+import 'resource_article_card.dart';
 
 /// RN's `searchConfig.ts` `trySuggestions` — shown as the launch-screen
 /// suggestion list, as the no-results empty-state suggestions, and as the
@@ -48,14 +50,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
 
   String _lastSearchedText = '';
+
+  /// RN `selectedCategory`: 'All', or a tab key (the category lowercased,
+  /// which is also what RN sends as the filter).
   String _selectedCategory = 'All';
   List<ResourceArticle> _resources = [];
   Map<String, int> _categoryCounts = {};
   int? _initialTotal;
   bool _hasMore = true;
-  bool _isLoading = false;
-  bool _isLoadingMore = false;
-  String? _error;
+
+  /// RN `loading` (`isLoading || isFetching`): any search request in flight.
+  bool _loading = false;
+
+  /// RN `showSearchResults`: set by the first search and never unset, so
+  /// Clear (X) stays on the results view.
+  bool _showSearchResults = false;
 
   bool _focused = false;
   List<String> _filteredSuggestions = [];
@@ -77,9 +86,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     super.dispose();
   }
 
+  // FlatList `onEndReachedThreshold: 0.5` (half a viewport from the end).
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - position.viewportDimension * 0.5) {
       _loadMore();
     }
   }
@@ -104,9 +114,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  /// RN `onSearch`.
   Future<void> _search([String? query]) async {
-    final text = (query ?? _controller.text).trim();
-    if (text.isEmpty) return;
+    final text = query ?? _controller.text;
+    if (text.trim().isEmpty) return;
     if (query != null) _controller.text = query;
     _focusNode.unfocus();
     setState(() {
@@ -114,57 +125,53 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _selectedCategory = 'All';
       _initialTotal = null;
       _filteredSuggestions = [];
-      _isLoading = true;
-      _error = null;
     });
-    try {
-      final result = await ref.read(searchRepositoryProvider).search(text);
-      setState(() {
-        _resources = result.documents;
-        _categoryCounts = result.categoryCounts;
-        _initialTotal = result.total;
-        _hasMore = result.total > result.documents.length;
-      });
-    } catch (e) {
-      setState(() => _error = '${ref.tr('search.error')}: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await _triggerSearch(text);
+    if (mounted) setState(() => _showSearchResults = true);
   }
 
-  Future<void> _selectCategory(String category) async {
-    if (category == _selectedCategory || _lastSearchedText.isEmpty) return;
-    setState(() {
-      _selectedCategory = category;
-      _initialTotal = null;
-      _isLoading = true;
-      _error = null;
-    });
+  /// RN `triggerSearch`: the previous results stay up (with the footer
+  /// spinner) until the response replaces them; a failure is only logged.
+  Future<void> _triggerSearch(String query, {String? category}) async {
+    final filtered = category != null && category != 'All';
+    if (_scrollController.hasClients) {
+      unawaited(_scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut));
+    }
+    setState(() => _loading = true);
     try {
-      final result = await ref
-          .read(searchRepositoryProvider)
-          .search(_lastSearchedText, category: category);
+      final result = await ref.read(searchRepositoryProvider).search(query, category: filtered ? category : null);
+      if (!mounted) return;
       setState(() {
         _resources = result.documents;
         _initialTotal = result.total;
         _hasMore = result.total > result.documents.length;
+        if (!filtered) _categoryCounts = result.categoryCounts;
       });
-    } catch (e) {
-      setState(() => _error = '${ref.tr('search.error')}: $e');
+    } catch (_) {
+      // RN: `logger.error` only.
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
+  /// RN `handleTabChange` → `onCategoryChange`.
+  Future<void> _selectTab(String key) async {
+    final category = key == 'all' ? 'All' : key;
+    setState(() => _selectedCategory = category);
+    if (_lastSearchedText.isNotEmpty) await _triggerSearch(_lastSearchedText, category: category);
+  }
+
+  /// RN `fetchRemainingResources`.
   Future<void> _loadMore() async {
-    if (_isLoading || _isLoadingMore || !_hasMore || _lastSearchedText.isEmpty) return;
-    setState(() => _isLoadingMore = true);
+    if (_loading || !_hasMore || _lastSearchedText.isEmpty) return;
+    setState(() => _loading = true);
     try {
       final result = await ref.read(searchRepositoryProvider).search(
             _lastSearchedText,
-            category: _selectedCategory,
+            category: _selectedCategory == 'All' ? null : _selectedCategory,
             excludedIds: [for (final r in _resources) r.id],
           );
+      if (!mounted) return;
       setState(() {
         _resources = [..._resources, ...result.documents];
         _hasMore = _initialTotal != null ? _initialTotal! > _resources.length : true;
@@ -172,10 +179,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     } catch (_) {
       // Stays retryable on the next scroll tick, same as the RN hook.
     } finally {
-      if (mounted) setState(() => _isLoadingMore = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
+  /// RN `resetSearch`: clears the query and results but leaves
+  /// `showSearchResults` alone, so the results view stays, showing
+  /// SearchEmpty's suggestions.
   void _resetSearch() {
     _debounce?.cancel();
     setState(() {
@@ -187,18 +197,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _initialTotal = null;
       _hasMore = true;
       _filteredSuggestions = [];
-      _error = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // RN `tabsMeta`: "All (sum)" then each category, keyed lowercased.
     final totalCount = _categoryCounts.values.fold(0, (a, b) => a + b);
     final tabs = [
-      ('All', totalCount),
-      for (final entry in _categoryCounts.entries) (entry.key, entry.value),
+      ('all', '${ref.t('search.allLabel')} ($totalCount)'),
+      for (final entry in _categoryCounts.entries) (entry.key.toLowerCase(), '${entry.key} (${entry.value})'),
     ];
-    final showingResults = _lastSearchedText.isNotEmpty;
 
     final searchBar = _SearchBar(
       controller: _controller,
@@ -219,7 +228,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
-          child: showingResults ? _buildDetailSearch(tabs, searchBar) : _buildSearchLaunch(searchBar),
+          child: _showSearchResults ? _buildDetailSearch(tabs, searchBar) : _buildSearchLaunch(searchBar),
         ),
       ),
     );
@@ -281,50 +290,68 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   /// RN `renderDetailSearch` (`styles.container`: 16pt sides).
-  Widget _buildDetailSearch(List<(String, int)> tabs, Widget searchBar) {
+  Widget _buildDetailSearch(List<(String, String)> tabs, Widget searchBar) {
+    final rn = RnSize.of(context);
+    final activeKey = _selectedCategory.toLowerCase();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           searchBar,
-          if (tabs.length > 1 && _resources.isNotEmpty)
-            SizedBox(
-              height: 48,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                children: [
-                  for (final (category, count) in tabs)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text('${category == 'All' ? ref.t('search.allLabel') : category} ($count)'),
-                        selected: _selectedCategory == category,
-                        onSelected: (_) => _selectCategory(category),
-                      ),
+          if (_resources.isNotEmpty) _CategoryTabs(tabs: tabs, activeKey: activeKey, onTap: _selectTab),
+          Expanded(
+            child: _resources.isEmpty && _loading
+                // RN `showInitialLoader`: a small indicator, 16vs margins.
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: rn.vs(16)),
+                      child: const CircularProgressIndicator.adaptive(),
                     ),
-                ],
-              ),
-            ),
-          Expanded(child: _buildResultsBody()),
+                  )
+                : _resources.isNotEmpty
+                    ? _buildResultsList(rn)
+                    : _buildEmpty(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildResultsBody() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
-    }
-    if (_resources.isEmpty) {
-      // RN `SearchEmpty`: 32@vs top/bottom, everything 16pt in.
-      final rn = _RnVerticalScale.of(context);
-      return SingleChildScrollView(
-        padding: EdgeInsets.symmetric(vertical: rn.vs(32)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+  /// RN's FlatList: `tabBody` (marginTop 6), `tabBodyContent`
+  /// (paddingBottom 200), footer spinner while a request is in flight.
+  Widget _buildResultsList(RnSize rn) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.only(bottom: 200),
+        itemCount: _resources.length + (_loading ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= _resources.length) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: rn.vs(16)),
+              child: const Center(child: CircularProgressIndicator.adaptive()),
+            );
+          }
+          final article = _resources[index];
+          return ResourceArticleCard(key: ValueKey('$_selectedCategory-${article.id}'), article: article);
+        },
+      ),
+    );
+  }
+
+  /// RN `SearchEmpty` (light): 32@vs top/bottom, everything 16pt in; the
+  /// "No results" line only when there was a query (not after Clear).
+  Widget _buildEmpty() {
+    final rn = _RnVerticalScale.of(context);
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(vertical: rn.vs(32)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_lastSearchedText.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 16),
               child: Text(
@@ -337,44 +364,83 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, top: 18, bottom: 10),
+            child: Text(
+              ref.t('search.suggestionsTitle'),
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 14,
+                height: 20 / 14,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          for (final suggestion in _trySuggestions)
             Padding(
-              padding: const EdgeInsets.only(left: 16, top: 18, bottom: 10),
-              child: Text(
-                ref.t('search.suggestionsTitle'),
-                style: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifRegular,
-                  fontSize: 14,
-                  height: 20 / 14,
-                  color: Colors.black,
+              padding: const EdgeInsets.only(left: 16),
+              child: _SuggestionChip(text: suggestion, iconSize: 14, onTap: () => _search(suggestion)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN `components/CustomTabs` (light): a horizontally scrolling 38pt row
+/// with a 1pt lightGray14 bottom border; each tab 36pt tall, 10 sides /
+/// 3 bottom padding, IBM Plex Serif Medium body.small; the active one in
+/// darkSlate w500 over a 2pt black underline, the rest lightGray3 w400.
+class _CategoryTabs extends StatelessWidget {
+  const _CategoryTabs({required this.tabs, required this.activeKey, required this.onTap});
+
+  final List<(String, String)> tabs;
+  final String activeKey;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.lightGray14)),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final (key, title) in tabs)
+            Semantics(
+              selected: key == activeKey,
+              button: true,
+              child: GestureDetector(
+                key: ValueKey('search-tab-$key'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(key),
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.only(left: 10, right: 10, bottom: 3),
+                  alignment: Alignment.bottomCenter,
+                  decoration: key == activeKey
+                      ? const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.black, width: 2)))
+                      : null,
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifMedium,
+                      fontSize: 12,
+                      height: 16 / 12,
+                      letterSpacing: 0.2,
+                      color: key == activeKey ? AppColors.darkSlate : AppColors.lightGray3,
+                      fontWeight: key == activeKey ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
                 ),
               ),
             ),
-            for (final suggestion in _trySuggestions)
-              Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: _SuggestionChip(text: suggestion, iconSize: 14, onTap: () => _search(suggestion)),
-              ),
-          ],
-        ),
-      );
-    }
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount: _resources.length + (_isLoadingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= _resources.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final article = _resources[index];
-        return ListTile(
-          title: Text(article.heading),
-          subtitle: Text(article.content, maxLines: 2, overflow: TextOverflow.ellipsis),
-          trailing: Chip(label: Text(article.category)),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -527,6 +593,7 @@ class _SearchBar extends ConsumerWidget {
               ),
               if (controller.text.isNotEmpty)
                 GestureDetector(
+                  key: const Key('search-clear'),
                   onTap: onClear,
                   child: Container(
                     width: 18,

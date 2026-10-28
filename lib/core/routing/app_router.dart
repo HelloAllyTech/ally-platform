@@ -21,7 +21,6 @@ import '../../features/courses/presentation/course_item_player_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
-import '../../features/preferences/presentation/preferences_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/reactions/presentation/reactions_screen.dart';
 import '../../features/reviews/presentation/review_details_screen.dart';
@@ -41,6 +40,9 @@ import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 import '../navigation/app_shell_screen.dart';
 import '../navigation/home_tab_navigation.dart';
+import '../localization/translate_ref.dart';
+import '../theme/app_colors.dart';
+import 'launch_splash.dart';
 import '../widgets/review_type_chip.dart';
 
 /// `extra` shape for `/share-for-review/:scenarioSessionId` — one record
@@ -80,10 +82,17 @@ String? computeRedirect({
   required String matchedLocation,
   required bool? profileCompleted,
   bool isRestored = true,
+  bool isSplashFinished = true,
+  bool isUserLoading = false,
 }) {
-  // Launch: wait on the blank splash until the stored session is read.
+  // Launch: RN's SplashScreen plays its animation on every cold start and
+  // only routes once it has ended (`isAnimationEnded`) and, signed in, once
+  // `/users/me` has settled (`isUserLoading`), so the profile-completion
+  // gate is known. A failed `/users/me` still moves on (no logout on
+  // network errors; a 401 is the auth interceptor's job).
   if (!isRestored) return matchedLocation == '/splash' ? null : '/splash';
   final isLaunching = matchedLocation == '/splash';
+  if (isLaunching && (!isSplashFinished || (isAuthenticated && isUserLoading))) return null;
   // Signed in, the splash leaves exactly like /login does (to Home or
   // complete-profile below); signed out, the generic rule sends it to /login.
   final isLoggingIn = matchedLocation == '/login' || (isLaunching && isAuthenticated);
@@ -130,16 +139,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Profile-completion status isn't known synchronously — read
       // whatever's currently cached (null while the very first fetch is
       // still in flight) rather than block routing on it.
-      final user = ref.read(currentUserProvider).value;
+      final userAsync = ref.read(currentUserProvider);
       return computeRedirect(
         isAuthenticated: isAuthenticated,
         matchedLocation: state.matchedLocation,
-        profileCompleted: user?.profileCompleted,
+        profileCompleted: userAsync.value?.profileCompleted,
         isRestored: auth.isRestored,
+        isSplashFinished: ref.read(launchSplashProvider).finished,
+        isUserLoading: !userAsync.hasValue && !userAsync.hasError,
       );
     },
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const _LaunchScreen()),
+      GoRoute(path: '/splash', builder: (context, state) => const LaunchSplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/home',
@@ -156,29 +167,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileSettingsScreen(),
       ),
       GoRoute(
-        path: '/preferences',
-        builder: (context, state) => const PreferencesScreen(),
-      ),
-      GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/scribe',
-        builder: (context, state) {
-          final userId = ref.read(currentUserProvider).value?.id.toString() ?? 'dev-user';
-          return ScribeRecordingScreen(userId: userId);
-        },
+        builder: (context, state) => _CurrentUserGate(builder: (userId) => ScribeRecordingScreen(userId: userId)),
       ),
       GoRoute(
         path: '/conference-listening/:chatId',
-        builder: (context, state) {
-          final userId = ref.read(currentUserProvider).value?.id.toString() ?? 'dev-user';
-          return ConferenceListeningScreen(
+        builder: (context, state) => _CurrentUserGate(
+          builder: (userId) => ConferenceListeningScreen(
             chatId: int.parse(state.pathParameters['chatId']!),
             userId: userId,
-          );
-        },
+          ),
+        ),
       ),
       GoRoute(
         path: '/courses/:trackId',
@@ -382,18 +385,39 @@ class _RouterRefreshListenable extends ChangeNotifier {
       }
     });
     ref.listen(currentUserProvider, (previous, next) {
-      if (previous?.value?.profileCompleted != next.value?.profileCompleted) {
+      bool settled(AsyncValue<Object?>? v) => v != null && (v.hasValue || v.hasError);
+      if (previous?.value?.profileCompleted != next.value?.profileCompleted || settled(previous) != settled(next)) {
         notifyListeners();
       }
+    });
+    ref.listen(launchSplashProvider, (previous, next) {
+      if (previous?.finished != next.finished) notifyListeners();
     });
   }
 }
 
-/// Shown for the moment it takes to read the stored session at launch;
-/// blank like the native launch screen it follows.
-class _LaunchScreen extends StatelessWidget {
-  const _LaunchScreen();
+/// The listening screens key their socket and transcript speaker on the
+/// signed-in user's id (RN reads it from the Redux user, always loaded by
+/// then). Until `/users/me` resolves, show the listening screen's dark
+/// background with a spinner rather than starting a session under a
+/// made-up id.
+class _CurrentUserGate extends ConsumerWidget {
+  const _CurrentUserGate({required this.builder});
+
+  final Widget Function(String userId) builder;
 
   @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.white);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final userId = user.value?.id.toString();
+    if (userId != null) return builder(userId);
+    return Scaffold(
+      backgroundColor: AppColors.darkGray7,
+      body: Center(
+        child: user.hasError && !user.isLoading
+            ? Text(ref.t('common.somethingWentWrong'), style: const TextStyle(color: Colors.white))
+            : const CircularProgressIndicator.adaptive(),
+      ),
+    );
+  }
 }

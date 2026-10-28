@@ -1268,10 +1268,6 @@
       "nameNotSet": "(name not set)"
     }
   },
-  "preferences": {
-    "title": "Preferences",
-    "defaultLanguage": "Default simulation language"
-  },
   "review": {
     "title": "Review",
     "hidden": "Hidden",
@@ -2068,7 +2064,9 @@
     "title": "App Language"
   },
   "accessibility": {
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "filter": "Filter",
+    "refresh": "Refresh"
   },
   "bugReport": {
     "menuLabel": "Report a problem",
@@ -2096,7 +2094,8 @@
     "boxBreathing": "Phase 4: Box breathing",
     "cases": "Phase 4: Cases",
     "scribe": "Phase 1: Scribe recording",
-    "roleplay": "Phase 1: Roleplay voice"
+    "roleplay": "Phase 1: Roleplay voice",
+    "noAccessibleTabs": "No accessible tabs for this account"
   },
   "notifications": {
     "title": "Notifications",

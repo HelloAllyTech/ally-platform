@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:url_launcher_platform_interface/link.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import 'package:ally_mobile_flutter/core/navigation/app_bottom_tab_bar.dart';
 import 'package:ally_mobile_flutter/core/navigation/app_shell_screen.dart';
@@ -30,6 +32,22 @@ class _NoopPushService extends PushNotificationService {
 /// Reviewer-only account: Achievements (first visible tab) + Search.
 const _permissions = [UserPermissions.viewUserBadges, UserPermissions.viewReferenceDocument];
 
+class _FakeUrlLauncherPlatform extends UrlLauncherPlatform {
+  final List<String> launchedUrls = [];
+
+  @override
+  LinkDelegate? get linkDelegate => null;
+
+  @override
+  Future<bool> canLaunch(String url) async => true;
+
+  @override
+  Future<bool> launchUrl(String url, LaunchOptions options) async {
+    launchedUrls.add(url);
+    return true;
+  }
+}
+
 void main() {
   late MockAchievementsRepository achievements;
 
@@ -39,7 +57,10 @@ void main() {
     when(() => achievements.getUnviewedBadges()).thenAnswer((_) async => []);
   });
 
-  Future<GoRouter> pumpShell(WidgetTester tester) async {
+  Future<GoRouter> pumpShell(
+    WidgetTester tester, {
+    Future<List<String>> Function()? permissions,
+  }) async {
     late GoRouter router;
     router = GoRouter(
       initialLocation: '/home',
@@ -56,7 +77,7 @@ void main() {
       ProviderScope(
         overrides: [
           fixedTranslationsOverride(),
-          userPermissionsProvider.overrideWith((ref) async => _permissions),
+          userPermissionsProvider.overrideWith((ref) => (permissions ?? () async => _permissions)()),
           unreadReviewCountProvider.overrideWith((ref) async => 0),
           pushNotificationServiceProvider.overrideWithValue(_NoopPushService()),
           notificationsRepositoryProvider.overrideWithValue(MockNotificationsRepository()),
@@ -102,5 +123,42 @@ void main() {
     goToHomeTab(router, kTabLeaderboard);
     await tester.pumpAndSettle();
     expect(currentTab(tester), 0);
+  });
+
+  testWidgets('every Community tap reopens the site and leaves the first tab selected', (tester) async {
+    final launcher = _FakeUrlLauncherPlatform();
+    UrlLauncherPlatform.instance = launcher;
+    await pumpShell(
+      tester,
+      permissions: () async => [..._permissions, UserPermissions.viewCommunity],
+    );
+    final bar = tester.widget<AppBottomTabBar>(find.byType(AppBottomTabBar));
+    final communityIndex = bar.visibleTabs.indexWhere((t) => t.name == kTabCommunity);
+    expect(communityIndex, greaterThan(0));
+
+    for (var i = 0; i < 2; i++) {
+      tester.widget<AppBottomTabBar>(find.byType(AppBottomTabBar)).onTap(communityIndex);
+      await tester.pumpAndSettle();
+      expect(currentTab(tester), 0);
+    }
+    expect(launcher.launchedUrls, ['https://community.helloally.ai/', 'https://community.helloally.ai/']);
+  });
+
+  testWidgets('a failed permissions fetch shows a retry that refetches', (tester) async {
+    var offline = true;
+    await pumpShell(
+      tester,
+      permissions: () async {
+        if (offline) throw Exception('offline');
+        return _permissions;
+      },
+    );
+    expect(find.text('Something went wrong!'), findsOneWidget);
+    expect(find.textContaining('offline'), findsNothing);
+
+    offline = false;
+    await tester.tap(find.byKey(const Key('shell-permissions-retry')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppBottomTabBar), findsOneWidget);
   });
 }
