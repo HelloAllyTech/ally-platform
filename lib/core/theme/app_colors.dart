@@ -149,4 +149,11 @@ class AppColors {
   // box breathing parity (src/theme/colors.ts)
   static const black0 = Color(0x1A000000); // rgba(0,0,0,0.1) BreathingScreen gradient bottom
   static const darkBlue3 = Color(0xFF0A1F3C); // CallEndOverlay gradient bottom
+  // simkit parity (src/theme/colors.ts)
+  static const blackTransparent50 = Color(0x80000000); // rgba(0,0,0,0.5) start-simulation modal overlays
+  static const lightGrayD9 = Color(0xFFD9D9D9); // IllustratedActionModal secondary border
+  static const charcoalGray = Color(0xFF47464F); // IllustratedActionModal secondary text
+  static const darkGray16 = Color(0xFF656565); // RetrySessionModal countdown
+  static const smokyBlack = Color(0x8C131313); // rgba(19,19,19,0.55) VideoPreview overlay
+  static const whiteTransparent90 = Color(0xE6FFFFFF); // rgba(255,255,255,0.9) VideoPreview play disc
 }
