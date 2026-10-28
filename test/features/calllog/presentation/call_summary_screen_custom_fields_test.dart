@@ -8,6 +8,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
 import 'package:ally_mobile_flutter/features/account/data/user_profile.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
+import 'package:ally_mobile_flutter/features/calllog/data/call_summary_fields.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/custom_fields_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
@@ -73,6 +74,7 @@ void main() {
           callLogRepositoryProvider.overrideWithValue(repository),
           customFieldsRepositoryProvider.overrideWithValue(customFieldsRepository),
           customFieldsEnabledProvider.overrideWith((ref) async => true),
+          summaryVisibleFieldsProvider.overrideWith((ref) async => [for (final f in summaryFieldDefs) f.key]),
           // The call's own counsellor (counselorId: 7), but not an admin —
           // RN's `SectionWrapper.tsx` gates the section's whole edit-mode
           // toggle on `sectionConfig.canEdit && (isAdmin || isCounsellorForCall)`;
@@ -166,6 +168,7 @@ void main() {
         callLogRepositoryProvider.overrideWithValue(repository),
         customFieldsRepositoryProvider.overrideWithValue(customFieldsRepository),
         customFieldsEnabledProvider.overrideWith((ref) async => false),
+        summaryVisibleFieldsProvider.overrideWith((ref) async => [for (final f in summaryFieldDefs) f.key]),
       ],
     );
     await tester.pumpAndSettle();

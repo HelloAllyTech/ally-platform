@@ -527,3 +527,25 @@ const summaryFieldDefs = <SummaryFieldDef>[
     editable: false,
   ),
 ];
+
+/// RN `ALWAYS_VISIBLE_SECTIONS` (`constants/summary.ts`): shown regardless
+/// of the tenant's `/settings/summary-fields` config.
+const alwaysVisibleSummarySections = {SummarySection.additionalNotes};
+
+/// RN `CallSummaryDetails.renderSection`: a section renders only when the
+/// tenant's visible-field list names at least one of its built-in fields
+/// (an empty or missing list hides it), except the always-visible ones.
+bool isSummarySectionVisible(SummarySection section, List<String>? visibleFields) {
+  if (alwaysVisibleSummarySections.contains(section)) return true;
+  final visible = visibleFields ?? const <String>[];
+  return summaryFieldDefs.any((f) => f.section == section && visible.contains(f.key));
+}
+
+/// RN `SectionWrapper.renderSection` / `VoiceNoteSection`'s field filter:
+/// within a shown section, a field shows when the list is empty or names it
+/// (always-visible sections show every field).
+bool isSummaryFieldVisible(SummaryFieldDef field, List<String>? visibleFields) {
+  if (alwaysVisibleSummarySections.contains(field.section)) return true;
+  if (visibleFields == null || visibleFields.isEmpty) return true;
+  return visibleFields.contains(field.key);
+}

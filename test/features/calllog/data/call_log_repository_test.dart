@@ -814,7 +814,7 @@ void main() {
         () => dio.put<Map<String, dynamic>>(
           '/chats/9/call-details',
           data: {
-            'summary': {'sessionSummary': 'Updated text', 'tags': null},
+            'summary': {'sessionSummary': 'Updated text', 'tags': <String>[]},
           },
         ),
       ).thenAnswer(
@@ -835,11 +835,38 @@ void main() {
         () => dio.put<Map<String, dynamic>>(
           '/chats/9/call-details',
           data: {
-            'summary': {'sessionSummary': 'Updated text', 'tags': null},
+            'summary': {'sessionSummary': 'Updated text', 'tags': <String>[]},
           },
         ),
       ).called(1);
       expect(result.sessionSummary, 'Updated text');
+    });
+
+    test('sends tags as a list of names, not the comma-joined form text (RN handleSubmit)', () {
+      expect(summaryPatchForSubmission({'tags': ' anxiety, , sleep ,grief'}), {
+        'tags': ['anxiety', 'sleep', 'grief'],
+      });
+      expect(summaryPatchForSubmission({'tags': ''}), {'tags': <String>[]});
+      expect(summaryPatchForSubmission({'flow': 'x'}), {'flow': 'x'});
+    });
+  });
+
+  group('CallSummaryDetails form fields', () {
+    test('tags and dominantFeelings arrays become comma-separated text', () {
+      final details = CallSummaryDetails.fromJson({
+        'id': 1,
+        'details': {
+          'summary': {
+            'tags': [
+              {'tag': 'a', 'positivity_rating': 1},
+              {'tag': 'b', 'positivity_rating': 0},
+            ],
+            'dominantFeelings': ['sad', 'angry'],
+          },
+        },
+      });
+      expect(details.fields['tags'], 'a, b');
+      expect(details.fields['dominantFeelings'], 'sad, angry');
     });
   });
 

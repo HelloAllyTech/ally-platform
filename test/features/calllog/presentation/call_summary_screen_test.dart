@@ -7,10 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
 import 'package:ally_mobile_flutter/features/account/data/user_profile.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
+import 'package:ally_mobile_flutter/features/calllog/data/call_summary_fields.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
 import '../../../support/pump_app.dart';
@@ -34,7 +36,11 @@ UserProfile _user(int id) =>
 /// `sectionConfig.canEdit && (isAdmin || isCounsellorForCall)`, so a test
 /// user must be the call's counsellor (or an admin) to ever see the pencil
 /// button at all.
-List<Override> _editorOverrides() => [
+/// Every built-in field visible, as for a tenant that shows them all.
+final _allSummaryFieldKeys = [for (final f in summaryFieldDefs) f.key];
+
+List<Override> _editorOverrides({List<String>? visibleFields}) => [
+  summaryVisibleFieldsProvider.overrideWith((ref) async => visibleFields ?? _allSummaryFieldKeys),
   userPermissionsProvider.overrideWith((ref) async => const <String>[]),
   currentUserProvider.overrideWith((ref) async => _user(7)),
 ];

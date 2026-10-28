@@ -100,4 +100,26 @@ void main() {
       }
     });
   });
+
+  group('tenant visible summary fields (RN /settings/summary-fields)', () {
+    test('a section shows only when the list names one of its fields', () {
+      expect(isSummarySectionVisible(SummarySection.flow, ['counselingProcessFlow']), isTrue);
+      expect(isSummarySectionVisible(SummarySection.assessment, ['counselingProcessFlow']), isFalse);
+      // RN hides on an empty or not-yet-loaded list too.
+      expect(isSummarySectionVisible(SummarySection.flow, const []), isFalse);
+      expect(isSummarySectionVisible(SummarySection.flow, null), isFalse);
+    });
+
+    test('Additional Notes is always visible', () {
+      expect(isSummarySectionVisible(SummarySection.additionalNotes, const []), isTrue);
+    });
+
+    test('fields: empty list shows all, otherwise only listed ones', () {
+      final age = summaryFieldDefs.firstWhere((f) => f.key == 'age');
+      final gender = summaryFieldDefs.firstWhere((f) => f.key == 'gender');
+      expect(isSummaryFieldVisible(age, const []), isTrue);
+      expect(isSummaryFieldVisible(age, ['age']), isTrue);
+      expect(isSummaryFieldVisible(gender, ['age']), isFalse);
+    });
+  });
 }

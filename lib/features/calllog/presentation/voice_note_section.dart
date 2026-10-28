@@ -28,8 +28,8 @@ String _voiceNoteFieldType(SummaryFieldType type) {
 
 /// The built-in-field catalog voice dictation can fill — editable
 /// `summaryFieldDefs` only. Mirrors RN's `VoiceNoteSection`'s `voiceFields`
-/// memo, minus the org's custom-field definitions and the per-tenant
-/// visible-fields filter. `custom_fields_repository.dart` now exists
+/// memo, minus the org's custom-field definitions.
+/// `custom_fields_repository.dart` now exists
 /// (flutter-whole-app-status-2026-10-26.md backlog item #4 is done for
 /// display/edit/filter), but RN's real custom-field voice path runs every
 /// extracted value through `normalizeVoiceValueForCustomField` — per-type
@@ -39,11 +39,10 @@ String _voiceNoteFieldType(SummaryFieldType type) {
 /// that layer would silently store wrong values for select/boolean/date
 /// fields in a clinical record, which is worse than the feature not
 /// existing — left out deliberately, not from the client being missing.
-/// There is also still no per-tenant field-visibility system at all, so
-/// voice dictation can fill any editable built-in field, same set a
-/// counsellor could otherwise type into on this screen.
-List<Map<String, dynamic>> _voiceFieldCatalog() => summaryFieldDefs
-    .where((field) => field.editable)
+/// Filtered by the tenant's visible summary fields exactly as RN's memo is
+/// (`isSummaryFieldVisible`).
+List<Map<String, dynamic>> _voiceFieldCatalog(List<String>? visibleFields) => summaryFieldDefs
+    .where((field) => field.editable && isSummaryFieldVisible(field, visibleFields))
     .map(
       (field) => {
         'id': field.key,
@@ -145,7 +144,10 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
     try {
       final result = await ref
           .read(callLogRepositoryProvider)
-          .generateNoteFromAudio(audioFilePath: path, fields: _voiceFieldCatalog());
+          .generateNoteFromAudio(
+            audioFilePath: path,
+            fields: _voiceFieldCatalog(ref.read(summaryVisibleFieldsProvider).value),
+          );
 
       final updates = <String, dynamic>{};
       for (final value in result.values) {

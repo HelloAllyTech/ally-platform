@@ -228,6 +228,11 @@ class CallSummaryDetails {
     fields['clientId'] ??= json['clientId'];
     fields['mode'] ??= callInfo?['mode'];
     fields['additionalNotes'] ??= callInfo?['notes'];
+    // RN `transformSummaryToFormData`: an array of feelings is edited as
+    // comma-separated text.
+    if (fields['dominantFeelings'] is List) {
+      fields['dominantFeelings'] = (fields['dominantFeelings'] as List).join(', ');
+    }
     if (fields['tags'] is List) {
       fields['tags'] = (fields['tags'] as List)
           .map((t) => (t as Map<String, dynamic>)['tag'])
@@ -544,7 +549,7 @@ class CallLogRepository {
   ) async {
     final response = await _dio.put<Map<String, dynamic>>(
       '/chats/$chatId/call-details',
-      data: {'summary': changedFields},
+      data: {'summary': summaryPatchForSubmission(changedFields)},
     );
     return CallSummaryDetails.fromJson(response.data!);
   }
@@ -887,3 +892,18 @@ final chatMessagesProvider = FutureProvider.family<List<ChatMessage>, int>((
 ) {
   return ref.watch(callLogRepositoryProvider).getChatMessages(chatId);
 });
+
+/// RN `transformFormDataForSubmission` + `handleSubmit`'s tag split: the form
+/// holds tags as comma-separated text (see [CallSummaryDetails.fromJson]),
+/// but the API takes a list of tag names and keeps each existing tag's
+/// rating. Sending the joined string overwrote the stored tags.
+Map<String, dynamic> summaryPatchForSubmission(Map<String, dynamic> changedFields) {
+  if (!changedFields.containsKey('tags')) return changedFields;
+  final tags = changedFields['tags'];
+  return {
+    ...changedFields,
+    'tags': tags is List
+        ? tags
+        : '${tags ?? ''}'.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList(),
+  };
+}
