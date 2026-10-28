@@ -207,6 +207,7 @@ class CallSummaryDetails {
     this.reviewStatus,
     this.reviewNote,
     this.reviewCreatedAt,
+    this.callProvider,
   });
 
   factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
@@ -260,8 +261,12 @@ class CallSummaryDetails {
       reviewStatus: json['reviewStatus'] as String?,
       reviewNote: json['reviewNote'] as String?,
       reviewCreatedAt: json['reviewCreatedAt'] as String?,
+      callProvider: callInfo?['provider'] as String?,
     );
   }
+
+  /// RN `details.callInfo.provider` (`ChatProvider`, e.g. `WEBRTC`).
+  final String? callProvider;
 
   final int? counselorId;
 
@@ -652,14 +657,34 @@ class CallLogRepository {
     await _dio.put<void>('/chats/$chatId/transcript', data: {'transcript': transcript});
   }
 
-  Future<List<ChatMessage>> getChatMessages(int chatId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/chats/$chatId/messages',
-    );
-    final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
-        .toList();
+  /// RN `useCallTranscriptDetails` page size.
+  static const chatMessagesPageSize = 20;
+
+  /// RN `getChatMessages` with `useCallTranscriptDetails`' params
+  /// (`limit: 20, offset, sortOrder: 'ASC', sortBy`): `sortBy` is
+  /// `createdAt` for WEBRTC calls and `startSeconds` otherwise. RN pages in
+  /// on scroll; this walks every page up to the response `count` so the
+  /// whole call is returned in order (one request used to return only the
+  /// backend's default first page, unsorted).
+  Future<List<ChatMessage>> getChatMessages(int chatId, {String sortBy = 'startSeconds'}) async {
+    final messages = <ChatMessage>[];
+    // A runaway guard only; 500 pages is 10k turns.
+    for (var page = 0; page < 500; page++) {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/chats/$chatId/messages',
+        queryParameters: {
+          'limit': chatMessagesPageSize,
+          'offset': page * chatMessagesPageSize,
+          'sortBy': sortBy,
+          'sortOrder': 'ASC',
+        },
+      );
+      final data = response.data?['data'] as List<dynamic>? ?? const [];
+      messages.addAll(data.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>)));
+      final count = (response.data?['count'] as num?)?.toInt();
+      if (data.length < chatMessagesPageSize || (count != null && messages.length >= count)) break;
+    }
+    return messages;
   }
 }
 
@@ -889,8 +914,17 @@ final callSummaryProvider = FutureProvider.family<CallSummaryDetails, int>((
 final chatMessagesProvider = FutureProvider.family<List<ChatMessage>, int>((
   ref,
   chatId,
-) {
-  return ref.watch(callLogRepositoryProvider).getChatMessages(chatId);
+) async {
+  // RN reads the call's provider off the summary to pick the sort key; only
+  // that flag is watched, so a summary refetch doesn't refetch the transcript.
+  var isWebrtc = false;
+  try {
+    isWebrtc = await ref.watch(callSummaryProvider(chatId).selectAsync((s) => s.callProvider == 'WEBRTC'));
+  } catch (_) {
+    // No summary (e.g. 403): RN's default `startSeconds`.
+  }
+  final repository = ref.watch(callLogRepositoryProvider);
+  return isWebrtc ? repository.getChatMessages(chatId, sortBy: 'createdAt') : repository.getChatMessages(chatId);
 });
 
 /// RN `transformFormDataForSubmission` + `handleSubmit`'s tag split: the form

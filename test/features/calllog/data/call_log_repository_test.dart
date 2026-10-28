@@ -872,7 +872,7 @@ void main() {
 
   group('getChatMessages', () {
     test('maps each entry in the response list', () async {
-      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages')).thenAnswer(
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters'))).thenAnswer(
         (_) async => _response({
           'data': [
             {
@@ -899,13 +899,46 @@ void main() {
     });
 
     test('returns an empty list when data is missing', () async {
-      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages')).thenAnswer(
-        (_) async => _response({}),
-      );
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => _response({}));
 
       final messages = await repository.getChatMessages(9);
 
       expect(messages, isEmpty);
+    });
+
+    Map<String, dynamic> msg(int id) =>
+        {'messageId': id, 'content': 'm$id', 'createdAt': '2026-01-01T10:00:00Z', 'senderId': 1};
+
+    test('pages 20 at a time, ASC by startSeconds, until count (RN useCallTranscriptDetails)', () async {
+      final calls = <Map<String, dynamic>>[];
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((invocation) async {
+        final params = invocation.namedArguments[#queryParameters] as Map<String, dynamic>;
+        calls.add(params);
+        final offset = params['offset'] as int;
+        final ids = [for (var i = offset; i < offset + 20 && i < 45; i++) i];
+        return _response({'data': [for (final i in ids) msg(i)], 'count': 45});
+      });
+
+      final messages = await repository.getChatMessages(9);
+
+      expect(messages.map((m) => m.messageId), [for (var i = 0; i < 45; i++) i]);
+      expect(calls.map((c) => c['offset']), [0, 20, 40]);
+      expect(calls.first, {'limit': 20, 'offset': 0, 'sortBy': 'startSeconds', 'sortOrder': 'ASC'});
+    });
+
+    test('WEBRTC calls sort by createdAt', () async {
+      Map<String, dynamic>? params;
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((invocation) async {
+        params = invocation.namedArguments[#queryParameters] as Map<String, dynamic>;
+        return _response({'data': [msg(1)], 'count': 1});
+      });
+
+      await repository.getChatMessages(9, sortBy: 'createdAt');
+
+      expect(params!['sortBy'], 'createdAt');
     });
   });
 }
