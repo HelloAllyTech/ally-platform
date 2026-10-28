@@ -72,6 +72,15 @@ class SettingsRepository {
     return response.data ?? true;
   }
 
+  /// `GET /settings/summary-fields` — the tenant's visible built-in summary
+  /// field keys (RN `settingsApi.getSummaryFields`, stored in redux as
+  /// `summary.visibleFields`). See `call_summary_fields.dart`'s
+  /// `isSummarySectionVisible` for how they gate the form.
+  Future<List<String>> getSummaryFields() async {
+    final response = await _dio.get<List<dynamic>>('/settings/summary-fields');
+    return (response.data ?? const []).whereType<String>().toList();
+  }
+
   /// `GET /settings/nudge-status` — whether the tenant has AI nudges enabled
   /// at all during a live recording. RN's `useGetNudgeStatusQuery` has no
   /// permission/skip guard and gates purely the *rendering* of `NudgeSection`
@@ -123,4 +132,12 @@ final nudgeStatusProvider = FutureProvider<bool>((ref) {
 /// bothers asking for a user who couldn't start anything either way.
 final visibleChatTypesProvider = FutureProvider<List<String>>((ref) {
   return ref.watch(settingsRepositoryProvider).getVisibleChatTypes();
+});
+
+/// RN `summarySlice.visibleFields`. Kept alive like the redux slice so a
+/// refetch (RN refetches whenever CallSummary opens) keeps showing the last
+/// list while it loads. RN's slice starts as `[]` and a failed fetch leaves
+/// it there; callers treat an error the same way.
+final summaryVisibleFieldsProvider = FutureProvider<List<String>>((ref) {
+  return ref.watch(settingsRepositoryProvider).getSummaryFields();
 });

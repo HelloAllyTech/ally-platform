@@ -54,14 +54,15 @@ List<GoRoute> _routes() => [
     path: '/roleplay',
     builder: (context, state) {
       final extra = state.extra as Map<String, Object?>;
-      return Text('ROLEPLAY:${extra['scenarioSessionId']}');
+      return Text('ROLEPLAY:${extra['scenarioSessionId']} caseId=${extra['caseId']}');
     },
   ),
   GoRoute(
     path: '/simulations/feedback/:sessionId',
     builder: (context, state) => Text(
       'FEEDBACK:${state.pathParameters['sessionId']}'
-      ' fromLogs=${state.uri.queryParameters['fromLogs']}',
+      ' fromLogs=${state.uri.queryParameters['fromLogs']}'
+      ' caseId=${state.uri.queryParameters['caseId']}',
     ),
   ),
 ];
@@ -144,7 +145,7 @@ void main() {
         caseSessionItemId: 'item-1',
       ),
     ).called(1);
-    expect(find.text('ROLEPLAY:new-session-1'), findsOneWidget);
+    expect(find.text('ROLEPLAY:new-session-1 caseId=case-1'), findsOneWidget);
   });
 
   testWidgets('onEnsureSession creates a case session when none exists yet', (
@@ -216,7 +217,7 @@ void main() {
     verify(() => repository.getScenarioSessionByCaseItem('item-1')).called(1);
     // Viewing an already-completed session — must not force a rating
     // prompt on exit, mirroring RN's own fromLogs: true here.
-    expect(find.text('FEEDBACK:resolved-session-1 fromLogs=true'), findsOneWidget);
+    expect(find.text('FEEDBACK:resolved-session-1 fromLogs=true caseId=case-1'), findsOneWidget);
   });
 
   testWidgets('shows an error message when loading case details fails', (

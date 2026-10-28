@@ -52,6 +52,9 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
     super.key,
     required this.scenarioSessionId,
     this.fromLogs = false,
+    this.pathId,
+    this.caseId,
+    this.languageId,
   });
 
   final String scenarioSessionId;
@@ -59,6 +62,14 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
   /// RN `route.params.fromLogs`: reached from a historical Call Logs row,
   /// so the debrief is read-only and leaving never forces a rating.
   final bool fromLogs;
+
+  /// RN `route.params.pathId` / `caseId`: the session belongs to a path or
+  /// case, so back returns to its details and "Try another" is hidden.
+  final String? pathId;
+  final String? caseId;
+
+  /// RN `route.params.languageId` (carried; the screen itself doesn't read it).
+  final int? languageId;
 
   @override
   ConsumerState<SimulationFeedbackScreen> createState() => _SimulationFeedbackScreenState();
@@ -224,9 +235,24 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
 
   // ── Navigation ───────────────────────────────────────────────────────
 
-  /// RN `handleBack`: Logs go back; a fresh session returns to Learn.
+  /// RN `handleBack`: a path/case session resets to that path/case's
+  /// details; Logs go back; a fresh session returns to Learn.
   void _handleBack() {
     if (!mounted) return;
+    final pathId = widget.pathId;
+    final caseId = widget.caseId;
+    if (pathId != null || caseId != null) {
+      // RN `navigation.reset` to the details screen alone; here the shell
+      // stays underneath so back from the details lands on Learn, which is
+      // where RN's details screen sends a back with nothing to go back to.
+      final router = GoRouter.of(context);
+      final details = pathId != null ? '/simulation-paths/$pathId' : '/cases/$caseId';
+      router.go('/home');
+      // `push` builds on the delegate's current stack, which `go` only
+      // replaces once the new location is parsed — push on the next frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) => router.push(details));
+      return;
+    }
     if (widget.fromLogs) {
       if (context.canPop()) context.pop();
       return;
@@ -448,11 +474,17 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         !_hideReviewDetails &&
         canSeeReview;
     final showTryAnother =
-        _feedbackEnabled && _activeTab != FeedbackTab.debrief && !widget.fromLogs && summary != null;
+        _feedbackEnabled &&
+        _activeTab != FeedbackTab.debrief &&
+        !widget.fromLogs &&
+        widget.pathId == null &&
+        widget.caseId == null &&
+        summary != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return PopScope(
-      canPop: !_popupVisible && !_shouldAskOnLeave,
+      // A path/case session always goes through `_handleBack` (RN reset).
+      canPop: !_popupVisible && !_shouldAskOnLeave && widget.pathId == null && widget.caseId == null,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBackPressed();
       },

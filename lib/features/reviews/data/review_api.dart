@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/review_type_chip.dart';
+import '../../achievements/data/achievements_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
 import 'review_models.dart';
 
@@ -20,10 +21,19 @@ typedef AddCommentResult = ({
 /// one class keyed by [reviewType] covers both (ally-be's two
 /// `comment.controller.ts` files are the same shape).
 class ReviewApi {
-  ReviewApi(this._dio, this.reviewType);
+  ReviewApi(this._dio, this.reviewType, {void Function()? onBadgesChanged}) : _onBadgesChanged = onBadgesChanged;
 
   final Dio _dio;
   final ReviewType reviewType;
+
+  /// RN `invalidatesTags: ['Badges']` (reviewer badges can unlock): on
+  /// `addReviewComment`/`deleteComment` for simulation reviews, and on
+  /// `addReactionToReview` for both kinds. Wired to `badgesProvider`.
+  final void Function()? _onBadgesChanged;
+
+  void _badgesChangedIf(bool condition) {
+    if (condition) _onBadgesChanged?.call();
+  }
 
   String get _base =>
       reviewType == ReviewType.scribe ? '/scribe-session-reviews' : '/scenario-session-reviews';
@@ -125,6 +135,7 @@ class ReviewApi {
         'content': content,
       },
     );
+    _badgesChangedIf(reviewType == ReviewType.simulation);
     ({String id, String? createdAt})? entity(String key) {
       final value = response.data?[key];
       if (value is! Map<String, dynamic> || value['id'] == null) return null;
@@ -140,6 +151,7 @@ class ReviewApi {
 
   Future<void> deleteComment(String commentId) async {
     await _dio.delete<void>('$_base/comments/$commentId');
+    _badgesChangedIf(reviewType == ReviewType.simulation);
   }
 
   Future<void> updateCommentVisibility({required String commentId, required bool hidden}) async {
@@ -166,6 +178,7 @@ class ReviewApi {
       '$_base/$reviewId/reactions',
       data: {'reaction': reaction, 'action': _actionValue(action)},
     );
+    _badgesChangedIf(true);
   }
 }
 
@@ -183,5 +196,9 @@ ReactionAction reactionActionFor(String? currentEmoji, String unicode) {
 }
 
 final reviewApiProvider = Provider.family<ReviewApi, ReviewType>(
-  (ref, reviewType) => ReviewApi(ref.watch(apiClientProvider), reviewType),
+  (ref, reviewType) => ReviewApi(
+    ref.watch(apiClientProvider),
+    reviewType,
+    onBadgesChanged: () => ref.invalidate(badgesProvider),
+  ),
 );

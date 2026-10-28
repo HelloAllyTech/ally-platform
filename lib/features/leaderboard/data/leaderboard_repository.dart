@@ -105,7 +105,14 @@ class LeaderboardRepository {
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/community/leaderboard',
-      queryParameters: {'window': window.apiValue, 'limit': limit, 'offset': offset},
+      // RN `leaderboardApi.getLeaderboard` defaults: sortBy score, order DESC.
+      queryParameters: {
+        'window': window.apiValue,
+        'limit': limit,
+        'offset': offset,
+        'sortBy': 'score',
+        'order': 'DESC',
+      },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return (

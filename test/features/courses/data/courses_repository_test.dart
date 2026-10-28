@@ -18,10 +18,84 @@ Response<T> _response<T>(T? data, {int statusCode = 200}) => Response<T>(
 void main() {
   late MockDio dio;
   late CoursesRepository repository;
+  late int invalidations;
 
   setUp(() {
     dio = MockDio();
-    repository = CoursesRepository(dio);
+    invalidations = 0;
+    repository = CoursesRepository(dio, onInvalidateTracks: () => invalidations++);
+  });
+
+  group('RN ALL_TRACK_TAGS invalidation', () {
+    test('enroll, start, article-read, quiz, journal submit, branching, bucket place, language', () async {
+      when(() => dio.post<void>(any())).thenAnswer((_) async => _response<void>(null));
+      when(() => dio.put<void>(any(), data: any(named: 'data'))).thenAnswer((_) async => _response<void>(null));
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => _response(<String, dynamic>{
+          'trackItemProgressId': 'p',
+          'type': 'GAME',
+          'attemptId': 'a',
+          'score': 0,
+          'passed': false,
+          'status': 'GRADED',
+          'results': <dynamic>[],
+          'correct': true,
+          'correctBucketId': 'b',
+          'outcome': <String, dynamic>{},
+        }),
+      );
+      when(() => dio.post<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => _response(<String, dynamic>{'trackItemProgressId': 'p', 'type': 'GAME'}),
+      );
+
+      await repository.enrollTrack('t');
+      await repository.startTrackItem('i');
+      await repository.markArticleRead('i');
+      await repository.submitJournal('i');
+      await repository.setTrackLanguage(trackId: 't', languageCode: 'hi');
+      expect(invalidations, 5);
+    });
+
+    test('video progress only once it completes the item', () async {
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((_) async => _response(<String, dynamic>{'completed': false}));
+      await repository.reportVideoProgress(itemId: 'i', watchedPct: 10);
+      expect(invalidations, 0);
+
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((_) async => _response(<String, dynamic>{'completed': true}));
+      await repository.reportVideoProgress(itemId: 'i', watchedPct: 90);
+      expect(invalidations, 1);
+    });
+
+    test('article question only when its answer completes the article', () async {
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => _response(<String, dynamic>{'correct': true, 'correctOptionId': 'o'}),
+      );
+      await repository.submitArticleQuestionAnswer(itemId: 'i', questionId: 'q', selectedOptionId: 'o');
+      expect(invalidations, 0);
+
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => _response(<String, dynamic>{
+          'correct': true,
+          'correctOptionId': 'o',
+          'completion': {'completed': true},
+        }),
+      );
+      await repository.submitArticleQuestionAnswer(itemId: 'i', questionId: 'q', selectedOptionId: 'o');
+      expect(invalidations, 1);
+    });
+
+    test('game result, journal draft and bucket restart invalidate nothing', () async {
+      when(() => dio.post<void>(any())).thenAnswer((_) async => _response<void>(null));
+      when(() => dio.post<void>(any(), data: any(named: 'data'))).thenAnswer((_) async => _response<void>(null));
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((_) async => _response(<String, dynamic>{'bestScore': 3}));
+      await repository.recordGameResult(itemId: 'i', score: 3);
+      await repository.saveJournalDraft(itemId: 'i', responses: const []);
+      await repository.restartBucketSort('i');
+      expect(invalidations, 0);
+    });
   });
 
   group('getLearnTracks', () {

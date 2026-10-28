@@ -203,6 +203,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             accessToken: params['accessToken'] as String? ?? '',
             scenarioSessionId: params['scenarioSessionId'] as String?,
             scenario: params['scenario'] as Scenario?,
+            pathId: params['pathId'] as String?,
+            caseId: params['caseId'] as String?,
+            languageId: params['languageId'] as int?,
           );
         },
       ),
@@ -248,6 +251,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SimulationFeedbackScreen(
           scenarioSessionId: state.pathParameters['sessionId']!,
           fromLogs: state.uri.queryParameters['fromLogs'] == 'true',
+          pathId: state.uri.queryParameters['pathId'],
+          caseId: state.uri.queryParameters['caseId'],
+          languageId: int.tryParse(state.uri.queryParameters['languageId'] ?? ''),
         ),
       ),
       GoRoute(

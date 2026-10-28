@@ -12,6 +12,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
+import '../data/custom_fields_repository.dart';
+import '../data/voice_custom_fields.dart';
 import 'voice_note_recorder.dart';
 
 String _voiceNoteFieldType(SummaryFieldType type) {
@@ -26,24 +28,13 @@ String _voiceNoteFieldType(SummaryFieldType type) {
   }
 }
 
-/// The built-in-field catalog voice dictation can fill — editable
-/// `summaryFieldDefs` only. Mirrors RN's `VoiceNoteSection`'s `voiceFields`
-/// memo, minus the org's custom-field definitions and the per-tenant
-/// visible-fields filter. `custom_fields_repository.dart` now exists
-/// (flutter-whole-app-status-2026-10-26.md backlog item #4 is done for
-/// display/edit/filter), but RN's real custom-field voice path runs every
-/// extracted value through `normalizeVoiceValueForCustomField` — per-type
-/// normalization (matching a spoken value to the closest option label,
-/// mapping yes/no to true/false, parsing a spoken date) that has no
-/// equivalent here yet. Wiring custom fields into voice dictation without
-/// that layer would silently store wrong values for select/boolean/date
-/// fields in a clinical record, which is worse than the feature not
-/// existing — left out deliberately, not from the client being missing.
-/// There is also still no per-tenant field-visibility system at all, so
-/// voice dictation can fill any editable built-in field, same set a
-/// counsellor could otherwise type into on this screen.
-List<Map<String, dynamic>> _voiceFieldCatalog() => summaryFieldDefs
-    .where((field) => field.editable)
+/// The built-in half of RN `VoiceNoteSection`'s `voiceFields` memo:
+/// editable `summaryFieldDefs`, filtered by the tenant's visible summary
+/// fields (`isSummaryFieldVisible`). The custom-field half comes from
+/// `voice_custom_fields.dart`, whose `encodeVoiceCustomValue` is RN's
+/// per-type encoding of the spoken answers.
+List<Map<String, dynamic>> _voiceFieldCatalog(List<String>? visibleFields) => summaryFieldDefs
+    .where((field) => field.editable && isSummaryFieldVisible(field, visibleFields))
     .map(
       (field) => {
         'id': field.key,
@@ -68,7 +59,12 @@ List<Map<String, dynamic>> _voiceFieldCatalog() => summaryFieldDefs
 /// the call site), when the tenant has the voice-note toggle enabled, and
 /// for a counsellor.
 class VoiceNoteSection extends ConsumerStatefulWidget {
-  const VoiceNoteSection({super.key, required this.chatId, required this.onValuesApplied});
+  const VoiceNoteSection({
+    super.key,
+    required this.chatId,
+    required this.onValuesApplied,
+    this.onCustomValuesApplied,
+  });
 
   final int chatId;
 
@@ -78,6 +74,10 @@ class VoiceNoteSection extends ConsumerStatefulWidget {
   /// mirroring RN's `handleGenerate`, which only does so once
   /// `applyGeneratedValues` has resolved without throwing.
   final Future<void> Function(Map<String, dynamic> builtinUpdates) onValuesApplied;
+
+  /// RN `onCustomValuesApplied`: dictation upserted custom-field values, so
+  /// the caller re-seeds its custom-field form from the server.
+  final VoidCallback? onCustomValuesApplied;
 
   @override
   ConsumerState<VoiceNoteSection> createState() => _VoiceNoteSectionState();
@@ -143,18 +143,36 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
     if (path == null) return;
     setState(() => _isGenerating = true);
     try {
+      final builtinFields = _voiceFieldCatalog(ref.read(summaryVisibleFieldsProvider).value);
+      final builtinKeys = {for (final f in builtinFields) f['id'] as String};
+      final customDefs = {for (final d in _editableCustomFieldDefs()) d.id: d};
       final result = await ref
           .read(callLogRepositoryProvider)
-          .generateNoteFromAudio(audioFilePath: path, fields: _voiceFieldCatalog());
+          .generateNoteFromAudio(
+            audioFilePath: path,
+            fields: [...builtinFields, for (final d in customDefs.values) voiceCustomFieldSpec(d)],
+          );
 
+      // RN `applyGeneratedValues`.
       final updates = <String, dynamic>{};
+      final customUpdates = <({String fieldDefinitionId, String? value})>[];
       for (final value in result.values) {
         final trimmed = value.value.trim();
         if (trimmed.isEmpty) continue;
-        updates[value.id] = trimmed;
+        if (builtinKeys.contains(value.id)) {
+          updates[value.id] = trimmed;
+        } else if (customDefs[value.id] case final def?) {
+          final encoded = encodeVoiceCustomValue(def, trimmed);
+          if (encoded != null) customUpdates.add((fieldDefinitionId: def.id, value: encoded));
+        }
       }
+      final filled = updates.length + customUpdates.length;
       if (updates.isNotEmpty) {
         await widget.onValuesApplied(updates);
+      }
+      if (customUpdates.isNotEmpty) {
+        await ref.read(customFieldsRepositoryProvider).upsertValues(widget.chatId, customUpdates);
+        widget.onCustomValuesApplied?.call();
       }
 
       // Best-effort: a transcript-save failure must not fail the generation —
@@ -178,7 +196,7 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
         SnackBar(
           content: Text(
             ref.t(
-              updates.isNotEmpty ? 'calls.createNote.voice.generated' : 'calls.createNote.voice.nothingExtracted',
+              filled > 0 ? 'calls.createNote.voice.generated' : 'calls.createNote.voice.nothingExtracted',
             ),
           ),
         ),
@@ -209,6 +227,19 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
     }
   }
 
+  /// The org's custom fields this user may fill by voice — RN skips the
+  /// definitions query only when the tenant toggle is explicitly off.
+  List<CustomFieldDefinition> _editableCustomFieldDefs() {
+    if (ref.read(customFieldsEnabledProvider).value == false) return const [];
+    final permissions = ref.read(userPermissionsProvider).value ?? const <String>[];
+    final isAdmin = permissions.contains(UserPermissions.manageCustomFieldDefinitions);
+    final isCounsellor = permissions.contains(UserPermissions.counselorAccess);
+    return [
+      for (final def in ref.read(customFieldDefinitionsProvider).value ?? const <CustomFieldDefinition>[])
+        if (canVoiceFillCustomField(def, isAdmin: isAdmin, isCounsellor: isCounsellor)) def,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
@@ -216,6 +247,8 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
     final voiceEnabled = ref.watch(scribeVoiceNoteEnabledProvider).value ?? false;
     final canUseVoice = isCounselor && voiceEnabled;
     if (!canUseVoice) return const SizedBox.shrink();
+    // Loaded up front (RN's hooks) so Generate has the custom-field list.
+    if (ref.watch(customFieldsEnabledProvider).value != false) ref.watch(customFieldDefinitionsProvider);
 
     if (!_voiceOpen) {
       return Padding(

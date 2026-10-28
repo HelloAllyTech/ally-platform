@@ -24,14 +24,17 @@ import '../../../support/pump_router_app.dart';
 
 class MockCoursesRepository extends Mock implements CoursesRepository {}
 
-TrackDetailItem _item({TrackItemType type = TrackItemType.article}) =>
+TrackDetailItem _item({
+  TrackItemType type = TrackItemType.article,
+  TrackItemStatus status = TrackItemStatus.unlocked,
+}) =>
     TrackDetailItem(
       id: 'item1',
       type: type,
       order: 0,
       title: 'Item title',
       description: null,
-      status: TrackItemStatus.unlocked,
+      status: status,
       score: null,
       maxWatchedPct: null,
     );
@@ -158,6 +161,58 @@ void main() {
     await pump(tester);
 
     expect(find.byType(JournalPlayer), findsOneWidget);
+  });
+
+  group('a server-completed item reopens as completed (RN alreadyCompleted)', () {
+    Future<void> pumpCompleted(WidgetTester tester) => pumpApp(
+          tester,
+          CourseItemPlayerScreen(
+            trackId: 'track-1',
+            item: _item(status: TrackItemStatus.completed),
+          ),
+          overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+        );
+
+    testWidgets('journal', (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'JOURNAL',
+          journalPrompts: const [],
+          journalSavedResponses: const [],
+        ),
+      );
+      await pumpCompleted(tester);
+      expect(tester.widget<JournalPlayer>(find.byType(JournalPlayer)).alreadyCompleted, isTrue);
+    });
+
+    testWidgets('video', (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'VIDEO',
+          videoSource: 'youtube',
+          videoUrl: 'https://youtube.com/watch?v=abc',
+          durationSeconds: 60,
+          interjections: const [],
+        ),
+      );
+      await pumpCompleted(tester);
+      expect(tester.widget<VideoItemPlayer>(find.byType(VideoItemPlayer)).alreadyCompleted, isTrue);
+    });
+
+    testWidgets('article does not ask to be marked read again', (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'ARTICLE',
+          html: '<p>Hello world</p>',
+          articleQuestions: const [],
+        ),
+      );
+      await pumpCompleted(tester);
+      expect(find.text('courses.article.markRead'), findsNothing);
+    });
   });
 
   testWidgets('GAME payload renders GamePlayer', (tester) async {

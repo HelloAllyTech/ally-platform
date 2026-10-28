@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/screen_focus_listener.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
@@ -318,118 +319,128 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
       }
     }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // RN `CallLogHeader`: filter, refresh and (when allowed) the
-              // archive actions menu, `gap: 12`, all 16pt icons.
-              TabScreenHeader(
-                title: _isViewingArchive
-                    ? ref.t('calls.menu.archives')
-                    : ref.t('calls.header.title'),
-                subtitle: _isViewingArchive ? null : ref.t('calls.header.subtitle'),
-                italicSubtitle: true,
-                leading: _isViewingArchive
-                    ? GestureDetector(
-                        key: const Key('call-log-archive-back'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _isViewingArchive = false),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: SvgPicture.asset(
-                            'assets/icons/leftArrow.svg',
-                            width: 14,
-                            height: 14,
-                            colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
-                          ),
-                        ),
-                      )
-                    : null,
-                trailing: onRefresh == null
-                    ? null
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (showFilterAction) ...[
-                            _FilterButton(hasTagsPermission: hasTags),
-                            const SizedBox(width: 12),
-                          ],
-                          _RefreshButton(
-                            isFetching: isFetching,
-                            onRefresh: onRefresh,
-                          ),
-                          if (showArchiveAction) ...[
-                            const SizedBox(width: 12),
-                            _ActionsMenu(
-                              label: ref.t('callSummary.header.actionsMenu.archive'),
-                              onArchivePress: () => setState(() => _isViewingArchive = true),
+    // RN `useFocusEffect`s: coming back to Call Logs reloads every log
+    // list from page 0 and (for call starters) re-asks the chat types.
+    return ScreenFocusListener(
+      onFocus: () {
+        ref.invalidate(realCallLogsControllerProvider);
+        ref.invalidate(archivedCallLogsControllerProvider);
+        ref.invalidate(simulationLogsControllerProvider);
+        if (canStartCall) ref.invalidate(visibleChatTypesProvider);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                // RN `CallLogHeader`: filter, refresh and (when allowed) the
+                // archive actions menu, `gap: 12`, all 16pt icons.
+                TabScreenHeader(
+                  title: _isViewingArchive
+                      ? ref.t('calls.menu.archives')
+                      : ref.t('calls.header.title'),
+                  subtitle: _isViewingArchive ? null : ref.t('calls.header.subtitle'),
+                  italicSubtitle: true,
+                  leading: _isViewingArchive
+                      ? GestureDetector(
+                          key: const Key('call-log-archive-back'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _isViewingArchive = false),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: SvgPicture.asset(
+                              'assets/icons/leftArrow.svg',
+                              width: 14,
+                              height: 14,
+                              colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
                             ),
+                          ),
+                        )
+                      : null,
+                  trailing: onRefresh == null
+                      ? null
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (showFilterAction) ...[
+                              _FilterButton(hasTagsPermission: hasTags),
+                              const SizedBox(width: 12),
+                            ],
+                            _RefreshButton(
+                              isFetching: isFetching,
+                              onRefresh: onRefresh,
+                            ),
+                            if (showArchiveAction) ...[
+                              const SizedBox(width: 12),
+                              _ActionsMenu(
+                                label: ref.t('callSummary.header.actionsMenu.archive'),
+                                onArchivePress: () => setState(() => _isViewingArchive = true),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-              ),
-              if (showTabs)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: AppTabView<_LogTab>(
-                    tabs: [
-                      AppTabViewItem(key: _LogTab.real, label: ref.t('analytics.types.callLogs')),
-                      AppTabViewItem(
-                        key: _LogTab.simulation,
-                        label: ref.t('analytics.types.rolePlay'),
-                      ),
-                    ],
-                    activeTab: _activeTab!,
-                    onTabChange: (tab) => setState(() => _activeTab = tab),
-                  ),
+                        ),
                 ),
-              Expanded(
-                child: _activeTab == null
-                    ? Center(child: Text(ref.t('calls.fallback.callEmptyTitle')))
-                    : _isViewingArchive
-                        ? _RealLogsList(
-                            provider: archivedCallLogsControllerProvider,
-                            canViewDetails: hasChatDetails,
-                          )
-                        : _activeTab == _LogTab.real
-                            ? _RealLogsList(
-                                provider: realCallLogsControllerProvider,
-                                canViewDetails: hasChatDetails,
-                              )
-                            : _SimulationLogsList(canViewDetails: hasScenarioDetails),
-              ),
-            ],
-          ),
-          if (showFab)
-            Positioned(
-              right: 20,
-              bottom: MediaQuery.paddingOf(context).bottom + 100,
-              child: _StartSessionFab(
-                // Only inert when we actually KNOW there is nothing to offer;
-                // while the chat-types answer is missing the press re-asks.
-                enabled: canOfferAnySessionType || isSessionTypeUnknown,
-                hasOptions: canOfferAnySessionType,
-                onPressed: () {
-                  if (isSessionTypeUnknown) {
-                    if (canStartCall) ref.invalidate(visibleChatTypesProvider);
-                    if (!canOfferAnySessionType) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(ref.t('common.somethingWentWrong'))),
-                      );
-                      return;
-                    }
-                  }
-                  _showStartSessionModal(
-                    hasMicrophoneChatType: hasMicrophoneChatType,
-                    canCreateNote: canCreateNote,
-                  );
-                },
-              ),
+                if (showTabs)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: AppTabView<_LogTab>(
+                      tabs: [
+                        AppTabViewItem(key: _LogTab.real, label: ref.t('analytics.types.callLogs')),
+                        AppTabViewItem(
+                          key: _LogTab.simulation,
+                          label: ref.t('analytics.types.rolePlay'),
+                        ),
+                      ],
+                      activeTab: _activeTab!,
+                      onTabChange: (tab) => setState(() => _activeTab = tab),
+                    ),
+                  ),
+                Expanded(
+                  child: _activeTab == null
+                      ? Center(child: Text(ref.t('calls.fallback.callEmptyTitle')))
+                      : _isViewingArchive
+                          ? _RealLogsList(
+                              provider: archivedCallLogsControllerProvider,
+                              canViewDetails: hasChatDetails,
+                            )
+                          : _activeTab == _LogTab.real
+                              ? _RealLogsList(
+                                  provider: realCallLogsControllerProvider,
+                                  canViewDetails: hasChatDetails,
+                                )
+                              : _SimulationLogsList(canViewDetails: hasScenarioDetails),
+                ),
+              ],
             ),
-        ],
+            if (showFab)
+              Positioned(
+                right: 20,
+                bottom: MediaQuery.paddingOf(context).bottom + 100,
+                child: _StartSessionFab(
+                  // Only inert when we actually KNOW there is nothing to offer;
+                  // while the chat-types answer is missing the press re-asks.
+                  enabled: canOfferAnySessionType || isSessionTypeUnknown,
+                  hasOptions: canOfferAnySessionType,
+                  onPressed: () {
+                    if (isSessionTypeUnknown) {
+                      if (canStartCall) ref.invalidate(visibleChatTypesProvider);
+                      if (!canOfferAnySessionType) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(ref.t('common.somethingWentWrong'))),
+                        );
+                        return;
+                      }
+                    }
+                    _showStartSessionModal(
+                      hasMicrophoneChatType: hasMicrophoneChatType,
+                      canCreateNote: canCreateNote,
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

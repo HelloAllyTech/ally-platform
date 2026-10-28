@@ -24,6 +24,7 @@ import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
+import '../data/summary_form_state.dart';
 import 'voice_note_section.dart';
 
 /// Mirrors ally-mobile (React Native)'s `PRIVACY_POLICY_URL`.
@@ -660,15 +661,12 @@ class _SummaryTab extends ConsumerStatefulWidget {
 }
 
 class _SummaryTabState extends ConsumerState<_SummaryTab> {
-  final Map<String, dynamic> _formValues = {};
-
-  /// Last-known-saved baseline for built-in fields — mirrors RN's
-  /// `savedFormData`, used by `handleSectionFieldsReset` (the section
-  /// close/X button) to reset just that section's fields back to their
-  /// real last-saved values, not merely clear the dirty flag.
-  final Map<String, dynamic> _savedFormValues = {};
-  final Set<String> _dirtyKeys = {};
-  String? _seededForChatId;
+  /// Built-in field values + last-saved baseline (RN `formData` /
+  /// `savedFormData`); dirty = differs from the baseline. See
+  /// [SummaryFormState] for why that, not a touched-set, keeps edits made
+  /// during a save and across a reseed.
+  final SummaryFormState _form = SummaryFormState();
+  CallSummaryDetails? _seededFrom;
   bool _isSaving = false;
   bool _isRetrying = false;
   String? _error;
@@ -682,8 +680,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   final Set<SummarySection> _enhancingSections = {};
 
   // Tenant-configured custom fields (see custom_fields_repository.dart) —
-  // kept in their own map/dirty-set rather than merged into _formValues/
-  // _dirtyKeys above: they save through a different endpoint
+  // kept in their own map/dirty-set rather than merged into _form above: they save through a different endpoint
   // (upsertValues, not updateCallSummary) and are keyed by field-definition
   // id, a different id space from the built-in SummaryFieldDef.key values.
   final Map<String, String?> _customFieldValues = {};
@@ -691,24 +688,30 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   List<CustomFieldDefinition> _customFieldDefs = const [];
   String? _customFieldsSeededForChatId;
 
+  /// RN `useCallSummaryForm`'s seed effect: reseeds on every new server
+  /// copy (an AI fill or regeneration landing, a refetch), keeping unsaved
+  /// edits for the same chat — not only once per chat.
+  @override
+  void initState() {
+    super.initState();
+    // RN CallSummaryScreen refetches `getSummaryFields` whenever it opens;
+    // the previous list keeps showing meanwhile. Not built yet means the
+    // first watch fetches it anyway.
+    if (ref.exists(summaryVisibleFieldsProvider)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.invalidate(summaryVisibleFieldsProvider);
+      });
+    }
+  }
+
   void _seedIfNeeded(CallSummaryDetails summary) {
-    final key = '${widget.log.id}';
-    if (_seededForChatId == key) return;
-    _formValues
-      ..clear()
-      ..addAll(summary.fields);
-    _savedFormValues
-      ..clear()
-      ..addAll(summary.fields);
-    _dirtyKeys.clear();
-    _seededForChatId = key;
+    if (identical(_seededFrom, summary)) return;
+    _form.seed(summary.fields, chatId: widget.log.id);
+    _seededFrom = summary;
   }
 
   void _onFieldChanged(String fieldKey, dynamic value) {
-    setState(() {
-      _formValues[fieldKey] = value;
-      _dirtyKeys.add(fieldKey);
-    });
+    setState(() => _form.set(fieldKey, value));
   }
 
   /// Mirrors RN's `SectionHeader`/`toggleSection` (`CallSummaryDetails.tsx`):
@@ -740,10 +743,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// section is reopened and actually saved — a faithfully-ported quirk,
   /// not something to silently "fix" here.
   void _resetSectionFields(SummarySection section) {
-    for (final field in summaryFieldDefs.where((f) => f.section == section && f.editable)) {
-      _formValues[field.key] = _savedFormValues[field.key];
-      _dirtyKeys.remove(field.key);
-    }
+    _form.reset(summaryFieldDefs.where((f) => f.section == section && f.editable).map((f) => f.key));
   }
 
   void _onClosePress(SummarySection section) {
@@ -776,7 +776,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       }
     }
     if (field == null || !field.editable) return;
-    final content = _formValues[field.key];
+    final content = _form[field.key];
     if (content is! String || content.trim().isEmpty) return;
 
     setState(() => _enhancingSections.add(section));
@@ -805,6 +805,11 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// refetch (the query has `refetchOnMountOrArgChange: true` upstream)
   /// never clobbers an in-progress edit.
   void _seedCustomFieldsIfNeeded(List<CustomFieldValue> values) {
+    final pending = _customValuesBeforeReseed;
+    if (pending != null && !identical(values, pending)) {
+      _customFieldsSeededForChatId = null;
+      _customValuesBeforeReseed = null;
+    }
     final key = '${widget.log.id}';
     if (_customFieldsSeededForChatId == key) return;
     _customFieldValues
@@ -812,6 +817,14 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)));
     _dirtyCustomFieldIds.clear();
     _customFieldsSeededForChatId = key;
+  }
+
+  /// RN `onCustomValuesApplied` (remount + re-seed): voice dictation wrote
+  /// custom values server-side, so seed again from the refetched list.
+  List<CustomFieldValue>? _customValuesBeforeReseed;
+  void _reseedCustomFields() {
+    _customValuesBeforeReseed = ref.read(customFieldValuesProvider(widget.log.id)).value ?? const [];
+    ref.invalidate(customFieldValuesProvider(widget.log.id));
   }
 
   void _onCustomFieldChanged(String fieldDefinitionId, String? value) {
@@ -830,8 +843,13 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// it's filled in. Rethrows on failure: `VoiceNoteSection._handleGenerate`
   /// relies on that to know not to close its panel/reset the recorder.
   Future<void> _applyVoiceValues(Map<String, dynamic> updates) async {
-    setState(() => _formValues.addAll(updates));
+    setState(() {
+      for (final entry in updates.entries) {
+        _form.set(entry.key, entry.value);
+      }
+    });
     await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, updates);
+    if (mounted) setState(() => _form.markSaved(updates));
   }
 
   // RN's global bottom Save button only ever shows/acts on built-in-field
@@ -843,18 +861,20 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   // custom fields are only ever editable inside a section's edit mode
   // (gated the same way built-in fields are), so this reverts to RN's
   // actual scope.
-  bool get _hasDirtyChanges => _dirtyKeys.isNotEmpty;
+  bool get _hasDirtyChanges => _form.hasChanges;
 
   /// RN's `handleSubmit` — saves every dirty built-in field across the
   /// whole form (not scoped to one section), shared by both the global
   /// Save button and each section's own tick/checkmark.
   Future<bool> _saveBuiltinFields() async {
-    if (_dirtyKeys.isEmpty) return true;
-    final patch = {for (final key in _dirtyKeys) key: _formValues[key]};
+    if (!_form.hasChanges) return true;
+    // Snapshot what is sent: only these values become the new baseline, so
+    // anything typed while the request is in flight stays unsaved (RN
+    // `markFormDataSaved` of the written keys only).
+    final patch = _form.pendingPatch();
     try {
       await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, patch);
-      _savedFormValues.addAll(patch);
-      _dirtyKeys.clear();
+      if (mounted) setState(() => _form.markSaved(patch));
       ref.invalidate(callSummaryProvider(widget.log.id));
       return true;
     } catch (e) {
@@ -980,6 +1000,16 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         }
         _seedIfNeeded(summary);
 
+        // RN `selectSummaryVisibleFields` (tenant `/settings/summary-fields`).
+        // RN has it in redux before this screen opens; here the first load
+        // waits for it rather than flashing sections that then vanish. An
+        // error is RN's untouched initial `[]`.
+        final visibleFieldsAsync = ref.watch(summaryVisibleFieldsProvider);
+        if (!visibleFieldsAsync.hasValue && visibleFieldsAsync.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final visibleFields = visibleFieldsAsync.value ?? const <String>[];
+
         // Custom fields: fetched/seeded only once the tenant toggle resolves
         // true — mirrors RN's `skip: !customFieldsActive` on both the
         // definitions and values queries, rather than firing either request
@@ -1001,7 +1031,11 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         return Column(
           children: [
             if (summary.isManualNote)
-              VoiceNoteSection(chatId: widget.log.id, onValuesApplied: _applyVoiceValues),
+              VoiceNoteSection(
+                chatId: widget.log.id,
+                onValuesApplied: _applyVoiceValues,
+                onCustomValuesApplied: _reseedCustomFields,
+              ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -1049,24 +1083,26 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                     ),
                   ),
                   for (final section in SummarySection.values)
-                    _SectionCard(
-                      section: section,
-                      formValues: _formValues,
-                      onFieldChanged: _onFieldChanged,
-                      customFieldDefs: _customFieldDefs,
-                      customFieldValues: _customFieldValues,
-                      onCustomFieldChanged: _onCustomFieldChanged,
-                      isAdmin: isAdmin,
-                      isCounsellorForCall: isCounsellorForCall,
-                      isExpanded: _expandedSections[section] ?? false,
-                      isEditing: _editingSections[section] ?? false,
-                      isEnhancing: _enhancingSections.contains(section),
-                      onToggle: () => _toggleSection(section),
-                      onEditPress: () => _onEditPress(section),
-                      onWandPress: () => _onWandPress(section),
-                      onTickPress: () => _onTickPress(section),
-                      onClosePress: () => _onClosePress(section),
-                    ),
+                    if (isSummarySectionVisible(section, visibleFields))
+                      _SectionCard(
+                        section: section,
+                        visibleFields: visibleFields,
+                        formValues: _form.values,
+                        onFieldChanged: _onFieldChanged,
+                        customFieldDefs: _customFieldDefs,
+                        customFieldValues: _customFieldValues,
+                        onCustomFieldChanged: _onCustomFieldChanged,
+                        isAdmin: isAdmin,
+                        isCounsellorForCall: isCounsellorForCall,
+                        isExpanded: _expandedSections[section] ?? false,
+                        isEditing: _editingSections[section] ?? false,
+                        isEnhancing: _enhancingSections.contains(section),
+                        onToggle: () => _toggleSection(section),
+                        onEditPress: () => _onEditPress(section),
+                        onWandPress: () => _onWandPress(section),
+                        onTickPress: () => _onTickPress(section),
+                        onClosePress: () => _onClosePress(section),
+                      ),
                 ],
               ),
             ),
@@ -1139,9 +1175,13 @@ class _SectionCard extends ConsumerWidget {
     this.onCustomFieldChanged,
     this.isAdmin = false,
     this.isCounsellorForCall = false,
+    this.visibleFields,
   });
 
   final SummarySection section;
+
+  /// Tenant visible field keys (RN `SectionWrapper`'s field filter).
+  final List<String>? visibleFields;
   final Map<String, dynamic> formValues;
   final void Function(String fieldKey, dynamic value) onFieldChanged;
   final bool isExpanded;
@@ -1166,15 +1206,12 @@ class _SectionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fields = summaryFieldDefs.where((f) => f.section == section).toList();
+    final fields = summaryFieldDefs
+        .where((f) => f.section == section && isSummaryFieldVisible(f, visibleFields))
+        .toList();
     final sectionCustomFields = customFieldDefs.where((d) => d.sectionKey == section.name).toList();
     // RN's `canEdit={sectionConfig.canEdit && (isAdmin || isCounsellorForCall)}`.
     final canEdit = section.canEdit && (isAdmin || isCounsellorForCall);
-    // The RN screen also hides a section with no tenant-configured
-    // "visible fields" (a backend-driven per-org form config, Redux
-    // `selectSummaryVisibleFields`) — not ported, so every section in the
-    // catalog shows here regardless of whether it has data yet, which
-    // matters for a section the counsellor still needs to fill in.
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppCard(

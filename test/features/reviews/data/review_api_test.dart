@@ -71,6 +71,28 @@ void main() {
       expect(result.reply?.id, 'r-1');
     });
 
+    test('Badges are refetched exactly where RN invalidates the tag', () async {
+      when(() => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((_) async => _response<Map<String, dynamic>>({}));
+      when(() => dio.post<void>(any(), data: any(named: 'data'))).thenAnswer((_) async => _response<void>(null));
+      when(() => dio.delete<void>(any())).thenAnswer((_) async => _response<void>(null));
+
+      var sim = 0;
+      final simApi = ReviewApi(dio, ReviewType.simulation, onBadgesChanged: () => sim++);
+      await simApi.addComment(reviewId: 'r', content: 'x');
+      await simApi.deleteComment('c');
+      await simApi.addReactionToReview(reviewId: 'r', reaction: 'x', action: ReactionAction.add);
+      await simApi.addReactionToComment(commentId: 'c', reaction: 'x', action: ReactionAction.add);
+      expect(sim, 3);
+
+      var scribe = 0;
+      final scribeApi = ReviewApi(dio, ReviewType.scribe, onBadgesChanged: () => scribe++);
+      await scribeApi.addComment(reviewId: 'r', content: 'x');
+      await scribeApi.deleteComment('c');
+      await scribeApi.addReactionToReview(reviewId: 'r', reaction: 'x', action: ReactionAction.add);
+      expect(scribe, 1);
+    });
+
     test('comments overview asks for the latest two, newest first (RN getGeneralCommentsOverview)', () async {
       when(
         () => dio.get<Map<String, dynamic>>(any(), queryParameters: any(named: 'queryParameters')),

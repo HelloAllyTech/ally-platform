@@ -23,7 +23,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/scribe-session-reviews',
-          queryParameters: {'sortBy': 'LATEST', 'limit': 10, 'offset': 0},
+          queryParameters: {'sortBy': 'LATEST', 'limit': 10, 'offset': 0, 'order': 'DESC'},
         ),
       ).thenAnswer(
         (_) async => _response({
@@ -55,6 +55,7 @@ void main() {
             'limit': 10,
             'offset': 0,
             'readFilter': 'UNREAD',
+            'order': 'DESC',
           },
         ),
       ).thenAnswer((_) async => _response({'data': <dynamic>[]}));
@@ -69,6 +70,7 @@ void main() {
             'limit': 10,
             'offset': 0,
             'readFilter': 'UNREAD',
+            'order': 'DESC',
           },
         ),
       ).called(1);

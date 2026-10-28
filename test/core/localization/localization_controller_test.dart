@@ -167,6 +167,42 @@ void main() {
     );
 
     testWidgets(
+      'same version but nothing cached for the current language: fetches it (RN cachedResource check)',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'ui_language': 'hi',
+          'i18n_version': 'v2',
+          // Only English was ever synced for v2.
+          'i18n_resource_v2_en': jsonEncode({
+            'progress': {'title': 'EN cached'},
+          }),
+        });
+        final dio = MockDio();
+        when(() => dio.get<Map<String, dynamic>>('${AppConfig.i18nBaseUrl}/manifest.json')).thenAnswer(
+          (_) async => _response({
+            'currentVersion': 'v2',
+            'languages': ['en', 'hi'],
+            'namespaces': ['progress'],
+          }),
+        );
+        when(() => dio.get<Map<String, dynamic>>('${AppConfig.i18nBaseUrl}/v2/hi/progress.json'))
+            .thenAnswer((_) async => _response({'title': 'HI from CDN'}));
+
+        final container = ProviderContainer(
+          overrides: [localizationControllerProvider.overrideWith(() => LocalizationController(dio: dio))],
+        );
+        addTearDown(container.dispose);
+
+        await tester.runAsync(() async {
+          await container.read(localizationControllerProvider.future);
+          await container.read(localizationControllerProvider.notifier).refresh();
+        });
+
+        expect(container.read(localizationControllerProvider).value!.t('progress.title'), 'HI from CDN');
+      },
+    );
+
+    testWidgets(
       'swallows a network error and leaves the existing translations untouched',
       (tester) async {
         SharedPreferences.setMockInitialValues({});

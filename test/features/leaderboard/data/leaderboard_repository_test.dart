@@ -28,7 +28,13 @@ void main() {
         when(
           () => dio.get<Map<String, dynamic>>(
             '/community/leaderboard',
-            queryParameters: {'window': window.apiValue, 'limit': kLeaderboardPageSize, 'offset': 0},
+            queryParameters: {
+              'window': window.apiValue,
+              'limit': kLeaderboardPageSize,
+              'offset': 0,
+              'sortBy': 'score',
+              'order': 'DESC',
+            },
           ),
         ).thenAnswer(
           (_) async => _response({
@@ -44,7 +50,13 @@ void main() {
         verify(
           () => dio.get<Map<String, dynamic>>(
             '/community/leaderboard',
-            queryParameters: {'window': window.apiValue, 'limit': kLeaderboardPageSize, 'offset': 0},
+            queryParameters: {
+              'window': window.apiValue,
+              'limit': kLeaderboardPageSize,
+              'offset': 0,
+              'sortBy': 'score',
+              'order': 'DESC',
+            },
           ),
         ).called(1);
         expect(result.items.single.name, 'Alice');
@@ -56,7 +68,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/community/leaderboard',
-          queryParameters: {'window': LeaderboardWindow.lastWeek.apiValue, 'limit': 10, 'offset': 20},
+          queryParameters: {'window': LeaderboardWindow.lastWeek.apiValue, 'limit': 10, 'offset': 20, 'sortBy': 'score', 'order': 'DESC'},
         ),
       ).thenAnswer((_) async => _response({'data': <dynamic>[], 'totalCount': 0}));
 
@@ -66,7 +78,7 @@ void main() {
       verify(
         () => dio.get<Map<String, dynamic>>(
           '/community/leaderboard',
-          queryParameters: {'window': LeaderboardWindow.lastWeek.apiValue, 'limit': 10, 'offset': 20},
+          queryParameters: {'window': LeaderboardWindow.lastWeek.apiValue, 'limit': 10, 'offset': 20, 'sortBy': 'score', 'order': 'DESC'},
         ),
       ).called(1);
     });

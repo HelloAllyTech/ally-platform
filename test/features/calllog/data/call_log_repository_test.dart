@@ -234,8 +234,8 @@ void main() {
             'archive': false,
             'startDate': '2026-01-01',
             'endDate': '2026-01-31',
-            'minDuration': 5.0,
-            'maxDuration': 30.0,
+            'minDuration': 300,
+            'maxDuration': 1800,
             'tags': 'anxious,hopeful',
             'mode': 'SCRIBE,DICTATION',
             'status': 'SUCCESS,FAILED',
@@ -266,8 +266,8 @@ void main() {
             'archive': false,
             'startDate': '2026-01-01',
             'endDate': '2026-01-31',
-            'minDuration': 5.0,
-            'maxDuration': 30.0,
+            'minDuration': 300,
+            'maxDuration': 1800,
             'tags': 'anxious,hopeful',
             'mode': 'SCRIBE,DICTATION',
             'status': 'SUCCESS,FAILED',
@@ -337,6 +337,21 @@ void main() {
       expect(partial.activeCount, 2);
     });
 
+    test('duration is entered in minutes and sent in seconds (RN buildBuiltinParams)', () {
+      expect(
+        const CallLogFilterState(minDuration: 1.5, maxDuration: 10).toQueryParameters(),
+        {'minDuration': 90, 'maxDuration': 600},
+      );
+    });
+
+    test('withDuration clears a bound that was emptied', () {
+      const original = CallLogFilterState(minDuration: 5, maxDuration: 30, tags: ['a']);
+      final cleared = original.withDuration(min: null, max: original.maxDuration);
+      expect(cleared.minDuration, isNull);
+      expect(cleared.maxDuration, 30);
+      expect(cleared.tags, ['a']);
+    });
+
     test('copyWith overrides only the given fields', () {
       const original = CallLogFilterState(startDate: '2026-01-01', tags: ['anxious']);
 
@@ -386,7 +401,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/learn/scenario-sessions',
-          queryParameters: {'limit': 25, 'offset': 0},
+          queryParameters: {'limit': 25, 'offset': 0, 'sortBy': 'createdAt', 'order': 'DESC'},
         ),
       ).thenAnswer(
         (_) async => _response({
@@ -814,7 +829,7 @@ void main() {
         () => dio.put<Map<String, dynamic>>(
           '/chats/9/call-details',
           data: {
-            'summary': {'sessionSummary': 'Updated text', 'tags': null},
+            'summary': {'sessionSummary': 'Updated text', 'tags': <String>[]},
           },
         ),
       ).thenAnswer(
@@ -835,17 +850,44 @@ void main() {
         () => dio.put<Map<String, dynamic>>(
           '/chats/9/call-details',
           data: {
-            'summary': {'sessionSummary': 'Updated text', 'tags': null},
+            'summary': {'sessionSummary': 'Updated text', 'tags': <String>[]},
           },
         ),
       ).called(1);
       expect(result.sessionSummary, 'Updated text');
     });
+
+    test('sends tags as a list of names, not the comma-joined form text (RN handleSubmit)', () {
+      expect(summaryPatchForSubmission({'tags': ' anxiety, , sleep ,grief'}), {
+        'tags': ['anxiety', 'sleep', 'grief'],
+      });
+      expect(summaryPatchForSubmission({'tags': ''}), {'tags': <String>[]});
+      expect(summaryPatchForSubmission({'flow': 'x'}), {'flow': 'x'});
+    });
+  });
+
+  group('CallSummaryDetails form fields', () {
+    test('tags and dominantFeelings arrays become comma-separated text', () {
+      final details = CallSummaryDetails.fromJson({
+        'id': 1,
+        'details': {
+          'summary': {
+            'tags': [
+              {'tag': 'a', 'positivity_rating': 1},
+              {'tag': 'b', 'positivity_rating': 0},
+            ],
+            'dominantFeelings': ['sad', 'angry'],
+          },
+        },
+      });
+      expect(details.fields['tags'], 'a, b');
+      expect(details.fields['dominantFeelings'], 'sad, angry');
+    });
   });
 
   group('getChatMessages', () {
     test('maps each entry in the response list', () async {
-      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages')).thenAnswer(
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters'))).thenAnswer(
         (_) async => _response({
           'data': [
             {
@@ -872,13 +914,46 @@ void main() {
     });
 
     test('returns an empty list when data is missing', () async {
-      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages')).thenAnswer(
-        (_) async => _response({}),
-      );
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((_) async => _response({}));
 
       final messages = await repository.getChatMessages(9);
 
       expect(messages, isEmpty);
+    });
+
+    Map<String, dynamic> msg(int id) =>
+        {'messageId': id, 'content': 'm$id', 'createdAt': '2026-01-01T10:00:00Z', 'senderId': 1};
+
+    test('pages 20 at a time, ASC by startSeconds, until count (RN useCallTranscriptDetails)', () async {
+      final calls = <Map<String, dynamic>>[];
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((invocation) async {
+        final params = invocation.namedArguments[#queryParameters] as Map<String, dynamic>;
+        calls.add(params);
+        final offset = params['offset'] as int;
+        final ids = [for (var i = offset; i < offset + 20 && i < 45; i++) i];
+        return _response({'data': [for (final i in ids) msg(i)], 'count': 45});
+      });
+
+      final messages = await repository.getChatMessages(9);
+
+      expect(messages.map((m) => m.messageId), [for (var i = 0; i < 45; i++) i]);
+      expect(calls.map((c) => c['offset']), [0, 20, 40]);
+      expect(calls.first, {'limit': 20, 'offset': 0, 'sortBy': 'startSeconds', 'sortOrder': 'ASC'});
+    });
+
+    test('WEBRTC calls sort by createdAt', () async {
+      Map<String, dynamic>? params;
+      when(() => dio.get<Map<String, dynamic>>('/chats/9/messages', queryParameters: any(named: 'queryParameters')))
+          .thenAnswer((invocation) async {
+        params = invocation.namedArguments[#queryParameters] as Map<String, dynamic>;
+        return _response({'data': [msg(1)], 'count': 1});
+      });
+
+      await repository.getChatMessages(9, sortBy: 'createdAt');
+
+      expect(params!['sortBy'], 'createdAt');
     });
   });
 }

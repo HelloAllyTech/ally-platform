@@ -127,6 +127,8 @@ class FeedbackHarness {
   Future<GoRouter> pump(
     WidgetTester tester, {
     bool fromLogs = false,
+    String? pathId,
+    String? caseId,
     List<String> permissions = allPermissions,
   }) {
     return pumpRouterApp(
@@ -136,7 +138,20 @@ class FeedbackHarness {
       routes: [
         GoRoute(
           path: '/feedback',
-          builder: (context, state) => SimulationFeedbackScreen(scenarioSessionId: 'session-1', fromLogs: fromLogs),
+          builder: (context, state) => SimulationFeedbackScreen(
+            scenarioSessionId: 'session-1',
+            fromLogs: fromLogs,
+            pathId: pathId,
+            caseId: caseId,
+          ),
+        ),
+        GoRoute(
+          path: '/simulation-paths/:pathId',
+          builder: (context, state) => Text('PATH_DETAILS:${state.pathParameters['pathId']}'),
+        ),
+        GoRoute(
+          path: '/cases/:caseId',
+          builder: (context, state) => Text('CASE_DETAILS:${state.pathParameters['caseId']}'),
         ),
         GoRoute(path: '/home', builder: (context, state) => const Text('HOME')),
         GoRoute(path: '/simulations', builder: (context, state) => const Text('SIMULATIONS_LIST')),

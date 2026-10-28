@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
+import 'package:ally_mobile_flutter/features/reviews/data/scribe_reviews_repository.dart';
 
 class MockDio extends Mock implements Dio {}
 
@@ -48,6 +49,7 @@ void main() {
               'sortBy': 'LATEST',
               'limit': 10,
               'offset': 0,
+              'order': 'DESC',
             },
           )).thenAnswer(
         (_) async => _response({
@@ -65,6 +67,7 @@ void main() {
               'sortBy': 'LATEST',
               'limit': 10,
               'offset': 0,
+              'order': 'DESC',
             },
           )).called(1);
     });
@@ -77,6 +80,7 @@ void main() {
               'limit': 10,
               'offset': 0,
               'readFilter': 'UNREAD',
+              'order': 'DESC',
             },
           )).thenAnswer((_) async => _response({'data': <dynamic>[]}));
 
@@ -90,6 +94,7 @@ void main() {
               'limit': 10,
               'offset': 0,
               'readFilter': 'UNREAD',
+              'order': 'DESC',
             },
           )).called(1);
     });
@@ -264,6 +269,44 @@ void main() {
       final container = containerWith([UserPermissions.simulationReviewerAccess]);
 
       expect(await container.read(unreadReviewCountProvider.future), 2);
+    });
+
+    test('adds the scribe unread count for scribe reviewers (RN sim + scribe)', () async {
+      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/unread-count'))
+          .thenAnswer((_) async => _response({'count': 2}));
+      when(() => dio.get<Map<String, dynamic>>('/scribe-session-reviews/unread-count'))
+          .thenAnswer((_) async => _response({'count': 3}));
+      final container = ProviderContainer(
+        overrides: [
+          reviewsRepositoryProvider.overrideWithValue(repository),
+          scribeReviewsRepositoryProvider.overrideWithValue(ScribeReviewsRepository(dio)),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.simulationReviewerAccess, UserPermissions.viewScribeReviews],
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(await container.read(unreadReviewCountProvider.future), 5);
+    });
+
+    test('a failing half counts as 0', () async {
+      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/unread-count'))
+          .thenThrow(DioException(requestOptions: RequestOptions(path: '')));
+      when(() => dio.get<Map<String, dynamic>>('/scribe-session-reviews/unread-count'))
+          .thenAnswer((_) async => _response({'count': 1}));
+      final container = ProviderContainer(
+        overrides: [
+          reviewsRepositoryProvider.overrideWithValue(repository),
+          scribeReviewsRepositoryProvider.overrideWithValue(ScribeReviewsRepository(dio)),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [UserPermissions.simulationReviewerAccess, UserPermissions.viewScribeReviews],
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(await container.read(unreadReviewCountProvider.future), 1);
     });
   });
 }

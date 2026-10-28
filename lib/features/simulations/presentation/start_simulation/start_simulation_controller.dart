@@ -22,6 +22,8 @@ class StartSimulationParams {
     this.trackItemProgressId,
     this.languageId,
     this.scenario,
+    this.pathId,
+    this.caseId,
   });
 
   final int scenarioId;
@@ -35,6 +37,11 @@ class StartSimulationParams {
   /// The caller's own copy of the scenario, used for the live screen when
   /// the start response's `scenario` can't be read.
   final Scenario? scenario;
+
+  /// RN `useStartSimulation` `pathId`/`caseId`: carried to the live screen
+  /// and on to Feedback, whose back then returns to that path/case.
+  final String? pathId;
+  final String? caseId;
 }
 
 enum StartSimulationErrorKind { rateLimited, activeSimulation, other }
@@ -89,6 +96,9 @@ void _pushRoleplay(BuildContext context, SessionData session, StartSimulationPar
       'accessToken': session.accessToken,
       'scenarioSessionId': session.id,
       'scenario': session.scenario ?? params.scenario,
+      'pathId': ?params.pathId,
+      'caseId': ?params.caseId,
+      'languageId': ?params.languageId,
     },
   );
 }

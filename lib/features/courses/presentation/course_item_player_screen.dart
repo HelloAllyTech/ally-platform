@@ -316,6 +316,17 @@ class _CourseItemPlayerScreenState
     // and rebuilds a fresh child, rather than reusing one still holding the
     // previous item's local state (answered questions, scroll position).
     final key = ValueKey(_currentItemId);
+    // RN `alreadyCompleted`: the server's own item status OR completed in
+    // this session — not just the latter, or a finished journal reopens
+    // editable, a watched video loses "Watched" and a read article asks to
+    // be marked read again.
+    final detail = ref.watch(trackDetailProvider(widget.trackId)).value;
+    final current = detail == null
+        ? null
+        : _flattenTrackItems(detail).where((f) => f.item.id == _currentItemId).firstOrNull?.item;
+    final item = current ?? widget.item;
+    final alreadyCompleted =
+        _completed || _justCompleted.contains(_currentItemId) || (item.id == _currentItemId && _isItemCompleted(item));
     switch (payload.type) {
       case 'QUIZ':
         return QuizPlayer(
@@ -331,7 +342,7 @@ class _CourseItemPlayerScreenState
           key: key,
           payload: payload,
           itemId: _currentItemId,
-          completed: _completed,
+          completed: alreadyCompleted,
           onMarkComplete: _markArticleComplete,
         );
       case 'VIDEO':
@@ -339,7 +350,7 @@ class _CourseItemPlayerScreenState
           key: key,
           payload: payload,
           itemId: _currentItemId,
-          alreadyCompleted: _completed,
+          alreadyCompleted: alreadyCompleted,
           onCompleted: _handleCompletion,
         );
       case 'JOURNAL':
@@ -347,7 +358,7 @@ class _CourseItemPlayerScreenState
           key: key,
           payload: payload,
           itemId: _currentItemId,
-          alreadyCompleted: _completed,
+          alreadyCompleted: alreadyCompleted,
           onCompleted: _handleCompletion,
         );
       case 'GAME':
@@ -388,11 +399,6 @@ class _CourseItemPlayerScreenState
         );
       case 'ROLEPLAY':
       case 'CASE':
-        final detail = ref.watch(trackDetailProvider(widget.trackId)).value;
-        final current = detail == null
-            ? null
-            : _flattenTrackItems(detail).where((f) => f.item.id == _currentItemId).firstOrNull?.item;
-        final item = current ?? widget.item;
         return RoleplayCasePlayer(
           key: key,
           payload: payload,

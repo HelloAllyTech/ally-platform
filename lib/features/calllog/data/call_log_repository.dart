@@ -207,6 +207,7 @@ class CallSummaryDetails {
     this.reviewStatus,
     this.reviewNote,
     this.reviewCreatedAt,
+    this.callProvider,
   });
 
   factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
@@ -228,6 +229,11 @@ class CallSummaryDetails {
     fields['clientId'] ??= json['clientId'];
     fields['mode'] ??= callInfo?['mode'];
     fields['additionalNotes'] ??= callInfo?['notes'];
+    // RN `transformSummaryToFormData`: an array of feelings is edited as
+    // comma-separated text.
+    if (fields['dominantFeelings'] is List) {
+      fields['dominantFeelings'] = (fields['dominantFeelings'] as List).join(', ');
+    }
     if (fields['tags'] is List) {
       fields['tags'] = (fields['tags'] as List)
           .map((t) => (t as Map<String, dynamic>)['tag'])
@@ -255,8 +261,12 @@ class CallSummaryDetails {
       reviewStatus: json['reviewStatus'] as String?,
       reviewNote: json['reviewNote'] as String?,
       reviewCreatedAt: json['reviewCreatedAt'] as String?,
+      callProvider: callInfo?['provider'] as String?,
     );
   }
+
+  /// RN `details.callInfo.provider` (`ChatProvider`, e.g. `WEBRTC`).
+  final String? callProvider;
 
   final int? counselorId;
 
@@ -317,6 +327,7 @@ class CallLogFilterState {
 
   final String? startDate;
   final String? endDate;
+  /// Entered in minutes (the sheet's "Duration (mins)"); sent in seconds.
   final double? minDuration;
   final double? maxDuration;
   final List<String> tags;
@@ -382,6 +393,28 @@ class CallLogFilterState {
     );
   }
 
+  /// Sets (or, with null, clears) the duration bounds — `copyWith` can't
+  /// clear a field, so emptying a box used to leave its old filter applied.
+  CallLogFilterState withDuration({required double? min, required double? max}) => CallLogFilterState(
+        startDate: startDate,
+        endDate: endDate,
+        minDuration: min,
+        maxDuration: max,
+        tags: tags,
+        modes: modes,
+        statuses: statuses,
+        sources: sources,
+        customFieldValues: customFieldValues,
+      );
+
+  /// RN `buildBuiltinParams`: duration is entered in minutes and sent in
+  /// seconds, the backend column's unit.
+  static num? _minutesToSeconds(double? minutes) {
+    if (minutes == null) return null;
+    final seconds = minutes * 60;
+    return seconds == seconds.roundToDouble() ? seconds.round() : seconds;
+  }
+
   /// Builds `getCallLogs`' query-parameter map — comma-joined for the
   /// multiselect fields, matching the backend's `.split(',')` parsing
   /// exactly (`chat.repository.ts`'s `applyTagFilters`/
@@ -390,8 +423,8 @@ class CallLogFilterState {
   Map<String, dynamic> toQueryParameters() => {
     'startDate': ?startDate,
     'endDate': ?endDate,
-    'minDuration': ?minDuration,
-    'maxDuration': ?maxDuration,
+    'minDuration': ?_minutesToSeconds(minDuration),
+    'maxDuration': ?_minutesToSeconds(maxDuration),
     if (tags.isNotEmpty) 'tags': tags.join(','),
     if (modes.isNotEmpty) 'mode': modes.join(','),
     if (statuses.isNotEmpty) 'status': statuses.join(','),
@@ -497,7 +530,8 @@ class CallLogRepository {
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/learn/scenario-sessions',
-      queryParameters: {'limit': limit, 'offset': offset},
+      // RN `simulationsApi.getSimulationLogs`: newest first.
+      queryParameters: {'limit': limit, 'offset': offset, 'sortBy': 'createdAt', 'order': 'DESC'},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
@@ -544,7 +578,7 @@ class CallLogRepository {
   ) async {
     final response = await _dio.put<Map<String, dynamic>>(
       '/chats/$chatId/call-details',
-      data: {'summary': changedFields},
+      data: {'summary': summaryPatchForSubmission(changedFields)},
     );
     return CallSummaryDetails.fromJson(response.data!);
   }
@@ -647,14 +681,34 @@ class CallLogRepository {
     await _dio.put<void>('/chats/$chatId/transcript', data: {'transcript': transcript});
   }
 
-  Future<List<ChatMessage>> getChatMessages(int chatId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/chats/$chatId/messages',
-    );
-    final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
-        .toList();
+  /// RN `useCallTranscriptDetails` page size.
+  static const chatMessagesPageSize = 20;
+
+  /// RN `getChatMessages` with `useCallTranscriptDetails`' params
+  /// (`limit: 20, offset, sortOrder: 'ASC', sortBy`): `sortBy` is
+  /// `createdAt` for WEBRTC calls and `startSeconds` otherwise. RN pages in
+  /// on scroll; this walks every page up to the response `count` so the
+  /// whole call is returned in order (one request used to return only the
+  /// backend's default first page, unsorted).
+  Future<List<ChatMessage>> getChatMessages(int chatId, {String sortBy = 'startSeconds'}) async {
+    final messages = <ChatMessage>[];
+    // A runaway guard only; 500 pages is 10k turns.
+    for (var page = 0; page < 500; page++) {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/chats/$chatId/messages',
+        queryParameters: {
+          'limit': chatMessagesPageSize,
+          'offset': page * chatMessagesPageSize,
+          'sortBy': sortBy,
+          'sortOrder': 'ASC',
+        },
+      );
+      final data = response.data?['data'] as List<dynamic>? ?? const [];
+      messages.addAll(data.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>)));
+      final count = (response.data?['count'] as num?)?.toInt();
+      if (data.length < chatMessagesPageSize || (count != null && messages.length >= count)) break;
+    }
+    return messages;
   }
 }
 
@@ -884,6 +938,30 @@ final callSummaryProvider = FutureProvider.family<CallSummaryDetails, int>((
 final chatMessagesProvider = FutureProvider.family<List<ChatMessage>, int>((
   ref,
   chatId,
-) {
-  return ref.watch(callLogRepositoryProvider).getChatMessages(chatId);
+) async {
+  // RN reads the call's provider off the summary to pick the sort key; only
+  // that flag is watched, so a summary refetch doesn't refetch the transcript.
+  var isWebrtc = false;
+  try {
+    isWebrtc = await ref.watch(callSummaryProvider(chatId).selectAsync((s) => s.callProvider == 'WEBRTC'));
+  } catch (_) {
+    // No summary (e.g. 403): RN's default `startSeconds`.
+  }
+  final repository = ref.watch(callLogRepositoryProvider);
+  return isWebrtc ? repository.getChatMessages(chatId, sortBy: 'createdAt') : repository.getChatMessages(chatId);
 });
+
+/// RN `transformFormDataForSubmission` + `handleSubmit`'s tag split: the form
+/// holds tags as comma-separated text (see [CallSummaryDetails.fromJson]),
+/// but the API takes a list of tag names and keeps each existing tag's
+/// rating. Sending the joined string overwrote the stored tags.
+Map<String, dynamic> summaryPatchForSubmission(Map<String, dynamic> changedFields) {
+  if (!changedFields.containsKey('tags')) return changedFields;
+  final tags = changedFields['tags'];
+  return {
+    ...changedFields,
+    'tags': tags is List
+        ? tags
+        : '${tags ?? ''}'.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList(),
+  };
+}

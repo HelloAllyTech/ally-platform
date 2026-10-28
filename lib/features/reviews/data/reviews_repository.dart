@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import 'review_models.dart';
+import 'scribe_reviews_repository.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/reviewsApi.ts`.
 /// Scoped to the list + mark-read + detail fetch; comment threads,
@@ -16,10 +17,8 @@ class ReviewsRepository {
   final Dio _dio;
 
   /// `sortBy` mirrors RN's `SortBy` enum values exactly ('LATEST' /
-  /// 'MOST_VIEWED' / 'MOST_COMMENTED') — confirmed from `useReviews.ts`'s
-  /// real query, which sends `sortBy`/`readFilter`/`limit`/`offset` only
-  /// (no `order` param; this previously sent `sortBy: 'createdAt', order:
-  /// 'DESC'`, a shape the real backend doesn't use at all).
+  /// 'MOST_VIEWED' / 'MOST_COMMENTED'), sent with `readFilter`/`limit`/
+  /// `offset` and `order: 'DESC'` exactly as RN `reviewsApi.getReviews`.
   /// One page of RN's `useReviews` infinite list (`LIMIT = 10`).
   Future<ReviewsPage> getReviews({
     String? readFilter,
@@ -34,6 +33,8 @@ class ReviewsRepository {
         'limit': limit,
         'offset': offset,
         'readFilter': ?readFilter,
+        // RN `getReviews`/`getScribeReviews` always send `order: DESC`.
+        'order': 'DESC',
       },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
@@ -121,22 +122,34 @@ final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {
   return ReviewsRepository(ref.watch(apiClientProvider));
 });
 
-/// Simulation-review half of RN's `hasUnreadReviews` (`simUnread.count +
-/// scribeUnread.count > 0`) — the scribe-review half isn't modeled yet
-/// since scribe review browsing itself isn't ported, only Scribe
-/// recording. Revisit once that lands.
+/// RN TabNavigator's `hasUnreadReviews` total: `simUnread.count +
+/// scribeUnread.count` (each `?? 0`, so one failing doesn't hide the other).
 ///
-/// Only reviewers can have unread reviews: ally-be answers anyone else with
-/// a 403, which Riverpod then retried — 6 failed calls per launch for every
-/// learner. RN fires it unconditionally too, but RTK Query doesn't retry.
+/// Each half is only asked of users ally-be will answer: anyone else gets a
+/// 403, which Riverpod then retried — 6 failed calls per launch for every
+/// learner. RN fires both unconditionally, but RTK Query doesn't retry.
 final unreadReviewCountProvider = FutureProvider<int>((ref) async {
   final repository = ref.watch(reviewsRepositoryProvider);
   final permissions = await ref.watch(userPermissionsProvider.future);
-  if (!permissions.contains(UserPermissions.simulationReviewerAccess)) return 0;
-  return repository.getUnreadCount();
+  Future<int> countOrZero(Future<int> Function() fetch) async {
+    try {
+      return await fetch();
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  final counts = await Future.wait([
+    if (permissions.contains(UserPermissions.simulationReviewerAccess)) countOrZero(repository.getUnreadCount),
+    if (permissions.contains(UserPermissions.viewScribeReviews))
+      countOrZero(ref.watch(scribeReviewsRepositoryProvider).getUnreadCount),
+  ]);
+  return counts.fold<int>(0, (sum, count) => sum + count);
 });
 
-final reviewDetailProvider = FutureProvider.family<ReviewItem, String>((
+/// RN `keepUnusedDataFor: 0` + `refetchOnMountOrArgChange`: dropped as
+/// soon as nothing shows it, so every open of the review fetches it fresh.
+final reviewDetailProvider = FutureProvider.autoDispose.family<ReviewItem, String>((
   ref,
   reviewId,
 ) {

@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/screen_focus_listener.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/custom_dropdown.dart';
@@ -131,6 +132,15 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // RN `refetchOnMountOrArgChange: true` on both queries: a remount (the
+    // standalone /leaderboard route after the tab) refetches cached data.
+    if (ref.exists(leaderboardControllerProvider) || ref.exists(myRankProvider)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.invalidate(leaderboardControllerProvider);
+        ref.invalidate(myRankProvider);
+      });
+    }
   }
 
   @override
@@ -263,162 +273,166 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     // (shown) until myRank is known to say otherwise.
     final showRankColumn = !(myRank?.hideRankInCommunity ?? false);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            TabScreenHeader(
-              title: ref.t('community.title'),
-              tooltip:
-                  '${ref.t('community.title')}\n${ref.t('achievements.badgeTooltipDescription')}',
-              trailing: _BadgesButton(
-                label: '$myBadgeCount ${ref.t('community.table.badges')}',
-                onPressed: () => context.push('/achievements'),
+    // RN useLeaderboard `useFocusEffect(refetchMyRank)`.
+    return ScreenFocusListener(
+      onFocus: () => ref.invalidate(myRankProvider),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              TabScreenHeader(
+                title: ref.t('community.title'),
+                tooltip:
+                    '${ref.t('community.title')}\n${ref.t('achievements.badgeTooltipDescription')}',
+                trailing: _BadgesButton(
+                  label: '$myBadgeCount ${ref.t('community.table.badges')}',
+                  onPressed: () => context.push('/achievements'),
+                ),
               ),
-            ),
-            // styles.leaderboardHeader: right-aligned, 24pt sides, 10pt top/bottom.
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: CustomDropdown(
-                  key: const Key('leaderboard-period-dropdown'),
-                  menuKey: const Key('leaderboard-period-menu'),
-                  // RN's `getPeriodLabel` translates this via `t()`.
-                  value: ref.t(selectedWindow.labelKey),
-                  options: [for (final window in LeaderboardWindow.values) ref.t(window.labelKey)],
-                  onSelect: (label) {
-                    final window = LeaderboardWindow.values.firstWhere((w) => ref.t(w.labelKey) == label);
-                    ref.read(leaderboardWindowProvider.notifier).select(window);
-                  },
-                  // RN's `CustomDropdown` as this screen configures it:
-                  // `fixedWidth={120}`, a 0.5pt-stroke white header, 12/20
-                  // IBM Plex Serif text.
-                  fixedWidth: 120,
-                  headerPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                  headerDecoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.strokePrimary, width: 0.5),
-                  ),
-                  headerTextStyle: const TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
-                    fontSize: 12,
-                    height: 20 / 12,
-                    letterSpacing: 0.2,
-                    color: AppColors.highEmphasis,
-                  ),
-                  itemTextStyle: const TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
-                    fontSize: 14,
-                    height: 22 / 14,
-                    letterSpacing: 0.2,
-                    color: AppColors.highEmphasis,
+              // styles.leaderboardHeader: right-aligned, 24pt sides, 10pt top/bottom.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: CustomDropdown(
+                    key: const Key('leaderboard-period-dropdown'),
+                    menuKey: const Key('leaderboard-period-menu'),
+                    // RN's `getPeriodLabel` translates this via `t()`.
+                    value: ref.t(selectedWindow.labelKey),
+                    options: [for (final window in LeaderboardWindow.values) ref.t(window.labelKey)],
+                    onSelect: (label) {
+                      final window = LeaderboardWindow.values.firstWhere((w) => ref.t(w.labelKey) == label);
+                      ref.read(leaderboardWindowProvider.notifier).select(window);
+                    },
+                    // RN's `CustomDropdown` as this screen configures it:
+                    // `fixedWidth={120}`, a 0.5pt-stroke white header, 12/20
+                    // IBM Plex Serif text.
+                    fixedWidth: 120,
+                    headerPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                    headerDecoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                    ),
+                    headerTextStyle: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 12,
+                      height: 20 / 12,
+                      letterSpacing: 0.2,
+                      color: AppColors.highEmphasis,
+                    ),
+                    itemTextStyle: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 14,
+                      height: 22 / 14,
+                      letterSpacing: 0.2,
+                      color: AppColors.highEmphasis,
+                    ),
                   ),
                 ),
               ),
-            ),
-            // styles.listContainer: marginBottom 100.
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 100),
-                child: Column(
-                  children: [
-                    _TableHeaderRow(showRankColumn: showRankColumn),
-                    Expanded(
-                      child: pageAsync.when(
-                        loading: () => const _LeaderboardLoading(),
-                        // RN's screen never reads the hook's error: a failed
-                        // fetch leaves `data` empty and shows the empty state.
-                        error: (_, _) => const _LeaderboardEmpty(),
-                        data: (page) {
-                          if (page.items.isEmpty) return const _LeaderboardEmpty();
+              // styles.listContainer: marginBottom 100.
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  child: Column(
+                    children: [
+                      _TableHeaderRow(showRankColumn: showRankColumn),
+                      Expanded(
+                        child: pageAsync.when(
+                          loading: () => const _LeaderboardLoading(),
+                          // RN's screen never reads the hook's error: a failed
+                          // fetch leaves `data` empty and shows the empty state.
+                          error: (_, _) => const _LeaderboardEmpty(),
+                          data: (page) {
+                            if (page.items.isEmpty) return const _LeaderboardEmpty();
 
-                          final currentUserIndex =
-                              myRank == null ? -1 : page.items.indexWhere((e) => e.userId == myRank.userId);
+                            final currentUserIndex =
+                                myRank == null ? -1 : page.items.indexWhere((e) => e.userId == myRank.userId);
 
-                          return Stack(
-                            children: [
-                              RefreshIndicator(
-                                color: AppColors.primary,
-                                onRefresh: () => ref.refresh(leaderboardControllerProvider.future),
-                                child: ListView.builder(
-                                  controller: _scrollController,
-                                  padding: const EdgeInsets.only(bottom: 100),
-                                  itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
-                                  itemBuilder: (context, index) {
-                                    if (index >= page.items.length) {
-                                      return const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 20),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: AppColors.primary,
+                            return Stack(
+                              children: [
+                                RefreshIndicator(
+                                  color: AppColors.primary,
+                                  onRefresh: () => ref.refresh(leaderboardControllerProvider.future),
+                                  child: ListView.builder(
+                                    controller: _scrollController,
+                                    padding: const EdgeInsets.only(bottom: 100),
+                                    itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
+                                    itemBuilder: (context, index) {
+                                      if (index >= page.items.length) {
+                                        return const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 20),
+                                          child: Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.primary,
+                                              ),
                                             ),
+                                          ),
+                                        );
+                                      }
+                                      return _row(
+                                        entry: page.items[index],
+                                        showRankColumn: showRankColumn,
+                                        isHighlighted: index == currentUserIndex,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                // RN's sticky footer: pinned current-user row, shown only
+                                // while that row's position is still below the visible
+                                // viewport (not yet scrolled to) — never when already in
+                                // view or when the row hasn't loaded into this page yet.
+                                if (showRankColumn && myRank != null && myRank.rank > 0)
+                                  AnimatedBuilder(
+                                    animation: _scrollController,
+                                    builder: (context, _) {
+                                      final attached =
+                                          _scrollController.hasClients && _scrollController.position.haveDimensions;
+                                      final offset = attached ? _scrollController.offset : 0.0;
+                                      final viewportHeight =
+                                          attached ? _scrollController.position.viewportDimension : 0.0;
+                                      final rowTop = currentUserIndex == -1 ? 0.0 : currentUserIndex * _kRowHeight;
+                                      final shouldShow = rowTop > offset + viewportHeight;
+                                      if (!shouldShow) return const SizedBox.shrink();
+                                      // styles.stickyFooter: plain white, no shadow.
+                                      return Align(
+                                        key: const Key('leaderboard-sticky-footer'),
+                                        alignment: Alignment.bottomCenter,
+                                        child: ColoredBox(
+                                          color: Colors.white,
+                                          child: _row(
+                                            entry: LeaderboardEntry(
+                                              userId: myRank.userId,
+                                              name: myRank.name,
+                                              profileImageUrl: myRank.profileImageUrl,
+                                              rank: myRank.rank,
+                                              minutesPlayed: myRank.minutesPlayed,
+                                              badgeCount: myRank.badgeCount,
+                                            ),
+                                            showRankColumn: showRankColumn,
+                                            isHighlighted: true,
                                           ),
                                         ),
                                       );
-                                    }
-                                    return _row(
-                                      entry: page.items[index],
-                                      showRankColumn: showRankColumn,
-                                      isHighlighted: index == currentUserIndex,
-                                    );
-                                  },
-                                ),
-                              ),
-                              // RN's sticky footer: pinned current-user row, shown only
-                              // while that row's position is still below the visible
-                              // viewport (not yet scrolled to) — never when already in
-                              // view or when the row hasn't loaded into this page yet.
-                              if (showRankColumn && myRank != null && myRank.rank > 0)
-                                AnimatedBuilder(
-                                  animation: _scrollController,
-                                  builder: (context, _) {
-                                    final attached =
-                                        _scrollController.hasClients && _scrollController.position.haveDimensions;
-                                    final offset = attached ? _scrollController.offset : 0.0;
-                                    final viewportHeight =
-                                        attached ? _scrollController.position.viewportDimension : 0.0;
-                                    final rowTop = currentUserIndex == -1 ? 0.0 : currentUserIndex * _kRowHeight;
-                                    final shouldShow = rowTop > offset + viewportHeight;
-                                    if (!shouldShow) return const SizedBox.shrink();
-                                    // styles.stickyFooter: plain white, no shadow.
-                                    return Align(
-                                      key: const Key('leaderboard-sticky-footer'),
-                                      alignment: Alignment.bottomCenter,
-                                      child: ColoredBox(
-                                        color: Colors.white,
-                                        child: _row(
-                                          entry: LeaderboardEntry(
-                                            userId: myRank.userId,
-                                            name: myRank.name,
-                                            profileImageUrl: myRank.profileImageUrl,
-                                            rank: myRank.rank,
-                                            minutesPlayed: myRank.minutesPlayed,
-                                            badgeCount: myRank.badgeCount,
-                                          ),
-                                          showRankColumn: showRankColumn,
-                                          isHighlighted: true,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                            ],
-                          );
-                        },
+                                    },
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

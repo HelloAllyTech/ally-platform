@@ -14,6 +14,7 @@ import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
+import '../../simulations/presentation/simulation_feedback_location.dart';
 import 'call_modals.dart';
 import 'live_feedback_toast.dart';
 import 'participant_tile.dart';
@@ -91,6 +92,9 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
     required this.accessToken,
     this.scenarioSessionId,
     this.scenario,
+    this.pathId,
+    this.caseId,
+    this.languageId,
     this.now = DateTime.now,
   });
 
@@ -105,6 +109,11 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
   /// `pauseEnabled` is read here too but has no control to gate yet (see the
   /// class doc on pause/resume).
   final Scenario? scenario;
+
+  /// RN route params `pathId`/`caseId`/`languageId`, passed on to Feedback.
+  final String? pathId;
+  final String? caseId;
+  final int? languageId;
 
   /// Injectable clock for the session timer, so tests can assert on a
   /// specific elapsed duration without a real wall-clock wait — the
@@ -508,8 +517,14 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   void _goToFeedback() {
     final sessionId = widget.scenarioSessionId;
     if (!mounted || sessionId == null) return;
-    GoRouter.maybeOf(context)
-        ?.pushReplacement('/simulations/feedback/$sessionId');
+    GoRouter.maybeOf(context)?.pushReplacement(
+      simulationFeedbackLocation(
+        sessionId,
+        pathId: widget.pathId,
+        caseId: widget.caseId,
+        languageId: widget.languageId,
+      ),
+    );
   }
 
   /// Fixed 3-2-1 overlay started on mount, independent of the connection —

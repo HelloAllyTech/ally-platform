@@ -8,17 +8,24 @@ import 'start_item_payload.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/coursesApi.ts` —
 /// same routes (`src/constants/general.ts`'s `API_ROUTES.TRACKS`), same
-/// backend contract. RTK Query's cache-tag invalidation isn't replicated
-/// here; Riverpod screens re-fetch via `ref.invalidate` on the relevant
-/// provider after a mutation instead, which is the Riverpod-idiomatic
-/// equivalent for the mutations this phase actually needs.
+/// backend contract. RTK Query's `ALL_TRACK_TAGS` invalidation is
+/// replicated through [_invalidateTracks] (wired by the provider to
+/// `ref.invalidate` of the list, detail and progress providers): the same
+/// mutations, and the same conditional ones (article question / video
+/// progress only once they complete the item).
 ///
 /// Scope: ARTICLE, VIDEO, QUIZ (all 8 question types), JOURNAL, GAME,
 /// BRANCHING_SCENARIO, and BUCKET_SORT items end-to-end.
 class CoursesRepository {
-  CoursesRepository(this._dio);
+  CoursesRepository(this._dio, {void Function()? onInvalidateTracks})
+      : _onInvalidateTracks = onInvalidateTracks;
 
   final Dio _dio;
+
+  /// RN `ALL_TRACK_TAGS` (`LearnTracks`, `LearnTrackDetail`, `LearnTrackNext`).
+  final void Function()? _onInvalidateTracks;
+
+  void _invalidateTracks() => _onInvalidateTracks?.call();
 
   Future<List<TrackListItem>> getLearnTracks() async {
     final response = await _dio.get<Map<String, dynamic>>('/learn/tracks');
@@ -61,6 +68,7 @@ class CoursesRepository {
       '/learn/tracks/$trackId/language',
       data: {'languageCode': languageCode},
     );
+    _invalidateTracks();
   }
 
   Future<TrackProgressDashboard> getLearnTrackProgress(String trackId) async {
@@ -72,6 +80,7 @@ class CoursesRepository {
 
   Future<void> enrollTrack(String trackId) async {
     await _dio.post<void>('/learn/tracks/$trackId/enroll');
+    _invalidateTracks();
   }
 
   /// Returns the real per-type content payload (quiz questions, article
@@ -81,6 +90,7 @@ class CoursesRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       '/learn/tracks/items/$itemId/start',
     );
+    _invalidateTracks();
     return StartItemPayload.fromJson(response.data!);
   }
 
@@ -88,6 +98,7 @@ class CoursesRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       '/learn/tracks/items/$itemId/article-read',
     );
+    _invalidateTracks();
     return TrackItemCompletionResult.fromJson(response.data ?? {});
   }
 
@@ -112,6 +123,8 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/video-progress',
       data: {'watchedPct': watchedPct},
     );
+    // RN patches the cache every ~10s and only invalidates on completion.
+    if (response.data?['completed'] == true) _invalidateTracks();
     return (
       completed: response.data?['completed'] as bool? ?? false,
       maxWatchedPct:
@@ -131,6 +144,8 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/article-questions/$questionId/answer',
       data: {'selectedOptionId': selectedOptionId},
     );
+    final completion = response.data?['completion'];
+    if (completion is Map && completion['completed'] == true) _invalidateTracks();
     return (
       correct: response.data!['correct'] as bool,
       correctOptionId: response.data!['correctOptionId'] as String,
@@ -164,6 +179,7 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/quiz-attempts',
       data: {'answers': answers.map((a) => a.toJson()).toList()},
     );
+    _invalidateTracks();
     return QuizAttemptResult.fromJson(response.data!);
   }
 
@@ -186,6 +202,7 @@ class CoursesRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       '/learn/tracks/items/$itemId/journal/submit',
     );
+    _invalidateTracks();
     return TrackItemCompletionResult.fromJson(response.data ?? {});
   }
 
@@ -214,6 +231,7 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/branching-result',
       data: {'path': path},
     );
+    _invalidateTracks();
     return BranchingResult.fromJson(response.data!);
   }
 
@@ -228,6 +246,7 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/bucket-sort/place',
       data: {'sortItemId': sortItemId, 'bucketId': bucketId},
     );
+    _invalidateTracks();
     return BucketSortPlacementResult.fromJson(response.data!);
   }
 
@@ -237,8 +256,16 @@ class CoursesRepository {
   }
 }
 
-final coursesRepositoryProvider = Provider<CoursesRepository>((ref) {
-  return CoursesRepository(ref.watch(apiClientProvider));
+final Provider<CoursesRepository> coursesRepositoryProvider = Provider<CoursesRepository>((ref) {
+  return CoursesRepository(
+    ref.watch(apiClientProvider),
+    // `LearnTrackDetail` also tags `getLearnTrackProgress` in RN.
+    onInvalidateTracks: () {
+      ref.invalidate(learnTracksProvider);
+      ref.invalidate(trackDetailProvider);
+      ref.invalidate(trackProgressProvider);
+    },
+  );
 });
 
 final learnTracksProvider = FutureProvider<List<TrackListItem>>((ref) {
