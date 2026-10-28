@@ -53,6 +53,7 @@ class ShareForReviewScreen extends ConsumerStatefulWidget {
     this.contextTitle,
     this.contextDescription,
     this.contextCoverImageUrl,
+    this.contextCoverVideoUrl,
     this.contextDateTime,
     this.contextDuration,
   });
@@ -69,6 +70,9 @@ class ShareForReviewScreen extends ConsumerStatefulWidget {
   final String? contextTitle;
   final String? contextDescription;
   final String? contextCoverImageUrl;
+
+  /// RN `scenarioData.coverVideoUrl`: plays in the context card.
+  final String? contextCoverVideoUrl;
 
   /// ISO 8601 — rendered via [formatReviewDateTime].
   final String? contextDateTime;
@@ -234,6 +238,7 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
           reviewType: reviewType,
           title: widget.contextTitle,
           coverImageUrl: widget.isScribe ? null : widget.contextCoverImageUrl,
+          coverVideoUrl: widget.isScribe ? null : widget.contextCoverVideoUrl,
           descriptionText: widget.isScribe ? null : htmlToPlainText(widget.contextDescription),
           descriptionWidget: widget.isScribe
               ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: _detailRows())

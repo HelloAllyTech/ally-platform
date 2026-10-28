@@ -335,13 +335,21 @@ void main() {
 
   group('share switch', () {
     testWidgets('on with no review yet opens Share for review with the session context', (tester) async {
-      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
+      final json = summaryJson(note: _note, hasFeedback: true);
+      (json['scenario'] as Map<String, dynamic>)
+        ..['coverImageUrl'] = 'https://x/cover.png'
+        ..['description'] = 'A parent lost a child';
+      h.stubSummary(json);
       await h.pump(tester);
 
       await tester.tap(find.byKey(const Key('simulation-feedback-share-switch')));
       await tester.pumpAndSettle();
 
-      expect(find.text('SHARE:null:300:Supporting a grieving parent'), findsOneWidget);
+      // RN scenarioData carries the cover and description too.
+      expect(
+        find.text('SHARE:null:300:Supporting a grieving parent:https://x/cover.png:A parent lost a child'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('off on an older shared review makes it private', (tester) async {

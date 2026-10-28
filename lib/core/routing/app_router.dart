@@ -56,6 +56,18 @@ typedef ShareForReviewArgs = ({
   String? contextTitle,
 });
 
+/// [ShareForReviewArgs] plus the scenario context card's media and
+/// description (RN `ShareSimulationScreen` `scenarioData.coverImageUrl /
+/// coverVideoUrl / description`) — passed by the simulation callers
+/// (Feedback's share, review details' edit-note). A separate record so the
+/// scribe caller's plain [ShareForReviewArgs] keeps working unchanged.
+typedef ShareSimulationForReviewArgs = ({
+  ShareForReviewArgs args,
+  String? coverImageUrl,
+  String? coverVideoUrl,
+  String? description,
+});
+
 /// The redirect gate's actual decision logic, extracted to a pure top-level
 /// function so it's testable without constructing a real [GoRouterState]
 /// (whose constructor needs a private `RouteConfiguration` not obtainable
@@ -328,7 +340,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // the path's own `scenarioSessionId` is a dummy value in edit
           // mode anyway (editing only PATCHes the existing review, it
           // never needs the session id).
-          final args = state.extra as ShareForReviewArgs?;
+          final extra = state.extra;
+          final scenario = extra is ShareSimulationForReviewArgs ? extra : null;
+          final args = scenario?.args ?? (extra is ShareForReviewArgs ? extra : null);
           return ShareForReviewScreen(
             scenarioSessionId: state.pathParameters['scenarioSessionId']!,
             reviewId: args?.reviewId,
@@ -338,6 +352,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             contextTitle: args?.contextTitle,
             contextDateTime: args?.contextDateTime,
             contextDuration: args?.contextDuration,
+            contextCoverImageUrl: scenario?.coverImageUrl,
+            contextCoverVideoUrl: scenario?.coverVideoUrl,
+            contextDescription: scenario?.description,
           );
         },
       ),
