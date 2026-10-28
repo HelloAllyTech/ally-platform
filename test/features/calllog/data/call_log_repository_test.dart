@@ -802,24 +802,82 @@ void main() {
   });
 
   group('addSummaryFeedback', () {
-    test('POSTs rating and nested feedback.issues/comment', () async {
-      when(() => dio.post<void>(
-            '/chats/9/summary-feedback',
-            data: {
-              'rating': 4,
-              'feedback': {'issues': <String>[], 'comment': 'Great summary'},
-            },
-          )).thenAnswer((_) async => _response<void>(null));
+    test('POSTs rating and the whole popup value under feedback (RN onAddSummaryFeedback)', () async {
+      final body = {
+        'rating': 3,
+        'feedback': {
+          'rating': 3,
+          'issues': ['INACCURATE'],
+          'comment': 'Missed a concern',
+          'tags': ['Too long'],
+        },
+      };
+      when(() => dio.post<void>('/chats/9/summary-feedback', data: body)).thenAnswer((_) async => _response<void>(null));
 
-      await repository.addSummaryFeedback(chatId: 9, rating: 4, comment: 'Great summary');
+      await repository.addSummaryFeedback(
+        chatId: 9,
+        rating: 3,
+        comment: 'Missed a concern',
+        issues: ['INACCURATE'],
+        tags: ['Too long'],
+      );
 
-      verify(() => dio.post<void>(
-            '/chats/9/summary-feedback',
-            data: {
-              'rating': 4,
-              'feedback': {'issues': <String>[], 'comment': 'Great summary'},
-            },
-          )).called(1);
+      verify(() => dio.post<void>('/chats/9/summary-feedback', data: body)).called(1);
+    });
+  });
+
+  group('call summary menu + notes endpoints', () {
+    setUpAll(() => registerFallbackValue(Options()));
+
+    test('deleteCallSummary PUTs an empty summary object', () async {
+      when(() => dio.put<void>('/chats/9/call-details', data: {'summary': <String, dynamic>{}}))
+          .thenAnswer((_) async => _response<void>(null));
+
+      await repository.deleteCallSummary(9);
+
+      verify(() => dio.put<void>('/chats/9/call-details', data: {'summary': <String, dynamic>{}})).called(1);
+    });
+
+    test('exportCallSummary GETs export-summary as plain text', () async {
+      when(() => dio.get<dynamic>('/chats/9/export-summary', options: any(named: 'options')))
+          .thenAnswer((_) async => _response<dynamic>('SESSION SUMMARY'));
+
+      expect(await repository.exportCallSummary(9), 'SESSION SUMMARY');
+    });
+
+    test('exportCallSummary rejects a non-string body (RN invalidResponseFormat)', () async {
+      when(() => dio.get<dynamic>('/chats/9/export-summary', options: any(named: 'options')))
+          .thenAnswer((_) async => _response<dynamic>({'oops': true}));
+
+      expect(repository.exportCallSummary(9), throwsA(isA<FormatException>()));
+    });
+
+    test('updateNotes POSTs {content} to /chats/:id/notes', () async {
+      when(() => dio.post<void>('/chats/9/notes', data: {'content': 'Called back at 5'}))
+          .thenAnswer((_) async => _response<void>(null));
+
+      await repository.updateNotes(9, 'Called back at 5');
+
+      verify(() => dio.post<void>('/chats/9/notes', data: {'content': 'Called back at 5'})).called(1);
+    });
+
+    test('CallSummaryDetails reads summaryName, notes, times and mode', () {
+      final summary = CallSummaryDetails.fromJson({
+        'id': 9,
+        'createdAt': '2026-01-01T09:59:00Z',
+        'details': {
+          'startTime': '2026-01-01T10:00:00Z',
+          'callDuration': 754,
+          'callInfo': {'summaryName': 'CALL-9', 'notes': 'note', 'mode': 'DICTATION'},
+        },
+      });
+
+      expect(summary.summaryName, 'CALL-9');
+      expect(summary.notes, 'note');
+      expect(summary.startTime, '2026-01-01T10:00:00Z');
+      expect(summary.createdAt, '2026-01-01T09:59:00Z');
+      expect(summary.callDuration, 754);
+      expect(summary.callMode, 'DICTATION');
     });
   });
 

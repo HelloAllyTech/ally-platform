@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
@@ -109,18 +108,17 @@ void main() {
       (_) async => (success: true, message: 'Regenerating'),
     );
 
-    final router = _router();
     await _pump(
       tester,
       overrides: [callLogRepositoryProvider.overrideWithValue(repository)],
-      router: router,
+      router: _router(),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Failed to generate session summary'), findsOneWidget);
-    expect(find.widgetWithText(AppButton, 'Retry'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(AppButton, 'Retry'));
+    await tester.tap(find.byKey(const Key('summary-progress-primary')));
     await tester.pumpAndSettle();
 
     verify(() => repository.retrySummary(1001)).called(1);
@@ -134,18 +132,81 @@ void main() {
     when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _noAudioSummary());
     when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
 
-    final router = _router();
     await _pump(
       tester,
       overrides: [callLogRepositoryProvider.overrideWithValue(repository)],
-      router: router,
+      router: _router(),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('No audio detected'), findsOneWidget);
     expect(find.text('Failed to generate session summary'), findsOneWidget);
-    expect(find.widgetWithText(AppButton, 'Retry'), findsNothing);
-    expect(find.text("See if its ready"), findsNothing);
+    expect(find.byKey(const Key('summary-progress-primary')), findsNothing);
     expect(find.text("I'll check later"), findsOneWidget);
+  });
+
+  testWidgets('from the logs the steps start at "Generating summary", with the ETA', (tester) async {
+    final repository = MockCallLogRepository();
+    when(() => repository.getCallSummary(1001)).thenAnswer(
+      (_) async => CallSummaryDetails.fromJson({
+        'id': 1001,
+        'summaryStatus': 'IN_PROGRESS',
+        'details': {'callDuration': 2503},
+      }),
+    );
+    when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+
+    await _pump(tester, overrides: [callLogRepositoryProvider.overrideWithValue(repository)], router: _router());
+
+    expect(find.text('Generating summary...'), findsOneWidget);
+    // 178s × 1.2 → 4 min (RN getEstimatedSummaryGenerationTime).
+    expect(find.text('Estimated time: ~ 4 min'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('Enriching summary...'), findsOneWidget);
+  });
+
+  testWidgets('notes typed while generating are saved 1s after the last keystroke', (tester) async {
+    final repository = MockCallLogRepository();
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _pendingSummary());
+    when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+    when(() => repository.updateNotes(1001, any())).thenAnswer((_) async {});
+
+    await _pump(tester, overrides: [callLogRepositoryProvider.overrideWithValue(repository)], router: _router());
+
+    expect(find.byKey(const Key('add-notes-input')), findsNothing, reason: 'collapsed by default');
+    await tester.ensureVisible(find.byKey(const Key('add-notes-header')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('add-notes-header')));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('add-notes-input')));
+    await tester.pump();
+    await tester.enterText(find.byKey(const Key('add-notes-input')), 'Call');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.enterText(find.byKey(const Key('add-notes-input')), 'Call back Monday');
+    await tester.pump(const Duration(milliseconds: 999));
+    verifyNever(() => repository.updateNotes(any(), any()));
+    await tester.pump(const Duration(milliseconds: 2));
+
+    verify(() => repository.updateNotes(1001, 'Call back Monday')).called(1);
+  });
+
+  testWidgets("I'll check later goes to the Call Log tab", (tester) async {
+    final repository = MockCallLogRepository();
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _pendingSummary());
+    when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+    final router = GoRouter(
+      initialLocation: '/call-log/1001',
+      routes: [
+        GoRoute(path: '/call-log/1001', builder: (context, state) => CallSummaryScreen(log: _log)),
+        GoRoute(path: '/home', builder: (context, state) => Text('HOME ${state.uri.queryParameters['tab']}')),
+      ],
+    );
+
+    await _pump(tester, overrides: [callLogRepositoryProvider.overrideWithValue(repository)], router: router);
+    await tester.tap(find.byKey(const Key('summary-progress-check-later')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('HOME CallLog'), findsOneWidget);
   });
 }

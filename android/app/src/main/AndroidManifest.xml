@@ -10,6 +10,9 @@
       motivated the whole migration — not something fixable by better JS/
       bridge code, since RN never had a path to declare this at all.
     -->
+    <!-- Call summary export to Downloads on Android 9 and below (RN's
+         useStoragePermissions / fileOperations.saveFile). -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -25,7 +28,8 @@
         android:label="Ally"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

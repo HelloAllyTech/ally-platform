@@ -5,7 +5,6 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
@@ -64,8 +63,15 @@ void main() {
       final repository = MockCallLogRepository();
       when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _generatedSummary());
       when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
-      when(() => repository.addSummaryFeedback(chatId: 1001, rating: 4, comment: 'Nice'))
-          .thenAnswer((_) async {});
+      when(
+        () => repository.addSummaryFeedback(
+          chatId: 1001,
+          rating: 5,
+          comment: 'Nice',
+          issues: const [],
+          tags: any(named: 'tags'),
+        ),
+      ).thenAnswer((_) async {});
 
       var elapsed = Duration.zero;
       await _pump(
@@ -83,19 +89,71 @@ void main() {
       // Still on the summary screen — the pop was intercepted, not let through.
       expect(find.text('CALL_LOG'), findsNothing);
 
-      await tester.tap(find.byIcon(Icons.star_border).at(3));
+      // 5 stars: no issue chips, the comment box shows (RN FeedbackPopup).
+      await tester.tap(find.byKey(const ValueKey('feedback-popup-star-5')));
       await tester.pump();
-      await tester.enterText(find.byType(TextField), 'Nice');
+      expect(find.byKey(const ValueKey('feedback-issue-OTHER')), findsNothing);
+      await tester.enterText(find.byKey(const Key('feedback-popup-comment')), 'Nice');
       await tester.pump();
-      await tester.tap(find.widgetWithText(AppButton, 'Submit'));
+      await tester.tap(find.byKey(const Key('feedback-popup-submit')));
       await tester.pumpAndSettle();
 
-      verify(() => repository.addSummaryFeedback(chatId: 1001, rating: 4, comment: 'Nice')).called(1);
+      verify(
+        () => repository.addSummaryFeedback(
+          chatId: 1001,
+          rating: 5,
+          comment: 'Nice',
+          issues: const [],
+          tags: any(named: 'tags'),
+        ),
+      ).called(1);
       expect(find.text('CALL_LOG'), findsOneWidget, reason: 'submitting also navigates back');
     },
   );
 
-  testWidgets('dismissing the feedback popup (X) leaves without submitting', (tester) async {
+  testWidgets('a 1-4 star rating shows the issue chips and submits the picked issues', (tester) async {
+    final repository = MockCallLogRepository();
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _generatedSummary());
+    when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+    when(
+      () => repository.addSummaryFeedback(
+        chatId: any(named: 'chatId'),
+        rating: any(named: 'rating'),
+        comment: any(named: 'comment'),
+        issues: any(named: 'issues'),
+        tags: any(named: 'tags'),
+      ),
+    ).thenAnswer((_) async {});
+
+    var elapsed = Duration.zero;
+    await _pump(tester, repository: repository, now: () => DateTime(2026, 1, 1).add(elapsed));
+    await tester.pumpAndSettle();
+    elapsed = const Duration(seconds: 31);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('feedback-popup-star-3')));
+    await tester.pump();
+    expect(find.byKey(const Key('feedback-popup-comment')), findsNothing, reason: 'comment only with Other');
+    await tester.tap(find.byKey(const ValueKey('feedback-issue-INACCURATE')));
+    await tester.tap(find.byKey(const ValueKey('feedback-issue-OTHER')));
+    await tester.pump();
+    expect(find.byKey(const Key('feedback-popup-comment')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('feedback-popup-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repository.addSummaryFeedback(
+        chatId: 1001,
+        rating: 3,
+        comment: '',
+        issues: const ['INACCURATE', 'OTHER'],
+        tags: const [],
+      ),
+    ).called(1);
+  });
+
+  testWidgets('closing the feedback popup only hides it (RN hideSummaryFeedbackPopup)', (tester) async {
     final repository = MockCallLogRepository();
     when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _generatedSummary());
     when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
@@ -110,7 +168,7 @@ void main() {
 
     expect(find.text('Rate the AI-generated summary?'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byKey(const Key('feedback-popup-backdrop')), warnIfMissed: false);
     await tester.pumpAndSettle();
 
     verifyNever(
@@ -120,7 +178,46 @@ void main() {
         comment: any(named: 'comment'),
       ),
     );
-    expect(find.text('CALL_LOG'), findsOneWidget);
+    expect(find.text('Rate the AI-generated summary?'), findsNothing);
+    expect(find.text('CALL_LOG'), findsNothing);
+  });
+
+  testWidgets('the live flow prompts on back at once and leaves to the Call Log tab', (tester) async {
+    final repository = MockCallLogRepository();
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _generatedSummary(feedbackAdded: true));
+    when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+    final router = await pumpRouterApp(
+      tester,
+      initialLocation: '/call-log',
+      routes: [
+        GoRoute(path: '/call-log', builder: (context, state) => const Text('CALL_LOG')),
+        GoRoute(path: '/home', builder: (context, state) => Text('HOME ${state.uri.queryParameters['tab']}')),
+        GoRoute(
+          path: '/call-log/1001',
+          builder: (context, state) => const CallSummaryScreen(chatId: 1001, fromLogs: false),
+        ),
+      ],
+      overrides: [
+        callLogRepositoryProvider.overrideWithValue(repository),
+        userPermissionsProvider.overrideWith((ref) async => const [UserPermissions.editSummaryFeedback]),
+      ],
+    );
+    router.push('/call-log/1001');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // RN canShowSummary: the live flow holds "Setting up" for 3s.
+    expect(find.text('Setting up your summary screen'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    expect(find.text('Setting up your summary screen'), findsNothing);
+
+    await tester.pageBack();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Feedback already given → no prompt; live flow resets to Call Log tab.
+    expect(find.text('HOME CallLog'), findsOneWidget);
   });
 
   testWidgets('backing out immediately (under 30s) leaves without prompting', (tester) async {

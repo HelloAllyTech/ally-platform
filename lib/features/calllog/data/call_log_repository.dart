@@ -169,6 +169,7 @@ class ChatMessage {
     required this.content,
     required this.createdAt,
     required this.senderId,
+    this.startSeconds,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -176,7 +177,12 @@ class ChatMessage {
     content: json['content'] as String,
     createdAt: json['createdAt'] as String,
     senderId: (json['senderId'] as num).toInt(),
+    startSeconds: (json['startSeconds'] as num?)?.toDouble(),
   );
+
+  /// Offset into the recording (microphone/Exotel calls) — RN's transcript
+  /// time for non-WEBRTC calls.
+  final double? startSeconds;
 
   final int messageId;
   final String content;
@@ -208,6 +214,12 @@ class CallSummaryDetails {
     this.reviewNote,
     this.reviewCreatedAt,
     this.callProvider,
+    this.summaryName,
+    this.notes,
+    this.startTime,
+    this.createdAt,
+    this.callDuration,
+    this.callMode,
   });
 
   factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
@@ -262,8 +274,37 @@ class CallSummaryDetails {
       reviewNote: json['reviewNote'] as String?,
       reviewCreatedAt: json['reviewCreatedAt'] as String?,
       callProvider: callInfo?['provider'] as String?,
+      summaryName: callInfo?['summaryName'] as String?,
+      notes: callInfo?['notes'] as String?,
+      startTime: details?['startTime'] as String?,
+      createdAt: json['createdAt'] as String?,
+      callDuration: switch (details?['callDuration']) {
+        final num n => n.toInt(),
+        final String text => int.tryParse(text),
+        _ => null,
+      },
+      callMode: callInfo?['mode'] as String?,
     );
   }
+
+  /// RN `details.callInfo.summaryName` — the header's `#name` and the
+  /// rename modal's prefill (`useCallSummaryActions`' `summaryName`).
+  final String? summaryName;
+
+  /// RN `details.callInfo.notes` — what `AddNotesSection` shows as
+  /// `savedNotes` while the summary generates.
+  final String? notes;
+
+  /// RN `details.startTime` / top-level `createdAt` / `details.callDuration`
+  /// (seconds) — the share screen's context card, transcript times and the
+  /// generation ETA.
+  final String? startTime;
+  final String? createdAt;
+  final int? callDuration;
+
+  /// RN `details.callInfo.mode` (`SCRIBE`/`DICTATION`) — the transcript's
+  /// dictation merge.
+  final String? callMode;
 
   /// RN `details.callInfo.provider` (`ChatProvider`, e.g. `WEBRTC`).
   final String? callProvider;
@@ -568,6 +609,33 @@ class CallLogRepository {
     );
   }
 
+  /// RN `useCallSummaryActions.handleDelete`: `PUT /chats/:id/call-details`
+  /// with an empty `summary` object (ally-be clears the stored summary).
+  /// Sent raw, not through [summaryPatchForSubmission], which would treat
+  /// an empty patch as "nothing changed".
+  Future<void> deleteCallSummary(int chatId) async {
+    await _dio.put<void>('/chats/$chatId/call-details', data: {'summary': <String, dynamic>{}});
+  }
+
+  /// RN `exportCallSummary` (`GET /chats/:id/export-summary`,
+  /// `responseHandler: 'text'`): the plain-text export the menu saves to a
+  /// file. Anything but a string is RN's `invalidResponseFormat` error.
+  Future<String> exportCallSummary(int chatId) async {
+    final response = await _dio.get<dynamic>(
+      '/chats/$chatId/export-summary',
+      options: Options(responseType: ResponseType.plain),
+    );
+    final data = response.data;
+    if (data is! String) throw const FormatException('invalidResponseFormat');
+    return data;
+  }
+
+  /// RN `chatApi.updateNotes` (`POST /chats/:id/notes {content}`) — the
+  /// notes typed in `AddNotesSection` while the summary generates.
+  Future<void> updateNotes(int chatId, String content) async {
+    await _dio.post<void>('/chats/$chatId/notes', data: {'content': content});
+  }
+
   /// Matches `useCallSummaryForm`'s `handleSubmit` — PUT only the changed
   /// fields, nested under `summary` (the backend patches rather than
   /// replaces, per the RN hook's own comment on omitted vs. null values:
@@ -615,12 +683,15 @@ class CallLogRepository {
     required int rating,
     required String comment,
     List<String> issues = const [],
+    List<String> tags = const [],
   }) async {
+    // RN `onAddSummaryFeedback` nests the popup's whole value under
+    // `feedback`: `{rating, issues, comment, tags}`.
     await _dio.post<void>(
       '/chats/$chatId/summary-feedback',
       data: {
         'rating': rating,
-        'feedback': {'issues': issues, 'comment': comment},
+        'feedback': {'rating': rating, 'issues': issues, 'comment': comment, 'tags': tags},
       },
     );
   }

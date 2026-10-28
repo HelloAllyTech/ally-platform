@@ -10,6 +10,7 @@ import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/core/widgets/root_scaffold_messenger.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
+import 'package:ally_mobile_flutter/features/calllog/data/summary_file_export.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 import 'package:ally_mobile_flutter/features/reactions/data/reactions_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
@@ -36,6 +37,26 @@ class _FakeUrlLauncherPlatform extends UrlLauncherPlatform {
   Future<bool> launchUrl(String url, LaunchOptions options) async {
     launchedUrls.add(url);
     return true;
+  }
+}
+
+class _FakeFileSaver extends SummaryFileSaver {
+  _FakeFileSaver({this.permission = StoragePermissionResult.granted});
+
+  final StoragePermissionResult permission;
+  final saved = <(int, String)>[];
+  bool openedSettings = false;
+
+  @override
+  Future<StoragePermissionResult> checkAndRequestPermissions() async => permission;
+
+  @override
+  Future<void> openSettings() async => openedSettings = true;
+
+  @override
+  Future<String> saveFile({required String content, required int chatId, DateTime? now}) async {
+    saved.add((chatId, content));
+    return '/docs/CallSummary/call-summary-$chatId.txt';
   }
 }
 
@@ -75,6 +96,7 @@ Future<GoRouter> _pump(
   required MockCallLogRepository repository,
   MockScribeReviewsRepository? scribeReviewsRepository,
   MockScribeReactionsRepository? scribeReactionsRepository,
+  SummaryFileSaver? saver,
 }) async {
   final router = await pumpRouterApp(
     tester,
@@ -99,6 +121,7 @@ Future<GoRouter> _pump(
     ],
     overrides: [
       callLogRepositoryProvider.overrideWithValue(repository),
+      if (saver != null) summaryFileSaverProvider.overrideWithValue(saver),
       userPermissionsProvider.overrideWith(
         (ref) async => const [UserPermissions.viewScribeReview, UserPermissions.editSummaryFeedback],
       ),
@@ -293,17 +316,81 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'New name');
-    await tester.tap(find.text('Save'));
+    // RN `CustomModal`: prefilled with the current name.
+    expect(find.widgetWithText(TextField, 'Walk-in #1'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('call-summary-modal-input')), 'New name');
+    await tester.tap(find.byKey(const Key('call-summary-modal-primary')));
     await tester.pumpAndSettle();
 
     verify(() => repository.updateSummaryName(1001, 'New name')).called(1);
     expect(find.text('Summary name updated successfully'), findsOneWidget);
+    // The header shows the new name at once.
+    expect(find.text('#New name'), findsOneWidget);
+  });
+
+  testWidgets('3-dot menu: Rename cancel sends nothing', (tester) async {
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary());
+    await _pump(tester, repository: repository, scribeReviewsRepository: scribeReviewsRepository, scribeReactionsRepository: scribeReactionsRepository);
+
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('call-summary-modal-secondary')));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repository.updateSummaryName(any(), any()));
+    expect(find.text('#Walk-in #1'), findsOneWidget);
+  });
+
+  testWidgets('3-dot menu: Export saves the exported text and toasts (RN handleExport)', (tester) async {
+    final saver = _FakeFileSaver();
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary());
+    when(() => repository.exportCallSummary(1001)).thenAnswer((_) async => 'SUMMARY TEXT');
+    await _pump(tester, repository: repository, scribeReviewsRepository: scribeReviewsRepository, scribeReactionsRepository: scribeReactionsRepository, saver: saver);
+
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('call-summary-menu-export')));
+    await tester.pumpAndSettle();
+
+    expect(saver.saved, [(1001, 'SUMMARY TEXT')]);
+    expect(find.text('File exported successfully'), findsOneWidget);
+  });
+
+  testWidgets('3-dot menu: Export with storage denied toasts and opens settings', (tester) async {
+    final saver = _FakeFileSaver(permission: StoragePermissionResult.denied);
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary());
+    await _pump(tester, repository: repository, scribeReviewsRepository: scribeReviewsRepository, scribeReactionsRepository: scribeReactionsRepository, saver: saver);
+
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('call-summary-menu-export')));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repository.exportCallSummary(any()));
+    expect(saver.openedSettings, isTrue);
+    expect(find.text('Storage permission denied'), findsOneWidget);
+  });
+
+  testWidgets('3-dot menu: a failed export toasts fileExportFailed', (tester) async {
+    final saver = _FakeFileSaver();
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary());
+    when(() => repository.exportCallSummary(1001)).thenThrow(Exception('boom'));
+    await _pump(tester, repository: repository, scribeReviewsRepository: scribeReviewsRepository, scribeReactionsRepository: scribeReactionsRepository, saver: saver);
+
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('call-summary-menu-export')));
+    await tester.pumpAndSettle();
+
+    expect(saver.saved, isEmpty);
+    expect(find.text('Failed to export file'), findsOneWidget);
   });
 
   testWidgets('3-dot menu: Data Policy opens the privacy URL externally', (tester) async {
@@ -318,7 +405,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Data Policy'));
     await tester.pumpAndSettle();
@@ -337,7 +424,7 @@ void main() {
       scribeReactionsRepository: scribeReactionsRepository,
     );
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byKey(const Key('call-summary-menu')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Archive Session'));
     await tester.pumpAndSettle();

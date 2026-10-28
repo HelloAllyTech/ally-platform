@@ -10,6 +10,17 @@ import 'feedback_widgets.dart';
 
 typedef FeedbackValue = ({int rating, List<String> tags, String comment});
 
+/// RN `constants/feedback.ts` `FEEDBACK_ISSUE_OPTIONS` (value, label key);
+/// `OTHER` must stay last — it is the one that opens the comment box.
+const feedbackIssueOptions = <(String, String)>[
+  ('MISSING_KEY_INFORMATION', 'callFeedback.issues.missingKeyInfo'),
+  ('INACCURATE', 'callFeedback.issues.inaccurate'),
+  ('TOO_VAGUE', 'callFeedback.issues.tooVague'),
+  ('DIFFICULT_TO_UNDERSTAND', 'callFeedback.issues.difficultToUnderstand'),
+  ('TOO_SHORT', 'callFeedback.issues.tooShort'),
+  ('OTHER', 'callFeedback.issues.other'),
+];
+
 /// Port of RN `components/FeedbackPopup` as `SimulationFeedbackScreen` uses
 /// it (`showChips={false}`, a custom title and placeholder): a dimmed
 /// backdrop (tap = close) and a bottom sheet that springs up with the
@@ -25,7 +36,23 @@ class FeedbackPopup extends ConsumerStatefulWidget {
     required this.title,
     required this.placeholder,
     this.initialFeedback,
+    this.showChips = false,
+    this.note,
+    this.onSubmitWithIssues,
   });
+
+  /// RN `showChips` (default true there; Simulation feedback passes false).
+  /// With it, a 1-4 star rating shows the "select issues" chips and the
+  /// comment box only appears for 5 stars or once "Other" is picked.
+  final bool showChips;
+
+  /// RN `note`: centered text above Submit (Call Summary's
+  /// `callFeedback.rateSubtitle`).
+  final String? note;
+
+  /// Used instead of [onSubmit] when given: also carries the picked issue
+  /// values (RN's `issues`).
+  final void Function(FeedbackValue value, List<String> issues)? onSubmitWithIssues;
 
   final VoidCallback onClose;
   final ValueChanged<FeedbackValue> onSubmit;
@@ -40,6 +67,7 @@ class FeedbackPopup extends ConsumerStatefulWidget {
 class _FeedbackPopupState extends ConsumerState<FeedbackPopup> {
   late int _rating = widget.initialFeedback?.rating ?? 0;
   late final _selectedTags = <String>[...?widget.initialFeedback?.tags];
+  final _selectedIssues = <String>[];
   late final _commentController = TextEditingController(text: widget.initialFeedback?.comment ?? '');
 
   @override
@@ -85,7 +113,12 @@ class _FeedbackPopupState extends ConsumerState<FeedbackPopup> {
                 shadowColor: Colors.black.withValues(alpha: 0.25),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + (keyboard > 0 ? 0 : MediaQuery.paddingOf(context).bottom)),
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    24,
+                    24,
+                    24 + (keyboard > 0 ? 0 : MediaQuery.paddingOf(context).bottom),
+                  ),
                   child: Column(
                     key: const Key('feedback-popup'),
                     mainAxisSize: MainAxisSize.min,
@@ -110,6 +143,7 @@ class _FeedbackPopupState extends ConsumerState<FeedbackPopup> {
                         onChanged: (value) => setState(() {
                           _rating = value;
                           _selectedTags.clear();
+                          _selectedIssues.clear();
                         }),
                       ),
                       if (ratingText.isNotEmpty)
@@ -135,51 +169,89 @@ class _FeedbackPopupState extends ConsumerState<FeedbackPopup> {
                             children: [for (final tag in tags) _tag(tag)],
                           ),
                         ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: TextField(
-                          key: const Key('feedback-popup-comment'),
-                          controller: _commentController,
-                          minLines: 4,
-                          maxLines: null,
-                          style: const TextStyle(
-                            fontFamily: AppFonts.ibmPlexSerifRegular,
-                            fontSize: 14,
-                            height: 22 / 14,
-                            letterSpacing: 0.2,
-                            color: Colors.black,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: widget.placeholder,
-                            hintStyle: const TextStyle(
+                      if (widget.showChips && _rating != 5 && _rating != 0) ..._issueChips(),
+                      if (_showSuggestionPrompt)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 12),
+                          child: Text(
+                            ref.t('callFeedback.moreSuggestions'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               fontFamily: AppFonts.ibmPlexSerifRegular,
-                              fontSize: 14,
-                              color: AppColors.lowEmphasis,
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.all(12),
-                            filled: true,
-                            fillColor: Colors.white,
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppColors.strokePrimary, width: 0.5),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppColors.strokePrimary, width: 0.5),
+                              fontSize: 12,
+                              color: AppColors.darkGray12,
                             ),
                           ),
                         ),
-                      ),
+                      if (_showComment)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: TextField(
+                            key: const Key('feedback-popup-comment'),
+                            controller: _commentController,
+                            minLines: 4,
+                            maxLines: null,
+                            style: const TextStyle(
+                              fontFamily: AppFonts.ibmPlexSerifRegular,
+                              fontSize: 14,
+                              height: 22 / 14,
+                              letterSpacing: 0.2,
+                              color: Colors.black,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: widget.placeholder,
+                              hintStyle: const TextStyle(
+                                fontFamily: AppFonts.ibmPlexSerifRegular,
+                                fontSize: 14,
+                                color: AppColors.lowEmphasis,
+                              ),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.all(12),
+                              filled: true,
+                              fillColor: Colors.white,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.strokePrimary, width: 0.5),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.strokePrimary, width: 0.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (widget.note != null && widget.note!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Text(
+                            widget.note!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: AppFonts.ibmPlexSerifRegular,
+                              fontSize: 14,
+                              height: 18 / 14,
+                              letterSpacing: 0.2,
+                              color: AppColors.highEmphasis,
+                            ),
+                          ),
+                        ),
                       AppButton(
                         key: const Key('feedback-popup-submit'),
                         label: ref.t('callFeedback.submit'),
                         isDisabled: _rating < 1,
-                        onPressed: () => widget.onSubmit((
-                          rating: _rating,
-                          tags: List.of(_selectedTags),
-                          comment: _commentController.text,
-                        )),
+                        onPressed: () {
+                          final value = (
+                            rating: _rating,
+                            tags: List.of(_selectedTags),
+                            comment: _commentController.text,
+                          );
+                          final withIssues = widget.onSubmitWithIssues;
+                          if (withIssues != null) {
+                            withIssues(value, List.of(_selectedIssues));
+                          } else {
+                            widget.onSubmit(value);
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -190,6 +262,65 @@ class _FeedbackPopupState extends ConsumerState<FeedbackPopup> {
         ),
       ],
     );
+  }
+
+  /// RN: the comment box shows for 5 stars, without chips, or with "Other"
+  /// picked; its "more suggestions" prompt only while no issue is picked
+  /// and the caller gave no placeholder of its own.
+  bool get _showComment => _rating == 5 || !widget.showChips || _selectedIssues.contains(feedbackIssueOptions.last.$1);
+  bool get _showSuggestionPrompt => widget.showChips && _showComment && _selectedIssues.isEmpty;
+
+  /// RN `ChipGroup` (title `callFeedback.selectIssues`, Medium 16 black)
+  /// of `Chip`s (lightGray4 outline, lightGray3 IBM Plex Serif 14; selected
+  /// = azureBlue fill, white 500) and the lowEmphasis separator under it.
+  List<Widget> _issueChips() {
+    return [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Text(
+          ref.t('callFeedback.selectIssues'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 16, color: Colors.black),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          children: [
+            for (final (value, labelKey) in feedbackIssueOptions)
+              GestureDetector(
+                key: ValueKey('feedback-issue-$value'),
+                onTap: () => setState(
+                  () => _selectedIssues.contains(value) ? _selectedIssues.remove(value) : _selectedIssues.add(value),
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _selectedIssues.contains(value) ? AppColors.azureBlue : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _selectedIssues.contains(value) ? AppColors.azureBlue : AppColors.lightGray4,
+                    ),
+                  ),
+                  child: Text(
+                    ref.t(labelKey),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 14,
+                      color: _selectedIssues.contains(value) ? Colors.white : AppColors.lightGray3,
+                      fontWeight: _selectedIssues.contains(value) ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      Container(height: 1, margin: const EdgeInsets.only(bottom: 16), color: AppColors.lowEmphasis),
+    ];
   }
 
   Widget _tag(String tag) {

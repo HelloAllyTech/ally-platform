@@ -22,6 +22,7 @@ import '../../../core/realtime/socket_service.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
+import '../../../core/app_update/force_update.dart';
 import '../../roleplay/presentation/call_modals.dart';
 import '../data/chat_models.dart';
 import '../data/chat_repository.dart';
@@ -33,6 +34,7 @@ import 'listening_chrome.dart';
 import 'listening_controls.dart';
 import 'network_disconnected.dart';
 import 'nudge_section.dart';
+import 'scribe_reference_search.dart';
 
 /// Port of ally-mobile (React Native)'s `MicrophoneListeningScreen.tsx` +
 /// `hooks/useListeningCommon.ts` + `hooks/useLiveAudioStream.ts` — Scribe's
@@ -66,8 +68,10 @@ import 'nudge_section.dart';
 ///   succeeds; leaving without a live session clears the current chat.
 /// - The screen is kept awake throughout (RN `activateKeepAwake`).
 ///
-/// Not ported: the reference-document `Search` panel in non-focus mode, and
-/// the temporary `SCRIBE_START_DIAGNOSTIC` telemetry.
+/// The reference-document search sits under the nudge in non-focus mode
+/// (`ScribeReferenceSearch`, RN `components/Search`), and RN's temporary
+/// `SCRIBE_START_DIAGNOSTIC` telemetry fires at 5s/15s if the session
+/// hasn't started.
 class ScribeRecordingScreen extends ConsumerStatefulWidget {
   const ScribeRecordingScreen({super.key, required this.userId});
 
@@ -129,6 +133,14 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
 
   bool get _isWebMicrophoneMode => _chat?.isWebMicrophoneMode ?? false;
 
+  /// RN `useLiveAudioStream.permissionStatus` (react-native-permissions
+  /// RESULTS: 'unavailable' until checked).
+  String _permissionStatus = 'unavailable';
+
+  /// RN's temporary SCRIBE_START_DIAGNOSTIC timers (5s and 15s).
+  final List<Timer> _diagnosticTimers = [];
+  final Set<int> _diagnosticSent = {};
+
   @override
   void initState() {
     super.initState();
@@ -155,6 +167,35 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     if (_chatId == null) _armChatIdTimeout();
     _connectSocket();
     if (!_isWebMicrophoneMode) _requestMicrophone();
+    // 5s matches when the microphone-failure view appears; 15s catches
+    // counsellors who wait rather than back out.
+    for (final afterMs in const [5000, 15000]) {
+      _diagnosticTimers.add(Timer(Duration(milliseconds: afterMs), () => _sendStartDiagnostic(afterMs)));
+    }
+  }
+
+  /// RN `SCRIBE_START_DIAGNOSTIC`: once per mark, unless the session really
+  /// started (audio chat emitted with a chat id), report the start gates.
+  Future<void> _sendStartDiagnostic(int afterMs) async {
+    if (!mounted || _diagnosticSent.contains(afterMs)) return;
+    if (_isAudioChatEmitted && _chatId != null) return;
+    _diagnosticSent.add(afterMs);
+    String appVersion = '';
+    try {
+      appVersion = await ref.read(appVersionProvider.future);
+    } catch (_) {}
+    if (!mounted) return;
+    _socketService.emit(SocketEvent.scribeStartDiagnostic, {
+      'afterMs': afterMs,
+      'appVersion': appVersion,
+      'isPermissionGranted': _isPermissionGranted,
+      'permissionStatus': _permissionStatus,
+      'isMicrophoneModeSessionCreated': _isMicrophoneModeSessionCreated,
+      'isWebMicrophoneMode': _isWebMicrophoneMode,
+      'isAudioChatEmitted': _isAudioChatEmitted,
+      'hasChatId': _chatId != null,
+      'isOffline': _isOffline,
+    });
   }
 
   @override
@@ -171,6 +212,9 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     _keepAwake.deactivate();
     _chatIdTimeoutTimer?.cancel();
     _pauseDebounceTimer?.cancel();
+    for (final timer in _diagnosticTimers) {
+      timer.cancel();
+    }
     _isIntentionalDisconnect = true;
     if (_hasStartedRecording) _recorder.stop();
     _recorder.dispose();
@@ -238,6 +282,7 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
   Future<void> _checkMicrophone({required bool request}) async {
     final status = await Permission.microphone.status;
     if (!mounted) return;
+    _permissionStatus = _rnPermissionResult(status);
     if (status.isGranted) {
       await _startStreaming();
       return;
@@ -246,6 +291,7 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     _hasRequestedPermission = true;
     final result = await requestMicrophonePermission();
     if (!mounted) return;
+    _permissionStatus = result == MicrophonePermissionResult.granted ? 'granted' : 'denied';
     if (result == MicrophonePermissionResult.granted) {
       await _startStreaming();
       return;
@@ -624,6 +670,8 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
               onFeedbackSuccess: (feedback) =>
                   setState(() => _currentNudge = _currentNudge?.copyWithFeedback(feedback)),
             ),
+          // RN `<Search />` (flex 1) shares the space with the transcript.
+          const Expanded(child: ScribeReferenceSearch()),
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(top: rn.vs(15)),
@@ -662,3 +710,12 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     return '${pad(seconds ~/ 60)}:${pad(seconds % 60)}';
   }
 }
+
+/// react-native-permissions `RESULTS` names for a permission_handler status.
+String _rnPermissionResult(PermissionStatus status) => switch (status) {
+  PermissionStatus.granted => 'granted',
+  PermissionStatus.limited => 'limited',
+  PermissionStatus.permanentlyDenied || PermissionStatus.restricted => 'blocked',
+  PermissionStatus.provisional => 'granted',
+  PermissionStatus.denied => 'denied',
+};

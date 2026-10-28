@@ -13,7 +13,6 @@ import '../../../core/navigation/tab_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../calllog/data/call_log_repository.dart';
 import 'breath_sound_player.dart';
 import 'call_end_overlay.dart';
 import 'flower_petal_painter.dart';
@@ -192,25 +191,12 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
     goToHomeTab(GoRouter.of(context), kTabCallLog);
   }
 
-  Future<void> _viewCallSummary() async {
+  /// RN `onPressViewSessionSummary`: CallSummary with no params — the
+  /// current call, live-flow semantics (back resets to the Call Log tab).
+  void _viewCallSummary() {
     _setPlaying(false);
     final chatId = widget.chatId ?? ref.read(currentChatProvider)?.chatId;
-    if (chatId == null) return;
-    CallLogItem log;
-    try {
-      log = await ref.read(callLogRepositoryProvider).getCallLogItem(chatId);
-    } catch (_) {
-      log = CallLogItem(
-        id: chatId,
-        startedAt: '',
-        endedAt: '',
-        status: 'ENDED',
-        sessionName: null,
-        score: null,
-      );
-    }
-    if (!mounted) return;
-    context.push('/call-log/$chatId', extra: log);
+    context.push(chatId == null ? '/call-summary' : '/call-log/$chatId?live=1');
   }
 
   @override

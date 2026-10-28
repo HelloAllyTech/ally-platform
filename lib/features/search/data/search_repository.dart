@@ -11,6 +11,7 @@ class ResourceArticle {
     required this.heading,
     required this.content,
     required this.category,
+    this.tags = const [],
   });
 
   factory ResourceArticle.fromJson(Map<String, dynamic> json) => ResourceArticle(
@@ -18,12 +19,16 @@ class ResourceArticle {
         heading: json['heading'] as String,
         content: json['content'] as String,
         category: json['category'] as String? ?? '',
+        tags: (json['tags'] as List<dynamic>? ?? const []).map((e) => e.toString()).toList(),
       );
 
   final String id;
   final String heading;
   final String content;
   final String category;
+
+  /// RN `ResourceArticleCard`'s `tags` chips.
+  final List<String> tags;
 }
 
 /// Mirrors `src/screens/SearchScreen/types.ts`'s `SearchResult` — the

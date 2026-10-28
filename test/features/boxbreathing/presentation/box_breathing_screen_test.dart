@@ -52,11 +52,11 @@ class _Harness {
   final _FakeSound sound;
   final _FakeCallLogRepository repo;
   final ProviderContainer container;
-  Object? summaryExtra;
+  Uri? summaryUri;
 }
 
 /// The screen loops its animation forever, so no `pumpAndSettle` here.
-Future<_Harness> _pump(WidgetTester tester, {bool skipOverlay = true}) async {
+Future<_Harness> _pump(WidgetTester tester, {bool skipOverlay = true, String initialLocation = '/box-breathing?chatId=42'}) async {
   SharedPreferences.setMockInitialValues({});
   final sound = _FakeSound();
   final repo = _FakeCallLogRepository();
@@ -70,7 +70,7 @@ Future<_Harness> _pump(WidgetTester tester, {bool skipOverlay = true}) async {
   addTearDown(container.dispose);
   final harness = _Harness(sound, repo, container);
   final router = GoRouter(
-    initialLocation: '/box-breathing?chatId=42',
+    initialLocation: initialLocation,
     routes: [
       GoRoute(
         path: '/box-breathing',
@@ -81,10 +81,11 @@ Future<_Harness> _pump(WidgetTester tester, {bool skipOverlay = true}) async {
       GoRoute(
         path: '/call-log/:id',
         builder: (_, state) {
-          harness.summaryExtra = state.extra;
+          harness.summaryUri = state.uri;
           return Text('summary ${state.pathParameters['id']}');
         },
       ),
+      GoRoute(path: '/call-summary', builder: (_, state) => const Text('summary without chat')),
       GoRoute(path: '/home', builder: (_, state) => Text('home shell ${state.uri.queryParameters['tab'] ?? ''}'.trim())),
     ],
   );
@@ -194,17 +195,28 @@ void main() {
     expect(h.sound.calls, ['volume:0.0', 'volume:1.0', 'replay']);
   });
 
-  testWidgets('View Call Summary opens the ended chat\'s summary', (tester) async {
+  testWidgets('View Call Summary opens the ended chat\'s summary in the live flow', (tester) async {
     final h = await _pump(tester);
 
     await tester.tap(find.text('View Call Summary'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(h.repo.requested, [42]);
+    // RN navigates with no callId: live-flow semantics, nothing prefetched.
+    expect(h.repo.requested, isEmpty);
     expect(find.text('summary 42'), findsOneWidget);
-    expect((h.summaryExtra! as CallLogItem).sessionName, 'CALL-42');
+    expect(h.summaryUri?.queryParameters['live'], '1');
     expect(h.sound.calls, contains('pause'));
+  });
+
+  testWidgets('View Call Summary with no chat still opens Call Summary (RN B8)', (tester) async {
+    await _pump(tester, initialLocation: '/box-breathing');
+
+    await tester.tap(find.text('View Call Summary'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('summary without chat'), findsOneWidget);
   });
 
   testWidgets('back resets to the home shell (Call Log tab) and clears the current chat', (tester) async {

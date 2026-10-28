@@ -22,6 +22,7 @@ import 'elapsed_timer.dart';
 import 'listening_chrome.dart';
 import 'listening_controls.dart';
 import 'nudge_section.dart';
+import 'scribe_reference_search.dart';
 
 /// Port of ally-mobile (React Native)'s `ConferenceListeningScreen` — the
 /// companion screen for a cloud-telephony (Exotel/Ozonetel) conference
@@ -45,7 +46,8 @@ import 'nudge_section.dart';
 /// returning the chat is re-checked: if it ended meanwhile, box breathing.
 /// The screen is kept awake throughout.
 ///
-/// Not ported: the reference-document `Search` panel in non-focus mode.
+/// The reference-document search sits under the nudge in non-focus mode
+/// (`ScribeReferenceSearch`, RN `components/Search`).
 class ConferenceListeningScreen extends ConsumerStatefulWidget {
   const ConferenceListeningScreen({super.key, required this.chatId, required this.userId});
 
@@ -295,6 +297,8 @@ class _ConferenceListeningScreenState extends ConsumerState<ConferenceListeningS
               onFeedbackSuccess: (feedback) =>
                   setState(() => _currentNudge = _currentNudge?.copyWithFeedback(feedback)),
             ),
+          // RN `<Search />` under the nudge.
+          const Expanded(child: ScribeReferenceSearch()),
         ],
       ),
     );
