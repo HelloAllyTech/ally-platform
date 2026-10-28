@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -96,7 +97,14 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
       theme: AppTheme.light,
       routerConfig: router,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
-      builder: (context, child) => RnScale(child: child!),
+      // RN switches the status bar to dark content once its splash ends
+      // (SplashScreen.tsx) and only a few screens override it. Screens with
+      // no region of their own kept whatever was set last, so after the
+      // login hero's light bar the clock was white-on-white on Home.
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+        child: RnScale(child: child!),
+      ),
       // Flutter's own built-in widget strings (date pickers, dialog button
       // labels) localized across the same 5 languages the app's own
       // content supports — separate from this app's own translation
