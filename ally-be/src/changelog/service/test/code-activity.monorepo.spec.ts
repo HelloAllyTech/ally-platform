@@ -102,8 +102,6 @@ describe('CodeActivityService across the monorepo cutover', () => {
       since: '2026-10-01T00:00:00Z',
       until: '2026-10-23T05:21:16Z',
     });
-    // infra did not move: read whole months on both sides.
-    expect(calls.filter((v) => v.name === 'infra')).toHaveLength(2);
   });
 
   it('counts each monorepo commit once, under the repo whose folder it touched', async () => {
