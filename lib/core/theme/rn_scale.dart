@@ -49,3 +49,32 @@ class RnScale extends StatelessWidget {
     );
   }
 }
+
+/// RN's other size-matters helpers, in this app's units under [RnScale].
+///
+/// [RnScale] reproduces `ms()` (`@ms`), which covers most RN styles. These
+/// cover the rest: `s()` / `vs()` (`@s` / `@vs`) scale fully with screen
+/// width / height (350 x 680pt guideline), `mvs()` (`@mvs`) is half of
+/// `vs()`'s change, and [raw] is for RN numbers written with no scaling at
+/// all (fixed icon sizes, hairlines), which [RnScale] would otherwise grow.
+///
+/// Because [RnScale] lays the app out in a viewport shrunk by its factor,
+/// `s` and `vs` reduce to a fraction of the logical screen size (the
+/// factor cancels); `mvs` and [raw] need the factor itself, recovered from
+/// the devicePixelRatio [RnScale] multiplied by it (1 without [RnScale]).
+class RnSize {
+  const RnSize._(this._size, this._factor);
+
+  factory RnSize.of(BuildContext context) => RnSize._(
+        MediaQuery.sizeOf(context),
+        MediaQuery.devicePixelRatioOf(context) / View.of(context).devicePixelRatio,
+      );
+
+  final Size _size;
+  final double _factor;
+
+  double s(double size) => size * _size.shortestSide / 350;
+  double vs(double size) => size * _size.longestSide / 680;
+  double mvs(double size) => 0.5 * raw(size) + 0.5 * vs(size);
+  double raw(double size) => size / _factor;
+}
