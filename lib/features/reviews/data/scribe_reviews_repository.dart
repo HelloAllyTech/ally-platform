@@ -122,7 +122,9 @@ final scribeReviewsRepositoryProvider = Provider<ScribeReviewsRepository>((ref) 
   return ScribeReviewsRepository(ref.watch(apiClientProvider));
 });
 
-final scribeReviewDetailProvider = FutureProvider.family<ReviewItem, String>((
+/// RN `keepUnusedDataFor: 0` + `refetchOnMountOrArgChange`: dropped as
+/// soon as nothing shows it, so every open of the review fetches it fresh.
+final scribeReviewDetailProvider = FutureProvider.autoDispose.family<ReviewItem, String>((
   ref,
   reviewId,
 ) {

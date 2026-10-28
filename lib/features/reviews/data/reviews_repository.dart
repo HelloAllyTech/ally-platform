@@ -147,7 +147,9 @@ final unreadReviewCountProvider = FutureProvider<int>((ref) async {
   return counts.fold<int>(0, (sum, count) => sum + count);
 });
 
-final reviewDetailProvider = FutureProvider.family<ReviewItem, String>((
+/// RN `keepUnusedDataFor: 0` + `refetchOnMountOrArgChange`: dropped as
+/// soon as nothing shows it, so every open of the review fetches it fresh.
+final reviewDetailProvider = FutureProvider.autoDispose.family<ReviewItem, String>((
   ref,
   reviewId,
 ) {
