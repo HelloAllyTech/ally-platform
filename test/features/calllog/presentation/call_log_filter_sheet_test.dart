@@ -47,7 +47,7 @@ void main() {
         () => repository.getCallLogs(limit: kCallLogPageSize, archive: false, filter: const CallLogFilterState()),
       ).called(1);
 
-      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.tap(find.byKey(const Key('call-log-filter')));
       await tester.pumpAndSettle();
 
       expect(find.text('Filters'), findsOneWidget);
@@ -85,14 +85,14 @@ void main() {
       ],
     );
 
-    await tester.tap(find.byIcon(Icons.filter_list));
+    await tester.tap(find.byKey(const Key('call-log-filter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Generated'));
     await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
     expect(find.text('1'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.filter_list));
+    await tester.tap(find.byKey(const Key('call-log-filter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Clear'));
     await tester.tap(find.text('Apply'));
@@ -152,7 +152,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.tap(find.byKey(const Key('call-log-filter')));
       await tester.pumpAndSettle();
 
       // The custom-fields section is appended after every built-in filter
