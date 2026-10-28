@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
+import '../../../core/widgets/custom_dropdown.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/leaderboard_repository.dart';
 
@@ -281,7 +282,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: _PeriodDropdown(
+                child: CustomDropdown(
+                  key: const Key('leaderboard-period-dropdown'),
+                  menuKey: const Key('leaderboard-period-menu'),
                   // RN's `getPeriodLabel` translates this via `t()`.
                   value: ref.t(selectedWindow.labelKey),
                   options: [for (final window in LeaderboardWindow.values) ref.t(window.labelKey)],
@@ -289,6 +292,30 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                     final window = LeaderboardWindow.values.firstWhere((w) => ref.t(w.labelKey) == label);
                     ref.read(leaderboardWindowProvider.notifier).select(window);
                   },
+                  // RN's `CustomDropdown` as this screen configures it:
+                  // `fixedWidth={120}`, a 0.5pt-stroke white header, 12/20
+                  // IBM Plex Serif text.
+                  fixedWidth: 120,
+                  headerPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  headerDecoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.strokePrimary, width: 0.5),
+                  ),
+                  headerTextStyle: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 12,
+                    height: 20 / 12,
+                    letterSpacing: 0.2,
+                    color: AppColors.highEmphasis,
+                  ),
+                  itemTextStyle: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 14,
+                    height: 22 / 14,
+                    letterSpacing: 0.2,
+                    color: AppColors.highEmphasis,
+                  ),
                 ),
               ),
             ),
@@ -478,155 +505,6 @@ class _LeaderboardEmpty extends ConsumerWidget {
                 height: 22 / 14,
                 letterSpacing: 0.2,
                 color: AppColors.mediumEmphasis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Port of RN's `CustomDropdown` as this screen configures it
-/// (`fixedWidth={120}`, `alignModalRight`, `styles.dropdownHeader`/
-/// `dropdownText`): a 120pt white header with a 0.5pt stroke, 4pt radius,
-/// 12/20 IBM Plex Serif text and a 6pt arrow that flips when open; the menu
-/// drops from 2pt above the header's bottom edge, right-aligned to it, at
-/// least as wide as the longest option + 36, 10pt radius, lightGray7
-/// border, body.medium items with the selected one in primary/w500.
-/// The shared `AppDropdown` wraps Material's `DropdownMenu`, which can't
-/// reproduce this header (it clipped "Last 7 days").
-class _PeriodDropdown extends StatefulWidget {
-  const _PeriodDropdown({required this.value, required this.options, required this.onSelect});
-
-  final String value;
-  final List<String> options;
-  final ValueChanged<String> onSelect;
-
-  @override
-  State<_PeriodDropdown> createState() => _PeriodDropdownState();
-}
-
-class _PeriodDropdownState extends State<_PeriodDropdown> {
-  bool _isOpen = false;
-
-  static const _itemStyle = TextStyle(
-    fontFamily: AppFonts.ibmPlexSerifRegular,
-    fontSize: 14,
-    height: 22 / 14,
-    letterSpacing: 0.2,
-    color: AppColors.highEmphasis,
-  );
-
-  Future<void> _open() async {
-    final box = context.findRenderObject()! as RenderBox;
-    final topLeft = box.localToGlobal(Offset.zero);
-    final rect = topLeft & box.size;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final textScaler = MediaQuery.textScalerOf(context);
-    final longest = widget.options.fold('', (a, b) => a.length >= b.length ? a : b);
-    final painter = TextPainter(
-      text: TextSpan(text: longest, style: _itemStyle),
-      textDirection: TextDirection.ltr,
-      textScaler: textScaler,
-    )..layout();
-    final minWidth = (painter.width + 36).ceilToDouble();
-    painter.dispose();
-
-    setState(() => _isOpen = true);
-    final selected = await showGeneralDialog<String>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.transparent,
-      transitionDuration: Duration.zero,
-      pageBuilder: (dialogContext, _, _) => Stack(
-        children: [
-          Positioned(
-            top: rect.bottom - 2,
-            right: screenWidth - rect.right,
-            child: Container(
-              key: const Key('leaderboard-period-menu'),
-              constraints: BoxConstraints(
-                minWidth: minWidth > rect.width ? minWidth : rect.width,
-                maxHeight: (widget.options.length * 40).clamp(0, 200).toDouble(),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.lightGray7),
-                boxShadow: const [BoxShadow(color: Color(0x33000000), offset: Offset(0, 2), blurRadius: 4)],
-              ),
-              child: Material(
-                type: MaterialType.transparency,
-                child: SingleChildScrollView(
-                  child: IntrinsicWidth(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final option in widget.options)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => Navigator.of(dialogContext).pop(option),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                              child: Text(
-                                option,
-                                style: option == widget.value
-                                    ? _itemStyle.copyWith(color: AppColors.primary, fontWeight: FontWeight.w500)
-                                    : _itemStyle,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    setState(() => _isOpen = false);
-    if (selected != null) widget.onSelect(selected);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      key: const Key('leaderboard-period-dropdown'),
-      behavior: HitTestBehavior.opaque,
-      onTap: _open,
-      child: Container(
-        width: 120,
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppColors.strokePrimary, width: 0.5),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Text(
-                widget.value,
-                style: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifRegular,
-                  fontSize: 12,
-                  height: 20 / 12,
-                  letterSpacing: 0.2,
-                  color: AppColors.highEmphasis,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: RotatedBox(
-                quarterTurns: _isOpen ? 2 : 0,
-                child: SvgPicture.asset('assets/icons/arrowDown.svg', width: 6, height: 6),
               ),
             ),
           ],

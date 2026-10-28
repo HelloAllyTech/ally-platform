@@ -8,8 +8,8 @@ import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
-import '../../../core/widgets/app_dropdown.dart';
 import '../../../core/widgets/app_tab_view.dart';
+import '../../../core/widgets/custom_dropdown.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/review_models.dart';
@@ -250,13 +250,40 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
                 ),
               ),
               const SizedBox(width: 8),
-              AppDropdown(
+              // RN's `CustomDropdown` here gets no `fixedWidth` (only
+              // `alignModalRight`) — its header sizes to the current
+              // selection only (RN's `alignSelf: 'flex-start'`), not to the
+              // widest option. `AppDropdown` (Material's `DropdownMenu`)
+              // can't do that — it always sizes its closed field to the
+              // widest possible entry, which is why this filter used to
+              // render as wide as "Most commented" even while showing the
+              // short "Latest".
+              CustomDropdown(
                 value: ref.t(_query.sortBy.labelKey),
                 options: [for (final sort in ReviewSortBy.values) ref.t(sort.labelKey)],
                 onSelect: (label) {
                   final sort = ReviewSortBy.values.firstWhere((s) => ref.t(s.labelKey) == label);
                   setState(() => _query = (readFilter: _query.readFilter, sortBy: sort));
                 },
+                // RN's shared `Dropdown.tsx` base header style + `fieldValueText`.
+                headerDecoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(4)),
+                ),
+                headerTextStyle: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 14,
+                  height: 22 / 14,
+                  letterSpacing: 0.2,
+                  color: AppColors.mediumEmphasis,
+                ),
+                itemTextStyle: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 14,
+                  height: 22 / 14,
+                  letterSpacing: 0.2,
+                  color: AppColors.highEmphasis,
+                ),
               ),
             ],
           ),
