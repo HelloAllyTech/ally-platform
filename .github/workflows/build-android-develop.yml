@@ -93,7 +93,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
-          flutter build apk --release --flavor dev --dart-define-from-file=.env --build-number=$VERSION_CODE
+          flutter build apk --release --flavor dev --obfuscate --split-debug-info=build/symbols --dart-define-from-file=.env --build-number=$VERSION_CODE
           DATETIME=$(date +'%Y%m%d-%H%M')
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-dev-release.apk "dist/ally-flutter-develop-${{ github.run_number }}-${DATETIME}.apk"
@@ -104,6 +104,42 @@ jobs:
           name: ally-flutter-develop-${{ github.run_number }}
           path: dist/*.apk
           retention-days: 7
+
+      - name: Keep Dart debug symbols
+        # Obfuscated Dart stack traces can only be read with these; kept so a
+        # build can still be symbolicated after the Firebase secret is added.
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-symbols-${{ github.run_number }}
+          path: build/symbols
+          retention-days: 90
+
+      - name: Upload Crashlytics symbols
+        # Best effort, never fails the release: skipped with a warning when
+        # the Firebase config or the Firebase service account is missing.
+        # The R8 mapping file is uploaded by the Crashlytics Gradle plugin
+        # during the build; this uploads the Dart --split-debug-info files.
+        continue-on-error: true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON }}
+        run: |
+          GSJ=android/app/src/dev/google-services.json
+          APP_ID=""
+          if [ -f "$GSJ" ]; then
+            APP_ID=$(jq -r '.client[] | select(.client_info.android_client_info.package_name == "com.helloally.ally_mobile_flutter") | .client_info.mobilesdk_app_id' "$GSJ" | head -n 1)
+          fi
+          if [ -z "$APP_ID" ]; then
+            echo "::warning::No google-services.json for com.helloally.ally_mobile_flutter; skipping Crashlytics symbol upload"
+            exit 0
+          fi
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON not set; skipping Dart symbol upload"
+            exit 0
+          fi
+          echo "$FIREBASE_SA" > "$RUNNER_TEMP/firebase-sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" \
+            npx --yes firebase-tools@14 crashlytics:symbols:upload --app="$APP_ID" build/symbols
+          rm -f "$RUNNER_TEMP/firebase-sa.json"
 
       - name: Send Slack notification
         if: success()

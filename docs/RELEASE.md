@@ -75,6 +75,29 @@ Not in git (`.gitignore`), as in RN, whose CI pulls them from S3:
 Without them the app builds and runs with Firebase off (no push, no
 Crashlytics): `main.dart` tolerates a failed `Firebase.initializeApp()`.
 
+### Crashlytics symbols
+
+Release builds are obfuscated (`--obfuscate --split-debug-info=build/symbols`),
+so Crashlytics needs symbols to show readable stack traces. Every piece
+skips with a warning, never fails, when its config is missing:
+
+- **iOS native (dSYMs):** the "Upload Crashlytics Symbols" build phase runs
+  Firebase's `Crashlytics/run` from the Swift package checkout (RN runs the
+  same script from Pods) when the build has a dSYM and a
+  `GoogleService-Info.plist`. The iOS workflows also upload the archive's
+  dSYMs with `upload-symbols`, which needs only the plist.
+- **Android (R8 mapping):** the `com.google.firebase.crashlytics` Gradle
+  plugin, applied with google-services only when a `google-services.json`
+  exists (as RN applies it). NDK symbol upload is off: the app has no
+  native code of its own.
+- **Dart:** the four release workflows keep `build/symbols` as a
+  `dart-symbols-<run>` artifact (90 days) and upload it with
+  `firebase crashlytics:symbols:upload`, which needs the
+  `FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON` secret.
+
+To symbolicate an older build by hand, download its `dart-symbols` artifact
+and run `firebase crashlytics:symbols:upload --app=<GOOGLE_APP_ID> <dir>`.
+
 ## Version and build numbers
 
 - **Marketing version** (`CFBundleShortVersionString` / `versionName`):
@@ -133,6 +156,7 @@ this repo:
 | `ANDROID_RELEASE_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` | Android | RN's upload keystore. Play rejects a `com.helloally.app` update signed with any other key. |
 | `ANDROID_SERVICE_ACCOUNT_JSON` | Android prod | Play publishing service account. |
 | `SLACK_WEBHOOK_URL` | all | Optional. |
+| **`FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON`** (new) | all four release workflows, optional | Service account key of the Firebase project, with the Firebase Crashlytics Admin role. Only the Dart symbol upload uses it; without it that step is skipped with a warning. |
 | **`PROVISION_PROFILE_DEV_BASE64`** (new) | iOS dev | App Store profile named "Ally Flutter AppStore Distribution" for `com.helloally.allyMobileFlutter`. |
 
 ### One-time admin setup

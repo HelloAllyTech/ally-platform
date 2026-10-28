@@ -180,6 +180,7 @@
 				91D0E364F18C4ECB7EF29C49 /* Copy GoogleService-Info.plist */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				C4A5F1D20E6B4C3A9D8E7F10 /* Upload Crashlytics Symbols */,
 			);
 			buildRules = (
 			);
@@ -303,6 +304,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		C4A5F1D20E6B4C3A9D8E7F10 /* Upload Crashlytics Symbols */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}",
+			);
+			name = "Upload Crashlytics Symbols";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Crashlytics dSYM upload, as RN's \"[CP-User] [RNFB] Crashlytics\" phase\n# (FirebaseCrashlytics/run). Best effort: it never fails the build. CI also\n# uploads the archive's dSYMs explicitly (see docs/RELEASE.md).\nif [ \"${DEBUG_INFORMATION_FORMAT}\" != \"dwarf-with-dsym\" ]; then\n  echo \"note: ${CONFIGURATION} builds no dSYM; skipping Crashlytics upload\"\n  exit 0\nfi\nif [ ! -f \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\" ]; then\n  echo \"warning: no GoogleService-Info.plist in the app; skipping Crashlytics dSYM upload\"\n  exit 0\nfi\n# Swift Package Manager checkout: `flutter build` clones packages into\n# build/ios/SourcePackages (= BUILD_DIR/SourcePackages); an Xcode build uses\n# DerivedData/<project>/SourcePackages. CocoaPods last.\nDERIVED=\"${BUILD_DIR%/Build/*}\"\nRUN=\"\"\nfor c in \"${BUILD_DIR}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\" \"${DERIVED}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\" \"${PODS_ROOT}/FirebaseCrashlytics/run\"; do\n  if [ -f \"$c\" ]; then RUN=\"$c\"; break; fi\ndone\nif [ -z \"$RUN\" ]; then\n  RUN=$(ls -t \"${HOME}\"/Library/Developer/Xcode/DerivedData/Runner-*/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run 2>/dev/null | head -n 1)\nfi\nif [ -z \"$RUN\" ]; then\n  echo \"warning: Crashlytics run script not found; skipping dSYM upload\"\n  exit 0\nfi\n/bin/sh \"$RUN\" || echo \"warning: Crashlytics dSYM upload failed; continuing\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

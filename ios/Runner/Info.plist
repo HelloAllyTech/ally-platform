@@ -66,10 +66,18 @@
 		     data-only engagement reminders (push_notification_service.dart). -->
 		<string>remote-notification</string>
 	</array>
+	<!-- Usage strings are RN's (ios/ally/Info.plist) word for word: the prod
+	     flavor is the same App Store listing. Camera: LiveKit/WebRTC link the
+	     camera APIs, so App Store Connect rejects an upload without it
+	     (ITMS-90683) even though the app never opens the camera. RN's empty
+	     NSLocationWhenInUseUsageDescription is not copied: nothing here links
+	     location APIs, and an empty purpose string is itself a review flag. -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app may access your camera for video communication features. Camera access is required for live video calls and screen sharing functionality.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ally needs microphone access to record counselling sessions and power live roleplay practice.</string>
+	<string>We need access to your microphone for audio streaming</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Ally needs access to your photos so you can set a profile picture.</string>
+	<string>This app needs access to your photo library to allow you to select a profile image for your account.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
