@@ -530,7 +530,8 @@ class CallLogRepository {
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/learn/scenario-sessions',
-      queryParameters: {'limit': limit, 'offset': offset},
+      // RN `simulationsApi.getSimulationLogs`: newest first.
+      queryParameters: {'limit': limit, 'offset': offset, 'sortBy': 'createdAt', 'order': 'DESC'},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data

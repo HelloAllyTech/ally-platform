@@ -29,6 +29,8 @@ class ScribeReviewsRepository {
         'limit': limit,
         'offset': offset,
         'readFilter': ?readFilter,
+        // RN `getReviews`/`getScribeReviews` always send `order: DESC`.
+        'order': 'DESC',
       },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
@@ -36,6 +38,13 @@ class ScribeReviewsRepository {
       items: data.map((e) => ReviewItem.fromJson(e as Map<String, dynamic>)).toList(),
       count: (response.data?['count'] as num?)?.toInt() ?? data.length,
     );
+  }
+
+  /// RN `getUnreadScribeReviewCount` (`GET /scribe-session-reviews/
+  /// unread-count`, ally-be gate `VIEW_SCRIBE_REVIEWS`).
+  Future<int> getUnreadCount() async {
+    final response = await _dio.get<Map<String, dynamic>>('/scribe-session-reviews/unread-count');
+    return (response.data?['count'] as num?)?.toInt() ?? 0;
   }
 
   Future<ReviewItem> getScribeReview(String reviewId) async {

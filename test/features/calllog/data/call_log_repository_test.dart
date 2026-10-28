@@ -401,7 +401,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/learn/scenario-sessions',
-          queryParameters: {'limit': 25, 'offset': 0},
+          queryParameters: {'limit': 25, 'offset': 0, 'sortBy': 'createdAt', 'order': 'DESC'},
         ),
       ).thenAnswer(
         (_) async => _response({
