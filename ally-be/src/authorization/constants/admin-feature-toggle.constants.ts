@@ -610,6 +610,7 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Default the admin sidebar to collapsed and expand it on hover.',
     legacyGrants: SUPER_ADMIN_TIER,
+    defaultEnabled: true,
   },
 ];
 
