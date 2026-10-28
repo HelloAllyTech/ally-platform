@@ -246,6 +246,33 @@ describe('ShipVolumeAnalyticsService', () => {
     });
   });
 
+  describe('when a repository is unreachable', () => {
+    it('does not report infra as unavailable since it is no longer tracked', async () => {
+      const infraUrl = '/repos/HelloAllyTech/infra/';
+      mockedAxios.get.mockImplementation((url: string) => {
+        if (url.includes(infraUrl)) {
+          return Promise.reject(new Error('404 Not Found'));
+        }
+        return Promise.resolve({
+          data: [week('2026-08-30', 10, 0)],
+          status: 200,
+        });
+      });
+
+      const result = await service.getShipVolume({ weeks: 12 });
+
+      const getCalls = mockedAxios.get.mock.calls;
+      const infraCall = getCalls.find((call) => call[0].includes(infraUrl));
+      expect(infraCall).toBeUndefined();
+
+      expect(result.unavailableRepos).not.toContainEqual({
+        repo: 'infra',
+        reason: 'unreachable',
+        servedFromCache: false,
+      });
+    });
+  });
+
   it('reports every repo as not_configured when there is no token, without calling GitHub', async () => {
     const module = await Test.createTestingModule({
       providers: [
