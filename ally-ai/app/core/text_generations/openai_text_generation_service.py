@@ -1603,6 +1603,36 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
             ]
         )
 
+        # Select prompt and response model based on memory requirement
+        if need_memory:
+            template_path = "scenario/scenario_evaluation_with_memory"
+        else:
+            template_path = "scenario/scenario_evaluation"
+
+        evaluation_llm = self._client_for(template_path, prompts)
+
+        # Bound the transcript the evaluator reads (long sessions otherwise
+        # overflow the prompt and fail every time).
+        chat_history_str = await self._condense_for_summary(
+            chat_history_str, llm_override=evaluation_llm, prompts=prompts
+        )
+
+        # Select prompt and response model based on memory requirement
+        if need_memory:
+            template_path = "scenario/scenario_evaluation_with_memory"
+            response_model = ScenarioEvaluationWithMemory
+        else:
+            template_path = "scenario/scenario_evaluation"
+            response_model = ScenarioEvaluation
+
+        evaluation_llm = self._client_for(template_path, prompts)
+
+        # Bound the transcript the evaluator reads (long sessions otherwise
+        # overflow the prompt and fail every time).
+        chat_history_str = await self._condense_for_summary(
+            chat_history_str, llm_override=evaluation_llm, prompts=prompts
+        )
+
         # Track the client's keys so emotional_movement can be validated against
         # them. The counselor's used to be tracked too, for message tags; those
         # were deprecated with the annotated transcript.
@@ -1626,7 +1656,6 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                 unhelpful_behaviours=unhelpful_behaviours,
             )
 
-            # Select prompt and response model based on memory requirement
             if need_memory:
                 custom_prompt_section = (
                     f"Additional Instructions:\n{memory_prompt}"
@@ -1647,7 +1676,6 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                         "shared/skill_coverage", prompts=prompts
                     ),
                 )
-                response_model = ScenarioEvaluationWithMemory
                 logger.info(
                     "OpenAI.generate_scenario_evaluation: prompt loaded "
                     "(template=scenario/scenario_evaluation_with_memory, "
@@ -1665,7 +1693,6 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                         "shared/skill_coverage", prompts=prompts
                     ),
                 )
-                response_model = ScenarioEvaluation
                 logger.info(
                     "OpenAI.generate_scenario_evaluation: prompt loaded "
                     "(template=scenario/scenario_evaluation, prompt_chars=%d)",
@@ -1693,14 +1720,6 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                 "OpenAI.generate_scenario_evaluation: invoking LLM "
                 "(response_model=%s)",
                 response_model.__name__,
-            )
-            evaluation_llm = self._client_for(
-                (
-                    "scenario/scenario_evaluation_with_memory"
-                    if need_memory
-                    else "scenario/scenario_evaluation"
-                ),
-                prompts,
             )
             response = cast(
                 response_model,
