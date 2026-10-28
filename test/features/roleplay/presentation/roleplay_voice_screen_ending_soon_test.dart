@@ -51,7 +51,8 @@ void main() {
 
       await tester.tap(find.text('Connect'));
       await tester.pump();
-      await tester.pump(const Duration(seconds: 3)); // past the countdown
+      await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester); // past the countdown
 
       expect(find.text('Session Ending Soon'), findsNothing);
 

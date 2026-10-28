@@ -165,4 +165,16 @@ class AppColors {
   static const sendButtonIdle = Color(0xFFD1D5DC); // '#d1d5dc' literal: AskAI/Debrief send button
   static const rankBadgeBorder = Color(0xFFBFD4F6); // '#BFD4F6' literal: Ally avatar ring
   static const darkGray17 = Color(0xFF1A1A1A); // InfoTooltip bubble
+  // roleplay parity (SimulationAssistantScreen, components/ButtonGroup)
+  static const grey950 = Color(0xFF17181A); // ds.grey[950]: live call background
+  static const whiteAlpha50 = Color(0x0AFFFFFF); // ds.whiteAlpha[50]: participant tile
+  static const blackAlpha200 = Color(0x1F000000); // ds.blackAlpha[200]: controls bar
+  static const darkGray10 = Color(0xFF282B31); // ButtonItem background
+  static const darkGray5 = Color(0xFF1E2025); // ButtonItem active label
+  static const lightGrayD9 = Color(0xFFD9D9D9); // CollapsibleButtonGroup chevron
+  static const lightGray3 = Color(0xFF676767); // loader microphone prompt
+  static const coralRed = Color(0xFFFB6767); // End-session square icon
+  static const callDivider = Color(0xFF3D4045); // '#3D4045' literal: info tab rule, PiP border
+  static const infoTabInactive = Color(0xFF9CA3AF); // '#9CA3AF' literal: inactive info tab
+  static const callGreen = Color(0xFF57F646); // '#57f646' literal: info tab indicator, countdown ring
 }

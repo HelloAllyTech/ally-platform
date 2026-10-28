@@ -47,7 +47,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Before connecting, back just leaves — no confirmation needed.
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      // RN has no header back arrow on the live call: system back only.
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text('End Role play'), findsNothing);
       expect(find.text('HOME'), findsOneWidget);
@@ -60,9 +61,11 @@ void main() {
 
       await tester.tap(find.text('Connect'));
       await tester.pump();
-      await tester.pump(const Duration(seconds: 3)); // past the countdown
+      await tester.pump(const Duration(seconds: 3));
+      await expandRoleplayControls(tester); // past the countdown
 
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      // RN has no header back arrow on the live call: system back only.
+      await tester.binding.handlePopRoute();
       await tester.pump();
 
       expect(find.text('End Role play'), findsOneWidget);
@@ -72,10 +75,11 @@ void main() {
       await tester.pump();
 
       expect(find.text('End Role play'), findsNothing);
-      expect(find.text('Connected to room'), findsOneWidget, reason: 'cancel stays on the call');
+      expect(find.byKey(const ValueKey('participant-tile-remote')), findsOneWidget, reason: 'cancel stays on the call');
       verifyNever(() => liveKitService.disconnect());
 
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      // RN has no header back arrow on the live call: system back only.
+      await tester.binding.handlePopRoute();
       await tester.pump();
       await tester.tap(find.text('End session').last);
       await tester.pump();

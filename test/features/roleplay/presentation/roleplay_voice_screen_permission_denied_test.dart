@@ -32,7 +32,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Microphone permission required'), findsOneWidget);
-    expect(find.text('Not connected'), findsOneWidget);
+    expect(find.text('Connecting to session...'), findsOneWidget);
     verifyNever(
       () => liveKitService.connect(
         liveKitServerUrl: any(named: 'liveKitServerUrl'),

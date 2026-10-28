@@ -15,17 +15,23 @@ void main() {
       await pumpApp(
         tester,
         const Scaffold(
-          body: ParticipantTile(
-            avatarUrl: null,
-            isSpeaking: true,
-            turnState: TurnState.aiSpeaking,
+          body: SizedBox(
+            width: 300,
+            height: 280,
+            child: ParticipantTile(
+              avatarUrl: null,
+              name: 'Asha',
+              isSpeaking: true,
+              turnState: TurnState.aiSpeaking,
+            ),
           ),
         ),
       );
 
       expect(find.text('Speaking...'), findsOneWidget);
       expect(find.byKey(const ValueKey('speaking-indicator')), findsOneWidget);
-      expect(find.byIcon(Icons.person), findsOneWidget);
+      expect(find.byKey(const ValueKey('participant-placeholder')), findsOneWidget);
+      expect(find.text('Asha'), findsOneWidget);
     },
   );
 }
