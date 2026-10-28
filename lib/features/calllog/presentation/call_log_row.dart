@@ -33,7 +33,15 @@ class CallLogRow extends StatefulWidget {
     this.enabled = true,
     this.isSimulation = false,
     this.noAudioLabel = 'No Audio',
+    this.expanded,
+    this.onToggle,
   });
+
+  /// RN `expanded` / `onToggle` (CallLogScreen's `expandedIdx`): when
+  /// [onToggle] is set the parent owns the state, so only one row is open
+  /// at a time; otherwise the row keeps its own.
+  final bool? expanded;
+  final VoidCallback? onToggle;
 
   final String title;
   final ChatSummaryStatus status;
@@ -70,7 +78,9 @@ class CallLogRow extends StatefulWidget {
 }
 
 class _CallLogRowState extends State<CallLogRow> {
-  bool _expanded = false;
+  bool _localExpanded = false;
+
+  bool get _expanded => widget.onToggle != null ? (widget.expanded ?? false) : _localExpanded;
 
   // styles.logId: IBM_PLEX_SERIF.MEDIUM + typography.label.large.
   static const _titleStyle = TextStyle(
@@ -219,7 +229,7 @@ class _CallLogRowState extends State<CallLogRow> {
               GestureDetector(
                 key: const ValueKey('call-log-row-toggle'),
                 behavior: HitTestBehavior.opaque,
-                onTap: () => setState(() => _expanded = !_expanded),
+                onTap: widget.onToggle ?? () => setState(() => _localExpanded = !_localExpanded),
                 child: Container(
                   width: 24,
                   height: 24,

@@ -335,6 +335,19 @@ void main() {
       const partial = CallLogFilterState(minDuration: 5, tags: ['anxious']);
       expect(partial.isEmpty, isFalse);
       expect(partial.activeCount, 2);
+
+      // C5: RN counts the date range and the duration range as one each.
+      const full = CallLogFilterState(startDate: '2026-01-01', endDate: '2026-01-31', minDuration: 1, maxDuration: 9);
+      expect(full.activeCount, 2);
+    });
+
+    test('an emptied date box clears its bound instead of sending startDate= (C6)', () {
+      final typed = const CallLogFilterState().withDates(start: '2026-01-01', end: '2026-01-31');
+      expect(typed.toQueryParameters(), {'startDate': '2026-01-01', 'endDate': '2026-01-31'});
+      final emptied = typed.withDates(start: '', end: '  ');
+      expect(emptied.startDate, isNull);
+      expect(emptied.toQueryParameters(), isEmpty);
+      expect(emptied.activeCount, 0);
     });
 
     test('duration is entered in minutes and sent in seconds (RN buildBuiltinParams)', () {
