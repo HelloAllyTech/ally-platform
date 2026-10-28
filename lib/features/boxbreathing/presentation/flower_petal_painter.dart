@@ -11,29 +11,20 @@ import 'package:flutter/material.dart';
 /// original). A gray semicircular "stem" sits underneath, static regardless
 /// of bloom state.
 ///
-/// The real component's bezier control points (-35,-40 / -35,-100 / 0,-140 /
-/// etc.) are hard-coded pixel offsets tuned for its typical real-world
-/// container size (280, from `BoxBreathingAnimation`'s
-/// `min(squareSize * 0.8, 280)`), not normalized to whatever `size` prop is
-/// passed in — so this paints in that same fixed 280x280 reference space,
-/// then uniformly scales the canvas to whatever box it's actually given,
-/// preserving the exact petal proportions at any screen width instead of
-/// clipping them at a smaller size.
+/// Like the real component, the bezier control points (-35,-40 / -35,-100 /
+/// 0,-140 / etc.) are fixed offsets from the canvas center, NOT scaled to
+/// the `size` it's given — RN's `<Svg viewBox="0 0 size size">` maps 1:1,
+/// so a smaller flower box only moves the center, never shrinks the petals.
 class FlowerPetalPainter extends CustomPainter {
   const FlowerPetalPainter({required this.bloomProgress});
 
   final double bloomProgress;
 
-  static const double _referenceSize = 280;
   static const List<double> _petalAngles = [0, -65, -35, 65, 35];
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.width / _referenceSize;
-    canvas.save();
-    canvas.scale(scale);
-
-    const center = Offset(_referenceSize / 2, _referenceSize / 2);
+    final center = Offset(size.width / 2, size.height / 2);
     final opacity = (0.2 + math.min(bloomProgress, 0.6)).clamp(0.0, 1.0);
 
     for (final angleDeg in _petalAngles) {
@@ -63,7 +54,6 @@ class FlowerPetalPainter extends CustomPainter {
     }
 
     _paintStem(canvas, center);
-    canvas.restore();
   }
 
   /// `M cx,cy C t(-35,-40) t(-35,-100) t(0,-140) C t(35,-100) t(35,-40) cx,cy

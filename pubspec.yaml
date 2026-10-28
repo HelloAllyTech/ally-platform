@@ -64,6 +64,8 @@ dependencies:
   lottie: ^3.3.2
   package_info_plus: ^10.2.2
   confetti: ^0.8.0
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
 
 dev_dependencies:
   flutter_test:
@@ -154,6 +156,8 @@ flutter:
     - assets/icons/
     - assets/images/
     - assets/animations/
+    # RN's src/assets/sounds/breath.mp3 (BoxBreathingAnimation's SoundPlayer).
+    - assets/sounds/breath.mp3
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

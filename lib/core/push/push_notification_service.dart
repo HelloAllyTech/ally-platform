@@ -26,7 +26,7 @@ final FlutterLocalNotificationsPlugin localNotificationsPlugin = FlutterLocalNot
 
 /// Renders a data-only FCM message as a local notification — the single
 /// display path used by both the foreground listener
-/// ([PushNotificationService._initializeLocalNotifications]) and the
+/// ([PushNotificationService.initializeAndRegister]) and the
 /// background-isolate handler ([firebaseMessagingBackgroundHandler]), mirroring
 /// RN's single `displayRemoteMessage` (`pushNotificationService.ts`) used by
 /// both `subscribeToForegroundMessages` and `index.js`'s
@@ -67,6 +67,62 @@ Future<void> displayReminderNotification(RemoteMessage message) async {
     // map), so the full payload is round-tripped through it as JSON.
     payload: jsonEncode({'data': data}),
   );
+}
+
+bool _localNotificationsInitialized = false;
+Future<void>? _localNotificationsInit;
+
+/// Registers the tap handler that fires for a notification tapped while
+/// this isolate is already alive — whether the app was genuinely in the
+/// foreground, or merely backgrounded (not killed) and resumed by the tap —
+/// then runs RN's `notifee.getInitialNotification()` cold-start check.
+/// `flutter_local_notifications` unifies both live cases into one callback,
+/// unlike RN/Notifee's split between `onForegroundEvent` (RootNavigator) and
+/// `onBackgroundEvent` (`index.js`).
+///
+/// Idempotent: shared by [PushNotificationService] (server reminders) and
+/// the weekly leaderboard reminder (`leaderboard_notification.dart`). On iOS
+/// the default [DarwinInitializationSettings] also asks for notification
+/// permission, as RN's `requestNotificationPermission` does.
+Future<void> initializeLocalNotifications(GoRouter router) {
+  if (_localNotificationsInitialized) return _localNotificationsInit!;
+  _localNotificationsInitialized = true;
+  return _localNotificationsInit = () async {
+    try {
+      await localNotificationsPlugin.initialize(
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(),
+        ),
+        onDidReceiveNotificationResponse: (response) => navigateForNotificationPayload(response.payload, router),
+      );
+    } catch (_) {
+      // Let a later caller retry (e.g. no plugin registered yet).
+      _localNotificationsInitialized = false;
+      rethrow;
+    }
+    final launchDetails = await localNotificationsPlugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp != true) return;
+    navigateForNotificationPayload(launchDetails?.notificationResponse?.payload, router);
+  }();
+}
+
+/// Decodes a local notification's payload — `{"id": "...", "data":
+/// {...}}`, see [displayReminderNotification] and the leaderboard reminder —
+/// and routes via [routeForNotificationTap].
+void navigateForNotificationPayload(String? payload, GoRouter router) {
+  if (payload == null) return;
+  String? notificationId;
+  Map<String, dynamic> data;
+  try {
+    final decoded = jsonDecode(payload) as Map<String, dynamic>;
+    notificationId = decoded['id'] as String?;
+    data = (decoded['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+  } catch (_) {
+    return;
+  }
+  final target = routeForNotificationTap(notificationId: notificationId, data: data);
+  if (target != null) router.go(target);
 }
 
 /// FCM's background-message handler: fires in a separate background isolate
@@ -128,6 +184,15 @@ class PushNotificationService {
   bool _initialized = false;
 
   Future<void> initializeAndRegister(NotificationsRepository repository, GoRouter router) async {
+    // Local notifications (tap routing, the cold-start check) don't depend
+    // on Firebase: the locally-scheduled weekly leaderboard reminder needs
+    // them even while this app has no Firebase project configured.
+    try {
+      await initializeLocalNotifications(router);
+    } catch (_) {
+      // Same graceful-degradation contract as the rest of this class.
+    }
+
     try {
       await Firebase.initializeApp();
     } catch (error) {
@@ -151,58 +216,18 @@ class PushNotificationService {
           repository.registerDeviceToken(token: newToken, platform: _platform);
         });
 
-        await _initializeLocalNotifications(router);
         // Foreground-only: `firebaseMessagingBackgroundHandler` (registered
         // separately, in `main.dart`) covers backgrounded/killed arrival —
         // mirrors RN's split between `subscribeToForegroundMessages`
         // (RootNavigator effect) and `setBackgroundMessageHandler`
         // (`index.js`, module scope).
         FirebaseMessaging.onMessage.listen(displayReminderNotification);
-        await _handleNotificationThatLaunchedApp(router);
       }
     } catch (error) {
       // A real Firebase project but a still-rejected token request (e.g.
       // permission denied) shouldn't be fatal either — same reasoning.
       return;
     }
-  }
-
-  /// Registers the tap handler that fires for a notification tapped while
-  /// this isolate is already alive — whether the app was genuinely in the
-  /// foreground, or merely backgrounded (not killed) and resumed by the tap.
-  /// `flutter_local_notifications` unifies both cases into this one
-  /// callback, unlike RN/Notifee's split between `onForegroundEvent`
-  /// (RootNavigator) and `onBackgroundEvent` (`index.js`) — one registration
-  /// point covers what RN needed two for.
-  Future<void> _initializeLocalNotifications(GoRouter router) async {
-    await localNotificationsPlugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
-      ),
-      onDidReceiveNotificationResponse: (response) => _navigateForPayload(response.payload, router),
-    );
-  }
-
-  /// RN's `notifee.getInitialNotification()` cold-start check — the
-  /// notification that launched the app from fully killed, if any.
-  Future<void> _handleNotificationThatLaunchedApp(GoRouter router) async {
-    final launchDetails = await localNotificationsPlugin.getNotificationAppLaunchDetails();
-    if (launchDetails?.didNotificationLaunchApp != true) return;
-    _navigateForPayload(launchDetails?.notificationResponse?.payload, router);
-  }
-
-  void _navigateForPayload(String? payload, GoRouter router) {
-    if (payload == null) return;
-    Map<String, dynamic> data;
-    try {
-      final decoded = jsonDecode(payload) as Map<String, dynamic>;
-      data = (decoded['data'] as Map?)?.cast<String, dynamic>() ?? const {};
-    } catch (_) {
-      return;
-    }
-    final target = routeForNotificationTap(data: data);
-    if (target != null) router.go(target);
   }
 
   // `defaultTargetPlatform`, not `dart:io`'s `Platform` — the latter throws

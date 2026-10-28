@@ -1,133 +1,224 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/core/chat/current_chat_provider.dart';
 import 'package:ally_mobile_flutter/features/boxbreathing/presentation/box_breathing_screen.dart';
+import 'package:ally_mobile_flutter/features/boxbreathing/presentation/breath_sound_player.dart';
+import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
+import 'package:ally_mobile_flutter/features/scribe/data/chat_models.dart';
 
-import '../../../support/prewarm_translations.dart';
+import '../../../support/fake_translations.dart';
 
-/// `BoxBreathingScreen` drives its own `AnimationController` in an endless
-/// loop (it `forward()`s again every time a phase completes, forever) —
-/// `pumpAndSettle` (what the shared `pumpApp` helper uses) would never see
-/// "no more scheduled frames" and time out, so this pumps explicitly
-/// instead, replicating `pumpApp`'s translation-loading sequence without
-/// the final settle.
-Future<void> _pumpBoxBreathing(WidgetTester tester) async {
-  await preWarmTranslations(tester);
+class _FakeSound implements BreathSoundPlayer {
+  final calls = <String>[];
+
+  @override
+  Future<void> playAsset() async => calls.add('playAsset');
+  @override
+  Future<void> replay() async => calls.add('replay');
+  @override
+  Future<void> pause() async => calls.add('pause');
+  @override
+  Future<void> setVolume(double volume) async => calls.add('volume:$volume');
+  @override
+  Future<void> stop() async => calls.add('stop');
+}
+
+class _FakeCallLogRepository extends CallLogRepository {
+  _FakeCallLogRepository() : super(Dio());
+
+  final requested = <int>[];
+
+  @override
+  Future<CallLogItem> getCallLogItem(int chatId) async {
+    requested.add(chatId);
+    return CallLogItem(
+      id: chatId,
+      startedAt: '2026-10-28T10:00:00Z',
+      endedAt: '2026-10-28T10:10:00Z',
+      status: 'ENDED',
+      sessionName: 'CALL-$chatId',
+      score: null,
+    );
+  }
+}
+
+class _Harness {
+  _Harness(this.sound, this.repo, this.container);
+  final _FakeSound sound;
+  final _FakeCallLogRepository repo;
+  final ProviderContainer container;
+  Object? summaryExtra;
+}
+
+/// The screen loops its animation forever, so no `pumpAndSettle` here.
+Future<_Harness> _pump(WidgetTester tester, {bool skipOverlay = true}) async {
   SharedPreferences.setMockInitialValues({});
-  await tester.pumpWidget(
-    const ProviderScope(child: MaterialApp(home: BoxBreathingScreen())),
+  final sound = _FakeSound();
+  final repo = _FakeCallLogRepository();
+  final container = ProviderContainer(
+    overrides: [
+      fixedTranslationsOverride(),
+      breathSoundPlayerFactoryProvider.overrideWithValue(() => sound),
+      callLogRepositoryProvider.overrideWithValue(repo),
+    ],
   );
-  await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+  addTearDown(container.dispose);
+  final harness = _Harness(sound, repo, container);
+  final router = GoRouter(
+    initialLocation: '/box-breathing?chatId=42',
+    routes: [
+      GoRoute(
+        path: '/box-breathing',
+        builder: (_, state) => BoxBreathingScreen(
+          chatId: int.tryParse(state.uri.queryParameters['chatId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: '/call-log/:id',
+        builder: (_, state) {
+          harness.summaryExtra = state.extra;
+          return Text('summary ${state.pathParameters['id']}');
+        },
+      ),
+      GoRoute(path: '/home', builder: (_, _) => const Text('home shell')),
+    ],
+  );
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(routerConfig: router),
+    ),
+  );
   await tester.pump();
+  if (skipOverlay) {
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+  }
+  return harness;
 }
 
 void main() {
-  testWidgets('starts on the Inhale phase', (tester) async {
-    await _pumpBoxBreathing(tester);
+  testWidgets('shows the call-end overlay, swaps its message at 1s, hands over at 3s', (tester) async {
+    final h = await _pump(tester, skipOverlay: false);
 
-    expect(find.text('Box breathing'), findsOneWidget);
+    expect(find.text('You gave your best in that session'), findsOneWidget);
+    expect(find.text('Return to self'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 1000));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(find.text('Now, take a moment for yourself'), findsOneWidget);
+    expect(h.sound.calls, isEmpty, reason: 'sound starts with the animation, not the overlay');
+
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pump();
+    expect(find.text('Now, take a moment for yourself'), findsNothing);
+    expect(find.text('Return to self'), findsOneWidget);
+    expect(find.text('View Call Summary'), findsOneWidget);
     expect(find.text('Inhale'), findsOneWidget);
+    expect(h.sound.calls, ['playAsset', 'replay']);
   });
 
-  // The controller's own 4-second-per-phase timing (box_breathing_screen.dart's
-  // `_phaseDuration`) is exercised directly via `tester.pump(duration)` — this
-  // is what's "reasonably testable" here without fighting the animation
-  // controller itself; verifying the exact scale/transform curve isn't
-  // attempted.
   testWidgets('advances inhale -> hold -> exhale -> hold -> inhale every 4s', (tester) async {
-    await _pumpBoxBreathing(tester);
+    await _pump(tester);
     expect(find.text('Inhale'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 4, milliseconds: 50));
     expect(find.text('Hold'), findsOneWidget);
-
     await tester.pump(const Duration(seconds: 4, milliseconds: 50));
     expect(find.text('Exhale'), findsOneWidget);
-
     await tester.pump(const Duration(seconds: 4, milliseconds: 50));
     expect(find.text('Hold'), findsOneWidget);
-
     await tester.pump(const Duration(seconds: 4, milliseconds: 50));
     expect(find.text('Inhale'), findsOneWidget);
   });
 
-  testWidgets('counts 1 to 4 once per second within a phase, resetting on the next one', (tester) async {
-    await _pumpBoxBreathing(tester);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('counts 1 to 4 within a phase, resetting on the next one', (tester) async {
+    await _pump(tester);
+    String timer() => tester.widget<Text>(find.byKey(const ValueKey('breathing-timer'))).data!;
+    expect(timer(), '1');
 
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('2'), findsOneWidget);
+    expect(timer(), '2');
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('3'), findsOneWidget);
+    expect(timer(), '3');
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('4'), findsOneWidget);
-
-    // Phase changes at 4s total — the countdown resets to 1 for the new phase.
+    expect(timer(), '4');
     await tester.pump(const Duration(milliseconds: 1050));
     expect(find.text('Hold'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
+    expect(timer(), '1');
   });
 
-  testWidgets('pausing stops both the phase animation and the countdown, resuming restarts them', (
-    tester,
-  ) async {
-    await _pumpBoxBreathing(tester);
+  testWidgets('pause resets to the first Hold phase like RN; resume restarts at Inhale', (tester) async {
+    final h = await _pump(tester);
 
-    await tester.tap(find.byIcon(Icons.pause));
+    await tester.tap(find.byKey(const ValueKey('play-pause-button')));
     await tester.pump();
-    expect(find.byIcon(Icons.play_arrow), findsOneWidget, reason: 'icon flips to show the resume action');
+    expect(find.byKey(const ValueKey('play-icon')), findsOneWidget);
+    expect(find.text('Hold'), findsOneWidget);
+    expect(h.sound.calls.last, 'pause');
 
-    // Neither the phase nor the countdown advance while paused.
-    await tester.pump(const Duration(seconds: 4, milliseconds: 50));
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('Hold'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('play-pause-button')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('pause-icon')), findsOneWidget);
     expect(find.text('Inhale'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.play_arrow));
-    await tester.pump();
-    expect(find.byIcon(Icons.pause), findsOneWidget);
-
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.text('2'), findsOneWidget, reason: 'countdown resumes ticking');
+    expect(h.sound.calls.last, 'replay');
   });
 
-  testWidgets('renders the dot and a flower painter inside the square, moving the dot within a phase', (
-    tester,
-  ) async {
-    await _pumpBoxBreathing(tester);
+  testWidgets('muting sets volume 0 and stops replaying the sound on Inhale', (tester) async {
+    final h = await _pump(tester);
+    h.sound.calls.clear();
 
-    expect(find.byKey(const ValueKey('box-breathing-dot')), findsOneWidget);
-    expect(find.byType(CustomPaint), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('volume-button')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('volume-off-icon')), findsOneWidget);
+    expect(h.sound.calls, ['volume:0.0']);
 
-    Offset dotPositionNow() =>
-        tester.getTopLeft(find.byKey(const ValueKey('box-breathing-dot')));
+    // A full cycle back to Inhale: no replay while muted.
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(seconds: 4, milliseconds: 50));
+    }
+    expect(find.text('Inhale'), findsOneWidget);
+    expect(h.sound.calls, ['volume:0.0']);
 
-    // Right after mount, Inhale has barely started travelling from its
-    // predecessor corner — captured well inside this same phase (no 4s
-    // boundary crossing involved, sidestepping the exact-boundary pumping
-    // gotcha documented elsewhere in this codebase) to avoid any ambiguity
-    // about which phase is active.
-    final start = dotPositionNow();
-    await tester.pump(const Duration(seconds: 2));
-    final halfway = dotPositionNow();
-
-    // Inhale travels corner-to-corner along the top edge (left -> right) —
-    // by the halfway point the dot should have moved a clearly measurable
-    // distance, not a sub-pixel jitter.
-    expect((halfway.dx - start.dx).abs(), greaterThan(20));
+    await tester.tap(find.byKey(const ValueKey('volume-button')));
+    await tester.pump();
+    expect(h.sound.calls, ['volume:0.0', 'volume:1.0', 'replay']);
   });
 
-  testWidgets('tapping the volume button toggles its own icon', (tester) async {
-    await _pumpBoxBreathing(tester);
+  testWidgets('View Call Summary opens the ended chat\'s summary', (tester) async {
+    final h = await _pump(tester);
 
-    expect(find.byIcon(Icons.volume_up), findsOneWidget);
-    expect(find.byIcon(Icons.volume_off), findsNothing);
-
-    await tester.tap(find.byIcon(Icons.volume_up));
+    await tester.tap(find.text('View Call Summary'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.byIcon(Icons.volume_off), findsOneWidget);
-    expect(find.byIcon(Icons.volume_up), findsNothing);
+    expect(h.repo.requested, [42]);
+    expect(find.text('summary 42'), findsOneWidget);
+    expect((h.summaryExtra! as CallLogItem).sessionName, 'CALL-42');
+    expect(h.sound.calls, contains('pause'));
+  });
+
+  testWidgets('back resets to the home shell and clears the current chat', (tester) async {
+    final h = await _pump(tester);
+    h.container.read(currentChatProvider.notifier).set(
+      Chat(chatId: 42, status: 'ENDED', provider: 'x', startedAt: '2026-10-28T10:00:00Z', messages: const []),
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('home shell'), findsOneWidget);
+    expect(h.container.read(currentChatProvider), isNull);
+    expect(h.sound.calls, containsAllInOrder(['pause', 'stop']));
   });
 }

@@ -146,4 +146,7 @@ class AppColors {
   static const lightGray12 = Color(0xFFA5A5A5); // Search no-results text
   static const lightGray13 = Color(0xFF898989); // Search input placeholder
   static const lightGray1 = Color(0xFFF8F8F8); // AchievementCard icon background
+  // box breathing parity (src/theme/colors.ts)
+  static const black0 = Color(0x1A000000); // rgba(0,0,0,0.1) BreathingScreen gradient bottom
+  static const darkBlue3 = Color(0xFF0A1F3C); // CallEndOverlay gradient bottom
 }

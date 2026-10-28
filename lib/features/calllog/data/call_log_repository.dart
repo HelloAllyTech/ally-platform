@@ -512,6 +512,14 @@ class CallLogRepository {
     );
   }
 
+  /// One chat as a call-log row (same `GET /chats/:id` payload the
+  /// summary reads) — for opening Call Summary from outside the list, e.g.
+  /// Box Breathing's "View Call Summary" right after a call ends.
+  Future<CallLogItem> getCallLogItem(int chatId) async {
+    final response = await _dio.get<Map<String, dynamic>>('/chats/$chatId');
+    return CallLogItem.fromJson(response.data!);
+  }
+
   Future<CallSummaryDetails> getCallSummary(int chatId) async {
     final response = await _dio.get<Map<String, dynamic>>('/chats/$chatId');
     return CallSummaryDetails.fromJson(response.data!);
