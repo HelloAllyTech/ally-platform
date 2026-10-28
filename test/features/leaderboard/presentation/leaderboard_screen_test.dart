@@ -104,6 +104,30 @@ void main() {
     },
   );
 
+  testWidgets('on a 402pt phone the row keeps RN\'s 160pt user column and runs past the edge', (tester) async {
+    // RN's userColumn minWidth 160@ms: header and rows overflow to the right
+    // instead of squeezing the user column, which places duration/badges.
+    // A 402pt iPhone is 402 / 1.0743 = 374 logical once RnScale applies ms().
+    tester.view.physicalSize = const Size(374 * 3, 814 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final repository = MockLeaderboardRepository();
+    when(() => repository.getLeaderboard(LeaderboardWindow.lastWeek)).thenAnswer(
+      (_) async => (
+        items: [LeaderboardEntry(userId: 1, name: 'Alice', profileImageUrl: '', rank: 1, minutesPlayed: 90, badgeCount: 4)],
+        totalCount: 1,
+      ),
+    );
+    when(() => repository.getMyRank(LeaderboardWindow.lastWeek)).thenAnswer((_) async => null);
+
+    await _pumpLeaderboard(tester, repository: repository);
+
+    expect(tester.takeException(), isNull);
+    // rank 21+38, user 160+10, duration 95 -> badges column starts at 324.
+    expect(tester.getTopLeft(find.text('4')).dx, closeTo(324, 0.5));
+    expect(tester.getSize(find.text('1 h 30 min')).height, lessThan(30));
+  });
+
   testWidgets('shows each row\'s badge count and formatted duration', (tester) async {
     final repository = MockLeaderboardRepository();
     when(() => repository.getLeaderboard(LeaderboardWindow.lastWeek)).thenAnswer(

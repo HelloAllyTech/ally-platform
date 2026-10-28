@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -166,7 +167,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     required bool isHighlighted,
   }) {
     final highlightColor = isHighlighted ? AppColors.blue : null;
-    final highlightWeight = isHighlighted ? FontWeight.w500 : null;
+    // RN's highlightedText adds fontWeight 500 to IBM Plex Serif Regular,
+    // which iOS resolves to the Medium face.
+    final highlightFamily = isHighlighted ? AppFonts.ibmPlexSerifMedium : AppFonts.ibmPlexSerifRegular;
     return Container(
       key: isHighlighted ? const Key('leaderboard-highlighted-row') : null,
       padding: EdgeInsets.only(top: 10, bottom: 10, left: isHighlighted ? 5 : 0),
@@ -181,7 +184,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          _RnMinWidthRow(
+            // rank (margin + 38) or the 21pt inset, user min 160 + 10, duration 95, badges 60
+            minWidth: (showRankColumn ? (isHighlighted ? 9 : 21) + 38 : 21) + 160 + 10 + 95 + 60,
             children: [
               if (showRankColumn)
                 Container(
@@ -207,7 +212,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                             fontSize: 12,
                             height: 16 / 12,
                             letterSpacing: 0.2,
-                            fontWeight: highlightWeight ?? FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                             color: highlightColor ?? AppColors.highEmphasis,
                           ),
                         ),
@@ -223,11 +228,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontFamily: highlightFamily,
                     fontSize: 10,
                     height: 14 / 10,
                     letterSpacing: 0.3,
-                    fontWeight: highlightWeight,
                     color: highlightColor ?? Colors.black,
                   ),
                 ),
@@ -239,11 +243,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontFamily: highlightFamily,
                     fontSize: 10,
                     height: 14 / 10,
                     letterSpacing: 0.3,
-                    fontWeight: highlightWeight,
                     color: highlightColor ?? AppColors.highEmphasis,
                   ),
                 ),
@@ -462,14 +465,20 @@ class _BadgesButton extends StatelessWidget {
             child: SvgPicture.asset('assets/icons/badgeIcon.svg'),
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: AppFonts.ibmPlexSerifRegular,
-              fontSize: 12,
-              height: 20 / 12,
-              letterSpacing: 0.2,
-              color: AppColors.primary,
+          // Flexible so a long translation ellipsizes inside the header's
+          // capped trailing slot instead of overflowing it.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 12,
+                height: 20 / 12,
+                letterSpacing: 0.2,
+                color: AppColors.primary,
+              ),
             ),
           ),
         ],
@@ -562,7 +571,8 @@ class _TableHeaderRow extends ConsumerWidget {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.lightGray2)),
       ),
-      child: Row(
+      child: _RnMinWidthRow(
+        minWidth: (showRankColumn ? 45 : 0) + 160 + 88 + 60,
         children: [
           if (showRankColumn) SizedBox(width: 45, child: label('community.table.rank')),
           Expanded(child: label('community.table.user')),
@@ -570,6 +580,40 @@ class _TableHeaderRow extends ConsumerWidget {
           SizedBox(width: 60, child: label('community.table.badges')),
         ],
       ),
+    );
+  }
+}
+
+/// A Row whose `Expanded` column keeps RN's `minWidth: 160@ms`. Yoga lets a
+/// flex child with a minWidth push the row past its parent instead of
+/// shrinking; on a 402pt phone that moves the duration and badges columns
+/// ~10-22pt right of where a plain Expanded puts them. Below [minWidth] the
+/// row is laid out at [minWidth] and overflows to the right, unclipped,
+/// like RN's default `overflow: visible`.
+class _RnMinWidthRow extends StatelessWidget {
+  const _RnMinWidthRow({required this.minWidth, required this.children});
+
+  final double minWidth;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Row(children: children);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= minWidth) return row;
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: OverflowBox(
+            alignment: Alignment.centerLeft,
+            // Take the row's own height; the list gives no height bound.
+            fit: OverflowBoxFit.deferToChild,
+            minWidth: minWidth,
+            maxWidth: minWidth,
+            child: row,
+          ),
+        );
+      },
     );
   }
 }
