@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/course_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/quiz_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
@@ -82,11 +82,8 @@ void main() {
   testWidgets('submit is disabled until an answer is chosen', (tester) async {
     await pump(tester, interjection());
 
-    // Not a bare find.byType(AppButton) — QuizQuestionWidget's own
-    // True/False controls are AppButtons too now.
-    AppButton submitButton() => tester.widget<AppButton>(
-          find.widgetWithText(AppButton, 'courses.video.interjection.submit'),
-        );
+    CourseButton submitButton() =>
+        tester.widget<CourseButton>(find.byKey(const Key('interjection-submit')));
     expect(submitButton().isDisabled, isTrue);
 
     await tester.tap(find.text('courses.quiz.question.true'));
@@ -115,12 +112,9 @@ void main() {
           answer: any(named: 'answer'),
         )).called(1);
 
-    // `_ResultBanner` interpolates status/points into one translated string
-    // (`courses.quiz.question.resultBanner`); without a loaded translation
-    // table, `ref.t()` falls back to that raw key as a whole rather than
-    // substituting — so the raw key itself is the right signal that the
-    // result banner rendered.
-    expect(find.text('courses.quiz.question.resultBanner'), findsOneWidget);
+    // RN: a Correct/Incorrect pill and "Keep going with the video."
+    expect(find.text('courses.quiz.results.correct'), findsOneWidget);
+    expect(find.text('courses.video.interjection.continueBody'), findsOneWidget);
     expect(find.text('courses.video.interjection.continue'), findsOneWidget);
     // Submit is replaced by Continue once a result is shown.
     expect(find.text('courses.video.interjection.submit'), findsNothing);

@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
+import '../course_styles.dart';
 import '../../data/video_watch_progress.dart';
 import 'video_fallback_card.dart';
 import 'video_interjection_dialog.dart';
@@ -147,9 +149,12 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
   }
 
   Future<void> _showInterjection(VideoInterjection interjection) async {
+    // RN `Modal transparent animationType="fade"` over a 50% black overlay.
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
+      barrierColor: AppColors.blackTransparent50,
+      useSafeArea: false,
       builder: (_) => VideoInterjectionDialog(
         itemId: widget.itemId,
         interjection: interjection,
@@ -188,28 +193,39 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
               onMarkWatched: _markWatchedExternally,
             ),
           ),
-        Padding(
+        // styles.footer: borderTop 0.5, padding 16, centred.
+        Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(16),
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+          ),
           child: _completed
               ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  key: const Key('video-watched-chip'),
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    SvgPicture.asset(
-                      'assets/icons/checkCircle.svg',
-                      width: 24,
-                      height: 24,
+                    SvgPicture.asset('assets/icons/tickRound.svg', width: 16, height: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      ref.t('courses.video.watched'),
+                      style: const TextStyle(fontFamily: courseSystemFont, fontSize: 14, color: AppColors.green700),
                     ),
-                    const SizedBox(width: 8),
-                    Text(ref.t('courses.video.watched')),
                   ],
                 )
-              : SizedBox(
-                  width: 160,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: _tracker.watchedPct / 100,
-                    ),
+              // styles.progressTrack: 128 x 6, radius 3, grey[200]; fill primary.
+              : Container(
+                  key: const Key('video-progress-track'),
+                  width: 128,
+                  height: 6,
+                  clipBehavior: Clip.antiAlias,
+                  alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(color: AppColors.grey200, borderRadius: BorderRadius.circular(3)),
+                  child: FractionallySizedBox(
+                    widthFactor: (_tracker.watchedPct / 100).clamp(0.0, 1.0),
+                    heightFactor: 1,
+                    child: const ColoredBox(color: AppColors.primary),
                   ),
                 ),
         ),
