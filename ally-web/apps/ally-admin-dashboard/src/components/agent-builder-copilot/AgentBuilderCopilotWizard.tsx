@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { CheckCircle, FailIcon } from "@icons";
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, useWatch } from "react-hook-form";
 
 import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
 import { useGetAgentTestCasesQuery } from "@api";
@@ -87,6 +87,11 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [history, setHistory] = useState<ChatEntry[]>([]);
   const [description, setDescription] = useState("");
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+
+  const competency = useWatch({
+    control: formMethods.control,
+    name: "competency",
+  });
 
   const { data: goalsData, isLoading: isLoadingGoals } = useGetAgentTestCasesQuery();
   const goalOptions = goalsData?.data ?? [];
@@ -218,20 +223,26 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
         )}
       </div>
 
-      {/* Bottom composer — the active question, or the generation controls. */}
-      <div className="shrink-0 border-t border-border-light pt-4 flex flex-col gap-3">
+      {/* Bottom composer — the active question, or the generation controls.
+          It may shrink: the panel around it has a fixed height and hides
+          overflow, so a long description or a long list of test cases used to
+          push the Next / Generate button out of sight. The question scrolls
+          inside the composer instead, and the button row never does. */}
+      <div className="shrink min-h-0 border-t border-border-light pt-4 flex flex-col gap-3">
         {step === "describe" && (
           <>
-            <h3 className="text-base font-medium text-typography-900">{QUESTIONS.describe}</h3>
-            <AutoExpandableTextarea
-              value={description}
-              onChange={setDescription}
-              placeholder="Describe the person the AI should role-play — who they are, their background, what's bringing them to this session, how they speak and behave..."
-              minHeight={96}
-              maxLines={24}
-              className="w-full rounded border border-border-light px-3 py-2 bg-white text-base"
-            />
-            <div className="flex justify-end">
+            <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-3">
+              <h3 className="text-base font-medium text-typography-900">{QUESTIONS.describe}</h3>
+              <AutoExpandableTextarea
+                value={description}
+                onChange={setDescription}
+                placeholder="Describe the person the AI should role-play — who they are, their background, what's bringing them to this session, how they speak and behave..."
+                minHeight={96}
+                maxLines={24}
+                className="w-full rounded border border-border-light px-3 py-2 bg-white text-base"
+              />
+            </div>
+            <div className="shrink-0 flex justify-end">
               <Button
                 variant={ButtonVariant.PRIMARY}
                 onClick={handleDescribeNext}
@@ -262,6 +273,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
               <Button
                 variant={ButtonVariant.PRIMARY}
                 onClick={handleCompetencyNext}
+                disabled={!competency?.name}
                 className="h-[40px] px-6"
               >
                 Next
@@ -272,8 +284,10 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
 
         {step === "goals" && (
           <>
-            <h3 className="text-base font-medium text-typography-900">{QUESTIONS.goals}</h3>
-            <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto custom-scrollbar">
+            <h3 className="shrink-0 text-base font-medium text-typography-900">
+              {QUESTIONS.goals}
+            </h3>
+            <div className="min-h-0 flex flex-col gap-2 max-h-[280px] overflow-y-auto custom-scrollbar">
               {isLoadingGoals ? (
                 <p className="text-sm text-typography-700">Loading agent test cases…</p>
               ) : goalOptions.length === 0 ? (
@@ -307,7 +321,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 })
               )}
             </div>
-            <div className="flex justify-end">
+            <div className="shrink-0 flex justify-end">
               <Button
                 variant={ButtonVariant.PRIMARY}
                 onClick={handleGenerate}
