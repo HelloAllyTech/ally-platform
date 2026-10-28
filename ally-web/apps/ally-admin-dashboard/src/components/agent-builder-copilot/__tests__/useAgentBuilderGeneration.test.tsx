@@ -314,7 +314,9 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     for (const request of later) {
       expect(request.establishedContext).toEqual(expected);
     }
-    for (const request of requests.filter(r => STAGE_ONE.includes(String(r.field)))) {
+    for (const request of requests.filter(
+      r => String(r.field) !== "challenge_description" && STAGE_ONE.includes(String(r.field)),
+    )) {
       expect(request.establishedContext).toBeUndefined();
     }
   });
@@ -328,10 +330,16 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     const { result } = renderHook(() => useAgentBuilderGeneration(form));
 
     act(() => result.current.start(INPUTS));
+    // With `persona` held, `challenge_description` (which now depends on it)
+    // should remain "active", while `spoken_languages` (also stage one, but
+    // independent) should finish.
     await waitFor(() =>
-      expect(result.current.tasks.find(t => t.field === "challenge_description")?.status).toBe(
+      expect(result.current.tasks.find(t => t.field === "spoken_languages")?.status).toBe(
         "done",
       ),
+    );
+    expect(result.current.tasks.find(t => t.field === "challenge_description")?.status).toBe(
+      "active",
     );
 
     expect(fieldsRequested()).not.toContain("title");
@@ -355,6 +363,27 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     const backstory = requests.find(r => r.field === "backstory");
     expect(backstory?.establishedContext).toEqual({ challengeDescription: "She minimises." });
     expect(result.current.tasks.find(t => t.field === "backstory")?.status).toBe("done");
+  });
+
+  it("sends the generated persona as context to challenge description generation", async () => {
+    const { form } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start(INPUTS));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    const personaRequest = requests.find(r => r.field === "persona");
+    const challengeRequest = requests.find(r => r.field === "challenge_description");
+
+    // Persona is called with no context
+    expect(personaRequest?.establishedContext).toBeUndefined();
+
+    // Challenge description is called with persona context. The `challengeDescription`
+    // is undefined because it has not been generated yet.
+    expect(challengeRequest?.establishedContext).toEqual({
+      persona: { name: "Suchi", age: 34, gender: "female" },
+      challengeDescription: undefined,
+    });
   });
 
   it("never fires the waiting fields when stopped during the foundation", async () => {

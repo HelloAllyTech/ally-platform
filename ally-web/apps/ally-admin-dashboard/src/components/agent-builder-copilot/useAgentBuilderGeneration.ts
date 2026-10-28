@@ -455,13 +455,39 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         });
       };
 
-      // Stage one fires now; its settle becomes the context stage two reads.
-      for (const { field } of fieldPlan.filter(t => isStageOne(t.field))) {
-        runsByField.set(field, runTask({ key: field, field }));
-      }
-      foundation = Promise.allSettled(
-        [...FOUNDATION_FIELDS].map(field => runsByField.get(field) ?? Promise.resolve()),
-      ).then(() => readEstablishedContext(formMethods));
+      // Stage one fires now. `persona` and `spoken_languages` run in parallel.
+      // `challenge_description` runs after `persona` completes, using its output
+      // as context to ensure consistency. The final `foundation` promise for
+      // stage two waits for all three to settle.
+      const personaRun = runTask({ key: "persona", field: "persona" });
+      runsByField.set("persona", personaRun);
+
+      const challengeDescRun = personaRun.then(() => {
+        if (abortedRef.current) return Promise.resolve();
+        // Read just the persona from the form; challenge_description isn't there
+        // yet. This becomes the context for generating the description.
+        const personaContext = readEstablishedContext(formMethods);
+        return runTask({
+          key: "challenge_description",
+          field: "challenge_description",
+          establishedContext: personaContext,
+        });
+      });
+      runsByField.set("challenge_description", challengeDescRun);
+
+      // `spoken_languages` is independent of the other foundation fields and can
+      // run in parallel with `persona`.
+      runsByField.set(
+        SPOKEN_LANGUAGES_FIELD.field,
+        runTask({ key: SPOKEN_LANGUAGES_FIELD.field, field: SPOKEN_LANGUAGES_FIELD.field }),
+      );
+
+      // The `foundation` promise resolves once both foundation fields have
+      // settled, and its value is the context for all stage-two calls.
+      foundation = Promise.allSettled([personaRun, challengeDescRun]).then(() =>
+        abortedRef.current ? undefined : readEstablishedContext(formMethods),
+      );
+
       for (const { field } of fieldPlan.filter(t => !isStageOne(t.field))) {
         runsByField.set(field, runAfterFoundation({ key: field, field }));
       }
