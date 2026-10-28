@@ -18,7 +18,9 @@ import 'voice_note_recorder.dart';
 
 String _voiceNoteFieldType(SummaryFieldType type) {
   switch (type) {
+    // RN `mapBuiltinType`: Dropdown and SearchableDropdown are both 'select'.
     case SummaryFieldType.dropdown:
+    case SummaryFieldType.searchableDropdown:
       return 'select';
     case SummaryFieldType.multilineText:
       return 'multiline';

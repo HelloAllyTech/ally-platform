@@ -205,4 +205,9 @@ class AppColors {
   static const teal = Color(0xFF4D8779); // colors.teal: nudge feedback divider
   static const paleBlue = Color(0xFFEAFEFE); // colors.paleBlue: nudge markdown text
   static const lightCyan = Color(0xFFDAFFFF); // colors.lightCyan: nudge markdown title
+  // callsummary parity
+  static const whiteTransparent10 = Color(0x1AFFFFFF); // colors.whiteTransparent10: CustomMenuModal overlay
+  static const modalOverlay = Color(0x5E131313); // rgba(19,19,19,0.37): CustomModal overlay
+  static const iceBlue = Color(0xFFEEF8FF); // colors.iceBlue: "transcription deleted" pill
+  static const mediumGray2 = Color(0xFF9E9E9E); // colors.mediumGray2: summary ETA text
 }

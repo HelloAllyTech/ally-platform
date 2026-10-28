@@ -82,7 +82,8 @@ Future<void> checkForActiveChat(WidgetRef ref, GoRouter router) async {
 bool isExemptFromClearingCurrentChat(String location) {
   return isListeningRoute(location) ||
       location.startsWith('/box-breathing') ||
-      location.startsWith('/call-log/');
+      location.startsWith('/call-log/') ||
+      location.startsWith('/call-summary');
 }
 
 /// `true` for the screen family a discovered active chat is already

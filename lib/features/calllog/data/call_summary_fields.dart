@@ -37,7 +37,9 @@ enum SummarySection {
   final bool canEnhance;
 }
 
-enum SummaryFieldType { text, multilineText, inlineText, dropdown }
+/// [searchableDropdown] is RN `FieldType.SearchableDropdown` — the Location
+/// field's places picker (`SearchableLocationDropdown`).
+enum SummaryFieldType { text, multilineText, inlineText, dropdown, searchableDropdown }
 
 class SummaryFieldDef {
   const SummaryFieldDef({
@@ -181,9 +183,8 @@ const summaryFieldDefs = <SummaryFieldDef>[
     key: 'location',
     label: 'Location',
     section: SummarySection.featuresAndDemographics,
-    // RN uses a searchable dropdown sourced from a places list; plain text
-    // entry here instead — no places catalog ported.
-    type: SummaryFieldType.inlineText,
+    // RN `FieldType.SearchableDropdown`: picked from `/places`.
+    type: SummaryFieldType.searchableDropdown,
   ),
   SummaryFieldDef(
     key: 'codeOfConcern',

@@ -273,10 +273,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/call-log/:id',
-        builder: (context, state) {
-          final log = state.extra as CallLogItem;
-          return CallSummaryScreen(log: log);
-        },
+        // `extra` (the list row) is optional, so a deep link or restored
+        // route still opens; `?live=1` is the post-call flow (RN navigates
+        // to CallSummary with no `callId`).
+        builder: (context, state) => CallSummaryScreen(
+          log: state.extra is CallLogItem ? state.extra as CallLogItem : null,
+          chatId: int.tryParse(state.pathParameters['id'] ?? ''),
+          fromLogs: state.uri.queryParameters['live'] != '1',
+        ),
+      ),
+      GoRoute(
+        // RN Breathing's "View call summary" with no current chat.
+        path: '/call-summary',
+        builder: (context, state) => const CallSummaryScreen(fromLogs: false),
       ),
       GoRoute(
         path: '/community',

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/settings/settings_repository.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
@@ -41,7 +42,8 @@ final _allSummaryFieldKeys = [for (final f in summaryFieldDefs) f.key];
 
 List<Override> _editorOverrides({List<String>? visibleFields}) => [
   summaryVisibleFieldsProvider.overrideWith((ref) async => visibleFields ?? _allSummaryFieldKeys),
-  userPermissionsProvider.overrideWith((ref) async => const <String>[]),
+  // VIEW_MESSAGES: RN only shows the Transcript tab with it.
+  userPermissionsProvider.overrideWith((ref) async => const <String>[UserPermissions.viewMessages]),
   currentUserProvider.overrideWith((ref) async => _user(7)),
 ];
 
@@ -184,7 +186,9 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => repository.updateCallSummary(1001, {'sessionSummary': 'Edited summary text'})).called(1);
-      expect(find.text('Call summary updated successfully'), findsOneWidget);
+      // RN's global Save shows no success toast (only the feedback popup,
+      // which needs EDIT_SUMMARY_FEEDBACK this user lacks).
+      expect(find.text('Call summary updated successfully'), findsNothing);
 
       // After a successful save, Save disappears again (no more pending
       // changes) until something else is edited.

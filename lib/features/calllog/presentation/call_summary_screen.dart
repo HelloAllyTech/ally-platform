@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -7,7 +8,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
@@ -17,7 +17,6 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/review_type_chip.dart';
-import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../../account/data/account_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/scribe_reviews_repository.dart';
@@ -25,6 +24,16 @@ import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
 import '../data/summary_form_state.dart';
+import '../../../core/chat/current_chat_provider.dart';
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
+import '../../reviews/presentation/review_formatting.dart';
+import '../../simulations/presentation/widgets/feedback/feedback_popup.dart';
+import 'call_summary_actions.dart';
+import 'call_summary_menu.dart';
+import 'call_transcript_tab.dart';
+import 'searchable_location_dropdown.dart';
+import 'summary_generation_progress.dart';
 import 'voice_note_section.dart';
 
 /// Mirrors ally-mobile (React Native)'s `PRIVACY_POLICY_URL`.
@@ -197,39 +206,47 @@ const _fieldOptionLabelKeys = <String, String>{
   'Difficult to Understand': 'summary.options.speech.difficultToUnderstand',
 };
 
-/// Scoped port of ally-mobile (React Native)'s `CallSummaryScreen` — the
-/// full structured clinical documentation form (`summaryFieldDefs`,
-/// ported from `src/constants/summary.ts`'s `SECTION_LIST`/`summaryFields`:
-/// demographics, flow, key concerns, observations, assessment, intake/risk
-/// screening, ongoing risks, and more), editable and saved back via
-/// `updateCallSummary`, plus the real message-by-message transcript.
+/// Port of ally-mobile (React Native)'s `CallSummaryScreen` — the
+/// structured clinical documentation form (`summaryFieldDefs`, ported from
+/// `src/constants/summary.ts`), editable and saved back via
+/// `updateCallSummary`, plus the call's transcript.
 ///
-/// The header's share toggle (creating/toggling the visibility of a scribe
-/// review — a genuinely separate backend resource from simulation reviews,
-/// see `ScribeReviewsRepository`'s own doc comment), 3-dot menu
-/// (rename/data-policy-link/archive), and the floating "view review"
-/// button (gated the same way RN's `useHideReviewDetails` does: a private
-/// review with no threads or reactions stays hidden) are now wired too.
+/// Opened two ways, like RN: from the call log ([fromLogs], RN's `callId`
+/// param) or right after a live call from Box Breathing (RN navigates with
+/// no params; [chatId] then comes from the current chat). The live flow
+/// holds the "Setting up" state for 3s once the summary lands, prompts for
+/// summary feedback on back at once, and leaves by resetting to the Call
+/// Log tab (`useCallSummaryActions.handleGoBack`).
 ///
-/// Not ported: AI-enhance per section, export (needs platform storage
-/// permissions + a file-save flow — a different, device-dependent kind of
-/// risk from the rest of this screen), delete (RN reaches it from inside
-/// the rename modal rather than the menu itself, and it's destructive
-/// enough to deserve its own careful pass), tag *ratings* (as opposed to
-/// tag names, which are editable here), the Ask-AI chat, and the
-/// separately backend-configurable "custom fields" system.
+/// The 3-dot menu ports RN's `SummaryModals` (`CustomMenuModal`: rename,
+/// export, data policy, archive/unarchive). The header share toggle, the
+/// floating "view review" button (`useHideReviewDetails`), generation
+/// progress with notes (`SummaryGenerationProgress`/`AddNotesSection`) and
+/// the summary-feedback popup are wired as in RN.
 class CallSummaryScreen extends ConsumerStatefulWidget {
   const CallSummaryScreen({
     super.key,
-    required this.log,
+    this.log,
+    this.chatId,
+    this.fromLogs = true,
     this.now = DateTime.now,
   });
 
-  final CallLogItem log;
+  /// The call-log row this was opened from, when there is one.
+  final CallLogItem? log;
+
+  /// The chat to show; falls back to [log]'s id. Null only when the live
+  /// flow has no current chat (RN then shows the generating state forever).
+  final int? chatId;
+
+  /// RN `isCallLogSummaryFlow` (`Boolean(callId)`).
+  final bool fromLogs;
 
   /// Injectable clock, so tests can fast-forward past the 30s
   /// back-press-feedback-prompt threshold without a real wall-clock wait.
   final DateTime Function() now;
+
+  int? get resolvedChatId => chatId ?? log?.id;
 
   @override
   ConsumerState<CallSummaryScreen> createState() => _CallSummaryScreenState();
@@ -238,6 +255,21 @@ class CallSummaryScreen extends ConsumerStatefulWidget {
 class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
   late final DateTime _mountTime;
   bool _showFeedbackPopup = false;
+
+  /// RN `useSummaryState.canShowSummary`: true from the start when opened
+  /// from the logs; in the live flow it flips 3s after the summary arrives.
+  late bool _canShowSummary = widget.fromLogs;
+  Timer? _canShowSummaryTimer;
+
+  /// RN latches these for the screen's lifetime (`setIsSummaryAvailable`
+  /// never resets; `isManualNoteRef`), so the first save of a manual note
+  /// doesn't turn it into an AI summary that prompts for feedback.
+  bool _isSummaryAvailable = false;
+  bool _isManualNote = false;
+
+  /// RN `useCallSummaryActions.summaryName` — kept locally so a rename
+  /// shows at once.
+  String? _summaryName;
 
   /// Mirrors RN's `useHideReviewDetails`'s `hideReviewDetails` state
   /// (initial value `true`, same as there) — whether the floating "view
@@ -249,6 +281,10 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
   /// review's identity or privacy actually changes, not on every rebuild.
   String? _hideReviewDetailsCheckedFor;
 
+  int get _chatId => widget.resolvedChatId!;
+
+  CallSummaryActions get _actions => CallSummaryActions(ref, _chatId);
+
   @override
   void initState() {
     super.initState();
@@ -256,6 +292,24 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
     // be the real mount moment, not whenever `_mountTime` happens to be
     // first read (which is only on back-press, long after mount).
     _mountTime = widget.now();
+    _summaryName = widget.log?.sessionName;
+  }
+
+  @override
+  void dispose() {
+    _canShowSummaryTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onSummary(CallSummaryDetails summary) {
+    if (summary.summaryName != null) _summaryName = summary.summaryName;
+    if (summary.isSummaryAvailable) _isSummaryAvailable = true;
+    if (summary.isManualNote) _isManualNote = true;
+    if (_isSummaryAvailable && !_canShowSummary && _canShowSummaryTimer == null) {
+      _canShowSummaryTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _canShowSummary = true);
+      });
+    }
   }
 
   /// Mirrors RN's `useHideReviewDetails`: a non-private review's button is
@@ -267,16 +321,12 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
       return;
     }
     try {
-      final threads = await ref
-          .read(scribeReviewsRepositoryProvider)
-          .getThreads(reviewId, limit: 1);
+      final threads = await ref.read(scribeReviewsRepositoryProvider).getThreads(reviewId, limit: 1);
       if (threads.threads.isNotEmpty) {
         if (mounted) setState(() => _hideReviewDetails = false);
         return;
       }
-      final reactions = await ref
-          .read(scribeReactionsRepositoryProvider)
-          .getReactionsCount(reviewId);
+      final reactions = await ref.read(scribeReactionsRepositoryProvider).getReactionsCount(reviewId);
       if (mounted) setState(() => _hideReviewDetails = reactions.isEmpty);
     } catch (_) {
       // RN only logs this (console.error) and leaves the prior value in
@@ -284,215 +334,294 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
     }
   }
 
+  /// RN `handleRefresh` on every re-focus after the first (back from the
+  /// share or review screens).
+  Future<void> _pushAndRefresh(Future<void> navigation) async {
+    await navigation;
+    if (mounted) ref.invalidate(callSummaryProvider(_chatId));
+  }
+
   /// Mirrors RN's `handleShareToggle`: turning the switch ON when there's
   /// no review yet, or one was created within the last 10 minutes, opens
-  /// the share/edit-note screen instead of silently flipping a status (a
-  /// very-fresh review's note is still worth reviewing before it goes
-  /// live). Any other toggle — ON for an older review, or OFF at all —
-  /// just flips the review's visibility directly.
+  /// the share/edit-note screen (RN `handleShareForReview`) instead of
+  /// silently flipping a status. Any other toggle — ON for an older review,
+  /// or OFF at all — just flips the review's visibility directly.
   Future<void> _handleShareToggle(bool isEnabled, CallSummaryDetails summary) async {
     final reviewId = summary.reviewId;
     final createdAt = summary.reviewCreatedAt;
     final recentlyCreated = createdAt != null && !_isMinutesPassed(createdAt);
     if (isEnabled && (reviewId == null || recentlyCreated)) {
-      await context.push<void>(
-        '/share-for-review/${widget.log.id}',
-        extra: (
-          reviewId: reviewId,
-          note: summary.reviewNote,
-          contextDateTime: null,
-          contextDuration: null,
-          isScribe: true,
-          contextTitle: widget.log.sessionName,
+      final title = _summaryName?.isNotEmpty ?? false
+          ? _summaryName
+          : ref.tr('review.feedCard.sharedSimulationForReview');
+      await _pushAndRefresh(
+        context.push<void>(
+          '/share-for-review/$_chatId',
+          extra: (
+            reviewId: reviewId,
+            note: summary.reviewNote,
+            contextDateTime: summary.startTime ?? summary.createdAt,
+            contextDuration: formatReviewDuration('${summary.callDuration ?? 0}'),
+            isScribe: true,
+            contextTitle: title,
+          ),
         ),
       );
-      ref.invalidate(callSummaryProvider(widget.log.id));
       return;
     }
     if (reviewId == null) return;
     try {
       await ref
           .read(scribeReviewsRepositoryProvider)
-          .updateReviewStatus(
-            reviewId: reviewId,
-            status: isEnabled ? 'IN_REVIEW' : 'HIDDEN',
-          );
-      if (mounted) {
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('simulationPage.privacyUpdated'))),
-        );
-      }
+          .updateReviewStatus(reviewId: reviewId, status: isEnabled ? 'IN_REVIEW' : 'HIDDEN');
+      if (mounted) showCallSummaryToast(ref.tr('simulationPage.privacyUpdated'));
     } catch (_) {
-      if (mounted) {
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('simulationPage.errorUpdatePrivacy'))),
-        );
-      }
+      if (mounted) showCallSummaryToast(ref.tr('simulationPage.errorUpdatePrivacy'));
     } finally {
-      ref.invalidate(callSummaryProvider(widget.log.id));
+      ref.invalidate(callSummaryProvider(_chatId));
     }
   }
 
-  Future<void> _showRenameDialog(String currentName) async {
-    final controller = TextEditingController(text: currentName);
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(ref.t('callSummary.info.rename')),
-        content: TextField(controller: controller, autofocus: true),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(ref.t('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: Text(ref.t('common.save')),
-          ),
-        ],
-      ),
+  /// RN `DeleteRenameModal` 'rename' (`CustomModal` with an input) →
+  /// `handleSummaryNameChange`.
+  Future<void> _showRenameModal() async {
+    final newName = await CallSummaryTextModal.show(
+      context,
+      title: ref.tr('callSummary.info.rename'),
+      primaryLabel: ref.tr('callSummary.info.confirm'),
+      secondaryLabel: ref.tr('callSummary.info.cancel'),
+      initialValue: _summaryName ?? '',
+      showInput: true,
     );
-    if (newName == null || newName.isEmpty) return;
-    try {
-      await ref.read(callLogRepositoryProvider).updateSummaryName(widget.log.id, newName);
-      ref.invalidate(callSummaryProvider(widget.log.id));
-      if (mounted) {
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('callSummary.info.summaryNameUpdateSuccess'))),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('callSummary.info.summaryNameUpdateFailed'))),
-        );
-      }
-    }
+    if (newName == null) return;
+    final renamed = await _actions.rename(newName);
+    if (!mounted) return;
+    if (renamed) setState(() => _summaryName = newName);
+    ref.invalidate(callSummaryProvider(_chatId));
   }
 
+  /// RN `ArchiveActionModal` → `handleArchive`.
   Future<void> _handleArchiveToggle(bool currentlyArchived) async {
     final action = currentlyArchived ? 'unarchive' : 'archive';
     final confirmed = await ConfirmationModal.show(
       context,
-      title: ref.t('callSummary.archiveActionModal.$action.header.title'),
-      subtitle: ref.t('callSummary.archiveActionModal.$action.header.subtitle'),
-      description: ref.t('callSummary.archiveActionModal.$action.description'),
-      confirmLabel: ref.t('callSummary.archiveActionModal.$action.confirm'),
-      cancelLabel: ref.t('callSummary.archiveActionModal.$action.cancel'),
+      title: ref.tr('callSummary.archiveActionModal.$action.header.title'),
+      subtitle: ref.tr('callSummary.archiveActionModal.$action.header.subtitle'),
+      description: ref.tr('callSummary.archiveActionModal.$action.description'),
+      confirmLabel: ref.tr('callSummary.archiveActionModal.$action.confirm'),
+      cancelLabel: ref.tr('callSummary.archiveActionModal.$action.cancel'),
       confirmVariant: currentlyArchived ? AppButtonVariant.primary : AppButtonVariant.destructive,
     );
     if (confirmed != true) return;
-    try {
-      await ref
-          .read(callLogRepositoryProvider)
-          .archiveCallLog(widget.log.id, archive: !currentlyArchived);
-      ref.invalidate(callSummaryProvider(widget.log.id));
-      if (mounted) {
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('callSummary.archiveActionModal.$action.success'))),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text(ref.tr('callSummary.archiveActionModal.$action.failed'))),
-        );
-      }
+    await _actions.archive(archive: !currentlyArchived);
+    ref.invalidate(callSummaryProvider(_chatId));
+  }
+
+  /// RN `DeleteRenameModal` 'delete' → `handleDelete` (back after 2s).
+  /// RN's menu has no entry that opens it; kept for parity of behaviour.
+  // ignore: unused_element
+  Future<void> _showDeleteModal() async {
+    final confirmed = await CallSummaryTextModal.show(
+      context,
+      title: ref.tr('callSummary.customMenu.delete'),
+      primaryLabel: ref.tr('callSummary.customMenu.delete'),
+      secondaryLabel: ref.tr('callSummary.info.cancel'),
+      primaryTextColor: AppColors.brightRed,
+      description: ref.tr('callSummary.customMenu.deleteConfirmation'),
+    );
+    if (confirmed == null) return;
+    if (await _actions.delete()) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (mounted) context.pop();
     }
   }
 
-  /// Mirrors RN's `onBackNavigation` — a summary that's already visible,
-  /// generated by AI (not a hand-filled manual note), without feedback
-  /// already given, held by someone with edit permission, and at least 30s
-  /// into viewing it, re-surfaces a rating prompt instead of leaving
-  /// silently. Everything else just leaves.
+  /// RN `SummaryModals`' `customMenuOptions`.
+  void _showMenu(CallSummaryDetails? summary) {
+    final isArchived = summary?.isArchived ?? false;
+    CallSummaryMenu.show(context, [
+      CallSummaryMenuOption(
+        key: const Key('call-summary-menu-rename'),
+        label: ref.tr('callSummary.info.rename'),
+        iconAsset: 'assets/icons/edit.svg',
+        onPress: _showRenameModal,
+      ),
+      if (_isSummaryAvailable)
+        CallSummaryMenuOption(
+          key: const Key('call-summary-menu-export'),
+          label: ref.tr('callSummary.customMenu.export'),
+          iconAsset: 'assets/icons/export.svg',
+          onPress: _actions.export,
+        ),
+      CallSummaryMenuOption(
+        key: const Key('call-summary-menu-data-policy'),
+        label: ref.tr('callSummary.customMenu.dataPolicy'),
+        iconAsset: 'assets/icons/contract.svg',
+        onPress: () => launchUrl(Uri.parse(_privacyPolicyUrl), mode: LaunchMode.externalApplication),
+      ),
+      CallSummaryMenuOption(
+        key: const Key('call-summary-menu-archive'),
+        label: ref.tr(isArchived ? 'callSummary.customMenu.unarchive' : 'callSummary.customMenu.archive'),
+        iconAsset: isArchived ? 'assets/icons/unarchive.svg' : 'assets/icons/archive.svg',
+        onPress: () => _handleArchiveToggle(isArchived),
+      ),
+    ]);
+  }
+
+  /// RN `useCallSummaryActions.handleGoBack`: back from the logs; the live
+  /// flow resets to the Call Log tab and clears the current chat.
+  void _handleGoBack() {
+    if (!mounted) return;
+    if (widget.fromLogs) {
+      context.pop();
+    } else {
+      _goToCallLog();
+    }
+  }
+
+  /// RN `onViewCallLogs` ("I'll check later") and the live-flow go-back.
+  void _goToCallLog() {
+    ref.read(currentChatProvider.notifier).set(null);
+    goToHomeTab(GoRouter.of(context), kTabCallLog);
+  }
+
+  bool get _hasEditFeedbackPermission =>
+      (ref.read(userPermissionsProvider).value ?? const <String>[]).contains(UserPermissions.editSummaryFeedback);
+
+  bool get _hasFeedbackAlready => ref.read(callSummaryProvider(_chatId)).value?.isSummaryFeedbackAdded ?? false;
+
+  /// Mirrors RN's `onBackNavigation`: an AI summary that's on screen, not
+  /// rated yet, with EDIT_SUMMARY_FEEDBACK, prompts for feedback when the
+  /// counsellor has spent 30s on it or came straight from the call.
+  /// Manual notes never prompt.
   Future<void> _handleBackPress() async {
-    final summary = ref.read(callSummaryProvider(widget.log.id)).value;
-    final permissions =
-        ref.read(userPermissionsProvider).value ?? const <String>[];
+    if (widget.resolvedChatId == null) return _handleGoBack();
+    final summaryGenerated = _isSummaryAvailable && _canShowSummary;
+    if (!summaryGenerated || _isManualNote) return _handleGoBack();
     final elapsed = widget.now().difference(_mountTime);
-    final shouldPrompt =
-        summary != null &&
-        summary.isSummaryAvailable &&
-        !summary.isManualNote &&
-        !summary.isSummaryFeedbackAdded &&
-        permissions.contains(UserPermissions.editSummaryFeedback) &&
-        elapsed >= const Duration(seconds: 30);
-    if (shouldPrompt) {
+    if ((elapsed >= const Duration(seconds: 30) || !widget.fromLogs) &&
+        !_hasFeedbackAlready &&
+        _hasEditFeedbackPermission) {
       setState(() => _showFeedbackPopup = true);
       return;
     }
-    if (mounted) context.pop();
+    _handleGoBack();
   }
 
-  void _dismissFeedback() {
-    setState(() => _showFeedbackPopup = false);
-    context.pop();
+  /// RN `onSaveButtonPress`: after the global Save, ask for feedback on an
+  /// AI summary that hasn't been rated.
+  void _onSaveButtonPress() {
+    if (!_hasFeedbackAlready && _hasEditFeedbackPermission && !_isManualNote) {
+      setState(() => _showFeedbackPopup = true);
+    }
   }
 
-  Future<void> _submitFeedback(int rating, String comment) async {
+  /// RN `onSubmitSummaryFeedback`: toast either way, close, go back.
+  Future<void> _submitFeedback(FeedbackValue value, List<String> issues) async {
     try {
       await ref
           .read(callLogRepositoryProvider)
           .addSummaryFeedback(
-            chatId: widget.log.id,
-            rating: rating,
-            comment: comment,
+            chatId: _chatId,
+            rating: value.rating,
+            comment: value.comment,
+            issues: issues,
+            tags: value.tags,
           );
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(ref.tr('callFeedback.submitted'))),
-      );
+      showCallSummaryToast(ref.tr('callFeedback.submitted'));
     } catch (_) {
-      rootScaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: Text(
-            ref.tr('summaryLoading.summaryFeedbackSubmittedFailed'),
+      showCallSummaryToast(ref.tr('summaryLoading.summaryFeedbackSubmittedFailed'));
+    }
+    if (!mounted) return;
+    setState(() => _showFeedbackPopup = false);
+    _handleGoBack();
+  }
+
+  Widget _buildHeaderTitle(BuildContext context) {
+    // "Session" (regular) + "Summary" (bold italic), then `#summaryName`
+    // or `-` (RN `Header.tsx`).
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.highEmphasis),
+            children: [
+              TextSpan(text: '${ref.t('callSummary.header.title')} '),
+              TextSpan(
+                text: ref.t('callSummary.header.subtitle'),
+                style: const TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
         ),
-      );
-    }
-    if (mounted) {
-      setState(() => _showFeedbackPopup = false);
-      context.pop();
-    }
+        Text(
+          (_summaryName?.isNotEmpty ?? false) ? '#$_summaryName' : '-',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.mediumEmphasis),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(callSummaryProvider(widget.log.id));
-    final messagesAsync = ref.watch(chatMessagesProvider(widget.log.id));
+    final chatId = widget.resolvedChatId;
     // Warms the cache so `_handleBackPress`'s `ref.read` (fired once, on
     // back-press) sees an already-resolved value instead of the still-
     // loading state a cold first `read` of a `FutureProvider` returns.
     final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
+    final AsyncValue<CallSummaryDetails?> summaryAsync = chatId == null
+        ? const AsyncData<CallSummaryDetails?>(null)
+        : ref.watch(callSummaryProvider(chatId));
 
-    // One-time-per-identity visibility check for the floating "view review"
-    // button — mirrors RN's `useEffect([reviewId, isPrivate, ...])` in
-    // `useHideReviewDetails`.
-    ref.listen(callSummaryProvider(widget.log.id), (previous, next) {
-      final summary = next.value;
-      final reviewId = summary?.reviewId;
-      if (reviewId == null) return;
-      final isPrivate = summary!.reviewStatus == 'HIDDEN';
-      final key = '$reviewId|$isPrivate';
-      if (_hideReviewDetailsCheckedFor == key) return;
-      _hideReviewDetailsCheckedFor = key;
-      _checkHideReviewDetails(reviewId, isPrivate);
-    });
+    if (chatId != null) {
+      // One-time-per-identity visibility check for the floating "view
+      // review" button — RN's `useEffect([reviewId, isPrivate, ...])`.
+      ref.listen(callSummaryProvider(chatId), (previous, next) {
+        final summary = next.value;
+        final reviewId = summary?.reviewId;
+        if (reviewId == null) return;
+        final isPrivate = summary!.reviewStatus == 'HIDDEN';
+        final key = '$reviewId|$isPrivate';
+        if (_hideReviewDetailsCheckedFor == key) return;
+        _hideReviewDetailsCheckedFor = key;
+        _checkHideReviewDetails(reviewId, isPrivate);
+      });
+    }
 
     final summary = summaryAsync.value;
+    if (summary != null) _onSummary(summary);
+    final error = summaryAsync.error;
+    final isUnauthorized = error is DioException && error.response?.statusCode == 403;
+    // RN `showTranscriptTab`: a chat, not a 403, and VIEW_MESSAGES.
+    final showTranscriptTab =
+        chatId != null && !isUnauthorized && permissions.contains(UserPermissions.viewMessages);
     final showShareSwitch =
+        _isSummaryAvailable &&
         summary != null &&
-        summary.isSummaryAvailable &&
         summary.summaryStatus == 'SUCCESS' &&
         summary.hasTranscript &&
         !summary.isArchived;
     final hasScribeReviewPermission = permissions.contains(UserPermissions.viewScribeReview);
     final showReviewButton =
-        summary?.reviewId != null &&
-        !_hideReviewDetails &&
-        hasScribeReviewPermission &&
-        !(summary?.isArchived ?? false);
+        summary?.reviewId != null && !_hideReviewDetails && hasScribeReviewPermission && !(summary?.isArchived ?? false);
+
+    final summaryTab = _SummaryTab(
+      chatId: chatId,
+      summaryAsync: summaryAsync,
+      isLiveFlow: !widget.fromLogs || ref.watch(currentChatProvider) != null,
+      canShowSummary: _canShowSummary,
+      isSummaryAvailable: _isSummaryAvailable,
+      isManualNote: _isManualNote,
+      alwaysShowSave: !widget.fromLogs,
+      isFeedbackPopupVisible: _showFeedbackPopup,
+      onSaveButtonPress: _onSaveButtonPress,
+      onCheckLater: _goToCallLog,
+      onGoBack: _handleGoBack,
+    );
 
     return PopScope(
       canPop: false,
@@ -500,64 +629,22 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
         if (!didPop) _handleBackPress();
       },
       child: DefaultTabController(
-        length: 2,
+        key: ValueKey(showTranscriptTab),
+        length: showTranscriptTab ? 2 : 1,
         child: Scaffold(
           appBar: AppBar(
-            // Mirrors RN's `Header.tsx`: a plain white header, not the blue
-            // chrome this screen inherited from Flutter's global
-            // `AppBarTheme` default. RN never uses a blue header anywhere —
-            // `RootNavigator` sets `headerShown: false` globally and every
-            // screen builds its own white custom header instead.
+            // RN `Header.tsx`: a plain white header.
             backgroundColor: Colors.white,
             foregroundColor: AppColors.highEmphasis,
             elevation: 0,
-            // `PopScope(canPop: false)` makes `ModalRoute.canPop` report
-            // false, which would otherwise make `AppBar` hide its
-            // auto-implied back button entirely (it assumes "can't pop" ==
-            // "nothing to go back to") — an explicit `leading` keeps the
-            // back arrow visible and routes it through the same
-            // interception as the system back gesture.
+            // `PopScope(canPop: false)` hides the implied back button, so
+            // an explicit one routes through the same interception.
             leading: IconButton(
               icon: const BackButtonIcon(),
               tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               onPressed: _handleBackPress,
             ),
-            // "Session" (regular) + "Summary" (bold italic) title, then the
-            // real session code as a muted subtitle — `widget.log.sessionName`
-            // is RN's `callInfo.summaryName` (e.g. "CALL-1774-2026-07-16"),
-            // prefixed with "#" exactly like `Header.tsx`'s
-            // `summaryName ? '#'+summaryName : '-'`.
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(color: AppColors.highEmphasis),
-                    children: [
-                      TextSpan(text: '${ref.t('callSummary.header.title')} '),
-                      TextSpan(
-                        text: ref.t('callSummary.header.subtitle'),
-                        style: const TextStyle(
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  widget.log.sessionName != null
-                      ? '#${widget.log.sessionName}'
-                      : '-',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: AppColors.mediumEmphasis),
-                ),
-              ],
-            ),
+            title: _buildHeaderTitle(context),
             actions: [
               if (showShareSwitch)
                 Row(
@@ -570,56 +657,28 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
                     ),
                   ],
                 ),
-              if (summary != null)
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'rename':
-                        _showRenameDialog(widget.log.sessionName ?? '');
-                      case 'dataPolicy':
-                        launchUrl(
-                          Uri.parse(_privacyPolicyUrl),
-                          mode: LaunchMode.externalApplication,
-                        );
-                      case 'archive':
-                        _handleArchiveToggle(summary.isArchived);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'rename',
-                      child: Text(ref.t('callSummary.info.rename')),
-                    ),
-                    PopupMenuItem(
-                      value: 'dataPolicy',
-                      child: Text(ref.t('callSummary.customMenu.dataPolicy')),
-                    ),
-                    PopupMenuItem(
-                      value: 'archive',
-                      child: Text(
-                        ref.t(
-                          summary.isArchived
-                              ? 'callSummary.customMenu.unarchive'
-                              : 'callSummary.customMenu.archive',
-                        ),
-                      ),
-                    ),
-                  ],
+              if (chatId != null)
+                IconButton(
+                  key: const Key('call-summary-menu'),
+                  icon: SvgPicture.asset('assets/icons/threeDots.svg'),
+                  onPressed: () => _showMenu(summary),
                 ),
             ],
             bottom: TabBar(
               tabs: [
                 Tab(text: ref.t('postCallSummary.header.summary')),
-                Tab(text: ref.t('summary.tabs.transcript')),
+                if (showTranscriptTab) Tab(text: ref.t('summary.tabs.transcript')),
               ],
             ),
           ),
           floatingActionButton: showReviewButton
               ? FloatingActionButton(
                   key: const Key('call-summary-view-review'),
-                  onPressed: () => context.push(
-                    '/reviews/${summary!.reviewId}',
-                    extra: ReviewType.scribe,
+                  onPressed: () => _pushAndRefresh(
+                    context.push(
+                      '/reviews/${summary!.reviewId}',
+                      extra: ReviewType.scribe,
+                    ),
                   ),
                   child: const Icon(Icons.comment_outlined),
                 )
@@ -628,18 +687,25 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
             children: [
               TabBarView(
                 children: [
-                  _SummaryTab(log: widget.log, summaryAsync: summaryAsync),
-                  _TranscriptTab(
-                    messagesAsync: messagesAsync,
-                    counselorId: summaryAsync.value?.counselorId,
-                  ),
+                  summaryTab,
+                  if (showTranscriptTab)
+                    CallTranscriptTab(
+                      messagesAsync: ref.watch(chatMessagesProvider(chatId)),
+                      summary: summary,
+                    ),
                 ],
               ),
               if (_showFeedbackPopup)
                 Positioned.fill(
-                  child: _SummaryFeedbackPopup(
-                    onDismiss: _dismissFeedback,
-                    onSubmit: _submitFeedback,
+                  child: FeedbackPopup(
+                    title: ref.t('callFeedback.rateTitle'),
+                    placeholder: ref.t('callFeedback.suggestionPlaceholder'),
+                    note: ref.t('callFeedback.rateSubtitle'),
+                    showChips: true,
+                    // RN `hideSummaryFeedbackPopup`: just closes.
+                    onClose: () => setState(() => _showFeedbackPopup = false),
+                    onSubmit: (value) => _submitFeedback(value, const []),
+                    onSubmitWithIssues: _submitFeedback,
                   ),
                 ),
             ],
@@ -651,10 +717,37 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
 }
 
 class _SummaryTab extends ConsumerStatefulWidget {
-  const _SummaryTab({required this.log, required this.summaryAsync});
+  const _SummaryTab({
+    required this.chatId,
+    required this.summaryAsync,
+    required this.isLiveFlow,
+    required this.canShowSummary,
+    required this.isSummaryAvailable,
+    required this.isManualNote,
+    required this.alwaysShowSave,
+    required this.isFeedbackPopupVisible,
+    required this.onSaveButtonPress,
+    required this.onCheckLater,
+    required this.onGoBack,
+  });
 
-  final CallLogItem log;
-  final AsyncValue<CallSummaryDetails> summaryAsync;
+  final int? chatId;
+  final AsyncValue<CallSummaryDetails?> summaryAsync;
+
+  /// RN `currentChat` in `SummaryGenerationProgress`: all steps vs the tail.
+  final bool isLiveFlow;
+
+  /// RN `canShowSummary` / latched `isSummaryAvailable` / `isManualNote`.
+  final bool canShowSummary;
+  final bool isSummaryAvailable;
+  final bool isManualNote;
+
+  /// RN `shouldShowSaveButton = (!callId || hasChanges) && !popupVisible`.
+  final bool alwaysShowSave;
+  final bool isFeedbackPopupVisible;
+  final VoidCallback onSaveButtonPress;
+  final VoidCallback onCheckLater;
+  final VoidCallback onGoBack;
 
   @override
   ConsumerState<_SummaryTab> createState() => _SummaryTabState();
@@ -669,6 +762,28 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   CallSummaryDetails? _seededFrom;
   bool _isSaving = false;
   bool _isRetrying = false;
+  Timer? _notesDebounce;
+
+  int get _chatId => widget.chatId!;
+
+  @override
+  void dispose() {
+    _notesDebounce?.cancel();
+    super.dispose();
+  }
+
+  /// RN `useSummaryState.handleNoteChange`: `POST /chats/:id/notes`, 1s
+  /// after the last keystroke; failures are only logged.
+  void _onNoteChange(String text) {
+    _notesDebounce?.cancel();
+    final chatId = widget.chatId;
+    if (chatId == null) return;
+    _notesDebounce = Timer(const Duration(seconds: 1), () {
+      ref.read(callLogRepositoryProvider).updateNotes(chatId, text).catchError((Object error) {
+        debugPrint('Error updating notes: $error');
+      });
+    });
+  }
   String? _error;
 
   // Per-section accordion/edit-mode state — mirrors RN's
@@ -706,7 +821,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
 
   void _seedIfNeeded(CallSummaryDetails summary) {
     if (identical(_seededFrom, summary)) return;
-    _form.seed(summary.fields, chatId: widget.log.id);
+    _form.seed(summary.fields, chatId: _chatId);
     _seededFrom = summary;
   }
 
@@ -810,7 +925,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       _customFieldsSeededForChatId = null;
       _customValuesBeforeReseed = null;
     }
-    final key = '${widget.log.id}';
+    final key = '$_chatId';
     if (_customFieldsSeededForChatId == key) return;
     _customFieldValues
       ..clear()
@@ -823,8 +938,8 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// custom values server-side, so seed again from the refetched list.
   List<CustomFieldValue>? _customValuesBeforeReseed;
   void _reseedCustomFields() {
-    _customValuesBeforeReseed = ref.read(customFieldValuesProvider(widget.log.id)).value ?? const [];
-    ref.invalidate(customFieldValuesProvider(widget.log.id));
+    _customValuesBeforeReseed = ref.read(customFieldValuesProvider(_chatId)).value ?? const [];
+    ref.invalidate(customFieldValuesProvider(_chatId));
   }
 
   void _onCustomFieldChanged(String fieldDefinitionId, String? value) {
@@ -848,7 +963,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         _form.set(entry.key, entry.value);
       }
     });
-    await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, updates);
+    await ref.read(callLogRepositoryProvider).updateCallSummary(_chatId, updates);
     if (mounted) setState(() => _form.markSaved(updates));
   }
 
@@ -873,9 +988,9 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     // `markFormDataSaved` of the written keys only).
     final patch = _form.pendingPatch();
     try {
-      await ref.read(callLogRepositoryProvider).updateCallSummary(widget.log.id, patch);
+      await ref.read(callLogRepositoryProvider).updateCallSummary(_chatId, patch);
       if (mounted) setState(() => _form.markSaved(patch));
-      ref.invalidate(callSummaryProvider(widget.log.id));
+      ref.invalidate(callSummaryProvider(_chatId));
       return true;
     } catch (e) {
       if (mounted) {
@@ -899,7 +1014,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     if (changed.isEmpty) return true;
     try {
       await ref.read(customFieldsRepositoryProvider).upsertValues(
-        widget.log.id,
+        _chatId,
         [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
       );
       if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
@@ -914,20 +1029,17 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     }
   }
 
+  /// RN `onSubmitButtonPress`: `handleSubmit` (a no-op without changes —
+  /// the live flow shows Save regardless), then `onSaveButtonPress`.
   Future<void> _save() async {
-    if (!_hasDirtyChanges) return;
     setState(() {
       _isSaving = true;
       _error = null;
     });
-    final succeeded = await _saveBuiltinFields();
+    await _saveBuiltinFields();
     if (mounted) {
-      if (succeeded) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ref.tr('callSummary.info.summaryUpdatedSuccess'))),
-        );
-      }
       setState(() => _isSaving = false);
+      widget.onSaveButtonPress();
     }
   }
 
@@ -936,7 +1048,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     try {
       final result = await ref
           .read(callLogRepositoryProvider)
-          .retrySummary(widget.log.id);
+          .retrySummary(_chatId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -955,17 +1067,64 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         );
       }
     }
-    ref.invalidate(callSummaryProvider(widget.log.id));
+    ref.invalidate(callSummaryProvider(_chatId));
+    try {
+      await ref.read(callSummaryProvider(_chatId).future);
+    } catch (_) {
+      // Surfaced via the provider's own AsyncError state.
+    }
     if (mounted) setState(() => _isRetrying = false);
   }
 
+  /// RN's generating layout: `SummaryGenerationProgress` + `AddNotesSection`
+  /// in a scroll view, and the footer buttons (hidden while the feedback
+  /// popup is up).
+  Widget _buildGenerating(CallSummaryDetails? summary) {
+    final status = summary?.summaryStatus;
+    final hasFailed = status == 'FAILED';
+    final settingUp = widget.isSummaryAvailable && !widget.canShowSummary;
+    final busy = settingUp || _isRetrying || widget.summaryAsync.isLoading;
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+            child: Column(
+              children: [
+                SummaryGenerationProgress(
+                  summaryStatus: status,
+                  isLiveFlow: widget.isLiveFlow,
+                  callDurationSeconds: summary?.callDuration ?? 0,
+                ),
+                AddNotesSection(savedNotes: summary?.notes ?? '', onNoteChange: _onNoteChange),
+              ],
+            ),
+          ),
+        ),
+        if (!widget.isFeedbackPopupVisible)
+          SummaryProgressButtons(
+            summaryStatus: status,
+            isBusy: busy,
+            label: settingUp
+                ? ref.t('summaryLoading.settingUp')
+                : hasFailed
+                ? ref.t('common.retry')
+                : ref.t('summaryLoading.seeIfReady'),
+            onPrimary: hasFailed ? _retrySummary : _refresh,
+            onCheckLater: widget.onCheckLater,
+          ),
+      ],
+    );
+  }
+
   Future<void> _refresh() async {
+    if (widget.chatId == null) return;
     setState(() => _isRetrying = true);
-    ref.invalidate(callSummaryProvider(widget.log.id));
+    ref.invalidate(callSummaryProvider(_chatId));
     // Mirrors RN's own `handleRefresh`: the loading flag just covers the
     // refetch's own round trip, not a fixed delay.
     try {
-      await ref.read(callSummaryProvider(widget.log.id).future);
+      await ref.read(callSummaryProvider(_chatId).future);
     } catch (_) {
       // Surfaced via the provider's own AsyncError state, nothing more to do here.
     }
@@ -975,6 +1134,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   @override
   Widget build(BuildContext context) {
     return widget.summaryAsync.when(
+      skipLoadingOnRefresh: true,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) {
         // RN's `isUnauthorized`: any 403 on the summary fetch (viewing a
@@ -982,21 +1142,15 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         // generic error text, and suppresses the transcript tab too — see
         // `CallSummaryScreen`'s own `showTranscriptTab` check.
         if (error is DioException && error.response?.statusCode == 403) {
-          return const _SummaryUnauthorizedView();
+          return _SummaryUnauthorizedView(onGoBack: widget.onGoBack);
         }
         return Center(
           child: Text('${ref.t('common.somethingWentWrong')} $error'),
         );
       },
       data: (summary) {
-        if (!(summary.isSummaryAvailable || summary.isManualNote)) {
-          final hasFailed = summary.summaryStatus == 'FAILED';
-          return _GenerationProgressView(
-            summaryStatus: summary.summaryStatus,
-            isBusy: _isRetrying,
-            onPrimaryAction: hasFailed ? _retrySummary : _refresh,
-            onCheckLater: () => Navigator.of(context).maybePop(),
-          );
+        if (summary == null || !((widget.isSummaryAvailable || widget.isManualNote) && widget.canShowSummary)) {
+          return _buildGenerating(summary);
         }
         _seedIfNeeded(summary);
 
@@ -1017,7 +1171,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
         final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
         if (customFieldsEnabled) {
           _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
-          final valuesAsync = ref.watch(customFieldValuesProvider(widget.log.id));
+          final valuesAsync = ref.watch(customFieldValuesProvider(_chatId));
           final values = valuesAsync.value;
           if (values != null) _seedCustomFieldsIfNeeded(values);
         } else {
@@ -1030,9 +1184,9 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
 
         return Column(
           children: [
-            if (summary.isManualNote)
+            if (widget.isManualNote)
               VoiceNoteSection(
-                chatId: widget.log.id,
+                chatId: _chatId,
                 onValuesApplied: _applyVoiceValues,
                 onCustomValuesApplied: _reseedCustomFields,
               ),
@@ -1118,7 +1272,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
             // — the button is absent with nothing to save, not present and
             // disabled with a relabeled "No changes" state (which was never
             // RN's actual behaviour here).
-            if (_hasDirtyChanges)
+            if ((widget.alwaysShowSave || _hasDirtyChanges) && !widget.isFeedbackPopupVisible)
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -1343,6 +1497,28 @@ class _FieldEditor extends ConsumerWidget {
             // exactly; labelMedium would wrongly render it in Roboto.
             Text(label, style: Theme.of(context).textTheme.bodyMedium),
             Text(display),
+          ],
+        ),
+      );
+    }
+
+    if (field.type == SummaryFieldType.searchableDropdown) {
+      // RN `fieldRenderer` SearchableDropdown: the label, then the places
+      // picker capped at 200 wide (`dropdownContainer`).
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: SearchableLocationDropdown(
+                key: ValueKey('location-${field.key}'),
+                value: value?.toString() ?? '',
+                onSelect: (selected) => onChanged(field.key, selected),
+              ),
+            ),
           ],
         ),
       );
@@ -1576,64 +1752,16 @@ class _CustomFieldEditorState extends ConsumerState<_CustomFieldEditor> {
   }
 }
 
-class _TranscriptTab extends ConsumerWidget {
-  const _TranscriptTab({
-    required this.messagesAsync,
-    required this.counselorId,
-  });
-
-  final AsyncValue<List<ChatMessage>> messagesAsync;
-  final int? counselorId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return messagesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) =>
-          Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
-      data: (messages) {
-        if (messages.isEmpty) {
-          return Center(child: Text(ref.t('transcription.empty')));
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final message = messages[index];
-            final isCounselor = message.senderId == counselorId;
-            return Align(
-              alignment: isCounselor
-                  ? Alignment.centerRight
-                  : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                padding: const EdgeInsets.all(12),
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.75,
-                ),
-                decoration: BoxDecoration(
-                  color: isCounselor
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(message.content),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
 /// Port of ally-mobile (React Native)'s `SummaryUnauthorized` — shown
 /// instead of the generic error text when the summary fetch comes back
 /// 403 (e.g. a call not owned/assigned to the viewer). Not a dedicated
 /// permission check: RN's own `isUnauthorized` is purely "did this one
 /// request come back 403."
 class _SummaryUnauthorizedView extends ConsumerWidget {
-  const _SummaryUnauthorizedView();
+  const _SummaryUnauthorizedView({required this.onGoBack});
+
+  /// RN `SummaryUnauthorized onGoBack={handleGoBack}`.
+  final VoidCallback onGoBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1659,7 +1787,7 @@ class _SummaryUnauthorizedView extends ConsumerWidget {
             const SizedBox(height: 24),
             AppButton(
               label: ref.t('achievements.backAria'),
-              onPressed: () => context.pop(),
+              onPressed: onGoBack,
             ),
           ],
         ),
@@ -1668,250 +1796,3 @@ class _SummaryUnauthorizedView extends ConsumerWidget {
   }
 }
 
-/// Port of ally-mobile (React Native)'s `SummaryGenerationProgress` — scoped
-/// down to the real state machine (pending/in-progress spinner, failed
-/// retry, no-audio) without RN's cycling Lottie step animation or the
-/// transient "transcription deleted" banner, which are cosmetic rather than
-/// functional. [summaryStatus] is RN's `ChatSummaryStatus`
-/// ('PENDING'/'IN_PROGRESS'/'SUCCESS'/'FAILED'/'NO_AUDIO') — null/pending/
-/// in-progress all render the same "still generating" state.
-class _GenerationProgressView extends ConsumerWidget {
-  const _GenerationProgressView({
-    required this.summaryStatus,
-    required this.isBusy,
-    required this.onPrimaryAction,
-    required this.onCheckLater,
-  });
-
-  final String? summaryStatus;
-  final bool isBusy;
-  final VoidCallback onPrimaryAction;
-  final VoidCallback onCheckLater;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hasFailed = summaryStatus == 'FAILED';
-    final isNoAudio = summaryStatus == 'NO_AUDIO';
-
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isNoAudio)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.warning_amber,
-                      color: AppColors.red400,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      ref.t('calls.status.noAudio'),
-                      style: const TextStyle(color: AppColors.red400),
-                    ),
-                  ],
-                ),
-              ),
-            if (hasFailed || isNoAudio) ...[
-              const Icon(
-                Icons.error_outline,
-                size: 56,
-                color: AppColors.red400,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                ref.t('summaryLoading.failedTitle'),
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-            ] else ...[
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                ref.t('summaryLoading.processingDescMain2'),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            const SizedBox(height: 24),
-            // RN hides this entirely for NO_AUDIO — there's nothing to retry
-            // or re-check when the call never had audio to begin with.
-            if (!isNoAudio)
-              AppButton(
-                label: hasFailed
-                    ? ref.t('common.retry')
-                    : ref.t('summaryLoading.seeIfReady'),
-                isLoading: isBusy,
-                onPressed: onPrimaryAction,
-              ),
-            if (!isBusy)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: TextButton(
-                  onPressed: onCheckLater,
-                  child: Text(ref.t('summaryLoading.checkLater')),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Port of ally-mobile (React Native)'s `FeedbackPopup` as used by
-/// `SummaryModals` (`note={t('callFeedback.rateSubtitle')}`) — star rating
-/// plus the same rating-dependent tag chips
-/// (`postSim.feedback.dialog.rating.tags.<rating>`) ported for
-/// `SimulationFeedbackScreen`'s own feedback form, and a comment box. Not
-/// ported: the separate `FEEDBACK_ISSUE_OPTIONS` chip row RN shows for a
-/// 2-4 rating (`showChips`, true by default for this caller, unlike
-/// SimulationFeedbackScreen's `showChips={false}`) — a second, independent
-/// chip set this scoped port leaves out; the comment box below always shows
-/// instead of being gated behind it.
-class _SummaryFeedbackPopup extends ConsumerStatefulWidget {
-  const _SummaryFeedbackPopup({
-    required this.onDismiss,
-    required this.onSubmit,
-  });
-
-  final VoidCallback onDismiss;
-  final void Function(int rating, String comment) onSubmit;
-
-  @override
-  ConsumerState<_SummaryFeedbackPopup> createState() =>
-      _SummaryFeedbackPopupState();
-}
-
-class _SummaryFeedbackPopupState extends ConsumerState<_SummaryFeedbackPopup> {
-  int _rating = 0;
-  final _selectedTags = <String>{};
-  final _commentController = TextEditingController();
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tags = _rating == 0
-        ? const <dynamic>[]
-        : ref
-                      .watch(localizationControllerProvider)
-                      .value
-                      ?.raw('postSim.feedback.dialog.rating.tags.$_rating')
-                  as List<dynamic>? ??
-              const [];
-
-    return Container(
-      color: Colors.black.withValues(alpha: 0.5),
-      alignment: Alignment.bottomCenter,
-      child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        // RN's own bottom sheet caps itself at `maxHeight: '90%'` — without
-        // a cap here, the rating tags (a 5-item Wrap, on top of everything
-        // else already in the sheet) can overflow a short viewport.
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-          ),
-          child: SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: widget.onDismiss,
-                      ),
-                    ],
-                  ),
-                  Text(
-                    ref.t('callFeedback.rateTitle'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    ref.t('callFeedback.rateSubtitle'),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final starValue = index + 1;
-                      return IconButton(
-                        iconSize: 32,
-                        onPressed: () => setState(() {
-                          _rating = starValue;
-                          _selectedTags.clear();
-                        }),
-                        icon: Icon(
-                          starValue <= _rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                        ),
-                      );
-                    }),
-                  ),
-                  if (tags.isNotEmpty)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        for (final tag in tags.cast<String>())
-                          FilterChip(
-                            label: Text(tag),
-                            selected: _selectedTags.contains(tag),
-                            onSelected: (selected) => setState(() {
-                              if (selected) {
-                                _selectedTags.add(tag);
-                              } else {
-                                _selectedTags.remove(tag);
-                              }
-                            }),
-                          ),
-                      ],
-                    ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _commentController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: ref.t('callFeedback.suggestionPlaceholder'),
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  AppButton(
-                    label: ref.t('callFeedback.submit'),
-                    isDisabled: _rating == 0,
-                    onPressed: () => widget.onSubmit(
-                      _rating,
-                      _commentController.text.trim(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
