@@ -262,7 +262,20 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         if (!didPop) _confirmLeave();
       },
       child: Scaffold(
+        // RN's `SimulationFeedbackScreen.tsx` is a plain white
+        // `SafeAreaView` with a black back arrow
+        // (`<LeftArrowIcon color={colors.black} />`), not this app's global
+        // blue `AppBarTheme` default. RN's real title is also a composed
+        // "{{review.tabs.simulation}} {{subtitle}}" (the subtitle varies by
+        // `fromLogs`) plus a share switch next to it, rather than this
+        // screen's single `postSim.feedback.sessionFeedback` string —
+        // replicating that exact composition/switch is a content rebuild
+        // beyond this pass's color-only scope, so it's left as a separate,
+        // disclosed follow-up rather than rushed in here.
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.highEmphasis,
+          elevation: 0,
           title: Text(ref.t('postSim.feedback.sessionFeedback')),
           bottom: TabBar(
             controller: _tabController,

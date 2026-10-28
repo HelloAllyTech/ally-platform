@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
 import '../data/simulations_repository.dart';
 import 'learning_path_detail_view.dart';
 
@@ -21,7 +22,17 @@ class SimulationPathDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(simulationPathDetailsProvider(pathId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('learn.choose.track'))),
+      // RN's `SimulationPathDetailsScreen.tsx` renders `LearningPathHeader`
+      // — a plain white header (black back arrow, REPLAY_PRO.HEADLINE
+      // title), not this app's global blue `AppBarTheme` default. Same
+      // scoped-out credits-display note as `CaseDetailsScreen`'s identical
+      // fix.
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
+        title: Text(ref.t('learn.choose.track')),
+      ),
       body: detailsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(

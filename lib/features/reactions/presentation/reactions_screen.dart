@@ -50,7 +50,15 @@ class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
         : ref.watch(reactionsCountProvider(widget.reviewId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('review.reactionsModal.title'))),
+      // RN's `ReactionsScreen.tsx` is a plain white header with a black
+      // back arrow (`<LeftArrowIcon color={colors.black} />`), not this
+      // app's global blue `AppBarTheme` default.
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
+        title: Text(ref.t('review.reactionsModal.title')),
+      ),
       body: Column(
         children: [
           countsAsync.maybeWhen(

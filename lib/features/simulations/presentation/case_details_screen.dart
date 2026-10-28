@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
 import '../data/simulations_repository.dart';
 import 'learning_path_detail_view.dart';
 
@@ -24,7 +25,20 @@ class CaseDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(caseDetailsProvider(caseId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('learn.choose.case'))),
+      // RN's `CaseDetailsScreen.tsx` renders `LearningPathHeader` — a plain
+      // white header (black back arrow, REPLAY_PRO.HEADLINE title), not
+      // this app's global blue `AppBarTheme` default. RN's header also
+      // shows a credits display here (same bolt-icon consumed/limit
+      // fraction as `SimulationsScreen`'s catalog header, already fixed
+      // this session) — not ported, since that needs its own data
+      // plumbing in this screen; scoped out as separate follow-up work
+      // rather than rushed in alongside a color fix.
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
+        title: Text(ref.t('learn.choose.case')),
+      ),
       body: detailsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(

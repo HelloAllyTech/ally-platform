@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
 import '../data/preferences_repository.dart';
 
 /// Port of ally-mobile (React Native)'s preferences screen
@@ -17,7 +18,19 @@ class PreferencesScreen extends ConsumerWidget {
     final languagesAsync = ref.watch(availableLanguagesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('preferences.title'))),
+      // RN has no standalone "Preferences" screen with its own header to
+      // cite directly, but every other screen checked in this app's RN
+      // source (`CallSummaryScreen`, `ProfileSettingsScreen`,
+      // `BugReportScreen`, `ReactionsScreen`, ...) uses a plain white header
+      // with a dark back arrow/title, never this app's global blue
+      // `AppBarTheme` default — applying the same settings-screen pattern
+      // here for consistency.
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
+        title: Text(ref.t('preferences.title')),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(

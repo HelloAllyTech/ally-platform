@@ -88,7 +88,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
+      // RN's `ProfileSettingsScreen.tsx` is a plain white header (black
+      // back arrow, REPLAY_PRO.HEADLINE title in
+      // `colors.ds.typography.highEmphasis`), not this app's global blue
+      // `AppBarTheme` default.
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.highEmphasis,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
