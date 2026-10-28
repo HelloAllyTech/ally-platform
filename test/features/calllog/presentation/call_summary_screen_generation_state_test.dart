@@ -176,6 +176,16 @@ void main() {
     expect(find.byKey(const Key('add-notes-input')), findsNothing, reason: 'collapsed by default');
     await tester.ensureVisible(find.byKey(const Key('add-notes-header')));
     await tester.pump();
+
+    // RN PrivacyTooltip on the (i): opens over a scrim, closes on tap-out.
+    await tester.tap(find.byKey(const Key('add-notes-info')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const ValueKey('privacy-tooltip')), findsOneWidget);
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const ValueKey('privacy-tooltip')), findsNothing);
     await tester.tap(find.byKey(const Key('add-notes-header')));
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('add-notes-input')));

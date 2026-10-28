@@ -209,6 +209,7 @@ class CallSummaryDetails {
     this.isSummaryAvailable = true,
     this.isSummaryFeedbackAdded = false,
     this.hasTranscript = false,
+    this.transcript,
     this.archivedAt,
     this.reviewId,
     this.reviewStatus,
@@ -269,6 +270,7 @@ class CallSummaryDetails {
       // from `summaryData.details.transcript` (not the live messages list —
       // this is a flag on the summary response itself).
       hasTranscript: details?['transcript'] != null,
+      transcript: details?['transcript'] is String ? details!['transcript'] as String : null,
       archivedAt: json['archivedAt'] as String?,
       reviewId: json['reviewId'] as String?,
       reviewStatus: json['reviewStatus'] as String?,
@@ -287,6 +289,10 @@ class CallSummaryDetails {
       callMode: callInfo?['mode'] as String?,
     );
   }
+
+  /// RN `details.transcript` — a manual note's saved dictation text, which
+  /// `VoiceNoteSection` seeds from so a second dictation appends to it.
+  final String? transcript;
 
   /// RN `details.callInfo.summaryName` — the header's `#name` and the
   /// rename modal's prefill (`useCallSummaryActions`' `summaryName`).
@@ -400,14 +406,13 @@ class CallLogFilterState {
       sources.isEmpty &&
       !customFieldValues.values.any(hasFilterValue);
 
-  /// Drives the badge on CallLogScreen's filter button — one count per
-  /// non-empty field, matching RN's `countActiveFilters`.
-  int get activeCount => [
-    startDate,
-    endDate,
-    minDuration,
-    maxDuration,
-  ].where((v) => v != null).length +
+  /// Drives the badge on CallLogScreen's filter button — RN's
+  /// `countActiveFilters` counts one per non-empty `FilterState` entry, and
+  /// the date range (`dateAndTime`) and duration range (`duration`) are one
+  /// entry each, so a full date + duration filter counts 2, not 4.
+  int get activeCount =>
+      (startDate != null || endDate != null ? 1 : 0) +
+      (minDuration != null || maxDuration != null ? 1 : 0) +
       [tags, modes, statuses, sources].where((v) => v.isNotEmpty).length +
       customFieldValues.values.where(hasFilterValue).length;
 
@@ -448,6 +453,24 @@ class CallLogFilterState {
         sources: sources,
         customFieldValues: customFieldValues,
       );
+
+  /// Sets the date bounds; an emptied (or blank) box clears its bound
+  /// instead of sending `startDate=` — RN `buildBuiltinParams` only sends a
+  /// non-empty `date[0]`/`date[1]`.
+  CallLogFilterState withDates({required String? start, required String? end}) {
+    String? orNull(String? v) => v == null || v.trim().isEmpty ? null : v;
+    return CallLogFilterState(
+      startDate: orNull(start),
+      endDate: orNull(end),
+      minDuration: minDuration,
+      maxDuration: maxDuration,
+      tags: tags,
+      modes: modes,
+      statuses: statuses,
+      sources: sources,
+      customFieldValues: customFieldValues,
+    );
+  }
 
   /// RN `buildBuiltinParams`: duration is entered in minutes and sent in
   /// seconds, the backend column's unit.

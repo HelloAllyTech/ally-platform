@@ -229,7 +229,13 @@ class AppColors {
   static const black = Color(0xFF000000); // colors.black: question-media video frame
   static const lightboxScrim = Color(0xE6000000); // rgba(0,0,0,0.9): QuestionMedia lightbox
   static const iosPlaceholder = Color(0x4D3C3C43); // iOS default TextInput placeholder (no placeholderTextColor)
-
+  // w5scribe parity (src/theme/colors.ts)
+  static const carrotOrange = Color(0xFFEC930F); // colors.carrotOrange: call-summary AI banner icon ring
+  static const rnGray = Color(0xFF7E7E7E); // colors.gray: call-summary editing section border, multi-select checkbox
+  // w5learn parity (src/theme/designSystem/colors.ts)
+  static const green500 = Color(0xFF4CAF50); // ds.green[500]: demonstrated skill ring
+  static const orange500 = Color(0xFFFF9800); // ds.orange[500]: needs-practice skill ring
+  static const orange800 = Color(0xFFEF6C00); // ds.orange[800]: needs-practice badge text
   // w5shell parity (src/theme/colors.ts)
   static const white4 = Color(0xFFECECEC); // ResourceArticleCard light category chip
   static const darkGray14 = Color(0xFF535353); // ResourceArticleCard light category text

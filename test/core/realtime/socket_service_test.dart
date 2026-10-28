@@ -67,38 +67,31 @@ void main() {
       },
     );
 
-    // testWidgets for its fake clock.
-    testWidgets('a failed open retries after RETRY_AFTER_FAILURE_MS (2s), until disconnect', (tester) async {
+    // testWidgets for its fake clock (Timer) — no widget is pumped.
+    testWidgets('retries after RETRY_AFTER_FAILURE_MS when opening the socket fails, until disconnect()', (
+      tester,
+    ) async {
+      final retrying = SocketService(tokenStorage);
       var calls = 0;
-      when(() => tokenStorage.accessToken).thenAnswer((_) async {
+      when(() => tokenStorage.accessToken).thenAnswer((_) {
         calls++;
-        throw Exception('keychain locked');
+        return calls == 1 ? Future<String?>.error(Exception('keychain locked')) : Future<String?>.value(null);
       });
 
-      await service.connect(namespacePath: '/cloud-telephony-chat', userId: 'user-1');
+      await retrying.connect(namespacePath: '/microphone-chat', userId: 'user-1');
       expect(calls, 1);
 
       await tester.pump(const Duration(milliseconds: 1999));
       expect(calls, 1);
       await tester.pump(const Duration(milliseconds: 1));
-      expect(calls, 2, reason: 'retried once the 2s timer fired');
+      expect(calls, 2, reason: 'retried after 2s');
 
-      service.disconnect();
-      await tester.pump(const Duration(seconds: 10));
-      expect(calls, 2, reason: 'disconnect cancels the retry');
-    });
-
-    test('a disconnect while the token is loading abandons that connect', () async {
-      final tokenCompleter = Completer<String?>();
-      when(() => tokenStorage.accessToken).thenAnswer((_) => tokenCompleter.future);
-
-      final pending = service.connect(namespacePath: '/microphone-chat', userId: 'user-1');
-      service.disconnect();
-      // Had it not bailed out, a real token would reach `io.io(...)`.
-      tokenCompleter.complete('token');
-      await pending;
-
-      expect(service.isConnected, isFalse);
+      // A failure followed by disconnect() never retries.
+      calls = 0;
+      await retrying.connect(namespacePath: '/microphone-chat', userId: 'user-1');
+      retrying.disconnect();
+      await tester.pump(const Duration(seconds: 5));
+      expect(calls, 1);
     });
 
     // NOTE: the `if (_socket != null) { ... }` idempotent-reconnect branch

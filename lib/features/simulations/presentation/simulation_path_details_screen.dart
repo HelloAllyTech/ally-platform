@@ -25,55 +25,74 @@ class SimulationPathDetailsScreen extends ConsumerWidget {
 
     // RN: white screen, LearningPathHeader with the credits read-out, then
     // a large spinner / DataUnavailable EmptyState / the list.
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          LearningPathHeader(
-            title: ref.t('learn.choose.track'),
-            showCredits: true,
-          ),
-          Expanded(
-            child: detailsAsync.when(
-              loading: () => const LearningPathLoading(),
-              error: (_, _) => LearningPathLoadError(
-                title: ref.t('simulationPage.failedToLoadPathDetails'),
-              ),
-              data: (details) => LearningPathDetailView(
-                details: details,
-                onRefresh: () =>
-                    ref.refresh(simulationPathDetailsProvider(pathId).future),
-                onEnsureSession: () async {
-                  if (details.scenarioPathSessionId != null) return;
-                  await ref
-                      .read(simulationsRepositoryProvider)
-                      .createPathSession(pathId);
-                  ref.invalidate(simulationPathDetailsProvider(pathId));
-                },
-                startParamsFor: (scenario, languageId) => StartSimulationParams(
-                  scenarioId: scenario.scenarioId,
-                  scenarioPathSessionItemId: scenario.sessionId,
-                  languageId: languageId,
-                  pathId: pathId,
+    // RN `handleBack` (header + hardware back): pop, or with nothing to pop
+    // (a cold deep link) `navigateToLearnTab`.
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) learningPathBack(context);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            LearningPathHeader(
+              title: ref.t('learn.choose.track'),
+              showCredits: true,
+              onBack: () => learningPathBack(context),
+            ),
+            Expanded(
+              child: detailsAsync.when(
+                loading: () => const LearningPathLoading(),
+                error: (_, _) => LearningPathLoadError(
+                  title: ref.t('simulationPage.failedToLoadPathDetails'),
                 ),
-                onViewFeedback: (scenario) async {
-                  final sessionId = await ref
-                      .read(simulationsRepositoryProvider)
-                      .getScenarioSessionByPathItem(scenario.sessionId!);
-                  if (sessionId != null && context.mounted) {
-                    // Reviewing an already-completed session (not a fresh
-                    // finish) — mirrors RN's own `fromLogs: true` on this exact
-                    // call site, so the feedback screen doesn't force a rating
-                    // prompt on exit.
-                    context.push(
-                      simulationFeedbackLocation(sessionId, fromLogs: true, pathId: pathId),
-                    );
-                  }
-                },
+                data: (details) => LearningPathDetailView(
+                  details: details,
+                  onRefresh: () =>
+                      ref.refresh(simulationPathDetailsProvider(pathId).future),
+                  onEnsureSession: () async {
+                    if (details.scenarioPathSessionId != null) return;
+                    await ref
+                        .read(simulationsRepositoryProvider)
+                        .createPathSession(pathId);
+                    ref.invalidate(simulationPathDetailsProvider(pathId));
+                  },
+                  startParamsFor: (scenario, languageId) =>
+                      StartSimulationParams(
+                        scenarioId: scenario.scenarioId,
+                        scenarioPathSessionItemId: scenario.sessionId,
+                        languageId: languageId,
+                        pathId: pathId,
+                      ),
+                  onViewFeedback: (scenario) async {
+                    final sessionId = await ref
+                        .read(simulationsRepositoryProvider)
+                        .getScenarioSessionByPathItem(scenario.sessionId!);
+                    if (sessionId == null) return false;
+                    if (context.mounted) {
+                      // Reviewing an already-completed session (not a fresh
+                      // finish) — mirrors RN's own `fromLogs: true` on this exact
+                      // call site, so the feedback screen doesn't force a rating
+                      // prompt on exit.
+                      context.push(
+                        simulationFeedbackLocation(
+                          sessionId,
+                          fromLogs: true,
+                          pathId: pathId,
+                        ),
+                      );
+                    }
+                    return true;
+                  },
+                  sessionNotFoundMessage: ref.t(
+                    'simulationPage.failedToLoadPathDetails',
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -28,55 +28,74 @@ class CaseDetailsScreen extends ConsumerWidget {
 
     // RN: white screen, LearningPathHeader with the credits read-out, then
     // a large spinner / DataUnavailable EmptyState / the list.
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          LearningPathHeader(
-            title: ref.t('learn.choose.case'),
-            showCredits: true,
-          ),
-          Expanded(
-            child: detailsAsync.when(
-              loading: () => const LearningPathLoading(),
-              error: (_, _) => LearningPathLoadError(
-                title: ref.t('simulationPage.failedToLoadCaseDetails'),
-              ),
-              data: (details) => LearningPathDetailView(
-                details: details,
-                onRefresh: () =>
-                    ref.refresh(caseDetailsProvider(caseId).future),
-                onEnsureSession: () async {
-                  if (details.caseSessionId != null) return;
-                  await ref
-                      .read(simulationsRepositoryProvider)
-                      .createCaseSession(caseId);
-                  ref.invalidate(caseDetailsProvider(caseId));
-                },
-                startParamsFor: (scenario, languageId) => StartSimulationParams(
-                  scenarioId: scenario.scenarioId,
-                  caseSessionItemId: scenario.sessionId,
-                  languageId: languageId,
-                  caseId: caseId,
+    // RN `handleBack` (header + hardware back): pop, or with nothing to pop
+    // (a cold deep link) `navigateToLearnTab`.
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) learningPathBack(context);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            LearningPathHeader(
+              title: ref.t('learn.choose.case'),
+              showCredits: true,
+              onBack: () => learningPathBack(context),
+            ),
+            Expanded(
+              child: detailsAsync.when(
+                loading: () => const LearningPathLoading(),
+                error: (_, _) => LearningPathLoadError(
+                  title: ref.t('simulationPage.failedToLoadCaseDetails'),
                 ),
-                onViewFeedback: (scenario) async {
-                  final sessionId = await ref
-                      .read(simulationsRepositoryProvider)
-                      .getScenarioSessionByCaseItem(scenario.sessionId!);
-                  if (sessionId != null && context.mounted) {
-                    // Reviewing an already-completed session (not a fresh
-                    // finish) — mirrors RN's own `fromLogs: true` on this exact
-                    // call site, so the feedback screen doesn't force a rating
-                    // prompt on exit.
-                    context.push(
-                      simulationFeedbackLocation(sessionId, fromLogs: true, caseId: caseId),
-                    );
-                  }
-                },
+                data: (details) => LearningPathDetailView(
+                  details: details,
+                  onRefresh: () =>
+                      ref.refresh(caseDetailsProvider(caseId).future),
+                  onEnsureSession: () async {
+                    if (details.caseSessionId != null) return;
+                    await ref
+                        .read(simulationsRepositoryProvider)
+                        .createCaseSession(caseId);
+                    ref.invalidate(caseDetailsProvider(caseId));
+                  },
+                  startParamsFor: (scenario, languageId) =>
+                      StartSimulationParams(
+                        scenarioId: scenario.scenarioId,
+                        caseSessionItemId: scenario.sessionId,
+                        languageId: languageId,
+                        caseId: caseId,
+                      ),
+                  onViewFeedback: (scenario) async {
+                    final sessionId = await ref
+                        .read(simulationsRepositoryProvider)
+                        .getScenarioSessionByCaseItem(scenario.sessionId!);
+                    if (sessionId == null) return false;
+                    if (context.mounted) {
+                      // Reviewing an already-completed session (not a fresh
+                      // finish) — mirrors RN's own `fromLogs: true` on this exact
+                      // call site, so the feedback screen doesn't force a rating
+                      // prompt on exit.
+                      context.push(
+                        simulationFeedbackLocation(
+                          sessionId,
+                          fromLogs: true,
+                          caseId: caseId,
+                        ),
+                      );
+                    }
+                    return true;
+                  },
+                  sessionNotFoundMessage: ref.t(
+                    'simulationPage.failedToLoadCaseDetails',
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

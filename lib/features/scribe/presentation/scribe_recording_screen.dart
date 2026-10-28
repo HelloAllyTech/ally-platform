@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
+import '../../../core/navigation/home_tab_navigation.dart';
+import '../../../core/navigation/tab_config.dart';
 import '../../../core/chat/current_chat_provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
@@ -35,8 +37,6 @@ import 'listening_controls.dart';
 import 'network_disconnected.dart';
 import 'nudge_section.dart';
 import 'scribe_reference_search.dart';
-import '../../../core/navigation/home_tab_navigation.dart';
-import '../../../core/navigation/tab_config.dart';
 
 /// Port of ally-mobile (React Native)'s `MicrophoneListeningScreen.tsx` +
 /// `hooks/useListeningCommon.ts` + `hooks/useLiveAudioStream.ts` — Scribe's
@@ -537,6 +537,8 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     if (navigator.canPop()) {
       navigator.pop();
     } else {
+      // Nothing to pop back to: land where RN's goBack() would (Listening is
+      // only ever pushed from Call Logs) — RN `navigateToCallLogTab`.
       final router = GoRouter.maybeOf(context);
       if (router != null) goToHomeTab(router, kTabCallLog);
     }

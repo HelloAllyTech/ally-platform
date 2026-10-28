@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/navigation/screen_focus_listener.dart';
+import '../../../core/routing/app_router.dart' show ShareSimulationForReviewArgs;
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
@@ -355,21 +357,35 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       final end = DateTime.tryParse(endedAt);
       if (start != null && end != null) duration = end.difference(start).inSeconds.toString();
     }
-    await context.push(
-      '/share-for-review/${widget.scenarioSessionId}',
-      extra: (
+    final scenario = summary?.scenario;
+    // RN `handleShareSimulation` scenarioData: cover image/video, title,
+    // description, createdAt, duration.
+    final ShareSimulationForReviewArgs extra = (
+      args: (
         reviewId: summary?.reviewId,
         note: _review?.note,
         contextDateTime: summary?.createdAt ?? startedAt,
         contextDuration: duration,
         isScribe: false,
-        contextTitle: summary?.scenario?.title,
+        contextTitle: scenario?.title,
       ),
+      coverImageUrl: scenario?.coverImageUrl,
+      coverVideoUrl: scenario?.coverVideoUrl,
+      description: scenario?.description,
     );
-    // RN's focus effect: coming back restarts the poll (picks up the new
-    // review) — and the review itself is refetched.
+    await context.push('/share-for-review/${widget.scenarioSessionId}', extra: extra);
+    // Coming back restarts the poll via [_onRefocus] (RN useFocusEffect).
+  }
+
+  /// RN `useFocusEffect` (skipping the first focus): returning to this
+  /// screen from anything pushed over it — Share, Review details, a
+  /// transcript link — restarts the poll loop, which also recovers feedback
+  /// whose translation was still generating; the review (RN
+  /// `useGetReviewByIdQuery`, refetchOnFocus) is refetched with it.
+  void _onRefocus() {
     if (!mounted) return;
     _reviewFetchedFor = null;
+    _hideReviewDetailsCheckedFor = null;
     _restartPolling();
   }
 
@@ -484,7 +500,9 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         summary != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return PopScope(
+    return ScreenFocusListener(
+      onFocus: _onRefocus,
+      child: PopScope(
       // A path/case session always goes through `_handleBack` (RN reset).
       canPop: !_popupVisible && !_shouldAskOnLeave && widget.pathId == null && widget.caseId == null,
       onPopInvokedWithResult: (didPop, _) {
@@ -551,10 +569,9 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                   child: AppButton(
                     key: const Key('simulation-feedback-try-another'),
                     label: ref.t('postSim.common.tryAnother'),
-                    // RN wires this to `handleSubmit`, which only reopens
-                    // the rating popup — kept as the label's intent: pick
-                    // another simulation.
-                    onPressed: () => context.push('/simulations'),
+                    // RN `handleSubmit`: reopens the rating popup (the
+                    // popup source is left as it was).
+                    onPressed: () => setState(() => _popupVisible = true),
                   ),
                 ),
               ),
@@ -582,6 +599,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           ],
         ),
       ),
+    ),
     );
   }
 

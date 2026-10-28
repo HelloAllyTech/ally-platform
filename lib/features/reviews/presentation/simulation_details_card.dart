@@ -6,6 +6,7 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
+import '../../../core/widgets/cover_video_preview.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import 'review_styles.dart';
 import '../../../core/widgets/sized_network_image.dart';
@@ -18,9 +19,8 @@ import '../../../core/widgets/sized_network_image.dart';
 /// overflows, like RN's `onTextLayout` check) or a caller-supplied widget in
 /// that slot (scribe cards put their Date & time / Duration rows there).
 ///
-/// RN plays `coverVideoUrl` in a `VideoPreview` in place of the image; that
-/// player is being built as a shared widget elsewhere, so [coverVideoUrl] is
-/// accepted here and is where it plugs in (the image shows meanwhile).
+/// A `coverVideoUrl` plays in RN's `VideoPreview` ([CoverVideoPreview]) in
+/// place of the image, paused while the screen isn't focused.
 ///
 /// Shared by [ReviewCard] and `ShareForReviewScreen` (RN's
 /// `ShareSimulationScreen`/`ShareCallLogScreen` render this same component).
@@ -41,7 +41,7 @@ class SimulationDetailsCard extends ConsumerStatefulWidget {
   final String? title;
   final String? coverImageUrl;
 
-  /// TODO(video-preview): render the shared video preview here when set.
+  /// RN `VideoPreview` (autoPlay off, `shouldPause={!isFocused}`).
   final String? coverVideoUrl;
   final String? descriptionText;
   final Widget? descriptionWidget;
@@ -60,6 +60,7 @@ class _SimulationDetailsCardState extends ConsumerState<SimulationDetailsCard> {
   Widget _cover(double height) {
     final isScribe = widget.reviewType == ReviewType.scribe;
     final image = widget.coverImageUrl;
+    final video = widget.coverVideoUrl;
     return Container(
       height: height,
       width: double.infinity,
@@ -67,6 +68,9 @@ class _SimulationDetailsCardState extends ConsumerState<SimulationDetailsCard> {
       decoration: BoxDecoration(color: AppColors.grey50, borderRadius: BorderRadius.circular(8)),
       child: isScribe
           ? SvgPicture.asset('assets/icons/scribeReview.svg', width: double.infinity, height: height)
+          : (video != null && video.isNotEmpty)
+          // CoverVideoPreview pauses itself once its route is covered.
+          ? CoverVideoPreview(key: const Key('scenario-video-preview'), url: video, thumbnailUrl: image, height: height)
           : (image != null && image.isNotEmpty)
           ? SizedNetworkImage(
               image,

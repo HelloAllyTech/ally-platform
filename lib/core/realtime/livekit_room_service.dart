@@ -118,6 +118,13 @@ class LiveKitRoomService {
     await room.connect(liveKitServerUrl, accessToken);
   }
 
+  /// This client's participant once connected (RN `room.localParticipant`).
+  Participant? get localParticipant => _room?.localParticipant;
+
+  /// The agent: RN `useRemoteParticipants({room})[0]`.
+  Participant? get remoteParticipant =>
+      _room?.remoteParticipants.values.firstOrNull;
+
   Future<void> setMicrophoneEnabled(bool enabled) async {
     await room.localParticipant?.setMicrophoneEnabled(enabled);
   }

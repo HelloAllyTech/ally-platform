@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/chat/current_chat_provider.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/navigation/screen_focus_listener.dart';
 import '../../../core/permissions/permissions_repository.dart';
@@ -12,6 +16,7 @@ import '../../../core/permissions/user_permissions.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_tab_view.dart';
@@ -19,6 +24,7 @@ import '../../../core/widgets/illustrated_modal.dart';
 import '../../../core/widgets/root_scaffold_messenger.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
+import '../../scribe/data/chat_repository.dart';
 import '../data/call_log_repository.dart';
 import 'call_log_filter_sheet.dart';
 import 'call_log_row.dart';
@@ -111,6 +117,15 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   bool _isViewingArchive = false;
   bool _isStartingScribe = false;
 
+  /// RN `expandedIdx`: the one expanded row across the lists.
+  final ValueNotifier<Object?> _expandedLogKey = ValueNotifier(null);
+
+  @override
+  void dispose() {
+    _expandedLogKey.dispose();
+    super.dispose();
+  }
+
   /// Mirrors RN's `StartSessionModal`: Start Scribe Mode is offered as the
   /// primary button whenever `hasMicrophoneChatType` (the tenant's enabled
   /// chat types include microphone chat — not RN's permission-only
@@ -201,6 +216,8 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
       }
       if (!mounted) return;
       if (status.isGranted) {
+        // RN `checkCounselorChat()` right before navigating to Listening.
+        unawaited(_checkCounselorChat());
         context.push('/scribe');
         return;
       }
@@ -214,6 +231,41 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     } finally {
       if (mounted) setState(() => _isStartingScribe = false);
     }
+  }
+
+  /// RN `useCounselorChat().checkCounselorChat` (no-op without
+  /// VIEW_COUNSELOR_CHAT): primes the current chat from
+  /// `GET /chats/counsellor-chat`. RN clears the current chat when none is
+  /// active; that is skipped here because the scribe screen this precedes
+  /// sets its own chat from USER_JOINED and must not be raced into null.
+  Future<void> _checkCounselorChat() async {
+    final permissions = ref.read(userPermissionsProvider).value ?? const <String>[];
+    if (!permissions.contains(UserPermissions.viewCounselorChat)) return;
+    try {
+      final chat = await ref.read(chatRepositoryProvider).getCounsellorChat();
+      if (chat != null && mounted) ref.read(currentChatProvider.notifier).set(chat);
+    } catch (_) {
+      // RN ignores the error here too.
+    }
+  }
+
+  /// RN `handleLearnMorePress`: open ALLY_WEB_URL, else an error alert.
+  Future<void> _openLearnMore() async {
+    var opened = false;
+    try {
+      opened = await launchUrl(Uri.parse(AppConfig.allyWebUrl), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+    if (opened || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(ref.t('common.error')),
+        content: Text(ref.t('common.unableToOpenLink')),
+        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(ref.t('common.ok')))],
+      ),
+    );
   }
 
   Future<void> _showMicrophoneSettingsAlert() {
@@ -288,6 +340,23 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     // RN hides the FAB while a call is ongoing (`!currentChat?.chatId`).
     final hasCurrentChat = ref.watch(currentChatProvider) != null;
     final showFab = (canStartCall || canCreateNote) && !hasCurrentChat;
+
+    // RN `showFeatureUnavailable`: none of the bottom tabs' permissions.
+    if (!permissions.any(_tabPermissions.contains)) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            TabScreenHeader(
+              title: ref.t('calls.header.title'),
+              subtitle: ref.t('calls.header.subtitle'),
+              italicSubtitle: true,
+            ),
+            Expanded(child: _FeatureNotAvailable(onLearnMore: _openLearnMore)),
+          ],
+        ),
+      );
+    }
 
     if (hasReal && hasSimulation) {
       _activeTab ??= _LogTab.real;
@@ -403,13 +472,15 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                           ? _RealLogsList(
                               provider: archivedCallLogsControllerProvider,
                               canViewDetails: hasChatDetails,
+                              expandedKey: _expandedLogKey,
                             )
                           : _activeTab == _LogTab.real
                               ? _RealLogsList(
                                   provider: realCallLogsControllerProvider,
                                   canViewDetails: hasChatDetails,
+                                  expandedKey: _expandedLogKey,
                                 )
-                              : _SimulationLogsList(canViewDetails: hasScenarioDetails),
+                              : _SimulationLogsList(canViewDetails: hasScenarioDetails, expandedKey: _expandedLogKey),
                 ),
               ],
             ),
@@ -815,10 +886,11 @@ class _InfiniteScrollListViewState<T> extends State<_InfiniteScrollListView<T>> 
 }
 
 class _RealLogsList extends ConsumerWidget {
-  const _RealLogsList({required this.provider, required this.canViewDetails});
+  const _RealLogsList({required this.provider, required this.canViewDetails, required this.expandedKey});
 
   final AsyncNotifierProvider<PaginatedCallLogsController, PaginatedLogs<CallLogItem>> provider;
   final bool canViewDetails;
+  final ValueNotifier<Object?> expandedKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -837,9 +909,14 @@ class _RealLogsList extends ConsumerWidget {
             final isUpload = log.provider == 'AUDIO_UPLOAD';
             // RN has no swipe-to-archive on this list; archiving lives in
             // CallSummaryScreen's own menu.
-            return CallLogRow(
+            return _SingleExpandRow(
               key: ValueKey(log.id),
-              title: log.logTitle,
+              expandedKey: expandedKey,
+              rowKey: 'real-${log.id}',
+              builder: (expanded, onToggle) => CallLogRow(
+                expanded: expanded,
+                onToggle: onToggle,
+                title: log.logTitle,
               status: chatSummaryStatusFromString(log.displayStatus),
               noAudioLabel: ref.t('calls.status.noAudio'),
               dateLine: _formatDateTimeLine(log.startedAt),
@@ -857,6 +934,7 @@ class _RealLogsList extends ConsumerWidget {
               tags: log.tags,
               enabled: canViewDetails,
               onTap: () => context.push('/call-log/${log.id}', extra: log),
+              ),
             );
           },
         );
@@ -866,9 +944,10 @@ class _RealLogsList extends ConsumerWidget {
 }
 
 class _SimulationLogsList extends ConsumerWidget {
-  const _SimulationLogsList({required this.canViewDetails});
+  const _SimulationLogsList({required this.canViewDetails, required this.expandedKey});
 
   final bool canViewDetails;
+  final ValueNotifier<Object?> expandedKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -888,9 +967,14 @@ class _SimulationLogsList extends ConsumerWidget {
             // resolve `metadata.sessionName`, else the bare `ID-{id}`; the
             // scenario's own title shows in the *subtitle* line instead
             // (`{title} • {date}`), confirmed directly from `CallLogItem.tsx`.
-            return CallLogRow(
-              title: log.logTitle,
-              isSimulation: true,
+            return _SingleExpandRow(
+              expandedKey: expandedKey,
+              rowKey: 'simulation-${log.id}',
+              builder: (expanded, onToggle) => CallLogRow(
+                expanded: expanded,
+                onToggle: onToggle,
+                title: log.logTitle,
+                isSimulation: true,
               status: chatSummaryStatusFromString(log.status),
               dateLine: '${log.scenarioTitle ?? ''} • ${_formatDate(log.startedAt)}',
               durationText: _durationText(ref, log.startedAt, log.endedAt),
@@ -899,10 +983,118 @@ class _SimulationLogsList extends ConsumerWidget {
                   : null,
               enabled: canViewDetails,
               onTap: () => context.push('/simulations/feedback/${log.id}?fromLogs=true'),
+              ),
             );
           },
         );
       },
+    );
+  }
+}
+
+/// RN CallLogScreen's `expandedIdx` / `handleToggle`: one row open at a
+/// time — opening a row closes the previous one. Only the two rows whose
+/// state changes rebuild.
+class _SingleExpandRow extends StatelessWidget {
+  const _SingleExpandRow({super.key, required this.expandedKey, required this.rowKey, required this.builder});
+
+  final ValueNotifier<Object?> expandedKey;
+  final Object rowKey;
+  final Widget Function(bool expanded, VoidCallback onToggle) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Object?>(
+      valueListenable: expandedKey,
+      builder: (context, current, _) =>
+          builder(current == rowKey, () => expandedKey.value = current == rowKey ? null : rowKey),
+    );
+  }
+}
+
+/// RN `TAB_PERMISSIONS` (`constants/general.ts`).
+const _tabPermissions = {
+  UserPermissions.viewCallLogs,
+  UserPermissions.viewScenarioSession,
+  UserPermissions.editScenarioSession,
+  UserPermissions.viewSimulationReviews,
+  UserPermissions.viewScribeReviews,
+  UserPermissions.viewAnalyticsDashboard,
+  UserPermissions.viewCommunityLeaderboard,
+  UserPermissions.viewReferenceDocument,
+  UserPermissions.viewCommunity,
+};
+
+/// RN `CallLog/components/FeatureNotAvailable` as CallLogScreen renders it:
+/// the ReplayPro "Oops !" title, `calls.appCurrentlyForCounsellors`, and an
+/// underlined "Learn more" link to ALLY_WEB_URL.
+class _FeatureNotAvailable extends ConsumerWidget {
+  const _FeatureNotAvailable({required this.onLearnMore});
+
+  final VoidCallback onLearnMore;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rn = RnSize.of(context);
+    return Container(
+      key: const Key('call-log-feature-unavailable'),
+      color: Colors.white,
+      alignment: Alignment.center,
+      // RN `clientContainer` paddingHorizontal 40@s, overridden by
+      // CallLogScreen's `featureNotAvailable` (20).
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(bottom: rn.mvs(30)),
+            child: Text(
+              ref.t('audioCall.error.oops'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: AppFonts.replayProBoldItalic,
+                fontStyle: FontStyle.italic,
+                fontSize: 48,
+                height: 56 / 48,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(bottom: rn.mvs(15)),
+            child: Text(
+              ref.t('calls.appCurrentlyForCounsellors'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 18,
+                height: 24 / 18,
+                color: AppColors.mediumGray,
+              ),
+            ),
+          ),
+          GestureDetector(
+            key: const Key('call-log-learn-more'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onLearnMore,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: rn.mvs(8), horizontal: 24),
+              child: Text(
+                ref.t('calls.learnMore'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: AppFonts.robotoRegular,
+                  fontSize: 16,
+                  height: 20 / 16,
+                  color: AppColors.brightBlue,
+                  decoration: TextDecoration.underline,
+                  decorationColor: AppColors.brightBlue,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

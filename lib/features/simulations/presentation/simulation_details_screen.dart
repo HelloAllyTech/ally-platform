@@ -121,10 +121,11 @@ class _SimulationDetailsScreenState
                 child: scenarioAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(
-                    child: Text(
-                      '${ref.t('learn.details.loadingDetailsError')}: $error',
-                    ),
+                  // RN always has the scenario from route params; this
+                  // fetch fallback shows the translated message only, never
+                  // the raw exception (RN getErrorDetails).
+                  error: (_, _) => Center(
+                    child: Text(ref.t('learn.details.loadingDetailsError')),
                   ),
                   data: (scenario) {
                     _ensureLanguageInitialized(scenario);

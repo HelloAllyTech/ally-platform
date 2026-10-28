@@ -24,21 +24,21 @@ import '../network/token_storage.dart';
 /// below is kept anyway — belt and suspenders — since nothing prevents two
 /// *callers* from both invoking `connect()` around the same time.
 class SocketService {
-  SocketService(this._tokenStorage);
+  SocketService(this._tokenStorage, {this.retryAfterFailure = const Duration(milliseconds: 2000)});
 
   final TokenStorage _tokenStorage;
 
+  /// RN `RETRY_AFTER_FAILURE_MS`: when opening the socket throws (e.g. the
+  /// token read fails), try again after this long.
+  final Duration retryAfterFailure;
+
   io.Socket? _socket;
   bool _isConnecting = false;
-
-  /// RN `useSocket`'s `RETRY_AFTER_FAILURE_MS`: when opening the socket
-  /// throws (token read, client setup), try again after this long.
-  static const retryAfterFailure = Duration(milliseconds: 2000);
   Timer? _retryTimer;
 
-  /// RN `generationRef`: bumped by [disconnect], so a connect that was
-  /// awaiting the token when the owner disconnected abandons itself
-  /// instead of installing a socket nobody holds.
+  /// RN `generationRef`: bumped by [disconnect] so a connect still awaiting
+  /// the token (or a pending retry) abandons itself instead of installing a
+  /// socket nobody holds.
   int _generation = 0;
 
   bool get isConnected => _socket?.connected ?? false;
@@ -67,6 +67,7 @@ class SocketService {
 
     try {
       final accessToken = await _tokenStorage.accessToken;
+      // `disconnect()` ran while the token was being read.
       if (generation != _generation) return;
       if (accessToken == null) {
         return;
@@ -107,6 +108,8 @@ class SocketService {
       _socket = socket;
       socket.connect();
     } catch (_) {
+      // RN: "Failed to open socket connection" → retry after
+      // RETRY_AFTER_FAILURE_MS unless disconnect() ran meanwhile.
       if (generation != _generation) return;
       _retryTimer = Timer(retryAfterFailure, () {
         _retryTimer = null;
@@ -120,7 +123,7 @@ class SocketService {
         );
       });
     } finally {
-      if (generation == _generation) _isConnecting = false;
+      _isConnecting = false;
     }
   }
 

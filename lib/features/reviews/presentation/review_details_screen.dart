@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
+import '../../../core/realtime/connectivity.dart';
+import '../../../core/routing/app_router.dart' show ShareForReviewArgs;
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
@@ -57,7 +59,7 @@ class ReviewDetailsScreen extends ConsumerStatefulWidget {
   ConsumerState<ReviewDetailsScreen> createState() => _ReviewDetailsScreenState();
 }
 
-class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
+class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with WidgetsBindingObserver {
   static const _messagesPerPage = 10;
 
   final List<TranscriptMessage> _messages = [];
@@ -77,6 +79,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadMessages(reset: true);
     _markReadTimer = Timer(const Duration(seconds: 10), () {
       final markRead = _isScribe
@@ -92,9 +95,17 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _markReadTimer?.cancel();
     _general?.dispose();
     super.dispose();
+  }
+
+  /// RN `useGetReviewByIdQuery` `refetchOnFocus`: the app coming back to the
+  /// foreground refetches the review.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshReview();
   }
 
   void _refreshReview() {
@@ -277,21 +288,40 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
   void _editNote(ReviewItem review) {
     final session = _isScribe ? null : review.scenarioSession;
     final scribe = review.scribeSession;
-    context.push(
-      '/share-for-review/${review.id}',
-      extra: (
-        reviewId: review.id,
-        note: review.note,
-        contextDateTime: session?.createdAt ?? scribe?.createdAt,
-        contextDuration: session?.duration ?? scribe?.duration,
-        isScribe: _isScribe,
-        contextTitle: _isScribe ? (review.summaryName ?? scribe?.summaryName) : review.scenario?.title,
-      ),
+    final ShareForReviewArgs args = (
+      reviewId: review.id,
+      note: review.note,
+      contextDateTime: session?.createdAt ?? scribe?.createdAt,
+      contextDuration: session?.duration ?? scribe?.duration,
+      isScribe: _isScribe,
+      contextTitle: _isScribe ? (review.summaryName ?? scribe?.summaryName) : review.scenario?.title,
     );
+    final scenario = review.scenario;
+    // RN `updateReviewStatus` invalidates `ReviewDetails`: coming back from
+    // editing the note refetches the review.
+    context
+        .push(
+          '/share-for-review/${review.id}',
+          extra: _isScribe || scenario == null
+              ? args
+              : (
+                  args: args,
+                  coverImageUrl: scenario.coverImageUrl,
+                  coverVideoUrl: scenario.coverVideoUrl,
+                  description: scenario.description,
+                ),
+        )
+        .then((_) {
+          if (mounted) _refreshReview();
+        });
   }
 
   @override
   Widget build(BuildContext context) {
+    // RN `refetchOnReconnect`: back online → refetch the review.
+    ref.listen(isOfflineProvider, (previous, next) {
+      if (previous?.value == true && next.value == false) _refreshReview();
+    });
     final reviewAsync = _isScribe
         ? ref.watch(scribeReviewDetailProvider(widget.reviewId))
         : ref.watch(reviewDetailProvider(widget.reviewId));

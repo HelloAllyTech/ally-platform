@@ -338,4 +338,19 @@ void main() {
     verify(() => api.addComment(reviewId: 'rev-1', content: 'Glad it helped', parentCommentId: 'g-c1')).called(1);
     await finish(tester);
   });
+
+  testWidgets('the review refetches when the app comes back to the foreground (RN refetchOnFocus)', (tester) async {
+    await pump(tester);
+    verify(() => reviews.getReview('rev-1')).called(1);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    verify(() => reviews.getReview('rev-1')).called(1);
+    await finish(tester);
+  });
 }

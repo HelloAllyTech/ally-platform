@@ -45,7 +45,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
         backgroundColor: Colors.white,
         body: SafeArea(child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
       ),
-      error: (error, _) => Scaffold(body: SafeArea(child: Center(child: Text('$error')))),
+      // Never the raw exception (RN getErrorDetails' fallback copy).
+      error: (_, _) => Scaffold(body: SafeArea(child: Center(child: Text(ref.t('common.somethingWentWrong'))))),
       data: _buildScreen,
     );
   }

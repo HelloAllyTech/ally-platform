@@ -162,8 +162,12 @@ class FeedbackHarness {
         GoRoute(
           path: '/share-for-review/:scenarioSessionId',
           builder: (context, state) {
-            final args = state.extra! as ShareForReviewArgs;
-            return Text('SHARE:${args.reviewId}:${args.contextDuration}:${args.contextTitle}');
+            final extra = state.extra! as ShareSimulationForReviewArgs;
+            final args = extra.args;
+            return Text(
+              'SHARE:${args.reviewId}:${args.contextDuration}:${args.contextTitle}'
+              ':${extra.coverImageUrl}:${extra.description}',
+            );
           },
         ),
       ],
