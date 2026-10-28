@@ -1,0 +1,58 @@
+name: Tests (ally-archiver)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "ally-archiver/**"
+      - ".github/workflows/test-ally-archiver.yml"
+  push:
+    branches: [master]
+    paths:
+      - "ally-archiver/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-ally-archiver-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: ally-archiver
+
+jobs:
+  test:
+    name: go test (ally-archiver)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    services:
+      # Same LocalStack as ally-be's compose file; the S3 client's integration test runs
+      # against it.
+      localstack:
+        image: localstack/localstack:3.8.1
+        env:
+          SERVICES: s3
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"\\(available\\|running\\)\"'"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ally-archiver/go.mod
+          cache-dependency-path: ally-archiver/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w ."; exit 1; }
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        env:
+          ARCHIVER_IT_S3: "1"
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+        run: go test -race ./...

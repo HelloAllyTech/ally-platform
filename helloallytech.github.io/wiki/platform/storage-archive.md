@@ -82,7 +82,7 @@ bucket. A copy of the ledger is written to the Storage Box after every run.
    - The VPN peer is registered through the operator portal (see [infra](../repos/infra.md)).
    - The Storage Box has external reachability off and SFTP only, with a sub-account limited to the
      archive directory.
-   - A least-privilege IAM user can list, get and delete on the in-scope buckets only.
+   - A least-privilege IAM user can list, get, delete and (for restores) put on the in-scope buckets only.
    - Provisioning code lives in the infra repo: the first Hetzner Cloud Terraform there, plus an
      Ansible role and a systemd unit.
 2. **Build** the [ally-archiver](../repos/ally-archiver.md) app.
