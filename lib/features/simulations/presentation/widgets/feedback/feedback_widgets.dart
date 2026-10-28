@@ -10,6 +10,7 @@ import '../../../../../core/theme/app_radius.dart';
 import '../../../data/simulation_models.dart';
 import '../../../data/simulations_repository.dart';
 import '../../../../../core/widgets/sized_network_image.dart';
+import '../../simulation_info_modal.dart';
 
 /// Port of RN `SimulationFeedbackScreen/components/SummaryCard`: a white
 /// card (0.5 stroke border, radius 8, soft shadow) with an optional title
@@ -332,14 +333,36 @@ class ShortSessionSummary extends ConsumerWidget {
               SizedBox(height: 24, child: Align(alignment: Alignment.centerLeft, child: Text('ID: $sessionName', style: _meta))),
             if (title != null && title.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: AppFonts.ibmPlexSerifRegular,
-                  fontSize: 14,
-                  height: 18.2 / 14,
-                  color: AppColors.highEmphasis,
-                ),
+              // styles.titleRow: title, gap 4, the 14pt help icon that opens
+              // RN's SimulationDetailsModal (read-only, fitContent).
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifRegular,
+                        fontSize: 14,
+                        height: 18.2 / 14,
+                        color: AppColors.highEmphasis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    key: const Key('short-session-help'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => SimulationInfoModal.show(
+                      context,
+                      headerTitle: title,
+                      title: ref.tr('simulationPage.simulationDetails'),
+                      description: data?.scenario?.description,
+                      coverImageUrl: cover,
+                      coverVideoUrl: data?.scenario?.coverVideoUrl,
+                    ),
+                    child: SvgPicture.asset('assets/icons/help.svg', width: 14, height: 14),
+                  ),
+                ],
               ),
             ],
             if (data != null) ...[
