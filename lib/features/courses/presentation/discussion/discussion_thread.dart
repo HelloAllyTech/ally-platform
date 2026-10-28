@@ -1,9 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/localization_controller.dart';
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_fonts.dart';
+import '../../../../core/theme/rn_scale.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../data/discussion_repository.dart';
 import 'discussion_post_input.dart';
@@ -52,7 +55,7 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
       ref.invalidate(discussionProvider(widget.itemId));
       return true;
     } catch (e) {
-      if (mounted) setState(() => _mutationError = '$e');
+      if (mounted) setState(() => _mutationError = discussionErrorMessage(e) ?? ref.tr('common.somethingWentWrong'));
       return false;
     }
   }
@@ -103,137 +106,199 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
 
   @override
   Widget build(BuildContext context) {
-    // Watched unconditionally (not just lazily via `ref.t()` once data
-    // arrives) so the bundled-asset load starts on the very first frame
-    // regardless of `discussionProvider`'s own loading state — same
-    // precedent as `main.dart`'s `AllyApp`/`ProfileSettingsScreen`/
-    // `LanguageSelectorSheet`'s own eager pre-watch of this provider.
     ref.watch(localizationControllerProvider);
     final discussionAsync = ref.watch(discussionProvider(widget.itemId));
+    final data = discussionAsync.value;
+    final size = RnSize.of(context);
+    final isLoading = discussionAsync.isLoading && data == null;
+    final isError = discussionAsync.hasError && data == null;
+    final isFetching = discussionAsync.isLoading && data != null;
+    final primarySpinner = const CupertinoActivityIndicator(color: AppColors.primary);
 
-    return Container(
-      key: const Key('discussion-thread'),
-      constraints: const BoxConstraints(maxHeight: 320),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.strokePrimary))),
-      child: discussionAsync.when(
-        loading: () => const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  ref.t('courses.discussion.loadFailed'),
-                  style: const TextStyle(color: AppColors.mediumEmphasis),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: 120,
-                  child: AppButton(
-                    key: const Key('discussion-retry'),
-                    size: AppButtonSize.sm,
-                    label: ref.t('courses.player.retry'),
-                    onPressed: () => ref.invalidate(discussionProvider(widget.itemId)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        data: (data) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final Widget body;
+    if (isLoading) {
+      body = Padding(
+        padding: EdgeInsets.symmetric(vertical: size.mvs(20)),
+        child: Center(child: primarySpinner),
+      );
+    } else if (isError) {
+      // styles.centered: paddingVertical 20@mvs, gap 10@mvs.
+      body = Padding(
+        padding: EdgeInsets.symmetric(vertical: size.mvs(20)),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${ref.t('courses.discussion.heading')} (${data.postCount})',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: AppColors.highEmphasis),
-                  ),
-                ),
-                if (data.viewer.canModerate)
-                  InkWell(
-                    key: const Key('discussion-lock-toggle'),
-                    onTap: () => _handleToggleDiscussionLock(data.isLocked),
-                    child: Text(
-                      data.isLocked
-                          ? ref.t('courses.discussion.unlockDiscussion')
-                          : ref.t('courses.discussion.lockDiscussion'),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  if (data.posts.isEmpty)
-                    Padding(
-                      key: const Key('discussion-empty-state'),
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Column(
-                        children: [
-                          Text(
-                            ref.t('courses.discussion.emptyTitle'),
-                            style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.highEmphasis),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            ref.t('courses.discussion.emptyBody'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 13, color: AppColors.mediumEmphasis),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    for (final post in data.posts)
-                      DiscussionPostTile(
-                        key: ValueKey(post.id),
-                        post: post,
-                        maxLength: data.viewer.maxLength,
-                        highlightPostId: widget.highlightPostId,
-                        isSubmittingReply: _isReplying,
-                        isSubmittingEdit: _isEditing,
-                        onReply: _handleReply,
-                        onEdit: _handleEdit,
-                        onDelete: _handleDelete,
-                        onToggleLock: _handleToggleLock,
-                      ),
-                  if (_mutationError != null)
-                    Padding(
-                      key: const Key('discussion-mutation-error'),
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(_mutationError!, style: const TextStyle(fontSize: 12, color: AppColors.red400)),
-                    ),
-                  const SizedBox(height: 8),
-                  if (data.isLocked)
-                    Text(
-                      key: const Key('discussion-locked-note'),
-                      ref.t('courses.discussion.discussionLocked'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.mediumEmphasis),
-                    )
-                  else if (data.viewer.canPost)
-                    DiscussionPostInput(
-                      key: const Key('discussion-composer'),
-                      controller: _draftController,
-                      onSubmit: _handleSubmitPost,
-                      maxLength: data.viewer.maxLength,
-                      isSubmitting: _isPosting,
-                      submitLabel: ref.t('courses.discussion.post'),
-                    ),
-                ],
+            Text(
+              ref.t('courses.discussion.loadFailed'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifRegular,
+                fontSize: 14,
+                color: AppColors.mediumEmphasis,
               ),
+            ),
+            SizedBox(height: size.mvs(10)),
+            AppButton(
+              key: const Key('discussion-retry'),
+              size: AppButtonSize.sm,
+              label: ref.t('courses.player.retry'),
+              onPressed: () => ref.invalidate(discussionProvider(widget.itemId)),
             ),
           ],
         ),
+      );
+    } else {
+      final thread = data!;
+      body = Flexible(
+        child: SingleChildScrollView(
+          key: const Key('keyboard-aware-scroll-view'),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (thread.posts.isEmpty)
+                Padding(
+                  key: const Key('discussion-empty-state'),
+                  padding: EdgeInsets.symmetric(vertical: size.mvs(20)),
+                  child: Column(
+                    children: [
+                      Text(
+                        ref.t('courses.discussion.emptyTitle'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifMedium,
+                          fontSize: 14,
+                          color: AppColors.highEmphasis,
+                        ),
+                      ),
+                      SizedBox(height: size.mvs(4)),
+                      Text(
+                        ref.t('courses.discussion.emptyBody'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 13,
+                          color: AppColors.mediumEmphasis,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                for (final post in thread.posts)
+                  DiscussionPostTile(
+                    key: ValueKey(post.id),
+                    post: post,
+                    maxLength: thread.viewer.maxLength,
+                    highlightPostId: widget.highlightPostId,
+                    isSubmittingReply: _isReplying,
+                    isSubmittingEdit: _isEditing,
+                    onReply: _handleReply,
+                    onEdit: _handleEdit,
+                    onDelete: _handleDelete,
+                    onToggleLock: _handleToggleLock,
+                  ),
+              if (isFetching)
+                Padding(
+                  key: const Key('discussion-refreshing'),
+                  padding: EdgeInsets.symmetric(vertical: size.mvs(8)),
+                  child: Center(child: primarySpinner),
+                ),
+              if (_mutationError != null)
+                Text(
+                  _mutationError!,
+                  key: const Key('discussion-mutation-error'),
+                  style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 12, color: AppColors.red400),
+                ),
+              if (thread.isLocked)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: size.mvs(8)),
+                  child: Text(
+                    ref.t('courses.discussion.discussionLocked'),
+                    key: const Key('discussion-locked-note'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 13,
+                      color: AppColors.mediumEmphasis,
+                    ),
+                  ),
+                )
+              else if (thread.viewer.canPost)
+                DiscussionPostInput(
+                  testId: 'discussion-composer',
+                  controller: _draftController,
+                  onSubmit: _handleSubmitPost,
+                  maxLength: thread.viewer.maxLength,
+                  isSubmitting: _isPosting,
+                  submitLabel: ref.t('courses.discussion.post'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // styles.container: borderTop 1, paddingHorizontal 16, paddingVertical
+    // 12@mvs, gap 8@mvs. RN gives the panel no fixed height (its scroll view
+    // is flex 1 under the item player); here it is capped so the item above
+    // keeps its room.
+    return Container(
+      key: const Key('discussion-thread'),
+      constraints: const BoxConstraints(maxHeight: 320),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: size.mvs(12)),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.strokePrimary))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${ref.t('courses.discussion.heading')}${data != null ? ' (${data.postCount})' : ''}',
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 16,
+                    color: AppColors.highEmphasis,
+                  ),
+                ),
+              ),
+              if (data?.viewer.canModerate ?? false)
+                GestureDetector(
+                  key: const Key('discussion-lock-toggle'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _handleToggleDiscussionLock(data.isLocked),
+                  child: Text(
+                    data!.isLocked
+                        ? ref.t('courses.discussion.unlockDiscussion')
+                        : ref.t('courses.discussion.lockDiscussion'),
+                    style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 12, color: AppColors.primary),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: size.mvs(8)),
+          body,
+        ],
       ),
     );
   }
+}
+
+/// RN `getErrorDetails(err).message`: the API's `message` (or `error`)
+/// field; null when there is none so the caller falls back to
+/// `common.somethingWentWrong`.
+String? discussionErrorMessage(Object error) {
+  if (error is DioException) {
+    final data = error.response?.data;
+    if (data is Map) {
+      final message = data['message'];
+      if (message is String && message.isNotEmpty) return message;
+      if (message is List && message.isNotEmpty) return message.join(', ');
+      final err = data['error'];
+      if (err is String && err.isNotEmpty) return err;
+    }
+  }
+  return null;
 }

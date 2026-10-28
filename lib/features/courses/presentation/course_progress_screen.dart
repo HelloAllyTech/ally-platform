@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
@@ -92,8 +93,13 @@ class _CourseProgressScreenState extends ConsumerState<CourseProgressScreen> {
       ),
       body: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
+        // RN: EmptyState with the DataUnavailable icon and notFound title.
         error: (error, _) => Center(
-          child: Text('${ref.t('courses.progressDashboard.notFound')}: $error'),
+          child: AppEmptyState(
+            key: const Key('course-progress-error'),
+            iconAsset: 'assets/icons/dataUnavailable.svg',
+            title: ref.t('courses.progressDashboard.notFound'),
+          ),
         ),
         data: (progress) => ListView(
           padding: const EdgeInsets.all(24),

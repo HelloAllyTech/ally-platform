@@ -152,4 +152,15 @@ void main() {
       ).called(1);
     });
   });
+
+  test('getModeratorTenants GETs /learn/track-items/:id/discussion/tenants', () async {
+    when(() => dio.get<List<dynamic>>('/learn/track-items/item-1/discussion/tenants')).thenAnswer(
+      (_) async => _response(<dynamic>[
+        {'tenantId': 't1', 'tenantName': 'Org'},
+      ]),
+    );
+    final tenants = await repository.getModeratorTenants('item-1');
+    expect(tenants.single.tenantId, 't1');
+    expect(tenants.single.tenantName, 'Org');
+  });
 }

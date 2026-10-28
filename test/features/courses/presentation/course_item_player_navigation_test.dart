@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/course_button.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_item_player_screen.dart';
 
 import '../../../support/pump_router_app.dart';
@@ -66,6 +66,16 @@ StartItemPayload _articlePayload(String html) => StartItemPayload(
   articleQuestions: const [],
 );
 
+CourseButton _button(WidgetTester tester, String key) => tester.widget<CourseButton>(find.byKey(Key(key)));
+
+/// The article's footer unlocks after RN's 3s no-scroll grace period.
+Future<void> _markRead(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 3));
+  await tester.pump();
+  await tester.tap(find.text('Mark as read'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late MockCoursesRepository repository;
 
@@ -114,11 +124,11 @@ void main() {
       );
 
       expect(
-        tester.widget<AppButton>(find.widgetWithText(AppButton, 'Prev')).isDisabled,
+        _button(tester, 'player-prev-button').isDisabled,
         isTrue,
       );
       expect(
-        tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next')).isDisabled,
+        _button(tester, 'player-next-button').isDisabled,
         isTrue,
         reason: 'item1 has not reported completion yet',
       );
@@ -126,11 +136,10 @@ void main() {
       expect(find.byKey(const ValueKey('progress-segment-item2')), findsOneWidget);
       expect(find.text('0% complete'), findsOneWidget);
 
-      await tester.tap(find.text('Mark as read'));
-      await tester.pumpAndSettle();
+      await _markRead(tester);
 
       expect(
-        tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next')).isDisabled,
+        _button(tester, 'player-next-button').isDisabled,
         isFalse,
         reason: 'markArticleRead resolved, unlocking forward navigation',
       );
@@ -147,19 +156,18 @@ void main() {
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
       );
 
-      await tester.tap(find.text('Mark as read'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(AppButton, 'Next'));
+      await _markRead(tester);
+      await tester.tap(find.byKey(const Key('player-next-button')));
       await tester.pumpAndSettle();
 
       verify(() => repository.startTrackItem('item2')).called(1);
       expect(
-        tester.widget<AppButton>(find.widgetWithText(AppButton, 'Prev')).isDisabled,
+        _button(tester, 'player-prev-button').isDisabled,
         isFalse,
         reason: 'item2 is no longer the first item',
       );
       // The last item's Next button relabels to Finish.
-      expect(find.widgetWithText(AppButton, 'Finish'), findsOneWidget);
+      expect(find.widgetWithText(CourseButton, 'Finish'), findsOneWidget);
     },
   );
 
@@ -173,14 +181,12 @@ void main() {
       overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.text('Mark as read'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(AppButton, 'Next'));
+    await _markRead(tester);
+    await tester.tap(find.byKey(const Key('player-next-button')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mark as read'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(AppButton, 'Finish'));
+    await _markRead(tester);
+    await tester.tap(find.widgetWithText(CourseButton, 'Finish'));
     await tester.pumpAndSettle();
 
     expect(find.text('OVERVIEW'), findsOneWidget);
@@ -196,7 +202,7 @@ void main() {
       overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byKey(const Key('player-exit-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('OVERVIEW'), findsOneWidget);

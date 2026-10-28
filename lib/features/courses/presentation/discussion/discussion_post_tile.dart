@@ -1,11 +1,14 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/confirmation_modal.dart';
+import '../../../../core/theme/app_fonts.dart';
+import '../../../../core/theme/rn_scale.dart';
 import '../../data/discussion_models.dart';
+import '../course_styles.dart';
 import 'discussion_post_input.dart';
 
 /// Visual indent step per depth, capped — depth only ever goes to 3. Direct
@@ -24,7 +27,9 @@ String _timeAgo(String iso) {
   if (hours < 24) return '${hours}h ago';
   final days = hours ~/ 24;
   if (days < 7) return '${days}d ago';
-  return '${date.day}/${date.month}/${date.year}';
+  // `toLocaleDateString()` (en-US): M/D/YYYY.
+  final local = date.toLocal();
+  return '${local.month}/${local.day}/${local.year}';
 }
 
 /// Direct port of ally-mobile (React Native)'s `src/components/
@@ -74,14 +79,27 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
     super.dispose();
   }
 
+  /// RN `Alert.alert` with a Cancel and a destructive Delete — the native
+  /// iOS alert, so a Cupertino dialog here.
   Future<void> _handleDelete() async {
-    final confirmed = await ConfirmationModal.show(
-      context,
-      title: ref.t('courses.discussion.deleteConfirmTitle'),
-      description: ref.t('courses.discussion.deleteConfirmBody'),
-      confirmLabel: ref.t('courses.discussion.delete'),
-      cancelLabel: ref.t('common.cancel'),
-      confirmVariant: AppButtonVariant.destructive,
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(ref.t('courses.discussion.deleteConfirmTitle')),
+        content: Text(ref.t('courses.discussion.deleteConfirmBody')),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(ref.t('common.cancel')),
+          ),
+          CupertinoDialogAction(
+            key: const Key('discussion-delete-confirm'),
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(ref.t('courses.discussion.delete')),
+          ),
+        ],
+      ),
     );
     if (confirmed == true) widget.onDelete(widget.post.id);
   }
@@ -102,45 +120,61 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
+    final size = RnSize.of(context);
     final indent = (post.depth - 1).clamp(0, _maxIndentDepth - 1) * _indentStep;
+    // styles.container: paddingVertical 10@mvs, borderTop 1, gap 4@mvs.
+    final gap = size.mvs(4);
 
     if (post.isDeletedByAuthor) {
-      return Padding(
-        padding: EdgeInsets.only(left: indent),
+      return Container(
+        margin: EdgeInsets.only(left: indent),
+        padding: EdgeInsets.symmetric(vertical: size.mvs(10)),
+        decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.strokePrimary))),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: withGap<Widget>([
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: EdgeInsets.symmetric(vertical: size.mvs(10)),
               child: Text(
                 ref.t('courses.discussion.deletedByAuthor'),
-                style: const TextStyle(fontStyle: FontStyle.italic, color: AppColors.lowEmphasis),
+                style: CourseText.serif(
+                  CourseType.bodyMedium,
+                  AppColors.lowEmphasis,
+                ).copyWith(fontStyle: FontStyle.italic),
               ),
             ),
             for (final reply in post.replies) _buildReplyTile(reply),
-          ],
+          ], () => SizedBox(height: gap)),
         ),
       );
     }
 
     final isHighlighted = widget.highlightPostId != null && widget.highlightPostId == post.id;
+    const actionStyle = TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 12, color: AppColors.primary);
 
     return Container(
       margin: EdgeInsets.only(left: indent),
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: size.mvs(10)),
       decoration: BoxDecoration(
         border: const Border(top: BorderSide(color: AppColors.strokePrimary)),
-        color: isHighlighted ? AppColors.primaryLight.withValues(alpha: 0.1) : null,
+        // styles.highlighted: ds.theme.onSecondary (white).
+        color: isHighlighted ? Colors.white : null,
       ),
       child: Column(
         key: Key('discussion-post-${post.id}'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: withGap<Widget>([
           Row(
             children: [
-              Text(
-                post.author?.name ?? '',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.highEmphasis),
+              Flexible(
+                child: Text(
+                  post.author?.name ?? '',
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 13,
+                    color: AppColors.highEmphasis,
+                  ),
+                ),
               ),
               const SizedBox(width: 6),
               Text(
@@ -150,18 +184,22 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
                               ? ' · ${ref.t('courses.discussion.editedByModerator')}'
                               : ' · ${ref.t('courses.discussion.edited')}'
                         : ''),
-                style: const TextStyle(fontSize: 11, color: AppColors.lowEmphasis),
+                style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 11, color: AppColors.lowEmphasis),
               ),
               if (post.isLocked) ...[
-                const SizedBox(width: 4),
-                Icon(Icons.lock_outline, size: 12, color: AppColors.mediumEmphasis, key: Key('post-lock-badge-${post.id}')),
+                const SizedBox(width: 6 + 2),
+                SvgPicture.asset(
+                  'assets/icons/lock.svg',
+                  key: Key('post-lock-badge-${post.id}'),
+                  width: size.raw(12),
+                  height: size.raw(12),
+                ),
               ],
             ],
           ),
-          const SizedBox(height: 4),
           if (_isEditing)
             DiscussionPostInput(
-              key: Key('discussion-post-${post.id}-edit'),
+              testId: 'discussion-post-${post.id}-edit',
               controller: _editController,
               onSubmit: _submitEdit,
               maxLength: widget.maxLength,
@@ -174,63 +212,54 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
               },
             )
           else
-            Text(post.content ?? '', style: const TextStyle(color: AppColors.highEmphasis)),
+            Text(post.content ?? '', style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
           if (post.isLocked)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                ref.t('courses.discussion.threadLocked'),
-                style: const TextStyle(fontSize: 11, color: AppColors.mediumEmphasis),
-              ),
+            Text(
+              ref.t('courses.discussion.threadLocked'),
+              style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 11, color: AppColors.mediumEmphasis),
             ),
           if (!_isEditing)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: EdgeInsets.only(top: size.mvs(2)),
               child: Row(
-                children: [
+                children: withGap<Widget>([
                   if (post.canReply)
-                    _ActionText(
+                    _Tap(
                       key: Key('discussion-post-${post.id}-reply-toggle'),
-                      label: ref.t('courses.discussion.reply'),
                       onTap: () => setState(() => _isReplying = !_isReplying),
+                      child: Text(ref.t('courses.discussion.reply'), style: actionStyle),
                     ),
                   if (post.canEdit)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: InkWell(
-                        key: Key('discussion-post-${post.id}-edit-toggle'),
-                        onTap: () => setState(() => _isEditing = true),
-                        child: const Icon(Icons.edit_outlined, size: 14, color: AppColors.mediumEmphasis),
-                      ),
+                    _Tap(
+                      key: Key('discussion-post-${post.id}-edit-toggle'),
+                      onTap: () => setState(() => _isEditing = true),
+                      child: SvgPicture.asset('assets/icons/edit.svg', width: size.raw(14), height: size.raw(14)),
                     ),
                   if (post.canDelete)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: InkWell(
-                        key: Key('discussion-post-${post.id}-delete'),
-                        onTap: _handleDelete,
-                        child: const Icon(Icons.delete_outline, size: 14, color: AppColors.mediumEmphasis),
-                      ),
+                    _Tap(
+                      key: Key('discussion-post-${post.id}-delete'),
+                      onTap: _handleDelete,
+                      child: SvgPicture.asset('assets/icons/delete.svg', width: size.raw(14), height: size.raw(14)),
                     ),
                   if (post.canLock)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: _ActionText(
-                        key: Key('discussion-post-${post.id}-lock-toggle'),
-                        label: post.isLocked
+                    _Tap(
+                      key: Key('discussion-post-${post.id}-lock-toggle'),
+                      onTap: () => widget.onToggleLock(post.id, !post.isLocked),
+                      child: Text(
+                        post.isLocked
                             ? ref.t('courses.discussion.unlockThread')
                             : ref.t('courses.discussion.lockThread'),
-                        onTap: () => widget.onToggleLock(post.id, !post.isLocked),
+                        style: actionStyle,
                       ),
                     ),
-                ],
+                ], () => const SizedBox(width: 16)),
               ),
             ),
           if (_isReplying)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(top: size.mvs(8)),
               child: DiscussionPostInput(
-                key: Key('discussion-post-${post.id}-reply'),
+                testId: 'discussion-post-${post.id}-reply',
                 controller: _replyController,
                 onSubmit: _submitReply,
                 maxLength: widget.maxLength,
@@ -244,7 +273,7 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
               ),
             ),
           for (final reply in post.replies) _buildReplyTile(reply),
-        ],
+        ], () => SizedBox(height: gap)),
       ),
     );
   }
@@ -263,17 +292,13 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> {
   );
 }
 
-class _ActionText extends StatelessWidget {
-  const _ActionText({super.key, required this.label, required this.onTap});
+class _Tap extends StatelessWidget {
+  const _Tap({super.key, required this.onTap, required this.child});
 
-  final String label;
   final VoidCallback onTap;
+  final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-    );
-  }
+  Widget build(BuildContext context) =>
+      GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: child);
 }

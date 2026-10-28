@@ -3,20 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/html_rich_text.dart';
 import '../../data/courses_repository.dart';
+import '../../data/quiz_answer_state.dart';
 import '../../data/quiz_models.dart';
 import '../../data/start_item_payload.dart';
+import '../course_button.dart';
+import '../course_styles.dart';
+import '../question_media.dart';
 import '../quiz/quiz_question_widget.dart';
 
-/// Port of ally-mobile (React Native)'s `VideoInterjectionModal` — a
-/// blocking dialog for a video interjection, reusing the same
-/// [QuizQuestionWidget] the standalone quiz player uses (one question, no
-/// back/skip). The learner cannot dismiss it without submitting, same as
-/// the RN original having no `onRequestClose` handling.
+/// Port of RN `components/players/VideoInterjectionModal.tsx`: a blocking
+/// card (max width 420, max 80% of the screen, radius 20, padding 20, gap
+/// 12) with the same quiz widgets as the quiz player — title, prompt,
+/// media, the answer control and Submit; then a Correct / Incorrect pill,
+/// "Keep going with the video." and Continue. It can't be dismissed
+/// without answering. A failed submit stays on the question.
 ///
-/// Returns `true` once the learner has submitted and tapped Continue —
-/// the caller (the video item player) resumes playback on that signal.
+/// Pops `true` on Continue — the caller resumes playback.
 class VideoInterjectionDialog extends ConsumerStatefulWidget {
   const VideoInterjectionDialog({
     super.key,
@@ -32,35 +36,27 @@ class VideoInterjectionDialog extends ConsumerStatefulWidget {
 }
 
 class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialog> {
-  QuizAnswerInput? _answer;
-  QuizQuestionResult? _result;
+  late QuizAnswerState _answerState = initialAnswerState(widget.interjection.question);
+  bool? _correct;
   bool _isSubmitting = false;
-  String? _error;
+  bool _feedback = false;
 
   Future<void> _submit() async {
-    final answer = _answer;
-    if (answer == null || _isSubmitting) return;
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
     try {
       final result = await ref.read(coursesRepositoryProvider).submitInterjectionAnswer(
             itemId: widget.itemId,
             interjectionId: widget.interjection.id,
-            answer: answer,
+            answer: toAnswerInput(widget.interjection.question, _answerState),
           );
+      if (!mounted) return;
       setState(() {
-        _result = QuizQuestionResult(
-          questionId: widget.interjection.question.id,
-          correct: result.correct,
-          pointsAwarded: result.pointsAwarded,
-          pointsPossible: result.pointsPossible,
-          explanation: null,
-        );
+        _correct = result.correct;
+        _feedback = true;
       });
-    } catch (e) {
-      setState(() => _error = '${ref.tr('courses.video.interjection.submitError')}: $e');
+    } catch (_) {
+      // Stays on the question so the learner can retry submitting.
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -68,59 +64,104 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+    final question = widget.interjection.question;
+    final answered = isQuizQuestionAnswered(question, _answerState);
+    final promptHtml = question.promptHtml;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
+
+    final List<Widget> children;
+    if (!_feedback) {
+      children = [
+        Text(
+          ref.t('courses.video.interjection.title'),
+          textAlign: TextAlign.center,
+          style: CourseText.serifMedium(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
+        ),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 4),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  ref.t('courses.video.interjection.title'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: QuizQuestionWidget(
-                      question: widget.interjection.question,
-                      showResult: _result,
-                      // Must trigger a rebuild of *this* widget, not just
-                      // mutate the field — `QuizQuestionWidget`'s own
-                      // `setState()` only rebuilds its own subtree, so
-                      // without this the Submit button below (built here,
-                      // not inside QuizQuestionWidget) never reflects that
-                      // an answer was chosen and stays permanently
-                      // disabled. Found via widget testing — see
-                      // video_interjection_dialog_test.dart.
-                      onChanged: (answer) => setState(() => _answer = answer),
-                    ),
-                  ),
-                ),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
-                  ),
-                if (_result == null)
-                  AppButton(
-                    label: ref.t('courses.video.interjection.submit'),
-                    isDisabled: _answer == null,
-                    isLoading: _isSubmitting,
-                    onPressed: _answer == null ? null : _submit,
-                  )
+                if (promptHtml != null && promptHtml.isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(bottom: 8), child: HtmlRichText(html: promptHtml))
                 else
-                  AppButton(
-                    label: ref.t('courses.video.interjection.continue'),
-                    onPressed: () => Navigator.of(context).pop(true),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(question.prompt, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
+                  ),
+                QuestionMediaView(media: question.media),
+                // open_ended / likert never appear in interjections.
+                if (question.type != QuizQuestionType.openEnded && question.type != QuizQuestionType.likertScale)
+                  QuizQuestionWidget(
+                    question: question,
+                    state: _answerState,
+                    onChanged: (next) => setState(() => _answerState = next),
                   ),
               ],
+            ),
+          ),
+        ),
+        CourseButton(
+          key: const Key('interjection-submit'),
+          label: ref.t('courses.video.interjection.submit'),
+          isDisabled: !answered || _isSubmitting,
+          isLoading: _isSubmitting,
+          onPressed: _submit,
+        ),
+      ];
+    } else {
+      final correct = _correct == true;
+      children = [
+        Center(
+          child: Container(
+            key: const Key('interjection-status'),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: correct ? AppColors.green50 : AppColors.red50,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              correct ? ref.t('courses.quiz.results.correct') : ref.t('courses.quiz.results.incorrect'),
+              style: CourseText.serifMedium(
+                CourseType.bodySmall,
+                correct ? AppColors.green800 : AppColors.red600,
+                weight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+        Text(
+          ref.t('courses.video.interjection.continueBody'),
+          textAlign: TextAlign.center,
+          style: CourseText.roboto(CourseType.bodySmall, AppColors.mediumEmphasis),
+        ),
+        CourseButton(
+          key: const Key('interjection-continue'),
+          label: ref.t('courses.video.interjection.continue'),
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ];
+    }
+
+    return PopScope(
+      canPop: false,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 420, maxHeight: maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: withGap(children, () => const SizedBox(height: 12)),
+                ),
+              ),
             ),
           ),
         ),

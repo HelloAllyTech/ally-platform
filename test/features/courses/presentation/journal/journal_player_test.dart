@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/course_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
@@ -102,8 +102,8 @@ void main() {
       ),
     );
 
-    AppButton submitButton() =>
-        tester.widget<AppButton>(find.byType(AppButton));
+    CourseButton submitButton() =>
+        tester.widget<CourseButton>(find.byType(CourseButton));
 
     // Only the required prompt is missing text — Submit stays disabled.
     expect(submitButton().isDisabled, isTrue);
@@ -165,13 +165,13 @@ void main() {
       await tester.enterText(find.byType(TextField).first, 'Learned a lot');
       await tester.pump();
 
-      await tester.tap(find.byType(AppButton));
+      await tester.tap(find.byType(CourseButton));
       await tester.pumpAndSettle();
 
       verify(() => repository.submitJournal('item1')).called(1);
       expect(completedCalled, isTrue);
       // Submitted state: no Submit button, fields disabled.
-      expect(find.byType(AppButton), findsNothing);
+      expect(find.byType(CourseButton), findsNothing);
       final field = tester.widget<TextField>(find.byType(TextField).first);
       expect(field.enabled, isFalse);
     },
@@ -198,7 +198,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(AppButton), findsNothing);
+      expect(find.byType(CourseButton), findsNothing);
       final field = tester.widget<TextField>(find.byType(TextField).first);
       expect(field.enabled, isFalse);
       expect(field.controller?.text, 'Already answered');

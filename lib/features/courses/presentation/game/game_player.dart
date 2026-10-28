@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
+import '../course_styles.dart';
 
 /// Every game bundle the app can render, by `TrackGameKey` string — each
 /// asset is the exact HTML ally-mobile (React Native)'s `GamePlayer` embeds
@@ -34,6 +36,96 @@ const Map<String, double> _gameHeights = {
   'SNAKE': 400,
   'SPROUT': 420,
 };
+
+
+/// RN `FRAME_STRING_KEYS`: words a bundle draws inside its own WebView, by
+/// game. Handed to the frame as `window.__allyGameStrings` before the
+/// document runs, so the first paint is in the learner's language. The
+/// values are templates for the bundle to fill (`{{moves}}`), so they are
+/// looked up without interpolation. A bundle falls back to its own English
+/// when a game has no entry.
+const Map<String, Map<String, String>> gameFrameStringKeys = {
+  'MEMORY_MATCH': {
+    'moves': 'courses.game.frameStrings.MEMORY_MATCH.moves',
+    'restart': 'courses.game.frameStrings.MEMORY_MATCH.restart',
+    'wonTitle': 'courses.game.frameStrings.MEMORY_MATCH.wonTitle',
+    'wonDetail': 'courses.game.frameStrings.MEMORY_MATCH.wonDetail',
+    'playAgain': 'courses.game.frameStrings.MEMORY_MATCH.playAgain',
+    'cardLabel': 'courses.game.frameStrings.MEMORY_MATCH.cardLabel',
+  },
+  'CUB_N_PUP': {
+    'levels': 'courses.game.frameStrings.CUB_N_PUP.levels',
+    'close': 'courses.game.frameStrings.CUB_N_PUP.close',
+    'nextLevel': 'courses.game.frameStrings.CUB_N_PUP.nextLevel',
+    'solved': 'courses.game.frameStrings.CUB_N_PUP.solved',
+    'tutorial': 'courses.game.frameStrings.CUB_N_PUP.tutorial',
+    'hintDragToStar': 'courses.game.frameStrings.CUB_N_PUP.hintDragToStar',
+    'hintRotate': 'courses.game.frameStrings.CUB_N_PUP.hintRotate',
+    'hintFree': 'courses.game.frameStrings.CUB_N_PUP.hintFree',
+    'hintPivot': 'courses.game.frameStrings.CUB_N_PUP.hintPivot',
+    'hintRotateLink': 'courses.game.frameStrings.CUB_N_PUP.hintRotateLink',
+  },
+  'SNAKE': {
+    'score': 'courses.game.frameStrings.SNAKE.score',
+    'best': 'courses.game.frameStrings.SNAKE.best',
+    'restart': 'courses.game.frameStrings.SNAKE.restart',
+    'gameOver': 'courses.game.frameStrings.SNAKE.gameOver',
+  },
+  'SPROUT': {
+    'pickerLabel': 'courses.game.frameStrings.SPROUT.pickerLabel',
+    'plantSUCCULENT': 'courses.game.frameStrings.SPROUT.plantSUCCULENT',
+    'plantMARIGOLD': 'courses.game.frameStrings.SPROUT.plantMARIGOLD',
+    'plantFERN': 'courses.game.frameStrings.SPROUT.plantFERN',
+    'plantTOMATO': 'courses.game.frameStrings.SPROUT.plantTOMATO',
+    'visitorsLabel': 'courses.game.frameStrings.SPROUT.visitorsLabel',
+    'hintStart': 'courses.game.frameStrings.SPROUT.hintStart',
+    'aimSoil': 'courses.game.frameStrings.SPROUT.aimSoil',
+    'aimLeaves': 'courses.game.frameStrings.SPROUT.aimLeaves',
+    'aimAway': 'courses.game.frameStrings.SPROUT.aimAway',
+    'stateDry': 'courses.game.frameStrings.SPROUT.stateDry',
+    'stateGood': 'courses.game.frameStrings.SPROUT.stateGood',
+    'stateWet': 'courses.game.frameStrings.SPROUT.stateWet',
+    'stage0': 'courses.game.frameStrings.SPROUT.stage0',
+    'stage1': 'courses.game.frameStrings.SPROUT.stage1',
+    'stage2': 'courses.game.frameStrings.SPROUT.stage2',
+    'stage3': 'courses.game.frameStrings.SPROUT.stage3',
+    'stage4': 'courses.game.frameStrings.SPROUT.stage4',
+    'stage5': 'courses.game.frameStrings.SPROUT.stage5',
+    'leafDropped': 'courses.game.frameStrings.SPROUT.leafDropped',
+    'leafScorched': 'courses.game.frameStrings.SPROUT.leafScorched',
+    'bloomed': 'courses.game.frameStrings.SPROUT.bloomed',
+    'plantAnother': 'courses.game.frameStrings.SPROUT.plantAnother',
+    'visitorArrived': 'courses.game.frameStrings.SPROUT.visitorArrived',
+    'visitorBEE': 'courses.game.frameStrings.SPROUT.visitorBEE',
+    'visitorBUTTERFLY': 'courses.game.frameStrings.SPROUT.visitorBUTTERFLY',
+    'visitorLADYBIRD': 'courses.game.frameStrings.SPROUT.visitorLADYBIRD',
+  },
+};
+
+/// The bridge shim plus (when the game has [gameFrameStringKeys]) the
+/// translated strings, as one `<script>` to run before the bundle's own.
+/// RN does this with `injectedJavaScriptBeforeContentLoaded`;
+/// `webview_flutter` has no such hook, so it is prepended to the document.
+/// `jsonEncode` keeps a quote or newline in a translation from breaking out.
+String gameBootstrapScript(Map<String, String>? strings) {
+  final buffer = StringBuffer('<script>')
+    ..write(
+      'if (window.AllyGameChannel && !window.ReactNativeWebView) {'
+      'window.ReactNativeWebView = {postMessage: function(d) { AllyGameChannel.postMessage(d); }};'
+      '}',
+    );
+  if (strings != null) buffer.write('window.__allyGameStrings = ${jsonEncode(strings)};');
+  buffer.write('</script>');
+  return buffer.toString();
+}
+
+/// Inserts [script] at the start of the document's `<head>` (or before
+/// everything when there is none), so it runs before any bundle script.
+String injectBeforeContent(String html, String script) {
+  final head = RegExp(r'<head[^>]*>', caseSensitive: false).firstMatch(html);
+  if (head != null) return html.replaceRange(head.end, head.end, script);
+  return '$script$html';
+}
 
 /// Port of ally-mobile (React Native)'s `GamePlayer` — renders a
 /// self-contained HTML5 game bundle in a WebView.
@@ -77,7 +169,7 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
   WebViewController? _controller;
   int? _bestScore;
   int? _lastScore;
-  String? _loadError;
+  bool _unsupported = false;
 
   @override
   void initState() {
@@ -113,10 +205,14 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
     final gameKey = widget.payload.gameKey;
     final assetPath = _gameAssetPaths[gameKey];
     if (assetPath == null) {
-      setState(() => _loadError = ref.tr('courses.player.unsupportedTitle'));
+      setState(() => _unsupported = true);
       return;
     }
-    final html = await rootBundle.loadString(assetPath);
+    final rawHtml = await rootBundle.loadString(assetPath);
+    if (!mounted) return;
+    final keys = gameFrameStringKeys[gameKey];
+    final strings = keys == null ? null : {for (final e in keys.entries) e.key: ref.tr(e.value)};
+    final html = injectBeforeContent(rawHtml, gameBootstrapScript(strings));
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel(
@@ -136,6 +232,7 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
           },
         ),
       )
+      ..setBackgroundColor(Colors.white)
       ..loadHtmlString(html);
     if (mounted) setState(() => _controller = controller);
   }
@@ -164,60 +261,82 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
   @override
   Widget build(BuildContext context) {
     final gameKey = widget.payload.gameKey;
-    final height = _gameHeights[gameKey] ?? 300;
+    final height = _gameHeights[gameKey];
 
-    if (_loadError != null) {
+    if (_unsupported || height == null) {
+      // styles.unsupported: centred column, gap 12, paddingHorizontal 24.
       return Center(
+        key: const Key('game-unsupported'),
         child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(_loadError!),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                ref.t('courses.player.unsupportedTitle'),
+                textAlign: TextAlign.center,
+                style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                ref.t('courses.player.unsupportedBody'),
+                textAlign: TextAlign.center,
+                style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if ((widget.payload.gameIntro ?? '').isNotEmpty) ...[
-          Text(
-            widget.payload.gameIntro!,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-        ],
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: height,
-            child: _controller == null
-                ? const Center(child: CircularProgressIndicator())
-                : WebViewWidget(controller: _controller!),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_lastScore != null) ...[
-              Text(
-                ref.t('courses.game.lastScore.$gameKey', {'score': _lastScore}),
+    final small = CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis);
+    // styles.content: flexGrow 1, centred, gap 12, padding 16.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        key: const Key('game-player'),
+        padding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: (constraints.maxHeight - 32).clamp(0, double.infinity)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: withGap<Widget>([
+              if ((widget.payload.gameIntro ?? '').isNotEmpty)
+                Text(
+                  widget.payload.gameIntro!,
+                  textAlign: TextAlign.center,
+                  style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+                ),
+              // styles.frame: full width, radius 12, white.
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  height: height,
+                  color: Colors.white,
+                  child: _controller == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : WebViewWidget(controller: _controller!),
+                ),
               ),
-              const SizedBox(width: 16),
-            ],
-            if (_bestScore != null)
-              Text(
-                ref.t('courses.game.bestScore.$gameKey', {'score': _bestScore}),
-              ),
-          ],
+              Text(ref.t('courses.game.controlsTouch.$gameKey'), textAlign: TextAlign.center, style: small),
+              if (_lastScore != null || _bestScore != null)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: withGap<Widget>([
+                    if (_lastScore != null)
+                      Text(ref.t('courses.game.lastScore.$gameKey', {'score': _lastScore}), style: small),
+                    if (_bestScore != null)
+                      Text(
+                        ref.t('courses.game.bestScore.$gameKey', {'score': _bestScore}),
+                        style: CourseText.serif(CourseType.bodySmall, AppColors.highEmphasis, weight: FontWeight.w500),
+                      ),
+                  ], () => const SizedBox(width: 16)),
+                ),
+              Text(ref.t('courses.game.optional'), textAlign: TextAlign.center, style: small),
+            ], () => const SizedBox(height: 12)),
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          ref.t('courses.game.optional'),
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
+      ),
     );
   }
 }

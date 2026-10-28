@@ -181,7 +181,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/courses/item/:itemId',
         builder: (context, state) {
-          final args = state.extra as ({String trackId, TrackDetailItem item});
+          final extra = state.extra;
+          // A discussion-reply notification opens the player by id alone.
+          if (extra is CourseItemPlayerArgs) {
+            return CourseItemPlayerScreen(
+              trackId: extra.trackId,
+              item: extra.item,
+              itemId: state.pathParameters['itemId'],
+              highlightPostId: extra.highlightPostId,
+            );
+          }
+          final args = extra as ({String trackId, TrackDetailItem item});
           return CourseItemPlayerScreen(trackId: args.trackId, item: args.item);
         },
       ),

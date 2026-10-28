@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/features/courses/presentation/course_item_player_screen.dart';
 import 'package:ally_mobile_flutter/features/notifications/data/notification_item.dart';
 import 'package:ally_mobile_flutter/features/notifications/data/notifications_repository.dart';
 import 'package:ally_mobile_flutter/features/notifications/presentation/notifications_screen.dart';
@@ -252,7 +253,7 @@ void main() {
     expect(find.text('Title 20'), findsOneWidget);
   });
 
-  testWidgets('tapping a course-discussion-reply notification navigates to the track', (tester) async {
+  testWidgets('tapping a course-discussion-reply notification opens the item player at the post (RN)', (tester) async {
     when(() => repository.list()).thenAnswer(
       (_) async => _page([
         _item(
@@ -272,8 +273,11 @@ void main() {
       routes: [
         GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
         GoRoute(
-          path: '/courses/:trackId',
-          builder: (context, state) => Text('TRACK:${state.pathParameters['trackId']}'),
+          path: '/courses/item/:itemId',
+          builder: (context, state) {
+            final args = state.extra! as CourseItemPlayerArgs;
+            return Text('ITEM:${state.pathParameters['itemId']}:${args.trackId}:${args.highlightPostId}');
+          },
         ),
       ],
       overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
@@ -283,6 +287,6 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.markRead('n1')).called(1);
-    expect(find.text('TRACK:t1'), findsOneWidget);
+    expect(find.text('ITEM:i1:t1:p1'), findsOneWidget);
   });
 }

@@ -217,4 +217,16 @@ class AppColors {
   static const lightGray15 = Color(0xFFBFBFBF); // colors.lightGray15: dark CustomTabs text
   static const white2 = Color(0xFFE3E4E5); // colors.white2: dark ResourceArticleCard text
   static const white3 = Color(0xFFFDFDFD); // colors.white3: dark ResourceArticleCard category chip
+  // courses parity (src/theme/designSystem/colors.ts, src/theme/colors.ts)
+  static const lightBlue100 = Color(0xFFB3E5FC); // ds.lightBlue[100]: matching pair chip
+  static const lightBlue200 = Color(0xFF81D4FA); // ds.lightBlue[200]: current rail segment
+  static const lightBlue300 = Color(0xFF4FC3F7); // ds.lightBlue[300]: matching pair border
+  static const green800 = Color(0xFF2E7D32); // ds.green[800]: correct / passed pill text
+  static const red600 = Color(0xFFA9554D); // ds.red[600]: wrong option border, failed pill text
+  static const amber300 = Color(0xFFFFD54F); // ds.amber[300]: pending-grading dot
+  static const amber800 = Color(0xFFFF8F00); // ds.amber[800]: matching pair text
+  static const deepPurple300 = Color(0xFF9575CD); // ds.deepPurple[300]: matching pair border
+  static const black = Color(0xFF000000); // colors.black: question-media video frame
+  static const lightboxScrim = Color(0xE6000000); // rgba(0,0,0,0.9): QuestionMedia lightbox
+  static const iosPlaceholder = Color(0x4D3C3C43); // iOS default TextInput placeholder (no placeholderTextColor)
 }

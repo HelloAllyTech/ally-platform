@@ -1,9 +1,4 @@
-// RadioListTile's onChanged/groupValue are deprecated in favor of a
-// RadioGroup ancestor widget (Flutter 3.32+) — migrating every radio group
-// in this screen to that API is a separate refactor, not done here; the
-// deprecated API still works correctly.
-// ignore_for_file: deprecated_member_use
-
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -11,16 +6,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_card.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/html_rich_text.dart';
-import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/start_item_payload.dart';
+import 'article/article_player.dart';
 import 'branching/branching_scenario_player.dart';
 import 'bucket_sort/bucket_sort_player.dart';
 import 'celebration_modal.dart';
+import 'course_button.dart';
+import 'course_styles.dart';
 import 'discussion/discussion_thread.dart';
 import 'game/game_player.dart';
 import 'journal/journal_player.dart';
@@ -28,59 +25,60 @@ import 'quiz/quiz_player.dart';
 import 'roleplay/roleplay_case_player.dart';
 import 'video/video_item_player.dart';
 
-/// Full port of ally-mobile (React Native)'s `CourseItemPlayerScreen`
-/// (~9,700 lines across its real component tree) for ARTICLE, VIDEO, QUIZ,
-/// JOURNAL, GAME, BRANCHING_SCENARIO, and BUCKET_SORT item types — real
-/// `startTrackItem` content (not a stub), inline article questions, video
-/// interjections, the complete 8-question-type quiz engine, debounced
-/// journal autosave, the same HTML5 game bundles the RN and web apps embed,
-/// a locally-walked branching-scenario story graph, and a tap-to-place
-/// bucket-sort game. ROLEPLAY/CASE show RN's `RoleplayCasePlayer`, which
-/// launches the live role play (linked by `trackItemProgressId`) or opens
-/// the case screen; when this screen is back on top afterwards it refetches
-/// the track so the item's out-of-band completion shows (RN's
-/// `useFocusEffect` + `getActiveTrackContext`).
+/// Port of RN `screens/CourseItemPlayerScreen/CourseItemPlayerScreen.tsx`:
+/// a single screen that walks the whole track (RN's
+/// `useTrackPlayerNavigation` — Prev/Next swap the current item in place
+/// and re-POST `startTrackItem`), with RN's chrome: [_PlayerTopBar] (exit,
+/// section eyebrow, item title, description, overall %, the section's
+/// [_SegmentedProgressRail]), the item body, the item's
+/// [DiscussionThread] when `hasDiscussion`, [_PlayerBottomNav] and the
+/// [CelebrationModal]. Track and item load failures show RN's message and
+/// Retry; an item type with no player shows [_UnsupportedItemCard].
 ///
-/// In-player Prev/Next navigation and the per-section progress rail (RN's
-/// `useTrackPlayerNavigation` + `PlayerTopBar`/`SegmentedProgressRail`/
-/// `PlayerBottomNav`) are ported here too: `trackId` lets this screen watch
-/// the already-fetched `trackDetailProvider` and flatten its
-/// sections/items into one ordered list, same as RN's `flattenTrackItems`.
-/// Confirmed directly from the real source that this is genuinely a
-/// same-screen-instance, re-fetch-in-place design — RN's own Prev/Next
-/// never pushes a new screen, it just swaps `currentItemId` local state and
-/// re-POSTs `startTrackItem` for the new id, matched exactly here by
-/// `_goToItem`. "Next" is gated on the *current* item reporting completion
-/// (server status OR an in-session `_justCompleted` set, so a freshly
-/// completed item doesn't need a track refetch to unlock forward
-/// navigation) — never on a server "what's next" call; RN's real
-/// `next-item` endpoint (`CoursesRepository.getNextTrackItem`) only powers
-/// the Start/Continue entry points elsewhere (`CourseDetailScreen`'s
-/// Start/Continue button, `CourseProgressScreen`'s Continue/PracticeNudge
-/// actions), confirmed by checking every real caller of that endpoint.
-///
-/// If `trackDetailProvider` hasn't resolved yet (or errors — e.g. in tests
-/// that don't stub `getLearnTrackDetail`), the nav chrome simply doesn't
-/// render and this falls back to the old single-item `TabScreenHeader`
-/// shell, rather than blocking the item itself on a second network call.
-///
-/// Not ported from the same RN feature area (separate, larger follow-up):
-/// the in-player discussion thread (`hasDiscussion`-gated, its own
-/// CRUD+moderation system, unrelated to the Review screens' comments).
+/// Next is gated on the current item being completed (server status or
+/// completed in this session). ROLEPLAY/CASE and the breathing exercise
+/// complete out of band, so returning to this screen after launching one
+/// refetches the track (RN `getActiveTrackContext`).
 class CourseItemPlayerScreen extends ConsumerStatefulWidget {
-  const CourseItemPlayerScreen({super.key, required this.trackId, required this.item});
+  const CourseItemPlayerScreen({
+    super.key,
+    required this.trackId,
+    this.item,
+    String? itemId,
+    this.highlightPostId,
+  }) : assert(item != null || itemId != null),
+       itemId = itemId ?? '';
 
   final String trackId;
-  final TrackDetailItem item;
+
+  /// The item opened from the overview; null when opened by id alone (a
+  /// discussion-reply notification).
+  final TrackDetailItem? item;
+  final String itemId;
+
+  /// RN `highlightPostId`: the discussion post a reply notification points at.
+  final String? highlightPostId;
+
+  String get initialItemId => item?.id ?? itemId;
 
   @override
   ConsumerState<CourseItemPlayerScreen> createState() =>
       _CourseItemPlayerScreenState();
 }
 
+/// Route `extra` for `/courses/item/:itemId` when there is no
+/// [TrackDetailItem] to hand over (RN params `{trackId, itemId,
+/// highlightPostId}`).
+class CourseItemPlayerArgs {
+  const CourseItemPlayerArgs({required this.trackId, this.item, this.highlightPostId});
+
+  final String trackId;
+  final TrackDetailItem? item;
+  final String? highlightPostId;
+}
+
 /// One entry of RN's `flattenTrackItems()` — a track's sections/items
-/// (both sorted by `order`) walked into one ordered list, each entry
-/// carrying enough of its section to drive the per-section progress rail.
+/// (both sorted by `order`) walked into one ordered list.
 class _FlatTrackItem {
   const _FlatTrackItem({
     required this.item,
@@ -102,24 +100,26 @@ List<_FlatTrackItem> _flattenTrackItems(TrackDetail detail) {
   ];
 }
 
+/// RN `ActivityIndicator size="large" color={primary}`.
+Widget _largeSpinner(BuildContext context) => CupertinoActivityIndicator(
+  key: const Key('player-loading'),
+  radius: RnSize.of(context).raw(18),
+  color: AppColors.primary,
+);
+
 class _CourseItemPlayerScreenState
     extends ConsumerState<CourseItemPlayerScreen> {
   StartItemPayload? _payload;
-  bool _isLoading = true;
-  String? _error;
-  bool _completed = false;
+  bool _isLoadingItem = true;
+  bool _loadError = false;
   CelebrationKind? _celebration;
-  late String _currentItemId = widget.item.id;
+  late String _currentItemId = widget.initialItemId;
 
-  /// Items whose completion was just reported in this session but may not
-  /// be reflected in `trackDetailProvider`'s cached `TrackDetail` yet (a
-  /// full track refetch isn't triggered per-item) — unioned with the
-  /// server's own `TrackItemStatus.completed` wherever "is this item done"
-  /// is asked, same as RN's `justCompletedItemIds` set.
+  /// RN `justCompleted`: items completed in this player session.
   final Set<String> _justCompleted = {};
 
-  /// Set when a roleplay/case was launched from here — RN's stashed
-  /// `ActiveTrackContext`. Consumed on the next return to the top.
+  /// Set when a roleplay/case/breathing exercise was launched from here —
+  /// RN's stashed `ActiveTrackContext`. Consumed on the next return.
   bool _refetchTrackOnReturn = false;
   bool _wasCurrent = true;
 
@@ -140,49 +140,38 @@ class _CourseItemPlayerScreenState
   @override
   void initState() {
     super.initState();
-    _start();
+    _loadItem();
   }
 
-  Future<void> _start() async {
+  /// RN `loadItem`.
+  Future<void> _loadItem() async {
+    final itemId = _currentItemId;
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _isLoadingItem = true;
+      _loadError = false;
       _payload = null;
-      _completed = false;
-      _celebration = null;
     });
     try {
-      final payload = await ref
-          .read(coursesRepositoryProvider)
-          .startTrackItem(_currentItemId);
-      if (!mounted) return;
+      final payload = await ref.read(coursesRepositoryProvider).startTrackItem(itemId);
+      if (!mounted || itemId != _currentItemId) return;
       setState(() {
         _payload = payload;
-        _isLoading = false;
+        _isLoadingItem = false;
       });
-    } catch (e) {
-      if (!mounted) return;
+    } catch (_) {
+      if (!mounted || itemId != _currentItemId) return;
       setState(() {
-        _error = '${ref.tr('courses.player.loadFailed')}: $e';
-        _isLoading = false;
+        _loadError = true;
+        _isLoadingItem = false;
       });
     }
   }
 
-  Future<void> _markArticleComplete() async {
-    final result = await ref
-        .read(coursesRepositoryProvider)
-        .markArticleRead(_currentItemId);
-    if (mounted) _handleCompletion(result);
-  }
-
-  /// Mirrors RN's `handleCompletion` — a track-complete celebration always
-  /// wins over a section-complete one (a track can't finish without its
-  /// last section finishing too, so showing both would be redundant).
+  /// RN `handleCompletion` — a track-complete celebration wins over a
+  /// section-complete one.
   void _handleCompletion(TrackItemCompletionResult result) {
     if (!result.completed) return;
     setState(() {
-      _completed = true;
       _justCompleted.add(_currentItemId);
       if (result.trackCompleted) {
         _celebration = CelebrationKind.track;
@@ -197,16 +186,17 @@ class _CourseItemPlayerScreenState
 
   void _goToItem(String itemId) {
     setState(() => _currentItemId = itemId);
-    _start();
+    _loadItem();
   }
 
-  /// Mirrors RN's `goNextOrOverview`: advance to the next item in the
-  /// flattened track if there is one, otherwise leave for the overview.
-  /// Used by players (branching, bucket sort) whose own "Continue" button
-  /// plays the same role as the bottom nav's "Next"/"Finish".
-  void _goNextOrOverview() {
+  List<_FlatTrackItem>? _flat() {
     final detail = ref.read(trackDetailProvider(widget.trackId)).value;
-    final flat = detail == null ? null : _flattenTrackItems(detail);
+    return detail == null ? null : _flattenTrackItems(detail);
+  }
+
+  /// RN `goNextOrOverview`.
+  void _goNextOrOverview() {
+    final flat = _flat();
     final currentIndex = flat?.indexWhere((f) => f.item.id == _currentItemId) ?? -1;
     if (flat != null && currentIndex != -1 && currentIndex < flat.length - 1) {
       _goToItem(flat[currentIndex + 1].item.id);
@@ -215,6 +205,7 @@ class _CourseItemPlayerScreenState
     }
   }
 
+  /// RN `handleBackToOverview`.
   void _exitToOverview() {
     if (context.canPop()) {
       context.pop();
@@ -225,125 +216,139 @@ class _CourseItemPlayerScreenState
 
   @override
   Widget build(BuildContext context) {
-    final detail = ref.watch(trackDetailProvider(widget.trackId)).value;
-    final flat = detail == null ? null : _flattenTrackItems(detail);
-    final currentIndex = flat == null ? -1 : flat.indexWhere((f) => f.item.id == _currentItemId);
-    final hasNav = flat != null && currentIndex != -1;
-
-    Widget? topBar;
-    Widget? bottomNav;
-    if (hasNav) {
-      final current = flat[currentIndex];
-      final sectionItems = flat.where((f) => f.sectionId == current.sectionId).toList();
-      final completedCount = flat.where((f) => _isItemCompleted(f.item)).length;
-      final overallPct = flat.isEmpty ? 0.0 : completedCount / flat.length * 100;
-      final hasPrev = currentIndex > 0;
-      final hasNext = currentIndex < flat.length - 1;
-      final canAdvance = _isItemCompleted(current.item);
-
-      topBar = _PlayerTopBar(
-        sectionTitle: current.sectionTitle,
-        itemTitle: current.item.title,
-        description: current.item.description,
-        sectionItems: sectionItems,
-        currentItemId: _currentItemId,
-        isCompleted: _isItemCompleted,
-        overallPct: overallPct,
-        onExit: _exitToOverview,
-      );
-      bottomNav = _PlayerBottomNav(
-        hasPrev: hasPrev,
-        isLastItem: !hasNext,
-        canAdvance: canAdvance,
-        onPrev: hasPrev ? () => _goToItem(flat[currentIndex - 1].item.id) : null,
-        onNext: canAdvance
-            ? () => hasNext ? _goToItem(flat[currentIndex + 1].item.id) : _exitToOverview()
-            : null,
-      );
-    }
+    final trackAsync = ref.watch(trackDetailProvider(widget.trackId));
+    final detail = trackAsync.value;
+    final flat = detail == null ? const <_FlatTrackItem>[] : _flattenTrackItems(detail);
+    final currentIndex = flat.indexWhere((f) => f.item.id == _currentItemId);
+    final current = currentIndex == -1 ? null : flat[currentIndex];
+    final hasPrev = currentIndex > 0;
+    final hasNext = currentIndex != -1 && currentIndex < flat.length - 1;
+    final canAdvance = current != null && _isItemCompleted(current.item);
+    final sectionItems = current == null
+        ? const <_FlatTrackItem>[]
+        : flat.where((f) => f.sectionId == current.sectionId).toList();
+    // RN computeOverallPct: server COMPLETED status only.
+    final overallPct = flat.isEmpty
+        ? 0
+        : (flat.where((f) => f.item.status == TrackItemStatus.completed).length / flat.length * 100).round();
+    final completedCount = flat.where((f) => _isItemCompleted(f.item)).length;
+    final isTrackLoadPending = trackAsync.isLoading && detail == null;
+    final isTrackError = trackAsync.hasError && detail == null;
 
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
               children: [
-                topBar ?? TabScreenHeader(title: widget.item.title),
-                Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _error != null
-                      ? Center(
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: AppColors.red400),
-                          ),
-                        )
-                      : _buildBody(),
+                _PlayerTopBar(
+                  sectionTitle: current?.sectionTitle ?? '',
+                  itemTitle: current?.item.title ?? '',
+                  description: current?.item.description,
+                  sectionItems: sectionItems,
+                  currentItemId: _currentItemId,
+                  overallPct: overallPct,
+                  onExit: _exitToOverview,
                 ),
-                // Mirrors RN's own `nav.current?.item.hasDiscussion` gate,
-                // rendered below the item content and above the bottom nav
-                // (`CourseItemPlayerScreen.tsx`). Given a bounded max height
-                // rather than its own flex share — RN's own
-                // `DiscussionThreadProps.style` doc comment calls for
-                // exactly this ("kept fixed so it never collapses each
-                // item player's own flex: 1 internal layout"), which this
-                // port makes explicit since Flutter has no equivalent of
-                // RN's implicit flex-column sizing here.
-                if (hasNav && flat[currentIndex].item.hasDiscussion)
-                  DiscussionThread(itemId: _currentItemId),
-                ?bottomNav,
+                Expanded(
+                  child: _buildBody(
+                    isTrackError: isTrackError,
+                    isTrackLoadPending: isTrackLoadPending,
+                    current: current,
+                  ),
+                ),
+                if (current?.item.hasDiscussion ?? false)
+                  DiscussionThread(
+                    key: ValueKey('discussion-$_currentItemId'),
+                    itemId: _currentItemId,
+                    highlightPostId: widget.highlightPostId,
+                  ),
+                _PlayerBottomNav(
+                  hasPrev: hasPrev,
+                  isLastItem: !hasNext,
+                  canAdvance: canAdvance,
+                  onPrev: () {
+                    if (hasPrev) _goToItem(flat[currentIndex - 1].item.id);
+                  },
+                  onNext: _goNextOrOverview,
+                ),
               ],
             ),
-            if (_celebration != null)
-              Positioned.fill(
-                child: CelebrationModal(
-                  kind: _celebration!,
-                  onContinue: () => setState(() => _celebration = null),
-                  onBackToLearn: () => context.go('/home'),
-                ),
+          ),
+          if (_celebration != null)
+            Positioned.fill(
+              child: CelebrationModal(
+                kind: _celebration!,
+                completedCount: completedCount,
+                onContinue: () {
+                  setState(() => _celebration = null);
+                  _goNextOrOverview();
+                },
+                onBackToLearn: () {
+                  setState(() => _celebration = null);
+                  context.go('/home');
+                },
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _centered(List<Widget> children) => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: withGap(children, () => const SizedBox(height: 12)),
+      ),
+    ),
+  );
+
+  Widget _buildBody({
+    required bool isTrackError,
+    required bool isTrackLoadPending,
+    required _FlatTrackItem? current,
+  }) {
+    final errorStyle = CourseText.system(const TextStyle(fontSize: 14), AppColors.mediumEmphasis);
+    if (isTrackError && !isTrackLoadPending) {
+      return _centered([
+        Text(ref.t('courses.player.trackLoadFailed'), textAlign: TextAlign.center, style: errorStyle),
+        CourseButton(
+          key: const Key('player-track-retry'),
+          label: ref.t('courses.player.retry'),
+          onPressed: () => ref.invalidate(trackDetailProvider(widget.trackId)),
+        ),
+      ]);
+    }
+    if (_loadError) {
+      return _centered([
+        Text(ref.t('courses.player.loadFailed'), textAlign: TextAlign.center, style: errorStyle),
+        CourseButton(key: const Key('player-item-retry'), label: ref.t('courses.player.retry'), onPressed: _loadItem),
+      ]);
+    }
+    // RN also waits for `nav.current`; an item missing from the track would
+    // spin forever there, so the item handed in by the route stands in.
+    final item = current?.item ?? (widget.item?.id == _currentItemId ? widget.item : null);
+    if (isTrackLoadPending || _isLoadingItem || _payload == null || item == null) {
+      return Center(child: _largeSpinner(context));
+    }
+
     final payload = _payload!;
-    // Keyed by the current item id so navigating Prev/Next to another item
-    // of the *same* payload type (e.g. ARTICLE -> ARTICLE) still tears down
-    // and rebuilds a fresh child, rather than reusing one still holding the
-    // previous item's local state (answered questions, scroll position).
+    // Keyed by item so Prev/Next between two items of the same type never
+    // reuses the previous item's local state.
     final key = ValueKey(_currentItemId);
-    // RN `alreadyCompleted`: the server's own item status OR completed in
-    // this session — not just the latter, or a finished journal reopens
-    // editable, a watched video loses "Watched" and a read article asks to
-    // be marked read again.
-    final detail = ref.watch(trackDetailProvider(widget.trackId)).value;
-    final current = detail == null
-        ? null
-        : _flattenTrackItems(detail).where((f) => f.item.id == _currentItemId).firstOrNull?.item;
-    final item = current ?? widget.item;
-    final alreadyCompleted =
-        _completed || _justCompleted.contains(_currentItemId) || (item.id == _currentItemId && _isItemCompleted(item));
+    // RN `alreadyCompleted`: server COMPLETED status OR completed here.
+    final alreadyCompleted = _isItemCompleted(item);
     switch (payload.type) {
-      case 'QUIZ':
-        return QuizPlayer(
-          key: key,
-          itemId: _currentItemId,
-          quiz: payload.quiz!,
-          attemptsUsed: payload.attemptsUsed ?? 0,
-          maxAttempts: payload.maxAttempts,
-          onCompleted: _handleCompletion,
-        );
       case 'ARTICLE':
-        return _ArticleView(
+        return ArticlePlayer(
           key: key,
           payload: payload,
           itemId: _currentItemId,
-          completed: alreadyCompleted,
-          onMarkComplete: _markArticleComplete,
+          alreadyCompleted: alreadyCompleted,
+          onCompleted: _handleCompletion,
         );
       case 'VIDEO':
         return VideoItemPlayer(
@@ -361,16 +366,27 @@ class _CourseItemPlayerScreenState
           alreadyCompleted: alreadyCompleted,
           onCompleted: _handleCompletion,
         );
+      case 'QUIZ':
+        return QuizPlayer(
+          key: key,
+          itemId: _currentItemId,
+          quiz: payload.quiz!,
+          attemptsUsed: payload.attemptsUsed ?? 0,
+          maxAttempts: payload.maxAttempts,
+          onCompleted: _handleCompletion,
+          onRequestNext: _goNextOrOverview,
+        );
       case 'GAME':
-        // RN's `NativeGamePlayer` replaces the usual HTML5 `GamePlayer` for
-        // this one game key — it carries a config object instead of
-        // loading a bundle.
         if (payload.gameKey == 'BREATHING_EXERCISE' && payload.breathingExercise != null) {
           return _BreathingExerciseIntro(
             key: key,
             payload: payload,
             onCompleted: _handleCompletion,
+            onLaunched: () => _refetchTrackOnReturn = true,
           );
+        }
+        if (payload.gameKey == 'BREATHING_EXERCISE') {
+          return _UnsupportedItemCard(onBackToCourse: _exitToOverview);
         }
         return GamePlayer(
           key: key,
@@ -380,7 +396,6 @@ class _CourseItemPlayerScreenState
         );
       case 'BRANCHING_SCENARIO':
         return BranchingScenarioPlayer(
-          // Two scenarios back to back must not share a run.
           key: key,
           payload: payload,
           itemId: _currentItemId,
@@ -390,7 +405,6 @@ class _CourseItemPlayerScreenState
         );
       case 'BUCKET_SORT':
         return BucketSortPlayer(
-          // Two sorts back to back must not share a round.
           key: key,
           payload: payload,
           itemId: _currentItemId,
@@ -403,27 +417,73 @@ class _CourseItemPlayerScreenState
           key: key,
           payload: payload,
           item: item,
-          alreadyCompleted: _isItemCompleted(item),
+          alreadyCompleted: alreadyCompleted,
           onLaunched: () => _refetchTrackOnReturn = true,
         );
       default:
-        return Center(child: Text(ref.t('courses.player.unsupportedTitle')));
+        return _UnsupportedItemCard(onBackToCourse: _exitToOverview);
     }
   }
 }
 
-/// Port of ally-mobile (React Native)'s `NativeGamePlayer` for the
-/// `BREATHING_EXERCISE` game key — an intro card (title + intro text +
-/// Start button) shown inline in the player; tapping Start pushes the
-/// full-screen `BreathingExerciseScreen`. The item is already complete
-/// server-side the moment this card is shown (same as every other game
-/// key — see `GamePlayer`'s own doc comment), so completion is reported
-/// on mount regardless of whether the learner ever taps Start.
+/// Port of RN `components/UnsupportedItemCard.tsx`: an item type this build
+/// has no player for. Doesn't force Next open.
+class _UnsupportedItemCard extends ConsumerWidget {
+  const _UnsupportedItemCard({required this.onBackToCourse});
+
+  final VoidCallback onBackToCourse;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      key: const Key('unsupported-item-card'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              ref.t('courses.player.unsupportedTitle'),
+              textAlign: TextAlign.center,
+              style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              ref.t('courses.player.unsupportedBody'),
+              textAlign: TextAlign.center,
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+            ),
+            const SizedBox(height: 12),
+            CourseButton(
+              key: const Key('unsupported-back-to-course'),
+              label: ref.t('courses.player.backToCourse'),
+              variant: CourseButtonVariant.secondary,
+              onPressed: onBackToCourse,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Port of RN `components/players/NativeGamePlayer.tsx` for the
+/// `BREATHING_EXERCISE` game key: title, intro and Start, which opens the
+/// full-screen `BreathingExerciseScreen`. The item is complete server-side
+/// when opened, so completion is reported on mount.
 class _BreathingExerciseIntro extends ConsumerStatefulWidget {
-  const _BreathingExerciseIntro({super.key, required this.payload, required this.onCompleted});
+  const _BreathingExerciseIntro({
+    super.key,
+    required this.payload,
+    required this.onCompleted,
+    required this.onLaunched,
+  });
 
   final StartItemPayload payload;
   final void Function(TrackItemCompletionResult result) onCompleted;
+
+  /// RN `setActiveTrackContext`: refetch the track on return.
+  final VoidCallback onLaunched;
 
   @override
   ConsumerState<_BreathingExerciseIntro> createState() => _BreathingExerciseIntroState();
@@ -433,18 +493,12 @@ class _BreathingExerciseIntroState extends ConsumerState<_BreathingExerciseIntro
   @override
   void initState() {
     super.initState();
-    // Deferred to a post-frame callback — calling the parent's setState
-    // synchronously here throws "setState() or markNeedsBuild() called
-    // during build" (same gotcha GamePlayer's own doc comment documents).
+    // Post-frame: the parent's setState can't run during this build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         widget.onCompleted(
           widget.payload.gameCompletion ??
-              TrackItemCompletionResult(
-                completed: true,
-                sectionCompleted: false,
-                trackCompleted: false,
-              ),
+              TrackItemCompletionResult(completed: true, sectionCompleted: false, trackCompleted: false),
         );
       }
     });
@@ -453,6 +507,8 @@ class _BreathingExerciseIntroState extends ConsumerState<_BreathingExerciseIntro
   @override
   Widget build(BuildContext context) {
     final config = widget.payload.breathingExercise!;
+    final intro = widget.payload.gameIntro;
+    // styles.container: centred, padding 24, gap 24; content gap 8.
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -462,23 +518,28 @@ class _BreathingExerciseIntroState extends ConsumerState<_BreathingExerciseIntro
             Text(
               ref.t('courses.breathing.title'),
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall,
+              // typography.display.small + IBM Plex Serif Medium.
+              style: const TextStyle(
+                fontFamily: AppFonts.ibmPlexSerifMedium,
+                fontSize: 18,
+                height: 24 / 18,
+                letterSpacing: 0.18,
+                color: AppColors.highEmphasis,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              widget.payload.gameIntro?.isNotEmpty ?? false
-                  ? widget.payload.gameIntro!
-                  : ref.t('courses.breathing.defaultIntro'),
+              (intro ?? '').isNotEmpty ? intro! : ref.t('courses.breathing.defaultIntro'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.mediumEmphasis),
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: AppButton(
-                label: ref.t('courses.breathing.start'),
-                onPressed: () => context.push('/breathing-exercise', extra: config),
-              ),
+            CourseButton(
+              label: ref.t('courses.breathing.start'),
+              onPressed: () {
+                widget.onLaunched();
+                context.push('/breathing-exercise', extra: config);
+              },
             ),
           ],
         ),
@@ -487,128 +548,7 @@ class _BreathingExerciseIntroState extends ConsumerState<_BreathingExerciseIntro
   }
 }
 
-class _ArticleView extends ConsumerStatefulWidget {
-  const _ArticleView({
-    super.key,
-    required this.payload,
-    required this.itemId,
-    required this.completed,
-    required this.onMarkComplete,
-  });
-
-  final StartItemPayload payload;
-  final String itemId;
-  final bool completed;
-  final VoidCallback onMarkComplete;
-
-  @override
-  ConsumerState<_ArticleView> createState() => _ArticleViewState();
-}
-
-class _ArticleViewState extends ConsumerState<_ArticleView> {
-  final Map<String, String> _answeredOptionIds = {};
-  final Map<
-    String,
-    ({bool correct, String correctOptionId, String? explanation})
-  >
-  _results = {};
-
-  Future<void> _answer(ArticleQuestion question, String optionId) async {
-    try {
-      final result = await ref
-          .read(coursesRepositoryProvider)
-          .submitArticleQuestionAnswer(
-            itemId: widget.itemId,
-            questionId: question.id,
-            selectedOptionId: optionId,
-          );
-      setState(() {
-        _answeredOptionIds[question.id] = optionId;
-        _results[question.id] = result;
-      });
-    } catch (_) {
-      // Swallowed intentionally for this pass — a failed inline-question
-      // submission shouldn't block reading the rest of the article.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final payload = widget.payload;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        HtmlRichText(html: payload.html),
-        const SizedBox(height: 24),
-        for (final question in payload.articleQuestions ?? [])
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: AppCard(
-              variant: AppCardVariant.flat,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      question.prompt,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    for (final option in question.options)
-                      RadioListTile<String>(
-                        title: Text(option.text),
-                        value: option.id,
-                        groupValue: _answeredOptionIds[question.id],
-                        onChanged: _answeredOptionIds.containsKey(question.id)
-                            ? null
-                            : (value) => _answer(question, value!),
-                      ),
-                    if (_results[question.id] != null)
-                      Text(
-                        _results[question.id]!.correct
-                            ? ref.t('courses.article.question.correct')
-                            : ref.t('courses.article.question.incorrect'),
-                        style: TextStyle(
-                          color: _results[question.id]!.correct
-                              ? Colors.green
-                              : AppColors.red400,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: 16),
-        if (widget.completed)
-          Row(
-            children: [
-              SvgPicture.asset(
-                'assets/icons/checkCircle.svg',
-                width: 24,
-                height: 24,
-              ),
-              const SizedBox(width: 8),
-              Text(ref.t('courses.article.read')),
-            ],
-          )
-        else
-          AppButton(
-            label: ref.t('courses.article.markRead'),
-            onPressed: widget.onMarkComplete,
-          ),
-      ],
-    );
-  }
-}
-
-/// Port of ally-mobile (React Native)'s `PlayerTopBar` — an exit (X)
-/// button, a section-title eyebrow + item title, an optional item
-/// description, the per-section [SegmentedProgressRail], and an overall
-/// track-wide completion percentage. Replaces the generic
-/// [TabScreenHeader] (used by other screens) for this one, since RN's real
-/// player header is its own dedicated shell, not the app-wide one — it has
-/// no global progress ring, just this track's own chrome.
+/// Port of RN `components/PlayerTopBar.tsx`.
 class _PlayerTopBar extends ConsumerWidget {
   const _PlayerTopBar({
     required this.sectionTitle,
@@ -616,7 +556,6 @@ class _PlayerTopBar extends ConsumerWidget {
     required this.description,
     required this.sectionItems,
     required this.currentItemId,
-    required this.isCompleted,
     required this.overallPct,
     required this.onExit,
   });
@@ -626,115 +565,112 @@ class _PlayerTopBar extends ConsumerWidget {
   final String? description;
   final List<_FlatTrackItem> sectionItems;
   final String currentItemId;
-  final bool Function(TrackDetailItem item) isCompleted;
-  final double overallPct;
+  final int overallPct;
   final VoidCallback onExit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 12),
+    final size = RnSize.of(context);
+    final tiny = CourseText.roboto(CourseType.bodyTiny, AppColors.mediumEmphasis);
+    final plainDescription = htmlToPlainText(description);
+    // styles.header: padding 16/12/10, borderBottom 0.5, gap 8.
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: withGap<Widget>([
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: ref.t('courses.player.exit'),
-                onPressed: onExit,
+              Semantics(
+                button: true,
+                label: ref.t('courses.player.exit'),
+                child: GestureDetector(
+                  key: const Key('player-exit-button'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onExit,
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: Center(
+                      child: SvgPicture.asset('assets/icons/close.svg', width: size.raw(16), height: size.raw(16)),
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(sectionTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: tiny),
                     Text(
-                      sectionTitle,
-                      style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                      itemTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CourseText.serifMedium(CourseType.bodyMedium, AppColors.highEmphasis, weight: FontWeight.w500),
                     ),
-                    Text(itemTitle, style: Theme.of(context).textTheme.titleMedium),
                   ],
                 ),
               ),
-              Text(
-                ref.t('courses.player.overallProgress', {'pct': overallPct.round()}),
-                style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
-              ),
+              const SizedBox(width: 10),
+              Text(ref.t('courses.player.overallProgress', {'pct': overallPct}), style: tiny),
             ],
           ),
-          if (description != null && description!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 48, top: 4),
-              child: Text(
-                description!,
-                style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
-              ),
+          if (plainDescription.isNotEmpty)
+            Text(
+              plainDescription,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: CourseText.roboto(CourseType.bodySmall, AppColors.mediumEmphasis),
             ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _SegmentedProgressRail(
-              sectionItems: sectionItems,
-              currentItemId: currentItemId,
-              isCompleted: isCompleted,
-            ),
-          ),
-        ],
+          _SegmentedProgressRail(sectionItems: sectionItems, currentItemId: currentItemId),
+        ], () => const SizedBox(height: 8)),
       ),
     );
   }
 }
 
-/// Port of ally-mobile (React Native)'s `SegmentedProgressRail` — one
-/// equal-width bar per item in the *current section only*, filled for a
-/// completed item, lightly highlighted for the current item, grey
-/// otherwise. Purely visual (no "3 of 8" label — that's the top bar's
-/// separate overall-percentage text).
+/// Port of RN `components/SegmentedProgressRail.tsx`: one segment per item
+/// of the current section — completed (server status) fills primary, the
+/// current item is lightBlue[200], the rest grey[200]. Gap 4, height 4,
+/// radius 2.
 class _SegmentedProgressRail extends StatelessWidget {
-  const _SegmentedProgressRail({
-    required this.sectionItems,
-    required this.currentItemId,
-    required this.isCompleted,
-  });
+  const _SegmentedProgressRail({required this.sectionItems, required this.currentItemId});
 
   final List<_FlatTrackItem> sectionItems;
   final String currentItemId;
-  final bool Function(TrackDetailItem item) isCompleted;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [
+      children: withGap<Widget>([
         for (final flatItem in sectionItems)
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Container(
-                key: ValueKey('progress-segment-${flatItem.item.id}'),
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isCompleted(flatItem.item)
-                      ? AppColors.primary
-                      : flatItem.item.id == currentItemId
-                      ? AppColors.primary.withValues(alpha: 0.4)
-                      : AppColors.lightGray2,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+            child: Container(
+              key: ValueKey('progress-segment-${flatItem.item.id}'),
+              height: 4,
+              decoration: BoxDecoration(
+                color: flatItem.item.status == TrackItemStatus.completed
+                    ? AppColors.primary
+                    : flatItem.item.id == currentItemId
+                    ? AppColors.lightBlue200
+                    : AppColors.grey200,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-      ],
+      ], () => const SizedBox(width: 4)),
     );
   }
 }
 
-/// Port of ally-mobile (React Native)'s `PlayerBottomNav` — a fixed
-/// Prev/Next row. Prev is disabled on the first item (always visible,
-/// just greyed out — not hidden). Next's label flips to "Finish" on the
-/// last item, and in both cases it's disabled until the current item
-/// reports completion (`canAdvance`) — confirmed from the real source that
-/// `hasNext`/`isLastItem` do NOT separately gate Next once that's true,
-/// only `canAdvance` does.
+/// Port of RN `components/PlayerBottomNav.tsx`: Prev (secondary, left
+/// arrow) and Next/Finish (primary, right arrow), Next disabled until the
+/// item reports completion.
 class _PlayerBottomNav extends ConsumerWidget {
   const _PlayerBottomNav({
     required this.hasPrev,
@@ -747,29 +683,40 @@ class _PlayerBottomNav extends ConsumerWidget {
   final bool hasPrev;
   final bool isLastItem;
   final bool canAdvance;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+    final icon = RnSize.of(context).raw(16);
+    // styles.footer: row, gap 12, padding 16/12, borderTop 0.5.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: AppButton(
+            child: CourseButton(
+              key: const Key('player-prev-button'),
               label: ref.t('courses.player.prev'),
-              variant: AppButtonVariant.secondary,
+              variant: CourseButtonVariant.secondary,
               isDisabled: !hasPrev,
-              onPressed: onPrev ?? () {},
+              onPressed: onPrev,
+              iconLeft: SvgPicture.asset('assets/icons/leftArrowIcon.svg', width: icon, height: icon),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: AppButton(
+            child: CourseButton(
+              key: const Key('player-next-button'),
               label: ref.t(isLastItem ? 'courses.player.finish' : 'courses.player.next'),
               isDisabled: !canAdvance,
-              onPressed: onNext ?? () {},
+              onPressed: onNext,
+              iconRight: SvgPicture.asset('assets/icons/arrowRight.svg', width: icon, height: icon),
             ),
           ),
         ],

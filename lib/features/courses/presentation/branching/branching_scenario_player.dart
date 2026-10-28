@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../course_button.dart';
+import '../course_styles.dart';
 import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
@@ -37,7 +38,7 @@ Color _outcomeFg(BranchingOutcome outcome) {
     case BranchingOutcome.positive:
       return AppColors.onSuccessContainer;
     case BranchingOutcome.mixed:
-      return const Color(0xFF7A4100); // amber[900]-equivalent dark text
+      return AppColors.amber900; // ds.amber[900]
     case BranchingOutcome.negative:
       return AppColors.onErrorContainer;
   }
@@ -366,14 +367,23 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
     // A payload whose graph does not resolve (bad start id) has nothing to
     // play.
     if (node == null) {
-      return Center(child: Text(ref.t('courses.player.unsupportedBody')));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            ref.t('courses.player.unsupportedBody'),
+            textAlign: TextAlign.center,
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
+          ),
+        ),
+      );
     }
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (_path.isEmpty && _data.intro != null) ...[
-          Text(_data.intro!, style: const TextStyle(color: AppColors.mediumEmphasis)),
+          Text(_data.intro!, style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis)),
           const SizedBox(height: 12),
         ],
         if (_path.isEmpty && _endingsSeen > 0 && _endingCount > 0) ...[
@@ -383,7 +393,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
                     ? ' · ${ref.t('courses.branching.bestScore', {'score': _data.bestScore})}'
                     : ''),
             key: const Key('branching-endings-seen'),
-            style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
           ),
           const SizedBox(height: 12),
         ],
@@ -401,7 +411,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
         const SizedBox(height: 8),
         Text(
           ref.t('courses.branching.choicePrompt'),
-          style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.mediumEmphasis),
+          style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis, weight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         for (final choice in node.choices ?? const <BranchingChoice>[])
@@ -418,7 +428,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
                   border: Border.all(color: AppColors.strokePrimary, width: 1.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(choice.text, style: const TextStyle(color: AppColors.highEmphasis)),
+                child: Text(choice.text, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
               ),
             ),
           ),
@@ -439,15 +449,15 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
               width: double.infinity,
               fit: BoxFit.cover,
               semanticLabel: scene.image!.alt,
-              errorBuilder: (_, _, _) => Container(height: 180, color: AppColors.lightGray2),
+              errorBuilder: (_, _, _) => Container(height: 180, color: AppColors.grey100),
             ),
           ),
         if (scene.image != null) const SizedBox(height: 12),
         if (scene.title != null) ...[
-          Text(scene.title!, style: Theme.of(context).textTheme.titleMedium),
+          Text(scene.title!, style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500)),
           const SizedBox(height: 4),
         ],
-        Text(scene.text, style: const TextStyle(color: AppColors.highEmphasis)),
+        Text(scene.text, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
       ],
     );
   }
@@ -464,12 +474,12 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: 0.15),
+                color: AppColors.blue50,
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Text(
                 ref.t('courses.branching.youChose', {'text': _chosenText(i)}),
-                style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                style: CourseText.serif(CourseType.bodySmall, AppColors.primary),
               ),
             ),
         ],
@@ -485,7 +495,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
       decoration: BoxDecoration(color: _outcomeBg(outcome), borderRadius: BorderRadius.circular(99)),
       child: Text(
         ref.t(_outcomeKey(outcome)),
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _outcomeFg(outcome)),
+        style: CourseText.serif(CourseType.bodySmall, _outcomeFg(outcome), weight: FontWeight.w500),
       ),
     );
   }
@@ -521,7 +531,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
               children: [
                 Text(
                   ref.t('courses.branching.score', {'score': result.score}),
-                  style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.highEmphasis),
+                  style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis, weight: FontWeight.w500),
                 ),
                 Text(
                   ref.t('courses.branching.passMark', {'score': passScore}) +
@@ -533,7 +543,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
                               {'count': result.attemptsLeft},
                             )}'
                           : ''),
-                  style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                  style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
                 ),
                 // A replay that scores under the pass mark must not say the
                 // item "stays open" when an earlier run already completed it.
@@ -542,7 +552,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
                     result.passed
                         ? ref.t('courses.branching.passed')
                         : ref.t('courses.branching.notPassed'),
-                    style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                    style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
                   ),
               ],
             ),
@@ -557,7 +567,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
             ),
             child: Text(
               ending.takeaway!,
-              style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+              style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
             ),
           ),
         ],
@@ -567,10 +577,10 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
           Text(
             ref.t('courses.branching.saveFailed'),
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
           ),
           const SizedBox(height: 10),
-          AppButton(
+          CourseButton(
             key: const Key('branching-retry-save'),
             label: ref.t('courses.branching.retrySave'),
             isLoading: _isSaving,
@@ -583,17 +593,17 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
           if (done)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: AppButton(
+              child: CourseButton(
                 key: const Key('branching-continue'),
                 label: ref.t('courses.branching.continue'),
                 onPressed: widget.onRequestNext,
               ),
             ),
           if (canRetry)
-            AppButton(
+            CourseButton(
               key: const Key('branching-try-again'),
               label: ref.t('courses.branching.tryAgain'),
-              variant: done ? AppButtonVariant.secondary : AppButtonVariant.primary,
+              variant: done ? CourseButtonVariant.secondary : CourseButtonVariant.primary,
               onPressed: _handleRestart,
             )
           else
@@ -609,7 +619,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
       ref.t('courses.branching.attemptsUsedUp'),
       key: const Key('branching-exhausted-plain'),
       textAlign: TextAlign.center,
-      style: const TextStyle(color: AppColors.mediumEmphasis),
+      style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
     ),
   );
 
@@ -632,15 +642,15 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
         Text(
           ref.t('courses.branching.exhaustedTitle'),
           key: const Key('branching-exhausted'),
-          style: Theme.of(context).textTheme.titleMedium,
+          style: CourseText.serif(CourseType.bodyLarge, AppColors.highEmphasis, weight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
-        Text(nextRoundLine, style: const TextStyle(color: AppColors.highEmphasis)),
+        Text(nextRoundLine, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
         if (pause.recap.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
             ref.t('courses.branching.whatYouReached'),
-            style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis, weight: FontWeight.w500),
           ),
           const SizedBox(height: 10),
           for (final entry in pause.recap) _buildRecapRow(entry),
@@ -650,24 +660,24 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
           Text(
             ref.t('courses.player.loadFailed'),
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.mediumEmphasis),
+            style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
           ),
         ],
         const SizedBox(height: 16),
         if (_roundOpen)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: AppButton(
+            child: CourseButton(
               key: const Key('branching-start-round'),
               label: ref.t('courses.branching.startNewRound'),
               isLoading: _isStarting,
               onPressed: _handleStartNewRound,
             ),
           ),
-        AppButton(
+        CourseButton(
           key: const Key('branching-back'),
           label: ref.t('courses.player.backToCourse'),
-          variant: _roundOpen ? AppButtonVariant.secondary : AppButtonVariant.primary,
+          variant: _roundOpen ? CourseButtonVariant.secondary : CourseButtonVariant.primary,
           onPressed: widget.onBack,
         ),
       ],
@@ -692,13 +702,13 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildOutcomeBadge(ending?.outcome),
-            if (ending != null) Text(ending.text, style: const TextStyle(color: AppColors.highEmphasis)),
+            if (ending != null) Text(ending.text, style: CourseText.serif(CourseType.bodyMedium, AppColors.highEmphasis)),
             if (scoreLabel != null)
-              Text(scoreLabel, style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis)),
+              Text(scoreLabel, style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis)),
             if (ending?.takeaway != null)
               Text(
                 ending!.takeaway!,
-                style: const TextStyle(fontSize: 12, color: AppColors.mediumEmphasis),
+                style: CourseText.serif(CourseType.bodySmall, AppColors.mediumEmphasis),
               ),
           ],
         ),

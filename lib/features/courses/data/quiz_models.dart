@@ -36,11 +36,39 @@ class QuizOption {
   final String text;
 }
 
+/// Mirrors RN's `QuestionMedia` — the picture or clip a question is asking
+/// about. `source` is `s3` for an upload, else `youtube`/`vimeo`/`loom`.
+class QuestionMedia {
+  QuestionMedia({required this.kind, required this.source, required this.url, this.alt, this.posterUrl});
+
+  static QuestionMedia? maybeFromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final url = json['url'] as String?;
+    if (url == null || url.isEmpty) return null;
+    return QuestionMedia(
+      kind: json['kind'] as String? ?? 'image',
+      source: json['source'] as String? ?? 's3',
+      url: url,
+      alt: json['alt'] as String?,
+      posterUrl: json['posterUrl'] as String?,
+    );
+  }
+
+  /// `image` | `video`.
+  final String kind;
+  final String source;
+  final String url;
+  final String? alt;
+  final String? posterUrl;
+}
+
 class SanitizedQuizQuestion {
   SanitizedQuizQuestion({
     required this.id,
     required this.type,
     required this.prompt,
+    this.promptHtml,
+    this.media,
     required this.points,
     required this.graded,
     required this.options,
@@ -63,6 +91,8 @@ class SanitizedQuizQuestion {
       id: json['id'] as String,
       type: quizQuestionTypeFromString(json['type'] as String?),
       prompt: json['prompt'] as String,
+      promptHtml: json['promptHtml'] as String?,
+      media: QuestionMedia.maybeFromJson(json['media']),
       points: (json['points'] as num?)?.toInt() ?? 0,
       // Always present and false for likert_scale; absent (older backend)
       // reads as true — same leniency as the RN type's own doc comment.
@@ -82,6 +112,10 @@ class SanitizedQuizQuestion {
   final String id;
   final QuizQuestionType type;
   final String prompt;
+
+  /// Rich prompt (sanitized HTML); [prompt] is its plain-text fallback.
+  final String? promptHtml;
+  final QuestionMedia? media;
   final int points;
   final bool graded;
   final List<QuizOption>? options;
@@ -172,6 +206,35 @@ class QuizAnswerInput {
   };
 }
 
+/// Mirrors RN's `QuizCorrectAnswer` — the answer key, when the trainer lets
+/// learners see it. Never present for likert_scale or open_ended.
+class QuizCorrectAnswer {
+  QuizCorrectAnswer({this.selectedOptionIds, this.booleanAnswer, this.orderedItemIds, this.pairs, this.blanks});
+
+  factory QuizCorrectAnswer.fromJson(Map<String, dynamic> json) => QuizCorrectAnswer(
+    selectedOptionIds: (json['selectedOptionIds'] as List<dynamic>?)?.cast<String>(),
+    booleanAnswer: json['booleanAnswer'] as bool?,
+    orderedItemIds: (json['orderedItemIds'] as List<dynamic>?)?.cast<String>(),
+    pairs: (json['pairs'] as List<dynamic>?)
+        ?.map((e) => (leftId: (e as Map)['leftId'] as String, rightId: e['rightId'] as String))
+        .toList(),
+    blanks: (json['blanks'] as List<dynamic>?)
+        ?.map(
+          (e) => (
+            blankId: (e as Map)['blankId'] as String,
+            acceptedAnswers: ((e['acceptedAnswers'] as List<dynamic>?) ?? const []).cast<String>(),
+          ),
+        )
+        .toList(),
+  );
+
+  final List<String>? selectedOptionIds;
+  final bool? booleanAnswer;
+  final List<String>? orderedItemIds;
+  final List<({String leftId, String rightId})>? pairs;
+  final List<({String blankId, List<String> acceptedAnswers})>? blanks;
+}
+
 class QuizQuestionResult {
   QuizQuestionResult({
     required this.questionId,
@@ -179,22 +242,38 @@ class QuizQuestionResult {
     required this.pointsAwarded,
     required this.pointsPossible,
     required this.explanation,
+    this.graded = true,
+    this.llmFeedback,
+    this.correctAnswer,
   });
 
   factory QuizQuestionResult.fromJson(Map<String, dynamic> json) =>
       QuizQuestionResult(
         questionId: json['questionId'] as String,
         correct: json['correct'] as bool?,
+        // Absent (older backend) reads as graded.
+        graded: json['graded'] as bool? ?? true,
         pointsAwarded: (json['pointsAwarded'] as num?)?.toInt() ?? 0,
         pointsPossible: (json['pointsPossible'] as num?)?.toInt() ?? 0,
         explanation: json['explanation'] as String?,
+        llmFeedback: json['llmFeedback'] as String?,
+        correctAnswer: json['correctAnswer'] is Map<String, dynamic>
+            ? QuizCorrectAnswer.fromJson(json['correctAnswer'] as Map<String, dynamic>)
+            : null,
       );
 
   final String questionId;
+
+  /// null = pending LLM grading (when [graded]) or not scored.
   final bool? correct;
+  final bool graded;
   final int pointsAwarded;
   final int pointsPossible;
   final String? explanation;
+  final String? llmFeedback;
+  final QuizCorrectAnswer? correctAnswer;
+
+  bool get isPending => correct == null && graded;
 }
 
 class QuizAttemptResult {
@@ -208,19 +287,24 @@ class QuizAttemptResult {
     required this.questionResults,
     required this.sectionCompleted,
     required this.trackCompleted,
+    this.status,
+    this.itemCompleted = false,
   });
 
   factory QuizAttemptResult.fromJson(Map<String, dynamic> json) =>
       QuizAttemptResult(
         attemptId: json['attemptId'] as String,
+        status: json['status'] as String?,
         scorePct: (json['scorePct'] as num?)?.toDouble(),
-        passed: json['passed'] as bool,
-        passScore: (json['passScore'] as num).toInt(),
-        attemptsUsed: (json['attemptsUsed'] as num).toInt(),
+        passed: json['passed'] as bool? ?? false,
+        passScore: (json['passScore'] as num?)?.toInt() ?? 0,
+        attemptsUsed: (json['attemptsUsed'] as num?)?.toInt() ?? 0,
         maxAttempts: (json['maxAttempts'] as num?)?.toInt(),
-        questionResults: (json['questionResults'] as List<dynamic>? ?? [])
+        // ally-be's `QuizAttemptResult.questions` (RN reads the same key).
+        questionResults: ((json['questions'] ?? json['questionResults']) as List<dynamic>? ?? [])
             .map((e) => QuizQuestionResult.fromJson(e as Map<String, dynamic>))
             .toList(),
+        itemCompleted: json['itemCompleted'] as bool? ?? json['passed'] as bool? ?? false,
         // Mirrors RN's `QuizAttemptResult` — these sit flat on the attempt
         // response itself, not nested under a `completion` object the way
         // article/video/journal results are.
@@ -229,12 +313,18 @@ class QuizAttemptResult {
       );
 
   final String attemptId;
+
+  /// `GRADED` | `PENDING_GRADING`.
+  final String? status;
+
+  /// null when the quiz has no graded questions (a survey).
   final double? scorePct;
   final bool passed;
   final int passScore;
   final int attemptsUsed;
   final int? maxAttempts;
   final List<QuizQuestionResult> questionResults;
+  final bool itemCompleted;
   final bool sectionCompleted;
   final bool trackCompleted;
 }

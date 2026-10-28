@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/back_title_header.dart';
+import '../../courses/presentation/course_item_player_screen.dart';
 import '../data/notification_item.dart';
 import '../data/notifications_repository.dart';
 
@@ -14,13 +15,8 @@ import '../data/notifications_repository.dart';
 /// total `count`), and tap-to-navigate for a course-discussion-reply
 /// notification.
 ///
-/// Scoped simplification on that last one: RN pushes straight into
-/// `COURSE_ITEM_PLAYER` at the replied-to item with `highlightPostId` to
-/// scroll to/highlight the specific reply. This app's course-item-player
-/// route needs a full fetched `TrackDetailItem` (not just an id) and has
-/// no discussion-thread UI yet to highlight a post within, so tapping
-/// instead opens the track's own detail screen — close context, not the
-/// exact item/post RN lands on.
+/// Like RN, a reply notification pushes the course item player at the
+/// replied-to item with `highlightPostId`.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -78,7 +74,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
     if (item.type == kCourseDiscussionReplyNotificationType) {
       final trackId = item.data?['trackId'] as String?;
-      if (trackId != null && mounted) context.push('/courses/$trackId');
+      final itemId = item.data?['itemId'] as String?;
+      final postId = item.data?['postId'] as String?;
+      if (trackId != null && itemId != null && mounted) {
+        context.push(
+          '/courses/item/$itemId',
+          extra: CourseItemPlayerArgs(trackId: trackId, highlightPostId: postId),
+        );
+      }
     }
   }
 

@@ -32,17 +32,13 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
 class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   bool _isStarting = false;
 
+  /// RN `handleItemPress`: every unlocked item opens the player, which
+  /// shows `UnsupportedItemCard` for a type this build can't play.
   void _openItem(TrackDetailItem item) {
-    if (isPlayableTrackItemType(item.type)) {
-      context.push(
-        '/courses/item/${item.id}',
-        extra: (trackId: widget.trackId, item: item),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ref.tr('courses.player.unsupportedBody'))),
-      );
-    }
+    context.push(
+      '/courses/item/${item.id}',
+      extra: (trackId: widget.trackId, item: item),
+    );
   }
 
   Future<void> _startOrContinue(TrackDetail detail) async {

@@ -176,21 +176,34 @@ void main() {
     expect(find.text('item:i1'), findsOneWidget);
   });
 
-  testWidgets('tapping an unlocked but unsupported item type shows a snackbar instead of navigating',
-      (tester) async {
+  testWidgets('tapping an unlocked item of an unknown type opens the player (RN handleItemPress)', (tester) async {
     when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
       (_) async => _detail(items: [
-        _item(id: 'i1', type: TrackItemType.unknown, status: TrackItemStatus.unlocked, title: 'Roleplay item'),
+        _item(id: 'i1', type: TrackItemType.unknown, status: TrackItemStatus.unlocked, title: 'New kind of item'),
       ]),
     );
-
-    await pump(tester);
-
-    await tester.tap(find.text('Roleplay item'));
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (context, state) => const CourseDetailScreen(trackId: 't1')),
+        GoRoute(
+          path: '/courses/item/:itemId',
+          builder: (context, state) => Text('player:${state.pathParameters['itemId']}'),
+        ),
+      ],
+    );
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.byType(SnackBar), findsOneWidget);
-    expect(find.text('courses.player.unsupportedBody'), findsOneWidget);
+    await tester.tap(find.text('New kind of item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('player:i1'), findsOneWidget);
   });
 
   testWidgets(

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/localization/translate_ref.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../course_button.dart';
+import '../course_styles.dart';
 
 /// Port of ally-mobile (React Native)'s `VideoFallbackCard` — fallback for
 /// youtube/vimeo/loom sources: no native SDK integration for these hosts on
@@ -21,6 +23,7 @@ class VideoFallbackCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // styles.container: centred, gap 12, paddingHorizontal 24.
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -29,17 +32,19 @@ class VideoFallbackCard extends ConsumerWidget {
           children: [
             Text(
               ref.t('courses.meta.video'),
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: CourseText.serif(CourseType.bodyMedium, AppColors.mediumEmphasis),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
-            AppButton(
+            const SizedBox(height: 12),
+            CourseButton(
+              key: const Key('video-open-external'),
               label: ref.t('courses.video.openVideo'),
-              variant: AppButtonVariant.secondary,
+              variant: CourseButtonVariant.secondary,
               onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
             ),
-            const SizedBox(height: 8),
-            AppButton(
+            const SizedBox(height: 12),
+            CourseButton(
+              key: const Key('video-mark-watched'),
               label: ref.t('courses.video.markWatched'),
               onPressed: onMarkWatched,
             ),
