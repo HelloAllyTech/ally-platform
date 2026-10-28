@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -19,9 +20,7 @@ void main() {
   // provider stuck in `AsyncLoading` (an empirically-confirmed test-harness
   // gotcha, not specific to this screen or to go_router — sequential pumps
   // within one test body are unaffected).
-  testWidgets('CompleteProfileScreen: no phone field, live-disabled submit, dialog error, navigation', (
-    tester,
-  ) async {
+  testWidgets('CompleteProfileScreen: no phone field, live-disabled submit, dialog error, navigation', (tester) async {
     // --- Scenario 1: no phone field at all (RN has none either), and ---
     // --- Continue stays disabled until there's a non-empty name.     ---
     final repository1 = MockAccountRepository();
@@ -70,6 +69,40 @@ void main() {
     expect(find.text('Something went wrong'), findsOneWidget);
     expect(find.textContaining("We couldn't save your profile"), findsOneWidget);
 
+    expect(
+      tester.widget<AppButton>(find.widgetWithText(AppButton, 'Continue')).isLoading,
+      isFalse,
+      reason: 'RN stops loading before its Alert shows',
+    );
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // --- Scenario 2b: a backend message replaces the generic copy ---
+    // --- (RN: `message || t('completeProfile.errorDescription')`).  ---
+    final repository2b = MockAccountRepository();
+    when(() => repository2b.completeProfile(name: any(named: 'name'))).thenThrow(
+      DioException(
+        requestOptions: RequestOptions(path: '/users/me/complete-profile'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/users/me/complete-profile'),
+          statusCode: 400,
+          data: {'message': 'Name is too long'},
+        ),
+      ),
+    );
+    await pumpApp(
+      tester,
+      const CompleteProfileScreen(),
+      overrides: [accountRepositoryProvider.overrideWithValue(repository2b)],
+    );
+    await tester.enterText(find.byType(TextField), 'Jane Doe');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(AppButton, 'Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Name is too long'), findsOneWidget);
+    expect(find.textContaining("We couldn't save your profile"), findsNothing);
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 

@@ -128,4 +128,13 @@ class AppColors {
   static const lightBlue50 = Color(0xFFE1F5FE); // "Next" chip background
   static const blackAlpha700 = Color(0x8A000000); // rgba(0,0,0,0.54) modal backdrop
   static const blackAlpha800 = Color(0x99000000); // rgba(0,0,0,0.6) locked overlay
+  // auth parity (src/theme/colors.ts)
+  static const darkGreen = Color(0xFF1B282F); // SplashScreen background
+  static const lightGray18 = Color(0xFF021922); // SplashScreen hero gradient
+  static const brightBlue = Color(0xFF0473F2); // Login input focus, footer links
+  static const mediumGray = Color(0xFF8C8C8C); // Login "OR" divider, footer
+  static const roseWhite = Color(0xFFFFF0F1); // OTP error background
+  static const vividRed = Color(0xFFF50004); // OTP error text/border
+  static const ashGray = Color(0xFFEAEAEA); // CompleteProfile/Suspended borders
+  static const gray = Color(0xFF808080); // OtpInput empty-box dash (CSS 'gray')
 }

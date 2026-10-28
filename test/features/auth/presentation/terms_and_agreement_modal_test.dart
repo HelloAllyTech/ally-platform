@@ -22,10 +22,8 @@ Future<void> _pumpTermsPage(WidgetTester tester) async {
       child: MaterialApp(
         home: Scaffold(
           body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () => TermsAndAgreementModal.show(context),
-              child: const Text('open'),
-            ),
+            builder: (context) =>
+                TextButton(onPressed: () => TermsAndAgreementModal.show(context), child: const Text('open')),
           ),
         ),
       ),
@@ -36,9 +34,7 @@ Future<void> _pumpTermsPage(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('cannot be dismissed without agreeing: no close/back affordance pops it', (
-    tester,
-  ) async {
+  testWidgets('cannot be dismissed without agreeing: no close/back affordance pops it', (tester) async {
     await _pumpTermsPage(tester);
 
     expect(find.text('Terms and agreement'), findsOneWidget);
@@ -52,15 +48,13 @@ void main() {
     expect(find.text('Terms and agreement'), findsOneWidget);
   });
 
-  testWidgets('shows "scroll to bottom" until scrolled, then the checkbox + Agree button', (
-    tester,
-  ) async {
+  testWidgets('shows "scroll to bottom" until scrolled, then the checkbox + Agree button', (tester) async {
     await _pumpTermsPage(tester);
 
     expect(find.byKey(const Key('scroll-to-bottom-button')), findsOneWidget);
     expect(find.byKey(const Key('agree-checkbox-container')), findsNothing);
 
-    await tester.fling(find.byType(SingleChildScrollView), const Offset(0, -5000), 8000);
+    await tester.fling(find.byKey(const Key('terms-scroll-view')), const Offset(0, -5000), 8000);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
@@ -71,7 +65,7 @@ void main() {
   testWidgets('Agree button stays disabled until the checkbox is checked', (tester) async {
     await _pumpTermsPage(tester);
 
-    await tester.fling(find.byType(SingleChildScrollView), const Offset(0, -5000), 8000);
+    await tester.fling(find.byKey(const Key('terms-scroll-view')), const Offset(0, -5000), 8000);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
@@ -88,7 +82,7 @@ void main() {
   testWidgets('tapping Agree closes the modal', (tester) async {
     await _pumpTermsPage(tester);
 
-    await tester.fling(find.byType(SingleChildScrollView), const Offset(0, -5000), 8000);
+    await tester.fling(find.byKey(const Key('terms-scroll-view')), const Offset(0, -5000), 8000);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.tap(find.byKey(const Key('agree-checkbox-container')));
@@ -97,5 +91,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Terms and agreement'), findsNothing);
+  });
+
+  testWidgets('one tap on "Scroll to bottom" reveals the checkbox and Agree (RN sets the '
+      'flag on tap; the footer swap used to shrink the viewport and flip it back)', (tester) async {
+    await _pumpTermsPage(tester);
+
+    expect(find.byKey(const Key('scroll-to-bottom-button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('scroll-to-bottom-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('scroll-to-bottom-button')), findsNothing);
+    expect(find.byKey(const Key('agree-checkbox')), findsOneWidget);
+    expect(find.byKey(const Key('agree-checkbox-container')), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Agree'), findsOneWidget);
+
+    // Still there after any trailing scroll notifications/re-layout.
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byKey(const Key('scroll-to-bottom-button')), findsNothing);
+    expect(find.widgetWithText(AppButton, 'Agree'), findsOneWidget);
+  });
+
+  testWidgets('scrolling back up after reaching the bottom keeps Agree visible (one-way latch)', (tester) async {
+    await _pumpTermsPage(tester);
+
+    await tester.tap(find.byKey(const Key('scroll-to-bottom-button')));
+    await tester.pumpAndSettle();
+    await tester.fling(find.byKey(const Key('terms-scroll-view')), const Offset(0, 5000), 8000);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('scroll-to-bottom-button')), findsNothing);
+    expect(find.widgetWithText(AppButton, 'Agree'), findsOneWidget);
+  });
+
+  testWidgets('renders RN\'s TermsAndAgreement copy: serif bullets, Medium bold run, crisis link', (tester) async {
+    await _pumpTermsPage(tester);
+
+    expect(find.text('General Terms (All Users)'), findsOneWidget);
+    expect(find.text('•'), findsWidgets);
+    final bullet = tester.widget<Text>(find.text('•').first);
+    expect(bullet.style?.fontFamily, 'IBMPlexSerif-Regular');
+
+    final emergency = find.textContaining('https://findahelpline.com/', findRichText: true);
+    expect(emergency, findsOneWidget);
   });
 }

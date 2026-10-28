@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart' show CupertinoDialogAction;
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -18,8 +19,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_repository.dart';
 import 'terms_and_agreement_modal.dart';
 
@@ -30,19 +31,32 @@ const _otpLength = 4;
 const _resendCountdownSeconds = 60;
 const _defaultOtpExpiryMinutes = 10;
 
+/// iOS system font (SF Pro) — what an RN `<Text>` with no `fontFamily`
+/// renders in. Falls back to the platform default elsewhere.
+const _systemFont = 'CupertinoSystemText';
+
+/// splashAnimation.json is 360 frames at 120fps (3s). RN plays frames
+/// 0→200 (`lottieRef.play(0, 200)`), then re-renders the view with
+/// `progress={0.99}` once `onAnimationFinish` fires, so the hero settles
+/// on the animation's last frame.
+const _lottieDuration = Duration(milliseconds: 3000);
+const _lottiePlayToProgress = 200 / 360;
+const _lottieSettledProgress = 0.99;
+
+/// RN's `withTiming(-WINDOW_HEIGHT * 0.6, {duration: 1000})` — reanimated's
+/// default easing is `Easing.inOut(Easing.quad)`.
+const _sheetDuration = Duration(milliseconds: 1000);
+
+/// RN's `isValidEmail` (`src/utils/common.ts`) — same regex, gates the
+/// "Next" button there (`isDisabled={!isValidEmail(email)}`).
+final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+bool _isValidEmail(String email) => _emailRegex.hasMatch(email);
+
 /// RN's `isSuspendedUserError` (`src/utils/error.ts`) — a 403 whose body
 /// carries `error: 'USER_SUSPENDED'` or the literal message `'User
 /// suspended'`. Checked after every sign-in method (OTP, Google, Apple) so a
 /// suspended account reaches SuspendedAccountScreen instead of a generic
-/// "failed to verify OTP" error, same as RN's OtpVerification/useGoogleLogin/
-/// useAppleLogin hooks.
-/// RN's `isValidEmail` (`src/utils/common.ts`) — same regex, gates the
-/// "Next" button there (`isDisabled={!isValidEmail(email)}`). Flutter's
-/// button had no such gate at all, only an empty-string check, so anything
-/// vaguely email-shaped like "abc" could reach the backend unvalidated.
-final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-bool _isValidEmail(String email) => _emailRegex.hasMatch(email);
-
+/// error, same as RN's OtpVerification/useGoogleLogin/useAppleLogin hooks.
 bool _isSuspendedUserError(Object error) {
   if (error is! DioException) return false;
   if (error.response?.statusCode != 403) return false;
@@ -51,14 +65,54 @@ bool _isSuspendedUserError(Object error) {
   return data['error'] == 'USER_SUSPENDED' || data['message'] == 'User suspended';
 }
 
-/// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
-/// Native)'s `generateOtp`/`verifyOtp`/`loginWithGoogle`/`loginWithApple`
-/// contracts (`useGoogleLogin`/`useAppleLogin` hooks). Google/Apple can't
+/// RN's `getErrorDetails(error).message` (`src/utils/error.ts`): the
+/// backend body's `message`, else its `error`, else `null` (callers supply
+/// their own fallback, as RN's do).
+String? _apiErrorMessage(Object error) {
+  if (error is! DioException) return null;
+  final data = error.response?.data;
+  if (data is! Map) return null;
+  for (final key in ['message', 'error']) {
+    final value = data[key];
+    if (value is String && value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+/// Lower-cases and strips whitespace as the learner types — RN's
+/// `handleEmailChange` (`setEmail(text.trim().toLowerCase())`).
+class _EmailInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.trim().toLowerCase();
+    if (text == newValue.text) return newValue;
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+/// Port of ally-mobile (React Native)'s `src/screens/SplashScreen/` — the
+/// screen that is both the cold-launch splash and the sign-in flow:
+///
+/// * `SplashScreen.tsx`: the full-bleed splash Lottie plays once on the
+///   dark-green background; when it finishes (and nobody is signed in) the
+///   hero slides up 60% of the screen while the white, top-rounded sheet
+///   rises from the bottom and the greeting fades in over the hero. On the
+///   OTP step the hero stays put; only the title changes and a back arrow
+///   appears top-left.
+/// * `components/EmailLogin`: email + Next, "OR", Google and (iOS) Apple
+///   buttons, terms footer.
+/// * `components/OtpVerification` + `components/OtpInput`: four code boxes,
+///   expiry/resend copy, Verify pinned to the bottom of the sheet.
+///
+/// Email+OTP, Google and Apple sign-in match RN's `generateOtp`/`verifyOtp`/
+/// `loginWithGoogle`/`loginWithApple` contracts. Google/Apple can't
 /// complete a real round-trip until this app's own distinct package name
 /// has an OAuth client registered — see auth_repository.dart's doc comment
-/// — so those buttons disable themselves (Google) or surface the backend's
-/// real rejection (Apple, which has no equivalent "is configured" check
-/// client-side) rather than pretending to work.
+/// — so the Google button disables itself when unconfigured and Apple
+/// surfaces the backend's real rejection.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -68,14 +122,25 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 enum _Step { email, otp }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderStateMixin {
   final _emailController = TextEditingController();
-  final _otpControllers = List.generate(_otpLength, (_) => TextEditingController());
-  final _otpFocusNodes = List.generate(_otpLength, (_) => FocusNode());
+  final _emailFocusNode = FocusNode();
+  final _otpController = TextEditingController();
+  final _otpFocusNode = FocusNode();
+
+  late final AnimationController _lottieController;
+  late final AnimationController _sheetController;
+  bool _isSheetVisible = false;
+  bool _isSheetFullyOpen = false;
+
   _Step _step = _Step.email;
-  bool _isSubmitting = false;
+  bool _isOtpLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
+  bool _isVerifying = false;
   bool _isResending = false;
-  String? _error;
+  bool _isShowingTerms = false;
+  String? _otpError;
   Timer? _resendTimer;
   int _resendCountdown = 0;
   int _otpExpiryMinutes = _defaultOtpExpiryMinutes;
@@ -97,37 +162,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         serverClientId: AppConfig.googleWebClientId,
       );
     }
-    // Rebuilds the Verify button's enabled state as digits fill in.
-    for (final controller in _otpControllers) {
-      controller.addListener(_rebuild);
-    }
-    // Rebuilds the Next button's enabled state as the email is typed.
     _emailController.addListener(_rebuild);
+    _emailFocusNode.addListener(_rebuild);
+    _otpFocusNode.addListener(_rebuild);
+    _otpController.addListener(_keepOtpCaretAtEnd);
+
+    _sheetController = AnimationController(vsync: this, duration: _sheetDuration);
+    _lottieController = AnimationController(vsync: this, duration: _lottieDuration);
+    _lottieController.animateTo(_lottiePlayToProgress).then((_) => _onAnimationFinish());
   }
 
   @override
   void dispose() {
     _emailController.dispose();
-    for (final controller in _otpControllers) {
-      controller.dispose();
-    }
-    for (final node in _otpFocusNodes) {
-      node.dispose();
-    }
+    _emailFocusNode.dispose();
+    _otpController.dispose();
+    _otpFocusNode.dispose();
+    _lottieController.dispose();
+    _sheetController.dispose();
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
     _resendTimer?.cancel();
     super.dispose();
   }
 
   void _rebuild() => setState(() {});
 
-  bool get _isOtpComplete => _otpControllers.every((c) => c.text.isNotEmpty);
+  /// The boxes always fill left to right, so a tap on, say, the first box
+  /// must not put the hidden field's caret before the digits already typed.
+  void _keepOtpCaretAtEnd() {
+    final end = _otpController.text.length;
+    final selection = _otpController.selection;
+    // Only a moved caret; a select-all (to paste over) is left alone.
+    if (selection.isValid && selection.isCollapsed && selection.baseOffset != end) {
+      _otpController.selection = TextSelection.collapsed(offset: end);
+    }
+  }
+
+  /// RN's `onAnimationFinish` + the effect that calls `displayBottomSheet`
+  /// once the animation has ended and the user is not signed in (a signed-in
+  /// user is routed away by the router's auth redirect instead).
+  void _onAnimationFinish() {
+    if (!mounted) return;
+    _lottieController.value = _lottieSettledProgress;
+    if (ref.read(authControllerProvider).isAuthenticated || _isSheetVisible) return;
+    setState(() => _isSheetVisible = true);
+    _sheetController.forward().then((_) {
+      if (mounted) setState(() => _isSheetFullyOpen = true);
+    });
+  }
+
+  bool get _isLoading => _isOtpLoading || _isGoogleLoading || _isAppleLoading;
+
+  bool get _isOtpComplete => _otpController.text.length == _otpLength;
+
+  void _showToast(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
+  }
 
   void _startResendCountdown(int? expiresInSeconds) {
     _resendTimer?.cancel();
     setState(() {
       _resendCountdown = _resendCountdownSeconds;
-      _otpExpiryMinutes =
-          expiresInSeconds != null ? (expiresInSeconds / 60).ceil() : _defaultOtpExpiryMinutes;
+      _otpExpiryMinutes = expiresInSeconds != null ? (expiresInSeconds / 60).ceil() : _defaultOtpExpiryMinutes;
     });
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_resendCountdown <= 1) {
@@ -139,16 +236,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
-  Future<void> _signInWithGoogle() async {
-    final initFuture = _googleInitFuture;
-    if (initFuture == null) {
-      setState(() => _error = 'Google sign-in isn\'t configured for this build.');
+  /// RN's `useGoogleLogin`/`useAppleLogin` error handling: a suspended
+  /// account goes to SuspendedAccountScreen, any other backend error is a
+  /// toast with the backend's message (or the generic fallback).
+  void _handleSocialLoginError(Object error, String fallbackKey) {
+    if (_isSuspendedUserError(error)) {
+      if (mounted) context.push('/suspended');
       return;
     }
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
+    _showToast(_apiErrorMessage(error) ?? ref.tr(fallbackKey));
+  }
+
+  Future<void> _completeSocialLogin((String, String) tokens) async {
+    if (!mounted) return;
+    await TermsAndAgreementModal.show(context);
+    await ref.read(authControllerProvider.notifier).signIn(accessToken: tokens.$1, refreshToken: tokens.$2);
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final initFuture = _googleInitFuture;
+    if (initFuture == null) return;
+    setState(() => _isGoogleLoading = true);
+    (String, String)? tokens;
     try {
       await initFuture;
       try {
@@ -162,34 +271,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (idToken == null) {
         throw StateError('No ID token returned from Google');
       }
-      final (accessToken, refreshToken) =
-          await ref.read(authRepositoryProvider).loginWithGoogle(idToken);
-      if (!mounted) return;
-      await TermsAndAgreementModal.show(context);
-      await ref.read(authControllerProvider.notifier).signIn(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          );
+      tokens = await ref.read(authRepositoryProvider).loginWithGoogle(idToken);
     } on GoogleSignInException catch (e) {
       if (e.code != GoogleSignInExceptionCode.canceled) {
-        setState(() => _error = '${ref.tr('auth.login.google.error')}: ${e.description ?? e.code}');
+        _showToast(ref.tr('auth.login.google.error'));
       }
     } catch (e) {
-      if (_isSuspendedUserError(e)) {
-        if (mounted) context.push('/suspended');
-      } else {
-        setState(() => _error = '${ref.tr('auth.login.google.error')}: $e');
-      }
+      _handleSocialLoginError(e, 'auth.login.google.error');
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
+    if (tokens != null) await _completeSocialLogin(tokens);
   }
 
   Future<void> _signInWithApple() async {
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
+    setState(() => _isAppleLoading = true);
+    (String, String)? tokens;
     try {
       final credential = await SignInWithApple.getAppleIDCredential(
         scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
@@ -198,416 +295,863 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (identityToken == null) {
         throw StateError('No identity token returned from Apple');
       }
-      final (accessToken, refreshToken) = await ref.read(authRepositoryProvider).loginWithApple(
+      tokens = await ref
+          .read(authRepositoryProvider)
+          .loginWithApple(
             identityToken: identityToken,
             authorizationCode: credential.authorizationCode,
             givenName: credential.givenName,
             familyName: credential.familyName,
           );
-      if (!mounted) return;
-      await TermsAndAgreementModal.show(context);
-      await ref.read(authControllerProvider.notifier).signIn(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          );
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code != AuthorizationErrorCode.canceled) {
-        setState(() => _error = '${ref.tr('auth.login.apple.error')}: ${e.message}');
+        _showToast(ref.tr('auth.login.apple.error'));
       }
     } catch (e) {
-      if (_isSuspendedUserError(e)) {
-        if (mounted) context.push('/suspended');
-      } else {
-        setState(() => _error = '${ref.tr('auth.login.apple.error')}: $e');
-      }
+      _handleSocialLoginError(e, 'auth.login.apple.error');
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isAppleLoading = false);
     }
+    if (tokens != null) await _completeSocialLogin(tokens);
   }
 
   Future<void> _sendCode() async {
-    final email = _emailController.text.trim();
-    if (!_isValidEmail(email)) {
-      setState(() => _error = ref.tr('auth.login.email.error'));
+    final email = _emailController.text;
+    if (!_isValidEmail(email) || _isLoading) return;
+    setState(() => _isOtpLoading = true);
+    int? expiresIn;
+    try {
+      expiresIn = await ref.read(authRepositoryProvider).generateOtp(email);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isOtpLoading = false);
+      await _showSendOtpFailedAlert(e);
       return;
     }
+    if (!mounted) return;
     setState(() {
-      _isSubmitting = true;
-      _error = null;
+      _isOtpLoading = false;
+      _step = _Step.otp;
+      _otpController.clear();
+      _otpError = null;
     });
-    try {
-      final expiresIn = await ref.read(authRepositoryProvider).generateOtp(email);
-      if (!mounted) return;
-      setState(() => _step = _Step.otp);
-      _startResendCountdown(expiresIn);
-    } catch (e) {
-      setState(() => _error = '${ref.tr('auth.login.errors.generateOtp')}: $e');
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
+    _startResendCountdown(expiresIn);
+  }
+
+  /// RN's EmailLogin `handleOtpError`: an `Alert.alert` titled "Failed to
+  /// Send OTP" with the backend message, "check your internet" for a
+  /// network failure, or "Unknown error".
+  Future<void> _showSendOtpFailedAlert(Object error) {
+    final isNetworkError = error is DioException && error.response == null;
+    final message = isNetworkError
+        ? ref.tr('common.checkInternet')
+        : _apiErrorMessage(error) ?? ref.tr('common.unknownError');
+    return showAdaptiveDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text(ref.tr('auth.login.errors.sendOtpFailed')),
+        content: Text(message),
+        actions: [
+          if (defaultTargetPlatform == TargetPlatform.iOS)
+            CupertinoDialogAction(onPressed: () => Navigator.of(context).pop(), child: Text(ref.tr('common.ok')))
+          else
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(ref.tr('common.ok'))),
+        ],
+      ),
+    );
   }
 
   Future<void> _resendOtp() async {
     setState(() => _isResending = true);
     try {
-      final expiresIn =
-          await ref.read(authRepositoryProvider).generateOtp(_emailController.text.trim());
+      final expiresIn = await ref.read(authRepositoryProvider).generateOtp(_emailController.text);
       if (!mounted) return;
-      for (final controller in _otpControllers) {
-        controller.clear();
-      }
-      setState(() => _error = null);
+      setState(() {
+        _otpController.clear();
+        _otpError = null;
+      });
       _startResendCountdown(expiresIn);
-      _otpFocusNodes.first.requestFocus();
+      _otpFocusNode.requestFocus();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${ref.tr('auth.login.errors.generateOtp')}: $e')));
-      }
+      if (mounted) _showToast(_apiErrorMessage(e) ?? ref.tr('common.somethingWentWrong'));
     } finally {
       if (mounted) setState(() => _isResending = false);
     }
   }
 
   Future<void> _verifyCode() async {
-    final otp = _otpControllers.map((c) => c.text).join();
-    if (otp.isEmpty) {
-      setState(() => _error = ref.tr('auth.login.otp.emptyCodeError'));
+    final otp = _otpController.text;
+    setState(() {
+      _isVerifying = true;
+      _otpError = null;
+    });
+    (String, String) tokens;
+    try {
+      tokens = await ref.read(authRepositoryProvider).verifyOtp(email: _emailController.text, otp: otp);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+      if (_isSuspendedUserError(e)) {
+        context.push('/suspended');
+      } else {
+        setState(() => _otpError = _apiErrorMessage(e) ?? ref.tr('common.somethingWentWrong'));
+      }
       return;
     }
+    if (!mounted) return;
+    // RN: Verify stops loading and is disabled (`isDisabled={... ||
+    // showTermsModal}`) while the terms modal is up.
     setState(() {
-      _isSubmitting = true;
-      _error = null;
+      _isVerifying = false;
+      _isShowingTerms = true;
     });
-    try {
-      final (accessToken, refreshToken) = await ref.read(authRepositoryProvider).verifyOtp(
-            email: _emailController.text.trim(),
-            otp: otp,
-          );
-      if (!mounted) return;
-      await TermsAndAgreementModal.show(context);
-      await ref.read(authControllerProvider.notifier).signIn(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          );
-    } catch (e) {
-      if (_isSuspendedUserError(e)) {
-        if (mounted) context.push('/suspended');
-      } else {
-        setState(() => _error = '${ref.tr('auth.login.errors.verifyOtp')}: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
+    await TermsAndAgreementModal.show(context);
+    if (mounted) setState(() => _isShowingTerms = false);
+    await ref.read(authControllerProvider.notifier).signIn(accessToken: tokens.$1, refreshToken: tokens.$2);
+  }
+
+  /// RN's `handleBackPress` / hardware back on the OTP step. RN unmounts
+  /// EmailLogin while on the OTP step, so its email field comes back empty.
+  void _backToEmail() {
+    _resendTimer?.cancel();
+    setState(() {
+      _step = _Step.email;
+      _emailController.clear();
+      _otpController.clear();
+      _otpError = null;
+      _resendCountdown = 0;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // RN wraps this whole screen in a `KeyboardAwareScrollView` — the
-      // OTP/email forms plus the new subtitle/footer text can exceed a
-      // short screen's height (confirmed: a plain Center+Column overflowed
-      // once this content was added), and the content starts from the top
-      // in the real app rather than being vertically centered regardless.
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // RN's real SplashScreen opens full-screen on this Lottie
-              // animation, then slides/shrinks it away as the email/OTP
-              // sheet rises over it — confirmed from source
-              // (`animationContainer`'s absolute, full-screen positioning +
-              // a `translateY` interpolation tied to the sheet's state).
-              // Ported here as a simpler top-of-column illustration, shown
-              // only on the email step (closest single frame to what RN's
-              // animation settles on before the sheet takes over), rather
-              // than reproducing the full reanimated slide/shrink
-              // choreography.
-              if (_step == _Step.email) ...[
-                SizedBox(
-                  height: 220,
-                  child: Lottie.asset(
-                    'assets/animations/splashAnimation.json',
-                    fit: BoxFit.contain,
-                    repeat: false,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              _buildGreeting(context),
-              const SizedBox(height: 24),
-              if (_step == _Step.email) ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(ref.t('auth.login.subtitle')),
-                ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(ref.t('auth.login.email.label'), style: Theme.of(context).textTheme.labelLarge),
-                ),
-                const SizedBox(height: 8),
-                AppTextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
-                  ),
-                AppButton(
-                  label: ref.t('common.next'),
-                  onPressed: _sendCode,
-                  isLoading: _isSubmitting,
-                  isDisabled: !_isValidEmail(_emailController.text.trim()),
-                ),
-                const SizedBox(height: 24),
-                Row(
+    final size = MediaQuery.sizeOf(context);
+    final h = size.height;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: PopScope(
+        canPop: _step == _Step.email,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && _step == _Step.otp) _backToEmail();
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.darkGreen,
+          // RN's sheet geometry is fixed fractions of WINDOW_HEIGHT; the
+          // keyboard doesn't resize it (KeyboardAwareScrollView with
+          // automatic scroll off on iOS), it only adds scrollable room.
+          resizeToAvoidBottomInset: false,
+          body: GestureDetector(
+            // RN wraps the screen in TouchableWithoutFeedback → Keyboard.dismiss.
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: AnimatedBuilder(
+              animation: _sheetController,
+              builder: (context, _) {
+                final eased = Curves.easeInOutQuad.transform(_sheetController.value);
+                // animationTranslateY.value, as a fraction of WINDOW_HEIGHT.
+                final translate = 0.6 * eased;
+                return Stack(
                   children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(ref.t('common.or')),
+                    // styles.animationContainer: full-screen, translated up.
+                    Positioned.fill(
+                      child: Transform.translate(
+                        offset: Offset(0, -translate * h),
+                        child: Lottie.asset(
+                          'assets/animations/splashAnimation.json',
+                          controller: _lottieController,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                    const Expanded(child: Divider()),
+                    if (_isSheetFullyOpen) _buildHeroGradient(h),
+                    if (_isSheetVisible) _buildSheet(context, size, translate),
+                    _buildTitle(context, size, translate),
+                    if (_step == _Step.otp) _buildBackButton(size),
                   ],
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: (_isSubmitting || _googleInitFuture == null) ? null : _signInWithGoogle,
-                  icon: SvgPicture.asset('assets/icons/google.svg', width: 18, height: 18),
-                  label: Text(ref.t('auth.login.google.button')),
-                ),
-                if (defaultTargetPlatform == TargetPlatform.iOS) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _isSubmitting ? null : _signInWithApple,
-                    icon: const Icon(Icons.apple),
-                    label: Text(ref.t('auth.login.apple.button')),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                _buildTermsFooter(context),
-              ] else ...[
-                // RN's headerText/emailText: same size, different family —
-                // not one flat "enter code <email>" line.
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: ref.t('auth.login.otp.enterCode'),
-                          style: const TextStyle(fontFamily: AppFonts.replayProHeadline, fontSize: 20),
-                        ),
-                        const TextSpan(text: '\n'),
-                        TextSpan(
-                          text: _emailController.text.trim(),
-                          style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 20),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildOtpBoxes(context),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
-                  ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ref.t(
-                          _otpExpiryMinutes == 1
-                              ? 'auth.login.otp.expires_one'
-                              : 'auth.login.otp.expires_other',
-                          {'minutes': _otpExpiryMinutes},
-                        ),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      TextButton(
-                        onPressed: (_resendCountdown > 0 || _isResending) ? null : _resendOtp,
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          alignment: Alignment.centerLeft,
-                        ),
-                        child: Text(
-                          _resendCountdown > 0
-                              ? '${ref.t('auth.login.otp.resend')} (${_resendCountdown}s)'
-                              : ref.t('auth.login.otp.resend'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  label: ref.t('auth.login.otp.verify'),
-                  onPressed: _verifyCode,
-                  isLoading: _isSubmitting,
-                  isDisabled: !_isOtpComplete,
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _step = _Step.email),
-                  child: Text(ref.t('auth.login.otp.useDifferentEmail')),
-                ),
-              ],
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// RN's `OtpInput` — four boxed, individually-focused digit fields with
-  /// auto-advance on entry, backspace-to-previous when the current box is
-  /// already empty, and a paste shortcut (typing/pasting multiple digits
-  /// into the first box fills the rest). Previously this was one plain
-  /// `AppTextField` taking the whole code as free text.
-  Widget _buildOtpBoxes(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        for (var index = 0; index < _otpLength; index++)
-          SizedBox(
-            width: 60,
-            height: 60,
-            // Backspace on an already-empty box has nothing to delete, so
-            // `TextField`'s own handling leaves it unhandled and it bubbles
-            // up here — that's when it moves focus back a box.
-            child: Focus(
-              onKeyEvent: (node, event) {
-                if (event is KeyDownEvent &&
-                    event.logicalKey == LogicalKeyboardKey.backspace &&
-                    _otpControllers[index].text.isEmpty &&
-                    index > 0) {
-                  _otpControllers[index - 1].clear();
-                  _otpFocusNodes[index - 1].requestFocus();
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: TextField(
-                controller: _otpControllers[index],
-                focusNode: _otpFocusNodes[index],
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                maxLength: index == 0 ? _otpLength : 1,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: const Color(0xFFF5F5F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: _error != null ? AppColors.red400 : AppColors.lightGray2,
-                    ),
-                  ),
-                ),
-                onChanged: (value) => _handleOtpDigitChanged(value, index),
-              ),
+  /// react-native-size-matters' `scale` (`@s`) and `verticalScale` (`@vs`)
+  /// — guideline 350×680. In RnScale's logical units these reduce to a
+  /// fraction of the logical screen size (the `ms` factor cancels out).
+  double _s(Size size, double v) => v * size.width / 350;
+  double _vs(Size size, double v) => v * size.height / 680;
+
+  /// styles.welcomeGradientContainer: `lightGray18` at the bottom fading to
+  /// transparent, bottom 58% / height 25% of the screen, under the sheet.
+  Widget _buildHeroGradient(double h) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0.58 * h,
+      height: 0.25 * h,
+      child: const IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [AppColors.lightGray18, Color(0x00021922)],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 
-  void _handleOtpDigitChanged(String value, int index) {
-    if (value.length > 1) {
-      // A paste landed in one box — spread its digits across the rest.
-      for (var i = 0; i < _otpLength; i++) {
-        _otpControllers[i].text = i < value.length ? value[i] : '';
-      }
-      final lastFilled = value.length.clamp(0, _otpLength) - 1;
-      if (lastFilled >= 0) _otpFocusNodes[lastFilled].requestFocus();
-      return;
-    }
-    if (value.isNotEmpty && index < _otpLength - 1) {
-      _otpFocusNodes[index + 1].requestFocus();
-    }
+  /// styles.authContainer + `authContentStyle`: rises from below the screen
+  /// to 40% (minus the -18@vs margin), fading in over the first half.
+  Widget _buildSheet(BuildContext context, Size size, double translate) {
+    final h = size.height;
+    return Positioned(
+      top: -_vs(size, 18) + h - translate * h,
+      left: 0,
+      right: 0,
+      height: 0.65 * h,
+      child: Opacity(
+        opacity: (translate / 0.3).clamp(0.0, 1.0),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: _step == _Step.email ? _buildEmailStep(context, size) : _buildOtpStep(context, size),
+        ),
+      ),
+    );
   }
 
-  /// RN's SplashScreen shows a different greeting per step: on the email
-  /// step, "Hey," then "Welcome to Ally" (both ReplayPro-Headline, except
-  /// "Ally" itself, in its bespoke `allyText` style, YESEVA_ONE.REGULAR);
-  /// on the OTP step, a single unrelated line ("Verify your email address"),
-  /// no "Ally" wordmark at all. Previously this always showed bare "Ally",
-  /// on both steps, which is neither of RN's two real greetings.
-  Widget _buildGreeting(BuildContext context) {
-    final titleStyle = Theme.of(context).textTheme.displayMedium;
-    if (_step == _Step.otp) {
-      return Text(ref.t('auth.login.otp.title'), style: titleStyle);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(ref.t('auth.login.greetingLine1'), style: titleStyle),
-        Text.rich(
-          TextSpan(
-            style: titleStyle,
-            children: [
-              TextSpan(text: '${ref.t('auth.login.welcome')} '),
-              TextSpan(
-                text: ref.t('common.appName'),
-                style: TextStyle(fontFamily: AppFonts.yesevaOneRegular),
-              ),
-            ],
+  /// styles.titleContainer/title + `textStyle`: absolutely positioned, left
+  /// 30@s, translated from the bottom of the screen to 20% of the way up
+  /// the sheet's travel, white ReplayPro 33/40 over the hero.
+  Widget _buildTitle(BuildContext context, Size size, double translate) {
+    final h = size.height;
+    final progress = (translate / 0.65).clamp(0.0, 1.0);
+    const titleStyle = TextStyle(
+      fontFamily: AppFonts.replayProHeadline,
+      fontSize: 33,
+      height: 40 / 33,
+      color: Colors.white,
+    );
+    return Positioned(
+      top: h - progress * 0.8 * h - _s(size, 15),
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: (progress / 0.3).clamp(0.0, 1.0),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: _s(size, 30)),
+            child: _step == _Step.email
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ref.t('auth.login.greetingLine1'), style: titleStyle),
+                      Text.rich(
+                        TextSpan(
+                          style: titleStyle,
+                          children: [
+                            TextSpan(text: '${ref.t('auth.login.welcome')} '),
+                            // styles.allyText
+                            TextSpan(
+                              text: ref.t('common.appName'),
+                              style: const TextStyle(fontFamily: AppFonts.yesevaOneRegular),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(ref.t('auth.login.otp.title'), style: titleStyle),
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  /// styles.backButton: 40pt white circle at 70% opacity (icon included),
+  /// top 62@s / left 30@s, LeftArrowIcon drawn at 44×44 in black.
+  Widget _buildBackButton(Size size) {
+    return Positioned(
+      top: _s(size, 62),
+      left: _s(size, 30),
+      child: GestureDetector(
+        key: const Key('otp-back-button'),
+        onTap: _backToEmail,
+        child: Opacity(
+          opacity: 0.7,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: OverflowBox(
+              maxWidth: 44,
+              maxHeight: 44,
+              child: SvgPicture.asset(
+                'assets/icons/leftArrowIcon.svg',
+                width: 44,
+                height: 44,
+                colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// RN's `EmailLogin` (+ styles.ts).
+  Widget _buildEmailStep(BuildContext context, Size size) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isGoogleConfigured = _googleInitFuture != null;
+    return Padding(
+      padding: EdgeInsets.only(top: 15, bottom: _vs(size, 20)),
+      child: CustomScrollView(
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: keyboardInset),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Text(ref.t('auth.login.subtitle'), style: _sheetHeaderStyle),
+                  ),
+                  // styles.inputContainer: gap 8@s.
+                  Text(
+                    ref.t('auth.login.email.label'),
+                    style: const TextStyle(
+                      fontFamily: AppFonts.robotoRegular,
+                      fontSize: 12,
+                      height: 16 / 12,
+                      letterSpacing: 0.2,
+                      color: AppColors.charcoal2,
+                    ),
+                  ),
+                  SizedBox(height: _s(size, 8)),
+                  Padding(
+                    padding: EdgeInsets.only(right: _s(size, 2), bottom: _vs(size, 8)),
+                    child: _buildEmailInput(size),
+                  ),
+                  SizedBox(height: _s(size, 8)),
+                  AppButton(
+                    label: ref.t('common.next'),
+                    onPressed: _sendCode,
+                    isLoading: _isOtpLoading,
+                    isDisabled: !_isValidEmail(_emailController.text),
+                  ),
+                  // styles.dividerContainer
+                  Padding(
+                    padding: EdgeInsets.only(top: _vs(size, 30), bottom: _vs(size, 22)),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: ColoredBox(color: AppColors.strokePrimary, child: SizedBox(height: 1)),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: _s(size, 10)),
+                          child: Text(
+                            ref.t('common.or'),
+                            style: const TextStyle(
+                              fontFamily: _systemFont,
+                              fontSize: 12,
+                              height: 16 / 12,
+                              letterSpacing: 0.2,
+                              color: AppColors.mediumGray,
+                            ),
+                          ),
+                        ),
+                        const Expanded(
+                          child: ColoredBox(color: AppColors.strokePrimary, child: SizedBox(height: 1)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _GoogleLoginButton(
+                    label: ref.t('auth.login.google.button'),
+                    isLoading: _isGoogleLoading,
+                    isDisabled: _isLoading || !isGoogleConfigured,
+                    onPressed: _signInWithGoogle,
+                    verticalScale: (v) => _vs(size, v),
+                  ),
+                  if (defaultTargetPlatform == TargetPlatform.iOS)
+                    _AppleLoginButton(
+                      label: ref.t('auth.login.apple.button'),
+                      isLoading: _isAppleLoading,
+                      isDisabled: _isLoading,
+                      onPressed: _signInWithApple,
+                      height: _vs(size, 46),
+                      bottomMargin: _vs(size, 10),
+                    ),
+                  const Spacer(),
+                  _buildTermsFooter(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// EmailLogin's `styles.input`: Roboto 14, 1pt lightGray2 border (bright
+  /// blue while focused), radius 8, 16@s/10@vs padding, min height 40@vs,
+  /// no placeholder.
+  Widget _buildEmailInput(Size size) {
+    OutlineInputBorder border(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: color),
+    );
+    return TextField(
+      controller: _emailController,
+      focusNode: _emailFocusNode,
+      enabled: !_isLoading,
+      keyboardType: TextInputType.emailAddress,
+      autocorrect: false,
+      enableSuggestions: false,
+      textCapitalization: TextCapitalization.none,
+      textInputAction: TextInputAction.go,
+      inputFormatters: [_EmailInputFormatter()],
+      onSubmitted: (_) => _sendCode(),
+      style: const TextStyle(
+        fontFamily: AppFonts.robotoRegular,
+        fontSize: 14,
+        letterSpacing: 0.25,
+        fontWeight: FontWeight.w400,
+        color: Colors.black,
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: false,
+        constraints: BoxConstraints(minHeight: _vs(size, 40)),
+        contentPadding: EdgeInsets.symmetric(horizontal: _s(size, 16), vertical: _vs(size, 10)),
+        border: border(AppColors.lightGray2),
+        enabledBorder: border(AppColors.lightGray2),
+        disabledBorder: border(AppColors.lightGray2),
+        focusedBorder: border(AppColors.brightBlue),
+      ),
     );
   }
 
   /// RN's EmailLogin footer: "By proceeding, i agree to Ally's **Terms &
   /// Conditions** and acknowledge **Privacy Policy.**." — yes, a double
   /// period: `auth.login.privacy` already ends in one, and the JSX appends
-  /// a literal `.` after it regardless. Reproduced exactly rather than
-  /// "corrected", since that's what actually ships.
-  Widget _buildTermsFooter(BuildContext context) {
-    final linkStyle = const TextStyle(decoration: TextDecoration.underline);
-    return Text.rich(
-      TextSpan(
-        style: Theme.of(context).textTheme.bodySmall,
+  /// a literal `.` after it regardless. Reproduced exactly, since that's
+  /// what actually ships. System font, mediumGray, bright-blue links.
+  Widget _buildTermsFooter() {
+    const linkStyle = TextStyle(color: AppColors.brightBlue, decoration: TextDecoration.none);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Text.rich(
+        TextSpan(
+          style: const TextStyle(
+            fontFamily: _systemFont,
+            fontSize: 12,
+            height: 16 / 12,
+            letterSpacing: 0.2,
+            color: AppColors.mediumGray,
+          ),
+          children: [
+            TextSpan(text: '${ref.t('auth.login.proceedAgree')} '),
+            TextSpan(text: ref.t('auth.login.terms'), style: linkStyle, recognizer: _termsRecognizer),
+            TextSpan(text: ' ${ref.t('auth.login.and')} '),
+            TextSpan(text: ref.t('auth.login.privacy'), style: linkStyle, recognizer: _privacyRecognizer),
+            const TextSpan(text: '.'),
+          ],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  late final _termsRecognizer = TapGestureRecognizer()
+    ..onTap = () => launchUrl(Uri.parse(_termsAndConditionsUrl), mode: LaunchMode.externalApplication);
+  late final _privacyRecognizer = TapGestureRecognizer()
+    ..onTap = () => launchUrl(Uri.parse(_privacyPolicyUrl), mode: LaunchMode.externalApplication);
+
+  /// RN's `OtpVerification` (+ styles.ts): scrollable header/code/expiry
+  /// block, Verify pinned at the bottom above 54@vs of padding.
+  Widget _buildOtpStep(BuildContext context, Size size) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isResendDisabled = _resendCountdown > 0 || _isResending;
+    return Padding(
+      padding: EdgeInsets.only(bottom: _vs(size, 54)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextSpan(text: '${ref.t('auth.login.proceedAgree')} '),
-          TextSpan(
-            text: ref.t('auth.login.terms'),
-            style: linkStyle,
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => launchUrl(
-                    Uri.parse(_termsAndConditionsUrl),
-                    mode: LaunchMode.externalApplication,
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(top: 30, bottom: keyboardInset),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // styles.headerText with the nested styles.emailText.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Text.rich(
+                      TextSpan(
+                        style: _sheetHeaderStyle,
+                        children: [
+                          TextSpan(text: ref.t('auth.login.otp.enterCode')),
+                          const TextSpan(text: '\n'),
+                          TextSpan(
+                            text: _emailController.text,
+                            style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-          ),
-          TextSpan(text: ' ${ref.t('auth.login.and')} '),
-          TextSpan(
-            text: ref.t('auth.login.privacy'),
-            style: linkStyle,
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => launchUrl(
-                    Uri.parse(_privacyPolicyUrl),
-                    mode: LaunchMode.externalApplication,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _OtpInput(
+                      controller: _otpController,
+                      focusNode: _otpFocusNode,
+                      hasError: _otpError != null,
+                      dashWidth: _s(size, 10),
+                      dashHeight: _s(size, 1),
+                      onChanged: (_) => setState(() => _otpError = null),
+                    ),
                   ),
+                  if (_otpError != null)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: AppColors.roseWhite, borderRadius: BorderRadius.circular(8)),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _otpError!,
+                        style: const TextStyle(
+                          fontFamily: _systemFont,
+                          fontSize: 12,
+                          height: 16 / 12,
+                          letterSpacing: 0.2,
+                          color: AppColors.vividRed,
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ref.t(
+                            _otpExpiryMinutes == 1 ? 'auth.login.otp.expires_one' : 'auth.login.otp.expires_other',
+                            {'minutes': _otpExpiryMinutes},
+                          ),
+                          style: _otpSmallSerif.copyWith(color: AppColors.darkSlate, height: 20 / 12),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: GestureDetector(
+                            key: const Key('otp-resend'),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: isResendDisabled ? null : _resendOtp,
+                            child: Text(
+                              _resendCountdown > 0
+                                  ? '${ref.t('auth.login.otp.resend')} (${_resendCountdown}s)'
+                                  : ref.t('auth.login.otp.resend'),
+                              style: _otpSmallSerif.copyWith(
+                                color: isResendDisabled ? AppColors.lowEmphasis : AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const TextSpan(text: '.'),
+          AppButton(
+            label: ref.t('auth.login.otp.verify'),
+            onPressed: _verifyCode,
+            isLoading: _isVerifying,
+            isDisabled: !_isOtpComplete || _isShowingTerms,
+          ),
         ],
       ),
-      textAlign: TextAlign.center,
+    );
+  }
+}
+
+/// EmailLogin/OtpVerification `styles.headerText`: ReplayPro-Headline with
+/// typography.headline.small overridden to 20pt (line height stays 32).
+const _sheetHeaderStyle = TextStyle(
+  fontFamily: AppFonts.replayProHeadline,
+  fontSize: 20,
+  height: 32 / 20,
+  letterSpacing: 0,
+  color: AppColors.darkSlate,
+);
+
+/// IBM_PLEX_SERIF.REGULAR + typography.body.small.
+const _otpSmallSerif = TextStyle(
+  fontFamily: AppFonts.ibmPlexSerifRegular,
+  fontSize: 12,
+  height: 16 / 12,
+  letterSpacing: 0.2,
+);
+
+/// RN's `components/OtpInput` look (four 60×60 grey boxes, radius 12, a
+/// short grey dash in each empty unfocused box, a red outline around each
+/// box on error) — but backed by ONE hidden text field instead of four.
+///
+/// The previous four-`TextField` port moved focus to the next box only
+/// after each character landed (focus changes reach the iOS keyboard
+/// asynchronously), so fast typing hit the old box: `maxLength: 1` boxes
+/// dropped the extra keystrokes and box 0's paste path overwrote the
+/// others — four quick keystrokes left one digit behind. One field means
+/// every keystroke, a pasted code and iOS one-time-code autofill
+/// (`AutofillHints.oneTimeCode`) all land in the same controller, and the
+/// boxes simply render its characters.
+class _OtpInput extends StatelessWidget {
+  const _OtpInput({
+    required this.controller,
+    required this.focusNode,
+    required this.hasError,
+    required this.dashWidth,
+    required this.dashHeight,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool hasError;
+  final double dashWidth;
+  final double dashHeight;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([controller, focusNode]),
+      builder: (context, _) {
+        final text = controller.text;
+        final focusedIndex = focusNode.hasFocus ? text.length.clamp(0, _otpLength - 1) : null;
+        return Stack(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (var i = 0; i < _otpLength; i++) _buildBox(i, i < text.length ? text[i] : '', focusedIndex == i),
+              ],
+            ),
+            // The real input: invisible, covering the boxes so a tap
+            // anywhere on them focuses it.
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0,
+                child: TextField(
+                  key: const Key('otp-input'),
+                  controller: controller,
+                  focusNode: focusNode,
+                  keyboardType: TextInputType.number,
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  showCursor: false,
+                  maxLength: _otpLength,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: onChanged,
+                  decoration: const InputDecoration(
+                    counterText: '',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBox(int index, String digit, bool isFocused) {
+    final box = Container(
+      key: Key('otp-box-$index'),
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: AppColors.lightGray,
+        border: Border.all(color: AppColors.lightGray2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.center,
+      child: digit.isNotEmpty
+          ? Text(
+              digit,
+              style: const TextStyle(
+                fontFamily: _systemFont,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            )
+          // The focused empty box shows the text caret, as RN's does.
+          : isFocused
+          ? Container(width: 2, height: 28, color: AppColors.primary)
+          : null,
+    );
+    return Container(
+      decoration: hasError
+          ? BoxDecoration(
+              border: Border.all(color: AppColors.vividRed),
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          box,
+          // styles.inputDash: only while empty and not focused.
+          if (digit.isEmpty && !isFocused)
+            Positioned(
+              bottom: 20,
+              child: Container(width: dashWidth, height: dashHeight, color: AppColors.gray),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN's `components/Button/GoogleLoginButton`: white pill, 1pt
+/// stroke-primary border, 11@vs vertical padding, the Google "G" at its
+/// intrinsic 18×18, Roboto 14/22 black label; 60% opacity when disabled,
+/// a spinner when loading. (RN's `fontWeight: 'semibold'` resolves to the
+/// only bundled Roboto weight, Regular, on iOS.)
+class _GoogleLoginButton extends StatelessWidget {
+  const _GoogleLoginButton({
+    required this.label,
+    required this.isLoading,
+    required this.isDisabled,
+    required this.onPressed,
+    required this.verticalScale,
+  });
+
+  final String label;
+  final bool isLoading;
+  final bool isDisabled;
+  final VoidCallback onPressed;
+  final double Function(double) verticalScale;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = isDisabled || isLoading;
+    return Padding(
+      padding: EdgeInsets.only(bottom: verticalScale(10)),
+      child: Opacity(
+        opacity: isDisabled && !isLoading ? 0.6 : 1,
+        child: GestureDetector(
+          key: const Key('google-login-button'),
+          behavior: HitTestBehavior.opaque,
+          onTap: disabled ? null : onPressed,
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: verticalScale(isLoading ? 10 : 11)),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              border: Border.all(color: AppColors.strokePrimary),
+            ),
+            alignment: Alignment.center,
+            child: isLoading
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 2.5),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator.adaptive(valueColor: AlwaysStoppedAnimation(Colors.black)),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset('assets/icons/google.svg'),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.robotoRegular,
+                          fontSize: 14,
+                          height: 22 / 14,
+                          letterSpacing: 0.2,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// RN's `components/Button/AppleLoginButton`: the native black "Continue
+/// with Apple" button (`AppleButton.Style.BLACK`, `Type.CONTINUE`), pill
+/// corners, 46@vs tall; 60% opacity and untappable when disabled; a black
+/// pill with a white spinner while loading.
+class _AppleLoginButton extends StatelessWidget {
+  const _AppleLoginButton({
+    required this.label,
+    required this.isLoading,
+    required this.isDisabled,
+    required this.onPressed,
+    required this.height,
+    required this.bottomMargin,
+  });
+
+  final String label;
+  final bool isLoading;
+  final bool isDisabled;
+  final VoidCallback onPressed;
+  final double height;
+  final double bottomMargin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomMargin),
+      child: isLoading
+          ? Container(
+              height: height,
+              decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(AppRadius.full)),
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator.adaptive(valueColor: AlwaysStoppedAnimation(Colors.white)),
+              ),
+            )
+          : Opacity(
+              opacity: isDisabled ? 0.6 : 1,
+              child: IgnorePointer(
+                ignoring: isDisabled,
+                child: SignInWithAppleButton(
+                  key: const Key('apple-login-button'),
+                  text: label,
+                  height: height,
+                  style: SignInWithAppleButtonStyle.black,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  onPressed: onPressed,
+                ),
+              ),
+            ),
     );
   }
 }
