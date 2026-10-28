@@ -26,6 +26,10 @@ TrackDetailItem _item({
   required TrackItemType type,
   required TrackItemStatus status,
   String title = 'Item',
+  String? startedAt,
+  TrackItemContentMeta? contentMeta,
+  TrackCompletionCriteria? completionCriteria,
+  String? languageFallbackReason,
 }) =>
     TrackDetailItem(
       id: id,
@@ -36,6 +40,10 @@ TrackDetailItem _item({
       status: status,
       score: null,
       maxWatchedPct: null,
+      startedAt: startedAt,
+      contentMeta: contentMeta,
+      completionCriteria: completionCriteria,
+      languageFallbackReason: languageFallbackReason,
     );
 
 TrackDetail _detail({
@@ -46,6 +54,7 @@ TrackDetail _detail({
   int completedItems = 0,
   bool enrolled = true,
   String? languageCode,
+  String? sectionDescription,
   List<TrackLanguageOption> availableLanguages = const [],
 }) =>
     TrackDetail(
@@ -58,7 +67,15 @@ TrackDetail _detail({
       completedItems: completedItems,
       enrolled: enrolled,
       trackEnrollmentId: 'e1',
-      sections: [TrackSection(id: 's1', title: 'Section 1', order: 0, items: items)],
+      sections: [
+        TrackSection(
+          id: 's1',
+          title: 'Section 1',
+          order: 0,
+          items: items,
+          description: sectionDescription,
+        ),
+      ],
       languageCode: languageCode,
       availableLanguages: availableLanguages,
     );
@@ -114,14 +131,122 @@ void main() {
 
     await pump(tester);
 
-    expect(find.text('Section 1'), findsOneWidget);
-    expect(find.text('Done item'), findsOneWidget);
-    expect(find.text('Locked item'), findsOneWidget);
-    expect(find.text('Open item'), findsOneWidget);
+    // `skipOffstage: false` throughout: these rows are now taller (badge +
+    // meta line + optional caption, vs. a single-line ListTile before), so
+    // the third one can land past the default test viewport's fold — still
+    // very much in the tree, just not "onstage" by Flutter's test-finder
+    // definition, which `find.text`'s default `skipOffstage: true` would
+    // otherwise silently skip.
+    expect(find.text('Section 1', skipOffstage: false), findsOneWidget);
+    expect(find.text('Done item', skipOffstage: false), findsOneWidget);
+    expect(find.text('Locked item', skipOffstage: false), findsOneWidget);
+    expect(find.text('Open item', skipOffstage: false), findsOneWidget);
 
-    expect(find.byKey(const ValueKey('trailing-completed')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trailing-locked')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trailing-unlocked')), findsOneWidget);
+    // Completed: a checkmark next to the title, not a trailing icon.
+    expect(find.byKey(const ValueKey('item-check-completed'), skipOffstage: false), findsOneWidget);
+    // Locked: a lock icon inside the badge circle (not a trailing icon).
+    expect(find.byKey(const ValueKey('item-badge-locked'), skipOffstage: false), findsOneWidget);
+    // Unlocked and the only unlocked item: it's RN's one "Next" item across
+    // the whole course, shown as a status chip next to the title.
+    expect(find.byKey(const ValueKey('item-status-chip'), skipOffstage: false), findsOneWidget);
+    expect(find.text('common.next', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('section header shows a completion ring sized to this section, not the whole course',
+      (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [
+          _item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.completed),
+          _item(id: 'i2', type: TrackItemType.video, status: TrackItemStatus.locked),
+        ],
+      ),
+    );
+
+    await pump(tester);
+
+    final ring = tester.widget<CircularProgressIndicator>(find.byType(CircularProgressIndicator));
+    expect(ring.value, 0.5, reason: '1 of this section\'s 2 items completed');
+    expect(find.text('1'), findsOneWidget, reason: 'first (only) section is numbered from 1');
+  });
+
+  testWidgets(
+    'section subtitle falls back to "X of Y" completion text when the section has no description',
+    (tester) async {
+      when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+        (_) async => _detail(
+          items: [
+            _item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.completed),
+            _item(id: 'i2', type: TrackItemType.video, status: TrackItemStatus.locked),
+          ],
+        ),
+      );
+
+      await pump(tester);
+
+      expect(find.text('courses.progress', skipOffstage: false), findsOneWidget);
+    },
+  );
+
+  testWidgets('a section description, once present, replaces the "X of Y" fallback subtitle',
+      (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.unlocked)],
+        sectionDescription: '<p>Warm-up exercises</p>',
+      ),
+    );
+
+    await pump(tester);
+
+    // RN's `htmlToPlainText` strips the tags.
+    expect(find.text('Warm-up exercises'), findsOneWidget);
+    expect(find.text('courses.progress', skipOffstage: false), findsNothing);
+  });
+
+  testWidgets('the item meta line reflects its type (getTrackItemMeta)', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.unlocked)],
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.text('courses.meta.article', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('an in-progress item (unlocked with startedAt) shows an "In progress" chip',
+      (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [
+          _item(
+            id: 'i1',
+            type: TrackItemType.article,
+            status: TrackItemStatus.unlocked,
+            startedAt: '2026-01-01T00:00:00Z',
+          ),
+        ],
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.byKey(const ValueKey('item-status-chip'), skipOffstage: false), findsOneWidget);
+    expect(find.text('courses.status.inProgress', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('a locked item shows the "complete previous items" caption', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.locked)],
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.text('courses.lockedTooltip', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('a locked item cannot be tapped', (tester) async {
@@ -133,9 +258,8 @@ void main() {
 
     await pump(tester);
 
-    final tile = tester.widget<ListTile>(find.byType(ListTile));
-    expect(tile.enabled, isFalse);
-    expect(tile.onTap, isNull);
+    final row = tester.widget<InkWell>(find.byKey(const ValueKey('item-row-i1')));
+    expect(row.onTap, isNull);
   });
 
   testWidgets('tapping an unlocked playable item navigates to the item player route', (tester) async {
