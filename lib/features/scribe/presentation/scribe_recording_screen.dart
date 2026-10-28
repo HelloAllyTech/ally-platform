@@ -342,7 +342,9 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> {
   }
 
   void _navigateToBreathingExercise() {
-    if (mounted) context.go('/box-breathing');
+    if (!mounted) return;
+    final chatId = _chatId;
+    context.go(chatId != null ? '/box-breathing?chatId=$chatId' : '/box-breathing');
   }
 
   void _handleTryAgain() {

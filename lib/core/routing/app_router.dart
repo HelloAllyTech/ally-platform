@@ -270,7 +270,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/box-breathing',
-        builder: (context, state) => const BoxBreathingScreen(),
+        // `?chatId=` — the call that just ended (Scribe passes it), for
+        // the screen's "View Call Summary" button.
+        builder: (context, state) => BoxBreathingScreen(
+          chatId: int.tryParse(state.uri.queryParameters['chatId'] ?? ''),
+        ),
       ),
       GoRoute(
         path: '/cases/:caseId',

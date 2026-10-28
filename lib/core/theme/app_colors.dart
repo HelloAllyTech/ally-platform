@@ -108,4 +108,10 @@ class AppColors {
   static const orange50 = Color(0xFFFFF3E0); // Scribe chip background
   static const orange400 = Color(0xFFFFA726); // ReviewNote callout border
   static const orange900 = Color(0xFFE65100); // Scribe chip text
+
+  // box breathing parity (src/theme/colors.ts)
+  static const darkGray = Color(0xB302060B); // rgba(2,6,11,0.7) BreathingScreen gradient top
+  static const black0 = Color(0x1A000000); // rgba(0,0,0,0.1) BreathingScreen gradient bottom
+  static const darkBlue3 = Color(0xFF0A1F3C); // CallEndOverlay gradient bottom
+  static const lightGray6 = Color(0x33E5E7EB); // rgba(229,231,235,0.2) BreathingControls button
 }
