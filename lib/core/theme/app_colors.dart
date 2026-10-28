@@ -156,4 +156,5 @@ class AppColors {
   static const darkGray16 = Color(0xFF656565); // RetrySessionModal countdown
   static const smokyBlack = Color(0x8C131313); // rgba(19,19,19,0.55) VideoPreview overlay
   static const whiteTransparent90 = Color(0xE6FFFFFF); // rgba(255,255,255,0.9) VideoPreview play disc
+  static const amber900 = Color(0xFFFF6F00); // RoleplayCasePlayer assessment notice text
 }

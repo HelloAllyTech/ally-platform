@@ -117,16 +117,20 @@ class TrackListItem {
 /// only the two fields `getTrackItemMeta`'s QUIZ/ROLEPLAY branches actually
 /// read.
 class TrackCompletionCriteria {
-  TrackCompletionCriteria({this.minScore, this.passScore});
+  TrackCompletionCriteria({this.minScore, this.passScore, this.assessmentMode = false});
 
   factory TrackCompletionCriteria.fromJson(Map<String, dynamic> json) =>
       TrackCompletionCriteria(
         minScore: (json['minScore'] as num?)?.toDouble(),
         passScore: (json['passScore'] as num?)?.toDouble(),
+        assessmentMode: json['assessmentMode'] as bool? ?? false,
       );
 
   final double? minScore;
   final double? passScore;
+
+  /// Roleplay: one attempt only, locked once submitted.
+  final bool assessmentMode;
 }
 
 /// Mirrors RN's `TrackItemContentMeta` (`src/types/courses.ts:69-80`) — only
@@ -169,6 +173,7 @@ class TrackDetailItem {
     this.contentMeta,
     this.completionCriteria,
     this.languageFallbackReason,
+    this.completedAt,
   });
 
   factory TrackDetailItem.fromJson(Map<String, dynamic> json) =>
@@ -183,6 +188,7 @@ class TrackDetailItem {
         maxWatchedPct: (json['maxWatchedPct'] as num?)?.toDouble(),
         hasDiscussion: json['hasDiscussion'] as bool? ?? false,
         startedAt: json['startedAt'] as String?,
+        completedAt: json['completedAt'] as String?,
         contentMeta: json['contentMeta'] is Map<String, dynamic>
             ? TrackItemContentMeta.fromJson(json['contentMeta'] as Map<String, dynamic>)
             : null,
@@ -220,6 +226,10 @@ class TrackDetailItem {
   /// RN's `TrackLanguageFallbackReason` (why this component reads in
   /// English), or null.
   final String? languageFallbackReason;
+
+  /// When the learner completed the item (the roleplay/case player's
+  /// "Completed on {date}" chip).
+  final String? completedAt;
 }
 
 class TrackSection {
@@ -576,6 +586,7 @@ class NextTrackItem extends TrackDetailItem {
     super.completionCriteria,
     super.contentMeta,
     super.startedAt,
+    super.completedAt,
   });
 
   factory NextTrackItem.fromJson(Map<String, dynamic> json) {
@@ -593,6 +604,7 @@ class NextTrackItem extends TrackDetailItem {
       completionCriteria: item.completionCriteria,
       contentMeta: item.contentMeta,
       startedAt: item.startedAt,
+      completedAt: item.completedAt,
       sectionId: json['sectionId'] as String,
       sectionTitle: json['sectionTitle'] as String,
     );
@@ -663,4 +675,6 @@ bool isPlayableTrackItemType(TrackItemType type) =>
     type == TrackItemType.journal ||
     type == TrackItemType.game ||
     type == TrackItemType.branchingScenario ||
-    type == TrackItemType.bucketSort;
+    type == TrackItemType.bucketSort ||
+    type == TrackItemType.roleplay ||
+    type == TrackItemType.caseItem;
