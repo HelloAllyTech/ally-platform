@@ -190,9 +190,16 @@ void main() {
         overrides: [searchRepositoryProvider.overrideWithValue(repository)],
       );
 
+      // RN's SearchHeader collapses to the empty title's height, so its
+      // tagline is drawn behind the search input and never seen.
       expect(
         find.text('Guidance, safety, and support — whenever you need it.'),
-        findsOneWidget,
+        findsNothing,
+      );
+      // "Try now" chips are left-aligned (RN's alignSelf: 'flex-start').
+      expect(
+        tester.getTopLeft(find.text('Violence safety plan')).dx,
+        lessThan(tester.getSize(find.byType(Scaffold)).width / 3),
       );
       // RN's actual placeholder is nav.tabs.search ("Search"), not the
       // unused search.placeholder key a prior version of this screen used.
@@ -250,11 +257,7 @@ void main() {
         reason: 'the one matching suggestion, in the dropdown',
       );
       expect(find.text('Violence safety plan'), findsNothing, reason: 'non-matching, filtered out');
-      expect(
-        find.text('Guidance, safety, and support — whenever you need it.'),
-        findsNothing,
-        reason: 'header description collapses once focused',
-      );
+      expect(find.text('Try now:'), findsNothing, reason: 'launch suggestions hide once focused');
     },
   );
 

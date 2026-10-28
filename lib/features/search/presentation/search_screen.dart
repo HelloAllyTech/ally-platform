@@ -200,6 +200,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ];
     final showingResults = _lastSearchedText.isNotEmpty;
 
+    final searchBar = _SearchBar(
+      controller: _controller,
+      focusNode: _focusNode,
+      onSubmitted: (_) => _search(),
+      onClear: _resetSearch,
+      showDropdown: _focused && _filteredSuggestions.isNotEmpty,
+      suggestions: _filteredSuggestions,
+      onSuggestionTap: _search,
+    );
+
     return GestureDetector(
       // RN's `TouchableWithoutFeedback` wrapping both the launch and
       // results views — tapping anywhere outside the input/suggestions
@@ -207,57 +217,97 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       behavior: HitTestBehavior.translucent,
       onTap: () => _focusNode.unfocus(),
       child: Scaffold(
+        backgroundColor: Colors.white,
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                if (!showingResults) ...[
-                  const SizedBox(height: 24),
-                  _LogoHeader(showDescription: !_focused),
-                ],
-                _SearchBar(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  onSubmitted: (_) => _search(),
-                  onClear: _resetSearch,
-                  showDropdown: _focused && _filteredSuggestions.isNotEmpty,
-                  suggestions: _filteredSuggestions,
-                  onSuggestionTap: _search,
+          child: showingResults ? _buildDetailSearch(tabs, searchBar) : _buildSearchLaunch(searchBar),
+        ),
+      ),
+    );
+  }
+
+  /// RN `renderSearchLaunch`: `styles.searchContainer` (paddingTop 44@vs,
+  /// 24pt sides), `SearchHeader`, the search input, then — while unfocused —
+  /// the "Try now:" label and left-aligned suggestion chips. Focusing slides
+  /// the header up 60 and the input up 50 over 300ms, like RN's
+  /// `titleAnimStyle`/`searchAnimStyle`.
+  Widget _buildSearchLaunch(Widget searchBar) {
+    final rn = _RnVerticalScale.of(context);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: _focused ? 1 : 0),
+      duration: const Duration(milliseconds: 300),
+      builder: (context, t, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // RN's screen isn't inset for the status bar; this one is, so
+            // take the inset back out of RN's top spacing.
+            SizedBox(height: (rn.vs(44) - rn.statusBarTop).clamp(0, double.infinity)),
+            Transform.translate(offset: Offset(0, -60 * t), child: const _SearchHeader()),
+            Transform.translate(
+              offset: Offset(0, -50 * t),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: rn.mvs(10)),
+                child: searchBar,
+              ),
+            ),
+            if (!_focused) ...[
+              // styles.tryContainer: marginVertical 10@vs; styles.tryLabel.
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: rn.vs(10)),
+                child: Text(
+                  ref.t('search.suggestionsTitle'),
+                  style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 16, color: Colors.black),
                 ),
-                if (!showingResults && !_focused) ...[
-                  const SizedBox(height: 18),
-                  _TrySuggestions(onTap: _search),
-                ],
-                if (showingResults) ...[
-                  if (tabs.length > 1 && _resources.isNotEmpty)
-                    SizedBox(
-                      height: 48,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        children: [
-                          for (final (category, count) in tabs)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(
-                                  '${category == 'All' ? ref.t('search.allLabel') : category} ($count)',
-                                ),
-                                selected: _selectedCategory == category,
-                                onSelected: (_) => _selectCategory(category),
-                              ),
-                            ),
-                        ],
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final suggestion in _trySuggestions)
+                        _SuggestionChip(text: suggestion, iconSize: 16, onTap: () => _search(suggestion)),
+                    ],
+                  ),
+                ),
+              ),
+            ] else
+              const Spacer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// RN `renderDetailSearch` (`styles.container`: 16pt sides).
+  Widget _buildDetailSearch(List<(String, int)> tabs, Widget searchBar) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          searchBar,
+          if (tabs.length > 1 && _resources.isNotEmpty)
+            SizedBox(
+              height: 48,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                children: [
+                  for (final (category, count) in tabs)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text('${category == 'All' ? ref.t('search.allLabel') : category} ($count)'),
+                        selected: _selectedCategory == category,
+                        onSelected: (_) => _selectCategory(category),
                       ),
                     ),
-                  Expanded(child: _buildResultsBody()),
-                ] else
-                  const Spacer(),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
+          Expanded(child: _buildResultsBody()),
+        ],
       ),
     );
   }
@@ -268,17 +318,42 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
     }
     if (_resources.isEmpty) {
+      // RN `SearchEmpty`: 32@vs top/bottom, everything 16pt in.
+      final rn = _RnVerticalScale.of(context);
       return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 32),
+        padding: EdgeInsets.symmetric(vertical: rn.vs(32)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              ref.t('search.noResults', {'query': _lastSearchedText}),
-              style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 14),
+            Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Text(
+                ref.t('search.noResults', {'query': _lastSearchedText}),
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 14,
+                  height: 20 / 14,
+                  color: AppColors.lightGray12,
+                ),
+              ),
             ),
-            const SizedBox(height: 18),
-            _TrySuggestions(onTap: _search),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, top: 18, bottom: 10),
+              child: Text(
+                ref.t('search.suggestionsTitle'),
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 14,
+                  height: 20 / 14,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            for (final suggestion in _trySuggestions)
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: _SuggestionChip(text: suggestion, iconSize: 14, onTap: () => _search(suggestion)),
+              ),
           ],
         ),
       );
@@ -304,43 +379,70 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-/// RN's `SearchHeader` — centered Ally logo, with a description line that
-/// collapses away once the search bar is focused.
-class _LogoHeader extends ConsumerWidget {
-  const _LogoHeader({required this.showDescription});
+/// react-native-size-matters' `verticalScale`/`moderateVerticalScale` in
+/// this app's units. RN uses them (`@vs`/`@mvs`) for this screen's vertical
+/// spacing; they scale with screen *height* (680pt guideline) rather than
+/// width, so they can't be written as raw numbers under [RnScale] like
+/// `@ms` values.
+class _RnVerticalScale {
+  _RnVerticalScale({required this.logicalHeight, required this.factor, required this.statusBarTop});
 
-  final bool showDescription;
+  factory _RnVerticalScale.of(BuildContext context) {
+    final view = View.of(context);
+    // RnScale multiplies devicePixelRatio by its factor; 1 without it.
+    final factor = MediaQuery.devicePixelRatioOf(context) / view.devicePixelRatio;
+    return _RnVerticalScale(
+      logicalHeight: MediaQuery.sizeOf(context).height,
+      factor: factor,
+      statusBarTop: MediaQueryData.fromView(view).padding.top / factor,
+    );
+  }
+
+  final double logicalHeight;
+  final double factor;
+  final double statusBarTop;
+
+  double vs(double size) => size * logicalHeight / 680;
+  double mvs(double size) => 0.5 * size / factor + 0.5 * vs(size);
+}
+
+/// RN's `SearchHeader`: `marginTop: 80@mvs`, then a borderless
+/// `TabScreenHeader` (marginTop 16, 12pt top/bottom padding) whose title is
+/// empty and whose right content is the Ally logo + tagline. That content
+/// box is `flex: 1` inside an auto-height column, so it collapses to zero
+/// height: the header is only as tall as the empty title's 24pt line, the
+/// logo overflows downward from its top (centred), and the
+/// `search.headerDescription` tagline lands behind the search input, which
+/// is drawn over it — so RN never shows it. This keeps the same height and
+/// logo position and leaves the hidden tagline out.
+class _SearchHeader extends StatelessWidget {
+  const _SearchHeader();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final logo = SvgPicture.asset('assets/icons/allyLogo.svg', height: 32);
-    return Column(
-      children: [
-        // RN's `SearchHeader` also takes `showHamburger` — the logo stays
-        // centred, with the button pinned left, when Search is the first tab.
-        if (DrawerMenuScope.showsMenu(context))
-          Stack(
-            alignment: Alignment.center,
+  Widget build(BuildContext context) {
+    final rn = _RnVerticalScale.of(context);
+    return Padding(
+      padding: EdgeInsets.only(top: rn.mvs(80) + 16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: SizedBox(
+          height: 24,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              logo,
-              const Align(alignment: Alignment.centerLeft, child: DrawerMenuButton()),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Center(child: SvgPicture.asset('assets/icons/allyLogo.svg')),
+              ),
+              // RN's `showHamburger` when Search is the first tab.
+              if (DrawerMenuScope.showsMenu(context))
+                const Align(alignment: Alignment.centerLeft, child: DrawerMenuButton()),
             ],
-          )
-        else
-          logo,
-        if (showDescription) ...[
-          const SizedBox(height: 10),
-          Text(
-            ref.t('search.headerDescription'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: AppFonts.ibmPlexSerifRegular,
-              fontSize: 14,
-              color: AppColors.highEmphasis,
-            ),
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 }
@@ -373,39 +475,71 @@ class _SearchBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // styles.searchBar: white, 0.5pt lightGray4 border, radius 20, 12pt
+    // sides, capped at 40pt tall; 14pt SearchIcon in an 18pt box; 14pt
+    // IBM Plex Serif input in darkSlate with a lightGray13 placeholder.
     return Column(
       children: [
         Container(
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border.all(color: AppColors.lightGray2, width: 0.5),
+            border: Border.all(color: AppColors.lightGray4, width: 0.5),
             borderRadius: showDropdown
                 ? const BorderRadius.vertical(top: Radius.circular(20))
                 : BorderRadius.circular(20),
           ),
           child: Row(
             children: [
-              SvgPicture.asset('assets/icons/search.svg', width: 18, height: 18),
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: Center(child: SvgPicture.asset('assets/icons/search.svg', width: 14, height: 14)),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
                   onSubmitted: onSubmitted,
+                  cursorColor: AppColors.darkSlate,
                   decoration: InputDecoration(
                     hintText: ref.t('nav.tabs.search'),
+                    hintStyle: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 14,
+                      color: AppColors.lightGray13,
+                    ),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
                     isDense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 14),
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 14,
+                    color: AppColors.darkSlate,
+                  ),
                 ),
               ),
               if (controller.text.isNotEmpty)
                 GestureDetector(
                   onTap: onClear,
-                  child: const Icon(Icons.close, size: 16, color: AppColors.highEmphasis),
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    margin: const EdgeInsets.only(left: 8),
+                    alignment: Alignment.center,
+                    child: SvgPicture.asset(
+                      'assets/icons/close.svg',
+                      width: 16,
+                      height: 16,
+                      colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -413,17 +547,17 @@ class _SearchBar extends ConsumerWidget {
         if (showDropdown)
           Container(
             width: double.infinity,
-            margin: const EdgeInsets.only(top: 0),
             padding: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: AppColors.lightGray2, width: 0.5),
+              border: Border.all(color: AppColors.lightGray4, width: 0.5),
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
             ),
             child: Column(
               children: [
                 for (final suggestion in suggestions)
-                  InkWell(
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () => onSuggestionTap(suggestion),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -437,7 +571,7 @@ class _SearchBar extends ConsumerWidget {
                               style: const TextStyle(
                                 fontFamily: AppFonts.ibmPlexSerifRegular,
                                 fontSize: 16,
-                                color: AppColors.mediumEmphasis,
+                                color: AppColors.gray99,
                               ),
                             ),
                           ),
@@ -453,58 +587,51 @@ class _SearchBar extends ConsumerWidget {
   }
 }
 
-/// RN's "Try now:" label + suggestion rows — shown both on the idle launch
-/// screen (`renderSearchLaunch`) and below the no-results text in the
-/// empty state (`SearchEmpty`), same list and same row styling in both.
-class _TrySuggestions extends ConsumerWidget {
-  const _TrySuggestions({required this.onTap});
+/// RN's `SearchSuggestion` chip: left-aligned (`alignSelf: 'flex-start'`),
+/// 0.5pt lightGray14 border, radius 8, 7@mvs/8 padding, 14@mvs below,
+/// SearchIcon then 14/18 gray99 text up to 3 lines.
+class _SuggestionChip extends StatelessWidget {
+  const _SuggestionChip({required this.text, required this.iconSize, required this.onTap});
 
-  final ValueChanged<String> onTap;
+  final String text;
+  final double iconSize;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          ref.t('search.suggestionsTitle'),
-          style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 14),
+  Widget build(BuildContext context) {
+    final rn = _RnVerticalScale.of(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.only(bottom: rn.mvs(14)),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: rn.mvs(7)),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: AppColors.lightGray14, width: 0.5),
+          borderRadius: BorderRadius.circular(8),
         ),
-        const SizedBox(height: 10),
-        for (final suggestion in _trySuggestions)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: InkWell(
-              onTap: () => onTap(suggestion),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.lightGray14, width: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SvgPicture.asset('assets/icons/search.svg', width: 14, height: 14),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        suggestion,
-                        maxLines: 3,
-                        style: const TextStyle(
-                          fontFamily: AppFonts.ibmPlexSerifRegular,
-                          fontSize: 14,
-                          color: AppColors.mediumEmphasis,
-                        ),
-                      ),
-                    ),
-                  ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset('assets/icons/search.svg', width: iconSize, height: iconSize),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: AppFonts.ibmPlexSerifRegular,
+                  fontSize: 14,
+                  height: 18 / 14,
+                  color: AppColors.gray99,
                 ),
               ),
             ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -117,4 +117,8 @@ class AppColors {
   static const darkGray = Color(0xB302060B); // rgba(2,6,11,0.7) analytics error text
   static const deepPurple500 = Color(0xFF673AB7); // CallLogItem "Live Session" label
   static const blue = Color(0xFF1480FB); // colors.blue: Leaderboard highlighted row text
+  static const gray99 = Color(0xFF999999); // Search suggestion text
+  static const lightGray12 = Color(0xFFA5A5A5); // Search no-results text
+  static const lightGray13 = Color(0xFF898989); // Search input placeholder
+  static const darkSlate = Color(0xFF292929); // Search input text
 }
