@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,23 @@ import '../../../support/fake_network_image.dart';
 import '../../../support/pump_router_app.dart';
 
 class MockSimulationsRepository extends Mock implements SimulationsRepository {}
+
+DioException _dioError(int status, Map<String, dynamic> body) => DioException(
+  requestOptions: RequestOptions(path: '/learn/scenario-session-start'),
+  response: Response(
+    requestOptions: RequestOptions(path: '/learn/scenario-session-start'),
+    statusCode: status,
+    data: body,
+  ),
+);
+
+/// Start → RN's "Before you get started" → Start Session.
+Future<void> _startAndConfirm(WidgetTester tester) async {
+  await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Start Session'));
+  await tester.pumpAndSettle();
+}
 
 /// `HtmlRichText` renders via bare `RichText` widgets, which `find.text`
 /// doesn't match — same helper `html_rich_text_test.dart` uses.
@@ -133,6 +151,13 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
     await tester.pumpAndSettle();
 
+    // RN's NotificationModal ("Before you get started") comes first.
+    verifyNever(() => repository.startScenarioSession(scenarioId: 5));
+    expect(find.text('Before you get started'), findsOneWidget);
+    expect(find.byKey(const Key('pre-start-modal')), findsOneWidget);
+    await tester.tap(find.text('Start Session'));
+    await tester.pumpAndSettle();
+
     verify(() => repository.startScenarioSession(scenarioId: 5)).called(1);
     expect(
       find.text('ROLEPLAY:wss://livekit.example.com:access-tok:session-99'),
@@ -140,13 +165,7 @@ void main() {
     );
   });
 
-  testWidgets('shows an error message when starting the simulation fails', (
-    tester,
-  ) async {
-    when(
-      () => repository.startScenarioSession(scenarioId: 5),
-    ).thenThrow(Exception('rate limited'));
-
+  testWidgets('closing the pre-start modal does not start anything', (tester) async {
     await pumpRouterApp(
       tester,
       initialLocation: '/simulations/5',
@@ -156,8 +175,164 @@ void main() {
 
     await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pre-start-modal-close')));
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('Failed to start simulation'), findsOneWidget);
+    expect(find.byKey(const Key('pre-start-modal')), findsNothing);
+    verifyNever(() => repository.startScenarioSession(scenarioId: any(named: 'scenarioId')));
+  });
+
+  testWidgets('a plain start failure shows RN\'s error toast with the backend reason', (
+    tester,
+  ) async {
+    when(
+      () => repository.startScenarioSession(scenarioId: 5),
+    ).thenThrow(_dioError(400, {'message': 'Scenario unavailable'}));
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+
+    expect(find.text('Failed to start simulation: Scenario unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('retry-session-modal')), findsNothing);
+    expect(find.byKey(const Key('active-simulation-modal')), findsNothing);
+  });
+
+  testWidgets('a 429 opens the retry modal; a successful retry opens the role play', (tester) async {
+    var calls = 0;
+    when(() => repository.startScenarioSession(scenarioId: 5)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw _dioError(429, {'message': 'Too many'});
+      return SessionData(id: 'session-2', accessToken: 'tok', liveKitServerUrl: 'wss://lk');
+    });
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+
+    expect(find.byKey(const Key('retry-session-modal')), findsOneWidget);
+    expect(find.text("We're at capacity right now"), findsOneWidget);
+    expect(find.text("We'll automatically retry in 30s"), findsOneWidget);
+    expect(find.textContaining('Failed to start simulation'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text("We'll automatically retry in 29s"), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('retry-session-modal-retry')));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.byKey(const Key('retry-session-modal')), findsNothing);
+    expect(find.text('ROLEPLAY:wss://lk:tok:session-2'), findsOneWidget);
+  });
+
+  testWidgets('a retry that is still rate-limited switches to the cooldown countdown', (tester) async {
+    when(() => repository.startScenarioSession(scenarioId: 5)).thenThrow(_dioError(429, {}));
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+    // The 30 s auto-retry fires by itself.
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+
+    verify(() => repository.startScenarioSession(scenarioId: 5)).called(2);
+    expect(find.text('You can retry in 30s'), findsOneWidget);
+    final retry = find.byKey(const Key('retry-session-modal-retry'));
+    expect(tester.widget<InkWell>(find.descendant(of: retry, matching: find.byType(InkWell))).onTap, isNull);
+
+    await tester.tap(find.byKey(const Key('retry-session-modal-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('retry-session-modal')), findsNothing);
+  });
+
+  testWidgets('an entityId in the error body opens the active-simulation modal; End session ends it', (
+    tester,
+  ) async {
+    when(
+      () => repository.startScenarioSession(scenarioId: 5),
+    ).thenThrow(_dioError(400, {'message': 'Active session exists', 'entityId': 'running-1'}));
+    when(() => repository.endScenarioSession('running-1')).thenAnswer((_) async {});
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+
+    expect(find.byKey(const Key('active-simulation-modal')), findsOneWidget);
+    expect(find.text('You have a running simulation. End the existing session to start a new one.'), findsOneWidget);
+    expect(find.textContaining('Failed to start simulation'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('active-simulation-end')));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.endScenarioSession('running-1')).called(1);
+    expect(find.byKey(const Key('active-simulation-modal')), findsNothing);
+    expect(find.text('Simulation ended successfully'), findsOneWidget);
+  });
+
+  testWidgets('low credits: shows the no-credits modal for 5 s and disables Start', (tester) async {
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [
+        simulationsRepositoryProvider.overrideWithValue(repository),
+        simulationCreditsProvider.overrideWith(
+          (ref) async => SimulationCredits(creditLimit: 10, consumedCredits: 10, secondsAllowedPerCredit: 60),
+        ),
+      ],
+    );
+
+    expect(find.byKey(const Key('low-credits-modal')), findsOneWidget);
+    expect(find.text('No Credits Left'), findsOneWidget);
+    expect(tester.widget<AppButton>(find.byType(AppButton)).isDisabled, isTrue);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('low-credits-modal')), findsNothing);
+  });
+
+  testWidgets('a cover video renders the video preview instead of the image', (tester) async {
+    when(() => repository.getScenarioById(10)).thenAnswer(
+      (_) async => Scenario.fromJson({
+        'id': 10,
+        'title': 'Video scenario',
+        'description': 'desc',
+        'coverImageUrl': 'https://cdn.example.com/cover.png',
+        'coverVideoUrl': 'https://cdn.example.com/cover.mp4',
+      }),
+    );
+
+    await withFakeNetworkImages(() async {
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/simulations/10',
+        routes: _routes(),
+        overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      expect(find.byKey(const Key('scenario-video-preview')), findsOneWidget);
+    });
   });
 
   testWidgets('shows a completed chip with the right pluralization once attempted', (tester) async {
@@ -271,8 +446,7 @@ void main() {
     await tester.tap(find.text('Hindi').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
-    await tester.pumpAndSettle();
+    await _startAndConfirm(tester);
 
     verify(() => repository.startScenarioSession(scenarioId: 8, languageId: 2)).called(1);
   });

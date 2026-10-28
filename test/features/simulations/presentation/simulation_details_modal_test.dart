@@ -38,7 +38,7 @@ Future<void> _pump(
     Builder(
       builder: (context) => Center(
         child: ElevatedButton(
-          onPressed: () => SimulationDetailsModal.show(context, scenario: scenario, onStart: onStart),
+          onPressed: () => SimulationDetailsModal.show(context, scenario: scenario, onStart: (languageId, _) => onStart(languageId)),
           child: const Text('open'),
         ),
       ),
@@ -104,6 +104,8 @@ void main() {
 
       await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Session'));
+      await tester.pumpAndSettle();
 
       expect(captured, 2);
     },
@@ -114,6 +116,8 @@ void main() {
     await _pump(tester, scenario: _scenario(), onStart: (languageId) async => captured = languageId);
 
     await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start Session'));
     await tester.pumpAndSettle();
 
     expect(captured, isNull);
@@ -130,7 +134,25 @@ void main() {
     expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
   });
 
-  testWidgets('a start failure shows the error inline and keeps the modal open', (tester) async {
+  testWidgets('Start first shows RN\'s pre-start confirmation, hiding this modal; '
+      'closing it brings this modal back without starting', (tester) async {
+    var startCalls = 0;
+    await _pump(tester, scenario: _scenario(), onStart: (_) async => startCalls++);
+
+    await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before you get started'), findsOneWidget);
+    expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing, reason: 'hidden while confirming');
+
+    await tester.tap(find.byKey(const Key('pre-start-modal-close')));
+    await tester.pumpAndSettle();
+
+    expect(startCalls, 0);
+    expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget);
+  });
+
+  testWidgets('a start failure still closes the modal (RN\'s finally)', (tester) async {
     await _pump(
       tester,
       scenario: _scenario(),
@@ -139,15 +161,18 @@ void main() {
 
     await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Start Session'));
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('boom'), findsOneWidget);
-    expect(find.byKey(const Key('simulation-details-modal-start')), findsOneWidget);
+    expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
   });
 
   testWidgets('a successful start closes the modal', (tester) async {
     await _pump(tester, scenario: _scenario(), onStart: (_) async {});
 
     await tester.tap(find.byKey(const Key('simulation-details-modal-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start Session'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('simulation-details-modal-start')), findsNothing);
