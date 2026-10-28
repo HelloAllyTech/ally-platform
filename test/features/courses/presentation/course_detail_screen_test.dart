@@ -207,8 +207,8 @@ void main() {
   });
 
   testWidgets(
-    'tapping the progress section navigates to the progress route (RN has no separate '
-    'header icon for this — the progress bar itself is the only entry point)',
+    'tapping the progress section opens RN\'s CourseProgressSheet bottom sheet (RN has no '
+    'separate header icon for this — the progress bar itself is the only entry point)',
     (tester) async {
       when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
         (_) async => _detail(
@@ -238,10 +238,14 @@ void main() {
 
       expect(find.byIcon(Icons.bar_chart), findsNothing, reason: 'no separate header icon');
 
+      when(() => repository.getLearnTrackProgress('t1')).thenAnswer(
+        (_) async => TrackProgressDashboard(trackId: 't1', title: 'My Track', totalItems: 1, completedItems: 1, completionPct: 100),
+      );
       await tester.tap(find.byKey(const Key('learning-path-progress-bar')));
       await tester.pumpAndSettle();
 
-      expect(find.text('progress:t1'), findsOneWidget);
+      expect(find.text('progress:t1'), findsNothing, reason: 'a sheet, not a pushed screen');
+      expect(find.byKey(const Key('course-progress-sheet')), findsOneWidget);
     },
   );
 

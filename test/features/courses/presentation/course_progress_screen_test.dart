@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_progress_screen.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/learning_path_widgets.dart';
 
 import '../../../support/pump_app.dart';
 import '../../../support/pump_router_app.dart';
@@ -131,11 +132,11 @@ void main() {
     // directly.
     expect(find.textContaining('courses.progressDashboard.title'), findsOneWidget);
     expect(find.text('My Track'), findsNothing);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    final bar = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
-    expect(bar.value, closeTo(0.375, 0.0001));
-    expect(find.textContaining('courses.player.overallProgress'), findsOneWidget);
+    // RN CourseProgressBody opens with the LearningPathDetails ProgressBar
+    // ("3 of 8 completed"), no separate percentage line.
+    expect(find.byType(LearningPathProgressBar), findsOneWidget);
     expect(find.textContaining('simulations.progressCompleted'), findsOneWidget);
+    expect(find.textContaining('courses.player.overallProgress'), findsNothing);
   });
 
   testWidgets('renders section rows sorted by order, each with its completed/total count', (
@@ -373,5 +374,52 @@ void main() {
 
     verify(() => repository.getNextTrackItem('t1')).called(1);
     expect(find.text('ITEM:item-9'), findsOneWidget);
+  });
+
+  testWidgets('session rows use RN\'s chevronRight.svg, not a Material icon', (tester) async {
+    when(() => repository.getLearnTrackProgress('t1')).thenAnswer(
+      (_) async => _fullDashboard(roleplaySessions: _twoSessions()),
+    );
+    await pumpApp(
+      tester,
+      const CourseProgressScreen(trackId: 't1'),
+      overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+    );
+    await tester.scrollUntilVisible(find.text('Session A'), 200, scrollable: find.byType(Scrollable).first);
+    expect(find.byKey(const Key('session-row-chevron')), findsNWidgets(2));
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+  });
+
+  testWidgets('the progress sheet (RN CourseProgressSheet) closes before opening a session', (tester) async {
+    when(() => repository.getLearnTrackProgress('t1')).thenAnswer(
+      (_) async => _fullDashboard(roleplaySessions: _twoSessions()),
+    );
+    final opened = <String>[];
+    await pumpApp(
+      tester,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => showCourseProgressSheet(
+            context,
+            trackId: 't1',
+            onSessionPress: (s) => opened.add(s.scenarioSessionId),
+            onContinuePress: () {},
+          ),
+          child: const Text('open'),
+        ),
+      ),
+      overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('course-progress-sheet')), findsOneWidget);
+    expect(find.textContaining('courses.progressDashboard.title'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('latest-feedback-read-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('latest-feedback-read-more')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('course-progress-sheet')), findsNothing);
+    expect(opened, ['sess-2']);
   });
 }
