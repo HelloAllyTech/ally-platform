@@ -23,7 +23,8 @@ void main() {
       const ReviewNoteCallout(note: 'Flagged for follow-up'),
     );
 
-    expect(find.byIcon(Icons.edit), findsNothing);
+    expect(find.byKey(const Key('review-note-edit')), findsNothing);
+    expect(find.byKey(const Key('review-note-add')), findsNothing);
   });
 
   testWidgets('shows a pencil icon that calls onEditNote when supplied', (
@@ -38,8 +39,17 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.edit), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.edit));
+    expect(find.byKey(const Key('review-note-edit')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('review-note-edit')));
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('with no note yet, an editable callout shows RN\'s "+" add button instead', (tester) async {
+    var tapped = false;
+    await pumpApp(tester, ReviewNoteCallout(note: null, onEditNote: () => tapped = true));
+
+    expect(find.byKey(const Key('review-note-edit')), findsNothing);
+    await tester.tap(find.byKey(const Key('review-note-add')));
     expect(tapped, isTrue);
   });
 }

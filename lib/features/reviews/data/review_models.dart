@@ -192,49 +192,6 @@ class ReviewItem {
   bool get isPrivate => reviewStatus == 'HIDDEN';
 }
 
-/// Mirrors ally-mobile (React Native)'s `MessageThreadComment` — used here
-/// for general (not transcript-anchored) review comments only. Replies
-/// (`parentCommentId` threading) and reactions on individual comments
-/// aren't modeled — this is a flat discussion list, matching the scope of
-/// `generalCommentsApi.ts`'s `addGeneralComment` (reviewId + content only,
-/// no threading params).
-class ReviewComment {
-  ReviewComment({
-    required this.id,
-    required this.content,
-    required this.createdAt,
-    required this.authorName,
-    this.authorId,
-    this.hidden = false,
-  });
-
-  factory ReviewComment.fromJson(Map<String, dynamic> json) {
-    final createdBy = json['createdBy'] as Map<String, dynamic>?;
-    return ReviewComment(
-      id: json['id'] as String,
-      content: json['content'] as String? ?? '',
-      createdAt: json['createdAt'] as String?,
-      authorName: createdBy?['name'] as String? ?? 'Unknown',
-      authorId: (createdBy?['id'] as num?)?.toInt(),
-      hidden: json['hidden'] as bool? ?? false,
-    );
-  }
-
-  final String id;
-  final String content;
-  final String? createdAt;
-  final String authorName;
-
-  /// RN's `createdBy.id` — optional there too (`id?: number`), unlike
-  /// [ReviewAuthor.id] on a whole review/thread.
-  final int? authorId;
-
-  /// Whether the review's owner has hidden this comment — see
-  /// `review.details.hide`/`review.details.unhide`'s gate in
-  /// `ReviewComment.tsx`.
-  final bool hidden;
-}
-
 /// Mirrors `src/types/reviews.ts`'s `MessageData` — the transcript message
 /// a review thread is anchored to.
 class ReviewThreadMessage {
@@ -393,7 +350,7 @@ class ReviewThread {
     final content = message?.content;
     final sel = selection;
     if (content == null || content.isEmpty || sel == null) return null;
-    return _safeSlice(content, sel.startIndex, sel.endIndex);
+    return jsSlice(content, sel.startIndex, sel.endIndex);
   }
 
   ReviewThread copyWith({List<ThreadComment>? comments}) => ReviewThread(
@@ -407,7 +364,7 @@ class ReviewThread {
 }
 
 /// JS `String.prototype.slice` semantics (clamped, never throws).
-String _safeSlice(String text, int start, int end) {
+String jsSlice(String text, int start, int end) {
   final s = start.clamp(0, text.length);
   final e = end.clamp(0, text.length);
   return e > s ? text.substring(s, e) : '';

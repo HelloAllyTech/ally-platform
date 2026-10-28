@@ -82,32 +82,6 @@ class ScribeReviewsRepository {
     );
   }
 
-  /// Flat, non-transcript-anchored discussion — byte-for-byte path mirror
-  /// of `ReviewsRepository.getGeneralComments`/`addGeneralComment` with
-  /// `scenario-session-reviews` swapped for `scribe-session-reviews` (same
-  /// `scribeReviewsApi.ts` `getScribeGeneralReviewComments`/
-  /// `addScribeReviewComment` pair, GET/POST `/comments` with no
-  /// `threadId`).
-  Future<List<ReviewComment>> getGeneralComments(String reviewId) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/scribe-session-reviews/$reviewId/comments',
-    );
-    final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => ReviewComment.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<void> addGeneralComment({
-    required String reviewId,
-    required String content,
-  }) async {
-    await _dio.post<void>(
-      '/scribe-session-reviews/$reviewId/comments',
-      data: {'content': content},
-    );
-  }
-
   /// Transcript-anchored discussion threads — mirrors
   /// `ReviewsRepository.getThreads` (`scribeReviewThreadsApi.ts`'s
   /// `getScribeThreads`, which also always forces `includeMessage: true`).
@@ -133,74 +107,11 @@ class ScribeReviewsRepository {
     );
   }
 
-  /// Mirrors `ReviewsRepository.getCommentReplies`
-  /// (`scribeReviewThreadsApi.ts`'s `getScribeCommentReplies`).
-  Future<({List<ThreadComment> replies, int count})> getCommentReplies(
-    String commentId, {
-    int offset = 0,
-    int limit = 20,
-  }) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/scribe-session-reviews/comments/$commentId/replies',
-      queryParameters: {'offset': offset, 'limit': limit},
-    );
-    final data = response.data?['data'] as List<dynamic>? ?? [];
-    return (
-      replies: data
-          .map((e) => ThreadComment.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      count: (response.data?['count'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  /// Mirrors `ReviewsRepository.addThreadReply`
-  /// (`scribeReviewsApi.ts`'s `addScribeReviewComment` with `threadId` set).
-  Future<void> addThreadReply({
-    required String reviewId,
-    required String threadId,
-    required String content,
-  }) async {
-    await _dio.post<void>(
-      '/scribe-session-reviews/$reviewId/comments',
-      data: {'threadId': threadId, 'content': content},
-    );
-  }
-
-  /// Mirrors `ReviewsRepository.updateComment`
-  /// (`scribeReviewsApi.ts`'s `useUpdateScribeCommentMutation`).
-  Future<void> updateComment({
-    required String commentId,
-    required String content,
-  }) async {
-    await _dio.patch<void>(
-      '/scribe-session-reviews/comments/$commentId',
-      data: {'content': content},
-    );
-  }
-
-  /// Mirrors `ReviewsRepository.deleteComment`
-  /// (`scribeReviewsApi.ts`'s `useDeleteScribeCommentMutation`).
-  Future<void> deleteComment(String commentId) async {
-    await _dio.delete<void>('/scribe-session-reviews/comments/$commentId');
-  }
-
-  /// Mirrors `ReviewsRepository.updateCommentVisibility`
-  /// (`scribeReviewsApi.ts`'s `useUpdateScribeCommentVisibilityMutation`).
-  Future<void> updateCommentVisibility({
-    required String commentId,
-    required bool hidden,
-  }) async {
-    await _dio.patch<void>(
-      '/scribe-session-reviews/comments/$commentId/visibility',
-      data: {'hidden': hidden},
-    );
-  }
 }
 
 final scribeReviewsRepositoryProvider = Provider<ScribeReviewsRepository>((ref) {
   return ScribeReviewsRepository(ref.watch(apiClientProvider));
 });
-
 
 final scribeReviewDetailProvider = FutureProvider.family<ReviewItem, String>((
   ref,
@@ -209,17 +120,3 @@ final scribeReviewDetailProvider = FutureProvider.family<ReviewItem, String>((
   return ref.watch(scribeReviewsRepositoryProvider).getScribeReview(reviewId);
 });
 
-final scribeGeneralCommentsProvider =
-    FutureProvider.family<List<ReviewComment>, String>((ref, reviewId) {
-      return ref
-          .watch(scribeReviewsRepositoryProvider)
-          .getGeneralComments(reviewId);
-    });
-
-final scribeReviewThreadsProvider =
-    FutureProvider.family<List<ReviewThread>, String>((ref, reviewId) async {
-      final result = await ref
-          .watch(scribeReviewsRepositoryProvider)
-          .getThreads(reviewId);
-      return result.threads;
-    });
