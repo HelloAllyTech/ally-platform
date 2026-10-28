@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/widgets/info_tooltip_icon.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/achievements/data/achievements_repository.dart';
 import 'package:ally_mobile_flutter/features/achievements/presentation/achievements_screen.dart';
@@ -93,7 +94,7 @@ void main() {
       // --- info tooltip (one for the label, one per category shown). ---
       expect(find.text('Badges'), findsOneWidget);
       expect(find.byTooltip('Badges are earned based on your activity across simulations and community participation. Some badges may be removed if qualifying actions are undone.'), findsOneWidget);
-      expect(find.byIcon(Icons.info_outline), findsNWidgets(3), reason: 'the Badges label + one per category');
+      expect(find.byType(InfoTooltipIcon), findsNWidgets(3), reason: 'the Badges label + one per category');
 
       // --- Switch to Unlocked: locked badges disappear, and a category ---
       // --- left with nothing unlocked disappears entirely.             ---

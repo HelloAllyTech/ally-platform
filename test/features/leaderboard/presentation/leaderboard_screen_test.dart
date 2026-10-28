@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/features/leaderboard/data/leaderboard_repository.dart';
+import 'package:ally_mobile_flutter/core/widgets/info_tooltip_icon.dart';
 import 'package:ally_mobile_flutter/features/leaderboard/presentation/leaderboard_screen.dart';
 
 import '../../../support/pump_router_app.dart';
@@ -295,7 +296,7 @@ void main() {
 
       await _pumpLeaderboard(tester, repository: repository);
 
-      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.tap(find.byType(InfoTooltipIcon));
       await tester.pump();
 
       expect(

@@ -11,7 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../data/achievements_repository.dart';
-import '../../../core/widgets/sized_network_image.dart';
+import 'badge_network_image.dart';
 
 /// RN `constants/badgePopup.ts`.
 const badgeAutoCloseDelay = Duration(milliseconds: 5000);
@@ -247,7 +247,7 @@ class _BadgeCard extends ConsumerWidget {
                       decoration: const BoxDecoration(color: AppColors.grey100),
                       clipBehavior: Clip.hardEdge,
                       alignment: Alignment.center,
-                      child: _BadgeImage(url: badge.imageUrl),
+                      child: BadgeNetworkImage(url: badge.imageUrl),
                     ),
                   Padding(
                     padding: EdgeInsets.only(bottom: size.s(8)),
@@ -308,30 +308,3 @@ class _BadgeCard extends ConsumerWidget {
   static const _bodyMedium = TextStyle(fontSize: 14, height: 22 / 14, letterSpacing: 0.2);
 }
 
-/// RN `NetworkImage` with `resizeMode="contain"`: SVG URLs through
-/// flutter_svg, anything else as a bitmap; a failed load shows nothing.
-class _BadgeImage extends StatelessWidget {
-  const _BadgeImage({required this.url});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    if (url.toLowerCase().endsWith('.svg')) {
-      return SvgPicture.network(
-        url,
-        fit: BoxFit.contain,
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-      );
-    }
-    return SizedNetworkImage(
-      url,
-      fit: BoxFit.contain,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-    );
-  }
-}
