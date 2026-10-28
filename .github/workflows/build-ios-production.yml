@@ -126,7 +126,7 @@ jobs:
         env:
           BUILD_NAME: ${{ inputs.build_name }}
         run: |
-          flutter build ipa --release --flavor prod \
+          flutter build ipa --release --flavor prod --obfuscate --split-debug-info=build/symbols \
             --dart-define-from-file=.env \
             --build-number=${{ steps.increment_version.outputs.build_number }} \
             ${BUILD_NAME:+--build-name=$BUILD_NAME} \
@@ -156,6 +156,50 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Keep Dart debug symbols
+        # Obfuscated Dart stack traces can only be read with these; kept so a
+        # build can still be symbolicated after the Firebase secret is added.
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-symbols-${{ github.run_number }}
+          path: build/symbols
+          retention-days: 90
+
+      - name: Upload Crashlytics symbols
+        # Best effort, never fails the release: skipped with a warning when
+        # the Firebase config or the Firebase service account is missing.
+        # Native: the archive's dSYMs (the "Upload Crashlytics Symbols" build
+        # phase also tries, but its upload can race dSYM generation).
+        # Dart: the --split-debug-info files from the obfuscated build.
+        continue-on-error: true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON }}
+        run: |
+          GSP=ios/Runner/GoogleService-Info.plist
+          APP_ID=$(/usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$GSP" 2>/dev/null || true)
+          if [ -z "$APP_ID" ]; then
+            echo "::warning::No GoogleService-Info.plist; skipping Crashlytics symbol upload"
+            exit 0
+          fi
+          # flutter build clones Swift packages into build/ios/SourcePackages.
+          UPLOAD=$(ls build/ios/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+            "$HOME"/Library/Developer/Xcode/DerivedData/Runner-*/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+            2>/dev/null | head -n 1)
+          if [ -n "$UPLOAD" ] && [ -d build/ios/archive/Runner.xcarchive/dSYMs ]; then
+            "$UPLOAD" -gsp "$GSP" -p ios build/ios/archive/Runner.xcarchive/dSYMs \
+              || echo "::warning::dSYM upload failed"
+          else
+            echo "::warning::Crashlytics upload-symbols or the archive dSYMs not found; skipping dSYM upload"
+          fi
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON not set; skipping Dart symbol upload"
+            exit 0
+          fi
+          echo "$FIREBASE_SA" > "$RUNNER_TEMP/firebase-sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" \
+            npx --yes firebase-tools@14 crashlytics:symbols:upload --app="$APP_ID" build/symbols
+          rm -f "$RUNNER_TEMP/firebase-sa.json"
 
       - name: Send Slack notification (Production)
         if: success()

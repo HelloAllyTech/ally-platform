@@ -214,4 +214,40 @@ void main() {
       );
     });
   });
+
+  group('buildShareForReviewScreen', () {
+    ShareForReviewArgs args({String? reviewId, bool isEditNote = false}) => (
+      reviewId: reviewId,
+      isEditNote: isEditNote,
+      note: 'n',
+      contextDateTime: null,
+      contextDuration: '277',
+      isScribe: true,
+      contextTitle: 'T',
+    );
+
+    test('a re-share with an existing reviewId stays in share mode (RN handleShare)', () {
+      final screen = buildShareForReviewScreen('1001', args(reviewId: 'rev-1'));
+      expect(screen.reviewId, 'rev-1');
+      expect(screen.isEditNote, isFalse);
+      expect(screen.contextDuration, '277');
+    });
+
+    test('edit-note mode only when the caller sets isEditNote (review details)', () {
+      expect(buildShareForReviewScreen('rev-1', args(reviewId: 'rev-1', isEditNote: true)).isEditNote, isTrue);
+    });
+
+    test('simulation args unwrap the inner record', () {
+      final ShareSimulationForReviewArgs extra = (
+        args: args(reviewId: 'rev-2'),
+        coverImageUrl: 'img',
+        coverVideoUrl: null,
+        description: 'd',
+      );
+      final screen = buildShareForReviewScreen('sess-1', extra);
+      expect(screen.isEditNote, isFalse);
+      expect(screen.contextCoverImageUrl, 'img');
+      expect(screen.contextDescription, 'd');
+    });
+  });
 }

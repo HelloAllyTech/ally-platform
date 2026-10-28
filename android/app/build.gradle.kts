@@ -112,6 +112,16 @@ val googleServicesJson =
         .any { file(it).exists() }
 if (googleServicesJson) {
     apply(plugin = "com.google.gms.google-services")
+    // As RN (android/app/build.gradle: com.google.firebase.crashlytics):
+    // uploads the R8 mapping file of release builds so Java/Kotlin stack
+    // traces are readable. Needs the google_app_id that google-services
+    // generates, hence inside this block. Native (NDK) symbol upload stays
+    // off: the app has no NDK code of its own, Flutter hosts libflutter.so
+    // symbols itself, and Dart frames are symbolicated from the
+    // --split-debug-info files that CI uploads with the Firebase CLI.
+    apply(plugin = "com.google.firebase.crashlytics")
+} else {
+    logger.warn("No google-services.json: building without Firebase (no push, no Crashlytics symbol upload)")
 }
 
 dependencies {

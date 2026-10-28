@@ -331,10 +331,9 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     _hasStartedRecording = true;
     setState(() => _isPermissionGranted = true);
     _maybeEmitStartAudioChat();
-    // Required on Android 13+ for the foreground service's own persistent
-    // notification.
-    await Permission.notification.request();
-    if (!mounted) return;
+    // No notification-permission prompt here: RN never asks on Scribe start.
+    // Android still runs the foreground service without it (its
+    // notification is just not shown in the shade on 13+).
     await ForegroundRecordingService.start(
       notificationTitle: ref.tr('scribe.notificationTitle'),
       notificationText: ref.tr('scribe.notificationText'),
