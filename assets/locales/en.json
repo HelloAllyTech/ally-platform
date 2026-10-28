@@ -1268,10 +1268,6 @@
       "nameNotSet": "(name not set)"
     }
   },
-  "preferences": {
-    "title": "Preferences",
-    "defaultLanguage": "Default simulation language"
-  },
   "review": {
     "title": "Review",
     "hidden": "Hidden",

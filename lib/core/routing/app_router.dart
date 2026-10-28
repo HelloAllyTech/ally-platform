@@ -21,7 +21,6 @@ import '../../features/courses/presentation/course_item_player_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
-import '../../features/preferences/presentation/preferences_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/reactions/presentation/reactions_screen.dart';
 import '../../features/reviews/presentation/review_details_screen.dart';
@@ -41,6 +40,8 @@ import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 import '../navigation/app_shell_screen.dart';
 import '../navigation/home_tab_navigation.dart';
+import '../localization/translate_ref.dart';
+import '../theme/app_colors.dart';
 import 'launch_splash.dart';
 import '../widgets/review_type_chip.dart';
 
@@ -154,29 +155,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileSettingsScreen(),
       ),
       GoRoute(
-        path: '/preferences',
-        builder: (context, state) => const PreferencesScreen(),
-      ),
-      GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/scribe',
-        builder: (context, state) {
-          final userId = ref.read(currentUserProvider).value?.id.toString() ?? 'dev-user';
-          return ScribeRecordingScreen(userId: userId);
-        },
+        builder: (context, state) => _CurrentUserGate(builder: (userId) => ScribeRecordingScreen(userId: userId)),
       ),
       GoRoute(
         path: '/conference-listening/:chatId',
-        builder: (context, state) {
-          final userId = ref.read(currentUserProvider).value?.id.toString() ?? 'dev-user';
-          return ConferenceListeningScreen(
+        builder: (context, state) => _CurrentUserGate(
+          builder: (userId) => ConferenceListeningScreen(
             chatId: int.parse(state.pathParameters['chatId']!),
             userId: userId,
-          );
-        },
+          ),
+        ),
       ),
       GoRoute(
         path: '/courses/:trackId',
@@ -383,5 +376,31 @@ class _RouterRefreshListenable extends ChangeNotifier {
     ref.listen(launchSplashProvider, (previous, next) {
       if (previous?.finished != next.finished) notifyListeners();
     });
+  }
+}
+
+/// The listening screens key their socket and transcript speaker on the
+/// signed-in user's id (RN reads it from the Redux user, always loaded by
+/// then). Until `/users/me` resolves, show the listening screen's dark
+/// background with a spinner rather than starting a session under a
+/// made-up id.
+class _CurrentUserGate extends ConsumerWidget {
+  const _CurrentUserGate({required this.builder});
+
+  final Widget Function(String userId) builder;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final userId = user.value?.id.toString();
+    if (userId != null) return builder(userId);
+    return Scaffold(
+      backgroundColor: AppColors.darkGray7,
+      body: Center(
+        child: user.hasError && !user.isLoading
+            ? Text(ref.t('common.somethingWentWrong'), style: const TextStyle(color: Colors.white))
+            : const CircularProgressIndicator.adaptive(),
+      ),
+    );
   }
 }

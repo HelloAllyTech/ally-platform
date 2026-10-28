@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -224,4 +226,25 @@ void main() {
       expect(mounted.container.read(currentChatProvider), staleChat);
     },
   );
+
+  testWidgets('a /scribe pushed over /home counts as the listening route: no navigation', (tester) async {
+    when(() => chatRepository.getCounsellorChat()).thenAnswer(
+      (_) async => Chat(chatId: 7, status: ChatStatus.active, provider: ChatProvider.microphone, startedAt: '2026-01-01T10:00:00Z'),
+    );
+    final mounted = await _mount(
+      tester,
+      initialLocation: '/home',
+      overrides: overridesFor(isAuthenticated: true),
+    );
+    unawaited(mounted.router.push('/scribe'));
+    await tester.pumpAndSettle();
+    // The bug: `currentConfiguration.uri` still reads /home here.
+    expect(mounted.router.routerDelegate.currentConfiguration.uri.toString(), '/home');
+
+    await checkForActiveChat(mounted.ref, mounted.router);
+    await tester.pumpAndSettle();
+
+    // Still on the pushed /scribe, not replaced by a fresh go('/scribe').
+    expect(mounted.router.canPop(), isTrue);
+  });
 }

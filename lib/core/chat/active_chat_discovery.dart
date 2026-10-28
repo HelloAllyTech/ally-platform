@@ -59,7 +59,11 @@ Future<void> checkForActiveChat(WidgetRef ref, GoRouter router) async {
     return;
   }
 
-  final location = router.routerDelegate.currentConfiguration.uri.toString();
+  // The top screen's location: `currentConfiguration.uri` stays at the last
+  // `go()` location while screens are pushed over it (a pushed `/scribe`
+  // reads `/home` there), so the top match is used, as in deep_link_binding.
+  final config = router.routerDelegate.currentConfiguration;
+  final location = config.lastOrNull?.matchedLocation ?? config.uri.toString();
 
   if (chat == null) {
     if (!isExemptFromClearingCurrentChat(location)) {
