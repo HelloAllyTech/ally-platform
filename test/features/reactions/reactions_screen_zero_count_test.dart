@@ -16,10 +16,13 @@ void main() {
     "(a stray type with every reaction removed shouldn't show an empty '0' tab)",
     (tester) async {
       final repository = MockReactionsRepository();
-      when(() => repository.getReactions('rev-1', reaction: null)).thenAnswer(
-        (_) async => [
+      when(() => repository.getReactions('rev-1', offset: 0, reaction: null)).thenAnswer(
+        (_) async => ReactionsPage(
+          items: [
           Reaction(reaction: '1f44d', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
         ],
+          total: 1,
+        ),
       );
       when(() => repository.getReactionsCount('rev-1')).thenAnswer(
         (_) async => {'1f44d': 1, '2764-fe0f': 0},

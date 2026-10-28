@@ -42,6 +42,18 @@ class Reaction {
   final ReactionUser createdBy;
 }
 
+/// RN's `useReactions` page size (`LIMIT = 20`).
+const reactionsPageSize = 20;
+
+/// One page of who-reacted rows plus the backend's total `count`, which RN
+/// compares against the rows loaded so far to decide `hasMore`.
+class ReactionsPage {
+  const ReactionsPage({required this.items, required this.total});
+
+  final List<Reaction> items;
+  final int total;
+}
+
 /// Ported from ally-mobile (React Native)'s `ReactionsScreen` +
 /// `reactionsApi.ts` — review-level reactions (`addReactionToReview`) and
 /// comment-level reactions (`addReactionToComment`, used by thread
@@ -51,10 +63,10 @@ class ReactionsRepository {
 
   final Dio _dio;
 
-  Future<List<Reaction>> getReactions(
+  Future<ReactionsPage> getReactions(
     String reviewId, {
     int offset = 0,
-    int limit = 50,
+    int limit = reactionsPageSize,
     String? reaction,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
@@ -62,9 +74,11 @@ class ReactionsRepository {
       queryParameters: {'offset': offset, 'limit': limit, 'reaction': ?reaction},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => Reaction.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final items = data.map((e) => Reaction.fromJson(e as Map<String, dynamic>)).toList();
+    return ReactionsPage(
+      items: items,
+      total: (response.data?['count'] as num?)?.toInt() ?? items.length,
+    );
   }
 
   Future<Map<String, int>> getReactionsCount(String reviewId) async {
@@ -103,10 +117,6 @@ final reactionsRepositoryProvider = Provider<ReactionsRepository>((ref) {
   return ReactionsRepository(ref.watch(apiClientProvider));
 });
 
-final reactionsListProvider =
-    FutureProvider.family<List<Reaction>, ({String reviewId, String? reaction})>((ref, args) {
-  return ref.watch(reactionsRepositoryProvider).getReactions(args.reviewId, reaction: args.reaction);
-});
 
 final reactionsCountProvider = FutureProvider.family<Map<String, int>, String>((
   ref,
@@ -125,10 +135,10 @@ class ScribeReactionsRepository {
 
   final Dio _dio;
 
-  Future<List<Reaction>> getReactions(
+  Future<ReactionsPage> getReactions(
     String reviewId, {
     int offset = 0,
-    int limit = 50,
+    int limit = reactionsPageSize,
     String? reaction,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
@@ -136,9 +146,11 @@ class ScribeReactionsRepository {
       queryParameters: {'offset': offset, 'limit': limit, 'reaction': ?reaction},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => Reaction.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final items = data.map((e) => Reaction.fromJson(e as Map<String, dynamic>)).toList();
+    return ReactionsPage(
+      items: items,
+      total: (response.data?['count'] as num?)?.toInt() ?? items.length,
+    );
   }
 
   Future<Map<String, int>> getReactionsCount(String reviewId) async {
@@ -177,13 +189,6 @@ final scribeReactionsRepositoryProvider = Provider<ScribeReactionsRepository>((
   ref,
 ) {
   return ScribeReactionsRepository(ref.watch(apiClientProvider));
-});
-
-final scribeReactionsListProvider =
-    FutureProvider.family<List<Reaction>, ({String reviewId, String? reaction})>((ref, args) {
-  return ref
-      .watch(scribeReactionsRepositoryProvider)
-      .getReactions(args.reviewId, reaction: args.reaction);
 });
 
 final scribeReactionsCountProvider =

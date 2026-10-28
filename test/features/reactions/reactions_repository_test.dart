@@ -25,7 +25,7 @@ void main() {
     test('fetches and parses the reaction list with default pagination', () async {
       when(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews/rev-1/reactions',
-            queryParameters: {'offset': 0, 'limit': 50},
+            queryParameters: {'offset': 0, 'limit': 20},
           )).thenAnswer(
         (_) async => _response({
           'data': [
@@ -39,13 +39,15 @@ void main() {
 
       final result = await repository.getReactions('rev-1');
 
-      expect(result, hasLength(1));
-      expect(result.first.reaction, '👍');
-      expect(result.first.createdBy.name, 'Alex');
-      expect(result.first.createdBy.id, '1');
+      expect(result.items, hasLength(1));
+      expect(result.items.first.reaction, '👍');
+      expect(result.items.first.createdBy.name, 'Alex');
+      expect(result.items.first.createdBy.id, '1');
+      // No `count` in this response: falls back to the rows returned.
+      expect(result.total, 1);
       verify(() => dio.get<Map<String, dynamic>>(
             '/scenario-session-reviews/rev-1/reactions',
-            queryParameters: {'offset': 0, 'limit': 50},
+            queryParameters: {'offset': 0, 'limit': 20},
           )).called(1);
     });
 
@@ -69,7 +71,8 @@ void main() {
 
       final result = await repository.getReactions('rev-1');
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
+      expect(result.total, 0);
     });
   });
 
@@ -183,14 +186,14 @@ void main() {
     test('getReactions hits the scribe reactions path', () async {
       when(() => dio.get<Map<String, dynamic>>(
             '/scribe-session-reviews/rev-1/reactions',
-            queryParameters: {'offset': 0, 'limit': 50},
+            queryParameters: {'offset': 0, 'limit': 20},
           )).thenAnswer((_) async => _response({'data': <dynamic>[]}));
 
       await scribeRepository.getReactions('rev-1');
 
       verify(() => dio.get<Map<String, dynamic>>(
             '/scribe-session-reviews/rev-1/reactions',
-            queryParameters: {'offset': 0, 'limit': 50},
+            queryParameters: {'offset': 0, 'limit': 20},
           )).called(1);
     });
 

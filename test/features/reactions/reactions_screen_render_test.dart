@@ -15,18 +15,24 @@ void main() {
     'renders the who-reacted list with avatars, filter tabs, and re-fetches filtered when a tab is tapped',
     (tester) async {
       final repository = MockReactionsRepository();
-      when(() => repository.getReactions('rev-1', reaction: null)).thenAnswer(
-        (_) async => [
+      when(() => repository.getReactions('rev-1', offset: 0, reaction: null)).thenAnswer(
+        (_) async => ReactionsPage(
+          items: [
           // Backend data is keyed by the unicode-codepoint reaction id —
           // same contract as the thread-comment reaction picker.
           Reaction(reaction: '1f44d', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
           Reaction(reaction: '2764-fe0f', createdBy: ReactionUser(id: '2', name: 'Sam', profileImage: null)),
         ],
+          total: 2,
+        ),
       );
-      when(() => repository.getReactions('rev-1', reaction: '1f44d')).thenAnswer(
-        (_) async => [
+      when(() => repository.getReactions('rev-1', offset: 0, reaction: '1f44d')).thenAnswer(
+        (_) async => ReactionsPage(
+          items: [
           Reaction(reaction: '1f44d', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
         ],
+          total: 1,
+        ),
       );
       when(() => repository.getReactionsCount('rev-1')).thenAnswer((_) async => {'1f44d': 1, '2764-fe0f': 1});
 
@@ -50,7 +56,7 @@ void main() {
       await tester.tap(find.text('1').first);
       await tester.pumpAndSettle();
 
-      verify(() => repository.getReactions('rev-1', reaction: '1f44d')).called(1);
+      verify(() => repository.getReactions('rev-1', offset: 0, reaction: '1f44d')).called(1);
       expect(find.text('Alex'), findsOneWidget);
       expect(find.text('Sam'), findsNothing);
     },

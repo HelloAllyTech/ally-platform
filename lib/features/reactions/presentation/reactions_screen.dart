@@ -15,9 +15,10 @@ import '../data/reactions_repository.dart';
 /// rather than a bare emoji glyph. [reviewType] picks simulation vs.
 /// scribe endpoints, same role it plays in `ReviewDetailsScreen`.
 ///
-/// Not ported: infinite-scroll pagination (RN's `useReactions` hook loads
-/// more on scroll; this fetches a single page via the repository's
-/// existing `limit` default). There is no way to add a reaction from this
+/// Pages like RN's `useReactions`: 20 at a time, the next page requested
+/// when the list nears its end (FlatList's `onEndReachedThreshold: 0.3`),
+/// until the rows loaded reach the backend's total `count`; picking a
+/// filter tab starts over from offset 0. There is no way to add a reaction from this
 /// screen in the real app either — a prior version of this screen invented
 /// an emoji-picker row here; reacting happens from the comment/review
 /// itself (`ThreadDetailScreen`'s picker), not from this list.
@@ -37,14 +38,80 @@ class ReactionsScreen extends ConsumerStatefulWidget {
 
 class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
   String? _selectedReaction;
+  final List<Reaction> _reactions = [];
+  int _total = 0;
+  bool _loading = false;
+  bool _loadedFirstPage = false;
+  Object? _error;
+
+  // Bumped on every filter change so a page that lands after the user has
+  // switched tabs is dropped instead of appended to the wrong list.
+  int _generation = 0;
 
   bool get _isScribe => widget.reviewType == ReviewType.scribe;
+  bool get _hasMore => _reactions.length < _total;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPage();
+  }
+
+  Future<void> _loadPage() async {
+    if (_loading) return;
+    final generation = _generation;
+    setState(() => _loading = true);
+    try {
+      final page = _isScribe
+          ? await ref.read(scribeReactionsRepositoryProvider).getReactions(
+                widget.reviewId,
+                offset: _reactions.length,
+                reaction: _selectedReaction,
+              )
+          : await ref.read(reactionsRepositoryProvider).getReactions(
+                widget.reviewId,
+                offset: _reactions.length,
+                reaction: _selectedReaction,
+              );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _reactions.addAll(page.items);
+        _total = page.total;
+        _loadedFirstPage = true;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted && generation == _generation) setState(() => _loading = false);
+    }
+  }
+
+  void _selectReaction(String? reaction) {
+    if (reaction == _selectedReaction) return;
+    setState(() {
+      _selectedReaction = reaction;
+      _generation++;
+      _reactions.clear();
+      _total = 0;
+      _loading = false;
+      _loadedFirstPage = false;
+      _error = null;
+    });
+    _loadPage();
+  }
+
+  bool _onScroll(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (_hasMore && !_loading && metrics.extentAfter < metrics.viewportDimension * 0.3) {
+      _loadPage();
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final reactionsAsync = _isScribe
-        ? ref.watch(scribeReactionsListProvider((reviewId: widget.reviewId, reaction: _selectedReaction)))
-        : ref.watch(reactionsListProvider((reviewId: widget.reviewId, reaction: _selectedReaction)));
     final countsAsync = _isScribe
         ? ref.watch(scribeReactionsCountProvider(widget.reviewId))
         : ref.watch(reactionsCountProvider(widget.reviewId));
@@ -58,29 +125,37 @@ class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
             orElse: () => const SizedBox.shrink(),
           ),
           const Divider(height: 0.5),
-          Expanded(
-            child: reactionsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(
-                child: Text(
-                  '${ref.t('review.error.loadReactionsFailed')}: $error',
-                ),
-              ),
-              data: (reactions) {
-                if (reactions.isEmpty) {
-                  return Center(
-                    child: Text(ref.t('review.reactionsModal.noReactionsYet')),
-                  );
-                }
-                return ListView.separated(
-                  itemCount: reactions.length,
-                  separatorBuilder: (_, _) => const Divider(height: 0.5),
-                  itemBuilder: (context, index) => _ReactionRow(reaction: reactions[index]),
-                );
-              },
-            ),
-          ),
+          Expanded(child: _buildList()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildList() {
+    if (!_loadedFirstPage) {
+      if (_error != null) {
+        return Center(child: Text('${ref.t('review.error.loadReactionsFailed')}: $_error'));
+      }
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_reactions.isEmpty) {
+      return Center(child: Text(ref.t('review.reactionsModal.noReactionsYet')));
+    }
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: ListView.separated(
+        // One extra row for the next-page spinner while more remain.
+        itemCount: _reactions.length + (_hasMore ? 1 : 0),
+        separatorBuilder: (_, _) => const Divider(height: 0.5),
+        itemBuilder: (context, index) {
+          if (index == _reactions.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return _ReactionRow(reaction: _reactions[index]);
+        },
       ),
     );
   }
@@ -102,7 +177,7 @@ class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
           _FilterTab(
             label: '${ref.t('achievements.filters.all')} $totalCount',
             isSelected: _selectedReaction == null,
-            onTap: () => setState(() => _selectedReaction = null),
+            onTap: () => _selectReaction(null),
           ),
           const SizedBox(width: 16),
           for (final entry in sortedEntries) ...[
@@ -110,7 +185,7 @@ class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
               emoji: emojiGlyphFor(entry.key),
               label: '${entry.value}',
               isSelected: _selectedReaction == entry.key,
-              onTap: () => setState(() => _selectedReaction = entry.key),
+              onTap: () => _selectReaction(entry.key),
             ),
             const SizedBox(width: 16),
           ],
