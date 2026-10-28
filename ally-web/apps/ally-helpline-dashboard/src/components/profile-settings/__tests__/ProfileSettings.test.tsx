@@ -14,7 +14,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 }));
 
 vi.mock("@assets", () => ({
-  CloseIcon: (props: any) => <button data-testid="close-icon" {...props} />,
+  CloseIcon: (props: any) => <div data-testid="close-icon" {...props} />,
 }));
 
 vi.mock("../../button", () => ({
