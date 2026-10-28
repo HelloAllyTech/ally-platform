@@ -72,6 +72,10 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
   Timer? _pollTimer;
   Future<void>? _refreshInFlight;
 
+  /// `version/language` of the dynamic resource merged into [state], so a
+  /// poll that finds nothing new doesn't rebuild every translated widget.
+  String? _appliedResourceKey;
+
   /// The currently-applied UI language code — for Profile Settings' real
   /// "Language" field (RN's `i18nInstance.resolvedLanguage`), distinct from
   /// `preferences_repository.dart`'s default *simulation* language.
@@ -91,7 +95,10 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
     final cachedVersion = prefs.getString(_prefI18nVersionKey);
     if (cachedVersion != null) {
       final cached = await _readCachedResource(prefs, cachedVersion, _language);
-      if (cached != null) translations = translations.mergedWith(cached);
+      if (cached != null) {
+        translations = translations.mergedWith(cached);
+        _appliedResourceKey = '$cachedVersion/$_language';
+      }
     }
 
     if (AppConfig.languageSelectorEnabled) {
@@ -121,6 +128,7 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
 
     final bundled = await _loadBundledAsset(languageCode);
     state = AsyncData(Translations(bundled));
+    _appliedResourceKey = null;
     if (AppConfig.languageSelectorEnabled) await refresh();
   }
 
@@ -142,8 +150,15 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
 
       final prefs = await SharedPreferences.getInstance();
       final cachedVersion = prefs.getString(_prefI18nVersionKey);
-      if (cachedVersion == manifest.currentVersion) {
-        return; // Already have this version applied/cached — nothing to do.
+      // RN `refresh`: reuse the cache only if it holds THIS language's
+      // resource for the current version — after a language switch the
+      // version matches but the new language was never fetched.
+      final cachedResource = cachedVersion == manifest.currentVersion
+          ? await _readCachedResource(prefs, manifest.currentVersion, language)
+          : null;
+      if (cachedResource != null) {
+        await _apply(manifest.currentVersion, language, cachedResource);
+        return;
       }
 
       final resource = <String, dynamic>{};
@@ -154,14 +169,27 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
         resource[namespace] = response.data;
       }
 
-      final bundled = await _loadBundledAsset(language);
-      state = AsyncData(Translations(bundled).mergedWith(resource));
+      await _apply(manifest.currentVersion, language, resource);
       await _writeCachedResource(prefs, manifest.currentVersion, language, resource);
     } catch (_) {
-      // Network error — bundled asset (plus whatever was cached from a
-      // previous successful sync) is already applied. Nothing further to
-      // do; the next poll tick or app-resume will try again.
+      // Network error — RN applies whatever is cached for the current
+      // language; the static bundle is the final fallback.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final version = prefs.getString(_prefI18nVersionKey);
+        if (version == null) return;
+        final cached = await _readCachedResource(prefs, version, _language);
+        if (cached != null) await _apply(version, _language, cached);
+      } catch (_) {}
     }
+  }
+
+  Future<void> _apply(String version, String language, Map<String, dynamic> resource) async {
+    final key = '$version/$language';
+    if (_appliedResourceKey == key) return;
+    final bundled = await _loadBundledAsset(language);
+    state = AsyncData(Translations(bundled).mergedWith(resource));
+    _appliedResourceKey = key;
   }
 
   Future<Map<String, dynamic>> _loadBundledAsset(String language) async {
