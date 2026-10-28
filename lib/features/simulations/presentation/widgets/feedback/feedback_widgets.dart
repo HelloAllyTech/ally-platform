@@ -373,8 +373,9 @@ class ShortSessionSummary extends ConsumerWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  // Flexible: a long localized date wraps, as RN's Text does
-                  // in a row, instead of overflowing it.
+                  // Only the date is Flexible: it wraps if a localized date is
+                  // too long, as RN's Text does, while the short duration keeps
+                  // its width. Two Flexibles would split the row in half.
                   Flexible(
                     child: Text(
                       formatDateTime(
@@ -396,7 +397,7 @@ class ShortSessionSummary extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Flexible(child: Text(_duration(data.startedAt, data.endedAt), style: _meta)),
+                  Text(_duration(data.startedAt, data.endedAt), style: _meta),
                 ],
               ),
             ],
