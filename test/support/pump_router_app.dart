@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_translations.dart';
+import 'pump_app.dart' show toastHostBuilder;
 
 /// Widget-test harness for screens that navigate via go_router
 /// (`context.push`/`context.go`) — `pumpApp` alone can't exercise those,
@@ -19,12 +20,9 @@ import 'fake_translations.dart';
 /// `fixedTranslationsOverride()` for the same reliability reason `pumpApp`
 /// callers are pointed at in `fake_translations.dart`'s doc comment.
 ///
-/// [scaffoldMessengerKey]: pass `rootScaffoldMessengerKey` for a screen that
-/// shows a snackbar via that global key rather than its own `BuildContext`
-/// (needed when the snackbar is raised right before/after a `pop()`, which
-/// would otherwise tear down the context-local `ScaffoldMessenger` before
-/// the snackbar could display) — plain `MaterialApp.router` here doesn't
-/// wire it by default, unlike the real app's `main.dart`.
+/// Mounts `ToastHost` like `main.dart`, so `showToast` text is findable.
+/// [scaffoldMessengerKey] is optional, for a test that still wants the
+/// app's root `ScaffoldMessenger` key wired.
 Future<GoRouter> pumpRouterApp(
   WidgetTester tester, {
   required String initialLocation,
@@ -38,7 +36,11 @@ Future<GoRouter> pumpRouterApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [fixedTranslationsOverride(), ...overrides],
-      child: MaterialApp.router(routerConfig: router, scaffoldMessengerKey: scaffoldMessengerKey),
+      child: MaterialApp.router(
+        routerConfig: router,
+        scaffoldMessengerKey: scaffoldMessengerKey,
+        builder: toastHostBuilder,
+      ),
     ),
   );
   await tester.pumpAndSettle();

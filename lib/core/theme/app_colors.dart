@@ -241,4 +241,7 @@ class AppColors {
   static const darkGray14 = Color(0xFF535353); // ResourceArticleCard light category text
   static const darkGray15 = Color(0xFF616161); // ResourceArticleCard light tag text
   static const darkGray6 = Color(0xFF525252); // ResourceArticleCard light content / View more
+
+  // toast parity
+  static const red500 = Color(0xFFF93535); // ds.red[500]: error toast border/text (Toast.tsx)
 }

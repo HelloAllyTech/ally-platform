@@ -16,6 +16,7 @@ import 'core/errors/crash_reporting.dart';
 import 'core/errors/error_boundary.dart';
 import 'core/localization/localization_controller.dart';
 import 'core/migration/legacy_session_migration.dart';
+import 'core/network/error_details.dart';
 import 'core/network/token_storage.dart';
 import 'core/push/leaderboard_notification.dart';
 import 'core/push/push_notification_service.dart';
@@ -24,6 +25,7 @@ import 'core/network/retry_policy.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/rn_scale.dart';
 import 'core/widgets/root_scaffold_messenger.dart';
+import 'core/widgets/toast/toast.dart';
 
 Future<void> main() async {
   // Registering FCM's background-message handler requires a (possibly
@@ -110,7 +112,9 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     // and dynamic CDN sync both kick off as soon as the app starts, not
     // lazily on first use by some screen — matches the RN app's own
     // eager-init-at-startup behavior.
-    ref.watch(localizationControllerProvider);
+    final translations = ref.watch(localizationControllerProvider).value;
+    // RN's getErrorDetails calls i18next's global `t`; this is ours.
+    if (translations != null) errorTranslator = translations.t;
     // Schedules/cancels RN's weekly leaderboard reminder on sign-in/out.
     ref.watch(leaderboardNotificationSyncProvider);
     // Summary and course share links (core/deeplink).
@@ -146,11 +150,14 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
         child: RnScale(
-          child: AppErrorBoundary(
-            // RN re-mounts the navigator: back to Splash, which routes on
-            // from the current auth state.
-            onReset: () => router.go('/splash'),
-            child: ForceUpdateGate(child: child!),
+          // RN App.tsx's ToastProvider, above the navigator.
+          child: ToastHost(
+            child: AppErrorBoundary(
+              // RN re-mounts the navigator: back to Splash, which routes on
+              // from the current auth state.
+              onReset: () => router.go('/splash'),
+              child: ForceUpdateGate(child: child!),
+            ),
           ),
         ),
       ),

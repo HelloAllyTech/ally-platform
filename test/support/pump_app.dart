@@ -7,6 +7,11 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ally_mobile_flutter/core/widgets/toast/toast.dart';
+
+/// `MaterialApp.builder` mounting [ToastHost] like `main.dart` does, so a
+/// screen's `showToast` renders and tests can `find.text` it.
+Widget toastHostBuilder(BuildContext context, Widget? child) => ToastHost(child: child!);
 
 /// Shared widget-test harness. Every widget test that pumps a real screen
 /// (rather than a pure-logic unit test) should go through this instead of
@@ -39,7 +44,7 @@ Future<void> pumpApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: overrides,
-      child: MaterialApp(home: child),
+      child: MaterialApp(home: child, builder: toastHostBuilder),
     ),
   );
 
@@ -84,7 +89,7 @@ Future<void> pumpRoutedApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: overrides,
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(routerConfig: router, builder: toastHostBuilder),
     ),
   );
 
