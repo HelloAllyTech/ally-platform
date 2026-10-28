@@ -484,7 +484,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
 
       // The `foundation` promise resolves once both foundation fields have
       // settled, and its value is the context for all stage-two calls.
-      foundation = Promise.allSettled([personaRun, challengeDescRun]).then(() =>
+      foundation = challengeDescRun.then(() =>
         abortedRef.current ? undefined : readEstablishedContext(formMethods),
       );
 
