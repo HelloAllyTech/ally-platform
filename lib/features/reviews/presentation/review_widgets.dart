@@ -300,11 +300,13 @@ class _ReviewActionsMenuState extends State<ReviewActionsMenu> {
         key: const Key('comment-actions-menu'),
         behavior: HitTestBehavior.opaque,
         onTap: _controller.show,
-        child: SvgPicture.asset(
-          'assets/icons/threeDots.svg',
+        child: SizedBox(
           width: widget.iconSize,
           height: widget.iconSize,
-          colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+          child: SvgPicture.asset(
+            'assets/icons/threeDots.svg',
+            colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+          ),
         ),
       ),
     );
@@ -738,11 +740,13 @@ class SendArrowButton extends StatelessWidget {
                 maxHeight: iconSize,
                 child: Transform.rotate(
                   angle: math.pi,
-                  child: SvgPicture.asset(
-                    'assets/icons/leftArrowIcon.svg',
+                  child: SizedBox(
                     width: iconSize,
                     height: iconSize,
-                    colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                    child: SvgPicture.asset(
+                      'assets/icons/leftArrowIcon.svg',
+                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                    ),
                   ),
                 ),
               ),
@@ -923,11 +927,13 @@ class ReviewSheetBackHeader extends StatelessWidget {
                 padding: EdgeInsets.all(rn.s(8)),
                 child: Transform.translate(
                   offset: Offset(-rn.s(8), 0),
-                  child: SvgPicture.asset(
-                    'assets/icons/leftArrow.svg',
+                  child: SizedBox(
                     width: 12,
                     height: 15,
-                    colorFilter: const ColorFilter.mode(AppColors.highEmphasis, BlendMode.srcIn),
+                    child: SvgPicture.asset(
+                      'assets/icons/leftArrow.svg',
+                      colorFilter: const ColorFilter.mode(AppColors.highEmphasis, BlendMode.srcIn),
+                    ),
                   ),
                 ),
               ),

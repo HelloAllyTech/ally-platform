@@ -52,7 +52,11 @@ class DismissableBanner extends ConsumerWidget {
             key: const ValueKey('dismissable-banner-close'),
             behavior: HitTestBehavior.opaque,
             onTap: onClose,
-            child: SvgPicture.asset('assets/icons/close.svg', width: 18, height: 18),
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: SvgPicture.asset('assets/icons/close.svg'),
+            ),
           ),
         ],
       ),

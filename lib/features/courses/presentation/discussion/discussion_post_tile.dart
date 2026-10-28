@@ -200,11 +200,13 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> with Au
               ),
               if (post.isLocked) ...[
                 const SizedBox(width: 6 + 2),
-                SvgPicture.asset(
-                  'assets/icons/lock.svg',
-                  key: Key('post-lock-badge-${post.id}'),
+                SizedBox(
                   width: size.raw(12),
                   height: size.raw(12),
+                  child: SvgPicture.asset(
+                    'assets/icons/lock.svg',
+                    key: Key('post-lock-badge-${post.id}'),
+                  ),
                 ),
               ],
             ],
@@ -245,13 +247,21 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> with Au
                     _Tap(
                       key: Key('discussion-post-${post.id}-edit-toggle'),
                       onTap: () => _setComposer(() => _isEditing = true),
-                      child: SvgPicture.asset('assets/icons/edit.svg', width: size.raw(14), height: size.raw(14)),
+                      child: SizedBox(
+                        width: size.raw(14),
+                        height: size.raw(14),
+                        child: SvgPicture.asset('assets/icons/edit.svg'),
+                      ),
                     ),
                   if (post.canDelete)
                     _Tap(
                       key: Key('discussion-post-${post.id}-delete'),
                       onTap: _handleDelete,
-                      child: SvgPicture.asset('assets/icons/delete.svg', width: size.raw(14), height: size.raw(14)),
+                      child: SizedBox(
+                        width: size.raw(14),
+                        height: size.raw(14),
+                        child: SvgPicture.asset('assets/icons/delete.svg'),
+                      ),
                     ),
                   if (post.canLock)
                     _Tap(

@@ -78,7 +78,11 @@ class ConfirmationModal extends StatelessWidget {
               child: IconButton(
                 key: const ValueKey('confirmation-modal-close'),
                 onPressed: () => Navigator.of(context).pop(),
-                icon: SvgPicture.asset('assets/icons/close.svg', width: 16, height: 16),
+                icon: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: SvgPicture.asset('assets/icons/close.svg'),
+                ),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

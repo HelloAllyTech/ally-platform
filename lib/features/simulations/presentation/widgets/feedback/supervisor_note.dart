@@ -30,7 +30,11 @@ class AllyAvatar extends StatelessWidget {
           colors: [AppColors.blue50, Colors.white],
         ),
       ),
-      child: SvgPicture.asset('assets/icons/rankBadge.svg', width: iconSize, height: iconSize),
+      child: SizedBox(
+        width: iconSize,
+        height: iconSize,
+        child: SvgPicture.asset('assets/icons/rankBadge.svg'),
+      ),
     );
   }
 }

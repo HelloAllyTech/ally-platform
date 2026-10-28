@@ -548,7 +548,11 @@ class _SortDropdownState extends State<_SortDropdown> {
               children: [
                 Text(widget.value, style: _headerStyle),
                 const SizedBox(width: 8),
-                SvgPicture.asset('assets/icons/arrowDown.svg', width: RnSize.of(context).raw(6), height: RnSize.of(context).raw(6)),
+                SizedBox(
+                  width: RnSize.of(context).raw(6),
+                  height: RnSize.of(context).raw(6),
+                  child: SvgPicture.asset('assets/icons/arrowDown.svg'),
+                ),
               ],
             ),
           ),

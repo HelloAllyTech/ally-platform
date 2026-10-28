@@ -113,12 +113,14 @@ class _TakingNotesRowState extends ConsumerState<TakingNotesRow> {
             key: const ValueKey('privacy-lock'),
             behavior: HitTestBehavior.opaque,
             onTap: widget.isFocusMode ? _openTooltip : null,
-            child: SvgPicture.asset(
-              'assets/icons/lock.svg',
-              key: _lockKey,
+            child: SizedBox(
               width: 16,
               height: 16,
-              colorFilter: const ColorFilter.mode(AppColors.lightGrayD9, BlendMode.srcIn),
+              child: SvgPicture.asset(
+                'assets/icons/lock.svg',
+                key: _lockKey,
+                colorFilter: const ColorFilter.mode(AppColors.lightGrayD9, BlendMode.srcIn),
+              ),
             ),
           ),
           SizedBox(width: rn.s(8)),

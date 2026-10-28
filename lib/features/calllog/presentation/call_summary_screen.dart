@@ -650,7 +650,11 @@ class _CallSummaryScreenState extends ConsumerState<CallSummaryScreen> {
                           BoxShadow(color: Color(0x1AA09E9E), offset: Offset(8.52, 11.36), blurRadius: 14.2),
                         ],
                       ),
-                      child: SvgPicture.asset('assets/icons/chatBubble.svg', width: 20, height: 20),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: SvgPicture.asset('assets/icons/chatBubble.svg'),
+                      ),
                     ),
                   ),
                 )
@@ -1462,11 +1466,13 @@ class _SectionCard extends ConsumerWidget {
                                 : SizedBox(
                                     width: 24,
                                     child: Center(
-                                      child: SvgPicture.asset(
-                                        isExpanded ? 'assets/icons/arrowDown.svg' : 'assets/icons/arrowRight.svg',
-                                        key: ValueKey('section-caret-${section.name}'),
+                                      child: SizedBox(
                                         width: 10,
                                         height: 10,
+                                        child: SvgPicture.asset(
+                                          isExpanded ? 'assets/icons/arrowDown.svg' : 'assets/icons/arrowRight.svg',
+                                          key: ValueKey('section-caret-${section.name}'),
+                                        ),
                                       ),
                                     ),
                                   ),

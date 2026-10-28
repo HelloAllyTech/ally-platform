@@ -134,10 +134,12 @@ class _ScenarioLanguageDropdownState<T>
               const SizedBox(width: 8),
               RotatedBox(
                 quarterTurns: _isOpen ? 2 : 0,
-                child: SvgPicture.asset(
-                  'assets/icons/arrowDown.svg',
+                child: SizedBox(
                   width: 6,
                   height: 6,
+                  child: SvgPicture.asset(
+                    'assets/icons/arrowDown.svg',
+                  ),
                 ),
               ),
             ],

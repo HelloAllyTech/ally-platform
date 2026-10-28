@@ -197,7 +197,11 @@ class _ReviewCardState extends ConsumerState<ReviewCard> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SvgPicture.asset('assets/icons/chatAddOn.svg', width: rn.raw(16), height: rn.raw(16)),
+                SizedBox(
+                  width: rn.raw(16),
+                  height: rn.raw(16),
+                  child: SvgPicture.asset('assets/icons/chatAddOn.svg'),
+                ),
                 SizedBox(width: rn.s(8)),
                 Text(ref.t('review.feedCard.reviewTranscript'), style: _reviewTranscriptStyle),
               ],
@@ -348,11 +352,13 @@ class ExpandedComments extends ConsumerWidget {
             SizedBox(width: rn.s(8)),
             Transform.rotate(
               angle: math.pi,
-              child: SvgPicture.asset(
-                'assets/icons/chevronDown.svg',
+              child: SizedBox(
                 width: rn.raw(16),
                 height: rn.raw(16),
-                colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+                child: SvgPicture.asset(
+                  'assets/icons/chevronDown.svg',
+                  colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+                ),
               ),
             ),
           ],

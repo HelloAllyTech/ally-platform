@@ -456,7 +456,11 @@ class _BadgesButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset('assets/icons/badgeIcon.svg', width: 20, height: 20),
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: SvgPicture.asset('assets/icons/badgeIcon.svg'),
+          ),
           const SizedBox(width: 4),
           Text(
             label,

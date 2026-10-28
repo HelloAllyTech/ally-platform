@@ -204,7 +204,11 @@ class _OrderingQuestion extends ConsumerWidget {
             decoration: const BoxDecoration(color: AppColors.grey50, shape: BoxShape.circle),
             child: Transform.rotate(
               angle: angle,
-              child: SvgPicture.asset('assets/icons/arrowRight.svg', width: icon, height: icon),
+              child: SizedBox(
+                width: icon,
+                height: icon,
+                child: SvgPicture.asset('assets/icons/arrowRight.svg'),
+              ),
             ),
           ),
         ),

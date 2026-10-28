@@ -35,7 +35,11 @@ class AppEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconWidget =
-        icon ?? (iconAsset != null ? SvgPicture.asset(iconAsset!, width: iconWidth, height: iconHeight) : null);
+        icon ?? (iconAsset != null ? SizedBox(
+          width: iconWidth,
+          height: iconHeight,
+          child: SvgPicture.asset(iconAsset!),
+        ) : null);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,

@@ -235,10 +235,12 @@ class _CallLogRowState extends State<CallLogRow> {
                   height: 24,
                   margin: const EdgeInsets.only(right: 4),
                   alignment: Alignment.center,
-                  child: SvgPicture.asset(
-                    _expanded ? 'assets/icons/doubleBottomArrow.svg' : 'assets/icons/doubleRightArrow.svg',
+                  child: SizedBox(
                     width: 16,
                     height: 16,
+                    child: SvgPicture.asset(
+                      _expanded ? 'assets/icons/doubleBottomArrow.svg' : 'assets/icons/doubleRightArrow.svg',
+                    ),
                   ),
                 ),
               ),
@@ -265,11 +267,13 @@ class _CallLogRowState extends State<CallLogRow> {
                         if (widget.enabled)
                           Padding(
                             padding: const EdgeInsets.only(left: 10),
-                            child: SvgPicture.asset(
-                              key: const ValueKey('call-log-row-eye'),
-                              'assets/icons/eye.svg',
+                            child: SizedBox(
                               width: 16,
                               height: 16,
+                              child: SvgPicture.asset(
+                                key: const ValueKey('call-log-row-eye'),
+                                'assets/icons/eye.svg',
+                              ),
                             ),
                           ),
                       ],

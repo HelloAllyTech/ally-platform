@@ -159,10 +159,12 @@ class _CustomDropdownState extends State<CustomDropdown> {
             padding: const EdgeInsets.only(left: 8),
             child: RotatedBox(
               quarterTurns: _isOpen ? 2 : 0,
-              child: SvgPicture.asset(
-                'assets/icons/arrowDown.svg',
+              child: SizedBox(
                 width: widget.arrowSize,
                 height: widget.arrowSize,
+                child: SvgPicture.asset(
+                  'assets/icons/arrowDown.svg',
+                ),
               ),
             ),
           ),

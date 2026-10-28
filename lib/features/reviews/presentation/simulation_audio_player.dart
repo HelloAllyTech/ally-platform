@@ -181,13 +181,15 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                     )
-                  : SvgPicture.asset(
-                      _isPlaying ? 'assets/icons/pausePlayer.svg' : 'assets/icons/playWhite.svg',
-                      key: ValueKey(_isPlaying ? 'simulation-audio-player-pause' : 'simulation-audio-player-play'),
-                      width: 16,
-                      height: 16,
-                      colorFilter: const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
-                    ),
+                  : SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: SvgPicture.asset(
+                        _isPlaying ? 'assets/icons/pausePlayer.svg' : 'assets/icons/playWhite.svg',
+                        key: ValueKey(_isPlaying ? 'simulation-audio-player-pause' : 'simulation-audio-player-play'),
+                        colorFilter: const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
+                      ),
+                  ),
             ),
           ),
           const SizedBox(width: 8),

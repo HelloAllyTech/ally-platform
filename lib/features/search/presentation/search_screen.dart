@@ -600,11 +600,13 @@ class _SearchBar extends ConsumerWidget {
                     height: 18,
                     margin: const EdgeInsets.only(left: 8),
                     alignment: Alignment.center,
-                    child: SvgPicture.asset(
-                      'assets/icons/close.svg',
+                    child: SizedBox(
                       width: 16,
                       height: 16,
-                      colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                      child: SvgPicture.asset(
+                        'assets/icons/close.svg',
+                        colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                      ),
                     ),
                   ),
                 ),
@@ -681,7 +683,11 @@ class _SuggestionChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SvgPicture.asset('assets/icons/search.svg', width: iconSize, height: iconSize),
+            SizedBox(
+              width: iconSize,
+              height: iconSize,
+              child: SvgPicture.asset('assets/icons/search.svg'),
+            ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(

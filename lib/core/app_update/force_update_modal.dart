@@ -94,10 +94,12 @@ class ForceUpdateModal extends ConsumerWidget {
                 // styles.iconContainer; the icon is given an unscaled 125x125.
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: SvgPicture.asset(
-                    'assets/icons/forceUpdateAlert.svg',
+                  child: SizedBox(
                     width: size.raw(125),
                     height: size.raw(125),
+                    child: SvgPicture.asset(
+                      'assets/icons/forceUpdateAlert.svg',
+                    ),
                   ),
                 ),
                 Padding(

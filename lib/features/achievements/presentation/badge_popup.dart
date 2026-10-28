@@ -301,7 +301,11 @@ class _BadgeCard extends ConsumerWidget {
                 key: const ValueKey('badge-popup-close'),
                 behavior: HitTestBehavior.opaque,
                 onTap: onClose,
-                child: SvgPicture.asset('assets/icons/close.svg', width: size.raw(24), height: size.raw(24)),
+                child: SizedBox(
+                  width: size.raw(24),
+                  height: size.raw(24),
+                  child: SvgPicture.asset('assets/icons/close.svg'),
+                ),
               ),
             ),
           ],

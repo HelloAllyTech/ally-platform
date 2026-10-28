@@ -1227,13 +1227,15 @@ class _SimulationControls extends StatelessWidget {
               child: AnimatedRotation(
                 turns: isMaximized ? 0 : 0.5,
                 duration: const Duration(milliseconds: 250),
-                child: SvgPicture.asset(
-                  'assets/icons/chevronDown.svg',
+                child: SizedBox(
                   width: 24,
                   height: 12,
-                  colorFilter: const ColorFilter.mode(
-                    AppColors.lightGrayD9,
-                    BlendMode.srcIn,
+                  child: SvgPicture.asset(
+                    'assets/icons/chevronDown.svg',
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.lightGrayD9,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
               ),

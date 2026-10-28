@@ -234,11 +234,13 @@ class _ScenarioRow extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Center(
-                          child: SvgPicture.asset(
-                            'assets/icons/lock.svg',
+                          child: SizedBox(
                             width: 20,
                             height: 20,
-                            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                            child: SvgPicture.asset(
+                              'assets/icons/lock.svg',
+                              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                            ),
                           ),
                         ),
                       ),
@@ -323,7 +325,11 @@ class _ScenarioRow extends ConsumerWidget {
                     child: Semantics(
                       button: true,
                       label: ref.t('simulations.viewFeedback'),
-                      child: SvgPicture.asset('assets/icons/file.svg', width: 18, height: 18),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: SvgPicture.asset('assets/icons/file.svg'),
+                      ),
                     ),
                   ),
                 ),

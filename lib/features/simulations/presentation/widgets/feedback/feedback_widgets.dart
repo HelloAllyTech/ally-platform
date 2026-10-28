@@ -148,10 +148,12 @@ class EventChecklist extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                SvgPicture.asset(
-                  items[i].hasOccurred ? 'assets/icons/checkCircle.svg' : 'assets/icons/cancel.svg',
+                SizedBox(
                   width: 19,
                   height: 19,
+                  child: SvgPicture.asset(
+                    items[i].hasOccurred ? 'assets/icons/checkCircle.svg' : 'assets/icons/cancel.svg',
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Flexible(child: Text(items[i].name, style: _itemText)),
@@ -220,11 +222,13 @@ class _Star extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.asset(
-      'assets/icons/star.svg',
+    return SizedBox(
       width: size,
       height: size,
-      colorFilter: ColorFilter.mode(filled ? AppColors.starYellow : AppColors.lightGray4, BlendMode.srcIn),
+      child: SvgPicture.asset(
+        'assets/icons/star.svg',
+        colorFilter: ColorFilter.mode(filled ? AppColors.starYellow : AppColors.lightGray4, BlendMode.srcIn),
+      ),
     );
   }
 }

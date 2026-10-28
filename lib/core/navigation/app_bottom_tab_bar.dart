@@ -86,10 +86,12 @@ class _TabIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = SvgPicture.asset(
-      focused ? tab.activeIconAsset : tab.inactiveIconAsset,
+    final icon = SizedBox(
       width: 24,
       height: 24,
+      child: SvgPicture.asset(
+        focused ? tab.activeIconAsset : tab.inactiveIconAsset,
+      ),
     );
     if (!showUnreadDot) return icon;
     return Stack(

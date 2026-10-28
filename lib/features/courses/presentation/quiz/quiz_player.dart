@@ -257,7 +257,11 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
                   variant: CourseButtonVariant.secondary,
                   isDisabled: _current == 0,
                   onPressed: () => setState(() => _current = (_current - 1).clamp(0, questions.length - 1)),
-                  iconLeft: SvgPicture.asset('assets/icons/leftArrowIcon.svg', width: icon, height: icon),
+                  iconLeft: SizedBox(
+                    width: icon,
+                    height: icon,
+                    child: SvgPicture.asset('assets/icons/leftArrowIcon.svg'),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -274,7 +278,11 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
                         label: ref.t('courses.quiz.question.next'),
                         isDisabled: !answered,
                         onPressed: () => setState(() => _current = (_current + 1).clamp(0, questions.length - 1)),
-                        iconRight: SvgPicture.asset('assets/icons/arrowRight.svg', width: icon, height: icon),
+                        iconRight: SizedBox(
+                          width: icon,
+                          height: icon,
+                          child: SvgPicture.asset('assets/icons/arrowRight.svg'),
+                        ),
                       ),
               ),
             ],
@@ -477,7 +485,11 @@ class _QuizResults extends ConsumerWidget {
           height: 96,
           alignment: Alignment.center,
           decoration: const BoxDecoration(color: AppColors.green50, shape: BoxShape.circle),
-          child: SvgPicture.asset('assets/icons/checkCircle.svg', width: size.raw(40), height: size.raw(40)),
+          child: SizedBox(
+            width: size.raw(40),
+            height: size.raw(40),
+            child: SvgPicture.asset('assets/icons/checkCircle.svg'),
+          ),
         ),
         Text(
           ref.t('courses.quiz.results.responsesSubmitted'),

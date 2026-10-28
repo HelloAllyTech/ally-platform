@@ -441,11 +441,13 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with 
             key: const Key('review-details-back'),
             behavior: HitTestBehavior.opaque,
             onTap: () => context.pop(),
-            child: SvgPicture.asset(
-              'assets/icons/leftArrow.svg',
+            child: SizedBox(
               width: 16,
               height: 16,
-              colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+              child: SvgPicture.asset(
+                'assets/icons/leftArrow.svg',
+                colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+              ),
             ),
           ),
           if (review != null)

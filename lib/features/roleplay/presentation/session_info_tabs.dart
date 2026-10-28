@@ -147,7 +147,11 @@ class _InfoTabButton extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SvgPicture.asset(icon, width: 16, height: 16, colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: SvgPicture.asset(icon, colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                ),
                 const SizedBox(width: 6),
                 Text(
                   ref.t(labelKey),

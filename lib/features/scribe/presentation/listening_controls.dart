@@ -68,10 +68,12 @@ class _ListeningControlsState extends ConsumerState<ListeningControls> {
       if (widget.showPauseResumeButton)
         _ControlButton(
           key: const ValueKey('pause-resume-button'),
-          icon: SvgPicture.asset(
-            widget.isCallPaused ? 'assets/icons/resume.svg' : 'assets/icons/pause.svg',
+          icon: SizedBox(
             width: 24,
             height: 24,
+            child: SvgPicture.asset(
+              widget.isCallPaused ? 'assets/icons/resume.svg' : 'assets/icons/pause.svg',
+            ),
           ),
           label: ref.t(
             widget.isCallPaused ? 'listeningScreen.resumeTranscription' : 'listeningScreen.pauseTranscription',
@@ -128,11 +130,13 @@ class _ListeningControlsState extends ConsumerState<ListeningControls> {
                 child: AnimatedRotation(
                   turns: _isMaximized ? 0 : 0.5,
                   duration: const Duration(milliseconds: 250),
-                  child: SvgPicture.asset(
-                    'assets/icons/chevronDown.svg',
+                  child: SizedBox(
                     width: 24,
                     height: 12,
-                    colorFilter: const ColorFilter.mode(AppColors.lightGrayD9, BlendMode.srcIn),
+                    child: SvgPicture.asset(
+                      'assets/icons/chevronDown.svg',
+                      colorFilter: const ColorFilter.mode(AppColors.lightGrayD9, BlendMode.srcIn),
+                    ),
                   ),
                 ),
               ),
@@ -151,7 +155,11 @@ class _ListeningControlsState extends ConsumerState<ListeningControls> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SvgPicture.asset('assets/icons/shield.svg', width: 16, height: 16),
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: SvgPicture.asset('assets/icons/shield.svg'),
+                    ),
                     SizedBox(width: rn.s(4)),
                     Flexible(
                       child: Text(
@@ -278,7 +286,11 @@ class _MuteTooltip extends ConsumerWidget {
                       onTap: onDismiss,
                       // close.svg has a fixed #424242 fill, so RN's color
                       // prop doesn't change it.
-                      child: SvgPicture.asset('assets/icons/close.svg', width: 12, height: 12),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: SvgPicture.asset('assets/icons/close.svg'),
+                      ),
                     ),
                   ],
                 ),

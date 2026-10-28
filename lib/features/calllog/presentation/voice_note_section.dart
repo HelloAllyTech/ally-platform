@@ -281,7 +281,11 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SvgPicture.asset('assets/icons/mic.svg', width: 18, height: 18),
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: SvgPicture.asset('assets/icons/mic.svg'),
+              ),
               const SizedBox(width: 6),
               Text(ref.t('calls.createNote.voice.record'), style: _bodySmall.copyWith(color: AppColors.azureBlue)),
             ],
@@ -433,14 +437,22 @@ class _VoiceNotePanelState extends ConsumerState<_VoiceNotePanel> {
                 _ctrlButton(
                   key: 'voice-note-pause',
                   onTap: widget.onPause,
-                  icon: SvgPicture.asset('assets/icons/pause.svg', width: 16, height: 16),
+                  icon: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: SvgPicture.asset('assets/icons/pause.svg'),
+                  ),
                   label: ref.t('calls.createNote.voice.pause'),
                 )
               else
                 _ctrlButton(
                   key: 'voice-note-resume',
                   onTap: widget.onResume,
-                  icon: SvgPicture.asset('assets/icons/play.svg', width: 16, height: 16),
+                  icon: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: SvgPicture.asset('assets/icons/play.svg'),
+                  ),
                   label: ref.t('calls.createNote.voice.resume'),
                 ),
               const SizedBox(width: 8),
@@ -470,7 +482,11 @@ class _VoiceNotePanelState extends ConsumerState<_VoiceNotePanel> {
         children: [
           Flexible(
             child: _statusBlock(
-              leading: SvgPicture.asset('assets/icons/mic.svg', width: 18, height: 18),
+              leading: SizedBox(
+                width: 18,
+                height: 18,
+                child: SvgPicture.asset('assets/icons/mic.svg'),
+              ),
               label: ref.t('calls.createNote.voice.ready'),
             ),
           ),
@@ -480,7 +496,11 @@ class _VoiceNotePanelState extends ConsumerState<_VoiceNotePanel> {
               _ctrlButton(
                 key: 'voice-note-discard',
                 onTap: widget.onDiscard,
-                icon: SvgPicture.asset('assets/icons/delete.svg', width: 16, height: 16),
+                icon: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: SvgPicture.asset('assets/icons/delete.svg'),
+                ),
                 label: ref.t('calls.createNote.voice.discard'),
               ),
               const SizedBox(width: 8),

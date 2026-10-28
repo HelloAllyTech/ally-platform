@@ -24,7 +24,11 @@ class InfoTooltipIcon extends StatelessWidget {
     return Tooltip(
       message: message,
       triggerMode: TooltipTriggerMode.tap,
-      child: SvgPicture.asset('assets/icons/info.svg', width: size, height: size),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: SvgPicture.asset('assets/icons/info.svg'),
+      ),
     );
   }
 }

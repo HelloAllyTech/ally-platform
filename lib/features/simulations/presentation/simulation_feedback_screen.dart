@@ -764,11 +764,13 @@ class _ReviewButton extends StatelessWidget {
             ),
           ],
         ),
-        child: SvgPicture.asset(
-          'assets/icons/chatBubble.svg',
+        child: SizedBox(
           width: 20,
           height: 20,
-          colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+          child: SvgPicture.asset(
+            'assets/icons/chatBubble.svg',
+            colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+          ),
         ),
       ),
     );

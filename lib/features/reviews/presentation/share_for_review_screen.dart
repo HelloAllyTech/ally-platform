@@ -187,7 +187,11 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
             GestureDetector(
               key: const Key('share-review-close'),
               onTap: () => context.pop(),
-              child: SvgPicture.asset('assets/icons/close.svg', width: RnSize.of(context).raw(24), height: RnSize.of(context).raw(24)),
+              child: SizedBox(
+                width: RnSize.of(context).raw(24),
+                height: RnSize.of(context).raw(24),
+                child: SvgPicture.asset('assets/icons/close.svg'),
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(child: Text(screenTitle, style: _titleStyle)),
@@ -250,7 +254,11 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
             enableSearchBar: true,
             hideHeader: true,
           ),
-          child: SvgPicture.asset('assets/icons/addReaction.svg', width: RnSize.of(context).raw(24), height: RnSize.of(context).raw(24)),
+          child: SizedBox(
+            width: RnSize.of(context).raw(24),
+            height: RnSize.of(context).raw(24),
+            child: SvgPicture.asset('assets/icons/addReaction.svg'),
+          ),
         ),
       ),
     ];

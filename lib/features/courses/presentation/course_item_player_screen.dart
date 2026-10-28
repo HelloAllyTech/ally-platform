@@ -610,7 +610,11 @@ class _PlayerTopBar extends ConsumerWidget {
                     width: 32,
                     height: 32,
                     child: Center(
-                      child: SvgPicture.asset('assets/icons/close.svg', width: size.raw(16), height: size.raw(16)),
+                      child: SizedBox(
+                        width: size.raw(16),
+                        height: size.raw(16),
+                        child: SvgPicture.asset('assets/icons/close.svg'),
+                      ),
                     ),
                   ),
                 ),
@@ -720,7 +724,11 @@ class _PlayerBottomNav extends ConsumerWidget {
               variant: CourseButtonVariant.secondary,
               isDisabled: !hasPrev,
               onPressed: onPrev,
-              iconLeft: SvgPicture.asset('assets/icons/leftArrowIcon.svg', width: icon, height: icon),
+              iconLeft: SizedBox(
+                width: icon,
+                height: icon,
+                child: SvgPicture.asset('assets/icons/leftArrowIcon.svg'),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -730,7 +738,11 @@ class _PlayerBottomNav extends ConsumerWidget {
               label: ref.t(isLastItem ? 'courses.player.finish' : 'courses.player.next'),
               isDisabled: !canAdvance,
               onPressed: onNext,
-              iconRight: SvgPicture.asset('assets/icons/arrowRight.svg', width: icon, height: icon),
+              iconRight: SizedBox(
+                width: icon,
+                height: icon,
+                child: SvgPicture.asset('assets/icons/arrowRight.svg'),
+              ),
             ),
           ),
         ],

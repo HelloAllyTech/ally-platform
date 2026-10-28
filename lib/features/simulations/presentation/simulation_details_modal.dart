@@ -188,10 +188,12 @@ class _SimulationDetailsModalState
                             padding: const EdgeInsets.all(4),
                             // close.svg's #424242 fill is baked in; RN's
                             // `color` prop doesn't reach it.
-                            child: SvgPicture.asset(
-                              'assets/icons/close.svg',
+                            child: SizedBox(
                               width: 20,
                               height: 20,
+                              child: SvgPicture.asset(
+                                'assets/icons/close.svg',
+                              ),
                             ),
                           ),
                         ),

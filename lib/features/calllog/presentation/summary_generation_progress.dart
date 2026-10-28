@@ -360,7 +360,11 @@ class _AddNotesSectionState extends ConsumerState<AddNotesSection> {
                             padding: const EdgeInsets.only(left: 4, right: 10),
                             child: Transform.rotate(
                               angle: _isExpanded ? 0 : -1.5707963267948966,
-                              child: SvgPicture.asset('assets/icons/arrowDown.svg', width: 20, height: 20),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: SvgPicture.asset('assets/icons/arrowDown.svg'),
+                              ),
                             ),
                           ),
                           SvgPicture.asset('assets/icons/page.svg'),

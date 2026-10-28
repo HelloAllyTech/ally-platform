@@ -415,11 +415,13 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                           onTap: () => setState(() => _isViewingArchive = false),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: SvgPicture.asset(
-                              'assets/icons/leftArrow.svg',
+                            child: SizedBox(
                               width: 14,
                               height: 14,
-                              colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+                              child: SvgPicture.asset(
+                                'assets/icons/leftArrow.svg',
+                                colorFilter: const ColorFilter.mode(AppColors.iconDefault, BlendMode.srcIn),
+                              ),
                             ),
                           ),
                         )
@@ -536,7 +538,11 @@ class _FilterButton extends ConsumerWidget {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              SvgPicture.asset('assets/icons/filter.svg', width: 16, height: 16),
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: SvgPicture.asset('assets/icons/filter.svg'),
+              ),
               if (activeCount > 0)
                 Positioned(
                   top: -6,
@@ -609,7 +615,11 @@ class _RefreshButtonState extends ConsumerState<_RefreshButton> with SingleTicke
         onTap: widget.onRefresh,
         child: RotationTransition(
           turns: _controller,
-          child: SvgPicture.asset('assets/icons/replay.svg', width: 16, height: 16),
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: SvgPicture.asset('assets/icons/replay.svg'),
+          ),
         ),
       ),
     );
@@ -664,7 +674,11 @@ class _ActionsMenu extends StatelessWidget {
           ),
         ),
       ],
-      child: SvgPicture.asset('assets/icons/threeDots.svg', width: 16, height: 16),
+      child: SizedBox(
+        width: 16,
+        height: 16,
+        child: SvgPicture.asset('assets/icons/threeDots.svg'),
+      ),
     );
   }
 }

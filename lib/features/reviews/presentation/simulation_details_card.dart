@@ -67,7 +67,11 @@ class _SimulationDetailsCardState extends ConsumerState<SimulationDetailsCard> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: AppColors.grey50, borderRadius: BorderRadius.circular(8)),
       child: isScribe
-          ? SvgPicture.asset('assets/icons/scribeReview.svg', width: double.infinity, height: height)
+          ? SizedBox(
+            width: double.infinity,
+            height: height,
+            child: SvgPicture.asset('assets/icons/scribeReview.svg'),
+          )
           : (video != null && video.isNotEmpty)
           // CoverVideoPreview pauses itself once its route is covered.
           ? CoverVideoPreview(key: const Key('scenario-video-preview'), url: video, thumbnailUrl: image, height: height)

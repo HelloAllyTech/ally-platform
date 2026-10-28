@@ -204,7 +204,11 @@ class _QuestionVideoState extends State<_QuestionVideo> {
             if (!_started && poster != null && poster.isNotEmpty)
               Image.network(poster, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
             if (!value.isPlaying)
-              Center(child: SvgPicture.asset('assets/icons/playWhite.svg', width: 48, height: 48)),
+              Center(child: SizedBox(
+                width: 48,
+                height: 48,
+                child: SvgPicture.asset('assets/icons/playWhite.svg'),
+              )),
             if (value.isInitialized)
               Align(
                 alignment: Alignment.bottomCenter,

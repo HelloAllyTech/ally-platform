@@ -471,7 +471,11 @@ class InteractionsBar extends ConsumerWidget {
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  SvgPicture.asset('assets/icons/chatBubble.svg', width: rn.raw(20), height: rn.raw(20)),
+                  SizedBox(
+                    width: rn.raw(20),
+                    height: rn.raw(20),
+                    child: SvgPicture.asset('assets/icons/chatBubble.svg'),
+                  ),
                   if (commentsCount > 0)
                     Positioned(
                       // top/right 3@s inside the 36pt circle (8pt padding).

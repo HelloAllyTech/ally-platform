@@ -208,11 +208,13 @@ class _ScribeReferenceSearchState extends ConsumerState<ScribeReferenceSearch> {
                   width: 18,
                   height: 18,
                   child: Center(
-                    child: SvgPicture.asset(
-                      'assets/icons/close.svg',
+                    child: SizedBox(
                       width: 16,
                       height: 16,
-                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                      child: SvgPicture.asset(
+                        'assets/icons/close.svg',
+                        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                      ),
                     ),
                   ),
                 ),
@@ -250,11 +252,13 @@ class _ScribeReferenceSearchState extends ConsumerState<ScribeReferenceSearch> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SvgPicture.asset(
-                'assets/icons/searchActive.svg',
+              SizedBox(
                 width: iconSize,
                 height: iconSize,
-                colorFilter: const ColorFilter.mode(AppColors.darkGray8, BlendMode.srcIn),
+                child: SvgPicture.asset(
+                  'assets/icons/searchActive.svg',
+                  colorFilter: const ColorFilter.mode(AppColors.darkGray8, BlendMode.srcIn),
+                ),
               ),
               const SizedBox(width: 8),
               Flexible(

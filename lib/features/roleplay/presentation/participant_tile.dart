@@ -69,11 +69,13 @@ class ParticipantTile extends ConsumerWidget {
                 )
               else
                 Center(
-                  child: SvgPicture.asset(
-                    'assets/icons/user.svg',
-                    key: const ValueKey('participant-placeholder'),
+                  child: SizedBox(
                     width: compact ? 36 : 90,
                     height: compact ? 36 : 90,
+                    child: SvgPicture.asset(
+                      'assets/icons/user.svg',
+                      key: const ValueKey('participant-placeholder'),
+                    ),
                   ),
                 ),
               if (labelKey != null)

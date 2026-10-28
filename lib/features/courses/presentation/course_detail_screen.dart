@@ -471,13 +471,15 @@ class _CourseItemRow extends ConsumerWidget {
                   ),
                 ),
                 child: isLocked
-                    ? SvgPicture.asset(
-                        'assets/icons/lock.svg',
-                        key: const ValueKey('item-badge-locked'),
-                        width: 16,
-                        height: 16,
-                        colorFilter: const ColorFilter.mode(AppColors.grey400, BlendMode.srcIn),
-                      )
+                    ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: SvgPicture.asset(
+                          'assets/icons/lock.svg',
+                          key: const ValueKey('item-badge-locked'),
+                          colorFilter: const ColorFilter.mode(AppColors.grey400, BlendMode.srcIn),
+                        ),
+                    )
                     // styles.badgeText: IBM_PLEX_SERIF.MEDIUM + body.medium.
                     : Text(
                         _typeBadge(item.type),

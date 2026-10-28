@@ -87,7 +87,11 @@ class CallSummaryMenu extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SvgPicture.asset(option.iconAsset, width: 16, height: 16),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: SvgPicture.asset(option.iconAsset),
+                  ),
                 ],
               ),
             ),

@@ -267,7 +267,11 @@ class _CreditsSection extends ConsumerWidget {
             padding: EdgeInsets.only(bottom: rn.mvs(8)),
             child: Row(
               children: [
-                SvgPicture.asset('assets/icons/bolt.svg', width: 16, height: 16),
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: SvgPicture.asset('assets/icons/bolt.svg'),
+                ),
                 const SizedBox(width: 18),
                 Text(
                   ref.t('user.creditUsage'),

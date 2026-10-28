@@ -239,10 +239,12 @@ class PreStartNotificationModal extends ConsumerWidget {
           // hitSlop 10 on every side.
           child: Padding(
             padding: const EdgeInsets.all(10),
-            child: SvgPicture.asset(
-              'assets/icons/close.svg',
+            child: SizedBox(
               width: rn.raw(24),
               height: rn.raw(24),
+              child: SvgPicture.asset(
+                'assets/icons/close.svg',
+              ),
             ),
           ),
         ),

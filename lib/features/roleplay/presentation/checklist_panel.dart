@@ -251,11 +251,13 @@ class _ChecklistRow extends StatelessWidget {
                       child: AnimatedRotation(
                         turns: isExpanded ? 0.5 : 0,
                         duration: const Duration(milliseconds: 150),
-                        child: SvgPicture.asset(
-                          'assets/icons/chevronDown.svg',
+                        child: SizedBox(
                           width: 12,
                           height: 12,
-                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                          child: SvgPicture.asset(
+                            'assets/icons/chevronDown.svg',
+                            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                          ),
                         ),
                       ),
                     ),

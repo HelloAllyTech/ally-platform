@@ -41,13 +41,15 @@ class BadgeNetworkImage extends StatelessWidget {
     final w = width ?? double.infinity;
     final h = height ?? double.infinity;
     if (isSvgUrl(url)) {
-      return SvgPicture.network(
-        url,
-        fit: BoxFit.contain,
+      return SizedBox(
         width: w,
         height: h,
-        placeholderBuilder: (_) => SizedBox(width: width, height: height, child: _spinner),
-        errorBuilder: (_, _, _) => _error(),
+        child: SvgPicture.network(
+          url,
+          fit: BoxFit.contain,
+          placeholderBuilder: (_) => SizedBox(width: width, height: height, child: _spinner),
+          errorBuilder: (_, _, _) => _error(),
+        ),
       );
     }
     return SizedNetworkImage(

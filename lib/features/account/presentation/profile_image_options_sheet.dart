@@ -84,7 +84,11 @@ class _Option extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          SvgPicture.asset(icon, width: 24, height: 24),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: SvgPicture.asset(icon),
+          ),
           const SizedBox(width: 12),
           Text(
             label,

@@ -84,7 +84,11 @@ class _SearchableLocationDropdownState extends ConsumerState<SearchableLocationD
               const SizedBox(width: 8),
               Transform.rotate(
                 angle: _isOpen ? math.pi : 0,
-                child: SvgPicture.asset('assets/icons/arrowDown.svg', width: 6, height: 6),
+                child: SizedBox(
+                  width: 6,
+                  height: 6,
+                  child: SvgPicture.asset('assets/icons/arrowDown.svg'),
+                ),
               ),
             ],
           ),

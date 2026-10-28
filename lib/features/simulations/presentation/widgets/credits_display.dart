@@ -28,7 +28,11 @@ class CreditsDisplay extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // RN: <BoltIcon width={14} height={14} /> (11x16 viewBox, contained).
-        SvgPicture.asset('assets/icons/bolt.svg', width: 14, height: 14),
+        SizedBox(
+          width: 14,
+          height: 14,
+          child: SvgPicture.asset('assets/icons/bolt.svg'),
+        ),
         const SizedBox(width: 4),
         Text.rich(
           TextSpan(

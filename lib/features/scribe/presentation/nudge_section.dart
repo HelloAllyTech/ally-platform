@@ -166,11 +166,13 @@ class _Thumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = SvgPicture.asset(
-      'assets/icons/thumb.svg',
+    final icon = SizedBox(
       width: 18,
       height: 18,
-      colorFilter: ColorFilter.mode(selected ? Colors.white : AppColors.powderBlue, BlendMode.srcIn),
+      child: SvgPicture.asset(
+        'assets/icons/thumb.svg',
+        colorFilter: ColorFilter.mode(selected ? Colors.white : AppColors.powderBlue, BlendMode.srcIn),
+      ),
     );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
