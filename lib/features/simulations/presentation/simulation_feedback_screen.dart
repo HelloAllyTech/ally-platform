@@ -359,6 +359,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     final ShareSimulationForReviewArgs extra = (
       args: (
         reviewId: summary?.reviewId,
+        isEditNote: false,
         note: _review?.note,
         contextDateTime: summary?.createdAt ?? startedAt,
         contextDuration: duration,

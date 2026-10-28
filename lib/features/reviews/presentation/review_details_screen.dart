@@ -286,11 +286,13 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with 
     final scribe = review.scribeSession;
     final ShareForReviewArgs args = (
       reviewId: review.id,
+      isEditNote: true,
       note: review.note,
       contextDateTime: session?.createdAt ?? scribe?.createdAt,
       contextDuration: session?.duration ?? scribe?.duration,
       isScribe: _isScribe,
-      contextTitle: _isScribe ? (review.summaryName ?? scribe?.summaryName) : review.scenario?.title,
+      // RN `ScribeReviewDetailsScreen.handleEditNote`: `summaryName || 'Session Review'`.
+      contextTitle: _isScribe ? _scribeEditNoteTitle(review.summaryName ?? scribe?.summaryName) : review.scenario?.title,
     );
     final scenario = review.scenario;
     // RN `updateReviewStatus` invalidates `ReviewDetails`: coming back from
@@ -570,3 +572,9 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with 
     );
   }
 }
+
+/// RN `ScribeReviewDetailsScreen.handleEditNote`'s
+/// `reviewData?.summaryName || 'Session Review'` (a hardcoded English
+/// fallback in RN, not a translation key).
+String _scribeEditNoteTitle(String? summaryName) =>
+    (summaryName == null || summaryName.isEmpty) ? 'Session Review' : summaryName;

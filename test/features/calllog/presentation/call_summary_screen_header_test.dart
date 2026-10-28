@@ -78,6 +78,7 @@ CallSummaryDetails _summary({
   String? reviewCreatedAt,
   bool hasTranscript = true,
   String? summaryName,
+  int? callDuration,
 }) => CallSummaryDetails.fromJson({
   'id': 1001,
   'summaryStatus': 'SUCCESS',
@@ -89,6 +90,7 @@ CallSummaryDetails _summary({
   'details': {
     'summary': {'sessionSummary': 'All good'},
     'callInfo': <String, dynamic>{'summaryName': ?summaryName},
+    'callDuration': ?callDuration,
     if (hasTranscript) 'transcript': 'the transcript text',
   },
 });
@@ -240,6 +242,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('SHARE_SCREEN:1001'), findsOneWidget);
+      // RN `handleShareForReview` never sets `isEditNote`: a re-share stays
+      // in share mode even with an existing reviewId.
+      expect(find.textContaining('isEditNote: false'), findsOneWidget);
+      expect(find.textContaining('reviewId: rev-1'), findsOneWidget);
       verifyNever(
         () => scribeReviewsRepository.updateReviewStatus(
           reviewId: any(named: 'reviewId'),
@@ -248,6 +254,21 @@ void main() {
       );
     },
   );
+
+  testWidgets('the share screen gets the call duration as raw seconds (formatted once, there)', (tester) async {
+    when(() => repository.getCallSummary(1001)).thenAnswer((_) async => _summary(callDuration: 277));
+    await _pump(
+      tester,
+      repository: repository,
+      scribeReviewsRepository: scribeReviewsRepository,
+      scribeReactionsRepository: scribeReactionsRepository,
+    );
+
+    await tester.tap(find.byType(RnCustomSwitch));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('contextDuration: 277,'), findsOneWidget);
+  });
 
   testWidgets('toggling share ON for an older review flips its status directly, no navigation', (
     tester,
