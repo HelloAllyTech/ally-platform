@@ -9,10 +9,14 @@ enum CourseButtonVariant { primary, secondary }
 
 /// Local port of RN `components/Button` for the course screens.
 ///
-/// Differs from the shared `AppButton` in the two ways RN's Button actually
-/// renders: the label uses the system font (RN sets no `fontFamily`), and
-/// the `TouchableOpacity` keeps RN's default column direction, so an
-/// `IconLeft`/`IconRight` sits above/below the label rather than beside it.
+/// Differs from the shared `AppButton` (the same RN `Button.tsx`, ported
+/// for the rest of the app) only in that the label uses the system font
+/// (RN sets no `fontFamily` here). Icon placement now matches `AppButton`
+/// too: an `iconLeft`/`iconRight` sits beside the label in a row with an
+/// 8px gap, not stacked above/below it — a previous version of this port
+/// read RN's lack of an explicit `flexDirection` on the button style as
+/// "falls back to RN's view-level column default", which rendered Prev/
+/// Next's arrows above and below their labels instead of beside them.
 /// Full width, pill radius, `sizeMd` (minHeight 44@vs, paddingVertical
 /// 10@vs), disabled = `disabledContainer` fill.
 class CourseButton extends StatelessWidget {
@@ -66,16 +70,19 @@ class CourseButton extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 2.5),
                   child: CupertinoActivityIndicator(color: textColor),
                 )
-              : Column(
+              : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    ?iconLeft,
-                    Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: CourseText.system(CourseType.bodyMedium, textColor),
+                    if (iconLeft != null) ...[iconLeft!, const SizedBox(width: 8)],
+                    Flexible(
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: CourseText.system(CourseType.bodyMedium, textColor),
+                      ),
                     ),
-                    ?iconRight,
+                    if (iconRight != null) ...[const SizedBox(width: 8), iconRight!],
                   ],
                 ),
         ),
