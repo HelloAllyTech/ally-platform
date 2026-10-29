@@ -372,6 +372,7 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     label: 'Speech Recognition',
     description: 'Manage speech-to-text provider configuration.',
     legacyGrants: SDA_ONLY,
+    defaultEnabled: true,
   },
   {
     key: FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG,
