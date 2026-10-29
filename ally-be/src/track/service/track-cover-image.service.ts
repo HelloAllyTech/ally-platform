@@ -71,7 +71,10 @@ export class TrackCoverImageService {
     const startedAt = Date.now();
     let image: Buffer;
     try {
-      image = await provider.generateImage(dto.prompt, TRACK_COVER_IMAGE_SIZE, {
+      // The default prompt from the frontend includes "documentary-style", which
+      // can trip the provider's content filter.
+      const prompt = dto.prompt.replace(/documentary-style /gi, '');
+      image = await provider.generateImage(prompt, TRACK_COVER_IMAGE_SIZE, {
         quality: INTERACTIVE_IMAGE_QUALITY,
       });
     } catch (error) {
