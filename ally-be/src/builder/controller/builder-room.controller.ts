@@ -11,6 +11,7 @@ import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorat
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { BuilderHistoryService } from '../service/builder-history.service';
+import { BuilderNowService } from '../service/builder-now.service';
 import { ListBuilderHistoryQueryDto } from '../dto/builder.dto';
 
 /**
@@ -24,7 +25,23 @@ import { ListBuilderHistoryQueryDto } from '../dto/builder.dto';
 @ApiSecurity('access-token')
 @Controller({ path: 'builder', version: '1' })
 export class BuilderRoomController {
-  constructor(private readonly historyService: BuilderHistoryService) {}
+  constructor(
+    private readonly historyService: BuilderHistoryService,
+    private readonly nowService: BuilderNowService,
+  ) {}
+
+  /**
+   * The Now tab in one read: sessions in progress grouped by what they wait
+   * on, the decisions waiting on a person, and the in-progress limit.
+   */
+  @Get('now')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.VIEW_BUILDER],
+  })
+  @ApiOperation({ summary: 'The Builder tab: in progress, decisions, limit' })
+  now() {
+    return this.nowService.now();
+  }
 
   /** Every decision, ask and tell, newest first. Read-only: corrections are rules, never edits. */
   @Get('history')

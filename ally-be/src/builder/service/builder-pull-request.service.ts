@@ -245,6 +245,16 @@ export class BuilderPullRequestService {
     );
     // Feedback on a merged pull request is no longer anyone's to act on.
     await this.staleFeedback(row.id);
+    // The Slack prompt, if there was one, must stop offering a merge.
+    try {
+      await this.notificationService.mergePromptAnswered(row);
+    } catch (error) {
+      this.logger.warn(
+        `Could not retire the Slack merge prompt for ${row.repo}#${row.prNumber}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
     return (await this.repository.findOne({ where: { id: row.id } })) ?? row;
   }
 
@@ -905,13 +915,19 @@ export class BuilderPullRequestService {
       { id: pullRequest.id },
       { mergePromptedAt: new Date() },
     );
-    await this.notificationService.prReadyToMerge(session, {
+    const posted = await this.notificationService.prReadyToMerge(session, {
       id: pullRequest.id,
       repo: pullRequest.repo,
       prNumber: pullRequest.prNumber,
       prUrl: pullRequest.prUrl,
       title: pullRequest.title ?? null,
     });
+    if (posted) {
+      await this.repository.update(
+        { id: pullRequest.id },
+        { slackChannel: posted.channel, slackMessageTs: posted.ts },
+      );
+    }
   }
 
   /**

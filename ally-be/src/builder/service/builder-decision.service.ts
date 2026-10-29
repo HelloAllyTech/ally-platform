@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Optional,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -50,6 +51,7 @@ import {
   BUILDER_UNDO_SWEEP_MS,
   BUILDER_UNDO_WINDOW_MS,
 } from '../constants/builder.constants';
+import { BuilderLiveService } from './builder-live.service';
 import {
   BuilderHistoryAnswer,
   BuilderHistoryContext,
@@ -123,6 +125,8 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     private readonly orchestrator: BuilderInterviewOrchestratorService,
     private readonly redisService: RedisService,
     private readonly historyService: BuilderHistoryService,
+    // Optional so specs that build this positionally need not pass it.
+    @Optional() private readonly liveService?: BuilderLiveService,
   ) {}
 
   onModuleInit(): void {
@@ -287,6 +291,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
         60 * 60,
       );
       this.scheduleHeld(decisionId, BUILDER_UNDO_WINDOW_MS);
+      this.liveService?.changed('decisionsChanged');
       return {
         ok: true,
         outcome: 'pending',
@@ -299,6 +304,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
       const session = await this.sessionService.getSession(parsed.sessionId);
       const result = await this.applyAnswer(parsed, session, dto, userId);
       if (historyId) await this.historyService.markApplied(historyId);
+      this.liveService?.changed('decisionsChanged', 'sessionsChanged');
       return { ...result, historyId };
     } catch (error) {
       if (historyId) {
@@ -374,6 +380,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
       await this.redisService.del(this.heldKey(decisionId));
       this.clearHeldTimer(decisionId);
       if (held.historyId) await this.historyService.markUndone(held.historyId);
+      this.liveService?.changed('decisionsChanged');
       return { ok: true };
     } finally {
       await this.redisService.releaseLock(lock);
@@ -398,6 +405,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
         await this.applyAnswer(parsed, session, held.dto, held.userId);
         if (held.historyId)
           await this.historyService.markApplied(held.historyId);
+        this.liveService?.changed('decisionsChanged', 'sessionsChanged');
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
@@ -1184,6 +1192,19 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
    * the turn ends. The turn still holds the same per-session lock the stream
    * does, so the two surfaces cannot interleave over one transcript.
    */
+  /**
+   * Start an interview turn in the background, under the turn lock — the
+   * server-side seed for a session started from Up next, so three quick
+   * Starts give three running interviews without anyone opening a page.
+   */
+  async startBackgroundTurn(
+    sessionId: string,
+    message: string,
+    userId: number,
+  ): Promise<void> {
+    await this.startTurn(sessionId, { message }, userId);
+  }
+
   private async startTurn(
     sessionId: string,
     dto: CreateBuilderMessageDto,
@@ -1219,6 +1240,8 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
           }`,
         );
       } finally {
+        // The turn has ended: its question (or PRD) changed the feed.
+        this.liveService?.changed('decisionsChanged', 'sessionsChanged');
         try {
           await this.redisService.releaseLock(lockKey);
         } catch (error) {

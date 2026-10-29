@@ -76,6 +76,8 @@ import {
 } from './service/builder-history.service';
 import { BuilderHistoryEntry } from './entity/builder-history.entity';
 import { BuilderRoomController } from './controller/builder-room.controller';
+import { BuilderNowService } from './service/builder-now.service';
+import { BuilderLiveService } from './service/builder-live.service';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
@@ -211,6 +213,8 @@ import {
     BuilderNotificationService,
     BuilderDecisionService,
     BuilderHistoryService,
+    BuilderNowService,
+    BuilderLiveService,
     BuilderHistoryRepository,
     BuilderSchedulerRegistrationService,
     BuilderSessionRepository,
@@ -230,6 +234,12 @@ import {
   ],
   exports: [
     BuilderSessionService,
+    // The Builder tab's Up next, Start and Put back live with the roadmap
+    // (which owns opportunities); they read these to gate, seed and record.
+    BuilderNowService,
+    BuilderDecisionService,
+    BuilderHistoryService,
+    BuilderLiveService,
     BuilderKnowledgeService,
     // The read-only research belt, reused by the roadmap's opportunity copilot so it reads the
     // same repos, the same Stacks library and the same production evidence through the same

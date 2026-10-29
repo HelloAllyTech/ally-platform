@@ -768,6 +768,9 @@ export class BuilderController {
         ...(dto.maxConcurrentBuilds !== undefined
           ? { maxConcurrentBuilds: dto.maxConcurrentBuilds }
           : {}),
+        ...(dto.inProgressLimit !== undefined
+          ? { inProgressLimit: dto.inProgressLimit }
+          : {}),
         ...(dto.defaultBudgetUsd !== undefined
           ? { defaultBudgetUsd: String(dto.defaultBudgetUsd) }
           : {}),

@@ -44,6 +44,7 @@ export class BuilderSettingsService {
         BuilderSettings,
         | 'enabled'
         | 'maxConcurrentBuilds'
+        | 'inProgressLimit'
         | 'defaultBudgetUsd'
         | 'maxRunnerMinutes'
         | 'autoFixEnabled'

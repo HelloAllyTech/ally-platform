@@ -57,6 +57,8 @@ import { RoadmapOpportunityService } from './service/roadmap-opportunity.service
 import { RoadmapSavedViewService } from './service/roadmap-saved-view.service';
 import { RoadmapSplitMergeService } from './service/roadmap-split-merge.service';
 import { RoadmapBuilderService } from './service/roadmap-builder.service';
+import { RoadmapUpNextService } from './service/roadmap-up-next.service';
+import { RoadmapUpNextController } from './controller/roadmap-up-next.controller';
 import { BuilderModule } from 'src/builder/builder.module';
 import { RoadmapBoardService } from './service/roadmap-board.service';
 import { RoadmapTaxonomyService } from './service/roadmap-taxonomy.service';
@@ -159,6 +161,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
+    RoadmapUpNextController,
   ],
   providers: [
     // repositories
@@ -186,6 +189,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapAllocationService,
     RoadmapSplitMergeService,
     RoadmapBuilderService,
+    RoadmapUpNextService,
     RoadmapBoardService,
     RoadmapCommentService,
     RoadmapSavedViewService,

@@ -356,6 +356,16 @@ export class UpdateBuilderSettingsDto {
   maxConcurrentBuilds?: number;
 
   @ApiPropertyOptional({
+    description:
+      'How many sessions you want in progress at once (your attention, not the runner budget)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  inProgressLimit?: number;
+
+  @ApiPropertyOptional({
     description: 'Default per-session spend ceiling, USD',
   })
   @IsOptional()
