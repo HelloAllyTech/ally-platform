@@ -45,7 +45,9 @@ const CATEGORY_TAG: Record<BuilderDecision["category"], "purple" | "teal" | "mag
  * first — so the eye learns where to look and stops reading the layout. The
  * keyboard answers it: a digit picks, the same digit again (or Enter) sends,
  * Enter alone sends the recommendation, C writes a custom answer. A click
- * still works, but a feed cleared by mouse is a feed cleared slowly.
+ * still works, but a feed cleared by mouse is a feed cleared slowly. The one
+ * exception to "one press" is an option flagged `confirm` (merge, remove the
+ * ceiling, stop the build): it is picked first and sent on a second press.
  *
  * The card never decides what an answer *means*; it posts the ids and words
  * and the server routes them. That keeps the card the same for a merge button
@@ -129,20 +131,46 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
     [picked, sendOption],
   );
 
+  /**
+   * A click sends — except on an option that is hard to take back, where it
+   * picks first and the second click sends. The keyboard already works that way
+   * for every option; this gives the mouse the same deliberate step only where a
+   * slip costs something (a merge, an uncapped budget, a stopped build).
+   */
+  const clickSingle = useCallback(
+    (option: BuilderDecisionOption) => {
+      if (option.confirm) pickSingle(option);
+      else sendOption(option);
+    },
+    [pickSingle, sendOption],
+  );
+
   const toggleMulti = useCallback((option: BuilderDecisionOption) => {
     setPicked(prev =>
       prev.includes(option.id) ? prev.filter(id => id !== option.id) : [...prev, option.id],
     );
   }, []);
 
-  /** Enter: the pick if there is one, otherwise the recommendation. */
+  /**
+   * Enter: the pick if there is one, otherwise the recommendation — which, if it
+   * is hard to take back, is picked rather than sent, so a stray Enter on a merge
+   * card cannot merge. Enter again sends it.
+   */
   const sendDefault = useCallback(() => {
     if (isMulti) {
       sendMulti();
       return;
     }
-    const chosen = options.find(option => option.id === picked[0]) ?? recommended;
-    if (chosen) sendOption(chosen);
+    const chosen = options.find(option => option.id === picked[0]);
+    if (chosen) {
+      sendOption(chosen);
+      return;
+    }
+    if (recommended?.confirm) {
+      setPicked([recommended.id]);
+      return;
+    }
+    if (recommended) sendOption(recommended);
     else if (custom.trim()) sendCustom();
   }, [custom, isMulti, options, picked, recommended, sendCustom, sendMulti, sendOption]);
 
@@ -285,7 +313,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
                   type="button"
                   disabled={locked}
                   aria-pressed={isPicked}
-                  onClick={() => (isMulti ? toggleMulti(option) : sendOption(option))}
+                  onClick={() => (isMulti ? toggleMulti(option) : clickSingle(option))}
                   className={[
                     "flex w-full items-start gap-3 rounded border px-3 py-2 text-left transition-colors",
                     "hover:border-primary-500 hover:bg-primary-50",
@@ -310,13 +338,19 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
                       {option.recommended && (
                         <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
                           {strings.card.recommended}
-                          {!isMulti && ` · ${strings.card.pressEnter}`}
+                          {!isMulti &&
+                            ` · ${option.confirm ? strings.card.pressEnterTwice : strings.card.pressEnter}`}
                         </span>
                       )}
                     </span>
                     {option.description && (
                       <span className="mt-0.5 block text-xs text-typography-600">
                         {option.description}
+                      </span>
+                    )}
+                    {!isMulti && option.confirm && (
+                      <span className="mt-0.5 block text-xs font-medium text-typography-700">
+                        {isPicked ? strings.card.confirmPicked : strings.card.hardToUndo}
                       </span>
                     )}
                   </span>

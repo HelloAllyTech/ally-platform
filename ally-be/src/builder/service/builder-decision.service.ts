@@ -295,13 +295,19 @@ export class BuilderDecisionService {
           );
           return { ok: true, outcome: 'budget_raised' };
         }
-        const typed = Number(words.replace(/[^0-9.]/g, ''));
-        if (words && Number.isFinite(typed) && typed >= 0) {
+        // A ceiling of 0 means "no ceiling" downstream, so typed text must
+        // never reach it by accident: "none" or "a lot" has no digits and is
+        // refused, and so is a typed zero. Removing the ceiling is its own
+        // option, which asks for a second press.
+        const typed = Number(
+          /\d+(?:\.\d+)?/.exec(words.replace(/,/g, ''))?.[0],
+        );
+        if (words && Number.isFinite(typed) && typed > 0) {
           await this.buildService.raiseBudget(session, userId, typed);
           return { ok: true, outcome: 'budget_raised' };
         }
         throw new BadRequestException(
-          'Pick a raise, type the new ceiling in dollars, or stop the build.',
+          'Pick a raise, type a new ceiling in dollars above zero, or stop the build. To remove the ceiling, pick that option.',
         );
       }
 
@@ -587,11 +593,13 @@ export class BuilderDecisionService {
                 id: 'uncap',
                 label: 'Remove the ceiling',
                 description: 'No spend limit on this session.',
+                confirm: true,
               },
               {
                 id: 'stop',
                 label: 'Stop the build',
                 description: 'Nothing already written is lost.',
+                confirm: true,
               },
             ],
             allowCustom: true,
@@ -672,6 +680,7 @@ export class BuilderDecisionService {
                 id: 'merge',
                 label: 'Merge it as it is',
                 description: 'Refused unless every check is green.',
+                confirm: true,
               },
             ],
             allowCustom: false,
@@ -698,6 +707,7 @@ export class BuilderDecisionService {
                 description:
                   'Checks are read again first; anything red is refused.',
                 recommended: true,
+                confirm: true,
               },
             ],
             allowCustom: false,

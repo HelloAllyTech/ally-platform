@@ -345,6 +345,12 @@ describe('BuilderDecisionService', () => {
         'stop',
       ]);
       expect(decision.options[0].label).toBe('Raise by $10 (to $37.00)');
+      // Only the hard-to-undo options ask for a second press.
+      expect(
+        decision.options
+          .filter((option) => option.confirm)
+          .map((option) => option.id),
+      ).toEqual(['uncap', 'stop']);
     });
 
     it('says nothing about a building session within budget', async () => {
@@ -421,6 +427,17 @@ describe('BuilderDecisionService', () => {
       expect(decisions[1].context[0]).toBe(
         '3 fix rounds and 2 problems remain.',
       );
+      // A merge asks for a second press wherever it is offered; sending the
+      // pull request back to Builder does not.
+      expect(decisions[0].options.map((option) => option.confirm)).toEqual([
+        true,
+      ]);
+      expect(
+        decisions[1].options.map((option) => [option.id, option.confirm]),
+      ).toEqual([
+        ['resume', undefined],
+        ['merge', true],
+      ]);
     });
 
     it('recommends archiving a failed session whose work already opened pull requests', async () => {
@@ -718,6 +735,27 @@ describe('BuilderDecisionService', () => {
         service.answer('budget:sess-1', { selectedOptionIds: ['stop'] }, 42),
       ).resolves.toEqual({ ok: true, outcome: 'cancelled' });
       expect(sessionService.cancelSession).toHaveBeenCalledWith('sess-1', 42);
+    });
+
+    it('never reads typed text as "remove the ceiling"', async () => {
+      const held = session({
+        status: BuilderSessionStatus.BUILDING,
+        budgetUsd: '25',
+        totalCostUsd: '26.4',
+      });
+      const { service, buildService } = build({ sessions: [held] });
+
+      // A ceiling of 0 means "no ceiling" downstream. Text with no digits, or
+      // a typed zero, must be refused rather than uncap the session.
+      for (const text of ['none', 'a lot', '0', '$0.00']) {
+        await expect(
+          service.answer('budget:sess-1', { customValues: [text] }, 42),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      }
+      expect(buildService.raiseBudget).not.toHaveBeenCalled();
+
+      await service.answer('budget:sess-1', { customValues: ['$1,200'] }, 42);
+      expect(buildService.raiseBudget).toHaveBeenLastCalledWith(held, 42, 1200);
     });
 
     it('merges and resumes pull requests through the pull request service', async () => {

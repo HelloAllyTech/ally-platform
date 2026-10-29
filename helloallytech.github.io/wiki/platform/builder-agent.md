@@ -2,7 +2,7 @@
 title: Builder Agent — From a Sentence to a Merged Pull Request
 tags: [platform, builder, agent, automation, ci, release, admin, llm]
 summary: The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, the decision feed that clears what it is waiting on a person for, and why so much of its machinery is about not lying to the reader.
-last_reconciled: 2026-10-28
+last_reconciled: 2026-10-29
 ---
 
 # Builder Agent
@@ -295,9 +295,18 @@ The design target is decisions per hour of attention, and the rules follow from 
 - **One card has the keyboard.** A digit picks an option; the same digit again, or Enter,
   sends it; Enter alone sends the recommendation; `C` writes a custom answer; `S` skips.
   A click still works, but a feed cleared by mouse is a feed cleared slowly.
-- **No confirmation step.** The card already showed the trade-off; a second "are you
-  sure" taxes every decision to insure against a rare one. Refusals come back from the
-  server with their reason ("a ceiling below what was spent", "checks are not green").
+- **No confirmation step — except where an answer is hard to take back.** The card already
+  showed the trade-off; a second "are you sure" taxes every decision to insure against a
+  rare one. So an answer sends in one press, with one exception: an option the server
+  flags `confirm` — a merge, removing a budget ceiling, stopping a build — is *picked*
+  first and sent on a second press. A bare Enter on a merge card highlights the merge
+  instead of firing it, and a click picks before it sends; the card says so beside the
+  option. Everything else, including sending a pull request back to Builder, stays one
+  press. Refusals come back from the server with their reason ("a ceiling below what
+  was spent", "checks are not green").
+- **A failed read is not an empty queue.** If the feed cannot be loaded the page says it
+  could not read the queue and offers a retry; it never shows "Nothing needs you", which
+  would tell someone with a merge waiting that they are done.
 - **Order by cost of waiting and cost of deciding.** A held budget wastes a runner slot
   and takes one key; a merge is one key between finished work and production; interview
   questions are the bulk and sit in the middle; starting a build deserves a read of the

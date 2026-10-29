@@ -1206,6 +1206,8 @@ export interface BuilderDecisionOption {
   description?: string;
   /** At most one per decision; Enter answers with it. */
   recommended?: boolean;
+  /** Hard to take back: the card asks for a second press before it sends. */
+  confirm?: boolean;
 }
 
 export interface BuilderDecision {

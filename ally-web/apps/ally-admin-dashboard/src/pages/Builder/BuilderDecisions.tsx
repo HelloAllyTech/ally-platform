@@ -194,6 +194,8 @@ export const BuilderDecisions: React.FC = () => {
 
   const stats = sittingStats(openedAtRef.current, answeredAt);
   const workingCount = Object.keys(working).length;
+  // Nothing has ever loaded: "0 waiting" and "Nothing needs you" would be a guess.
+  const loadFailed = isError && !data;
 
   const renderRail = () => (
     <aside className="flex flex-col gap-2 lg:w-72 lg:shrink-0">
@@ -251,6 +253,18 @@ export const BuilderDecisions: React.FC = () => {
     </Tile>
   );
 
+  // A failed read is not an empty queue. Saying "Nothing needs you" over a failure
+  // would tell a person with a merge waiting that they are done.
+  const renderLoadFailed = () => (
+    <Tile className="flex flex-col items-start gap-2" data-testid="decisions-load-failed">
+      <p className="text-sm font-semibold text-typography-900">{strings.loadFailed}</p>
+      <p className="text-sm text-typography-600">{strings.loadFailedBody}</p>
+      <Button kind="tertiary" size="sm" onClick={() => void refetch()}>
+        {strings.retry}
+      </Button>
+    </Tile>
+  );
+
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col overflow-y-auto md:p-6">
       <header className="mb-4">
@@ -294,7 +308,7 @@ export const BuilderDecisions: React.FC = () => {
             </button>
           ))}
           <span className="ml-auto text-xs text-typography-500">
-            {strings.waiting(allDecisions.length)}
+            {!loadFailed && strings.waiting(allDecisions.length)}
             {workingCount > 0 && ` · ${strings.working(workingCount)}`}
           </span>
         </div>
@@ -317,6 +331,8 @@ export const BuilderDecisions: React.FC = () => {
 
       {isLoading ? (
         <SkeletonText paragraph lineCount={6} />
+      ) : loadFailed ? (
+        renderLoadFailed()
       ) : !active ? (
         renderEmpty()
       ) : (

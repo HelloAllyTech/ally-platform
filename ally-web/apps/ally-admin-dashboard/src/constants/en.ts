@@ -4241,6 +4241,9 @@ export const en = {
         "Every build is either working or done. Start one from mission control, or come back when I ask.",
       emptyFiltered: "Nothing in this group. Try another filter.",
       loadFailed: "Couldn't load the decision feed.",
+      // A failed read is not an empty queue; the page says so instead of "Nothing needs you".
+      loadFailedBody: "That doesn't mean nothing is waiting — I just couldn't read the queue.",
+      retry: "Try again",
       answerFailed: "Couldn't send that answer.",
       // What happened to the answer, as a toast. Keyed by the server's outcome.
       answered: {
@@ -4300,6 +4303,9 @@ export const en = {
         hideContext: "Show less",
         recommended: "Recommended",
         pressEnter: "Enter",
+        pressEnterTwice: "Enter twice",
+        hardToUndo: "Hard to undo — takes a second press.",
+        confirmPicked: "Press Enter, or click again, to confirm.",
         custom: "Your own answer",
         customPlaceholder: "Your own answer…",
         customHint: "C to write · Enter to send",
@@ -4316,7 +4322,7 @@ export const en = {
         toggle: "Shortcuts",
         title: "Keyboard",
         pick: "1–9  pick an option; press it again to send",
-        enter: "Enter  send the pick, or the recommendation",
+        enter: "Enter  send the pick, or the recommendation (hard-to-undo ones need Enter twice)",
         custom: "C  write your own answer",
         skip: "S  skip to the next card",
         move: "J / K  next and previous card",

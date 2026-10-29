@@ -56,6 +56,13 @@ export interface BuilderDecisionOption {
   description?: string;
   /** At most one per decision; the feed answers it on Enter. */
   recommended?: boolean;
+  /**
+   * Hard to take back — a merge, an uncapped budget, a stopped build. The feed
+   * clears every other option in one press, but asks for a second, deliberate
+   * one here: Enter never fires a flagged recommendation unprompted, and a
+   * click picks before it sends.
+   */
+  confirm?: boolean;
 }
 
 export interface BuilderDecision {

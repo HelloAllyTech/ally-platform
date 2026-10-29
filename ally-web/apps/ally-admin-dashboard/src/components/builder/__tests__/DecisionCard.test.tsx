@@ -128,6 +128,56 @@ describe("DecisionCard", () => {
     expect(onAnswer).toHaveBeenCalledWith({ selectedOptionIds: ["fri"] });
   });
 
+  describe("an option that is hard to undo", () => {
+    const mergeCard = {
+      id: "pr_merge:s2:pr1",
+      kind: "pr_merge" as const,
+      category: "issue" as const,
+      prompt: "Merge ally-be #12?",
+      allowCustom: false,
+      options: [{ id: "merge", label: "Merge", recommended: true, confirm: true }],
+    };
+
+    it("picks on the first click and sends on the second", () => {
+      const { onAnswer } = renderCard(mergeCard);
+
+      fireEvent.click(screen.getByText("Merge"));
+      expect(onAnswer).not.toHaveBeenCalled();
+      expect(screen.getByText("Press Enter, or click again, to confirm.")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("Merge"));
+      expect(onAnswer).toHaveBeenCalledWith({ selectedOptionIds: ["merge"] });
+    });
+
+    it("does not send its recommendation on a bare Enter — Enter picks, Enter again sends", () => {
+      const { onAnswer } = renderCard(mergeCard);
+
+      expect(screen.getByText(/Enter twice/)).toBeInTheDocument();
+      expect(screen.getByText("Hard to undo — takes a second press.")).toBeInTheDocument();
+
+      fireEvent.keyDown(window, { key: "Enter" });
+      expect(onAnswer).not.toHaveBeenCalled();
+      expect(screen.getByText("Merge").closest("button")).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.keyDown(window, { key: "Enter" });
+      expect(onAnswer).toHaveBeenCalledWith({ selectedOptionIds: ["merge"] });
+    });
+
+    it("leaves a one-press option on the same card one press", () => {
+      const { onAnswer } = renderCard({
+        ...mergeCard,
+        options: [
+          { id: "resume", label: "Send it back", recommended: true },
+          { id: "merge", label: "Merge it as it is", confirm: true },
+        ],
+      });
+
+      fireEvent.keyDown(window, { key: "Enter" });
+
+      expect(onAnswer).toHaveBeenCalledWith({ selectedOptionIds: ["resume"] });
+    });
+  });
+
   it("sends a custom answer from the textarea on Enter, and ignores shortcuts while typing", () => {
     const { onAnswer } = renderCard();
     const textarea = screen.getByLabelText("Your own answer");

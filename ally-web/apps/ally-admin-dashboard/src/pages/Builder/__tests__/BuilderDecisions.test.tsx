@@ -191,4 +191,25 @@ describe("BuilderDecisions", () => {
 
     expect(toastError).toHaveBeenCalledWith("Couldn't load the decision feed.");
   });
+
+  it("does not read a failed load as an empty queue, and offers a retry", () => {
+    feed = { data: undefined, isLoading: false, isError: true };
+    render(<BuilderDecisions />);
+
+    expect(screen.queryByText("Nothing needs you")).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 waiting/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Couldn't load the decision feed.").length).toBeGreaterThan(0);
+    expect(screen.getByText(/couldn't read the queue/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Try again"));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it("keeps showing the queue when a later poll fails", () => {
+    feed = { data: { decisions: twoDecisions(), count: 2 }, isLoading: false, isError: true };
+    render(<BuilderDecisions />);
+
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(screen.queryByText("Try again")).not.toBeInTheDocument();
+  });
 });
