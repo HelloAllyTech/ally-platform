@@ -9,10 +9,12 @@ import { CalibrationTab } from "./CalibrationTab";
 import { ImproverTab } from "./ImproverTab";
 import { OrganisationsTab } from "./OrganisationsTab";
 import { ReleasesTab } from "./ReleasesTab";
+import { ReviewTab } from "./ReviewTab";
 import { RunsTab } from "./RunsTab";
 
 export enum DebriefConsoleTab {
   RUNS = "runs",
+  REVIEW = "review",
   IMPROVER = "improver",
   RELEASES = "releases",
   ORGANISATIONS = "organisations",
@@ -21,6 +23,7 @@ export enum DebriefConsoleTab {
 
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RUNS]: RunsTab,
+  [DebriefConsoleTab.REVIEW]: ReviewTab,
   [DebriefConsoleTab.IMPROVER]: ImproverTab,
   [DebriefConsoleTab.RELEASES]: ReleasesTab,
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,

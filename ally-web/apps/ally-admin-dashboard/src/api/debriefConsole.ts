@@ -4,6 +4,7 @@ import {
   DebriefReleaseRow,
   DebriefRunDetail,
   DebriefRunRow,
+  DebriefReviewQueue,
   DebriefRunStatus,
   DebriefTenantRow,
   ImproverState,
@@ -97,6 +98,32 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getDebriefReview: builder.query<DebriefReviewQueue, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.REVIEW, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    actOnDebriefRun: builder.mutation<
+      unknown,
+      { id: string; action: "publish" | "todays-debrief" | "reviewed"; reason?: string }
+    >({
+      query: ({ id, action, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.RUN_ACTION(id, action),
+        method: HttpMethod.POST,
+        body: reason ? { reason } : {},
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    resolveDebriefFlag: builder.mutation<
+      unknown,
+      { id: string; outcome: "kept" | "removed"; note?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.RESOLVE_FLAG(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
   }),
 });
 
@@ -113,4 +140,7 @@ export const {
   useBuildDebriefTestSetsMutation,
   useGetDebriefTenantsQuery,
   useSetDebriefTenantLiveMutation,
+  useGetDebriefReviewQuery,
+  useActOnDebriefRunMutation,
+  useResolveDebriefFlagMutation,
 } = debriefConsoleAPI;

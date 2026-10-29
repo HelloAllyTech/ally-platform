@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
   rollback: vi.fn(),
   setLive: vi.fn(),
   build: vi.fn(),
+  review: vi.fn(),
+  act: vi.fn(),
+  resolve: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -48,6 +51,9 @@ vi.mock("@api", async importOriginal => ({
   useRollbackDebriefReleaseMutation: () => [h.rollback, { isLoading: false }],
   useSetDebriefTenantLiveMutation: () => [h.setLive, { isLoading: false }],
   useBuildDebriefTestSetsMutation: () => [h.build, { isLoading: false }],
+  useGetDebriefReviewQuery: () => h.review(),
+  useActOnDebriefRunMutation: () => [h.act, { isLoading: false }],
+  useResolveDebriefFlagMutation: () => [h.resolve, { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -56,6 +62,8 @@ import { ImproverTab } from "../ImproverTab";
 import { OrganisationsTab } from "../OrganisationsTab";
 // eslint-disable-next-line import/first
 import { ReleasesTab } from "../ReleasesTab";
+// eslint-disable-next-line import/first
+import { ReviewTab } from "../ReviewTab";
 // eslint-disable-next-line import/first
 import { RunsTab } from "../RunsTab";
 
@@ -231,7 +239,34 @@ describe("Debrief Console tabs", () => {
       ]),
     );
     h.tenants.mockReturnValue(ok([{ id: "t1", name: "Sangath", live: false, isTest: false }]));
-    [h.decide, h.rollback, h.setLive, h.screen, h.build].forEach(f =>
+    h.review.mockReturnValue(
+      ok({
+        runs: [
+          {
+            ...RUN_ROW,
+            evaluatorOverall: "4.00",
+            evaluatorHardFails: [{ code: "missed_risk_cue", evidence: "turn 15" }],
+            checkFailures: [],
+          },
+        ],
+        flags: [
+          {
+            id: "flag-1",
+            runId: RUN_ROW.id,
+            scenarioSessionId: RUN_ROW.scenarioSessionId,
+            section: "work_on_this[0]",
+            reason: "advice_doesnt_fit",
+            note: "My supervisor says otherwise.",
+            urgent: false,
+            createdAt: "2026-10-29T10:00:00Z",
+            language: "en",
+            tenantName: "Ally",
+            cardText: "Ask about safety directly.",
+          },
+        ],
+      }),
+    );
+    [h.decide, h.rollback, h.setLive, h.screen, h.build, h.act, h.resolve].forEach(f =>
       f.mockReturnValue(resolves()),
     );
     h.runImprover.mockReturnValue(resolves({ report: "r", ideas: [] }));
@@ -336,5 +371,25 @@ describe("Debrief Console tabs", () => {
     const dialogButtons = screen.getAllByRole("button", { name: "Switch on" });
     fireEvent.click(dialogButtons[dialogButtons.length - 1]);
     await waitFor(() => expect(h.setLive).toHaveBeenCalledWith({ tenantId: "t1", live: true }));
+  });
+
+  it("Review: a debrief waiting for a person can be published after confirming", async () => {
+    render(<ReviewTab />);
+    const run = screen.getByTestId("review-run");
+    expect(run).toHaveTextContent("missed_risk_cue");
+    fireEvent.click(within(run).getByRole("button", { name: "Publish as it is" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: RUN_ROW.id, action: "publish" }));
+  });
+
+  it("Review: keeping a flagged point needs a reason; removing does not", async () => {
+    render(<ReviewTab />);
+    const flag = screen.getByTestId("review-flag");
+    expect(flag).toHaveTextContent("My supervisor says otherwise.");
+    expect(within(flag).getByRole("button", { name: "Keep it" })).toBeDisabled();
+    fireEvent.click(within(flag).getByRole("button", { name: "Remove it" }));
+    await waitFor(() =>
+      expect(h.resolve).toHaveBeenCalledWith({ id: "flag-1", outcome: "removed", note: undefined }),
+    );
   });
 });

@@ -451,6 +451,10 @@ export const ApiEndpoints = {
     TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
     TENANTS: "/v1/debriefs/console/tenants",
     TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
+    REVIEW: "/v1/debriefs/console/review",
+    RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
+      `/v1/debriefs/console/runs/${id}/${action}`,
+    RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
   },
   DEBRIEF_CALIBRATION: {
     SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",

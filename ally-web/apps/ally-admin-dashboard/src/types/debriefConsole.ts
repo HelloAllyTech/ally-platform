@@ -122,6 +122,7 @@ export interface DebriefCardsData {
     handled_well: boolean;
     lead: string;
     body: string;
+    others?: Array<{ turn_index: number; quote: string; note: string }>;
   } | null;
   what_worked: Array<{
     skill: string;
@@ -214,4 +215,39 @@ export interface DebriefTenantRow {
   name: string;
   live: boolean;
   isTest: boolean;
+}
+
+export interface DebriefReviewRun {
+  id: string;
+  scenarioSessionId: string;
+  status: DebriefRunStatus;
+  skipReason: string | null;
+  language: string | null;
+  hasRiskCue: boolean;
+  learnerDistress: boolean;
+  evaluatorOverall: string | null;
+  judgeOverall: number | null;
+  checkFailures: Array<{ code: string; section: string; detail: string }>;
+  evaluatorHardFails: Array<{ code: string; evidence: string }>;
+  createdAt: string;
+  tenantName: string | null;
+}
+
+export interface DebriefReviewFlag {
+  id: string;
+  runId: string;
+  scenarioSessionId: string;
+  section: string;
+  reason: "didnt_say" | "described_wrongly" | "advice_doesnt_fit" | "something_else";
+  note: string | null;
+  urgent: boolean;
+  createdAt: string;
+  language: string | null;
+  tenantName: string | null;
+  cardText: string | null;
+}
+
+export interface DebriefReviewQueue {
+  runs: DebriefReviewRun[];
+  flags: DebriefReviewFlag[];
 }

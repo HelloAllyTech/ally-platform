@@ -30,6 +30,11 @@ const Cards: React.FC<{ cards: DebriefCardsData }> = ({ cards }) => {
             “{cards.important_moment.quote}” (turn {cards.important_moment.turn_index})
           </p>
           <p>{cards.important_moment.body}</p>
+          {(cards.important_moment.others ?? []).map(o => (
+            <p key={o.turn_index} className="pl-3">
+              <span className="italic">“{o.quote}”</span> (turn {o.turn_index}) {o.note}
+            </p>
+          ))}
         </div>
       )}
       {cards.what_worked.length > 0 && (
