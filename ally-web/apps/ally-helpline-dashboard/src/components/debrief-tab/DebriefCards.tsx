@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 
 import { DebriefCardsData, DebriefSkillWord, LearnerDebriefView } from "@types";
 
+import { CardFlag, DebriefHelpful } from "./DebriefCardFeedback";
+
 /** 'hi-IN' → 'hi'; anything unusable → undefined (inherit the page's lang). */
 export const toLangAttribute = (language?: string | null): string | undefined => {
   const base = language?.trim().split(/[-_]/)[0]?.toLowerCase();
@@ -68,9 +70,34 @@ const Lead: FC<{ children: ReactNode }> = ({ children }) => (
   <h4 className="font-primary text-sm font-semibold text-typography-900">{children}</h4>
 );
 
-const ReadyCards: FC<{ cards: DebriefCardsData }> = ({ cards }) => {
+const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessionId: string }> = ({
+  cards,
+  view,
+  sessionId,
+}) => {
   const { t } = useTranslation();
-  const moment = cards.important_moment;
+  const corrections = view.corrections ?? [];
+  // Sections keep their stored index, the one a flag and a correction name.
+  const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
+  const flagFor = (section: string) => view.feedback?.flags.find(f => f.section === section);
+  const correctionFor = (section: string) => corrections.find(c => c.section === section);
+  const flagControl = (section: string, cardLabel: string) => (
+    <CardFlag
+      sessionId={sessionId}
+      section={section}
+      cardLabel={cardLabel}
+      flag={flagFor(section)}
+      correction={correctionFor(section)}
+    />
+  );
+  const moment = removed.has("important_moment") ? null : cards.important_moment;
+  const worked = cards.what_worked
+    .map((item, index) => ({ item, index }))
+    .filter(({ index }) => !removed.has(`what_worked[${index}]`));
+  const growth = cards.work_on_this
+    .map((item, index) => ({ item, index }))
+    .filter(({ index }) => !removed.has(`work_on_this[${index}]`));
+  const practise = removed.has("practise_next") ? null : cards.practise_next;
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,7 +112,21 @@ const ReadyCards: FC<{ cards: DebriefCardsData }> = ({ cards }) => {
             <Lead>{moment.lead}</Lead>
             <Quote text={moment.quote} />
             <Body>{moment.body}</Body>
+            {!!moment.others?.length && (
+              <div className="flex flex-col gap-2">
+                <Lead>{t("postSim.debriefCards.importantMoment.others")}</Lead>
+                <ul className="flex flex-col gap-2" data-testid="debrief-other-moments">
+                  {moment.others.map(other => (
+                    <li key={other.turn_index} className="flex flex-col gap-1">
+                      <Quote text={other.quote} />
+                      <Body>{other.note}</Body>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <Body>{t("postSim.debriefCards.importantMoment.support")}</Body>
+            {flagControl("important_moment", t("postSim.debriefCards.importantMoment.title"))}
           </Card>
         </ul>
       )}
@@ -98,32 +139,33 @@ const ReadyCards: FC<{ cards: DebriefCardsData }> = ({ cards }) => {
       </p>
 
       <ul className="flex flex-col gap-4">
-        {cards.what_worked.length > 0 && (
+        {worked.length > 0 && (
           <Card
             testId="debrief-card-what-worked"
             title={t("postSim.debriefCards.whatWorked")}
             icon={<ThumbsUp aria-hidden="true" className="h-5 w-5 text-success-600" />}
           >
             <ul className="flex flex-col gap-4">
-              {cards.what_worked.map((item, index) => (
+              {worked.map(({ item, index }) => (
                 <li key={`${item.turn_index}-${index}`} className="flex flex-col gap-2">
                   <Lead>{item.lead}</Lead>
                   <Quote text={item.quote} />
                   <Body>{item.body}</Body>
+                  {flagControl(`what_worked[${index}]`, item.lead)}
                 </li>
               ))}
             </ul>
           </Card>
         )}
 
-        {cards.work_on_this.length > 0 && (
+        {growth.length > 0 && (
           <Card
             testId="debrief-card-work-on-this"
             title={t("postSim.debriefCards.workOnThis")}
             icon={<Target aria-hidden="true" className="h-5 w-5 text-warning-700" />}
           >
             <ul className="flex flex-col gap-4">
-              {cards.work_on_this.map((item, index) => (
+              {growth.map(({ item, index }) => (
                 <li key={`${item.turn_index}-${index}`} className="flex flex-col gap-2">
                   <Lead>{item.lead}</Lead>
                   <Quote text={item.quote} />
@@ -143,20 +185,22 @@ const ReadyCards: FC<{ cards: DebriefCardsData }> = ({ cards }) => {
                       {item.try_saying}
                     </span>
                   </p>
+                  {flagControl(`work_on_this[${index}]`, item.lead)}
                 </li>
               ))}
             </ul>
           </Card>
         )}
 
-        {cards.practise_next && (
+        {practise && (
           <Card
             testId="debrief-card-practise-next"
             title={t("postSim.debriefCards.practiseNext")}
             icon={<Sprout aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
-            <Lead>{cards.practise_next.skill}</Lead>
-            <Body>{cards.practise_next.reason}</Body>
+            <Lead>{practise.skill}</Lead>
+            <Body>{practise.reason}</Body>
+            {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
           </Card>
         )}
 
@@ -201,12 +245,19 @@ const ReadyCards: FC<{ cards: DebriefCardsData }> = ({ cards }) => {
           <Body>{cards.reflective_question}</Body>
         </Card>
       </ul>
+      {removed.size > 0 && (
+        <p data-testid="debrief-removed-note" className="font-primary text-xs text-typography-700">
+          {t("postSim.debriefCards.corrections.removed")}
+        </p>
+      )}
+      <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
     </div>
   );
 };
 
 interface DebriefCardsProps {
   view: LearnerDebriefView;
+  sessionId: string;
 }
 
 /**
@@ -217,7 +268,7 @@ interface DebriefCardsProps {
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
  */
-export const DebriefCards: FC<DebriefCardsProps> = ({ view }) => {
+export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId }) => {
   const { t } = useTranslation();
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
 
@@ -249,7 +300,7 @@ export const DebriefCards: FC<DebriefCardsProps> = ({ view }) => {
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
   } else if (view.state === "ready" && view.cards) {
-    content = <ReadyCards cards={view.cards} />;
+    content = <ReadyCards cards={view.cards} view={view} sessionId={sessionId} />;
   }
 
   return (

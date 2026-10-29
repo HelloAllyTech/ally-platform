@@ -872,7 +872,8 @@
       "aiLabel": "Written by Ally (AI)",
       "importantMoment": {
         "title": "An important moment",
-        "support": "Moments like this are hard. If this session brought something up for you, you can talk to your supervisor."
+        "support": "Moments like this are hard. If this session brought something up for you, you can talk to your supervisor.",
+        "others": "Other moments like this"
       },
       "whatWorked": "What worked",
       "workOnThis": "Work on this",
@@ -891,7 +892,36 @@
         "defaultStep": "Reading your session…"
       },
       "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.",
-      "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one."
+      "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one.",
+      "flag": {
+        "open": "This isn't right",
+        "openLabel": "This isn't right: {{card}}",
+        "question": "What's not right?",
+        "reasons": {
+          "didnt_say": "I didn't say this",
+          "described_wrongly": "This moment is described wrongly",
+          "advice_doesnt_fit": "This advice doesn't fit",
+          "something_else": "Something else"
+        },
+        "noteLabel": "Anything else to add? (optional)",
+        "send": "Send",
+        "sending": "Sending…",
+        "cancel": "Cancel",
+        "sent": "Thanks. Someone from the Ally team will look at this.",
+        "undo": "Undo",
+        "waiting": "Sent to the Ally team",
+        "failed": "That didn't send. Try again."
+      },
+      "corrections": {
+        "kept": "Reviewed: the Ally team kept this point. {{note}}",
+        "removed": "A point was removed after a review by the Ally team."
+      },
+      "helpful": {
+        "question": "Was this helpful?",
+        "yes": "Yes",
+        "no": "No",
+        "thanks": "Thanks for telling us."
+      }
     }
   },
   "review": {

@@ -219,6 +219,10 @@ export const ApiEndpoints = {
   DEBRIEFS: {
     // The Debrief agent's debrief for one of the caller's own sessions.
     GET_LEARNER_DEBRIEF: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}`,
+    HELPFUL: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/helpful`,
+    FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
+    FLAG: (sessionId: string, flagId: string) =>
+      `/v1/debriefs/sessions/${sessionId}/flags/${flagId}`,
   },
   PRACTICE_STREAK: {
     GET_PRACTICE_STREAK: "/v1/community/practice-streak",

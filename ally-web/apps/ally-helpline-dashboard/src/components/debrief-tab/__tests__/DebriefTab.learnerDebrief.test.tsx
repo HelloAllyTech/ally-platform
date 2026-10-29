@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { DebriefTab } from "../DebriefTab";
@@ -11,6 +11,7 @@ import { DebriefTab } from "../DebriefTab";
  */
 
 const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
+const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -24,6 +25,9 @@ vi.mock("react-redux", () => ({
 vi.mock("@api", () => ({
   useGetChatHistoryQuery: () => ({ data: undefined, isLoading: false }),
   useGetLearnerDebriefQuery: (...args: unknown[]) => mockLearnerDebriefQuery(...args),
+  useSetDebriefHelpfulMutation: () => [mockMutations.helpful, { isLoading: false }],
+  useFlagDebriefCardMutation: () => [mockMutations.flag, { isLoading: false }],
+  useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   LEARNER_DEBRIEF_POLL_MS: 5000,
 }));
 
@@ -240,5 +244,111 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
     expect(screen.getByText(key)).toBeInTheDocument();
     expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
+  });
+
+  describe("feedback and review outcomes", () => {
+    const ready = (extra: Record<string, unknown> = {}) =>
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", runId: "r1", cards: CARDS, language: "en", ...extra },
+        isLoading: false,
+        isError: false,
+      });
+
+    beforeEach(() => {
+      Object.values(mockMutations).forEach(m =>
+        m.mockReturnValue({ unwrap: () => Promise.resolve({}) }),
+      );
+    });
+
+    it("lists every other risk moment under the important moment", () => {
+      ready({
+        cards: {
+          ...CARDS,
+          important_moment: {
+            ...CARDS.important_moment,
+            others: [
+              { turn_index: 9, quote: "Nobody would notice.", note: "You moved on quickly." },
+            ],
+          },
+        },
+      });
+      renderTab();
+      expect(screen.getByTestId("debrief-other-moments")).toHaveTextContent("Nobody would notice.");
+    });
+
+    it("sends a flag on one card with a reason, and offers Undo while it can", async () => {
+      ready();
+      renderTab();
+      const growth = screen.getByTestId("debrief-card-work-on-this");
+      fireEvent.click(
+        within(growth).getByRole("button", { name: "postSim.debriefCards.flag.openLabel" }),
+      );
+      const send = screen.getByRole("button", { name: "postSim.debriefCards.flag.send" });
+      expect(send).toBeDisabled();
+      fireEvent.click(screen.getByLabelText("postSim.debriefCards.flag.reasons.advice_doesnt_fit"));
+      fireEvent.click(send);
+      await waitFor(() =>
+        expect(mockMutations.flag).toHaveBeenCalledWith({
+          sessionId: "s-1",
+          section: "work_on_this[0]",
+          reason: "advice_doesnt_fit",
+          note: undefined,
+        }),
+      );
+    });
+
+    it("an open flag shows Undo inside the window, then the waiting line", () => {
+      const until = new Date(Date.now() + 60_000).toISOString();
+      ready({
+        feedback: {
+          helpful: null,
+          flags: [{ id: "f1", section: "what_worked[0]", status: "open", canUndoUntil: until }],
+        },
+      });
+      renderTab();
+      const worked = screen.getByTestId("debrief-card-what-worked");
+      fireEvent.click(
+        within(worked).getByRole("button", { name: "postSim.debriefCards.flag.undo" }),
+      );
+      expect(mockMutations.undo).toHaveBeenCalledWith({ sessionId: "s-1", flagId: "f1" });
+    });
+
+    it("hides a removed card by its stored index and says a point was removed", () => {
+      ready({
+        corrections: [{ section: "work_on_this[0]", outcome: "removed", note: null, at: "" }],
+      });
+      renderTab();
+      expect(screen.queryByTestId("debrief-card-work-on-this")).toBeNull();
+      expect(screen.getByTestId("debrief-removed-note")).toBeInTheDocument();
+    });
+
+    it("shows the reviewer's reason on a card the Ally team kept", () => {
+      ready({
+        corrections: [
+          { section: "what_worked[0]", outcome: "kept", note: "It is in turn 3.", at: "" },
+        ],
+        feedback: {
+          helpful: null,
+          flags: [{ id: "f1", section: "what_worked[0]", status: "kept", canUndoUntil: null }],
+        },
+      });
+      renderTab();
+      expect(screen.getByTestId("debrief-correction")).toHaveTextContent(
+        "postSim.debriefCards.corrections.kept",
+      );
+    });
+
+    it("asks whether it was helpful and records the answer", () => {
+      ready({ feedback: { helpful: true, flags: [] } });
+      renderTab();
+      const helpful = screen.getByTestId("debrief-helpful");
+      expect(
+        within(helpful).getByRole("button", { name: "postSim.debriefCards.helpful.yes" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(
+        within(helpful).getByRole("button", { name: "postSim.debriefCards.helpful.no" }),
+      );
+      expect(mockMutations.helpful).toHaveBeenCalledWith({ sessionId: "s-1", helpful: false });
+    });
   });
 });

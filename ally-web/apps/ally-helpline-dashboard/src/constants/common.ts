@@ -115,6 +115,7 @@ export enum LoginSection {
 
 export const TAG_TYPES = {
   CALL_SUMMARY: "CallSummary",
+  LEARNER_DEBRIEF: "LearnerDebrief",
   NOTIFICATIONS: "Notifications",
   UNREAD_NOTIFICATION_COUNT: "UnreadNotificationCount",
   CALL_LOGS: "CallLogs",

@@ -118,7 +118,7 @@ export const DebriefTab: FC<DebriefTabProps> = ({
   // organisation is switched on. `null` — not switched on, request failed,
   // or still loading — keeps today's debrief exactly as it was.
   const learnerDebrief = useLearnerDebrief(sessionId);
-  if (learnerDebrief) return <DebriefCards view={learnerDebrief} />;
+  if (learnerDebrief) return <DebriefCards view={learnerDebrief} sessionId={sessionId} />;
 
   const summary = summaryData?.details?.summary;
   const note = summary?.feedback?.supervisorNote;
