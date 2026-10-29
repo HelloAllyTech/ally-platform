@@ -40,6 +40,7 @@ export * from "./characterInterview";
 export * from "./cohorts";
 export * from "./helplineAdmin";
 export * from "./skillExperiments";
+export * from "./debriefCalibration";
 export * from "./publicRoadmap";
 export * from "./courseCopilot";
 export * from "./allyGuide";

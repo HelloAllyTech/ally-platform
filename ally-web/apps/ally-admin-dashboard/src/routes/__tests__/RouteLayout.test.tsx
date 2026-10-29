@@ -68,6 +68,7 @@ vi.mock("@pages", () => ({
   TranslationManagement: () => <div>TranslationManagementPage</div>,
   TooltipManagement: () => <div>TooltipManagementPage</div>,
   AgentTestCases: () => <div>AgentTestCasesPage</div>,
+  DebriefConsole: () => <div>DebriefConsolePage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
   RoleplaySessionLogs: () => <div>RoleplaySessionLogsPage</div>,
   RoleplaySessionLogDetail: () => <div>RoleplaySessionLogDetailPage</div>,

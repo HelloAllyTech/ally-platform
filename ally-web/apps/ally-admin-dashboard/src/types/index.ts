@@ -40,6 +40,7 @@ export * from "./cohorts";
 export * from "./internalMonologue";
 export * from "./helpline";
 export * from "./skillExperiments";
+export * from "./debriefCalibration";
 export * from "./courseCopilot";
 export * from "./agentChat";
 export * from "./allyGuide";

@@ -115,6 +115,11 @@ const buildNavigationItems = (): NavigationItem[] => [
     path: ROUTES.ANALYTICS,
   },
   {
+    id: SIDEBAR_ITEMS.DEBRIEFS,
+    label: "Debriefs",
+    path: ROUTES.DEBRIEFS,
+  },
+  {
     id: SIDEBAR_ITEMS.AGENT_TEST_CASES,
     label: "Agent Test Cases",
     path: ROUTES.AGENT_TEST_CASES,

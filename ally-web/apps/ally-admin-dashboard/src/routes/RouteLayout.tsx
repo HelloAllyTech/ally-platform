@@ -51,6 +51,7 @@ import {
   CourseCopilotSessions,
   AgentTestCases,
   Competencies,
+  DebriefConsole,
   RoleplaySessionLogs,
   RoleplaySessionLogDetail,
   Terms,
@@ -623,6 +624,14 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
               <WhatsAppBot />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.DEBRIEFS}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+              <DebriefConsole />
             </PrivateLayout>
           }
         />

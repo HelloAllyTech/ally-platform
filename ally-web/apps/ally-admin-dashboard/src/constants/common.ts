@@ -437,6 +437,11 @@ export const ApiEndpoints = {
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
   },
+  DEBRIEF_CALIBRATION: {
+    SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
+    AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
+    ITEM: (sessionId: string) => `/v1/analytics/debrief-quality/calibration/${sessionId}`,
+  },
   SKILL_EXPERIMENTS: {
     LIST: "/v1/skill-experiments",
     BY_PROMPT: (promptId: string) => `/v1/skill-experiments/${promptId}`,
@@ -908,6 +913,7 @@ export const ROUTES = {
   MANAGE_LLM_CONFIGS: "/manage-llm-configs",
   MANAGE_LLM_MODEL_CATALOG: "/manage-llm-model-catalog",
   AI_TASKS: "/ai-tasks",
+  DEBRIEFS: "/debriefs",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
   MANAGE_LANGUAGE_GLOSSARY: (id: string | number) => `/manage-scenario-languages/${id}/glossary`,
   MANAGE_PROMPTS: "/manage-prompts",
@@ -1196,6 +1202,7 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on Skills Store). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
+  DEBRIEF_CALIBRATION: "debriefCalibration",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

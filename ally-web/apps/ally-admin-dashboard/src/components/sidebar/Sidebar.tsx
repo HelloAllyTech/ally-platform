@@ -26,6 +26,7 @@ import {
   Languages,
   List,
   Mobile,
+  Report,
   Search,
   Settings,
   SkillLevel,
@@ -285,6 +286,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Bullhorn size={20} />;
       case SIDEBAR_ITEMS.ANALYTICS:
         return <BarChart3 size={20} />;
+      case SIDEBAR_ITEMS.DEBRIEFS:
+        return <Report size={20} />;
       case SIDEBAR_ITEMS.AGENT_TEST_CASES:
         return <Flag size={20} />;
       case SIDEBAR_ITEMS.COMPETENCIES:
@@ -372,6 +375,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return location.pathname.includes(ROUTES.MANAGE_LLM_MODEL_CATALOG);
       case ROUTES.AI_TASKS:
         return location.pathname.includes(ROUTES.AI_TASKS);
+      case ROUTES.DEBRIEFS:
+        return location.pathname.includes(ROUTES.DEBRIEFS);
       case ROUTES.MANAGE_PROMPTS:
         return location.pathname.includes(ROUTES.MANAGE_PROMPTS);
       case ROUTES.MANAGE_GUARDRAILS:

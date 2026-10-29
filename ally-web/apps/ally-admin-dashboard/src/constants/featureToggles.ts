@@ -134,6 +134,7 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
+    [sidebarItems.DEBRIEFS, FeatureToggleKey.ANALYTICS],
     [sidebarItems.COMPETENCIES, FeatureToggleKey.COMPETENCIES],
     [sidebarItems.AI_LAB, FeatureToggleKey.AI_LAB],
     [sidebarItems.ROLEPLAY_SESSION_LOGS, FeatureToggleKey.ROLEPLAY_SESSION_LOGS],

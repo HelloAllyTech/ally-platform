@@ -64,6 +64,7 @@ import {
   Filter as CFilter,
   FaceSatisfied as CFaceSatisfied,
   Flag as CFlag,
+  Report as CReport,
   Flash as CFlash,
   FlowConnection as CFlowConnection,
   Globe as CGlobe,
@@ -283,6 +284,7 @@ export const HelpIcon = createCarbonIcon(CHelp);
 export const Languages = createCarbonIcon(CTranslate);
 export const Settings = createCarbonIcon(CSettings);
 export const Flag = createCarbonIcon(CFlag);
+export const Report = createCarbonIcon(CReport);
 export const SkillLevel = createCarbonIcon(CSkillLevel);
 export const Bold = createCarbonIcon(CTextBold);
 export const Italic = createCarbonIcon(CTextItalic);
