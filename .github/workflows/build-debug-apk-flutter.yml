@@ -1,0 +1,111 @@
+name: Build debug APK (Flutter)
+#
+# Manual-only test build — NOT a release pipeline. Produces a debug APK
+# (no signing config needed) for sideloading onto a real Android device to
+# validate Phase 1's actual fix: whether the foreground-service + Socket.IO
+# transport layer survives the app being backgrounded/screen-locked, which
+# is the entire reason this Flutter rewrite exists. See
+# ally-mobile-flutter/docs for the full phase plan.
+#
+# This app's package name (com.helloally.ally_mobile_flutter) is completely
+# distinct from the real production app (com.helloally.app) — installing
+# this build never touches, overwrites, or interacts with the real app, and
+# this workflow never publishes anywhere (no Play Store, no App Store,
+# nothing — it's a local artifact download only).
+
+defaults:
+  run:
+    working-directory: ally-mobile-flutter
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Third attempt ran for 40+ minutes with no completion and had to be
+    # manually cancelled — GitHub's API doesn't expose live logs for an
+    # in-progress job, so there was no way to tell genuine (if slow) native
+    # compilation from an actual hang. Bounding this so a repeat fails fast
+    # with a clear timeout instead of silently consuming CI minutes for
+    # hours (the default job timeout is 360 minutes).
+    #
+    # Raised from 25 to 40 after the 2026-10-27 run: verbose Gradle output
+    # showed assembleDebug genuinely still progressing (not hung) when the
+    # 25-minute budget killed it with SIGTERM (exit 143) at the 11-minute
+    # mark of that single task. The test suite has also grown substantially
+    # this session (960 -> 1008 tests) and alone now takes ~9 minutes, which
+    # the original 25-minute budget didn't leave enough room for on top of
+    # setup/disk-cleanup/analyze/test plus a cold native LiveKit/WebRTC
+    # compile. 40 minutes keeps the same "fail fast on a real hang" intent
+    # while giving a legitimately slow (not stuck) build enough headroom.
+    timeout-minutes: 40
+    steps:
+      # The second build attempt failed with "No space left on device" —
+      # LiveKit/flutter_webrtc's per-ABI native libraries plus the Android
+      # NDK exhaust ubuntu-latest's default free disk space. This well-known
+      # community action removes large pre-installed toolchains (.NET,
+      # Haskell, CodeQL, Docker images, etc.) this build never uses, buying
+      # back several GB before Gradle even starts.
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          # This action defaults to also removing the Android SDK (most of
+          # its users aren't building Android apps) — explicitly false here
+          # since this build needs it. Everything else freed is safe: none
+          # of it is something a Flutter/Android build touches.
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+          tool-cache: true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build debug APK
+        run: |
+          # Single-ABI build: this is for sideloading onto one real test
+          # phone, not a store release, and LiveKit/flutter_webrtc's native
+          # libraries are the actual reason earlier attempts ran out of
+          # disk — building all ABIs multiplies that several times over
+          # for no benefit here. arm64 covers virtually every Android phone
+          # from 2017 onward.
+          #
+          # --verbose: the third attempt gave no signal for 40+ minutes
+          # before being cancelled, and GitHub's API doesn't expose partial
+          # logs for an in-progress job — verbose Gradle/task-level output
+          # is the only way to tell real (if slow) progress from an actual
+          # hang if this happens again.
+          # --flavor dev: the test identity (pubspec's default-flavor too);
+          # see ally-mobile-flutter/docs/RELEASE.md.
+          flutter build apk --debug --flavor dev --target-platform android-arm64 --verbose \
+            --dart-define=API_BASE_URL=https://api.helloally.dev \
+            --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ally-mobile-flutter-debug-apk
+          path: ally-mobile-flutter/build/app/outputs/flutter-apk/app-dev-debug.apk
+          retention-days: 14

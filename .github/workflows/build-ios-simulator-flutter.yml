@@ -1,0 +1,75 @@
+name: Build iOS Simulator (Flutter)
+#
+# Manual-only test build — NOT a release pipeline, and not a real-device
+# build either. There is no Apple Developer account / signing certificate
+# set up for this project yet, so a real-device sideload isn't possible
+# the way the Android debug APK is. A Simulator build needs no signing at
+# all, which makes it the right first milestone: it proves out CocoaPods
+# dependency resolution and that every native iOS plugin actually compiles
+# for this project, without needing any Apple account setup first.
+#
+# This is the very first iOS build attempt for this project — there is no
+# committed Podfile/Podfile.lock yet; `flutter build ios` generates them on
+# first run. Expect this to need a few iterations.
+
+defaults:
+  run:
+    working-directory: ally-mobile-flutter
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # macos-15 runners ship more than one Xcode version, and the default
+      # selected one doesn't necessarily have the newest iOS SDK. The first
+      # build attempt failed compiling device_info_plus (a transitive dep,
+      # not one this project added directly): its iOS code references
+      # NSProcessInfo.isiOSAppOnVision, an iOS-26.1-only API — the selector
+      # has to exist in *some* imported header for the compiler to resolve
+      # it even inside an `@available` guard. Pinning the dependency down
+      # to a pre-26.1-aware version isn't viable either: it's stuck behind
+      # flutter_secure_storage's Windows backend needing a win32 major bump
+      # that landed in the same device_info_plus release as the Vision
+      # support. Selecting the newest available Xcode is the real fix.
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build iOS (Simulator, debug, unsigned)
+        run: |
+          flutter build ios --debug --simulator --flavor dev --verbose \
+            --dart-define=API_BASE_URL=https://api.helloally.dev \
+            --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
+
+      - name: Upload Simulator .app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ally-mobile-flutter-ios-simulator
+          path: ally-mobile-flutter/build/ios/iphonesimulator/Runner.app
+          retention-days: 14
