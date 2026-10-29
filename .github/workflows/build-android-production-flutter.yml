@@ -48,6 +48,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Confirm store identity
+        # Runs before checkout, so the job-level working-directory default
+        # (ally-mobile-flutter/, not created until checkout runs) doesn't
+        # apply here — override back to the workspace root for this one step.
+        working-directory: .
         env:
           CONFIRM: ${{ inputs.confirm_store_identity }}
         run: |
