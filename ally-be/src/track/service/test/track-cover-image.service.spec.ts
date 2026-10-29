@@ -18,7 +18,7 @@ describe('TrackCoverImageService', () => {
   let service: TrackCoverImageService;
 
   const mockProvider = {
-    getModel: jest.fn().mockReturnValue('dall-e-3'),
+    getModel: jest.fn().mockReturnValue('gpt-image-1.5'),
     assertConfigured: jest.fn(),
     generateImage: jest.fn(),
   };
@@ -94,7 +94,7 @@ describe('TrackCoverImageService', () => {
       expect.objectContaining({
         task: LlmTask.GENERATE_COURSE_COVER_IMAGE,
         unit: 'images',
-        model: 'dall-e-3',
+        model: 'gpt-image-1.5',
       }),
     );
   });
@@ -128,9 +128,10 @@ describe('TrackCoverImageService', () => {
     );
   });
 
-  it('maps a provider refusal to 400 and uploads nothing', async () => {
+  it('maps a content refusal to 400 and uploads nothing', async () => {
     mockProvider.generateImage.mockRejectedValue({
       status: 400,
+      code: 'moderation_blocked',
       message: 'safety system',
     });
 
@@ -142,6 +143,18 @@ describe('TrackCoverImageService', () => {
     expect(mockUsage.record).not.toHaveBeenCalled();
   });
 
+  it('does not blame the prompt for a 400 that is not a content refusal', async () => {
+    mockProvider.generateImage.mockRejectedValue({
+      status: 400,
+      code: 'invalid_value',
+      message: "The model 'dall-e-3' does not exist.",
+    });
+
+    const error = await service.generate(dto).catch((e) => e);
+    expect(error).toBeInstanceOf(BadGatewayException);
+    expect(error.message).not.toMatch(/rewording/);
+  });
+
   it('maps a rate limit or outage to 502', async () => {
     mockProvider.generateImage.mockRejectedValueOnce({ status: 429 });
     await expect(service.generate(dto)).rejects.toBeInstanceOf(
@@ -151,25 +164,6 @@ describe('TrackCoverImageService', () => {
     mockProvider.generateImage.mockRejectedValueOnce(new Error('timeout'));
     await expect(service.generate(dto)).rejects.toBeInstanceOf(
       BadGatewayException,
-    );
-  });
-
-  it("removes 'documentary-style' from the prompt before sending to the provider", async () => {
-    mockProvider.generateImage.mockResolvedValue(Buffer.from('png-bytes'));
-    const problematicPrompt =
-      'A warm, realistic documentary-style photograph of a group of people learning.';
-
-    await service.generate({
-      prompt: problematicPrompt,
-      trackTitle: 'Test Course',
-    });
-
-    const expectedPrompt =
-      'A warm, realistic photograph of a group of people learning.';
-    expect(mockProvider.generateImage).toHaveBeenCalledWith(
-      expectedPrompt,
-      '1536x1024',
-      { quality: 'medium' },
     );
   });
 });

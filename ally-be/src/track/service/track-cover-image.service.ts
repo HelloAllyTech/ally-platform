@@ -71,10 +71,7 @@ export class TrackCoverImageService {
     const startedAt = Date.now();
     let image: Buffer;
     try {
-      // The default prompt from the frontend includes "documentary-style", which
-      // can trip the provider's content filter.
-      const prompt = dto.prompt.replace(/documentary-style /gi, '');
-      image = await provider.generateImage(prompt, TRACK_COVER_IMAGE_SIZE, {
+      image = await provider.generateImage(dto.prompt, TRACK_COVER_IMAGE_SIZE, {
         quality: INTERACTIVE_IMAGE_QUALITY,
       });
     } catch (error) {
@@ -127,7 +124,13 @@ export class TrackCoverImageService {
    */
   private toHttpError(error: unknown): HttpException {
     const err = error as { status?: number; code?: string };
-    if (err?.status === 400 || err?.code === 'content_policy_violation') {
+    // Only a content refusal is the trainer's to fix by rewording. Every
+    // other 400 (invalid size, retired model) is our configuration bug —
+    // blaming the prompt for those sent two fixes down the wrong road.
+    if (
+      err?.code === 'moderation_blocked' ||
+      err?.code === 'content_policy_violation'
+    ) {
       return new BadRequestException(
         "The image service couldn't use this prompt. Try rewording it — for example, remove anything graphic or any real person's name.",
       );

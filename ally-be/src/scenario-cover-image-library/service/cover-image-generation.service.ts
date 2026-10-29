@@ -63,7 +63,12 @@ export class CoverImageGenerationService {
     const status = err?.status;
     const message = err?.message ?? 'Unknown error';
 
-    if (status === 400 || err?.code === 'content_policy_violation') {
+    // Only a content refusal is the author's to fix; any other 400 (invalid
+    // size, retired model) is our configuration bug, reported as upstream.
+    if (
+      err?.code === 'moderation_blocked' ||
+      err?.code === 'content_policy_violation'
+    ) {
       return new BadRequestException(
         `${providerType} rejected the image request: ${message}`,
       );

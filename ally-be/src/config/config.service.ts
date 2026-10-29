@@ -796,9 +796,12 @@ export class AppConfigService {
       imageModel: (() => {
         const model = this.configService.get<string>(
           'OPENAI_IMAGE_MODEL',
-          'dall-e-3',
+          'gpt-image-1.5',
         );
-        return model === 'gpt-image-1' ? 'dall-e-3' : model;
+        // OpenAI retired these on the Images API ('model does not exist'), so
+        // a stale env value must not bring image generation down with it.
+        const retired = ['gpt-image-1', 'dall-e-2', 'dall-e-3'];
+        return retired.includes(model) ? 'gpt-image-1.5' : model;
       })(),
     };
   }

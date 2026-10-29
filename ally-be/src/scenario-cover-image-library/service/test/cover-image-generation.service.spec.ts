@@ -161,9 +161,10 @@ describe('CoverImageGenerationService', () => {
     expect(mockProvider.generateImage).not.toHaveBeenCalled();
   });
 
-  it('maps provider 400s to BadRequest and does not upload', async () => {
+  it('maps a content refusal to BadRequest and does not upload', async () => {
     mockProvider.generateImage.mockRejectedValueOnce({
       status: 400,
+      code: 'moderation_blocked',
       message: 'content policy',
     });
 
@@ -171,6 +172,18 @@ describe('CoverImageGenerationService', () => {
       BadRequestException,
     );
     expect(mockS3.uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('reports a non-refusal 400 (retired model, bad size) as upstream, not the prompt', async () => {
+    mockProvider.generateImage.mockRejectedValueOnce({
+      status: 400,
+      code: 'invalid_value',
+      message: "The model 'gpt-image-1' does not exist.",
+    });
+
+    await expect(service.generateCoverImage(dto)).rejects.toThrow(
+      BadGatewayException,
+    );
   });
 
   it('maps provider quota/unknown failures to BadGateway', async () => {
