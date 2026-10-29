@@ -455,6 +455,30 @@ describe('buildSweepPrompt', () => {
       },
     ];
 
+    it('lists bugs already open, and tells the agent one root cause is one finding', () => {
+      // Two findings filed in one round for one LangGraph state-update error —
+      // "scheduled" and "immediately active" time events — reached Needs you
+      // as a pair because the sweep never saw what was open and named a
+      // different symbol for each symptom.
+      const p = build({
+        openBugs: [
+          {
+            title: 'Scheduled time events fail on an ambiguous state update',
+            file: 'app/graph/time_events.py',
+            symbol: 'schedule_time_events',
+          },
+        ],
+      });
+      expect(p).toMatch(/Already open — do NOT file a second one/);
+      expect(p).toContain(
+        'Scheduled time events fail on an ambiguous state update',
+      );
+      expect(p).toContain('app/graph/time_events.py · schedule_time_events');
+      expect(p).toMatch(/exactly that bug's file and symbol/);
+      expect(p).toMatch(/One root cause is one finding/);
+      expect(build({ openBugs: [] })).not.toMatch(/Already open/);
+    });
+
     it('says nothing at all when there is nothing settled', () => {
       // A heading with an empty list under it is prompt weight for no
       // information, and this text competes with the protocol it precedes.
