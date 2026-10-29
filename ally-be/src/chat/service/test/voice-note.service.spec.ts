@@ -304,4 +304,180 @@ describe('VoiceNoteService', () => {
       });
     });
   });
+
+  describe('evidence gate', () => {
+    const fields = JSON.stringify([
+      { id: 'sessionSummary', label: 'Summary', type: 'multiline' },
+      {
+        id: 'riskSuicidalThoughts',
+        label: 'Suicidal thoughts',
+        type: 'boolean',
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'riskSuicidalPlan',
+        label: 'Suicidal plan',
+        type: 'boolean',
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'assessmentAffect',
+        label: 'Affect',
+        type: 'select',
+        options: ['Congruent', 'Incongruent'],
+      },
+    ]);
+
+    const extractedAs = (body: unknown) =>
+      mockMessagesCreate.mockResolvedValue({
+        content: [{ type: 'text', text: JSON.stringify(body) }],
+      });
+
+    beforeEach(() => {
+      settingsService.getScribeVoiceNoteEnabled.mockResolvedValue(true);
+      mockTranscriptionsCreate.mockResolvedValue({
+        text:
+          'The child shared that she often has thoughts of not being in this ' +
+          'world anymore. Safety planning was completed.',
+      });
+    });
+
+    it('keeps values whose evidence is in the transcript', async () => {
+      extractedAs({
+        sessionSummary: {
+          value: '- Thoughts of not being in this world.',
+          evidence: [
+            'thoughts of not being in this world anymore',
+            'Safety planning was completed',
+          ],
+        },
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          // Case, punctuation and curly quotes do not decide a match.
+          evidence: '“She often has THOUGHTS of not being in this world…”',
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        {
+          id: 'sessionSummary',
+          value: '- Thoughts of not being in this world.',
+        },
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+    });
+
+    it('drops values the counsellor never said', async () => {
+      // The 10-29 pattern: a "No" and an MSE pick with nothing behind them.
+      extractedAs({
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          evidence: 'thoughts of not being in this world',
+        },
+        riskSuicidalPlan: { value: 'No', evidence: 'she denied having a plan' },
+        assessmentAffect: { value: 'Congruent' },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringMatching(/filled=1 unsupported=2 shape=evidence/),
+      );
+    });
+
+    it('rejects a quote too short to mean anything', async () => {
+      extractedAs({ riskSuicidalPlan: { value: 'No', evidence: 'the child' } });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('accepts a quote that skips words with an ellipsis', async () => {
+      extractedAs({
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          evidence: 'she often has thoughts ... Safety planning was completed',
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+    });
+
+    it('keeps a long field when one of its quotes is reworded or short', async () => {
+      // 10-29 local run: a 24-quote summary was dropped whole because one
+      // quote was the two-word heading "Objective observations".
+      extractedAs({
+        sessionSummary: {
+          value: '- Thoughts of not being in this world.',
+          evidence: [
+            'The child shared that she often has thoughts',
+            'Safety planning.',
+            'The child said she wants to die',
+          ],
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        {
+          id: 'sessionSummary',
+          value: '- Thoughts of not being in this world.',
+        },
+      ]);
+    });
+
+    it('drops a field none of whose quotes is in the transcript', async () => {
+      extractedAs({
+        riskSuicidalPlan: {
+          value: 'No',
+          evidence: ['no plan was reported', 'the child', 'Safety planning'],
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('drops a plain value mixed into an evidence-shaped reply', async () => {
+      extractedAs({
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          evidence: 'thoughts of not being in this world',
+        },
+        riskSuicidalPlan: 'No',
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+    });
+
+    it('passes the pre-evidence shape through while that prompt is live', async () => {
+      extractedAs({ riskSuicidalPlan: 'No', assessmentAffect: 'Congruent' });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalPlan', value: 'No' },
+        { id: 'assessmentAffect', value: 'Congruent' },
+      ]);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringMatching(/unsupported=0 shape=legacy/),
+      );
+    });
+  });
 });
