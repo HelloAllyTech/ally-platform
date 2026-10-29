@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from app.core.config import settings
 from app.core.debrief_quality.prompt import TranscriptTurn, build_judge_prompt
-from app.core.debrief_quality.schemas import DebriefQualityOutput
+from app.core.debrief_quality.schemas import DebriefQualityOutput, HardFailFinding
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -86,4 +86,24 @@ async def judge_debrief(
         )
         return None, meta["model"]
 
-    return output, meta["model"]
+    return _enforce_missed_risk_cue(output), meta["model"]
+
+
+def _enforce_missed_risk_cue(output: DebriefQualityOutput) -> DebriefQualityOutput:
+    """A risk cue the debrief leaves out IS the missed_risk_cue hard fail.
+
+    The model lists the risk cues and whether the debrief addresses each one;
+    the hard fail follows from that list in code rather than relying on the
+    model to also remember to raise it. Before this, a debrief that simply
+    omitted the moment scored as if nothing had happened.
+    """
+    missed = [c for c in output.risk_cues if not c.addressed_by_debrief]
+    if missed and not any(h.code == "missed_risk_cue" for h in output.hard_fails):
+        first = missed[0]
+        output.hard_fails.append(
+            HardFailFinding(
+                code="missed_risk_cue",
+                evidence=f"turn {first.turn_index}: {first.quote}",
+            )
+        )
+    return output

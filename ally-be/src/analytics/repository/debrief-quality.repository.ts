@@ -5,7 +5,9 @@ import { excludeTestTenants } from '../util/test-tenant.util';
 import { JudgeAttemptFamily } from '../constants/judge-scheduling.constants';
 import {
   DEBRIEF_QUALITY_DIMENSIONS,
+  DEBRIEF_QUALITY_PASS,
   DebriefQualityDimension,
+  debriefOverallSql,
 } from '../constants/debrief-quality.constants';
 import { judgeAttemptGate } from '../util/judge-attempts.util';
 import { settledEndedSessionPredicate } from '../util/session-eligibility.util';
@@ -45,6 +47,34 @@ export interface DebriefHardFail {
   code: string;
   evidence: string;
 }
+
+/** Raw aggregate for one group of scored debriefs; rates are applied in the service. */
+export interface DebriefQualityAggregate {
+  key: string;
+  n: number;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  passed: number;
+  hard_failed: number;
+}
+
+/** The slice a summary can be cut by, and the SQL expression for each. */
+const SLICE_KEY_SQL = {
+  language: `COALESCE(scored."language", 'unknown')`,
+  workerType: `COALESCE(scored."workerType", 'unknown')`,
+  // Short sessions get the short recipe (fewer than 6 learner turns), so that
+  // boundary is kept; the rest are split where length stops mattering.
+  sessionLength: `CASE
+      WHEN scored."learnerTurns" IS NULL THEN 'unknown'
+      WHEN scored."learnerTurns" < 6 THEN '1-5 turns'
+      WHEN scored."learnerTurns" <= 15 THEN '6-15 turns'
+      WHEN scored."learnerTurns" <= 30 THEN '16-30 turns'
+      ELSE '31+ turns' END`,
+  debriefSource: `scored."debriefSource"`,
+} as const;
+
+export type DebriefQualitySlice = keyof typeof SLICE_KEY_SQL;
 
 /**
  * Data access for the debrief-quality judge.
@@ -207,6 +237,117 @@ export class DebriefQualityRepository {
       [sessionId],
     );
     return renderDebrief(rows?.[0]?.feedback ?? null, turnByMessageId);
+  }
+
+  /**
+   * The scored rows for one judge pair over a window, with the overall
+   * computed by the same formula the TypeScript uses. Every summary query
+   * reads from this, so they cannot disagree about what "scored" means.
+   */
+  private scoredCte(): string {
+    return `
+      WITH scored AS (
+        SELECT j.*,
+               ${debriefOverallSql('j')} AS overall,
+               jsonb_array_length(COALESCE(j."hardFails", '[]'::jsonb)) > 0 AS has_hard_fail
+          FROM debrief_quality_judgment j
+         WHERE j."judgeModel" = $1
+           AND j."judgePromptVersion" = $2
+           AND j."occurredAt" >= now() - make_interval(days => $3)
+           AND ${excludeTestTenants('j."tenant_id"')}
+      )`;
+  }
+
+  /** Distribution, pass and hard-fail counts, overall or per slice. */
+  async aggregate(
+    pair: { judgeModel: string; judgePromptVersion: string },
+    sinceDays: number,
+    slice?: DebriefQualitySlice,
+  ): Promise<DebriefQualityAggregate[]> {
+    const key = slice ? SLICE_KEY_SQL[slice] : `'all'`;
+    const rows = await this.dataSource.query(
+      `${this.scoredCte()}
+       SELECT ${key} AS key,
+              count(*)::int AS n,
+              percentile_cont(0.25) WITHIN GROUP (ORDER BY overall) AS p25,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY overall) AS p50,
+              percentile_cont(0.75) WITHIN GROUP (ORDER BY overall) AS p75,
+              count(*) FILTER (WHERE overall >= ${DEBRIEF_QUALITY_PASS} AND NOT has_hard_fail)::int AS passed,
+              count(*) FILTER (WHERE has_hard_fail)::int AS hard_failed
+         FROM scored
+        GROUP BY 1
+        ORDER BY n DESC`,
+      [pair.judgeModel, pair.judgePromptVersion, sinceDays],
+    );
+    return rows.map((r: Record<string, unknown>) => ({
+      key: String(r.key),
+      n: Number(r.n),
+      p25: r.p25 == null ? null : Number(r.p25),
+      p50: r.p50 == null ? null : Number(r.p50),
+      p75: r.p75 == null ? null : Number(r.p75),
+      passed: Number(r.passed),
+      hard_failed: Number(r.hard_failed),
+    }));
+  }
+
+  /** Mean score per rubric dimension, in rubric order. */
+  async dimensionMeans(
+    pair: { judgeModel: string; judgePromptVersion: string },
+    sinceDays: number,
+  ): Promise<Array<{ dimension: string; mean: number | null }>> {
+    const cols = DEBRIEF_QUALITY_DIMENSIONS.map(
+      (d, i) => `round(avg("${d.column}")::numeric, 2) AS d${i}`,
+    ).join(', ');
+    const rows = await this.dataSource.query(
+      `${this.scoredCte()} SELECT ${cols} FROM scored`,
+      [pair.judgeModel, pair.judgePromptVersion, sinceDays],
+    );
+    const r = rows?.[0] ?? {};
+    return DEBRIEF_QUALITY_DIMENSIONS.map((d, i) => ({
+      dimension: d.dimension,
+      mean: r[`d${i}`] == null ? null : Number(r[`d${i}`]),
+    }));
+  }
+
+  /** How often each hard fail occurs, most frequent first. */
+  async hardFailCounts(
+    pair: { judgeModel: string; judgePromptVersion: string },
+    sinceDays: number,
+  ): Promise<Array<{ code: string; n: number }>> {
+    const rows = await this.dataSource.query(
+      `${this.scoredCte()}
+       SELECT f->>'code' AS code, count(DISTINCT scored.id)::int AS n
+         FROM scored, jsonb_array_elements(scored."hardFails") f
+        GROUP BY 1
+        ORDER BY n DESC, code`,
+      [pair.judgeModel, pair.judgePromptVersion, sinceDays],
+    );
+    return rows.map((r: { code: string; n: number }) => ({
+      code: r.code,
+      n: Number(r.n),
+    }));
+  }
+
+  /** Every judge pair with rows in the window; more than one means two series. */
+  async judgeVersions(
+    sinceDays: number,
+  ): Promise<
+    Array<{ judgeModel: string; judgePromptVersion: string; n: number }>
+  > {
+    const rows = await this.dataSource.query(
+      `SELECT "judgeModel", "judgePromptVersion", count(*)::int AS n
+         FROM debrief_quality_judgment
+        WHERE "occurredAt" >= now() - make_interval(days => $1)
+        GROUP BY 1, 2
+        ORDER BY n DESC`,
+      [sinceDays],
+    );
+    return rows.map(
+      (r: { judgeModel: string; judgePromptVersion: string; n: number }) => ({
+        ...r,
+        n: Number(r.n),
+      }),
+    );
   }
 
   /**

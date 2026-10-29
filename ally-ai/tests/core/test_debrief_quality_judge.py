@@ -98,6 +98,50 @@ class TestJudge:
         assert calls["temperature"] == 0
 
     @pytest.mark.asyncio
+    async def test_an_unaddressed_risk_cue_becomes_the_hard_fail(
+        self, dispatch_returns
+    ):
+        # The model listed the cue as unaddressed but forgot the hard fail:
+        # the rule follows from the list in code, not from its memory.
+        from app.core.debrief_quality.judge import judge_debrief
+        from app.core.debrief_quality.schemas import RiskCue
+
+        out = _output()
+        out.risk_cues = [
+            RiskCue(turn_index=2, quote="no point", addressed_by_debrief=False)
+        ]
+        dispatch_returns(out)
+        output, _ = await judge_debrief(TRANSCRIPT, "You listened.", "en")
+        assert [h.code for h in output.hard_fails] == ["missed_risk_cue"]
+        assert output.hard_fails[0].evidence == "turn 2: no point"
+
+    @pytest.mark.asyncio
+    async def test_an_addressed_risk_cue_adds_nothing(self, dispatch_returns):
+        from app.core.debrief_quality.judge import judge_debrief
+        from app.core.debrief_quality.schemas import RiskCue
+
+        out = _output()
+        out.risk_cues = [
+            RiskCue(turn_index=2, quote="no point", addressed_by_debrief=True)
+        ]
+        dispatch_returns(out)
+        output, _ = await judge_debrief(TRANSCRIPT, "You listened.", "en")
+        assert output.hard_fails == []
+
+    @pytest.mark.asyncio
+    async def test_the_hard_fail_is_not_doubled(self, dispatch_returns):
+        from app.core.debrief_quality.judge import judge_debrief
+        from app.core.debrief_quality.schemas import RiskCue
+
+        out = _output(hard_fails=["missed_risk_cue"])
+        out.risk_cues = [
+            RiskCue(turn_index=2, quote="no point", addressed_by_debrief=False)
+        ]
+        dispatch_returns(out)
+        output, _ = await judge_debrief(TRANSCRIPT, "You listened.", "en")
+        assert [h.code for h in output.hard_fails] == ["missed_risk_cue"]
+
+    @pytest.mark.asyncio
     async def test_a_missing_dimension_is_no_answer(self, dispatch_returns):
         from app.core.debrief_quality.judge import judge_debrief
 

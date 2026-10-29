@@ -510,6 +510,86 @@ export class DebriefQualityBackfillJobDto {
   @ApiProperty({ nullable: true }) error!: string | null;
 }
 
+export class DebriefQualityQueryDto {
+  @ApiProperty({ required: false, default: 90 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  sinceDays?: number;
+
+  @ApiProperty({ required: false, default: 'gemini-2.5-pro' })
+  @IsOptional()
+  @IsString()
+  judgeModel?: string;
+
+  @ApiProperty({ required: false, default: 'v1' })
+  @IsOptional()
+  @IsString()
+  judgePromptVersion?: string;
+}
+
+export class DebriefQualityStatsDto {
+  @ApiProperty({ description: 'Debriefs scored in this group' })
+  n!: number;
+  @ApiProperty({
+    description:
+      'True below 20 scored debriefs: show the count, not the rates — a pass ' +
+      'rate over six debriefs is noise.',
+  })
+  belowReportingFloor!: boolean;
+  @ApiProperty({ nullable: true }) p25!: number | null;
+  @ApiProperty({ nullable: true, description: 'Median overall out of 10' })
+  p50!: number | null;
+  @ApiProperty({ nullable: true }) p75!: number | null;
+  @ApiProperty({
+    nullable: true,
+    description: 'Share scoring 8 or more with no hard fail',
+  })
+  passRate!: number | null;
+  @ApiProperty({ nullable: true }) hardFailRate!: number | null;
+}
+
+export class DebriefQualitySliceDto extends DebriefQualityStatsDto {
+  @ApiProperty() key!: string;
+}
+
+export class DebriefQualityResponseDto {
+  @ApiProperty() judgeModel!: string;
+  @ApiProperty() judgePromptVersion!: string;
+  @ApiProperty() sinceDays!: number;
+  @ApiProperty({
+    description:
+      'Every (model, rubric) pair with rows in the window. Scores are only ' +
+      'comparable within one pair.',
+  })
+  judgeVersions!: Array<{
+    judgeModel: string;
+    judgePromptVersion: string;
+    n: number;
+  }>;
+  @ApiProperty({
+    description: 'Eligible sessions in the window not yet scored by this pair',
+  })
+  unscored!: number;
+  @ApiProperty({ type: DebriefQualityStatsDto })
+  overall!: DebriefQualityStatsDto;
+  @ApiProperty() dimensions!: Array<{ dimension: string; mean: number | null }>;
+  @ApiProperty() hardFails!: Array<{ code: string; n: number }>;
+  @ApiProperty({
+    description:
+      'The baseline cuts: language, learner level, session length (learner ' +
+      'turns) and which debrief was scored.',
+  })
+  slices!: {
+    language: DebriefQualitySliceDto[];
+    workerType: DebriefQualitySliceDto[];
+    sessionLength: DebriefQualitySliceDto[];
+    debriefSource: DebriefQualitySliceDto[];
+  };
+}
+
 export class RagQualityBackfillJobDto {
   @ApiProperty() jobId!: string;
   @ApiProperty({ description: 'queued | running | done | error' })

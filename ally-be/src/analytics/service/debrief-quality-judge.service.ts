@@ -10,7 +10,12 @@ import {
   runWithConcurrency,
   withJudgeSlot,
 } from '../util/judge-concurrency.util';
-import { DebriefQualityBackfillJobDto } from '../dto/platform-analytics.dto';
+import {
+  DebriefQualityBackfillJobDto,
+  DebriefQualityResponseDto,
+  DebriefQualitySliceDto,
+  DebriefQualityStatsDto,
+} from '../dto/platform-analytics.dto';
 import {
   JudgeAttemptFamily,
   JudgeAttemptOutcome,
@@ -21,9 +26,37 @@ import { ScheduledSelection } from '../util/judge-attempts.util';
 import {
   DebriefDimensionScore,
   DebriefHardFail,
+  DebriefQualityAggregate,
   DebriefQualityRepository,
   DebriefTranscriptTurn,
 } from '../repository/debrief-quality.repository';
+
+/**
+ * Below this many scored debriefs a group reports its count but no rates — the
+ * same floor the RAG-quality page uses. "83% pass" over six debriefs is noise
+ * that reads as a finding.
+ */
+const MIN_SCORED_FOR_RATES = 20;
+
+const round2 = (v: number | null) =>
+  v == null ? null : Math.round(v * 100) / 100;
+
+/** One group's counts as rates, withheld below the reporting floor. */
+export function toDebriefQualityStats(
+  a: DebriefQualityAggregate | undefined,
+): DebriefQualityStatsDto {
+  const n = a?.n ?? 0;
+  const below = n < MIN_SCORED_FOR_RATES;
+  return {
+    n,
+    belowReportingFloor: below,
+    p25: below ? null : round2(a?.p25 ?? null),
+    p50: below ? null : round2(a?.p50 ?? null),
+    p75: below ? null : round2(a?.p75 ?? null),
+    passRate: below || !a ? null : round2(a.passed / n),
+    hardFailRate: below || !a ? null : round2(a.hard_failed / n),
+  };
+}
 
 interface JudgeResult {
   judgeModel: string;
@@ -77,6 +110,56 @@ export class DebriefQualityJudgeService {
   ): Promise<DebriefQualityBackfillJobDto | undefined> {
     const raw = await this.redis.get(this.jobKey(jobId));
     return raw ? (JSON.parse(raw) as DebriefQualityBackfillJobDto) : undefined;
+  }
+
+  /**
+   * The baseline readout: how good debriefs are under one judge pair, overall
+   * and cut by language, learner level, session length and debrief source.
+   */
+  async getSummary(opts: {
+    sinceDays?: number;
+    judgeModel?: string;
+    judgePromptVersion?: string;
+  }): Promise<DebriefQualityResponseDto> {
+    const sinceDays = opts.sinceDays ?? 90;
+    const pair = {
+      judgeModel: opts.judgeModel ?? 'gemini-2.5-pro',
+      judgePromptVersion: opts.judgePromptVersion ?? 'v1',
+    };
+    const slice = async (
+      s: 'language' | 'workerType' | 'sessionLength' | 'debriefSource',
+    ): Promise<DebriefQualitySliceDto[]> =>
+      (await this.repo.aggregate(pair, sinceDays, s)).map((a) => ({
+        key: a.key,
+        ...toDebriefQualityStats(a),
+      }));
+
+    const [all, dimensions, hardFails, judgeVersions, unscored] =
+      await Promise.all([
+        this.repo.aggregate(pair, sinceDays),
+        this.repo.dimensionMeans(pair, sinceDays),
+        this.repo.hardFailCounts(pair, sinceDays),
+        this.repo.judgeVersions(sinceDays),
+        this.repo.selectSessions({ sinceDays, unjudgedForVersion: pair }),
+      ]);
+    const [language, workerType, sessionLength, debriefSource] =
+      await Promise.all([
+        slice('language'),
+        slice('workerType'),
+        slice('sessionLength'),
+        slice('debriefSource'),
+      ]);
+
+    return {
+      ...pair,
+      sinceDays,
+      judgeVersions,
+      unscored: unscored.length,
+      overall: toDebriefQualityStats(all[0]),
+      dimensions,
+      hardFails,
+      slices: { language, workerType, sessionLength, debriefSource },
+    };
   }
 
   /** Start an async backfill over a window; returns a job id to poll. */

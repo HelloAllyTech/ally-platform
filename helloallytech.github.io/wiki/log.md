@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-10-29] update | `repos/ally-ai.md`: the debrief-quality judge.
+- Added `/debrief-quality` to the HTTP surface and `debrief_quality/` to the judge modules: it scores a whole learner debrief on the debrief rubric's eight dimensions (0–10 each) and lists hard fails, and is the independent judge the debrief quality bar is read from. The judge-modules line now says it is the one ordinal exception, with the weighted overall still computed by ally-be. Also documented: the missed-risk-cue rule (derived in code from the judge's list of risk cues) and the perturbation script that gates a judge change. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
+
 ## [2026-10-24] update | `repos/ally-be.md`: Ally, the AI course companion.
 - Added `guide/`, `guide-learning/` and `llm-agent/harness/` under a new "Ally, the AI course companion" heading in Architecture & Key Modules: the turn pipeline, the SSE event stream, the one-schema wire contract and its codegen, the switches that keep it off by default, and the learning loop's evaluator, review queue, curator, canary and delegation stage. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
 

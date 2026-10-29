@@ -22,6 +22,7 @@ import { LanguageAnalyticsService } from '../../service/language-analytics.servi
 import { GlossaryEffectAnalyticsService } from '../../service/glossary-effect-analytics.service';
 import { WeakMetricsAnalyticsService } from '../../service/weak-metrics-analytics.service';
 import { FeedbackGroundednessJudgeService } from '../../service/feedback-groundedness-judge.service';
+import { DebriefQualityJudgeService } from '../../service/debrief-quality-judge.service';
 import { RagQualityAnalyticsService } from '../../service/rag-quality-analytics.service';
 import { ActivationAnalyticsService } from '../../service/activation-analytics.service';
 import { CompletionRateAnalyticsService } from '../../service/completion-rate-analytics.service';
@@ -212,6 +213,14 @@ describe('AnalyticsController', () => {
         {
           provide: FeedbackGroundednessJudgeService,
           useValue: { startBackfill: jest.fn(), getJob: jest.fn() },
+        },
+        {
+          provide: DebriefQualityJudgeService,
+          useValue: {
+            startBackfill: jest.fn(),
+            getJob: jest.fn(),
+            getSummary: jest.fn(),
+          },
         },
         {
           provide: RagQualityAnalyticsService,

@@ -54,8 +54,23 @@ class HardFailFinding(BaseModel):
     )
 
 
+class RiskCue(BaseModel):
+    """One client statement in the transcript that signals risk."""
+
+    turn_index: int
+    quote: str = Field(description="The client's words, as in the transcript.")
+    addressed_by_debrief: bool = Field(
+        description="Does the debrief name this moment and how the trainee responded?"
+    )
+
+
 class DebriefQualityOutput(BaseModel):
     """Exactly what the judge LLM returns."""
 
+    # Listed BEFORE the scores so the model reads the transcript for risk first.
+    # A risk cue the debrief leaves out is the most serious failure a debrief
+    # can have, and asking for it only as a hard-fail code let it slip by when
+    # the debrief simply omitted the moment.
+    risk_cues: List[RiskCue] = Field(default_factory=list)
     dimensions: List[DimensionScore]
     hard_fails: List[HardFailFinding] = Field(default_factory=list)

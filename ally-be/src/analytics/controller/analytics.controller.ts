@@ -164,6 +164,7 @@ import {
 } from '../dto/weak-metrics.dto';
 import { WeakMetricsAnalyticsService } from '../service/weak-metrics-analytics.service';
 import { FeedbackGroundednessJudgeService } from '../service/feedback-groundedness-judge.service';
+import { DebriefQualityJudgeService } from '../service/debrief-quality-judge.service';
 import { RagQualityAnalyticsService } from '../service/rag-quality-analytics.service';
 import { FillerAnalyticsService } from '../service/filler-analytics.service';
 import { FillerJudgeService } from '../service/filler-judge.service';
@@ -199,6 +200,9 @@ import {
   StartDriftBackfillDto,
   StartGroundednessBackfillDto,
   GroundednessBackfillJobDto,
+  DebriefQualityBackfillJobDto,
+  DebriefQualityQueryDto,
+  DebriefQualityResponseDto,
   StartFillerBackfillDto,
   StartLanguageBackfillDto,
   StartLatencyQueryDto,
@@ -435,6 +439,7 @@ export class AnalyticsController {
     private readonly glossaryEffectAnalyticsService: GlossaryEffectAnalyticsService,
     private readonly weakMetricsAnalyticsService: WeakMetricsAnalyticsService,
     private readonly feedbackGroundednessJudgeService: FeedbackGroundednessJudgeService,
+    private readonly debriefQualityJudgeService: DebriefQualityJudgeService,
     private readonly ragQualityAnalyticsService: RagQualityAnalyticsService,
     private readonly activationAnalyticsService: ActivationAnalyticsService,
     private readonly completionRateAnalyticsService: CompletionRateAnalyticsService,
@@ -2296,6 +2301,71 @@ export class AnalyticsController {
     @Param('jobId') jobId: string,
   ): Promise<GroundednessBackfillJobDto> {
     const job = await this.feedbackGroundednessJudgeService.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException(`Backfill job ${jobId} not found`);
+    }
+    return job;
+  }
+
+  @Get('debrief-quality')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Debrief quality, as the independent judge scored it (super-admin)',
+    description:
+      'The baseline readout for the debrief quality bar: the overall out of 10 ' +
+      '(eight rubric dimensions, weighted, capped at 4 by any hard fail), the ' +
+      'share passing (8 or more, no hard fail) and the hard-fail rate, overall ' +
+      'and cut by language, learner level, session length and debrief source. ' +
+      'Groups under 20 scored debriefs report counts only. Scores are only ' +
+      'comparable within one (judgeModel, judgePromptVersion) pair; ' +
+      '`judgeVersions` lists every pair present.',
+  })
+  @ApiResponse({ status: 200, type: DebriefQualityResponseDto })
+  async getDebriefQuality(
+    @Query() query: DebriefQualityQueryDto,
+  ): Promise<DebriefQualityResponseDto> {
+    return this.debriefQualityJudgeService.getSummary(query);
+  }
+
+  @Post('debrief-quality/backfill')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Score stored debriefs with the debrief-quality judge (super-admin)',
+    description:
+      'The scheduled drain already scores debriefs on its own; this is for a ' +
+      'manual run, e.g. after a provider outage (it ignores the attempt cap). ' +
+      'One Gemini call per debrief over its full transcript. Pass ' +
+      'judgePromptVersion to make the run resumable.',
+  })
+  @ApiResponse({ status: 202, type: DebriefQualityBackfillJobDto })
+  async startDebriefQualityBackfill(
+    @Body() body: StartGroundednessBackfillDto,
+  ): Promise<DebriefQualityBackfillJobDto> {
+    const unjudgedForVersion = body.judgePromptVersion
+      ? {
+          judgeModel: body.judgeModel ?? 'gemini-2.5-pro',
+          judgePromptVersion: body.judgePromptVersion,
+        }
+      : null;
+    return this.debriefQualityJudgeService.startBackfill(
+      body.sinceDays ?? 90,
+      unjudgedForVersion,
+      body.concurrency,
+    );
+  }
+
+  @Get('debrief-quality/backfill/:jobId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Debrief-quality backfill job status (super-admin)',
+  })
+  @ApiResponse({ status: 200, type: DebriefQualityBackfillJobDto })
+  async debriefQualityBackfillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<DebriefQualityBackfillJobDto> {
+    const job = await this.debriefQualityJudgeService.getJob(jobId);
     if (!job) {
       throw new NotFoundException(`Backfill job ${jobId} not found`);
     }
