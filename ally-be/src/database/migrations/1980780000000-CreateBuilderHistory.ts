@@ -17,8 +17,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * No FK to builder_sessions, like builder_lessons: what was decided outlives the session.
  */
-export class CreateBuilderHistory1980770000000 implements MigrationInterface {
-  name = 'CreateBuilderHistory1980770000000';
+export class CreateBuilderHistory1980780000000 implements MigrationInterface {
+  name = 'CreateBuilderHistory1980780000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

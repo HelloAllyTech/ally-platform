@@ -12,8 +12,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * writes a new row with `supersedesId` and switches the old one off; `active` is the only column
  * that changes. How often a rule applied is the count of builder_history rows carrying its id.
  */
-export class CreateBuilderRules1980790000000 implements MigrationInterface {
-  name = 'CreateBuilderRules1980790000000';
+export class CreateBuilderRules1980800000000 implements MigrationInterface {
+  name = 'CreateBuilderRules1980800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

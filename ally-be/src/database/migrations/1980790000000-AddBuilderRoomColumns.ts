@@ -10,8 +10,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   so the message can be edited to "Answered in Ally" once the pull request merges from any
  *   surface, instead of leaving a live button on finished work.
  */
-export class AddBuilderRoomColumns1980780000000 implements MigrationInterface {
-  name = 'AddBuilderRoomColumns1980780000000';
+export class AddBuilderRoomColumns1980790000000 implements MigrationInterface {
+  name = 'AddBuilderRoomColumns1980790000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
