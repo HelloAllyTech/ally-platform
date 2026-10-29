@@ -437,6 +437,21 @@ export const ApiEndpoints = {
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
   },
+  DEBRIEF_CONSOLE: {
+    OVERVIEW: "/v1/debriefs/console/overview",
+    RUNS: "/v1/debriefs/console/runs",
+    RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
+    RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
+    IMPROVER: "/v1/debriefs/console/improver",
+    IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
+      `/v1/debriefs/console/improver/ideas/${id}/${action}`,
+    RELEASES: "/v1/debriefs/console/releases",
+    ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
+    TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
+    TENANTS: "/v1/debriefs/console/tenants",
+    TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
+  },
   DEBRIEF_CALIBRATION: {
     SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
     AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
@@ -1228,6 +1243,7 @@ export const TAG_TYPES = {
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
   DEBRIEF_CALIBRATION: "debriefCalibration",
+  DEBRIEF_CONSOLE: "debriefConsole",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

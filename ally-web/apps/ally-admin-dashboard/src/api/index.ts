@@ -41,6 +41,7 @@ export * from "./cohorts";
 export * from "./helplineAdmin";
 export * from "./skillExperiments";
 export * from "./debriefCalibration";
+export * from "./debriefConsole";
 export * from "./publicRoadmap";
 export * from "./courseCopilot";
 export * from "./allyGuide";

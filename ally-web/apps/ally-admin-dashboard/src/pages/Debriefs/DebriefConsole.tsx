@@ -6,10 +6,26 @@ import { Tabs } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { CalibrationTab } from "./CalibrationTab";
+import { ImproverTab } from "./ImproverTab";
+import { OrganisationsTab } from "./OrganisationsTab";
+import { ReleasesTab } from "./ReleasesTab";
+import { RunsTab } from "./RunsTab";
 
 export enum DebriefConsoleTab {
+  RUNS = "runs",
+  IMPROVER = "improver",
+  RELEASES = "releases",
+  ORGANISATIONS = "organisations",
   CALIBRATION = "calibration",
 }
+
+const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
+  [DebriefConsoleTab.RUNS]: RunsTab,
+  [DebriefConsoleTab.IMPROVER]: ImproverTab,
+  [DebriefConsoleTab.RELEASES]: ReleasesTab,
+  [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
+  [DebriefConsoleTab.CALIBRATION]: CalibrationTab,
+};
 
 const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));
 
@@ -22,13 +38,16 @@ export const DebriefConsole: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabItems = useMemo(
-    () => [{ id: DebriefConsoleTab.CALIBRATION, label: en.debriefs.tabs.calibration }],
+    () => Object.values(DebriefConsoleTab).map(id => ({ id, label: en.debriefs.tabs[id] })),
     [],
   );
 
   const requested = searchParams.get("tab");
   const activeTab =
-    requested && VALID_TABS.has(requested) ? requested : DebriefConsoleTab.CALIBRATION;
+    requested && VALID_TABS.has(requested)
+      ? (requested as DebriefConsoleTab)
+      : DebriefConsoleTab.RUNS;
+  const Content = TAB_CONTENT[activeTab];
 
   return (
     <div className="relative py-[2px] font-primary" data-testid="debrief-console">
@@ -41,7 +60,7 @@ export const DebriefConsole: React.FC = () => {
         showCount={false}
       />
       <div className="pt-6">
-        <CalibrationTab />
+        <Content />
       </div>
     </div>
   );
