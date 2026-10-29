@@ -135,6 +135,72 @@ export class AnswerBuilderDecisionDto {
   @IsString()
   @MaxLength(4000)
   message?: string;
+
+  @ApiPropertyOptional({
+    enum: ['phone', 'tablet', 'desktop'],
+    description:
+      'Which layout answered, from breakpoint and pointer. Recorded in History so phone answers can be told apart.',
+  })
+  @IsOptional()
+  @IsIn(['phone', 'tablet', 'desktop'])
+  client?: 'phone' | 'tablet' | 'desktop';
+
+  @ApiPropertyOptional({
+    description: 'Milliseconds from the card taking focus to this answer.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(24 * 60 * 60 * 1000)
+  msToDecide?: number;
+}
+
+/** History search. `who` is relative to the caller. */
+export class ListBuilderHistoryQueryDto {
+  @ApiPropertyOptional({ description: 'Searches what was asked and chosen' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string;
+
+  @ApiPropertyOptional({
+    enum: ['decision', 'ask', 'tell', 'start', 'putback'],
+  })
+  @IsOptional()
+  @IsIn(['decision', 'ask', 'tell', 'start', 'putback'])
+  entryType?: 'decision' | 'ask' | 'tell' | 'start' | 'putback';
+
+  @ApiPropertyOptional({ enum: ['you', 'team', 'rule'] })
+  @IsOptional()
+  @IsIn(['you', 'team', 'rule'])
+  who?: 'you' | 'team' | 'rule';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  ruleId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Cursor: return entries decided before this ISO time',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  before?: string;
+
+  @ApiPropertyOptional({ default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 }
 
 export class CreateBuilderMessageDto {

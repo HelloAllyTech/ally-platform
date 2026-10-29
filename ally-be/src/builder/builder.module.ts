@@ -70,6 +70,12 @@ import { BuilderProductMapService } from './service/builder-product-map.service'
 import { BuilderPlatformContextService } from './service/builder-platform-context.service';
 import { BuilderNotificationService } from './service/builder-notification.service';
 import { BuilderDecisionService } from './service/builder-decision.service';
+import {
+  BuilderHistoryRepository,
+  BuilderHistoryService,
+} from './service/builder-history.service';
+import { BuilderHistoryEntry } from './entity/builder-history.entity';
+import { BuilderRoomController } from './controller/builder-room.controller';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
@@ -133,6 +139,7 @@ import {
       BuilderEvalSuite,
       BuilderEvalRun,
       BuilderCorrection,
+      BuilderHistoryEntry,
     ]),
     PromptModule,
     LlmUsageModule,
@@ -167,6 +174,7 @@ import {
     BuilderPipelineController,
     BuilderEvalController,
     BuilderCorrectionsController,
+    BuilderRoomController,
   ],
   providers: [
     BuilderSlackService,
@@ -202,6 +210,8 @@ import {
     BuilderPlatformContextService,
     BuilderNotificationService,
     BuilderDecisionService,
+    BuilderHistoryService,
+    BuilderHistoryRepository,
     BuilderSchedulerRegistrationService,
     BuilderSessionRepository,
     BuilderMessageRepository,

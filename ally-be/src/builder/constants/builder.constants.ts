@@ -7,6 +7,26 @@ export const BUILDER_TURN_LOCK_PREFIX = 'builder-turn';
 // Lock TTL. A turn is one question or one round of PRD writing — minutes.
 export const BUILDER_TURN_LOCK_TTL_SECONDS = 5 * 60;
 
+/* ── The Builder tab: undo window ───────────────────────────────────────── */
+
+/**
+ * How long a reversible answer is held before it reaches the session, so a
+ * mis-key costs one press of Undo instead of a wrong turn. One-way options
+ * (a merge, a stopped build) skip the window and arm instead. 8 s is the
+ * plan's starting value; the Phase 0 sitting is where it gets tuned.
+ */
+export const BUILDER_UNDO_WINDOW_MS = 8_000;
+
+/** Redis key holding an answer inside its undo window: `${prefix}:${decisionId}`. */
+export const BUILDER_UNDO_PREFIX = 'builder-undo';
+
+/**
+ * How often an instance sweeps for held answers whose window has closed but
+ * whose timer never fired — the instance that took the answer restarted or was
+ * replaced by a deploy. Without the sweep such an answer would be lost silently.
+ */
+export const BUILDER_UNDO_SWEEP_MS = 30_000;
+
 // SSE keep-alive: a turn that spends 40s researching the codebase emits
 // nothing, and proxies drop idle streams.
 export const BUILDER_SSE_PING_INTERVAL_MS = 15_000;

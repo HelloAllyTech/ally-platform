@@ -18,6 +18,19 @@ describe('the question gate', () => {
     expect(questionGateProblems(decision)).toEqual([]);
   });
 
+  it('holds a question to three options at most', () => {
+    const options = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ id: `o${i}`, label: `O${i}` }));
+    expect(questionGateProblems({ ...decision, options: options(3) })).toEqual(
+      [],
+    );
+    expect(
+      questionGateProblems({ ...decision, options: options(4) }).map(
+        (problem) => problem.key,
+      ),
+    ).toEqual(['too_many_options']);
+  });
+
   it('holds a question to a type, a basis and a reason research cannot settle it', () => {
     expect(
       questionGateProblems({ prompt: 'Which one?', questionType: 'fact' }).map(

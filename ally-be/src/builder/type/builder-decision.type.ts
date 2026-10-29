@@ -63,6 +63,16 @@ export interface BuilderDecisionOption {
    * click picks before it sends.
    */
   confirm?: boolean;
+  /**
+   * Can't be taken back once done. Replaces `confirm` (kept as a read alias
+   * until every client reads this): the card arms a one-way option on the
+   * first press, shows `consequence` in place, and only a second, deliberate
+   * press after a short delay sends it. Every other answer sends at once and
+   * is offered back for an undo window instead.
+   */
+  oneWay?: boolean;
+  /** What happens if this is chosen, in one line: "Merges #412 to master." Shown when armed. */
+  consequence?: string;
 }
 
 export interface BuilderDecision {
@@ -117,7 +127,12 @@ export type BuilderDecisionOutcome =
 
 export interface BuilderDecisionAnswerResult {
   ok: true;
-  outcome: BuilderDecisionOutcome;
+  /** `pending`: held for the undo window; it reaches the session at `undoableUntil`. */
+  outcome: BuilderDecisionOutcome | 'pending';
+  /** Set when the answer can still be taken back with DELETE …/answer. */
+  undoableUntil?: string;
+  /** The History row this answer wrote, when the write succeeded. */
+  historyId?: string | null;
 }
 
 /** Decision kinds and their category. */
