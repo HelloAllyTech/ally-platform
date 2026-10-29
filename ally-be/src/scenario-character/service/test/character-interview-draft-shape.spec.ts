@@ -65,6 +65,10 @@ describe('save_character_draft — per-language shapes', () => {
     profession: 'Schoolteacher',
     currentLocation: 'Pune',
     characterProfileText: 'A 34-year-old schoolteacher in Pune.',
+    // Style and samples are mandatory now (characters were being saved with
+    // both sections empty); each shape test overrides the map it exercises.
+    languageCharacteristics: { '1': 'Measured, formal English.' },
+    linguisticStyleSamples: { '1': ['I am managing, thank you.'] },
   };
 
   const run = async (input: Record<string, any>) => {
@@ -199,5 +203,21 @@ describe('save_character_draft — per-language shapes', () => {
     expect(Object.keys(draft.languageCharacteristics ?? {})).toEqual([
       'klingon',
     ]);
+  });
+
+  it('rejects a draft with no language style, so the agent fills it and retries', async () => {
+    const { outcome } = await run({ languageCharacteristics: undefined });
+    expect(outcome.modelResult.ok).toBe(false);
+    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
+      /languageCharacteristics is required/,
+    );
+  });
+
+  it('rejects a draft with no dialect samples, so the agent fills them and retries', async () => {
+    const { outcome } = await run({ linguisticStyleSamples: {} });
+    expect(outcome.modelResult.ok).toBe(false);
+    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
+      /linguisticStyleSamples is required/,
+    );
   });
 });

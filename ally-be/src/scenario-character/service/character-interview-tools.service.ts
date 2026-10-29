@@ -412,6 +412,11 @@ export class CharacterInterviewToolsService {
             'profession',
             'currentLocation',
             'characterProfileText',
+            // Required since models reliably satisfy schema `required` but
+            // routinely skipped these as optional, saving characters whose
+            // Language style and Dialect samples sections arrived empty.
+            'languageCharacteristics',
+            'linguisticStyleSamples',
           ],
         },
       },
@@ -847,6 +852,24 @@ export class CharacterInterviewToolsService {
     }
     if (linguisticStyleSamples.some((sample) => sample.length > 300)) {
       errors.push('each linguistic style sample must be ≤300 chars');
+    }
+    // Presence, not per-language completeness: shape leniency above files
+    // whatever the model sent, but a draft with NO style or NO samples saves a
+    // character whose speech sections are empty and the actor plays generic.
+    // ok=false makes the agent fill them and retry rather than skip silently.
+    if (Object.keys(languageCharacteristics).length === 0) {
+      errors.push(
+        'languageCharacteristics is required — describe how the character ' +
+          'speaks each of their languages (dialect, register, code-mixing, ' +
+          'pace, verbal tics), keyed by the numeric languageId from get_voices',
+      );
+    }
+    if (linguisticStyleSamples.length === 0) {
+      errors.push(
+        'linguisticStyleSamples is required — write 6-12 sample utterances ' +
+          'per language, keyed by the numeric languageId, each in that ' +
+          "language's own script",
+      );
     }
 
     const knowledgeSources = (
