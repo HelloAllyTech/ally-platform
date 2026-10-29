@@ -28,6 +28,7 @@ import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-togg
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefConsoleService } from '../service/debrief-console.service';
+import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefImproverService } from '../service/debrief-improver.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
@@ -39,6 +40,21 @@ class ReasonDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+}
+
+class ResolveFlagDto {
+  @ApiProperty({ enum: ['kept', 'removed'] })
+  @IsIn(['kept', 'removed'])
+  outcome!: 'kept' | 'removed';
+
+  @ApiProperty({
+    required: false,
+    description: 'Required to keep a point: the learner reads it.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 class TenantLiveDto {
@@ -77,7 +93,69 @@ export class DebriefConsoleController {
     private readonly judge: DebriefRunJudgeService,
     private readonly improver: DebriefImproverService,
     private readonly testSets: DebriefTestSetsService,
+    private readonly feedback: DebriefFeedbackService,
   ) {}
+
+  @Get('review')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'The review queue: live debriefs a person must finish or check, and open flags',
+  })
+  review() {
+    return this.feedback.queue();
+  }
+
+  @Post('runs/:id/publish')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({ summary: 'Publish a live run’s best draft as it is' })
+  publishRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.feedback.publishRun(id, req.user.id, body?.reason);
+  }
+
+  @Post('runs/:id/todays-debrief')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Show the learner today’s debrief for this session instead',
+  })
+  fallbackRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.feedback.fallbackRun(id, req.user.id, body?.reason);
+  }
+
+  @Post('runs/:id/reviewed')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'A below-the-bar debrief was checked and stays as it is',
+  })
+  reviewedRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.feedback.markReviewed(id, req.user.id, body?.reason);
+  }
+
+  @Post('flags/:id/resolve')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Resolve a learner’s flag: keep the point (with a reason) or remove it',
+  })
+  resolveFlag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ResolveFlagDto,
+  ) {
+    return this.feedback.resolveFlag(id, req.user.id, body.outcome, body.note);
+  }
 
   @Get('overview')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)

@@ -27,3 +27,31 @@ export enum DebriefRunArm {
   BASELINE = 'baseline',
   CHALLENGER = 'challenger',
 }
+
+/** What a learner told us about a debrief (debrief_run_feedback.kind). */
+export enum DebriefFeedbackKind {
+  /** "Was this helpful?" — one per learner per debrief. */
+  HELPFUL = 'helpful',
+  /** "This isn't right" on one card. */
+  FLAG = 'flag',
+}
+
+export enum DebriefFlagReason {
+  DIDNT_SAY = 'didnt_say',
+  DESCRIBED_WRONGLY = 'described_wrongly',
+  ADVICE_DOESNT_FIT = 'advice_doesnt_fit',
+  SOMETHING_ELSE = 'something_else',
+}
+
+export enum DebriefFeedbackStatus {
+  /** A flag waiting for the Ally team. */
+  OPEN = 'open',
+  /** Reviewed: the point stays, with the reviewer's reason. */
+  KEPT = 'kept',
+  /** Reviewed: the point is taken out of the learner's debrief. */
+  REMOVED = 'removed',
+  /** The learner undid it within the undo window. */
+  WITHDRAWN = 'withdrawn',
+  /** A "was this helpful?" answer: nothing to review. */
+  NOTED = 'noted',
+}

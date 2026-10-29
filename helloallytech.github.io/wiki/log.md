@@ -424,3 +424,6 @@ This is an append-only log of modifications, updates, and indexing runs performe
 ## [2026-10-29] update | The Debrief agent and its Improver, in shadow.
 - `repos/ally-be.md`: new `debrief/` module — recipe runner, budget and fallback ladder, shadow everywhere and live per organisation, `debrief_runs`, the Improver's daily analysis, screens on test sets and approval into releases.
 - `repos/ally-ai.md`: the remaining `/debrief/*` steps and `/debrief/improver/analyse`; the debrief-quality judge takes the trainee history the writer saw.
+
+## [2026-10-29] update | Debriefs: every risk cue covered, learner flags, review queue, live on session end.
+- `repos/ally-be.md`: the Debrief agent's learner feedback (`debrief_run_feedback`), the Review tab, risk-cue coverage, and live runs starting on session end.

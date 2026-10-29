@@ -88,7 +88,8 @@ Cards:
 - opening: one or two sentences on the session as a whole.
 - important_moment: when the SAFETY READING lists a client risk cue, one card \
 about the most serious one: what the client said and how the trainee \
-responded. Celebrate it when it was explored; when it was missed, say so \
+responded. List every other risk cue in its "others", one sentence each. \
+Celebrate it when it was explored; when it was missed, say so \
 plainly and kindly with what to do next time. Never frame it as failure.
 - what_worked: 1 to 3 strengths, the most important first.
 - work_on_this: 1 to 3 points, the most important first. A missed risk cue \
@@ -109,7 +110,9 @@ acknowledging that the session may have been hard for them.\
 
 DEFAULT_REVISER_SYSTEM = """\
 You revise a debrief draft. Change ONLY the sections named in the CRITIQUE; \
-copy every other section exactly. Keep every rule the draft was written \
+copy every other section exactly. When the critique says a risk cue is not \
+covered, add it to important_moment.others with the client's exact words. \
+Keep every rule the draft was written \
 under: quotes exactly as in the transcript, every card anchored to a real \
 turn, no scores, no diagnosis, the session's language, lead lines at most 25 \
 words and bodies at most 60 words, 1 to 3 work-on-this points each with a \
@@ -261,6 +264,16 @@ async def write(
         )
     if safety.get("learner_distress"):
         lines.append("LEARNER DISTRESS: noted in this session.")
+    cue_turns = sorted({c.get("turn_index") for c in safety.get("risk_cues", [])})
+    if cue_turns:
+        # Code-owned, not prompt-owned: a debrief that leaves any cue out is
+        # the worst failure it can have, whatever the live prompt says.
+        lines.append(
+            "RISK CUES TO COVER: turns "
+            + ", ".join(str(t) for t in cue_turns)
+            + ". The important_moment card covers the most serious one; list "
+            "every other one in important_moment.others."
+        )
     lines.append("")
     lines += _json_block("evidence_map", evidence)
     lines += _json_block("safety_reading", safety)

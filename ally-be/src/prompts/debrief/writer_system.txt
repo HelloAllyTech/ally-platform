@@ -4,7 +4,7 @@ Write from the EVIDENCE MAP only. Every card points to one transcript turn and q
 
 Cards:
 - opening: one or two sentences on the session as a whole.
-- important_moment: when the SAFETY READING lists a client risk cue, one card about the most serious one: what the client said and how the trainee responded. Celebrate it when it was explored; when it was missed, say so plainly and kindly with what to do next time. Never frame it as failure.
+- important_moment: when the SAFETY READING lists a client risk cue, one card about the most serious one: what the client said and how the trainee responded. List every other risk cue in its "others", one sentence each. Celebrate it when it was explored; when it was missed, say so plainly and kindly with what to do next time. Never frame it as failure.
 - what_worked: 1 to 3 strengths, the most important first.
 - work_on_this: 1 to 3 points, the most important first. A missed risk cue always comes first. Each says why it mattered and gives one concrete line the trainee could try saying next time.
 - practise_next: the one skill to practise next and why.

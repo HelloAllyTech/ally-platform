@@ -98,12 +98,27 @@ class ProgressReading(BaseModel):
 SkillWord = Literal["strength", "keep_practising", "didnt_come_up"]
 
 
+class OtherMoment(BaseModel):
+    turn_index: int
+    quote: str = Field(description="The client's words, exactly as in the transcript.")
+    note: str = Field(
+        description="One sentence, at most 30 words: how the trainee responded to it."
+    )
+
+
 class ImportantMomentCard(BaseModel):
     turn_index: int
     quote: str = Field(description="The client's words, exactly as in the transcript.")
     handled_well: bool
     lead: str = Field(description="At most 25 words, in Ally's voice.")
     body: str = Field(description="At most 60 words.")
+    others: List[OtherMoment] = Field(
+        default_factory=list,
+        description=(
+            "Every OTHER risk cue in the safety reading, one entry each, so no "
+            "cue goes unmentioned. Empty when there is only one."
+        ),
+    )
 
 
 class WorkedCard(BaseModel):

@@ -1,5 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
-import { DebriefAgentService } from '../service/debrief-agent.service';
+import {
+  DebriefAgentService,
+  LIVE_START_DELAY_MS,
+} from '../service/debrief-agent.service';
 
 function build(opts: {
   owner?: number;
@@ -89,5 +92,62 @@ describe('DebriefAgentService.learnerView', () => {
         }).learnerView('s', 7)
       ).state,
     ).toBe('on_its_way');
+  });
+});
+
+describe('DebriefAgentService.onSessionEnded', () => {
+  const make = (live: boolean, mode: 'off' | 'shadow' = 'shadow') => {
+    const runner = {
+      run: jest.fn(async () => ({
+        id: 'r',
+        status: 'published',
+        fallbackRung: 0,
+        cards: null,
+      })),
+    };
+    const releases = { syncSeed: jest.fn() };
+    const overrides = {
+      get: jest.fn(async () => (live ? { values: { live: true } } : null)),
+    };
+    const svc = new DebriefAgentService(
+      {} as any,
+      {} as any,
+      runner as any,
+      { judge: jest.fn() } as any,
+      releases as any,
+      overrides as any,
+      { debriefAgentMode: mode } as any,
+    );
+    return { svc, runner };
+  };
+  const event = {
+    scenarioSessionId: 's1',
+    tenantId: 't1',
+    userId: 7,
+    date: new Date(),
+    durationMinutes: 4,
+  };
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('starts a live debrief shortly after a switched-on session ends', async () => {
+    const { svc, runner } = make(true);
+    await svc.onSessionEnded(event);
+    expect(runner.run).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(LIVE_START_DELAY_MS);
+    expect(runner.run).toHaveBeenCalledWith('s1', { mode: 'live' });
+  });
+
+  it('leaves shadow organisations to the drain, and does nothing when switched off', async () => {
+    for (const [live, mode] of [
+      [false, 'shadow'],
+      [true, 'off'],
+    ] as const) {
+      const { svc, runner } = make(live, mode);
+      await svc.onSessionEnded(event);
+      await jest.advanceTimersByTimeAsync(LIVE_START_DELAY_MS);
+      expect(runner.run).not.toHaveBeenCalled();
+    }
   });
 });

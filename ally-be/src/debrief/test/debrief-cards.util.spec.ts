@@ -142,6 +142,39 @@ describe('debrief checks', () => {
     expect(run(c)).toContain(DebriefCheckCode.WRONG_SPEAKER);
   });
 
+  it('requires every risk cue to be covered, not only the most serious', () => {
+    const twoCues = {
+      risk_cues: [
+        ...safety.risk_cues,
+        {
+          turn_index: 4,
+          quote: 'Exams',
+          category: 'hopelessness',
+          learner_response: 'missed',
+        },
+      ],
+      learner_distress: [],
+    };
+    expect(run(good(), { safety: twoCues })).toContain(
+      DebriefCheckCode.RISK_CUE_UNCOVERED,
+    );
+    const c = good();
+    c.important_moment!.others = [
+      { turn_index: 4, quote: 'Exams, mostly.', note: 'You moved on.' },
+    ];
+    expect(run(c, { safety: twoCues })).toEqual([]);
+    expect(renderCards(c)).toContain('Other moments like this:');
+    c.important_moment!.others = [
+      { turn_index: 3, quote: 'Can you tell me more?', note: 'x' },
+    ];
+    expect(run(c, { safety: twoCues })).toEqual(
+      expect.arrayContaining([
+        DebriefCheckCode.WRONG_SPEAKER,
+        DebriefCheckCode.RISK_CUE_UNCOVERED,
+      ]),
+    );
+  });
+
   it('requires the important moment whenever there is a risk cue', () => {
     const c = good();
     c.important_moment = null;

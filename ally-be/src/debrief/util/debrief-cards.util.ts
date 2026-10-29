@@ -21,6 +21,8 @@ export interface ImportantMomentCard {
   handled_well: boolean;
   lead: string;
   body: string;
+  /** Every other risk cue, one line each, so none goes unmentioned. */
+  others?: Array<{ turn_index: number; quote: string; note: string }>;
 }
 
 export interface WorkedCard {
@@ -149,6 +151,9 @@ export function cardTexts(
   if (cards.important_moment) {
     push('important_moment', cards.important_moment.lead);
     push('important_moment', cards.important_moment.body);
+    cards.important_moment.others?.forEach((o, i) =>
+      push(`important_moment.others[${i}]`, o.note),
+    );
   }
   cards.what_worked?.forEach((c, i) => {
     push(`what_worked[${i}]`, c.lead);
@@ -260,6 +265,14 @@ export function runDebriefChecks(input: {
   if (cards.important_moment) {
     const m = cards.important_moment;
     checkAnchor('important_moment', m.turn_index, m.quote, 'client');
+    (m.others ?? []).forEach((o, i) =>
+      checkAnchor(
+        `important_moment.others[${i}]`,
+        o.turn_index,
+        o.quote,
+        'client',
+      ),
+    );
   }
   worked.forEach((c, i) =>
     checkAnchor(`what_worked[${i}]`, c.turn_index, c.quote, 'counselor'),
@@ -305,6 +318,15 @@ export function runDebriefChecks(input: {
       : []),
     ...worked.map((c, i) => [`what_worked[${i}]`, c.body] as [string, string]),
   ];
+  (cards.important_moment?.others ?? []).forEach((o, i) => {
+    if (wordCount(o.note) > 30) {
+      fail(
+        DebriefCheckCode.TOO_LONG,
+        `important_moment.others[${i}]`,
+        `note is ${wordCount(o.note)} words`,
+      );
+    }
+  });
   for (const [section, body] of bodies) {
     if (wordCount(body) > BODY_MAX_WORDS) {
       fail(
@@ -315,21 +337,30 @@ export function runDebriefChecks(input: {
     }
   }
 
-  // Every client risk cue is the debrief's important moment.
-  const cueTurns = new Set(safety.risk_cues.map((c) => c.turn_index));
-  if (cueTurns.size > 0) {
+  // Every client risk cue is covered: the most serious one by the important
+  // moment, each other one by a line in its `others`. A cue left out is the
+  // worst failure a debrief can have, so a single uncovered turn fails.
+  const cueTurns = [...new Set(safety.risk_cues.map((c) => c.turn_index))];
+  if (cueTurns.length > 0) {
     if (!cards.important_moment) {
       fail(
         DebriefCheckCode.RISK_CUE_UNCOVERED,
         'important_moment',
-        `${cueTurns.size} risk cue(s) and no important-moment card`,
+        `${cueTurns.length} risk cue(s) and no important-moment card`,
       );
-    } else if (!cueTurns.has(cards.important_moment.turn_index)) {
-      fail(
-        DebriefCheckCode.RISK_CUE_UNCOVERED,
-        'important_moment',
-        'the important moment is not one of the risk cues',
-      );
+    } else {
+      const covered = new Set([
+        cards.important_moment.turn_index,
+        ...(cards.important_moment.others ?? []).map((o) => o.turn_index),
+      ]);
+      const missing = cueTurns.filter((t) => !covered.has(t));
+      if (missing.length) {
+        fail(
+          DebriefCheckCode.RISK_CUE_UNCOVERED,
+          'important_moment.others',
+          `the risk cue(s) at turn ${missing.join(', ')} are not covered`,
+        );
+      }
     }
   }
 
@@ -406,8 +437,14 @@ export function renderCards(cards: DebriefCards): string {
       'An important moment:',
       `${m.lead} "${m.quote}" (turn ${m.turn_index})`,
       m.body,
-      '',
     );
+    if (m.others?.length) {
+      lines.push('Other moments like this:');
+      for (const o of m.others) {
+        lines.push(`- "${o.quote}" (turn ${o.turn_index}) ${o.note}`);
+      }
+    }
+    lines.push('');
   }
   if (cards.what_worked?.length) {
     lines.push('What worked:');

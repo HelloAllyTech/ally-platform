@@ -1302,7 +1302,7 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   {
     name: 'Debrief Writer',
     description:
-      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress. Never sees the rubric. Release-only.",
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1315,7 +1315,7 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   {
     name: 'Debrief Reviser',
     description:
-      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged. Release-only.",
+      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },

@@ -247,3 +247,21 @@ def test_judge_and_evaluator_see_the_history_the_writer_saw():
     )
     assert "<trainee_history>" in p and "Let the client finish." in p
     assert "<trainee_history>" not in build_judge_prompt([], "d", "en")
+
+
+@pytest.mark.asyncio
+async def test_writer_is_told_every_risk_cue_turn_to_cover(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {
+            "risk_cues": [{"turn_index": 9}, {"turn_index": 2}, {"turn_index": 9}],
+            "learner_distress": [],
+        },
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    assert "RISK CUES TO COVER: turns 2, 9." in calls["prompt"]

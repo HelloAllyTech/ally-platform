@@ -28,6 +28,7 @@ import {
 import { DebriefRunArm, DebriefRunMode } from '../enum/debrief-run.enum';
 import { DebriefAiClient } from './debrief-ai.client';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefFeedbackService } from './debrief-feedback.service';
 import {
   DebriefRunJudgeService,
   RunJudgment,
@@ -113,6 +114,16 @@ export interface ImproverSignals {
   checkFailures: Record<string, number>;
   hardFails: Record<string, number>;
   byLanguage: Record<string, { runs: number; judgeMean: number | null }>;
+  /** What learners in switched-on organisations said: counts only. */
+  learners: {
+    helpful: { answered: number; yes: number; rate: number | null };
+    flags: Array<{
+      section: string;
+      reason: string;
+      status: string;
+      n: number;
+    }>;
+  };
 }
 
 /**
@@ -144,6 +155,7 @@ export class DebriefImproverService implements OnModuleInit {
     private readonly testSets: DebriefTestSetsService,
     private readonly releases: AgentReleaseService,
     private readonly prompts: PromptVersioningService,
+    private readonly learnerFeedback: DebriefFeedbackService,
   ) {}
 
   onModuleInit(): void {
@@ -271,6 +283,7 @@ export class DebriefImproverService implements OnModuleInit {
                     AND r."createdAt" >= now() - make_interval(days => $1)
                   GROUP BY 1`),
       ),
+      learners: await this.learnerFeedback.signals(windowDays),
       byLanguage: Object.fromEntries(
         byLanguage.map((r) => [
           r.k,

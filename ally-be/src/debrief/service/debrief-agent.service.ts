@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
@@ -16,6 +17,10 @@ import {
   DEBRIEF_SEED_BUNDLE,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
+import {
+  ScenarioSessionLeaderboardEndedEventParams,
+  ScenarioSessionLeaderboardEvent,
+} from '../../learn/type/scenario-session-leaderboard-event.type';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService } from './debrief-runner.service';
@@ -23,6 +28,12 @@ import { DebriefRunnerService } from './debrief-runner.service';
 /** Sessions per 5-minute tick; at today's volume the backlog clears in one or two ticks. */
 const DRAIN_BATCH = 8;
 const DRAIN_CONCURRENCY = 2;
+/**
+ * How long after a live session ends its debrief starts: long enough for the
+ * last turns to land, short enough that the learner is still on the page.
+ * The drain is the backstop if this instance restarts in between.
+ */
+export const LIVE_START_DELAY_MS = 45_000;
 /** Only recent sessions: a debrief days late is not what a learner waits for. */
 const DRAIN_WINDOW_HOURS = 48;
 
@@ -41,6 +52,7 @@ export const DEBRIEF_POLICY: PolicySchema = {
 /** What a learner can read: cards only once published, nothing about the run. */
 export interface LearnerDebriefView {
   state: 'ready' | 'working' | 'on_its_way' | 'too_short' | 'not_available';
+  runId?: string;
   cards?: Record<string, any> | null;
   language?: string | null;
   steps?: string[];
@@ -173,6 +185,55 @@ export class DebriefAgentService implements OnModuleInit {
     this.logger.info(`[debrief] drain finished ${done}/${pending.length}`);
   }
 
+  /**
+   * A learner in a switched-on organisation is waiting on the Debrief tab, so
+   * their debrief starts as soon as the session ends instead of at the next
+   * drain (which waits for sessions to settle). Shadow runs keep to the drain:
+   * nobody is waiting for them.
+   */
+  @OnEvent(ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED, {
+    async: true,
+  })
+  async onSessionEnded(
+    event: ScenarioSessionLeaderboardEndedEventParams,
+  ): Promise<void> {
+    if (this.config.debriefAgentMode === 'off') return;
+    if (
+      !event?.scenarioSessionId ||
+      !(await this.isLive(event.tenantId ?? null))
+    ) {
+      return;
+    }
+    setTimeout(() => {
+      void this.runLiveNow(event.scenarioSessionId);
+    }, LIVE_START_DELAY_MS);
+  }
+
+  async runLiveNow(sessionId: string): Promise<void> {
+    try {
+      await this.ensureRelease();
+      const run = await this.runner.run(sessionId, {
+        mode: DebriefRunMode.LIVE,
+      });
+      this.logger.info(
+        `[debrief] live run ${run.id} session=${sessionId} status=${run.status} rung=${run.fallbackRung} (on session end)`,
+      );
+      if (run.cards) {
+        await this.judge
+          .judge(run)
+          .catch((e) =>
+            this.logger.warn(
+              `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
+            ),
+          );
+      }
+    } catch (e) {
+      this.logger.error(
+        `[debrief] live run for session ${sessionId} failed to start: ${(e as Error).message}`,
+      );
+    }
+  }
+
   /** What the learner sees on the Debrief tab, for their own session only. */
   async learnerView(
     sessionId: string,
@@ -213,7 +274,12 @@ export class DebriefAgentService implements OnModuleInit {
         };
       case DebriefRunStatus.PUBLISHED:
       case DebriefRunStatus.BELOW_BAR:
-        return { state: 'ready', cards: run.cards, language: run.language };
+        return {
+          state: 'ready',
+          runId: run.id,
+          cards: run.cards,
+          language: run.language,
+        };
       case DebriefRunStatus.SKIPPED:
         return {
           state: run.skipReason === 'too_short' ? 'too_short' : 'not_available',
