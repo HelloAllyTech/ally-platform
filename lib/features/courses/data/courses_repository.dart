@@ -286,10 +286,23 @@ final Provider<CoursesRepository> coursesRepositoryProvider = Provider<CoursesRe
   return CoursesRepository(
     ref.watch(apiClientProvider),
     // `LearnTrackDetail` also tags `getLearnTrackProgress` in RN.
+    //
+    // `ref.invalidate` is deliberately NOT used here: these three all
+    // `ref.watch(coursesRepositoryProvider)`, i.e. they are this provider's
+    // own dependents, and Riverpod's `Ref.invalidate` hard-fails with a
+    // `CircularDependencyError` ("Circular dependency detected... This
+    // happens when a provider somehow depends on itself") the moment a
+    // provider tries to invalidate one of its own watchers through its own
+    // ref — every call here threw, so starting ANY track item (every type,
+    // not just games) failed before the real request even had a chance to
+    // resolve. `ref.container.invalidate` does the identical underlying
+    // work but skips that provider-authoring safety check, which only
+    // exists to catch an accidental cycle in a provider's *build* graph —
+    // not relevant to an explicit, one-shot cache-bust like this.
     onInvalidateTracks: () {
-      ref.invalidate(learnTracksProvider);
-      ref.invalidate(trackDetailProvider);
-      ref.invalidate(trackProgressProvider);
+      ref.container.invalidate(learnTracksProvider);
+      ref.container.invalidate(trackDetailProvider);
+      ref.container.invalidate(trackProgressProvider);
     },
   );
 });
