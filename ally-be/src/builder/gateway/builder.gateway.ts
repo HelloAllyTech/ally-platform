@@ -13,6 +13,7 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { BuilderBuildEvent } from '../entity/builder-build-event.entity';
 import { BuilderEventService } from '../service/builder-event.service';
+import { BuilderLiveService } from '../service/builder-live.service';
 
 const sessionRoom = (sessionId: string) => `session:${sessionId}`;
 
@@ -23,6 +24,10 @@ export const BuilderSocketEvents = {
   JOINED: 'joined',
   /** A batch of new build events for the joined session. */
   EVENTS: 'buildEvents',
+  /** The Builder tab's decisions changed: refetch. No payload. */
+  DECISIONS_CHANGED: 'decisionsChanged',
+  /** A session in progress moved: refetch. No payload. */
+  SESSIONS_CHANGED: 'sessionsChanged',
 } as const;
 
 /**
@@ -49,6 +54,7 @@ export class BuilderGateway
   constructor(
     private readonly webSocketAuthMiddleware: WebSocketAuthMiddleware,
     private readonly eventService: BuilderEventService,
+    private readonly liveService: BuilderLiveService,
   ) {}
 
   @WebSocketServer()
@@ -63,11 +69,22 @@ export class BuilderGateway
 
     this.eventService.addListener((sessionId, events) => {
       this.broadcast(sessionId, events);
+      // A run moving is the Now page's row moving.
+      this.liveService.changed('sessionsChanged');
+    });
+
+    // The Builder tab listens on the namespace, not a room: every admin with
+    // VIEW_BUILDER sees the same feed.
+    this.liveService.setListener((events) => {
+      for (const event of events) {
+        this.server?.emit(event, { at: Date.now() });
+      }
     });
   }
 
   onModuleDestroy() {
     this.eventService.removeListener();
+    this.liveService.setListener(null);
   }
 
   handleConnection(client: any) {

@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { BuilderDecisionService } from '../builder-decision.service';
 import {
   BuilderMessageRole,
@@ -64,6 +68,11 @@ describe('BuilderDecisionService', () => {
     const pullRequests = over.pullRequests ?? [];
     const sessionRepository = {
       find: jest.fn().mockResolvedValue(sessions),
+      findOne: jest.fn(({ where }: { where: { id: string } }) =>
+        Promise.resolve(
+          sessions.find((entry: any) => entry.id === where.id) ?? null,
+        ),
+      ),
       findCreatorNames: jest.fn().mockResolvedValue(new Map([[7, 'Sandeep']])),
     };
     const messageRepository = {
@@ -113,9 +122,27 @@ describe('BuilderDecisionService', () => {
       [string, Record<string, any>, number]
     >;
     const orchestrator = { streamTurn };
+    const store = new Map<string, string>();
     const redisService = {
       acquireLock: jest.fn().mockResolvedValue(over.locked ?? true),
       releaseLock: jest.fn().mockResolvedValue(undefined),
+      get: jest.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
+      set: jest.fn((key: string, value: string) => {
+        store.set(key, value);
+        return Promise.resolve();
+      }),
+      del: jest.fn((key: string) => {
+        store.delete(key);
+        return Promise.resolve();
+      }),
+      getByPattern: jest.fn(() =>
+        Promise.resolve([...store.keys()].map((key) => `ally:${key}`)),
+      ),
+    };
+    const historyService = {
+      recordDecision: jest.fn().mockResolvedValue({ id: 'h-1' }),
+      markApplied: jest.fn().mockResolvedValue(undefined),
+      markUndone: jest.fn().mockResolvedValue(undefined),
     };
     const service = new BuilderDecisionService(
       sessionRepository as never,
@@ -127,9 +154,15 @@ describe('BuilderDecisionService', () => {
       sessionService as never,
       orchestrator as never,
       redisService as never,
+      historyService as never,
     );
     return {
       service,
+      // The session page's path: applied at once, no undo window.
+      answer: (id: string, dto: Record<string, any>, userId = 42) =>
+        service.answer(id, dto, userId, { surface: 'session' }),
+      historyService,
+      store,
       buildService,
       pullRequestService,
       sessionService,
@@ -140,6 +173,36 @@ describe('BuilderDecisionService', () => {
   };
 
   const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  const pullRequest = (over: Record<string, any> = {}) => ({
+    id: 'pr-1',
+    sessionId: 'sess-1',
+    repo: 'ally-platform',
+    prNumber: 61,
+    prUrl: 'https://github.com/x/y/pull/61',
+    title: 'feat: digest',
+    state: 'open',
+    merged: false,
+    ciStatus: 'success',
+    fixRunCount: 0,
+    needsHumanAt: null,
+    needsHumanReason: null,
+    escalationResolution: null,
+    mergePromptedAt: null,
+    ...over,
+  });
+
+  const pendingStub = (id: string, optionIds: string[]): any => ({
+    id,
+    kind: id.split(':')[0],
+    category: 'what',
+    sessionId: 'sess-1',
+    sessionTitle: 'Weekly digest email',
+    prompt: 'Stub',
+    options: optionIds.map((option) => ({ id: option, label: option })),
+    waitingSince: earlier.toISOString(),
+    questionType: null,
+  });
 
   describe('listPending', () => {
     it('surfaces the last assistant row’s unanswered question, with its context', async () => {
@@ -518,18 +581,18 @@ describe('BuilderDecisionService', () => {
 
   describe('answer', () => {
     it('runs an interview turn in the background with the picked option, under the turn lock', async () => {
-      const { service, streamTurn, redisService } = build({
+      const { answer, streamTurn, redisService } = build({
         messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
       });
 
-      const result = await service.answer(
+      const result = await answer(
         'question:sess-1:q-1',
         { selectedOptionIds: ['mon'] },
         42,
       );
       await flush();
 
-      expect(result).toEqual({ ok: true, outcome: 'turn_started' });
+      expect(result).toMatchObject({ ok: true, outcome: 'turn_started' });
       expect(redisService.acquireLock).toHaveBeenCalledWith(
         'builder-turn:sess-1',
         300,
@@ -549,11 +612,11 @@ describe('BuilderDecisionService', () => {
     });
 
     it('sends a custom answer as the admin’s words', async () => {
-      const { service, streamTurn } = build({
+      const { answer, streamTurn } = build({
         messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
       });
 
-      await service.answer(
+      await answer(
         'question:sess-1:q-1',
         { customValues: ['Wednesday, after the standup'] },
         42,
@@ -568,7 +631,7 @@ describe('BuilderDecisionService', () => {
     });
 
     it('refuses a question that has already been answered', async () => {
-      const { service, streamTurn } = build({
+      const { answer, streamTurn } = build({
         messages: {
           'sess-1': [
             assistantRow({ questions: [question()] }),
@@ -584,33 +647,25 @@ describe('BuilderDecisionService', () => {
       });
 
       await expect(
-        service.answer(
-          'question:sess-1:q-1',
-          { selectedOptionIds: ['mon'] },
-          42,
-        ),
+        answer('question:sess-1:q-1', { selectedOptionIds: ['mon'] }, 42),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(streamTurn).not.toHaveBeenCalled();
     });
 
     it('refuses to start a turn while another holds the session lock', async () => {
-      const { service, streamTurn } = build({
+      const { answer, streamTurn } = build({
         locked: false,
         messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
       });
 
       await expect(
-        service.answer(
-          'question:sess-1:q-1',
-          { selectedOptionIds: ['mon'] },
-          42,
-        ),
+        answer('question:sess-1:q-1', { selectedOptionIds: ['mon'] }, 42),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(streamTurn).not.toHaveBeenCalled();
     });
 
     it('releases the lock even when the turn throws', async () => {
-      const { service, redisService, streamTurn } = build({
+      const { answer, redisService, streamTurn } = build({
         messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
       });
       streamTurn.mockImplementation(async function* () {
@@ -619,11 +674,7 @@ describe('BuilderDecisionService', () => {
         yield { event: 'done', data: {} };
       });
 
-      await service.answer(
-        'question:sess-1:q-1',
-        { selectedOptionIds: ['mon'] },
-        42,
-      );
+      await answer('question:sess-1:q-1', { selectedOptionIds: ['mon'] }, 42);
       await flush();
 
       expect(redisService.releaseLock).toHaveBeenCalledWith(
@@ -632,7 +683,7 @@ describe('BuilderDecisionService', () => {
     });
 
     it('confirms every brief line and carries the note', async () => {
-      const { service, streamTurn } = build({
+      const { answer, streamTurn } = build({
         messages: {
           'sess-1': [
             assistantRow({
@@ -649,7 +700,7 @@ describe('BuilderDecisionService', () => {
         },
       });
 
-      await service.answer(
+      await answer(
         'brief:sess-1:brief-1',
         {
           selectedOptionIds: ['confirm_all'],
@@ -674,33 +725,29 @@ describe('BuilderDecisionService', () => {
 
     it('routes start, design and approve to the build service', async () => {
       const ready = session({ status: BuilderSessionStatus.PRD_READY });
-      const { service, buildService } = build({ sessions: [ready] });
+      const { answer, service, buildService } = build({ sessions: [ready] });
+      // Routing only: which decision is pending is the derivation tests' job.
+      jest
+        .spyOn(service, 'findPending')
+        .mockImplementation((id: string) =>
+          Promise.resolve(
+            pendingStub(id, ['start', 'design', 'approve', 'redraft']),
+          ),
+        );
 
       await expect(
-        service.answer(
-          'start_build:sess-1',
-          { selectedOptionIds: ['start'] },
-          42,
-        ),
-      ).resolves.toEqual({ ok: true, outcome: 'build_started' });
+        answer('start_build:sess-1', { selectedOptionIds: ['start'] }, 42),
+      ).resolves.toMatchObject({ ok: true, outcome: 'build_started' });
       expect(buildService.startBuild).toHaveBeenCalledWith(ready, 42);
 
       await expect(
-        service.answer(
-          'start_build:sess-1',
-          { selectedOptionIds: ['design'] },
-          42,
-        ),
-      ).resolves.toEqual({ ok: true, outcome: 'design_started' });
+        answer('start_build:sess-1', { selectedOptionIds: ['design'] }, 42),
+      ).resolves.toMatchObject({ ok: true, outcome: 'design_started' });
       expect(buildService.startDesign).toHaveBeenCalledWith(ready, 42);
 
       await expect(
-        service.answer(
-          'design_review:sess-1',
-          { selectedOptionIds: ['approve'] },
-          42,
-        ),
-      ).resolves.toEqual({ ok: true, outcome: 'design_approved' });
+        answer('design_review:sess-1', { selectedOptionIds: ['approve'] }, 42),
+      ).resolves.toMatchObject({ ok: true, outcome: 'design_approved' });
       expect(buildService.approveDesign).toHaveBeenCalledWith(ready, 42);
     });
 
@@ -710,30 +757,22 @@ describe('BuilderDecisionService', () => {
         budgetUsd: '25',
         totalCostUsd: '26.4',
       });
-      const { service, buildService, sessionService } = build({
+      const { answer, buildService, sessionService } = build({
         sessions: [held],
       });
 
-      await service.answer(
-        'budget:sess-1',
-        { selectedOptionIds: ['raise_10'] },
-        42,
-      );
+      await answer('budget:sess-1', { selectedOptionIds: ['raise_10'] }, 42);
       expect(buildService.raiseBudget).toHaveBeenLastCalledWith(held, 42, 37);
 
-      await service.answer('budget:sess-1', { customValues: ['$60'] }, 42);
+      await answer('budget:sess-1', { customValues: ['$60'] }, 42);
       expect(buildService.raiseBudget).toHaveBeenLastCalledWith(held, 42, 60);
 
-      await service.answer(
-        'budget:sess-1',
-        { selectedOptionIds: ['uncap'] },
-        42,
-      );
+      await answer('budget:sess-1', { selectedOptionIds: ['uncap'] }, 42);
       expect(buildService.raiseBudget).toHaveBeenLastCalledWith(held, 42, 0);
 
       await expect(
-        service.answer('budget:sess-1', { selectedOptionIds: ['stop'] }, 42),
-      ).resolves.toEqual({ ok: true, outcome: 'cancelled' });
+        answer('budget:sess-1', { selectedOptionIds: ['stop'] }, 42),
+      ).resolves.toMatchObject({ ok: true, outcome: 'cancelled' });
       expect(sessionService.cancelSession).toHaveBeenCalledWith('sess-1', 42);
     });
 
@@ -743,31 +782,32 @@ describe('BuilderDecisionService', () => {
         budgetUsd: '25',
         totalCostUsd: '26.4',
       });
-      const { service, buildService } = build({ sessions: [held] });
+      const { answer, buildService } = build({ sessions: [held] });
 
       // A ceiling of 0 means "no ceiling" downstream. Text with no digits, or
       // a typed zero, must be refused rather than uncap the session.
       for (const text of ['none', 'a lot', '0', '$0.00']) {
         await expect(
-          service.answer('budget:sess-1', { customValues: [text] }, 42),
+          answer('budget:sess-1', { customValues: [text] }, 42),
         ).rejects.toBeInstanceOf(BadRequestException);
       }
       expect(buildService.raiseBudget).not.toHaveBeenCalled();
 
-      await service.answer('budget:sess-1', { customValues: ['$1,200'] }, 42);
+      await answer('budget:sess-1', { customValues: ['$1,200'] }, 42);
       expect(buildService.raiseBudget).toHaveBeenLastCalledWith(held, 42, 1200);
     });
 
     it('merges and resumes pull requests through the pull request service', async () => {
-      const { service, pullRequestService } = build();
+      const { answer, pullRequestService } = build({
+        pullRequests: [
+          pullRequest({ id: 'pr-1', mergePromptedAt: earlier }),
+          pullRequest({ id: 'pr-2', needsHumanAt: earlier }),
+        ],
+      });
 
       await expect(
-        service.answer(
-          'pr_merge:sess-1:pr-1',
-          { selectedOptionIds: ['merge'] },
-          42,
-        ),
-      ).resolves.toEqual({ ok: true, outcome: 'merged' });
+        answer('pr_merge:sess-1:pr-1', { selectedOptionIds: ['merge'] }, 42),
+      ).resolves.toMatchObject({ ok: true, outcome: 'merged' });
       expect(pullRequestService.mergePullRequest).toHaveBeenCalledWith(
         'sess-1',
         'pr-1',
@@ -775,12 +815,12 @@ describe('BuilderDecisionService', () => {
       );
 
       await expect(
-        service.answer(
+        answer(
           'pr_needs_human:sess-1:pr-2',
           { selectedOptionIds: ['resume'] },
           42,
         ),
-      ).resolves.toEqual({ ok: true, outcome: 'resumed' });
+      ).resolves.toMatchObject({ ok: true, outcome: 'resumed' });
       expect(pullRequestService.resumeAutomation).toHaveBeenCalledWith(
         'sess-1',
         'pr-2',
@@ -790,18 +830,14 @@ describe('BuilderDecisionService', () => {
 
     it('retries or archives a failed build', async () => {
       const failed = session({ status: BuilderSessionStatus.FAILED });
-      const { service, buildService, sessionService } = build({
+      const { answer, buildService, sessionService } = build({
         sessions: [failed],
       });
 
-      await service.answer(
-        'build_failed:sess-1',
-        { selectedOptionIds: ['retry'] },
-        42,
-      );
+      await answer('build_failed:sess-1', { selectedOptionIds: ['retry'] }, 42);
       expect(buildService.startBuild).toHaveBeenCalledWith(failed, 42);
 
-      await service.answer(
+      await answer(
         'build_failed:sess-1',
         { selectedOptionIds: ['archive'] },
         42,
@@ -811,14 +847,193 @@ describe('BuilderDecisionService', () => {
 
     it('rejects an id that is not a decision, and an answer that picks nothing', async () => {
       const failed = session({ status: BuilderSessionStatus.FAILED });
-      const { service } = build({ sessions: [failed] });
+      const { answer } = build({ sessions: [failed] });
 
-      await expect(service.answer('nonsense', {}, 42)).rejects.toBeInstanceOf(
+      await expect(answer('nonsense', {}, 42)).rejects.toBeInstanceOf(
         BadRequestException,
       );
       await expect(
-        service.answer('build_failed:sess-1', {}, 42),
+        answer('build_failed:sess-1', {}, 42),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('the undo window', () => {
+    const withQuestion = () =>
+      build({
+        messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
+      });
+
+    it('holds a reversible answer from Now instead of applying it', async () => {
+      const { service, streamTurn, store } = withQuestion();
+
+      const result = await service.answer(
+        'question:sess-1:q-1',
+        { selectedOptionIds: ['mon'] },
+        42,
+      );
+
+      expect(result).toMatchObject({ ok: true, outcome: 'pending' });
+      expect(result.undoableUntil).toEqual(expect.any(String));
+      expect(store.has('builder-undo:question:sess-1:q-1')).toBe(true);
+      expect(streamTurn).not.toHaveBeenCalled();
+      service.onModuleDestroy();
+    });
+
+    it('applies the held answer when the window closes, once', async () => {
+      const { service, streamTurn, historyService } = withQuestion();
+      await service.answer(
+        'question:sess-1:q-1',
+        { selectedOptionIds: ['mon'] },
+        42,
+      );
+
+      await service.commitHeld('question:sess-1:q-1');
+      await service.commitHeld('question:sess-1:q-1');
+      await flush();
+
+      expect(streamTurn).toHaveBeenCalledTimes(1);
+      expect(historyService.markApplied).toHaveBeenCalledWith('h-1');
+    });
+
+    it('undo inside the window cancels it and marks the row undone', async () => {
+      const { service, streamTurn, historyService, store } = withQuestion();
+      await service.answer(
+        'question:sess-1:q-1',
+        { selectedOptionIds: ['mon'] },
+        42,
+      );
+
+      await expect(service.undo('question:sess-1:q-1', 42)).resolves.toEqual({
+        ok: true,
+      });
+      await service.commitHeld('question:sess-1:q-1');
+
+      expect(streamTurn).not.toHaveBeenCalled();
+      expect(historyService.markUndone).toHaveBeenCalledWith('h-1');
+      expect(store.size).toBe(0);
+    });
+
+    it('refuses an undo after the window, or by someone else', async () => {
+      const { service } = withQuestion();
+      await service.answer(
+        'question:sess-1:q-1',
+        { selectedOptionIds: ['mon'] },
+        42,
+      );
+
+      await expect(
+        service.undo('question:sess-1:q-1', 99),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await service.commitHeld('question:sess-1:q-1');
+      await expect(
+        service.undo('question:sess-1:q-1', 42),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('hides a held answer from the feed and refuses a second answer', async () => {
+      const { service } = withQuestion();
+      await service.answer(
+        'question:sess-1:q-1',
+        { selectedOptionIds: ['mon'] },
+        42,
+      );
+
+      expect(await service.listPending()).toEqual([]);
+      await expect(
+        service.answer(
+          'question:sess-1:q-1',
+          { selectedOptionIds: ['fri'] },
+          42,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      service.onModuleDestroy();
+    });
+
+    it('sends a one-way option at once, with no window', async () => {
+      const { service, pullRequestService, store } = build({
+        pullRequests: [pullRequest({ id: 'pr-1', mergePromptedAt: earlier })],
+      });
+
+      const result = await service.answer(
+        'pr_merge:sess-1:pr-1',
+        { selectedOptionIds: ['merge'] },
+        42,
+      );
+
+      expect(result).toMatchObject({ outcome: 'merged' });
+      expect(result.undoableUntil).toBeUndefined();
+      expect(pullRequestService.mergePullRequest).toHaveBeenCalled();
+      expect(store.size).toBe(0);
+    });
+
+    it('commits answers a gone instance left behind', async () => {
+      const { service, streamTurn, store } = withQuestion();
+      store.set(
+        'builder-undo:question:sess-1:q-1',
+        JSON.stringify({
+          dto: { selectedOptionIds: ['mon'] },
+          userId: 42,
+          historyId: 'h-9',
+          until: Date.now() - 1000,
+        }),
+      );
+
+      await service.sweepHeld();
+      await flush();
+
+      expect(streamTurn).toHaveBeenCalledTimes(1);
+    });
+
+    it('records History before applying, with the recommendation frozen', async () => {
+      const { answer, historyService } = withQuestion();
+
+      await answer('question:sess-1:q-1', { selectedOptionIds: ['fri'] });
+
+      expect(historyService.recordDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'question:sess-1:q-1' }),
+        expect.objectContaining({ selectedOptionIds: ['fri'] }),
+        expect.objectContaining({ surface: 'session', actorUserId: 42 }),
+      );
+    });
+
+    it('refuses a decision that is no longer pending, and an unknown option', async () => {
+      const { answer } = withQuestion();
+
+      await expect(
+        answer('build_failed:sess-1', { selectedOptionIds: ['retry'] }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(
+        answer('question:sess-1:q-1', { selectedOptionIds: ['tue'] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('marks every one-way option with what it does', async () => {
+      const { service } = build({
+        sessions: [
+          session({
+            status: BuilderSessionStatus.BUILDING,
+            budgetUsd: '25',
+            totalCostUsd: '26',
+          }),
+        ],
+        pullRequests: [pullRequest({ id: 'pr-1', mergePromptedAt: earlier })],
+      });
+
+      const options = (await service.listPending()).flatMap(
+        (decision) => decision.options,
+      );
+      const oneWay = options.filter((option) => option.oneWay);
+
+      expect(oneWay.map((option) => option.id).sort()).toEqual([
+        'merge',
+        'stop',
+        'uncap',
+      ]);
+      for (const option of oneWay) {
+        expect(option.consequence).toEqual(expect.any(String));
+        expect(option.confirm).toBe(true);
+      }
     });
   });
 

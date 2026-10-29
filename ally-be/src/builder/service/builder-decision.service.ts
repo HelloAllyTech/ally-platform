@@ -1,7 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  Optional,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { In, IsNull } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
@@ -43,7 +47,16 @@ import {
 import {
   BUILDER_TURN_LOCK_PREFIX,
   BUILDER_TURN_LOCK_TTL_SECONDS,
+  BUILDER_UNDO_PREFIX,
+  BUILDER_UNDO_SWEEP_MS,
+  BUILDER_UNDO_WINDOW_MS,
 } from '../constants/builder.constants';
+import { BuilderLiveService } from './builder-live.service';
+import {
+  BuilderHistoryAnswer,
+  BuilderHistoryContext,
+  BuilderHistoryService,
+} from './builder-history.service';
 
 /** How much of a long PRD summary or error a card shows before cutting it. */
 const CONTEXT_CLIP = 280;
@@ -60,6 +73,25 @@ const clip = (text: string | null | undefined, max = CONTEXT_CLIP): string => {
 
 const money = (value: number): string => `$${value.toFixed(2)}`;
 
+/** An answer inside its undo window, as stored in Redis. */
+interface HeldAnswer {
+  dto: AnswerBuilderDecisionDto;
+  userId: number;
+  historyId: string | null;
+  /** Epoch ms when the window closes. */
+  until: number;
+}
+
+const parseHeld = (raw: string | null | undefined): HeldAnswer | null => {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as HeldAnswer;
+    return value && typeof value.userId === 'number' ? value : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Everything a Builder session is waiting on a person for, as one list.
  *
@@ -73,10 +105,14 @@ const money = (value: number): string => `$${value.toFixed(2)}`;
  * Builder.
  */
 @Injectable()
-export class BuilderDecisionService {
+export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = LoggerService.getInstance(
     BuilderDecisionService.name,
   );
+
+  /** Timers for answers this instance is holding in their undo window. */
+  private readonly heldTimers = new Map<string, NodeJS.Timeout>();
+  private sweepTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly sessionRepository: BuilderSessionRepository,
@@ -88,7 +124,23 @@ export class BuilderDecisionService {
     private readonly sessionService: BuilderSessionService,
     private readonly orchestrator: BuilderInterviewOrchestratorService,
     private readonly redisService: RedisService,
+    private readonly historyService: BuilderHistoryService,
+    // Optional so specs that build this positionally need not pass it.
+    @Optional() private readonly liveService?: BuilderLiveService,
   ) {}
+
+  onModuleInit(): void {
+    this.sweepTimer = setInterval(() => {
+      void this.sweepHeld();
+    }, BUILDER_UNDO_SWEEP_MS);
+    this.sweepTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.sweepTimer) clearInterval(this.sweepTimer);
+    for (const timer of this.heldTimers.values()) clearTimeout(timer);
+    this.heldTimers.clear();
+  }
 
   /**
    * Every pending decision across every non-archived session, oldest wait
@@ -138,10 +190,36 @@ export class BuilderDecisionService {
       }
     }
 
-    return decisions.sort(
-      (a, b) =>
-        new Date(a.waitingSince).getTime() - new Date(b.waitingSince).getTime(),
+    // An answer inside its undo window is still pending underneath, but it
+    // has been answered: another tab or device must not offer it again.
+    const held = await this.heldIds(decisions.map((decision) => decision.id));
+    return decisions
+      .filter((decision) => !held.has(decision.id))
+      .sort(
+        (a, b) =>
+          new Date(a.waitingSince).getTime() -
+          new Date(b.waitingSince).getTime(),
+      );
+  }
+
+  /** One pending decision, re-derived from its session's state; null if nothing is pending under that id. */
+  async findPending(decisionId: string): Promise<BuilderDecision | null> {
+    const parsed = parseDecisionId(decisionId);
+    if (!parsed) return null;
+    const session = await this.sessionRepository.findOne({
+      where: { id: parsed.sessionId },
+    });
+    if (!session) return null;
+    const [names, pullRequests] = await Promise.all([
+      this.sessionRepository.findCreatorNames([session.createdBy]),
+      this.pullRequestRepository.find({ where: { sessionId: session.id } }),
+    ]);
+    const decisions = await this.decisionsForSession(
+      session,
+      names.get(session.createdBy) ?? null,
+      pullRequests,
     );
+    return decisions.find((decision) => decision.id === decisionId) ?? null;
   }
 
   /**
@@ -154,12 +232,272 @@ export class BuilderDecisionService {
     decisionId: string,
     dto: AnswerBuilderDecisionDto,
     userId: number,
+    context: Omit<BuilderHistoryContext, 'actorUserId'> = { surface: 'now' },
   ): Promise<BuilderDecisionAnswerResult> {
     const parsed = parseDecisionId(decisionId);
     if (!parsed) {
       throw new BadRequestException(`"${decisionId}" is not a decision id.`);
     }
-    const session = await this.sessionService.getSession(parsed.sessionId);
+    if ((await this.heldIds([decisionId])).size) {
+      throw new ConflictException(
+        'You answered this a moment ago. Undo that answer first to change it.',
+      );
+    }
+    const decision = await this.findPending(decisionId);
+    if (!decision) {
+      throw new ConflictException(
+        'This has already been decided, or Builder has moved on from it.',
+      );
+    }
+
+    const picked = dto.selectedOptionIds ?? [];
+    const words =
+      (dto.customValues ?? [])
+        .map((value) => String(value ?? '').trim())
+        .filter(Boolean)
+        .join('\n') || String(dto.message ?? '').trim();
+    const unknown = picked.filter(
+      (id) => !decision.options.some((option) => option.id === id),
+    );
+    if (unknown.length) {
+      throw new BadRequestException(
+        `"${unknown[0]}" is not one of this decision's options.`,
+      );
+    }
+    if (!picked.length && !words && !dto.none) {
+      throw new BadRequestException('Pick an option or write an answer.');
+    }
+    const oneWay = decision.options.some(
+      (option) =>
+        picked.includes(option.id) && (option.oneWay || option.confirm),
+    );
+
+    const history = await this.historyService.recordDecision(
+      decision,
+      { selectedOptionIds: picked, customText: words || null, none: dto.none },
+      // A rule decides on nobody's behalf at the moment it runs.
+      { ...context, actorUserId: context.surface === 'rule' ? null : userId },
+    );
+    const historyId = history?.id ?? null;
+
+    // Reversible answers from Now are held for the undo window; a one-way
+    // option was already armed and confirmed on the card, so it goes now.
+    if (!oneWay && context.surface === 'now') {
+      const until = Date.now() + BUILDER_UNDO_WINDOW_MS;
+      await this.redisService.set(
+        this.heldKey(decisionId),
+        JSON.stringify({ dto, userId, historyId, until } as HeldAnswer),
+        // Long enough to outlive a restart: the sweep commits it late rather
+        // than the answer evaporating.
+        60 * 60,
+      );
+      this.scheduleHeld(decisionId, BUILDER_UNDO_WINDOW_MS);
+      this.liveService?.changed('decisionsChanged');
+      return {
+        ok: true,
+        outcome: 'pending',
+        undoableUntil: new Date(until).toISOString(),
+        historyId,
+      };
+    }
+
+    try {
+      const session = await this.sessionService.getSession(parsed.sessionId);
+      const result = await this.applyAnswer(parsed, session, dto, userId);
+      if (historyId) await this.historyService.markApplied(historyId);
+      this.liveService?.changed('decisionsChanged', 'sessionsChanged');
+      return { ...result, historyId };
+    } catch (error) {
+      if (historyId) {
+        await this.historyService.markApplied(
+          historyId,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The session page took an action that answers a pending decision: write
+   * the same History row the feed would, with surface `session`, after the
+   * action succeeds. Best-effort — the action never waits on History.
+   * `candidateIds` are tried in order (a merge can answer `pr_merge` or
+   * `pr_needs_human`).
+   */
+  async withSessionAnswer<T>(
+    candidateIds: string[],
+    answer: BuilderHistoryAnswer,
+    userId: number,
+    apply: () => Promise<T>,
+  ): Promise<T> {
+    let decision: BuilderDecision | null = null;
+    try {
+      for (const id of candidateIds) {
+        decision = await this.findPending(id);
+        if (decision) break;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not snapshot ${candidateIds.join(' / ')} for History: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    const result = await apply();
+    if (decision) {
+      const row = await this.historyService.recordDecision(decision, answer, {
+        surface: 'session',
+        actorUserId: userId,
+      });
+      if (row) await this.historyService.markApplied(row.id);
+    }
+    return result;
+  }
+
+  /**
+   * Take a reversible answer back inside its undo window. Only the person who
+   * answered may; once the window has closed the answer has reached the
+   * session and the only way to change it is to tell the session so.
+   */
+  async undo(decisionId: string, userId: number): Promise<{ ok: true }> {
+    const lock = `${BUILDER_UNDO_PREFIX}-commit:${decisionId}`;
+    if (!(await this.redisService.acquireLock(lock, 60))) {
+      throw new ConflictException('Too late to undo: it is being sent now.');
+    }
+    try {
+      const raw = await this.redisService.get(this.heldKey(decisionId));
+      const held = parseHeld(raw);
+      if (!held) {
+        throw new ConflictException(
+          'Too late to undo: it has already reached the session.',
+        );
+      }
+      if (held.userId !== userId) {
+        throw new ForbiddenException(
+          'Only the person who answered can undo it.',
+        );
+      }
+      await this.redisService.del(this.heldKey(decisionId));
+      this.clearHeldTimer(decisionId);
+      if (held.historyId) await this.historyService.markUndone(held.historyId);
+      this.liveService?.changed('decisionsChanged');
+      return { ok: true };
+    } finally {
+      await this.redisService.releaseLock(lock);
+    }
+  }
+
+  /** Apply a held answer whose window has closed. Safe to call twice, from any instance. */
+  async commitHeld(decisionId: string): Promise<void> {
+    this.clearHeldTimer(decisionId);
+    const lock = `${BUILDER_UNDO_PREFIX}-commit:${decisionId}`;
+    if (!(await this.redisService.acquireLock(lock, 5 * 60))) return;
+    try {
+      const held = parseHeld(
+        await this.redisService.get(this.heldKey(decisionId)),
+      );
+      if (!held) return; // undone, or another instance got there first
+      await this.redisService.del(this.heldKey(decisionId));
+      const parsed = parseDecisionId(decisionId);
+      if (!parsed) return;
+      try {
+        const session = await this.sessionService.getSession(parsed.sessionId);
+        await this.applyAnswer(parsed, session, held.dto, held.userId);
+        if (held.historyId)
+          await this.historyService.markApplied(held.historyId);
+        this.liveService?.changed('decisionsChanged', 'sessionsChanged');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Held Builder answer ${decisionId} could not be applied: ${message}`,
+        );
+        if (held.historyId) {
+          await this.historyService.markApplied(held.historyId, message);
+        }
+      }
+    } finally {
+      await this.redisService.releaseLock(lock);
+    }
+  }
+
+  private heldKey(decisionId: string): string {
+    return `${BUILDER_UNDO_PREFIX}:${decisionId}`;
+  }
+
+  private async heldIds(decisionIds: string[]): Promise<Set<string>> {
+    if (!decisionIds.length) return new Set();
+    try {
+      const values = await Promise.all(
+        decisionIds.map((id) => this.redisService.get(this.heldKey(id))),
+      );
+      return new Set(decisionIds.filter((_, index) => values[index]));
+    } catch (error) {
+      // Redis down: show everything rather than nothing. A held answer may
+      // appear again for its eight seconds, which the answer path refuses.
+      this.logger.warn(
+        `Could not read held Builder answers: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return new Set();
+    }
+  }
+
+  private scheduleHeld(decisionId: string, delayMs: number): void {
+    this.clearHeldTimer(decisionId);
+    const timer = setTimeout(() => {
+      void this.commitHeld(decisionId);
+    }, delayMs);
+    timer.unref?.();
+    this.heldTimers.set(decisionId, timer);
+  }
+
+  private clearHeldTimer(decisionId: string): void {
+    const timer = this.heldTimers.get(decisionId);
+    if (timer) clearTimeout(timer);
+    this.heldTimers.delete(decisionId);
+  }
+
+  /** Commit held answers whose window closed on an instance that is gone. */
+  async sweepHeld(): Promise<void> {
+    try {
+      const keys = await this.redisService.getByPattern(
+        `*${BUILDER_UNDO_PREFIX}:*`,
+      );
+      for (const key of keys) {
+        const at = key.indexOf(`${BUILDER_UNDO_PREFIX}:`);
+        const decisionId = key.slice(at + BUILDER_UNDO_PREFIX.length + 1);
+        if (!decisionId || this.heldTimers.has(decisionId)) continue;
+        const held = parseHeld(
+          await this.redisService.get(this.heldKey(decisionId)),
+        );
+        if (held && held.until <= Date.now()) await this.commitHeld(decisionId);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Builder undo sweep failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Route an answer to the service call the session page makes for the same
+   * click. Only reached for a decision `answer` has re-derived as pending.
+   */
+  private async applyAnswer(
+    parsed: NonNullable<ReturnType<typeof parseDecisionId>>,
+    session: BuilderSession,
+    dto: AnswerBuilderDecisionDto,
+    userId: number,
+  ): Promise<BuilderDecisionAnswerResult> {
+    const decisionId = buildDecisionId(
+      parsed.kind,
+      parsed.sessionId,
+      parsed.ref,
+    );
     const picked = dto.selectedOptionIds ?? [];
     const custom = (dto.customValues ?? [])
       .map((value) => String(value ?? '').trim())
@@ -594,12 +932,18 @@ export class BuilderDecisionService {
                 label: 'Remove the ceiling',
                 description: 'No spend limit on this session.',
                 confirm: true,
+                oneWay: true,
+                consequence:
+                  'Removes the spend limit. Builder keeps spending on this session without asking.',
               },
               {
                 id: 'stop',
                 label: 'Stop the build',
                 description: 'Nothing already written is lost.',
                 confirm: true,
+                oneWay: true,
+                consequence:
+                  'Cancels this session. Work already pushed stays on its branch.',
               },
             ],
             allowCustom: true,
@@ -681,6 +1025,8 @@ export class BuilderDecisionService {
                 label: 'Merge it as it is',
                 description: 'Refused unless every check is green.',
                 confirm: true,
+                oneWay: true,
+                consequence: `Merges ${label} as it is. A release follows if auto-release is on.`,
               },
             ],
             allowCustom: false,
@@ -708,6 +1054,8 @@ export class BuilderDecisionService {
                   'Checks are read again first; anything red is refused.',
                 recommended: true,
                 confirm: true,
+                oneWay: true,
+                consequence: `Merges ${label}. A release follows if auto-release is on.`,
               },
             ],
             allowCustom: false,
@@ -845,6 +1193,19 @@ export class BuilderDecisionService {
    * the turn ends. The turn still holds the same per-session lock the stream
    * does, so the two surfaces cannot interleave over one transcript.
    */
+  /**
+   * Start an interview turn in the background, under the turn lock — the
+   * server-side seed for a session started from Up next, so three quick
+   * Starts give three running interviews without anyone opening a page.
+   */
+  async startBackgroundTurn(
+    sessionId: string,
+    message: string,
+    userId: number,
+  ): Promise<void> {
+    await this.startTurn(sessionId, { message }, userId);
+  }
+
   private async startTurn(
     sessionId: string,
     dto: CreateBuilderMessageDto,
@@ -880,6 +1241,8 @@ export class BuilderDecisionService {
           }`,
         );
       } finally {
+        // The turn has ended: its question (or PRD) changed the feed.
+        this.liveService?.changed('decisionsChanged', 'sessionsChanged');
         try {
           await this.redisService.releaseLock(lockKey);
         } catch (error) {

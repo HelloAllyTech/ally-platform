@@ -26,6 +26,15 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   @Column({ type: 'int', default: 3 })
   maxConcurrentBuilds!: number;
 
+  /**
+   * How many sessions a person wants in progress at once — their attention,
+   * where maxConcurrentBuilds is the runner budget. The Builder tab's Up next
+   * refuses Start at this many and offers Put back instead; it never queues
+   * silently.
+   */
+  @Column({ type: 'int', default: 3 })
+  inProgressLimit!: number;
+
   /** Applied to a new session's budgetUsd. Null disables the cap. */
   @Column({ type: 'numeric', precision: 10, scale: 4, nullable: true })
   defaultBudgetUsd?: string | null;

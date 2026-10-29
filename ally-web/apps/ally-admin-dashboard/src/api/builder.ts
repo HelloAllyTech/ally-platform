@@ -1,6 +1,19 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   AnswerBuilderDecisionRequest,
+  BuilderAskAnswer,
+  BuilderHistoryPage,
+  BuilderHistoryQuery,
+  BuilderNow,
+  BuilderPartnerScoreboard,
+  BuilderRule,
+  BuilderRuleDraft,
+  BuilderRulePreview,
+  BuilderRuleProposal,
+  BuilderTellResult,
+  BuilderThreadEntry,
+  BuilderUpNext,
+  CreateBuilderRuleRequest,
   AnswerBuilderDecisionResponse,
   BuilderArchivedSessionsPage,
   BuilderDecisionFeed,
@@ -448,7 +461,178 @@ export const builderAPI = baseAPI.injectEndpoints({
         TAG_TYPES.BUILDER_SESSIONS,
         TAG_TYPES.BUILDER_SESSION,
         TAG_TYPES.BUILDER_NOTIFICATIONS,
+        TAG_TYPES.BUILDER_HISTORY,
       ],
+    }),
+
+    /* ── The Builder tab: Now · Rules · History ─────────────────────── */
+
+    /** One snapshot: sessions in progress grouped by what they wait on, decisions, limit. */
+    getBuilderNow: builder.query<BuilderNow, void>({
+      query: () => ({ url: ApiEndpoints.BUILDER.NOW, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BUILDER_NOW, TAG_TYPES.BUILDER_DECISIONS],
+    }),
+
+    /** Take a reversible answer back inside its undo window. */
+    undoBuilderDecision: builder.mutation<{ ok: true }, string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.DECISION_ANSWER(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [
+        TAG_TYPES.BUILDER_NOW,
+        TAG_TYPES.BUILDER_DECISIONS,
+        TAG_TYPES.BUILDER_HISTORY,
+      ],
+    }),
+
+    getBuilderUpNext: builder.query<BuilderUpNext, void>({
+      query: () => ({ url: ApiEndpoints.BUILDER.UP_NEXT, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BUILDER_UP_NEXT],
+    }),
+
+    startBuilderUpNext: builder.mutation<{ sessionId: string; created: boolean }, string>({
+      query: opportunityId => ({
+        url: ApiEndpoints.BUILDER.UP_NEXT_START(opportunityId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [
+        TAG_TYPES.BUILDER_NOW,
+        TAG_TYPES.BUILDER_UP_NEXT,
+        TAG_TYPES.BUILDER_SESSIONS,
+        TAG_TYPES.BUILDER_HISTORY,
+      ],
+    }),
+
+    putBackBuilderSession: builder.mutation<{ ok: true; opportunityId: string | null }, string>({
+      query: sessionId => ({
+        url: ApiEndpoints.BUILDER.SESSION_PUT_BACK(sessionId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [
+        TAG_TYPES.BUILDER_NOW,
+        TAG_TYPES.BUILDER_UP_NEXT,
+        TAG_TYPES.BUILDER_SESSIONS,
+        TAG_TYPES.BUILDER_HISTORY,
+      ],
+    }),
+
+    getBuilderHistory: builder.query<BuilderHistoryPage, BuilderHistoryQuery>({
+      query: params => ({
+        url: ApiEndpoints.BUILDER.HISTORY,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.BUILDER_HISTORY],
+    }),
+
+    getBuilderThread: builder.query<BuilderThreadEntry[], string>({
+      query: sessionId => ({
+        url: ApiEndpoints.BUILDER.SESSION_THREAD(sessionId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, sessionId) => [
+        { type: TAG_TYPES.BUILDER_THREAD, id: sessionId },
+      ],
+    }),
+
+    askBuilderSession: builder.mutation<BuilderAskAnswer, { sessionId: string; question: string }>({
+      query: ({ sessionId, question }) => ({
+        url: ApiEndpoints.BUILDER.SESSION_ASK(sessionId),
+        method: HttpMethod.POST,
+        body: { question },
+      }),
+      invalidatesTags: (_result, _error, { sessionId }) => [
+        { type: TAG_TYPES.BUILDER_THREAD, id: sessionId },
+        TAG_TYPES.BUILDER_HISTORY,
+      ],
+    }),
+
+    tellBuilderSession: builder.mutation<
+      BuilderTellResult,
+      { sessionId: string; instruction: string; applyNow?: boolean }
+    >({
+      query: ({ sessionId, ...body }) => ({
+        url: ApiEndpoints.BUILDER.SESSION_TELL(sessionId),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: (_result, _error, { sessionId }) => [
+        { type: TAG_TYPES.BUILDER_THREAD, id: sessionId },
+        TAG_TYPES.BUILDER_HISTORY,
+        TAG_TYPES.BUILDER_NOW,
+      ],
+    }),
+
+    askBuilderAllWork: builder.mutation<BuilderAskAnswer, string>({
+      query: question => ({
+        url: ApiEndpoints.BUILDER.ASK_ALL,
+        method: HttpMethod.POST,
+        body: { question },
+      }),
+      invalidatesTags: [TAG_TYPES.BUILDER_HISTORY],
+    }),
+
+    getBuilderRules: builder.query<BuilderRule[], void>({
+      query: () => ({ url: ApiEndpoints.BUILDER.RULES, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BUILDER_RULES],
+    }),
+
+    draftBuilderRule: builder.mutation<BuilderRuleDraft, string>({
+      query: historyId => ({
+        url: ApiEndpoints.BUILDER.RULE_DRAFT,
+        method: HttpMethod.POST,
+        body: { historyId },
+      }),
+    }),
+
+    previewBuilderRule: builder.mutation<
+      BuilderRulePreview,
+      { statement: string; scope: string; excludeRuleId?: string }
+    >({
+      query: body => ({
+        url: ApiEndpoints.BUILDER.RULE_PREVIEW,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    createBuilderRule: builder.mutation<BuilderRule, CreateBuilderRuleRequest>({
+      query: body => ({ url: ApiEndpoints.BUILDER.RULES, method: HttpMethod.POST, body }),
+      invalidatesTags: [TAG_TYPES.BUILDER_RULES, TAG_TYPES.BUILDER_SETTINGS],
+    }),
+
+    setBuilderRuleActive: builder.mutation<BuilderRule, { id: string; active: boolean }>({
+      query: ({ id, active }) => ({
+        url: ApiEndpoints.BUILDER.RULE_BY_ID(id),
+        method: HttpMethod.PATCH,
+        body: { active },
+      }),
+      invalidatesTags: [TAG_TYPES.BUILDER_RULES, TAG_TYPES.BUILDER_SETTINGS],
+    }),
+
+    getBuilderRuleProposals: builder.query<BuilderRuleProposal[], void>({
+      query: () => ({ url: ApiEndpoints.BUILDER.RULE_PROPOSALS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BUILDER_RULES],
+    }),
+
+    dismissBuilderRuleProposal: builder.mutation<{ ok: true }, string>({
+      query: key => ({
+        url: ApiEndpoints.BUILDER.RULE_PROPOSAL(key),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.BUILDER_RULES],
+    }),
+
+    getBuilderPartnerScoreboard: builder.query<
+      BuilderPartnerScoreboard,
+      { windowDays?: number } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUILDER.PARTNER_SCOREBOARD,
+        method: HttpMethod.GET,
+        params: params ? { ...params } : {},
+      }),
     }),
 
     markBuilderNotificationsRead: builder.mutation<{ ok: boolean }, void>({
@@ -567,4 +751,22 @@ export const {
   usePatchBuilderLessonMutation,
   useConsolidateBuilderLessonsMutation,
   useGetBuilderExemplarsQuery,
+  useGetBuilderNowQuery,
+  useUndoBuilderDecisionMutation,
+  useGetBuilderUpNextQuery,
+  useStartBuilderUpNextMutation,
+  usePutBackBuilderSessionMutation,
+  useGetBuilderHistoryQuery,
+  useGetBuilderThreadQuery,
+  useAskBuilderSessionMutation,
+  useTellBuilderSessionMutation,
+  useAskBuilderAllWorkMutation,
+  useGetBuilderRulesQuery,
+  useDraftBuilderRuleMutation,
+  usePreviewBuilderRuleMutation,
+  useCreateBuilderRuleMutation,
+  useSetBuilderRuleActiveMutation,
+  useGetBuilderRuleProposalsQuery,
+  useDismissBuilderRuleProposalMutation,
+  useGetBuilderPartnerScoreboardQuery,
 } = builderAPI;

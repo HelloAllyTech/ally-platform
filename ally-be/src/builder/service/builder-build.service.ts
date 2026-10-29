@@ -50,6 +50,9 @@ import {
 import {
   BUILDER_CONSECUTIVE_FAILURE_LIMIT,
   BUILDER_DISPATCH_LOCK_PREFIX,
+  BUILDER_RUN_SLOT_ATTEMPTS,
+  BUILDER_RUN_SLOT_LOCK,
+  BUILDER_RUN_SLOT_LOCK_TTL_SECONDS,
   BUILDER_DISPATCH_LOCK_TTL_SECONDS,
   BUILDER_DISPATCH_TIMEOUT_MS,
   BUILDER_ENGINE,
@@ -1507,40 +1510,52 @@ export class BuilderBuildService {
     onCreated?: (run: BuilderBuildRun) => Promise<void>;
   }): Promise<BuilderBuildRun> {
     const { session, mode, userId, repos, models } = params;
-    const sequence = await this.runRepository.nextSequence(session.id);
 
-    // Our clock, a beat BEFORE the POST: clock skew can then only widen the
-    // correlation window, never exclude our own run from it.
-    const dispatchedAt = new Date(Date.now() - 5_000);
+    // The ceiling check and the run row are one step across sessions. Callers
+    // check early, for a clear refusal before any work; this re-checks under a
+    // platform-wide lock, because the early check counts rows that are only
+    // saved several awaits later — a burst of starts from different sessions
+    // all passed it and overshot maxConcurrentBuilds (builder-concurrency.spec).
+    const releaseSlot = await this.claimRunSlot();
+    let run: BuilderBuildRun;
+    try {
+      const sequence = await this.runRepository.nextSequence(session.id);
 
-    const run = await this.runRepository.save(
-      this.runRepository.create({
-        sessionId: session.id,
-        sequence,
-        mode,
-        status: BuilderRunStatus.QUEUED,
-        engine: BUILDER_ENGINE,
-        model: models.coder,
-        plannerModel: models.planner,
-        verifierModel: models.verifier,
-        size: models.size,
-        // Frozen with the run, not re-derived later: the PRD keeps changing,
-        // and a policy trained on today's draft would be learning from
-        // features this decision was never conditioned on.
-        requirementCount: models.requirementCount,
-        repoCount: models.repoCount,
-        technicalPlanLength: models.technicalPlanLength,
-        effort: models.effort,
-        // A milestone pushes to its own branch family (`<slug>-m2`), so the
-        // slices stay separately reviewable rather than piling into one branch.
-        branchSlug: params.branchSlugOverride ?? session.slug,
-        prdVersion: params.prdVersion ?? null,
-        repos,
-        milestoneId: params.milestoneId ?? null,
-        dispatchedAt,
-        createdBy: userId,
-      }),
-    );
+      // Our clock, a beat BEFORE the POST: clock skew can then only widen the
+      // correlation window, never exclude our own run from it.
+      const dispatchedAt = new Date(Date.now() - 5_000);
+
+      run = await this.runRepository.save(
+        this.runRepository.create({
+          sessionId: session.id,
+          sequence,
+          mode,
+          status: BuilderRunStatus.QUEUED,
+          engine: BUILDER_ENGINE,
+          model: models.coder,
+          plannerModel: models.planner,
+          verifierModel: models.verifier,
+          size: models.size,
+          // Frozen with the run, not re-derived later: the PRD keeps changing,
+          // and a policy trained on today's draft would be learning from
+          // features this decision was never conditioned on.
+          requirementCount: models.requirementCount,
+          repoCount: models.repoCount,
+          technicalPlanLength: models.technicalPlanLength,
+          effort: models.effort,
+          // A milestone pushes to its own branch family (`<slug>-m2`), so the
+          // slices stay separately reviewable rather than piling into one branch.
+          branchSlug: params.branchSlugOverride ?? session.slug,
+          prdVersion: params.prdVersion ?? null,
+          repos,
+          milestoneId: params.milestoneId ?? null,
+          dispatchedAt,
+          createdBy: userId,
+        }),
+      );
+    } finally {
+      await releaseSlot();
+    }
 
     try {
       if (params.onCreated) await params.onCreated(run);
@@ -1619,6 +1634,40 @@ export class BuilderBuildService {
           'Wait for one to finish, or raise the limit in Builder settings.',
       );
     }
+  }
+
+  /**
+   * Hold the platform-wide slot lock while a run row is created, re-checking
+   * the ceiling inside it. Returns the release. Waits briefly for another
+   * dispatch to finish rather than refusing at once: the lock is held for two
+   * queries, not for the GitHub call.
+   */
+  private async claimRunSlot(): Promise<() => Promise<void>> {
+    for (let attempt = 0; attempt < BUILDER_RUN_SLOT_ATTEMPTS; attempt++) {
+      if (
+        await this.redisService.acquireLock(
+          BUILDER_RUN_SLOT_LOCK,
+          BUILDER_RUN_SLOT_LOCK_TTL_SECONDS,
+        )
+      ) {
+        const release = () =>
+          this.redisService
+            .releaseLock(BUILDER_RUN_SLOT_LOCK)
+            .catch(() => undefined);
+        try {
+          const settings = await this.settingsService.get();
+          await this.assertWithinConcurrency(settings.maxConcurrentBuilds);
+        } catch (error) {
+          await release();
+          throw error;
+        }
+        return release;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    throw new BadRequestException(
+      'Another build is being started right now. Try again in a moment.',
+    );
   }
 
   /** The run a cancel should stop, if the session still has one in flight. */

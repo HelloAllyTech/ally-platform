@@ -356,6 +356,62 @@ export const BUILDER_LESSON_CURATOR_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/builder/rule_draft_system.txt */
+export const BUILDER_RULE_DRAFT_SYSTEM = definePrompt(
+  'builder_rule_draft_system',
+  {},
+  {
+    name: 'Builder — Rule Draft',
+    description:
+      'Turns one answer the admin gave Builder into a general rule (one sentence) and the area it belongs to, for the admin to edit before saving. Answers in JSON.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/rule_match_system.txt */
+export const BUILDER_RULE_MATCH_SYSTEM = definePrompt(
+  'builder_rule_match_system',
+  {},
+  {
+    name: 'Builder — Rule Preview',
+    description:
+      'Checks a proposed rule against the admin\'s earlier decisions: which it would have answered, and whether it agrees with what was chosen. Powers the rule editor\'s "would have applied to" preview. Answers in JSON.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/session_ask_system.txt */
+export const BUILDER_SESSION_ASK_SYSTEM = definePrompt(
+  'builder_session_ask_system',
+  {},
+  {
+    name: 'Builder — Ask a Session',
+    description:
+      "Answers an admin's read-only question about one Builder session from its PRD, transcript, runs, pull requests, decisions and rules. Never changes the session; may suggest an instruction for the admin to send. Answers in JSON.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/work_ask_system.txt */
+export const BUILDER_WORK_ASK_SYSTEM = definePrompt(
+  'builder_work_ask_system',
+  {},
+  {
+    name: 'Builder — Ask About All Work',
+    description:
+      "Answers an admin's read-only question across every Builder session in progress, the decisions waiting, the admin's rules, recent history and Up next. Answers in JSON.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/builder/outcome_system.txt */
 export const BUILDER_OUTCOME_SYSTEM = definePrompt(
   'builder_outcome_system',

@@ -675,6 +675,23 @@ export const ApiEndpoints = {
     // that routes each back to the action the session page would have taken.
     DECISIONS: "/v1/builder/decisions",
     DECISION_ANSWER: (id: string) => `/v1/builder/decisions/${encodeURIComponent(id)}/answer`,
+    // The Builder tab (Now · Rules · History). DELETE on DECISION_ANSWER is Undo.
+    NOW: "/v1/builder/now",
+    UP_NEXT: "/v1/builder/up-next",
+    UP_NEXT_START: (opportunityId: string) => `/v1/builder/up-next/${opportunityId}/start`,
+    SESSION_PUT_BACK: (id: string) => `/v1/builder/sessions/${id}/put-back`,
+    SESSION_ASK: (id: string) => `/v1/builder/sessions/${id}/ask`,
+    SESSION_TELL: (id: string) => `/v1/builder/sessions/${id}/tell`,
+    SESSION_THREAD: (id: string) => `/v1/builder/sessions/${id}/thread`,
+    ASK_ALL: "/v1/builder/ask",
+    HISTORY: "/v1/builder/history",
+    RULES: "/v1/builder/rules",
+    RULE_BY_ID: (id: string) => `/v1/builder/rules/${id}`,
+    RULE_DRAFT: "/v1/builder/rules/draft",
+    RULE_PREVIEW: "/v1/builder/rules/preview",
+    RULE_PROPOSALS: "/v1/builder/rules/proposals",
+    RULE_PROPOSAL: (key: string) => `/v1/builder/rules/proposals/${encodeURIComponent(key)}`,
+    PARTNER_SCOREBOARD: "/v1/builder/partner-scoreboard",
     NOTIFICATION_READ: (id: string) => `/v1/builder/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/builder/notifications/read-all",
     // Scoreboard + knowledge (lessons/exemplars) — the visibility surfaces.
@@ -954,6 +971,9 @@ export const ROUTES = {
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
   BUILDER_DECISIONS: "/builder/decisions",
+  // Mission control's full session list (search, archive, start by hand), moved off /builder
+  // when the Builder tab became Now · Rules · History.
+  BUILDER_ALL_SESSIONS: "/builder/sessions",
   BUILDER_SCOREBOARD: "/builder/scoreboard",
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
@@ -1159,6 +1179,11 @@ export const TAG_TYPES = {
   BUILDER_EXEMPLARS: "builderExemplars",
   BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
   BUILDER_EVAL_SUITES: "builderEvalSuites",
+  BUILDER_NOW: "builderNow",
+  BUILDER_UP_NEXT: "builderUpNext",
+  BUILDER_HISTORY: "builderHistory",
+  BUILDER_RULES: "builderRules",
+  BUILDER_THREAD: "builderThread",
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",

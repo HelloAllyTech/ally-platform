@@ -240,6 +240,13 @@ export enum LlmTask {
   // The learning loop: is an admin's reply in a Builder interview a
   // correction, and of what kind.
   BUILDER_CORRECTION_CLASSIFY = 'builder_correction_classify',
+  // The Builder tab: a read-only question to one session, or to all work.
+  BUILDER_SESSION_ASK = 'builder_session_ask',
+  BUILDER_WORK_ASK = 'builder_work_ask',
+  // The Builder tab's rules: drafting one from an answer, and previewing what
+  // it would have matched.
+  BUILDER_RULE_DRAFT = 'builder_rule_draft',
+  BUILDER_RULE_MATCH = 'builder_rule_match',
   // The roadmap's opportunity copilot: one pass of the guided interview's tool
   // loop (research, then a structured turn). Tagged with metadata.iteration so
   // a turn's passes can be summed.
