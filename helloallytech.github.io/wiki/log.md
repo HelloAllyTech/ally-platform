@@ -419,4 +419,4 @@ This is an append-only log of modifications, updates, and indexing runs performe
 - `platform/builder-agent.md`: **The decision feed** is rewritten as **The Builder tab: Now, Rules, History**. `/builder` is now the person's desk (mission control's list moved to `/builder/sessions`; `/builder/decisions` redirects).
 - Now: a waiting-on-you summary replaces the per-hour score; In progress grouped by what each session waits on, with Up next, Start (server-side first turn), a Limit and Put back; reversible answers undo for 8 s, one-way answers arm with their consequence and a 600 ms second press; live updates never reorder what is on screen.
 - New: Ask (read-only, grounded) and Tell (to the interview now, or queued for the next run), Rules (drafted by Builder, previewed against History, scoped, optionally deciding budget / stuck-PR / failed-build decisions), History (append-only, frozen at answer time), and a phone layout whose overlays the back gesture closes.
-
+- `repos/ally-be.md`: the `/builder` gateway now also broadcasts payload-free `decisionsChanged` / `sessionsChanged` for the Builder tab, with the 10 s poll as fallback.

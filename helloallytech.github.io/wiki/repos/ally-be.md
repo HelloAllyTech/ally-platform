@@ -2,7 +2,7 @@
 title: ally-be — Core Backend
 tags: [repo, backend, nestjs, api]
 summary: ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth, real-time voice sessions, the audio/transcription pipeline, AI-driven feedback, and analytics for the counselor-training platform.
-last_reconciled: 2026-08-06
+last_reconciled: 2026-10-29
 ---
 
 # ally-be — Core Backend
@@ -114,7 +114,7 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 - `/microphone-chat` — live audio chat with message streaming.
 - `/audio-ingest` — cloud-telephony integration.
 - `/scenario-report` — real-time scenario reporting.
-- `/builder` — live build transcript for a Builder session (rooms are `session:<id>`). An optimisation rather than a dependency: the admin polls the same events endpoint regardless, so a socket that never connects degrades the feed without breaking it.
+- `/builder` — live build transcript for a Builder session (rooms are `session:<id>`). An optimisation rather than a dependency: the admin polls the same events endpoint regardless, so a socket that never connects degrades the feed without breaking it. It also broadcasts two payload-free events to every connected admin — `decisionsChanged` and `sessionsChanged` (debounced, from `BuilderLiveService`) — on which the Builder tab refetches its Now snapshot; they reach only clients on the process that saw the change, so the tab keeps a 10 s poll as the fallback.
 - `/course-copilot` — build progress for a Course Copilot session (rooms are `course-copilot:<id>`). Same arrangement as `/builder`: a push reaches only clients on the process running the build, so the admin also polls `GET /v1/course-copilot/sessions/:id?afterSeq=` while jobs are live.
 
 **Auth model** — the REST API is versioned (`/api/v1/...`). Supported methods: JWT (access/refresh flow), email OTP (v2), Google OAuth, Magic Link, and `X-API-Key` for service-to-service calls. The WhatsApp webhook (`POST /api/v1/webhook/whatsapp`) carries no guard at all — an HMAC-SHA256 signature over the **raw** request body *is* its authentication, so `main.ts` captures the raw body in `express.json`'s `verify` hook rather than re-reading the stream (which is already drained by the time a handler runs). Multi-tenancy is enforced at the entity level, with fine-grained RBAC via groups and permission guards. See `DATA_SCHEMA.md` for the full store map (105 TypeORM tables plus Weaviate, Redis, SQS, S3, LiveKit).
