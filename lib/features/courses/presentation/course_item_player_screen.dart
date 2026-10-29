@@ -724,10 +724,23 @@ class _PlayerBottomNav extends ConsumerWidget {
               variant: CourseButtonVariant.secondary,
               isDisabled: !hasPrev,
               onPressed: onPrev,
+              // `leftArrowIcon.svg`'s drawn arrow is exactly 16x16 inside a
+              // padded 41x41 canvas (same asset the login screen's back
+              // button compensates for the same way) — sizing it to a
+              // literal 16x16 box like `arrowRight.svg` (whose glyph nearly
+              // fills its own canvas) shrinks the visible arrow to a
+              // quarter of its intended size. `OverflowBox` renders it at
+              // its native proportions so the glyph itself reads as ~16px,
+              // while the reserved layout space next to the label stays
+              // the same as Next's icon.
               iconLeft: SizedBox(
                 width: icon,
                 height: icon,
-                child: SvgPicture.asset('assets/icons/leftArrowIcon.svg'),
+                child: OverflowBox(
+                  maxWidth: icon * 41 / 16,
+                  maxHeight: icon * 41 / 16,
+                  child: SvgPicture.asset('assets/icons/leftArrowIcon.svg'),
+                ),
               ),
             ),
           ),
