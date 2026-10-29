@@ -162,6 +162,20 @@ jobs:
           mkdir -p distribution/whatsnew
           echo "$RELEASE_NOTES" > distribution/whatsnew/whatsnew-en-US
 
+      - name: Upload APK + AAB artifacts
+        # Runs BEFORE the Play Console upload below on purpose: if Play
+        # rejects the upload (e.g. "You must let us know whether your app
+        # uses any Foreground Service permissions" — the declaration form
+        # itself doesn't appear in App content until a build has been
+        # uploaded at least once through the Console's own web UI, not just
+        # the API this step below calls), this still leaves the built AAB
+        # downloadable so it can be uploaded by hand to break that deadlock.
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-production-release-${{ steps.version_info.outputs.version_code }}
+          path: ally-mobile-flutter/dist/
+          retention-days: 30
+
       - name: Upload to Google Play Console (internal track)
         uses: r0adkll/upload-google-play@v1
         with:
@@ -172,13 +186,6 @@ jobs:
           status: ${{ inputs.internal_track_status }}
           releaseName: '${{ steps.version_info.outputs.version_code }} (${{ steps.version_info.outputs.version_name }}) Flutter'
           whatsNewDirectory: ally-mobile-flutter/distribution/whatsnew
-
-      - name: Upload APK + AAB artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-production-release-${{ steps.version_info.outputs.version_code }}
-          path: ally-mobile-flutter/dist/
-          retention-days: 30
 
       - name: Keep Dart debug symbols
         # Obfuscated Dart stack traces can only be read with these; kept so a
