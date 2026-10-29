@@ -36,6 +36,8 @@ class LLMTask(str, Enum):
     # Debrief-quality judge: one call per debrief, scoring every rubric
     # dimension. Needs the matching value in ally-be's LlmTask enum.
     DEBRIEF_QUALITY_JUDGE = "debrief_quality_judge"
+    # Debrief agent steps, one label per step so each step's cost is visible.
+    DEBRIEF_SAFETY_READER = "debrief_safety_reader"
     # RAG-quality judge: one call per retrieval, labelling each returned
     # passage's relevance and the set's sufficiency. Priced separately because
     # its volume tracks retrievals rather than sessions.

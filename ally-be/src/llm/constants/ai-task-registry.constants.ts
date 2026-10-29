@@ -880,6 +880,20 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'DEBRIEF_QUALITY_JUDGE__MODEL',
   },
   {
+    id: 'debrief-safety-reader',
+    task: LlmTask.DEBRIEF_SAFETY_READER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run, whatever the recipe',
+    detail:
+      "Finds the client's risk cues and how the learner responded, and the learner's own " +
+      'distress. Mandatory: a recipe cannot drop it. Recall is gated at 100% on the seeded ' +
+      'safety set before any change to its prompt or model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'DEBRIEF__SAFETY_READER_MODEL',
+  },
+  {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,

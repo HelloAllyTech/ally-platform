@@ -120,6 +120,8 @@ export enum LlmTask {
   // eight dimensions. The independent judge the debrief quality bar is read
   // from; a sibling of the groundedness judge, not a replacement for it.
   DEBRIEF_QUALITY_JUDGE = 'debrief_quality_judge',
+  // Debrief agent steps in ally-ai, one label per step.
+  DEBRIEF_SAFETY_READER = 'debrief_safety_reader',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different

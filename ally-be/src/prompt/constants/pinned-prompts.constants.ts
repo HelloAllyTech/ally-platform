@@ -39,6 +39,9 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   ['builder_prd_review_system', 'guard'],
   ['builder_prd_recheck_system', 'guard'],
   ['builder_discovery_plan_system', 'guard'],
+  // Decides whether a learner sees "an important moment"; its recall is gated
+  // at 100% on the seeded safety set (ally-ai scripts/debrief_safety_recall.py).
+  ['debrief_safety_reader_system', 'guard'],
 ]);
 
 /** What the editor must have done before confirming, by reason. */

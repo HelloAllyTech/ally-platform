@@ -1200,6 +1200,19 @@ export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
   },
 );
 
+/** src/prompts/debrief/safety_reader_system.txt */
+export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
+  'debrief_safety_reader_system',
+  {},
+  {
+    name: 'Debrief Safety Reader',
+    description:
+      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text. Pinned: change it only after the safety recall gate passes.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/filler_quality_judge/rubric.txt */
 export const FILLER_QUALITY_JUDGE_RUBRIC = definePrompt(
   'filler_quality_judge_rubric',

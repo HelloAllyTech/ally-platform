@@ -218,6 +218,13 @@ class DebriefQualityJudgeSettings(BaseModel):
     PROMPT_VERSION: str = Field("v1")
 
 
+class DebriefSettings(BaseModel):
+    """The debrief agent's steps. Each runs on a pinned model id; a recipe in
+    ally-be may name a different approved model per step later."""
+
+    SAFETY_READER_MODEL: str = Field("gemini-2.5-flash")
+
+
 class RagQualityJudgeSettings(BaseModel):
     """RAG-quality judge — was each retrieved passage relevant, and was the set
     enough? Sibling of the drift, language and feedback-groundedness judges:
@@ -408,6 +415,7 @@ class AppSettings(BaseSettings):
     DEBRIEF_QUALITY_JUDGE: DebriefQualityJudgeSettings = Field(
         default_factory=DebriefQualityJudgeSettings
     )
+    DEBRIEF: DebriefSettings = Field(default_factory=DebriefSettings)
     RAG_QUALITY_JUDGE: RagQualityJudgeSettings = Field(
         default_factory=RagQualityJudgeSettings
     )
