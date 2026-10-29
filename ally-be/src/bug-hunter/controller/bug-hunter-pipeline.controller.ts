@@ -742,6 +742,11 @@ export class BugHunterPipelineController {
       }),
       { repo },
     );
+    // What is already open here, so a later night (or a second symptom
+    // tonight) of an existing bug is not filed again under a new symbol.
+    const openBugs = (await this.bugFindingService.listOpenForRepo(repo)).map(
+      (row) => ({ title: row.title, file: row.file, symbol: row.symbol }),
+    );
     // The always-on half of memory: the strongest notebook entries for this
     // repo, rendered up front. Recorded as a memory lookup like a search, so
     // the telemetry counts the context the agent was handed either way.
@@ -769,6 +774,7 @@ export class BugHunterPipelineController {
       senses: plan.senses,
       light: plan.light,
       knownNonBugs,
+      openBugs,
       engine,
       memories: memories.map((m) => ({
         id: m.id,

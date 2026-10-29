@@ -53,6 +53,13 @@ export interface KnownNonBug {
   note?: string | null;
 }
 
+/** One bug still open in this repo — see `openBugs`. */
+export interface OpenBug {
+  title: string;
+  file?: string | null;
+  symbol?: string | null;
+}
+
 export interface SweepPromptContext {
   repo: string;
   runId: string;
@@ -76,6 +83,18 @@ export interface SweepPromptContext {
    * teach it to stop reporting real bugs.
    */
   knownNonBugs?: KnownNonBug[];
+  /**
+   * Bugs still open in this repo, newest first.
+   *
+   * The server's dedupe matches file + symbol, so the same root cause filed
+   * under a different symbol — "scheduled time events fail" one night,
+   * "immediately active time events fail" the next, or both in one round —
+   * opened a second row every time. The sweep could not avoid that: it was
+   * never shown what was already open. Seeing the list lets it skip a bug
+   * that is already tracked, or file under that bug's exact file and symbol
+   * so dedupe touches the existing row.
+   */
+  openBugs?: OpenBug[];
   /**
    * Which CLI will run this prompt: "claude-code" (default) or "gemini".
    *
@@ -162,6 +181,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
     mode,
     deep,
     knownNonBugs = [],
+    openBugs = [],
     engine = 'claude-code',
     memories = [],
     senses = [...BUG_HUNTER_MODEL_SENSES],
@@ -305,6 +325,24 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
         ]
       : []),
     ``,
+    ...(openBugs.length
+      ? [
+          ``,
+          `### Already open — do NOT file a second one`,
+          `These bugs in "${repo}" are already tracked and not yet fixed, newest first. If something you find tonight has the same root cause as one of them — even when the symptom, the event, the endpoint or your wording differs — it is that bug, not a new one: leave it out, or, when you have new evidence, report it with exactly that bug's file and symbol so it is recorded against the same row.`,
+          DATA_BEGIN('open bugs'),
+          ...openBugs.map((entry) => {
+            const where = [entry.file, entry.symbol]
+              .filter(Boolean)
+              .join(' · ');
+            return (
+              `  - ${clip(entry.title)}` + (where ? ` (${clip(where)})` : '')
+            );
+          }),
+          DATA_END,
+        ]
+      : []),
+    ``,
     ...(memories.length
       ? [
           ``,
@@ -326,6 +364,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
     `  - touchesGuardedPath=true for migrations, auth/permission gating, payments, or any other security-sensitive service. Be generous with this flag; it costs a review, and getting it wrong costs a production incident.`,
     `  - source is one of: test_failure, lint_error, code_review, production_log, reported_bug. Browser errors from finder 4 file as production_log — there is no separate source for them.`,
     ``,
+    `One root cause is one finding. Two symptoms of the same defect — two event types, two endpoints, two log lines failing on the same state update or the same missing value — go in ONE finding whose description names both, with the file and symbol of the shared cause. A fix for one that would also fix the other means they are the same bug.`,
     `Then persist them all in ONE call, dropping any duplicates you produced within this round:`,
     `  curl -sS -X POST "${findingsUrl}" -H "Content-Type: application/json" ${auth} -d '{"repo":"${repo}","findings":[...]}'`,
     `The response's "items" array comes back in the same order you sent, each with an "id" — use those ids in every later call about a finding. You do NOT need to dedupe against previous runs: the server matches each finding against still-open rows and touches the existing one instead of inserting, so a bug rediscovered tonight keeps its history.`,
