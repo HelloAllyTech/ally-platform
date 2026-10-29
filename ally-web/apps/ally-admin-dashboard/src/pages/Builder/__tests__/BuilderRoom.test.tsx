@@ -219,6 +219,30 @@ describe("BuilderRoom", () => {
     expect(undoMock).toHaveBeenCalledWith("q1");
   });
 
+  it("takes an answer back even when Z is pressed before the server has replied", async () => {
+    let resolve: (value: unknown) => void = () => undefined;
+    answerMock.mockReturnValue({ unwrap: () => new Promise(r => (resolve = r)) });
+    renderRoom();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Option B q1/ }));
+    });
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "z" });
+    });
+    // The card is back at once; the undo goes out as soon as the answer lands.
+    expect(screen.getByRole("heading", { name: "Prompt q1" })).toBeInTheDocument();
+    expect(undoMock).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve({
+        ok: true,
+        outcome: "pending",
+        undoableUntil: new Date(Date.now() + 8_000).toISOString(),
+        historyId: "h1",
+      });
+    });
+    expect(undoMock).toHaveBeenCalledWith("q1");
+  });
+
   it("never moves the card you're reading when a decision arrives", () => {
     const { rerender } = renderRoom();
     mocks.nowData = {

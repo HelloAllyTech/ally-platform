@@ -81,18 +81,26 @@ export const reconcileQueue = (
   options: {
     now: number;
     focusedId: string | null;
-    /** Exclude these (answered and held in the undo window, or answered elsewhere). */
+    /** Answered from this page: never added as arrivals (the server may list them a moment longer). */
     hidden?: Set<string>;
+    /**
+     * Keep these where they are even when the server has stopped listing them:
+     * answers held in the undo window (the server hides those) and cards just
+     * restored by an undo, until the next snapshot lists them again. Without
+     * this an undone card would come back as a "new" arrival at the end.
+     */
+    keep?: Set<string>;
     lastAnswered?: { sessionId: string; at: number } | null;
   },
 ): QueueState => {
   const hidden = options.hidden ?? new Set<string>();
+  const keep = options.keep ?? new Set<string>();
   const live = decisions.filter(decision => !hidden.has(decision.id));
   if (!previous) {
     return { order: serverOrder(live, options.now).map(decision => decision.id), fresh: [] };
   }
-  const ids = new Set(live.map(decision => decision.id));
-  const kept = previous.order.filter(id => ids.has(id));
+  const ids = new Set(decisions.map(decision => decision.id));
+  const kept = previous.order.filter(id => ids.has(id) || keep.has(id));
   const known = new Set(previous.order);
   const arrivals = serverOrder(
     live.filter(decision => !known.has(decision.id)),
@@ -111,7 +119,10 @@ export const reconcileQueue = (
   order.push(...rest.map(decision => decision.id));
   return {
     order,
-    fresh: [...previous.fresh.filter(id => ids.has(id)), ...arrivals.map(decision => decision.id)],
+    fresh: [
+      ...previous.fresh.filter(id => ids.has(id) && !hidden.has(id)),
+      ...arrivals.map(decision => decision.id),
+    ],
   };
 };
 

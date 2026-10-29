@@ -117,6 +117,28 @@ describe("reconcileQueue", () => {
     expect(next.order).toEqual(["a", "b", "a2", "c"]);
   });
 
+  it("keeps an answered or just-restored card in its place while the server stops listing it", () => {
+    const first = reconcileQueue(null, [decision("a"), decision("b"), decision("c")], {
+      now: NOW,
+      focusedId: "b",
+    });
+    // b was answered: the server hides it during the undo window.
+    const held = reconcileQueue(first, [decision("a"), decision("c")], {
+      now: NOW,
+      focusedId: "c",
+      hidden: new Set(["b"]),
+      keep: new Set(["b"]),
+    });
+    expect(held.order).toEqual(["a", "b", "c"]);
+    // Undone: back in focus where it was, not a "new" arrival at the end.
+    const back = reconcileQueue(held, [decision("a"), decision("b"), decision("c")], {
+      now: NOW,
+      focusedId: "b",
+    });
+    expect(back.order).toEqual(["a", "b", "c"]);
+    expect(back.fresh).toEqual([]);
+  });
+
   it("drops what the server no longer lists and hides answers inside the undo window", () => {
     const first = reconcileQueue(null, [decision("a"), decision("b")], {
       now: NOW,

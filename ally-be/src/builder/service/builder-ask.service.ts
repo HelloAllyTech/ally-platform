@@ -40,7 +40,7 @@ import {
 } from '../enum/builder.enum';
 import { renderPrd } from '../constants/builder-build-prompt';
 import { BUILDER_AI_TASKS } from '../constants/builder.constants';
-import { parseJsonObject } from '../util/builder-json.util';
+import { parseJsonObject, stringFieldOf } from '../util/builder-json.util';
 
 export interface BuilderAskAnswer {
   historyId: string | null;
@@ -129,7 +129,7 @@ export class BuilderAskService {
       promptCode: BUILDER_SESSION_ASK_SYSTEM.code,
       system: renderPrompt(BUILDER_SESSION_ASK_SYSTEM, template, {}),
       prompt: `${context}\n\n## The admin asks\n${clip(text, ASK_MAX)}`,
-      maxTokens: 1200,
+      maxTokens: 2000,
       usageMetadata: { sessionId },
     });
     const parsed = parseJsonObject<{
@@ -137,7 +137,8 @@ export class BuilderAskService {
       basedOn?: string[];
       suggestedInstruction?: string | null;
     }>(result.text);
-    const answer = String(parsed?.answer ?? result.text ?? '').trim();
+    const answer =
+      stringFieldOf(result.text, 'answer') ?? String(result.text ?? '').trim();
     const basedOn = Array.isArray(parsed?.basedOn)
       ? parsed!.basedOn.map(String).slice(0, 6)
       : [];
@@ -214,12 +215,13 @@ export class BuilderAskService {
       promptCode: BUILDER_WORK_ASK_SYSTEM.code,
       system: renderPrompt(BUILDER_WORK_ASK_SYSTEM, template, {}),
       prompt: `${clip(context, CONTEXT_CLIP)}\n\n## The admin asks\n${clip(text, ASK_MAX)}`,
-      maxTokens: 1200,
+      maxTokens: 2000,
     });
     const parsed = parseJsonObject<{ answer?: string; basedOn?: string[] }>(
       result.text,
     );
-    const answer = String(parsed?.answer ?? result.text ?? '').trim();
+    const answer =
+      stringFieldOf(result.text, 'answer') ?? String(result.text ?? '').trim();
     const row = await this.historyService.record({
       entryType: 'ask',
       sessionId: null,

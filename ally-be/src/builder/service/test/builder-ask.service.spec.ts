@@ -133,3 +133,18 @@ describe('BuilderAskService', () => {
     expect(await service.tellsForRun('sess-1', 'run-5')).toBe('');
   });
 });
+
+describe('stringFieldOf', () => {
+  const { stringFieldOf } = require('../../util/builder-json.util');
+
+  it('reads a field from whole JSON, fenced JSON, or JSON cut off by the token limit', () => {
+    expect(stringFieldOf('{"answer":"Yes."}', 'answer')).toBe('Yes.');
+    expect(stringFieldOf('```json\n{"answer":"Yes."}\n```', 'answer')).toBe(
+      'Yes.',
+    );
+    expect(
+      stringFieldOf('{"answer":"I am waiting on \\"metrics\\" and', 'answer'),
+    ).toBe('I am waiting on "metrics" and');
+    expect(stringFieldOf('plain words', 'answer')).toBeNull();
+  });
+});

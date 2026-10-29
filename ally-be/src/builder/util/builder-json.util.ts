@@ -22,3 +22,29 @@ export function parseJsonObject<T = Record<string, unknown>>(
     return null;
   }
 }
+
+/**
+ * One string field from a model's JSON answer that may have been cut off by
+ * the token limit — `{"answer": "…` with no closing brace. Falls back to the
+ * raw text only when no such field opened at all, so a truncated answer reads
+ * as words rather than as a JSON fragment.
+ */
+export function stringFieldOf(
+  text: string | null | undefined,
+  field: string,
+): string | null {
+  const raw = String(text ?? '');
+  const parsed = parseJsonObject<Record<string, unknown>>(raw);
+  if (parsed && typeof parsed[field] === 'string') {
+    return (parsed[field] as string).trim();
+  }
+  const match = new RegExp(`"${field}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`).exec(
+    raw,
+  );
+  if (!match) return null;
+  try {
+    return (JSON.parse(`"${match[1]}"`) as string).trim();
+  } catch {
+    return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+  }
+}

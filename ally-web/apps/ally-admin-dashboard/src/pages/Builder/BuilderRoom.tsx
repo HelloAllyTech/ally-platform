@@ -118,7 +118,19 @@ export const BuilderRoom: React.FC = () => {
 
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(deepLinkId.current);
+  // Answered from this page (held, applied or in flight): skipped, but kept in place.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // Undone and back in focus, until the next snapshot lists them again.
+  const [restored, setRestored] = useState<Set<string>>(new Set());
+  // Every decision seen, so a restored card can render before the server lists it again.
+  const known = useRef(new Map<string, BuilderDecision>());
+  useEffect(() => {
+    for (const decision of decisions) known.current.set(decision.id, decision);
+    setRestored(previous => {
+      const still = [...previous].filter(id => !byId.has(id));
+      return still.length === previous.size ? previous : new Set(still);
+    });
+  }, [byId, decisions]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [elsewhere, setElsewhere] = useState<string | null>(null);
   const [lastAnswer, setLastAnswer] = useState<LastAnswer | null>(null);
@@ -133,6 +145,7 @@ export const BuilderRoom: React.FC = () => {
         now: Date.now(),
         focusedId,
         hidden,
+        keep: new Set([...hidden, ...restored]),
         lastAnswered: lastAnswer ? { sessionId: lastAnswer.sessionId, at: lastAnswer.at } : null,
       });
       // The card in front was answered somewhere else: say so, then step aside.
@@ -141,7 +154,8 @@ export const BuilderRoom: React.FC = () => {
         focusedId &&
         previous.order.includes(focusedId) &&
         !byId.has(focusedId) &&
-        !hidden.has(focusedId)
+        !hidden.has(focusedId) &&
+        !restored.has(focusedId)
       ) {
         setElsewhere(focusedId);
         return {
@@ -152,7 +166,7 @@ export const BuilderRoom: React.FC = () => {
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nowQuery.data, hidden]);
+  }, [nowQuery.data, hidden, restored]);
 
   useEffect(() => {
     if (!elsewhere) return undefined;
@@ -169,7 +183,8 @@ export const BuilderRoom: React.FC = () => {
     return () => clearTimeout(timer);
   }, [elsewhere]);
 
-  const order = useMemo(() => queue?.order ?? [], [queue]);
+  // What the person moves through: the queue minus what they've answered.
+  const order = useMemo(() => (queue?.order ?? []).filter(id => !hidden.has(id)), [queue, hidden]);
   const fresh = useMemo(() => queue?.fresh ?? [], [queue]);
 
   // Focus the first card once there is one; a deep link wins.
@@ -188,7 +203,9 @@ export const BuilderRoom: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedId]);
 
-  const focused: BuilderDecision | undefined = focusedId ? byId.get(focusedId) : undefined;
+  const focused: BuilderDecision | undefined = focusedId
+    ? (byId.get(focusedId) ?? (restored.has(focusedId) ? known.current.get(focusedId) : undefined))
+    : undefined;
   const focusedIndex = focusedId ? order.indexOf(focusedId) : -1;
   const freshSessions = useMemo(
     () => new Set(fresh.map(id => byId.get(id)?.sessionId).filter(Boolean) as string[]),
@@ -272,27 +289,49 @@ export const BuilderRoom: React.FC = () => {
     [order],
   );
 
+  /**
+   * The answer still on its way to the server. Undo must work the moment you
+   * answer, not once the server has replied, so an undo pressed while the
+   * request is in flight is queued and sent as soon as the reply lands.
+   */
+  const inFlight = useRef<{ decisionId: string; undoQueued: boolean } | null>(null);
+
+  const restoreCard = useCallback((decisionId: string) => {
+    setRestored(previous => new Set(previous).add(decisionId));
+    setHidden(previous => {
+      const next = new Set(previous);
+      next.delete(decisionId);
+      return next;
+    });
+    setFocusedId(decisionId);
+    setDeepDone(false);
+  }, []);
+
   const undo = useCallback(async () => {
     const last = lastAnswer;
     if (!last || Date.now() > last.until) {
       toast(strings.toast.nothingToUndo);
       return;
     }
+    if (inFlight.current?.decisionId === last.decisionId) {
+      inFlight.current.undoQueued = true;
+      restoreCard(last.decisionId);
+      setLastAnswer(null);
+      toast(strings.toast.undone);
+      return;
+    }
     try {
       await undoDecision(last.decisionId).unwrap();
-      setHidden(previous => {
-        const next = new Set(previous);
-        next.delete(last.decisionId);
-        return next;
-      });
-      setFocusedId(last.decisionId);
+      restoreCard(last.decisionId);
       setLastAnswer(null);
-      setDeepDone(false);
       toast(strings.toast.undone);
     } catch {
       toast.error(strings.toast.tooLate);
     }
-  }, [lastAnswer, undoDecision]);
+  }, [lastAnswer, restoreCard, undoDecision]);
+  // The toast's Undo outlives the render that made it; it must call today's undo.
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
 
   const [ruleSource, setRuleSource] = useState<RuleEditorSource | null>(null);
   const openRuleEditor = useCallback(
@@ -329,6 +368,17 @@ export const BuilderRoom: React.FC = () => {
       if (wasDeepLink) setDeepDone(true);
       const session = sessionById.get(decision.sessionId);
       const code = session ? sessionCode(session) : decision.sessionTitle;
+      if (!oneWay) {
+        // Undoable from this instant, before the server has replied.
+        inFlight.current = { decisionId: decision.id, undoQueued: false };
+        setLastAnswer({
+          decisionId: decision.id,
+          sessionId: decision.sessionId,
+          historyId: null,
+          until: Date.now() + UNDO_WINDOW_MS,
+          at: Date.now(),
+        });
+      }
       try {
         const result = await answerDecision({
           id: decision.id,
@@ -336,6 +386,18 @@ export const BuilderRoom: React.FC = () => {
           client: layout,
           msToDecide: Date.now() - focusStart.current,
         }).unwrap();
+        const queued = inFlight.current?.decisionId === decision.id && inFlight.current.undoQueued;
+        if (inFlight.current?.decisionId === decision.id) inFlight.current = null;
+        if (queued) {
+          try {
+            await undoDecision(decision.id).unwrap();
+          } catch {
+            // It reached the session after all: say so and take the card away again.
+            toast.error(strings.toast.tooLate);
+            setHidden(previous => new Set(previous).add(decision.id));
+          }
+          return;
+        }
         setLastAnswer({
           decisionId: decision.id,
           sessionId: decision.sessionId,
@@ -350,7 +412,7 @@ export const BuilderRoom: React.FC = () => {
         toast(message, {
           duration: result.undoableUntil ? UNDO_WINDOW_MS : 5_000,
           ...(result.undoableUntil
-            ? { action: { label: strings.toast.undo, onClick: () => void undo() } }
+            ? { action: { label: strings.toast.undo, onClick: () => void undoRef.current() } }
             : {}),
           ...(result.historyId
             ? {
@@ -367,6 +429,8 @@ export const BuilderRoom: React.FC = () => {
             : {}),
         });
       } catch (error) {
+        if (inFlight.current?.decisionId === decision.id) inFlight.current = null;
+        setLastAnswer(previous => (previous?.decisionId === decision.id ? null : previous));
         const status = (error as { status?: number })?.status;
         if (status === 409) {
           toast(strings.card.elsewhere(""));
@@ -383,16 +447,18 @@ export const BuilderRoom: React.FC = () => {
         if (wasDeepLink) setDeepDone(false);
       }
     },
-    [advanceFrom, answerDecision, hidden, layout, online, openRuleEditor, sessionById, undo],
+    [
+      advanceFrom,
+      answerDecision,
+      hidden,
+      layout,
+      online,
+      openRuleEditor,
+      sessionById,
+      undo,
+      undoDecision,
+    ],
   );
-
-  // An answer the server no longer lists has landed; stop hiding it.
-  useEffect(() => {
-    setHidden(previous => {
-      const stillPending = [...previous].filter(id => byId.has(id));
-      return stillPending.length === previous.size ? previous : new Set(stillPending);
-    });
-  }, [byId]);
 
   const later = useCallback(() => {
     if (!focusedId) return;
@@ -727,7 +793,8 @@ export const BuilderRoom: React.FC = () => {
   /* ── Render ───────────────────────────────────────────────────────── */
 
   const panelSession = panelId ? sessionById.get(panelId) : undefined;
-  const elsewhereDecision = elsewhere ? decisions.find(d => d.id === elsewhere) : undefined;
+  // The server no longer lists it, so draw it from what was last seen while it steps aside.
+  const elsewhereDecision = elsewhere ? known.current.get(elsewhere) : undefined;
   const cardDecision = focused ?? elsewhereDecision;
   const putBackCandidates = sessions.filter(session => session.putBackEligible);
   const sheetPlacement = phone ? "bottom" : "side";
