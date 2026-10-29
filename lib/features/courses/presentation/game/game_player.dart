@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show Factory;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -315,7 +317,24 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
                   color: Colors.white,
                   child: _controller == null
                       ? const Center(child: CircularProgressIndicator())
-                      : WebViewWidget(controller: _controller!),
+                      : WebViewWidget(
+                          controller: _controller!,
+                          // Nested inside the SingleChildScrollView below, so
+                          // without this a drag starting on the game canvas
+                          // (rotating CUB_N_PUP's puzzle, dragging SPROUT's
+                          // plant, swiping SNAKE) loses the gesture arena to
+                          // that scroll view's own vertical drag recognizer
+                          // and never reaches the WebView at all — RN's host
+                          // doesn't hit this (it disables the WebView's own
+                          // internal scrolling instead, a native-side knob
+                          // webview_flutter has no equivalent of), but the
+                          // framework's own documented fix for "parent
+                          // Scrollable claims the drag before a nested
+                          // platform view sees it" is an eager recognizer.
+                          gestureRecognizers: {
+                            Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                          },
+                        ),
                 ),
               ),
               Text(ref.t('courses.game.controlsTouch.$gameKey'), textAlign: TextAlign.center, style: small),
