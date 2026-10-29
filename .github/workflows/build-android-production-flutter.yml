@@ -36,6 +36,11 @@ on:
         description: 'versionName (blank = pubspec version). Must be above the RN version live in the store.'
         required: false
         type: string
+      continue_rn_version_code:
+        description: 'versionCode = RN''s last + 1, instead of the date-based test-build scheme. Only correct for the one-time real cutover release — see the Compute versionCode step''s comment before using this on a second run.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -125,14 +130,45 @@ jobs:
         id: version_info
         env:
           BUILD_NAME: ${{ inputs.build_name }}
-        # yyMMddHH + one digit for the 6-minute slot of the hour, UTC
-        # (e.g. 261028153). Always far above RN's versionCode (107 at the
-        # time of writing) and under Play's 2100000000 cap until 2099.
+          CONTINUE_RN: ${{ inputs.continue_rn_version_code }}
+        # Two schemes, picked by the continue_rn_version_code input:
+        #
+        # Default (test builds): yyMMddHH + one digit for the 6-minute slot
+        # of the hour, UTC (e.g. 261028153). Always far above RN's
+        # versionCode (108 at the time of writing) and under Play's
+        # 2100000000 cap until 2099. Needs no coordination with RN's own
+        # number, which is the point for a build that might run many times.
+        #
+        # continue_rn_version_code=true (the real cutover release): RN's own
+        # last versionCode (ally-mobile/android/app/build.gradle) + 1, so the
+        # Play listing's version history reads as one continuous sequence
+        # across the RN -> Flutter switch instead of an arbitrary jump.
+        #
+        # CAUTION: this only reads RN's file, not Play's actual live
+        # versionCode or any Flutter build already uploaded — correct for a
+        # true one-time cutover (RN's scheduled-mobile-release.yml must
+        # already be paused, see AUTO_RELEASE_ENABLED, or it could ship a
+        # build that reuses or exceeds this number). Running this workflow a
+        # second time with this flag on would recompute the SAME versionCode
+        # (RN's file doesn't change itself), which Play would then reject as
+        # not higher than the one already live — a second real release after
+        # cutover needs its own number above whatever Flutter last shipped,
+        # which isn't tracked anywhere yet (left for whenever that's needed).
         run: |
-          VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
           VERSION_NAME="$BUILD_NAME"
           if [ -z "$VERSION_NAME" ]; then
             VERSION_NAME=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
+          fi
+          if [ "$CONTINUE_RN" = "true" ]; then
+            RN_VERSION_CODE=$(grep -m1 'versionCode' "$GITHUB_WORKSPACE/ally-mobile/android/app/build.gradle" | awk '{print $2}')
+            if [ -z "$RN_VERSION_CODE" ]; then
+              echo "::error::Could not read RN's versionCode from ally-mobile/android/app/build.gradle"
+              exit 1
+            fi
+            VERSION_CODE=$((RN_VERSION_CODE + 1))
+            echo "Continuing RN's versionCode: $RN_VERSION_CODE -> $VERSION_CODE"
+          else
+            VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
           fi
           echo "versionCode $VERSION_CODE, versionName $VERSION_NAME"
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
