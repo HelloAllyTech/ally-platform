@@ -414,3 +414,9 @@ This is an append-only log of modifications, updates, and indexing runs performe
 
 ## [2026-10-29] update | The decision feed asks for a second press on hard-to-undo answers, and no longer reads a failed load as an empty queue.
 - `platform/builder-agent.md`, **The decision feed**: the "no confirmation step" rule now has one stated exception. An option the server flags `confirm` (a merge, removing a budget ceiling, stopping a build) is picked first and sent on a second press, so a stray Enter on a merge card cannot merge; every other answer stays one press. Added the rule that a failed read shows a retry, never "Nothing needs you". A typed budget ceiling with no digits, or a zero, is now refused instead of removing the ceiling.
+
+## [2026-10-29] update | Builder's decision feed becomes the Builder tab: Now, Rules, History — and works on a phone.
+- `platform/builder-agent.md`: **The decision feed** is rewritten as **The Builder tab: Now, Rules, History**. `/builder` is now the person's desk (mission control's list moved to `/builder/sessions`; `/builder/decisions` redirects).
+- Now: a waiting-on-you summary replaces the per-hour score; In progress grouped by what each session waits on, with Up next, Start (server-side first turn), a Limit and Put back; reversible answers undo for 8 s, one-way answers arm with their consequence and a 600 ms second press; live updates never reorder what is on screen.
+- New: Ask (read-only, grounded) and Tell (to the interview now, or queued for the next run), Rules (drafted by Builder, previewed against History, scoped, optionally deciding budget / stuck-PR / failed-build decisions), History (append-only, frozen at answer time), and a phone layout whose overlays the back gesture closes.
+

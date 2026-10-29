@@ -1,7 +1,7 @@
 ---
 title: Builder Agent — From a Sentence to a Merged Pull Request
 tags: [platform, builder, agent, automation, ci, release, admin, llm]
-summary: The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, the decision feed that clears what it is waiting on a person for, and why so much of its machinery is about not lying to the reader.
+summary: The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, the Builder tab (Now, Rules, History) where a person answers, asks, tells and writes rules, and why so much of its machinery is about not lying to the reader.
 last_reconciled: 2026-10-29
 ---
 
@@ -269,71 +269,114 @@ to see, rather than have quietly marked done.
 
 ---
 
-## The decision feed
+## The Builder tab: Now, Rules, History
 
 Everything above is Builder working. What bounds how much of it there can be is not the
-runner or the model but a person: every session stops at the points where only a human can
-choose — a scope question in the interview, a design to approve, a ceiling to raise, a
-pull request to merge or to take back. Each of those used to live where it was raised: the
-question inline in one session's chat, the merge button in a Slack message, the stopped
-build on mission control. Clearing them meant visiting every session and rebuilding its
-context each time, and across a dozen concurrent sessions that is the whole cost.
+runner or the model but a person: every session stops where only a human can choose — a
+scope question in the interview, a design to approve, a ceiling to raise, a pull request
+to merge or take back. The **Builder tab** (`/builder` in the admin console) is the one
+place a person does that job. It has three tabs, **Now · Rules · History**, and an
+overflow for All sessions, Pipeline, Scoreboard, Knowledge, Eval and Settings. The person
+sits in the collaborator and governor seat: they pick work, answer, ask, tell, and write
+down what they decided once so it is not asked twice.
 
-The **decision feed** (`/builder/decisions` in the admin console) folds them into one list
-of cards, one shape whatever the kind, to be cleared in one sitting. A card carries what is
-blocked until it is answered, the question, why Builder is asking (for a gated interview
-question: what it rests on and why research could not settle it), a few lines of context
-such as the PRD summary or the error, the options with the recommendation first, and a
-free-text answer wherever one makes sense. Cards group into three questions a person is
-really being asked — **what to build** (interview questions, the situation brief, a ready
-PRD), **how to build it** (a technical design in review) and **how to get unstuck** (a spent
-ceiling, a pull request Builder handed over, a merge, a failed build) — because a product
-owner clearing scope and an engineer clearing stuck pull requests are different sittings.
+One name per thing, in the screens and in the code: **Decision**, **Waiting on you**,
+**In progress**, **Up next**, **Start**, **Put back**, **Ask**, **Tell**, **Rule**,
+**Decide for me**, **History**, **Limit**.
 
-The design target is decisions per hour of attention, and the rules follow from it:
+### Now
 
-- **One card has the keyboard.** A digit picks an option; the same digit again, or Enter,
-  sends it; Enter alone sends the recommendation; `C` writes a custom answer; `S` skips.
-  A click still works, but a feed cleared by mouse is a feed cleared slowly.
-- **No confirmation step — except where an answer is hard to take back.** The card already
-  showed the trade-off; a second "are you sure" taxes every decision to insure against a
-  rare one. So an answer sends in one press, with one exception: an option the server
-  flags `confirm` — a merge, removing a budget ceiling, stopping a build — is *picked*
-  first and sent on a second press. A bare Enter on a merge card highlights the merge
-  instead of firing it, and a click picks before it sends; the card says so beside the
-  option. Everything else, including sending a pull request back to Builder, stays one
-  press. Refusals come back from the server with their reason ("a ceiling below what
-  was spent", "checks are not green").
-- **A failed read is not an empty queue.** If the feed cannot be loaded the page says it
-  could not read the queue and offers a retry; it never shows "Nothing needs you", which
-  would tell someone with a merge waiting that they are done.
-- **Order by cost of waiting and cost of deciding.** A held budget wastes a runner slot
-  and takes one key; a merge is one key between finished work and production; interview
-  questions are the bulk and sit in the middle; starting a build deserves a read of the
-  PRD, so it comes later. Within a kind, the oldest wait first. Skip means later, not
-  never: a skipped card goes to the back of the queue.
-- **The sitting keeps score.** Once two decisions have been made, the header shows how
-  many, the pace, and the rate it implies.
+A sentence answers "does anything need me?" in three seconds — "2 decisions need you ·
+waiting on you 41m · 1 stuck · 1 in review". The headline number is *waiting on you* (the
+minutes Builder sat idle on a person), not decisions per hour: a speed score on a screen
+whose biggest risk is rubber-stamping would train rubber-stamping, so pace lives on the
+Scoreboard as a private diagnostic.
 
-Two properties of how it is built matter more than the layout.
+On the left, **In progress** groups every session by what it waits on — Needs you, Stuck,
+Working, In review — each row two lines (what it is, and Builder's stage in its own words),
+status as an icon and a word, never colour alone. **Up next** sits at the foot: the top of
+the prioritised roadmap with **Start**, which hands it to Builder and runs the first
+interview turn server-side, so three quick Starts give three running interviews. A
+**Limit** (`builder_settings.inProgressLimit`, default 3, the person's attention rather
+than the runner budget) is enforced, never silently queued past: at the limit Start becomes
+"Put one back to start …", and **Put back** cancels an interview nobody has answered
+anything in and returns its opportunity to prioritised.
 
-**Nothing is stored.** A decision is *derived* from the state that already records it — an
-unanswered question on the interview's last assistant row, a pull request whose merge was
-prompted and has not happened, a session past its ceiling — and answering one goes
-through the same service call the session page would have made for the same click. A
-second table of pending decisions would have to be kept in step with the truth it
-summarises, and the first time it drifted the feed would be asking about a question
-somebody had already answered elsewhere. The same rule means a decision answered on the
-session page a minute ago is refused in the feed rather than appended a second time to
-the transcript.
+On the right, the **decision in focus** is the hero: the question is the largest text and
+the recommended option is the only filled control. The rules that make it fast and safe:
 
-**An interview answer runs as a background turn.** The session page streams a turn and the
-admin watches tokens arrive; the feed moves to the next card the moment an answer is sent,
-holding the same per-session lock the stream does so the two surfaces cannot interleave
-over one transcript. Builder's follow-up question, if it has one, comes back into the feed
-as a new card when the turn ends, and the feed says it is working on those answers so a
-quiet queue reads as "thinking" rather than "finished". A session page left open while its
-question is answered from the feed will not show the turn live; it catches up on reload.
+- **Undo, not confirmation, for what can be undone.** A reversible answer sends at once,
+  the next card appears, and a toast offers Undo for eight seconds (or `Z`). The server
+  holds the answer in Redis for that window before applying it, and a sweep commits any an
+  instance left behind.
+- **A deliberate second press for what can't.** A one-way option (a merge, removing a
+  ceiling, stopping a build) is armed by the first press, which shows its consequence in
+  place ("Merges #61 to master…"); a second press counts only after 600 ms, so a double-tap
+  can't fire it, and scrolling or pressing anywhere else disarms it.
+- **Nothing moves under the cursor.** Live updates (a payload-free `decisionsChanged` /
+  `sessionsChanged` on the `/builder` socket, with the 10 s poll as fallback) never reorder
+  what is on screen: new decisions wait behind an "n new" pill; a follow-up from the session
+  just answered goes next while the context is warm; a card answered on another surface says
+  so and steps aside.
+- **A failed read is not an empty queue**, and a failed send keeps the pick and offers Try
+  again.
+
+Clicking a session opens its **Session panel** in the same column — what it is doing, what
+is waiting on you, its thread of asks and tells, links — and `Esc` returns to the decision.
+
+### Ask and Tell
+
+One composer with a visible target ("To OPP-0646"), two verbs. **Ask** is read-only: an
+answer grounded in the PRD, transcript, runs, pull requests, History and rules, with no turn
+lock and no transcript write, stored in History. **Tell** changes the work and says where it
+will land before it is sent: into the interview now, or queued in the person's own lane and
+handed to the next run's spec (or fix round) under "You were told", stamped applied to that
+run. Restarting a run mid-flight with an instruction is only ever the explicit, costed
+secondary action.
+
+### Rules
+
+What a person decided once, read by every interview turn and every run, outranking Builder's
+own lessons. Builder drafts the general version of an answer ("For usage and cost data,
+store one row per event"); the person edits it, picks a scope (this session, an area, or
+everywhere) and sees **what it would have changed** — "would have applied to 4 earlier
+decisions, agrees with 3" — before saving; a contradiction with an existing rule is
+resolved in the editor, never by whichever was saved last. A rule whose effect is **Decide
+for me** answers matching budget, stuck pull request or failed build decisions itself
+(recorded as decided by the rule), only while the autonomy level is above `assist`; deciding
+*what* to build is never delegated, and a merge rule is the existing auto-merge switch, not
+a second merge path. Builder offers "Shall I decide this for you?" only after ten agreements
+in a row.
+
+### History
+
+Every decision, ask and tell, append-only, searchable and filterable. It freezes the card as
+it was answered — the recommendation is fixed before the answer applies — so the Scoreboard
+can say how often the person took it. Corrections are new rules, never edits.
+
+### On a phone
+
+A phone visit is short — a Slack nudge, two or three decisions, done — and is designed for
+as such. Every keyboard action has a visible control; key hints show only for a fine pointer.
+A bottom bar holds previous/next and **Ask or tell**, which opens a sheet; In progress is a
+strip that opens a sheet; the rationale collapses to one line; options are full-width and at
+least 48 px tall; swiping moves between decisions and never answers one. Every overlay is a
+URL parameter pushed as a history entry, so the back gesture closes it rather than leaving
+the tab, and `/builder?decision=<id>` opens one card and ends with "Done. n more need you".
+Drafts survive a suspended tab, the page refetches on return, and offline nothing sends.
+
+### What does not change
+
+**Nothing about a decision is stored.** A decision is *derived* from the state that already
+records it — an unanswered question on the interview's last assistant row, a pull request
+whose merge was prompted, a session past its ceiling — and answering one goes through the
+same service call the session page would have made. A second table of pending decisions
+would drift from the truth it summarises. History records what was *done*, never what is
+pending.
+
+**An interview answer runs as a background turn** under the session's existing turn lock, so
+the tab and the session page cannot interleave over one transcript; Builder's follow-up
+comes back as a new card when the turn ends.
 
 ## Reading the UI honestly
 
