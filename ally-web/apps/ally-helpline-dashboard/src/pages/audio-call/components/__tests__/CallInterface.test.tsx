@@ -105,7 +105,10 @@ vi.mock("../../utils", () => ({
 }));
 
 // Mock lucide-react
-vi.mock("lucide-react", () => ({
+// Keep every real icon (the debrief view the screen mounts uses others) and
+// replace only the ones these tests find.
+vi.mock("lucide-react", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   X: ({ className, onClick }: any) => (
     <div data-testid="x-icon" className={className} onClick={onClick}>
       X Icon

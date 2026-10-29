@@ -10,11 +10,13 @@ import { initSession } from "@reducer";
 import { RootState } from "@store";
 import { ChatMessagePayload, SimulationSummary as SimulationSummaryType } from "@types";
 
+import { DebriefCards } from "./DebriefCards";
 import { DebriefFeedback } from "./DebriefFeedback";
 import { DebriefReplyInput } from "./DebriefReplyInput";
 import { getDebriefViewState } from "./debriefViewState";
 import { ReplyBubble } from "./ReplyBubble";
 import { SupervisorNote } from "./SupervisorNote";
+import { useLearnerDebrief } from "./useLearnerDebrief";
 
 const NoteSkeleton = () => (
   <div className="flex w-full gap-3">
@@ -111,6 +113,12 @@ export const DebriefTab: FC<DebriefTabProps> = ({
       threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, streamingMessage, readOnly]);
+
+  // The Debrief agent's debrief replaces everything below once the learner's
+  // organisation is switched on. `null` — not switched on, request failed,
+  // or still loading — keeps today's debrief exactly as it was.
+  const learnerDebrief = useLearnerDebrief(sessionId);
+  if (learnerDebrief) return <DebriefCards view={learnerDebrief} />;
 
   const summary = summaryData?.details?.summary;
   const note = summary?.feedback?.supervisorNote;

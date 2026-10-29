@@ -83,7 +83,10 @@ vi.mock("@components", async importOriginal => {
 });
 
 // Mock lucide-react
-vi.mock("lucide-react", () => ({
+// Keep every real icon (the debrief view the screen mounts uses others) and
+// replace only the ones these tests find.
+vi.mock("lucide-react", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   ChevronDown: (props: any) => <svg data-testid="chevron-down-icon" {...props} />,
   ChevronUp: (props: any) => <svg data-testid="chevron-up-icon" {...props} />,
   XCircle: (props: any) => <svg data-testid="x-circle-icon" {...props} />,

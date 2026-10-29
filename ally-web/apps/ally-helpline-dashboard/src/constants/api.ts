@@ -216,6 +216,10 @@ export const ApiEndpoints = {
     // One boolean about the caller's own org; readable by any authenticated user.
     GET_PROGRESS_ENABLED: "/v1/progress/me/enabled",
   },
+  DEBRIEFS: {
+    // The Debrief agent's debrief for one of the caller's own sessions.
+    GET_LEARNER_DEBRIEF: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}`,
+  },
   PRACTICE_STREAK: {
     GET_PRACTICE_STREAK: "/v1/community/practice-streak",
     // Streak state without the heatmap cells — for callers that mount often

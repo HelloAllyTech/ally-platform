@@ -26,6 +26,9 @@ vi.mock("react-redux", () => ({
 
 vi.mock("@api", () => ({
   useGetChatHistoryQuery: (...args: unknown[]) => mockChatHistoryQuery(...args),
+  // The learner's org isn't on the new Debrief agent here, so today's view stays.
+  useGetLearnerDebriefQuery: () => ({ data: { state: "not_available" } }),
+  LEARNER_DEBRIEF_POLL_MS: 5000,
 }));
 
 vi.mock("@assets", () => ({
