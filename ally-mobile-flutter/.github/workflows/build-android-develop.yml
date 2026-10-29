@@ -1,0 +1,150 @@
+# Test build of the Flutter app under its own identity
+# (com.helloally.ally_mobile_flutter, "Ally Flutter"), so installing it never
+# replaces the real Ally app or RN's own com.helloally.app.dev build.
+# Mirrors ally-platform's build-android-develop.yml (same secret names): a
+# signed release APK as a workflow artifact, never uploaded to Play.
+name: 'Build Android app - Develop (test identity)'
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: development
+    timeout-minutes: 60
+    env:
+      # `secrets` can't be read in a step `if:`; job env can.
+      ANDROID_GSJ_URI: ${{ secrets.ANDROID_GOOGLE_SERVICES_S3_URI_DEV }}
+    steps:
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+          tool-cache: true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        if: env.ANDROID_GSJ_URI != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download Firebase config from S3 (Android Dev, optional)
+        # RN's dev json is for com.helloally.app.dev; this identity needs its
+        # own Firebase Android app. Without one the build has no Firebase
+        # (push/Crashlytics), which the app tolerates.
+        if: env.ANDROID_GSJ_URI != ''
+        run: |
+          mkdir -p android/app/src/dev
+          aws s3 cp "$ANDROID_GSJ_URI" "android/app/src/dev/google-services.json"
+          if ! jq -e '[.client[].client_info.android_client_info.package_name] | index("com.helloally.ally_mobile_flutter")' \
+              android/app/src/dev/google-services.json > /dev/null; then
+            echo "::warning::google-services.json has no com.helloally.ally_mobile_flutter client; building without Firebase"
+            rm -f android/app/src/dev/google-services.json
+          fi
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_VALUES_DEVELOP }}" > .env
+
+      - name: Decode release keystore
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_RELEASE_KEYSTORE_BASE64 secret is not set"
+            exit 1
+          fi
+          echo "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/ally-release.keystore
+
+      - name: Build APK (dev flavor)
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
+          flutter build apk --release --flavor dev --obfuscate --split-debug-info=build/symbols --dart-define-from-file=.env --build-number=$VERSION_CODE
+          DATETIME=$(date +'%Y%m%d-%H%M')
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-dev-release.apk "dist/ally-flutter-develop-${{ github.run_number }}-${DATETIME}.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ally-flutter-develop-${{ github.run_number }}
+          path: dist/*.apk
+          retention-days: 7
+
+      - name: Keep Dart debug symbols
+        # Obfuscated Dart stack traces can only be read with these; kept so a
+        # build can still be symbolicated after the Firebase secret is added.
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-symbols-${{ github.run_number }}
+          path: build/symbols
+          retention-days: 90
+
+      - name: Upload Crashlytics symbols
+        # Best effort, never fails the release: skipped with a warning when
+        # the Firebase config or the Firebase service account is missing.
+        # The R8 mapping file is uploaded by the Crashlytics Gradle plugin
+        # during the build; this uploads the Dart --split-debug-info files.
+        continue-on-error: true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON }}
+        run: |
+          GSJ=android/app/src/dev/google-services.json
+          APP_ID=""
+          if [ -f "$GSJ" ]; then
+            APP_ID=$(jq -r '.client[] | select(.client_info.android_client_info.package_name == "com.helloally.ally_mobile_flutter") | .client_info.mobilesdk_app_id' "$GSJ" | head -n 1)
+          fi
+          if [ -z "$APP_ID" ]; then
+            echo "::warning::No google-services.json for com.helloally.ally_mobile_flutter; skipping Crashlytics symbol upload"
+            exit 0
+          fi
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON not set; skipping Dart symbol upload"
+            exit 0
+          fi
+          echo "$FIREBASE_SA" > "$RUNNER_TEMP/firebase-sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" \
+            npx --yes firebase-tools@14 crashlytics:symbols:upload --app="$APP_ID" build/symbols
+          rm -f "$RUNNER_TEMP/firebase-sa.json"
+
+      - name: Send Slack notification
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Flutter Android test build (Ally Flutter) #${{ github.run_number }}: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|download APK>'

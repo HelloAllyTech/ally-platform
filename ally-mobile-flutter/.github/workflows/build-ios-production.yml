@@ -1,0 +1,221 @@
+# Store build of the Flutter app: bundle id com.helloally.app, i.e. an UPDATE
+# to the React Native app's App Store listing. Mirrors ally-platform's
+# .github/workflows/build-ios-production.yml step for step, with the SAME
+# secret names, so an admin can copy RN's secrets across (docs/RELEASE.md).
+#
+# Manual only. It uploads to TestFlight and stops there: nothing here
+# submits for App Store review or releases to users. Every TestFlight tester
+# of the real app who installs this build has the RN app replaced by it, so
+# the dispatch form asks you to type the bundle id to confirm.
+name: 'Build & Upload iOS app - Production (store identity)'
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_store_identity:
+        description: 'Type com.helloally.app to confirm this build replaces the RN app for TestFlight testers'
+        required: true
+        type: string
+      build_name:
+        description: 'Marketing version (blank = pubspec version). Must be above the RN version live in the store.'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_ios_production:
+    runs-on: macos-15
+    environment: production
+    timeout-minutes: 60
+
+    steps:
+      - name: Confirm store identity
+        env:
+          CONFIRM: ${{ inputs.confirm_store_identity }}
+        run: |
+          if [ "$CONFIRM" != "com.helloally.app" ]; then
+            echo "::error::Type com.helloally.app in confirm_store_identity to run a store-identity build."
+            exit 1
+          fi
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download Firebase config from S3 (iOS Prod)
+        run: |
+          aws s3 cp "${{ secrets.IOS_GOOGLE_SERVICES_S3_URI_PROD }}" "ios/Runner/GoogleService-Info.plist"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" ios/Runner/GoogleService-Info.plist)
+          if [ "$BUNDLE" != "com.helloally.app" ]; then
+            echo "::error::GoogleService-Info.plist is for $BUNDLE, not com.helloally.app"
+            exit 1
+          fi
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create .env file
+        # RN's .env format; flutter --dart-define-from-file reads it as-is.
+        run: |
+          echo "${{ secrets.ENV_VALUES_PRODUCTION }}" > .env
+
+      - name: Set up iOS code signing (Production)
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          PROVISION_PROFILES_BASE64: ${{ secrets.PROVISION_PROFILES_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/AppProvision.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$PROVISION_PROFILES_BASE64" | base64 --decode -o $PP_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          rm -rf ~/Library/MobileDevice/Provisioning\ Profiles/*
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+
+      - name: Set build number (Production)
+        id: increment_version
+        # RN's production scheme ("1" + YYYYMMDDHHMM): both apps' builds in
+        # the same App Store Connect app stay in time order, so this is
+        # always above the last RN build and a later RN build is above it.
+        run: |
+          build_number="1$(date +%Y%m%d%H%M)"
+          echo "Production build number: $build_number"
+          echo "build_number=$build_number" >> $GITHUB_OUTPUT
+
+      - name: Write export options
+        env:
+          EXPORT_OPTIONS_PLIST: ${{ secrets.EXPORT_OPTIONS_PLIST }}
+        run: |
+          echo -n "$EXPORT_OPTIONS_PLIST" | base64 --decode -o $RUNNER_TEMP/ExportOptions.plist
+          plutil -lint $RUNNER_TEMP/ExportOptions.plist
+
+      - name: Build ipa (prod flavor)
+        env:
+          BUILD_NAME: ${{ inputs.build_name }}
+        run: |
+          flutter build ipa --release --flavor prod --obfuscate --split-debug-info=build/symbols \
+            --dart-define-from-file=.env \
+            --build-number=${{ steps.increment_version.outputs.build_number }} \
+            ${BUILD_NAME:+--build-name=$BUILD_NAME} \
+            --export-options-plist=$RUNNER_TEMP/ExportOptions.plist
+          IPA=$(ls build/ios/ipa/*.ipa | head -1)
+          if [ -z "$IPA" ]; then
+            echo "::error::No .ipa produced"
+            ls -R build/ios || true
+            exit 1
+          fi
+          mkdir -p $RUNNER_TEMP/build
+          cp "$IPA" $RUNNER_TEMP/build/ally.ipa
+          unzip -p "$IPA" 'Payload/*.app/Info.plist' > $RUNNER_TEMP/Info.plist
+          plutil -p $RUNNER_TEMP/Info.plist | grep -E 'CFBundleIdentifier|CFBundleDisplayName|CFBundleShortVersionString|CFBundleVersion'
+
+      - name: Upload application artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-production-app
+          path: ${{ runner.temp }}/build/ally.ipa
+          retention-days: 30
+
+      - name: Upload to TestFlight (Production)
+        uses: Apple-Actions/upload-testflight-build@master
+        with:
+          app-path: ${{ runner.temp }}/build/ally.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Keep Dart debug symbols
+        # Obfuscated Dart stack traces can only be read with these; kept so a
+        # build can still be symbolicated after the Firebase secret is added.
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-symbols-${{ github.run_number }}
+          path: build/symbols
+          retention-days: 90
+
+      - name: Upload Crashlytics symbols
+        # Best effort, never fails the release: skipped with a warning when
+        # the Firebase config or the Firebase service account is missing.
+        # Native: the archive's dSYMs (the "Upload Crashlytics Symbols" build
+        # phase also tries, but its upload can race dSYM generation).
+        # Dart: the --split-debug-info files from the obfuscated build.
+        continue-on-error: true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON }}
+        run: |
+          GSP=ios/Runner/GoogleService-Info.plist
+          APP_ID=$(/usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$GSP" 2>/dev/null || true)
+          if [ -z "$APP_ID" ]; then
+            echo "::warning::No GoogleService-Info.plist; skipping Crashlytics symbol upload"
+            exit 0
+          fi
+          # flutter build clones Swift packages into build/ios/SourcePackages.
+          UPLOAD=$(ls build/ios/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+            "$HOME"/Library/Developer/Xcode/DerivedData/Runner-*/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+            2>/dev/null | head -n 1)
+          if [ -n "$UPLOAD" ] && [ -d build/ios/archive/Runner.xcarchive/dSYMs ]; then
+            "$UPLOAD" -gsp "$GSP" -p ios build/ios/archive/Runner.xcarchive/dSYMs \
+              || echo "::warning::dSYM upload failed"
+          else
+            echo "::warning::Crashlytics upload-symbols or the archive dSYMs not found; skipping dSYM upload"
+          fi
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON not set; skipping Dart symbol upload"
+            exit 0
+          fi
+          echo "$FIREBASE_SA" > "$RUNNER_TEMP/firebase-sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" \
+            npx --yes firebase-tools@14 crashlytics:symbols:upload --app="$APP_ID" build/symbols
+          rm -f "$RUNNER_TEMP/firebase-sa.json"
+
+      - name: Send Slack notification (Production)
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Flutter iOS store-identity build uploaded to TestFlight (not submitted for review).'
+          attachments: |
+            [
+              {
+                "color": "good",
+                "author_name": "${{ github.actor }}",
+                "fields": [
+                  {"title": "Build Number", "value": "${{ steps.increment_version.outputs.build_number }}"},
+                  {"title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"}
+                ]
+              }
+            ]

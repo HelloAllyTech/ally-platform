@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RN's launch colour (ally-mobile android/app/src/main/res/values/colors.xml). -->
+    <color name="launch_background">#021922</color>
+</resources>

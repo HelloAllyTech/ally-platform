@@ -1,0 +1,254 @@
+name: ally_mobile_flutter
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# In Windows, build-name is used as the major, minor, and patch parts
+# of the product and file versions while build-number is used as the build suffix.
+# Marketing version 2.0.0 sits above every React Native release (1.23.x), so
+# the store accepts this app as an update to RN's listing. The build number
+# here is a placeholder: release workflows pass --build-number (scheme in
+# docs/RELEASE.md) so it always exceeds RN's.
+version: 2.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  flutter_riverpod: ^3.4.3
+  dio: ^5.11.1
+  go_router: ^18.0.2
+  shared_preferences: ^2.5.6
+  flutter_secure_storage: ^11.2.0
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^8.2.0
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
+  firebase_crashlytics: ^5.4.0
+  flutter_local_notifications: ^22.3.2
+  permission_handler: ^13.0.2
+  flutter_dotenv: ^6.0.1
+  intl: ^0.20.3
+  livekit_client: ^2.13.1
+  socket_io_client: ^3.1.6
+  record: ^7.1.2
+  path_provider: ^2.1.6
+  audioplayers: ^6.5.1
+  flutter_foreground_task: ^11.0.3
+  url_launcher: ^6.3.3
+  image_picker: ^1.2.4
+  webview_flutter: ^4.13.0
+  video_player: ^2.14.1
+  # SF Symbol-style glyphs for the course video controls (iOS AVKit look).
+  cupertino_icons: ^1.0.9
+  flutter_svg: ^2.2.1
+  lottie: ^3.3.2
+  package_info_plus: ^10.2.2
+  confetti: ^0.8.0
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
+  flutter_markdown_plus: ^1.0.12
+  wakelock_plus: ^1.8.2
+  connectivity_plus: ^7.3.2
+  app_links: ^7.2.2
+  crypto: ^3.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^6.0.0
+  mocktail: ^1.0.5
+  # Used directly in tests to fake the `video_player`/`url_launcher`
+  # platform channels that don't exist under `flutter test` (see
+  # test/features/courses/presentation/video/fake_video_player_platform.dart
+  # and video_fallback_card_test.dart) — previously only transitive
+  # dependencies of video_player/url_launcher.
+  video_player_platform_interface: ^6.9.0
+  # Already resolved transitively via url_launcher — declared directly here
+  # only so community_screen_test.dart can fake UrlLauncherPlatform.instance
+  # (CommunityScreen's own real, unmockable-any-other-way dependency).
+  url_launcher_platform_interface: ^2.3.2
+  # Already resolved transitively via permission_handler — declared directly
+  # because test/support/fake_permission_platform.dart imports it to fake
+  # PermissionHandlerPlatform.instance (permission_handler itself has no
+  # mock-friendly seam like shared_preferences' setMockInitialValues, but
+  # does expose this real platform-interface swap point).
+  permission_handler_platform_interface: ^4.4.1
+  # Already resolved transitively via `record` — declared directly because
+  # test/support/mock_record_platform.dart mocks RecordPlatform.instance so
+  # ScribeRecordingScreen's eagerly-constructed AudioRecorder doesn't hit a
+  # real (absent) platform channel in widget tests.
+  record_platform_interface: ^2.1.0
+  # Already resolved transitively via `path_provider` — declared directly
+  # because test/support/mock_path_provider.dart fakes
+  # PathProviderPlatform.instance so VoiceNoteRecorder's
+  # getTemporaryDirectory() call doesn't hit a real (absent) platform channel
+  # in widget/unit tests.
+  path_provider_platform_interface: ^2.1.3
+  # Already resolved transitively via several platform-interface packages —
+  # declared directly because mock_record_platform.dart uses its
+  # MockPlatformInterfaceMixin, the sanctioned way to satisfy a
+  # PlatformInterface's token check from a mocktail Mock in tests.
+  plugin_platform_interface: ^2.1.8
+  # Generates the real Android/iOS launcher icons from assets/icon/icon.png
+  # (ally-mobile's own 1024x1024 App Store icon, RN's real icon asset) —
+  # this app was still shipping Flutter's default template icon.
+  flutter_launcher_icons: ^0.14.4
+
+# flutter_launcher_icons config — run `dart run flutter_launcher_icons`
+# after changing assets/icon/icon.png. RN's own Android icons
+# (ally-mobile/android/app/src/main/res/mipmap-*) are plain legacy
+# launcher icons with no adaptive-icon layers, so this mirrors that
+# exactly rather than adding an adaptive foreground/background this app's
+# real icon was never designed for.
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: "ic_launcher"
+  ios: true
+  # The source PNG's alpha channel is fully opaque already (no real
+  # transparency), but App Store Connect rejects an icon that even
+  # technically carries an alpha channel.
+  remove_alpha_ios: true
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  # Build flavors (docs/RELEASE.md): `dev` = the pre-cutover test identity,
+  # `prod` = the store app (RN's identity). Plain `flutter run`/`build` use
+  # dev, so nothing builds the store identity by accident.
+  default-flavor: dev
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  # Bundled locale JSON — real translated strings ported verbatim from
+  # ally-mobile (React Native)'s src/localization/locales/*.json. These are
+  # the zero-delay offline fallback only; the real source of truth is a
+  # dynamic CDN sync at runtime (see core/localization/ for why — these
+  # files are not run through gen-l10n/ARB, which can't represent a
+  # runtime-refreshable translation source).
+  #
+  # Also includes self-contained HTML5 game bundles for GAME course items —
+  # extracted verbatim (byte-identical) from ally-mobile (React Native)'s
+  # `src/screens/CourseItemPlayerScreen/components/players/games/*Html.ts`,
+  # which in turn are the same files ally-web serves from
+  # `public/games/*/index.html`. Each bundle detects its host at runtime
+  # (posts to `window.ReactNativeWebView` if present, `window.parent`
+  # otherwise) so no fork was needed for this Flutter host — see
+  # GamePlayer's doc comment for the webview_flutter bridge shim.
+  assets:
+    - assets/locales/en.json
+    - assets/locales/hi.json
+    - assets/locales/kn.json
+    - assets/locales/mr.json
+    - assets/locales/ta.json
+    - assets/games/trex_runner.html
+    - assets/games/tic_tac_toe.html
+    - assets/games/memory_match.html
+    - assets/games/cub_n_pup.html
+    - assets/games/snake.html
+    - assets/games/sprout.html
+    # Real design-system assets ported verbatim from ally-mobile (React
+    # Native)'s src/assets/{icons,images,animations}/ for exact-match UI
+    # parity — 143 SVGs, 11 PNGs, 4 Lottie JSONs. Flat directories, so a
+    # trailing-slash declaration picks up every file without listing each.
+    - assets/icons/
+    - assets/images/
+    - assets/animations/
+    # rn-emoji-keyboard 1.7.0 (MIT) data + category icons, for the Share
+    # for review emoji keyboard (features/reviews/.../emoji_keyboard).
+    - assets/emoji_keyboard/
+    # RN's src/assets/sounds/breath.mp3 (BoxBreathingAnimation's SoundPlayer).
+    - assets/sounds/breath.mp3
+    # RN's src/assets/sounds/{start,end}Simulation.mp3 (SimulationAssistantScreen's
+    # playNotificationSound on role-play start / end).
+    - assets/sounds/startSimulation.mp3
+    - assets/sounds/endSimulation.mp3
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
+
+  # Real fonts ported verbatim from ally-mobile (React Native)'s
+  # src/theme/fonts.ts — family names match that file's fontFamily strings
+  # exactly so lib/core/theme/app_fonts.dart can mirror its token structure.
+  # Roboto-ExtraLight has no font file in the RN repo either (a pre-existing
+  # gap there, not fabricated here) — ROBOTO.EXTRA_LIGHT falls back to
+  # Roboto-Regular, same as the real app effectively does.
+  fonts:
+    - family: ReplayPro-Headline
+      fonts:
+        - asset: assets/fonts/ReplayPro-Headline.otf
+    - family: ReplayPro-Bold
+      fonts:
+        - asset: assets/fonts/ReplayPro-Bold.otf
+    - family: ReplayPro-BoldItalic
+      fonts:
+        - asset: assets/fonts/ReplayPro-BoldItalic.otf
+          style: italic
+    - family: Roboto-Regular
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+    - family: IBMPlexSerif-Regular
+      fonts:
+        - asset: assets/fonts/IBMPlexSerif-Regular.ttf
+    - family: IBMPlexSerif-Medium
+      fonts:
+        - asset: assets/fonts/IBMPlexSerif-Medium.ttf
+    - family: YesevaOne-Regular
+      fonts:
+        - asset: assets/fonts/YesevaOne-Regular.ttf

@@ -1,0 +1,2142 @@
+{
+  "progress": {
+    "title": "आपकी प्रगति",
+    "hero": {
+      "level": "स्तर {{level}}",
+      "toNextLevel_one": "स्तर {{level}} तक {{count}} XP",
+      "toNextLevel_other": "स्तर {{level}} तक {{count}} XP",
+      "maxLevel": "आप सर्वोच्च स्तर पर पहुँच गए हैं",
+      "xpTotal_one": "कुल {{count}} XP अर्जित",
+      "xpTotal_other": "कुल {{count}} XP अर्जित"
+    },
+    "stats": {
+      "lifetimeMinutes": "अभ्यास के मिनट",
+      "sessions": "पूर्ण किए गए सत्र",
+      "trackItems": "पूर्ण किए गए पाठ्यक्रम आइटम"
+    },
+    "rank": {
+      "link": "देखें आप किस स्थान पर हैं"
+    },
+    "badges": {
+      "link": "अपने सभी बैज देखें"
+    },
+    "errors": {
+      "title": "आपकी प्रगति लोड नहीं हो सकी",
+      "description": "प्रगति प्राप्त करने में कुछ गड़बड़ हुई। पुनः प्रयास करने के लिए नीचे खींचें।"
+    },
+    "a11y": {
+      "level": "स्तर {{level}}, कुल {{xp}} XP अर्जित",
+      "navLevel": "आपकी प्रगति, स्तर {{level}}। आपकी प्रगति स्क्रीन खोलता है।"
+    }
+  },
+  "achievements": {
+    "title": "उपलब्धियां",
+    "badges": "बैज",
+    "viewAll": "सभी देखें",
+    "viewAllBadges": "सभी बैज देखें",
+    "badgeTooltipDescription": "यह दृश्य चयनित समयावधि में कुल गतिविधि को दर्शाता है, जिसमें अभ्यास का समय, अर्जित बैज और सामुदायिक भागीदारी शामिल है। यदि आपके या किसी समीक्षक द्वारा कोई टिप्पणी या प्रतिक्रिया हटा दी जाती है, तो लीडरबोर्ड तदनुसार अपडेट हो जाता है।",
+    "emptyHome": "आपके पास अभी तक कोई बैज नहीं है",
+    "badgesCount": "{{count}} बैज",
+    "badgesTooltip": "बैज सिमुलेशन में आपकी गतिविधि और समुदाय में भागीदारी के आधार पर अर्जित किए जाते हैं। यदि योग्य कार्य पूर्ववत किए जाते हैं तो कुछ बैज हटाए जा सकते हैं।",
+    "noAchievements": "कोई उपलब्धि नहीं मिली",
+    "filters": {
+      "all": "सभी",
+      "unlocked": "अनलॉक किए गए"
+    },
+    "empty": "कोई बैज नहीं मिला",
+    "backAria": "वापस जाएं",
+    "errors": {
+      "title": "उपलब्धियां लोड करने में असमर्थ",
+      "description": "उपलब्धियां लोड करते समय कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+    },
+    "modal": {
+      "newBadge": "आपने एक नया बैज अर्जित किया है"
+    },
+    "badgeTypes": {
+      "suffix": "बैज",
+      "journey": "ऐप यात्रा",
+      "momentum": "गति",
+      "contribution": "योगदान",
+      "resonance": "अनुनाद",
+      "tooltip": {
+        "journey": "सिमुलेशन मिनट पूरे करके अर्जित किया गया। केवल पूरे किए गए सिमुलेशन समय की गणना की जाती है।",
+        "momentum": "स्ट्रीक बनाने के लिए प्रतिदिन कम से कम एक रोल प्ले पूरा करें। एक दिन चूकने पर आपकी स्ट्रीक रीसेट हो जाती है।",
+        "contribution": "दूसरों के सत्रों पर आपके द्वारा जोड़ी गई टिप्पणियों और प्रतिक्रियाओं की संख्या। आपके अपने सत्रों की गतिविधि शामिल नहीं है।",
+        "resonance": "तब अर्जित होता है जब अन्य समीक्षक आपके सत्रों पर टिप्पणी या प्रतिक्रिया करते हैं। आपके सत्रों पर आपके अपने कार्य शामिल नहीं हैं।"
+      }
+    }
+  },
+  "analytics": {
+    "title": "सत्र मेट्रिक्स",
+    "dashboardTitle": "मेटाबेस डैशबोर्ड",
+    "types": {
+      "callLogs": "रीयल कॉल लॉग",
+      "simulations": "सिमुलेशन",
+      "rolePlay": "रोल प्ले",
+      "org": "संगठन मेट्रिक्स"
+    },
+    "empty": {
+      "title": "कोई डेटा नहीं",
+      "description": "अभी तक कोई डैशबोर्ड उपलब्ध नहीं है। कृपया अपने व्यवस्थापक से संपर्क करें।"
+    }
+  },
+  "askAi": {
+    "initial": {
+      "titlePrefix": "आप किस पर",
+      "titleSuffix": " फीडबैक चाहेंगे?",
+      "subtitle": "एक प्रॉम्प्ट चुनें या अपना खुद का प्रश्न पूछें।"
+    },
+    "cards": {
+      "responseEffectiveness": "इस सत्र में मैंने सबसे प्रभावी ढंग से कहाँ प्रतिक्रिया दी?",
+      "pacingPresence": "कुल मिलाकर मेरी गति और उपस्थिति कैसी थी?",
+      "missedClientCues": "मैं क्लाइंट को समझने में कहाँ चूक गया या गलत समझ बैठा?",
+      "therapeuticTechniques": "कौन सी उपचारात्मक तकनीकें/कदम सबसे मददगार थे?"
+    },
+    "transcriptReferences": "ट्रांसक्रिप्ट संदर्भ",
+    "inputPlaceholder": "सत्र के बारे में एक प्रश्न पूछें....",
+    "askAIMaxMessages": "कृपया अपना संदेश {{maxMessageLength}} वर्णों या उससे कम का रखें।"
+  },
+  "audioCall": {
+    "fallback": {
+      "ongoingCall": "एक चालू कॉल है",
+      "ongoingCallDesc": "अभी आपकी एक सक्रिय कॉल चल रही है",
+      "modeNotAvailable": "{{mode}} मोड उपलब्ध नहीं है",
+      "noPermission": "आपके पास {{mode}} मोड तक पहुंचने की अनुमति नहीं है",
+      "noActiveCall": "कोई सक्रिय कॉल नहीं",
+      "noActiveCallDesc": "आपकी सक्रिय कॉल यहाँ दिखाई जाएगी।",
+      "modeDictation": "डिक्टेशन",
+      "modeMicrophone": "माइक्रोफ़ोन"
+    },
+    "endDialog": {
+      "titleNormal": "समाप्त करें ",
+      "titleItalic": "सत्र",
+      "content": "क्या आप वाकई इस सत्र को समाप्त करना चाहते हैं",
+      "endSession": "सत्र समाप्त करें"
+    },
+    "controls": {
+      "resumeTranscription": "ट्रांसक्रिप्शन फिर से शुरू करें",
+      "pauseTranscription": "ट्रांसक्रिप्शन रोकें",
+      "focused": "फोकस्ड",
+      "focus": "फोकस",
+      "endSession": "सत्र समाप्त करें",
+      "muteTooltip": "क्या आपको नोट्स कैप्चर करने की आवश्यकता है? AI अभी आपको सुन नहीं सकता है। इसे सुनने देने के लिए फिर से शुरू करें।",
+      "dataSafe": "आपका डेटा सुरक्षित है"
+    },
+    "privacy": {
+      "noRecording": "हम ऑडियो रिकॉर्डिंग सहेजते नहीं हैं",
+      "encrypted": "डेटा एन्क्रिप्टेड है",
+      "noTrainingData": "हम अपने मॉडल को प्रशिक्षित करने के लिए आपके क्लाइंट के डेटा का उपयोग नहीं करते हैं",
+      "personalInfoRemoved": "क्लाइंट की व्यक्तिगत जानकारी स्वचालित रूप से हटा दी जाती है"
+    },
+    "status": {
+      "connecting": "आपके सत्र से कनेक्ट हो रहा है...",
+      "starting": "सत्र अब शुरू हो रहा है..",
+      "takingNotes": "नोट्स ले रहा है"
+    },
+    "notes": {
+      "waitOrEnd": "आप उनके फिर से जुड़ने की प्रतीक्षा कर सकते हैं या कॉल समाप्त कर सकते हैं।",
+      "differentPlatform": "नोट: यह कॉल किसी अन्य प्लेटफ़ॉर्म से शुरू की गई थी। आप सुन सकते हैं लेकिन कॉल को नियंत्रित (म्यूट/अनम्यूट) नहीं कर सकते।",
+      "activeInOtherTab": "नोट: यह कॉल पहले से ही किसी अन्य टैब/विंडो में सक्रिय है। आप सुन सकते हैं लेकिन कॉल को नियंत्रित (म्यूट/अनम्यूट) नहीं कर सकते।",
+      "refreshWarning": "नोट: रीफ्रेश करने, सक्रिय टैब बंद करने, या नेटवर्क में रुकावट आने पर कॉल समाप्त हो जाएगी।",
+      "scribeStopWarning": "आपके द्वारा कॉल समाप्त करते ही स्क्राइब नोट्स लेना बंद कर देगा।"
+    },
+    "sidebar": {
+      "isHelpful": "क्या यह मददगार है?",
+      "currentStage": "वर्तमान चरण:"
+    },
+    "error": {
+      "goBack": "वापस जाएं",
+      "tryAgain": "पुनः प्रयास करें",
+      "noNetwork": "कोई इंटरनेट कनेक्शन नहीं",
+      "noNetworkDesc": "नेटवर्क में रुकावट के कारण कॉल समाप्त हो गई, कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।",
+      "noNetworkSharedDesc": "कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।",
+      "somethingWrong": "कुछ गलत हो गया",
+      "somethingWrongDesc": "अज्ञात कारण से कॉल समाप्त हो गई, कृपया पुनः प्रयास करें..",
+      "oops": "उफ़ !"
+    }
+  },
+  "auth": {
+    "login": {
+      "greetingLine1": "नमस्ते,",
+      "welcome": "में आपका स्वागत है",
+      "greetingLine2": "{{app}} में आपका स्वागत है",
+      "subtitle": "जारी रखने के लिए अपना ईमेल पता दर्ज करें",
+      "email": {
+        "label": "ईमेल",
+        "placeholder": "अपना ईमेल पता दर्ज करें",
+        "error": "कृपया एक वैध ईमेल पता दर्ज करें"
+      },
+      "rememberMe": "मुझे याद रखें",
+      "generatingOtp": "ओटीपी जनरेट हो रहा है...",
+      "divider": "या",
+      "proceedAgree": "आगे बढ़कर, मैं Ally के",
+      "terms": "नियम एवं शर्तों से सहमत हूँ",
+      "and": "और",
+      "privacy": "गोपनीयता नीति को स्वीकार करता हूँ।",
+      "imageAlt": "लॉगिन",
+      "helloAlly": "helloally.ai",
+      "otp": {
+        "title": "अपना ईमेल पता सत्यापित करें",
+        "enterCode": "यहां भेजा गया सुरक्षा कोड दर्ज करें",
+        "expires_one": "यह कोड {{minutes}} मिनट में समाप्त हो जाएगा। नया कोड चाहिए?",
+        "expires_other": "यह कोड {{minutes}} मिनट में समाप्त हो जाएगा। नया कोड चाहिए?",
+        "resend": "पुनः भेजें",
+        "resendWithCountdown": "पुनः भेजें ({{seconds}})",
+        "verify": "सत्यापित करें",
+        "signingIn": "साइन इन हो रहा है...",
+        "emptyCodeError": "कोड दर्ज करें।",
+        "useDifferentEmail": "कोई दूसरा ईमेल उपयोग करें"
+      },
+      "google": {
+        "button": "Google के साथ जारी रखें",
+        "error": "Google के साथ साइन इन करने में विफल"
+      },
+      "errors": {
+        "generateOtp": "ओटीपी जनरेट करने में विफल। कृपया पुनः प्रयास करें।",
+        "verifyOtp": "ओटीपी सत्यापित करने में विफल। कृपया पुनः प्रयास करें।",
+        "agreeTerms": "नियम एवं शर्तों से सहमत होने में विफल",
+        "sendOtpFailed": "OTP भेजने में विफल"
+      },
+      "apple": {
+        "button": "Apple के साथ जारी रखें",
+        "error": "Apple के साथ साइन इन करने में विफल"
+      }
+    },
+    "sessionExpired": "आपका सत्र समाप्त हो गया है. कृपया दोबारा साइन इन करें."
+  },
+  "completeProfile": {
+    "title": "अपनी प्रोफ़ाइल पूरी करें",
+    "subtitle": "अपना खाता सेट करना पूरा करने के लिए हमें अपना नाम बताएं।",
+    "nameLabel": "पूरा नाम",
+    "namePlaceholder": "अपना पूरा नाम दर्ज करें",
+    "submit": "जारी रखें",
+    "errorTitle": "कुछ गलत हो गया",
+    "errorDescription": "हम आपकी प्रोफ़ाइल सहेज नहीं सके। कृपया पुनः प्रयास करें।",
+    "phoneLabel": "फ़ोन (वैकल्पिक)",
+    "required": "आवश्यक"
+  },
+  "boxBreathing": {
+    "inhale": "अब सांस अंदर लें",
+    "hold": "सांस रोकें",
+    "exhale": "सांस छोड़ें",
+    "phaseHold": "रोकें",
+    "phaseInhale": "साँस लें",
+    "phaseExhale": "साँस छोड़ें",
+    "title": "बॉक्स ब्रीदिंग"
+  },
+  "callFeedback": {
+    "rateTitle": "AI-जनित सारांश को रेट करें?",
+    "rateSubtitle": "कृपया गुणवत्ता का मूल्यांकन करें, हमें बताएं कि क्या अच्छा रहा, और सुधार के क्षेत्र साझा करें।",
+    "sessionGlimpse": "सत्र की झलक",
+    "moreSuggestions": "कोई और सुझाव?",
+    "suggestionPlaceholder": "क्या आप सारांश के बारे में कुछ और साझा करना चाहेंगे?",
+    "selectIssues": "कृपया एक या अधिक समस्याएं चुनें",
+    "concernPlaceholder": "अपनी चिंता का वर्णन यहां करें।",
+    "submitting": "सबमिट किया जा रहा है...",
+    "submit": "सबमिट करें",
+    "failSubmitFeedback": "फीडबैक सबमिट करने में विफल",
+    "placeholderText": "आपका अनुभव कैसा रहा?",
+    "questionText": "आपका अनुभव कैसा रहा?",
+    "submitted": "फीडबैक सफलतापूर्वक सबमिट किया गया",
+    "sharedForReview": "समीक्षा के लिए ट्रांसक्रिप्ट साझा किया गया",
+    "almostThereTitle": "लगभग पहुँच गए",
+    "almostThereDescription": "आप करीब पहुँच रहे हैं! आप अभी तक आवश्यक स्कोर या न्यूनतम समय तक नहीं पहुँचे हैं, लेकिन जारी रखें और तैयार होने पर पुनः प्रयास करें。",
+    "editNoteSuccess": "नोट सफलतापूर्वक अपडेट किया गया",
+    "ratings": {
+      "1": "खराब गुणवत्ता - महत्वपूर्ण सुधार की आवश्यकता है",
+      "2": "उम्मीदों से कम - बहुत बेहतर हो सकता था",
+      "3": "औसत गुणवत्ता - बुनियादी उम्मीदों को पूरा करता है",
+      "4": "अच्छी गुणवत्ता - उम्मीदों से ऊपर",
+      "5": "उत्कृष्ट गुणवत्ता - अत्यधिक अनुशंसित"
+    },
+    "issues": {
+      "missingKeyInfo": "मुख्य जानकारी गायब है",
+      "inaccurate": "अशुद्ध",
+      "tooVague": "बहुत अस्पष्ट",
+      "difficultToUnderstand": "समझने में कठिन",
+      "tooShort": "बहुत छोटा",
+      "other": "अन्य",
+      "editNoteExpired": "संपादन का समय समाप्त हो गया है। साझा करने के 10 मिनट के भीतर ही नोट्स संपादित किए जा सकते हैं।"
+    },
+    "sessionSkills": {
+      "sectionTitle": "इस सत्र में दिखाए गए कौशल",
+      "overallScore": "कुल स्कोर",
+      "skillCoverage": "कौशल कवरेज",
+      "clientEmotionalMovement": "क्लाइंट का भावनात्मक उतार-चढ़ाव",
+      "chartXAxisLabel": "X: सत्र टाइमलाइन(मिनट) ग्राफ़",
+      "chartYAxisLabel": "Y: स्तर (-5 से 5)",
+      "noDataFound": "कोई डेटा नहीं मिला",
+      "errorLoading": "कौशल डेटा लोड करने में विफल। कृपया बाद में पुनः प्रयास करें।"
+    }
+  },
+  "calls": {
+    "title": "सत्र लॉग",
+    "header": {
+      "title": "सत्र",
+      "subtitle": "लॉग"
+    },
+    "menu": {
+      "archives": "संग्रह"
+    },
+    "filters": {
+      "title": "फ़िल्टर",
+      "apply": "लागू करें",
+      "clear": "साफ़ करें",
+      "noFields": "फ़िल्टर करने योग्य कोई फ़ील्ड उपलब्ध नहीं है",
+      "searchPlaceholder": "खोजें…",
+      "min": "न्यूनतम",
+      "max": "अधिकतम",
+      "from": "से",
+      "to": "तक"
+    },
+    "actions": {
+      "uploadAudio": "ऑडियो अपलोड करें",
+      "startSession": "सत्र शुरू करें"
+    },
+    "table": {
+      "counsellorName": "काउंसलर",
+      "dateTime": "दिनांक और समय",
+      "summaryStatus": "स्थिति",
+      "source": "चैनल",
+      "actions": "कार्रवाइयां",
+      "scenario": "रोल प्ले",
+      "sessionScore": "सत्र अंक",
+      "mode": "मोड"
+    },
+    "duration": {
+      "lessThanOneMinute": "1 मिनट से कम",
+      "hour": "घंटा",
+      "hours": "घंटे",
+      "minute": "मिनट",
+      "minutes": "मिनट",
+      "second": "सेकंड",
+      "seconds": "सेकंड"
+    },
+    "userGroups": {
+      "my": "मेरे लॉग",
+      "org": "संगठन लॉग"
+    },
+    "fallback": {
+      "callEmptyTitle": "कोई कॉल लॉग नहीं मिला",
+      "callEmptyDesc": "फ़िल्टर समायोजित करने या पृष्ठ को रीफ्रेश करने का प्रयास करें।",
+      "simEmptyTitle": "कोई सिमुलेशन लॉग नहीं मिला",
+      "simEmptyDesc": "फ़िल्टर समायोजित करने या पृष्ठ को रीफ्रेश करने का प्रयास करें।"
+    },
+    "status": {
+      "processing": "प्रसंस्करण हो रहा है",
+      "generated": "उत्पन्न किया गया",
+      "error": "त्रुटि",
+      "noAudio": "कोई ऑडियो नहीं मिला",
+      "unknown": "अज्ञात"
+    },
+    "source": {
+      "uploaded": "अपलोड किया गया",
+      "liveSession": "लाइव सत्र"
+    },
+    "mode": {
+      "scribe": "स्क्राइब",
+      "dictation": "डिक्टेशन"
+    },
+    "dialog": {
+      "startSession": {
+        "embedTitle": "लाइव सुनें",
+        "embedDesc": "Ally आपके साथ ऑडियो सुनेगा",
+        "titleNormal": "शुरू करें",
+        "titleItalic": "सत्र",
+        "startScribeMode": "स्क्राइब मोड शुरू करें",
+        "startDictationMode": "डिक्टेशन मोड शुरू करें",
+        "footer": "शुरू करके, आप पुष्टि करते हैं कि जिनका ट्रांसक्रिप्शन हो रहा है उन सभी ने सहमति दी है।",
+        "description1": "Ally का मानसिक स्वास्थ्य AI स्क्राइब सुरक्षित रूप से सुनता है, ट्रांसक्राइब करता है ",
+        "description2": "और आपके लिए सत्र नोट्स लिखता है।"
+      },
+      "delete": {
+        "titleNormal": "हटाएं",
+        "titleItalic": "सत्र लॉग?",
+        "content": "इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+        "primary": "हटाएं",
+        "secondary": "रद्द करें"
+      },
+      "archive": {
+        "confirm": "पुष्टि करें",
+        "title": "इसे संग्रहीत करें",
+        "unarchiveItalic": "संग्रह से निकालें?",
+        "sessionItalic": "सत्र?",
+        "unarchiveContent": "क्या आप वाकई इस सत्र को संग्रह से निकालना चाहते हैं?",
+        "archiveContent": "क्या आप वाकई इस सत्र को संग्रहीत करना चाहते हैं? यह इसे सत्र लॉग से छिपा देगा, लेकिन आप इसे बाद में पुनर्स्थापित कर सकते हैं।",
+        "unarchive": "संग्रह से निकालें",
+        "archive": "संग्रहीत करें"
+      }
+    },
+    "archives": {
+      "backAria": "वापस जाएं",
+      "title": "संग्रह",
+      "errorTitle": "संग्रह लोड करने में असमर्थ",
+      "errorDesc": "संग्रह लोड करते समय कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
+      "emptyTitle": "कोई संग्रहीत लॉग नहीं मिला",
+      "emptyDesc": "अभी तक कोई संग्रहीत आइटम नहीं हैं।"
+    },
+    "audioUpload": {
+      "title": "ऑडियो रिकॉर्डिंग अपलोड करें",
+      "uploading": "आपकी ऑडियो फ़ाइल अपलोड की जा रही है",
+      "loadingWaveform": "वेवफॉर्म लोड हो रहा है...",
+      "fields": {
+        "counsellor": {
+          "label": "काउंसलर का नाम",
+          "placeholder": "काउंसलर चुनें"
+        },
+        "sessionDate": "सत्र की तारीख",
+        "timeZone": {
+          "label": "समय क्षेत्र",
+          "placeholder": "समय क्षेत्र चुनें"
+        },
+        "sessionTime": "सत्र का समय"
+      },
+      "actions": {
+        "upload": "अपलोड करें"
+      },
+      "errors": {
+        "uploadFailed": "ऑडियो अपलोड विफल!",
+        "genericError": "ऑडियो अपलोड करने में विफल"
+      }
+    },
+    "uploadProgress": {
+      "cancelled": "अपलोड रद्द किया गया",
+      "collapse": "संक्षिप्त करें",
+      "expand": "विस्तार करें",
+      "clearAll": "सभी साफ़ करें",
+      "noUploads": "कोई अपलोड नहीं",
+      "inProgress_one": "1 अपलोड प्रगति पर है",
+      "inProgress_other": "{{count}} अपलोड प्रगति पर हैं",
+      "summaryCancelled_one": "1 अपलोड रद्द किया गया",
+      "summaryCancelled_other": "{{count}} अपलोड रद्द किए गए",
+      "completed_one": "1 अपलोड पूरा हुआ",
+      "completed_other": "{{count}} अपलोड पूरे हुए",
+      "cancelDialog": {
+        "title": "रद्द करें",
+        "titleItalic": "अपलोड",
+        "content": "आपका अपलोड पूरा नहीं हुआ है। क्या आप अपलोड रद्द करना चाहेंगे?",
+        "primaryButton": "अपलोड रद्द करें",
+        "secondaryButton": "अपलोड जारी रखें"
+      }
+    },
+    "appCurrentlyForCounsellors": "यह ऐप वर्तमान में केवल काउंसलरों और सीखने वालों के लिए है।",
+    "learnMore": "और जानें",
+    "createNote": {
+      "button": "+ नोट बनाएं",
+      "error": "नोट नहीं बनाया जा सका। कृपया फिर से प्रयास करें।",
+      "voice": {
+        "record": "नोट रिकॉर्ड करें",
+        "listening": "सुन रहे हैं…",
+        "paused": "रोका गया",
+        "pause": "रोकें",
+        "resume": "जारी रखें",
+        "stop": "बंद करें",
+        "ready": "रिकॉर्डिंग तैयार है",
+        "generate": "नोट्स बनाएं",
+        "generating": "नोट्स बनाए जा रहे हैं…",
+        "discard": "हटाएं",
+        "micDenied": "माइक्रोफ़ोन की अनुमति नहीं दी गई। रिकॉर्ड करने के लिए सेटिंग्स में इसे चालू करें।",
+        "noSpeech": "हमें कोई आवाज़ सुनाई नहीं दी। कृपया फिर से रिकॉर्ड करें।",
+        "generateError": "रिकॉर्डिंग से नोट्स नहीं बनाए जा सके। कृपया फिर से प्रयास करें।",
+        "generated": "आपकी रिकॉर्डिंग से नोट्स बना दिए गए हैं",
+        "nothingExtracted": "हमने ऑडियो को ट्रांसक्राइब किया लेकिन उससे कोई फ़ील्ड नहीं भर सके।",
+        "processing": {
+          "transcribing": "आपकी रिकॉर्डिंग ट्रांसक्राइब हो रही है…",
+          "extracting": "नोट का विवरण निकाला जा रहा है…",
+          "populating": "फ़ील्ड भरी जा रही हैं…"
+        }
+      }
+    },
+    "sessionNumber": "सत्र #{{id}}"
+  },
+  "carousel": {
+    "slides": {
+      "noRecording": "हम ऑडियो रिकॉर्डिंग सहेजते नहीं हैं",
+      "noTrainingData": "हम अपने मॉडल को प्रशिक्षित करने के लिए आपके क्लाइंट के डेटा का उपयोग नहीं करते हैं",
+      "personalInfoRemoved": "क्लाइंट की व्यक्तिगत जानकारी स्वचालित रूप से हटा दी जाती है",
+      "encrypted": "डेटा एन्क्रिप्टेड है"
+    }
+  },
+  "common": {
+    "appName": "Ally",
+    "or": "या",
+    "loading": "लोड हो रहा है...",
+    "hours_one": "{{count}} घंटा",
+    "hours_other": "{{count}} घंटे",
+    "minutes_one": "{{count}} मिनट",
+    "minutes_other": "{{count}} मिनट",
+    "seconds_one": "{{count}} सेकंड",
+    "seconds_other": "{{count}} सेकंड",
+    "continue": "जारी रखें",
+    "start": "शुरू करें",
+    "close": "बंद करें",
+    "profile": "प्रोफ़ाइल",
+    "details": "विवरण",
+    "starting": "शुरू हो रहा है...",
+    "next": "अगला",
+    "viewSummary": "सारांश देखें",
+    "simulationIndex": "सिमुलेशन {{index}}",
+    "success": "सफल",
+    "error": "त्रुटि",
+    "simulationEndedSuccess": "सिमुलेशन सफलतापूर्वक समाप्त हुआ",
+    "somethingWentWrong": "कुछ गलत हो गया!",
+    "unexpectedErrorDesc": "ऐप में एक अनपेक्षित समस्या आ गई। आपका सहेजा गया काम सुरक्षित है।",
+    "offlineNetworkTitle": "कोई इंटरनेट कनेक्शन नहीं",
+    "offlineMicrophoneFailureTitle": "माइक्रोफ़ोन विफलता",
+    "offline": {
+      "socketTitle": "कुछ गलत हो गया",
+      "socketDescription": "किसी त्रुटि के कारण कॉल समाप्त हो गई। कृपया पुनः प्रयास करें।",
+      "networkTitle": "कोई इंटरनेट कनेक्शन नहीं",
+      "networkDescription": "नेटवर्क में रुकावट के कारण कॉल समाप्त हो गई, कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।",
+      "goBack": "वापस जाएं",
+      "tryAgain": "पुनः प्रयास करें",
+      "microphoneFailureTitle": "माइक्रोफ़ोन विफलता",
+      "microphoneFailureDescription": "माइक्रोफ़ोन विफलता के कारण कॉल समाप्त हो गई। कृपया पुनः प्रयास करें या ऐप को फिर से लॉन्च करें"
+    },
+    "summary": "सारांश",
+    "exportSummary": "सारांश डाउनलोड करें",
+    "startSimulation": "रोल प्ले शुरू करें",
+    "simulation": "रोल प्ले",
+    "triggerWarnings": "ट्रिगर चेतावनियाँ:",
+    "sessionId": "सत्र आईडी",
+    "duration": "अवधि",
+    "boxBreathing": {
+      "inhale": "अब सांस अंदर लें",
+      "hold": "सांस रोकें",
+      "exhale": "सांस छोड़ें"
+    },
+    "tags": "टैग",
+    "cancel": "रद्द करें",
+    "ok": "ठीक है",
+    "save": "सहेजें",
+    "add": "जोड़ें",
+    "share": "शेयर करें",
+    "viewMore": "और देखें",
+    "viewLess": "कम देखें",
+    "scribe": "स्क्राइब",
+    "scenario": "परिदृश्य:",
+    "retry": "पुनः प्रयास करें",
+    "uploading": "अपलोड हो रहा है...",
+    "maxActiveUsers": {
+      "title": "हम अभी पूरी क्षमता पर हैं",
+      "description": "हम वर्तमान में सक्रिय उपयोगकर्ताओं की अधिकतम संख्या को संभाल रहे हैं। कृपया कुछ क्षण प्रतीक्षा करें और पुनः प्रयास करें, एक्सेस आमतौर पर जल्द ही खाली हो जाता है।",
+      "retry": "पुनः प्रयास करें",
+      "manualRetry": "आप {{seconds}} सेकंड में पुनः प्रयास कर सकते हैं",
+      "autoRetry": "हम स्वचालित रूप से {{seconds}} सेकंड में पुनः प्रयास करेंगे"
+    },
+    "backToLearn": "सीखने पर वापस जाएं",
+    "errors": {
+      "locked": "आगामी सिमुलेशन लॉक है"
+    },
+    "draggableArea": {
+      "text": "ड्रैग एंड ड्रॉप करें या {{size}} से कम आकार की {{extensions}} फ़ाइल <0>चुनें</0>"
+    },
+    "testing": "परीक्षण",
+    "loadMore": "और लोड करें",
+    "unsavedChanges": "सहेजे न गए बदलाव",
+    "unsavedChangesDescription": "आपके पास सहेजे न गए बदलाव हैं। क्या आप वाकई उन्हें छोड़ना चाहते हैं?",
+    "discard": "छोड़ दें",
+    "openSettings": "सेटिंग्स खोलें",
+    "version": "संस्करण",
+    "finish": "समाप्त करें",
+    "addComment": "टिप्पणी जोड़ें",
+    "submit": "सबमिट करें",
+    "done": "पूर्ण",
+    "yes": "हां",
+    "no": "नहीं",
+    "select": "चुनें",
+    "unableToOpenLink": "लिंक खोलने में असमर्थ",
+    "checkInternet": "कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।",
+    "unknownError": "अज्ञात त्रुटि",
+    "practiceAgain": "फिर से अभ्यास करें",
+    "backToHome": "होम पर वापस जाएं"
+  },
+  "months": {
+    "short": [
+      "जन",
+      "फ़र",
+      "मार्च",
+      "अप्रैल",
+      "मई",
+      "जून",
+      "जुल",
+      "अग",
+      "सित",
+      "अक्टू",
+      "नव",
+      "दिस"
+    ],
+    "full": [
+      "जनवरी",
+      "फ़रवरी",
+      "मार्च",
+      "अप्रैल",
+      "मई",
+      "जून",
+      "जुलाई",
+      "अगस्त",
+      "सितंबर",
+      "अक्टूबर",
+      "नवंबर",
+      "दिसंबर"
+    ]
+  },
+  "community": {
+    "title": "समुदाय",
+    "you": "आप",
+    "emptyLeaderboard": "कोई लीडरबोर्ड डेटा उपलब्ध नहीं",
+    "emptyLeaderBoardDescription": "अपनी प्रगति देखने और दूसरों के साथ प्रतिस्पर्धा करने के लिए अभ्यास शुरू करें",
+    "loadingMore": "और लोड हो रहा है...",
+    "filters": {
+      "last7days": "पिछले 7 दिन",
+      "last28days": "पिछले 28 दिन",
+      "last364days": "पिछले 364 दिन",
+      "allTime": "सभी समय"
+    },
+    "duration": {
+      "hour": "घंटा",
+      "hours": "घंटे",
+      "minute": "मिनिट",
+      "minutes": "मिनट"
+    },
+    "table": {
+      "rank": "रैंक",
+      "user": "उपयोगकर्ता",
+      "totalDuration": "कुल अवधि",
+      "badges": "बैज"
+    },
+    "yourRank": "आपकी रैंक",
+    "loadError": "लीडरबोर्ड लोड करने में विफल"
+  },
+  "learn": {
+    "tabs": {
+      "simulations": "सिमुलेशन",
+      "tracks": "सीखने के मार्ग",
+      "cases": "केस",
+      "courses": "कोर्स"
+    },
+    "header": {
+      "prefix": "उपयोग करें",
+      "emphasis1": "AI-आवाज़ आधारित",
+      "middle": "वास्तविक दुनिया का अभ्यास परिदृश्य",
+      "emphasis2": "बनाने के लिए",
+      "suffix": "मदद करने का कौशल।"
+    },
+    "credits": {
+      "used": "उपयोग किए गए क्रेडिट:"
+    },
+    "scenario": {
+      "pageTitlePrefix": "शुरू करें",
+      "pageTitleEmphasis": "रोल प्ले",
+      "backAria": "परिदृश्य विवरण बंद करें",
+      "mediaUnavailable": "मीडिया उपलब्ध नहीं है",
+      "share": "शेयर करें",
+      "shareAria": "परिदृश्य साझा करें",
+      "shareTitle": "इस परिदृश्य को साझा करें",
+      "shareCopied": "परिदृश्य लिंक क्लिपबोर्ड पर कॉपी किया गया!",
+      "scenarioLabel": "स्थिति",
+      "startAria": "रोल प्ले शुरू करें",
+      "preStart": {
+        "titleNormal": "शुरू करने से पहले",
+        "titleItalic": "",
+        "button": "सत्र शुरू करें",
+        "content": "कभी-कभी, बॉट अनुत्तरदायी हो सकता है, या इसमें असामान्य देरी हो सकती है। हम अनुभव को बेहतर बनाने के लिए हमेशा काम कर रहे हैं!"
+      },
+      "existing": {
+        "titleNormal": "सक्रिय सिमुलेशन ",
+        "titleItalic": "मिला",
+        "content": "आपका एक सिमुलेशन चल रहा है। नया शुरू करने के लिए मौजूदा सत्र को समाप्त करें।",
+        "primary": "सत्र समाप्त करें"
+      },
+      "noCredits": {
+        "title": "कोई क्रेडिट नहीं बचा",
+        "desc": "ऐसा लगता है कि आपके पास सिमुलेशन क्रेडिट समाप्त हो गए हैं"
+      },
+      "notEnough": {
+        "title": "पर्याप्त क्रेडिट नहीं",
+        "desc": "इस सत्र को शुरू करने के लिए आपके पास पर्याप्त सिमुलेशन क्रेडिट नहीं हैं"
+      },
+      "notFound": {
+        "title": "परिदृश्य नहीं मिला",
+        "desc": "आप जो परिदृश्य खोज रहे हैं वह मौजूद नहीं है।"
+      }
+    },
+    "card": {
+      "imageAlt": "{{title}} {{type}} कवर",
+      "imageUnavailable": "छवि उपलब्ध नहीं है",
+      "comingSoon": "जल्द आ रहा है",
+      "simulationsCount": "{{count}} सिमुलेशन",
+      "simulationsCount_plural": "{{count}} सिमुलेशन",
+      "ariaLabel": "{{title}} परिदृश्य चुनें",
+      "type": {
+        "pathway": "मार्ग",
+        "scenario": "परिदृश्य"
+      }
+    },
+    "empty": {
+      "scenarios": "फिलहाल कोई परिदृश्य उपलब्ध नहीं है",
+      "pathways": "फिलहाल कोई मार्ग उपलब्ध नहीं है",
+      "cases": "फिलहाल कोई केस उपलब्ध नहीं है",
+      "refresh": "पृष्ठ रीफ्रेश करें"
+    },
+    "aria": {
+      "availableCases": "उपलब्ध केस",
+      "availablePathways": "उपलब्ध मार्ग",
+      "availableScenarios": "उपलब्ध परिदृश्य"
+    },
+    "choose": {
+      "prefix": "अपना चुनें",
+      "case": "केस",
+      "track": "ट्रैक",
+      "scenario": "स्थिति",
+      "course": "कोर्स"
+    },
+    "details": {
+      "progress": "{{total}} में से {{completed}} पूरे हुए",
+      "loadingDetailsError": "सिमुलेशन विवरण लोड करने में विफल",
+      "track": {
+        "breadcrumb": "सीखने के मार्ग",
+        "notFound": "ट्रैक नहीं मिला"
+      },
+      "case": {
+        "breadcrumb": "केस",
+        "notFound": "केस नहीं मिला"
+      },
+      "modal": {
+        "headerTitle": "रोल प्ले",
+        "headerSubtitle": "विवरण"
+      }
+    },
+    "evaluationChecklist": "मूल्यांकन चेकलिस्ट"
+  },
+  "nav": {
+    "sidebar": {
+      "expand": "साइडबार का विस्तार करें",
+      "collapse": "साइडबार को संक्षिप्त करें"
+    },
+    "language": {
+      "label": "भाषा चुनें",
+      "selectorAria": "भाषा चयनकर्ता"
+    },
+    "tabs": {
+      "learn": "सीखें",
+      "review": "समीक्षा",
+      "badges": "बैज",
+      "community": "समुदाय",
+      "sessions": "सत्र",
+      "statistics": "आंकड़े",
+      "search": "खोजें"
+    },
+    "logout": {
+      "title": {
+        "normal": "अपने खाते को",
+        "italic": "सुरक्षित रखें"
+      },
+      "content": "क्या आप वाकई लॉग आउट करना चाहते हैं? आपको फिर से लॉग इन करने के लिए सुरक्षित OTP दर्ज करना होगा।",
+      "button": "लॉगआउट करें और मेरा Ally खाता लॉक करें"
+    }
+  },
+  "postCallSummary": {
+    "header": {
+      "session": "सत्र",
+      "summary": "सारांश",
+      "shareForReview": "समीक्षा के लिए शेयर करें",
+      "comments": "टिप्पणियाँ"
+    },
+    "somethingWentWrongRetry": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+  },
+  "postSim": {
+    "titlePrefix": "रोल प्ले",
+    "noSessionRecording": "प्लेबैक के लिए कोई सत्र रिकॉर्डिंग उपलब्ध नहीं है।",
+    "skills": {
+      "empty": "इस सत्र के लिए कोई कौशल डेटा उपलब्ध नहीं है",
+      "failed": "कौशल डेटा लोड करने में विफल",
+      "coverage": "कौशल कवरेज",
+      "distressAlleviation": "क्लाइंट संकट निवारण",
+      "level": "स्तर (-5 से 5)",
+      "timeline": "सत्र टाइमलाइन",
+      "strengths": "ताकत और प्रदर्शित कौशल",
+      "areasForGrowth": "विकास के क्षेत्र",
+      "recommended": "अनुशंसित",
+      "categories": {
+        "listeningEngagement": "श्रवण सहभागिता",
+        "emotionalAttunement": "भावनात्मक तालमेल",
+        "supportiveEngagement": "सहायक सहभागिता"
+      }
+    },
+    "tabs": {
+      "transcript": "ट्रांस्क्रिप्ट",
+      "transcriptTranslationFailed": "ट्रांसक्रिप्ट लोड करने में विफल। कृपया पुनः प्रयास करें।",
+      "upNext": "अगला",
+      "askAi": "AI से पूछें",
+      "debrief": "डीब्रीफ़",
+      "skillsDemonstrated": "प्रदर्शित कौशल",
+      "sessionReview": "सत्र समीक्षा"
+    },
+    "shortSession": {
+      "title": "सत्र बहुत जल्दी समाप्त हो गया",
+      "description": "सार्थक प्रतिक्रिया प्रदान करने के लिए हमें और अधिक इंटरैक्शन डेटा की आवश्यकता है।"
+    },
+    "debrief": {
+      "header": "आपकी डीब्रीफ़",
+      "from": "Ally की ओर से",
+      "aiLabel": "AI-जनित",
+      "aiTooltip": "Ally एक AI सुपरवाइज़र है। यह डीब्रीफ़ आपके सेशन ट्रांसक्रिप्ट से AI द्वारा लिखी गई है, किसी व्यक्ति द्वारा नहीं।",
+      "generating": "Ally आपकी डीब्रीफ़ लिख रहा है…",
+      "generatingHint": "इसमें आमतौर पर कुछ पल लगते हैं।",
+      "failed": "Ally इस सेशन के लिए डीब्रीफ़ नहीं लिख सका।",
+      "momentLabel": "यह पल देखें",
+      "momentNotFound": "हम उस पल तक नहीं पहुँच सके — इसके बजाय पूरा ट्रांसक्रिप्ट यहाँ है।",
+      "section": {
+        "what_worked": "क्या काम आया",
+        "what_it_cost": "इससे क्या छूट गया",
+        "try_next": "अगली बार यह आज़माएँ"
+      },
+      "replyPlaceholder": "इस सेशन के बारे में Ally को जवाब दें…",
+      "replyPrompt": "इसके बारे में कोई सवाल है? नीचे जवाब दें।"
+    },
+    "feedback": {
+      "generating": "आपका फ़ीडबैक तैयार किया जा रहा है…",
+      "sessionFeedback": "सत्र प्रतिक्रिया",
+      "noData": "कोई डेटा नहीं मिला",
+      "dialog": {
+        "header": "क्या यह वास्तविक सत्रों के लिए उपयोगी अभ्यास जैसा लगा?",
+        "rating": {
+          "1": "बिल्कुल नहीं",
+          "2": "वास्तव में नहीं",
+          "3": "शायद",
+          "4": "हाँ",
+          "5": "बिल्कुल",
+          "tags": {
+            "1": [
+              "खराब",
+              "सहायक नहीं",
+              "बहुत बुरा",
+              "निराशाजनक",
+              "अनुपयोगी"
+            ],
+            "2": [
+              "औसत से कम",
+              "कमज़ोर",
+              "असंतोषजनक",
+              "अपर्याप्त",
+              "सुधार की ज़रूरत"
+            ],
+            "3": [
+              "तटस्थ",
+              "ठीक है",
+              "औसत",
+              "मध्यम",
+              "स्वीकार्य"
+            ],
+            "4": [
+              "अच्छा",
+              "सहायक",
+              "संतोषजनक",
+              "प्रभावी",
+              "उपयोगी"
+            ],
+            "5": [
+              "उत्कृष्ट",
+              "अद्भुत",
+              "बहुत उपयोगी",
+              "शानदार",
+              "अत्यंत प्रभावी"
+            ]
+          }
+        }
+      },
+      "ratingRequired": "कृपया एक रेटिंग चुनें।",
+      "ratingPrompt": "यह सत्र कैसा रहा?",
+      "commentLabel": "कोई टिप्पणी? (वैकल्पिक)",
+      "sessionDuration": "{{minutes}} मिनट का सत्र",
+      "whatWentWell": "क्या अच्छा रहा",
+      "areasForImprovement": "सुधार के क्षेत्र"
+    },
+    "common": {
+      "tryAnother": "कोई अन्य सिमुलेशन आज़माएं",
+      "details": "विवरण",
+      "scenario": "परिदृश्य:",
+      "shareForReview": "समीक्षा के लिए शेयर करें"
+    },
+    "postSim": {
+      "feedback": {
+        "dialog": {
+          "rating": {
+            "2": "वास्तव में नहीं",
+            "3": "शायद",
+            "4": "हाँ",
+            "5": "बिल्कुल"
+          }
+        }
+      }
+    }
+  },
+  "profile": {
+    "settings": {
+      "title": "प्रोफ़ाइल सेटिंग्स",
+      "upload_image": "छवि अपलोड करें",
+      "profile_image": "प्रोफ़ाइल चित्र",
+      "changeImage": "छवि बदलें",
+      "removeImage": "छवि हटाएं",
+      "name": "नाम",
+      "email": "ईमेल",
+      "cancel": "रद्द करें",
+      "done": "पूर्ण",
+      "error_image_size": "छवि 2MB से कम होनी चाहिए और उसका सही आस्पेक्ट रेश्यो होना चाहिए।",
+      "upload_hint": "केवल PNG या JPG फ़ाइलें 1:1 अनुपात (अधिकतम 2mb)",
+      "language": "भाषा",
+      "leaderboardNotification": "लीडरबोर्ड सूचना",
+      "nameNotSet": "(नाम सेट नहीं है)"
+    }
+  },
+  "review": {
+    "title": "समीक्षा",
+    "hidden": "छिपा हुआ",
+    "filter": {
+      "all": "सभी",
+      "latest": "नवीनतम",
+      "mostReviewed": "सबसे अधिक समीक्षा की गई",
+      "undiscovered": "अन्वेषित",
+      "read": "पढ़ा हुआ",
+      "unread": "अपठित"
+    },
+    "sort": {
+      "latest": "नवीनतम",
+      "mostViewed": "सर्वाधिक देखा गया",
+      "mostCommented": "सर्वाधिक टिप्पणी"
+    },
+    "empty": {
+      "title": "अभी तक कोई साझा सत्र नहीं",
+      "description": "साझा किए गए उपयोगकर्ता ट्रांसक्रिप्ट समीक्षा के लिए यहां उपलब्ध होंगे।",
+      "refresh": "पृष्ठ रीफ्रेश करें"
+    },
+    "error": {
+      "title": "समीक्षा लोड करने में असमर्थ",
+      "description": "समीक्षा लोड करते समय कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
+      "retry": "पुनः प्रयास करें",
+      "loadReviewFailed": "समीक्षा लोड करने में विफल",
+      "loadCommentsFailed": "टिप्पणियाँ लोड करने में विफल",
+      "loadThreadsFailed": "थ्रेड लोड करने में विफल",
+      "loadReactionsFailed": "प्रतिक्रियाएं लोड करने में विफल"
+    },
+    "privacy": {
+      "private": "इसे निजी रखें",
+      "share": "समीक्षा के लिए शेयर करें"
+    },
+    "details": {
+      "comments": "टिप्पणियाँ",
+      "comment_one": "{{count}} टिप्पणी",
+      "comment_other": "{{count}} टिप्पणियाँ",
+      "noCommentsYet": "अभी तक कोई टिप्पणी नहीं",
+      "you": "आप",
+      "by": "{{name}} द्वारा",
+      "dateAndTime": "दिनांक और समय",
+      "addNote": "नोट जोड़ें",
+      "editNote": "नोट संपादित करें",
+      "noteLabel": "नोट",
+      "editedLabel": "[संपादित]",
+      "addNotePlaceholder": "एक नोट जोड़ें...",
+      "shareModalHeader": "इसे समीक्षा के लिए शेयर करें",
+      "addCommentPlaceholder": "एक टिप्पणी जोड़ें",
+      "commentAction": "टिप्पणी करें",
+      "replyAction": "उत्तर दें",
+      "replyPlaceholder": "उत्तर जोड़ें",
+      "editCommentPlaceholder": "टिप्पणी संपादित करें",
+      "done": "पूर्ण",
+      "replyLabel": "उत्तर",
+      "repliesLabel": "उत्तर",
+      "commentLabel": "टिप्पणी",
+      "hideReply": "उत्तर छिपाएं",
+      "hideReplies": "उत्तर छिपाएं",
+      "hide": "छिपाएं",
+      "unhide": "दिखाएं",
+      "edit": "संपादित करें",
+      "delete": "हटाएं",
+      "insertEmoji": "इमोजी डालें",
+      "commentOptions": "टिप्पणी विकल्प",
+      "unknownUser": "अज्ञात",
+      "loadRepliesFailed": "उत्तर लोड करने में विफल।",
+      "reactionUpdateFailed": "प्रतिक्रिया अपडेट विफल",
+      "commentHiddenSuccessfully": "टिप्पणी सफलतापूर्वक छिपाई गई",
+      "commentUnhiddenSuccessfully": "टिप्पणी सफलतापूर्वक दिखाई गई",
+      "replyHiddenSuccessfully": "उत्तर सफलतापूर्वक छिपाया गया",
+      "replyUnhiddenSuccessfully": "उत्तर सफलतापूर्वक दिखाया गया",
+      "commentHideFailed": "टिप्पणी छिपाने में विफल",
+      "commentUnhideFailed": "टिप्पणी दिखाने में विफल",
+      "replyHideFailed": "उत्तर छिपाने में विफल",
+      "replyUnhideFailed": "उत्तर दिखाने में विफल",
+      "commentDeletedSuccessfully": "टिप्पणी सफलतापूर्वक हटाई गई",
+      "replyDeletedSuccessfully": "उत्तर सफलतापूर्वक हटाया गया",
+      "commentDeleteFailed": "टिप्पणी हटाने में विफल",
+      "replyDeleteFailed": "उत्तर हटाने में विफल",
+      "commentUpdatedSuccessfully": "टिप्पणी सफलतापूर्वक अपडेट की गई",
+      "replyUpdatedSuccessfully": "उत्तर सफलतापूर्वक अपडेट किया गया",
+      "commentUpdateFailed": "टिप्पणी अपडेट करने में विफल",
+      "replyUpdateFailed": "उत्तर अपडेट करने में विफल",
+      "replyCreatedSuccessfully": "उत्तर सफलतापूर्वक बनाया गया",
+      "replyCreateFailed": "उत्तर बनाने में विफल",
+      "callTitle": "CALL-{{id}}",
+      "threadsTab": "थ्रेड",
+      "clientSaid": "क्लाइंट ने कहा",
+      "learnerSaid": "सीखने वाले ने कहा",
+      "loadMoreRepliesOne": "1 और जवाब लोड करें",
+      "loadMoreReplies": "{{count}} और जवाब लोड करें"
+    },
+    "reactionsModal": {
+      "title": "प्रतिक्रियाएं",
+      "all": "सभी {{count}}",
+      "more": "और",
+      "noReactionsYet": "अभी तक कोई प्रतिक्रिया नहीं"
+    },
+    "feedCard": {
+      "dateTime": "दिनांक और समय",
+      "duration": "अवधि",
+      "sec": "सेकंड",
+      "min": "मिनट",
+      "reviewTranscript": "बातचीत की समीक्षा करें",
+      "reactions": "प्रतिक्रिया",
+      "reactions_plural": "प्रतिक्रियाएं",
+      "comments": "टिप्पणी",
+      "comments_plural": "टिप्पणियाँ",
+      "reply": "उत्तर",
+      "replies": "उत्तर",
+      "edited": "संपादित",
+      "noComments": "अभी तक कोई टिप्पणी नहीं",
+      "relativeTime": {
+        "justNow": "अभी-अभी",
+        "year_one": "1 वर्ष",
+        "year_other": "{{count}} वर्ष",
+        "yearMonth": "1 वर्ष {{months}}",
+        "month_one": "{{count}} महीना",
+        "month_other": "{{count}} महीने",
+        "week_one": "{{count}} सप्ताह",
+        "week_other": "{{count}} सप्ताह",
+        "day_one": "{{count}} दिन",
+        "day_other": "{{count}} दिन",
+        "hour_one": "{{count}} घंटा",
+        "hour_other": "{{count}} घंटे",
+        "minute_one": "{{count}} मिनट",
+        "minute_other": "{{count}} मिनट",
+        "second_one": "{{count}} सेकंड",
+        "second_other": "{{count}} सेकंड"
+      },
+      "reviewed": "समीक्षा की गई",
+      "showMore": "और दिखाएं",
+      "reviewType": "{{reviewType}}",
+      "sharedSimulationForReview": "फीडबैक के लिए रोल प्ले सत्र साझा किया गया"
+    },
+    "tabs": {
+      "scribe": "स्क्राइब",
+      "simulation": "सिमुलेशन"
+    },
+    "byAuthor": "{{name}} द्वारा",
+    "addNotePlaceholder": "एक नोट जोड़ें...",
+    "addNoteCaption": "अपने समीक्षक के लिए एक नोट जोड़ें (वैकल्पिक):",
+    "shareFailed": "समीक्षा के लिए साझा करने में विफल"
+  },
+  "search": {
+    "placeholder": "मार्गदर्शन चाहिए? यहां खोजें..",
+    "headerDescription": "मार्गदर्शन, सुरक्षा और समर्थन — जब भी आपको इसकी आवश्यकता हो।",
+    "suggestionsTitle": "अब आज़माएं:",
+    "noResults": "\"{{query}}\" के लिए कोई परिणाम नहीं मिला",
+    "allLabel": "सभी",
+    "error": "खोज परिणाम लाने में त्रुटि",
+    "logoAlt": "Ally लोगो",
+    "viewMore": "और देखें",
+    "viewLess": "कम देखें",
+    "categories": {
+      "Techniques": "तकनीकें",
+      "Assessment": "मूल्यांकन",
+      "Intervention": "हस्तक्षेप",
+      "Resources": "संसाधन",
+      "Guidelines": "दिशानिर्देश",
+      "Support": "समर्थन",
+      "Crisis": "संकट",
+      "Training": "प्रशिक्षण",
+      "Research": "अनुसंधान",
+      "Policy": "नीति"
+    }
+  },
+  "simulationPage": {
+    "mute": "म्यूट करें",
+    "simulationDetails": "सिमुलेशन विवरण",
+    "unmute": "अनम्यूट करें",
+    "pause": "रोकें",
+    "resume": "फिर से शुरू करें",
+    "focus": "फोकस",
+    "focused": "फोकस्ड",
+    "endSession": "सत्र समाप्त करें",
+    "sessionDuration": "सत्र की अवधि:",
+    "dataSafe": "आपका डेटा सुरक्षित है",
+    "waitingForAgent": "एजेंट के जुड़ने की प्रतीक्षा कर रहा है, इसमें कुछ सेकंड लग सकते हैं...",
+    "connectingToSession": "सत्र से कनेक्ट हो रहा है...",
+    "simulationCountdownLabel": "आपका सिमुलेशन शुरू होने वाला है…",
+    "allowMicrophone": "माइक्रोफ़ोन की अनुमति दें",
+    "microphonePromptBrowser": "सिमुलेशन शुरू करने के लिए, कृपया अपने ब्राउज़र से माइक्रोफ़ोन की अनुमति दें।",
+    "microphonePrompt": "सिमुलेशन शुरू करने के लिए, कृपया हमें आपके माइक्रोफ़ोन का उपयोग करने की अनुमति दें।",
+    "clickToAllow": "माइक्रोफ़ोन को अनुमति देने और सत्र में शामिल होने के लिए क्लिक करें।",
+    "closePreview": "पूर्वावलोकन बंद करें",
+    "points": "अंक",
+    "sessionTimer": "सत्र टाइमर",
+    "timeRemaining": "शेष समय",
+    "sessionChecklist": "सत्र चेकलिस्ट",
+    "progress": "प्रगति",
+    "completed": "पूरा हुआ",
+    "of": "में से",
+    "min": "मिनट",
+    "sec": "सेकंड",
+    "checklistTab": "चेकलिस्ट",
+    "remindersTab": "रिमाइंडर",
+    "descriptionTab": "विवरण",
+    "noRemindersYet": "इस परिदृश्य के लिए अभी कोई रिमाइंडर नहीं है।",
+    "simulationScore": "सिमुलेशन स्कोर",
+    "creatingRoom": "कमरा बनाया जा रहा है...",
+    "linkCopiedToClipboard": "लिंक क्लिपबोर्ड पर कॉपी किया गया",
+    "failedToLoadCaseDetails": "केस विवरण लोड करने में विफल",
+    "failedToLoadPathDetails": "पथ विवरण लोड करने में विफल",
+    "noSimulationsAvailable": "कोई सिमुलेशन उपलब्ध नहीं है",
+    "errorUpdatePrivacy": "गोपनीयता सेटिंग्स अपडेट करने में विफल",
+    "noPathsAvailable": "कोई पथ उपलब्ध नहीं है",
+    "noCasesAvailable": "कोई केस उपलब्ध नहीं है",
+    "privacyUpdated": "गोपनीयता सेटिंग अपडेट की गई",
+    "shareScreenTitle": "यह सिमुलेशन साझा करें",
+    "turnIndicator": {
+      "speaking": "बोल रहा है...",
+      "listening": "सुन रहा है...",
+      "yourTurnToSpeak": "बोलने की आपकी बारी",
+      "yourTurnToListen": "सुनने की आपकी बारी",
+      "thinking": "सोच रहा है...",
+      "paused": "रुका हुआ"
+    },
+    "warningDialog": {
+      "titleNormal": "सत्र",
+      "titleItalic": "जल्द ही समाप्त हो रहा है",
+      "content": "आपका सत्र 30 सेकंड में समाप्त हो जाएगा।",
+      "continueSession": "सत्र जारी रखें",
+      "endSession": "सत्र समाप्त करें"
+    },
+    "endDialog": {
+      "titleNormal": "समाप्त करें ",
+      "titleItalic": "सत्र",
+      "content": "क्या आप वाकई सत्र को समाप्त करना चाहते हैं?",
+      "endSession": "सत्र समाप्त करें",
+      "cancel": "रद्द करें"
+    },
+    "noCoursesAvailable": "कोई कोर्स उपलब्ध नहीं है"
+  },
+  "stressBuster": {
+    "messages": {
+      "gaveBest": "आपने उस सत्र में अपना सर्वश्रेष्ठ दिया",
+      "gaveBestHighlight": "सर्वश्रेष्ठ",
+      "momentForYourself": "अब, अपने लिए कुछ पल निकालें",
+      "momentHighlight": "अपने लिए"
+    },
+    "returnToSelf": "स्वयं की ओर लौटें",
+    "viewCallSummary": "कॉल सारांश देखें",
+    "breathing": {
+      "inhale": "सांस लें",
+      "hold": "रोकें",
+      "exhale": "सांस छोड़ें"
+    }
+  },
+  "summary": {
+    "disclaimer": "यह सारांश AI द्वारा उत्पन्न किया गया है। Ally AI गलतियाँ कर सकता है। सहेजने से पहले मुख्य विवरण जांचें और संपादित करें",
+    "notFoundTitle": "सारांश नहीं मिला",
+    "notFoundDesc": "आप जो सारांश खोज रहे हैं वह मौजूद नहीं है।",
+    "goHome": "होम पर जाएं",
+    "additionalNotes": "अतिरिक्त नोट्स",
+    "overallScore": "कुल स्कोर",
+    "save": "रिपोर्ट सहेजें",
+    "saving": "सहेजा जा रहा है...",
+    "enhance": "बढ़ाएं",
+    "enhanceFailed": "इस टेक्स्ट को बेहतर नहीं बनाया जा सका। कृपया पुनः प्रयास करें।",
+    "customFieldSaveFailed": "आपके बदलाव सहेजे नहीं जा सके। कृपया पुनः प्रयास करें।",
+    "tabs": {
+      "returnToSelf": "स्वयं की ओर लौटें",
+      "sessionSummary": "सत्र सारांश",
+      "transcript": "ट्रांसक्रिप्ट"
+    },
+    "sections": {
+      "featuresAndDemographics": "विशेषताएं और जनसांख्यिकी",
+      "sessionSummary": "सत्र सारांश",
+      "flow": "प्रवाह",
+      "keyConcerns": "मुख्य चिंताएं",
+      "objectiveObservations": "उद्देश्यपूर्ण अवलोकन",
+      "subjectiveObservations": "व्यक्तिपरक अवलोकन",
+      "assessment": "मूल्यांकन",
+      "dominantFeelings": "प्रमुख भावनाएं",
+      "issuesWorkedOn": "जिन मुद्दों पर काम किया गया",
+      "keyTherapeuticTechniques": "मुख्य उपचारात्मक तकनीकें",
+      "referralsProvided": "प्रदान किए गए रेफरल",
+      "homeworkRecommended": "अनुशंसित होमवर्क",
+      "plansForNextCall": "अगली कॉल के लिए योजनाएं",
+      "tags": "टैग",
+      "metrics": "मेट्रिक्स",
+      "intake": "इनटेक",
+      "ongoingRisks": "चल रहे जोखिम",
+      "additionalNotes": "अतिरिक्त नोट्स"
+    },
+    "duration": {
+      "day": "दिन",
+      "days": "दिन",
+      "hour": "घंटा",
+      "hours": "घंटे",
+      "minute": "मिनट",
+      "minutes": "मिनट",
+      "second": "सेकंड",
+      "seconds": "सेकंड",
+      "min": "मिनट"
+    },
+    "placeholders": {
+      "sessionSummary": "सत्र के मुख्य बिंदुओं का एक छोटा सारांश यहाँ जोड़ें।",
+      "flow": "बातचीत कैसे आगे बढ़ी और क्लाइंट के मूड में कोई बदलाव कैप्चर करें।",
+      "keyConcerns": "इस सत्र में क्लाइंट द्वारा उठाई गई किन्हीं मुख्य चिंताओं या तनावों की सूची बनाएं।",
+      "objectiveObservations": "क्लाइंट द्वारा साझा किए गए वस्तुनिष्ठ बयानों या अवलोकनों का दस्तावेज़ीकरण करें।",
+      "subjectiveObservations": "इस स्थान का उपयोग अपने छापों, अंतर्ज्ञान या भावनात्मक अंतर्दृष्टि के लिए करें।",
+      "assessment": "आज के सत्र से अपनी राय या उपचारात्मक प्रभाव को सारांशित करें",
+      "dominantFeelings": "सत्र के दौरान दृढ़ता से सामने आई किन्हीं भी भावनाओं को हाइलाइट करें।",
+      "issuesWorkedOn": "सत्र के दौरान किन चीज़ों का पता लगाया गया या उन पर काम किया गया, उसका उल्लेख करें।",
+      "keyTherapeuticTechniques": "सत्र में लागू किसी भी उपकरण, ढांचे या रणनीति पर ध्यान दें।",
+      "referralsProvided": "क्लाइंट के साथ साझा किए गए किन्हीं आंतरिक या बाहरी रेफरल या संसाधनों पर ध्यान दें।",
+      "homework": "सत्रों के बीच क्लाइंट को काम करने के लिए सुझाव या कार्य जोड़ें।",
+      "planForNextCall": "अगले सत्र में फिर से चर्चा करने के लिए लक्ष्यों या विषयों का उल्लेख करें।",
+      "tags": "इस सत्र को व्यवस्थित या वर्गीकृत करने में मदद के लिए कीवर्ड जोड़ें।",
+      "select": "चुनें",
+      "addNote": "नोट जोड़ें"
+    },
+    "fields": {
+      "callId": "कॉल आईडी",
+      "callName": "कॉल का नाम",
+      "callDuration": "कॉल की अवधि",
+      "callDate": "कॉल की तारीख",
+      "callTime": "कॉल का समय",
+      "newCallFollowUp": "नई कॉल फॉलो अप",
+      "counsellor": "काउंसलर",
+      "callQuality": "कॉल गुणवत्ता",
+      "callerId": "कॉलर आईडी",
+      "counsellorName": "उपयोगकर्ता नाम",
+      "callerType": "कॉलर का प्रकार",
+      "age": "उम्र",
+      "gender": "लिंग",
+      "profession": "पेशा",
+      "relationshipStatus": "रिलेशनशिप स्टेटस",
+      "languages": "भाषाएं",
+      "location": "स्थान",
+      "concernCode": "चिंता कोड",
+      "sessionSummary": "सत्र सारांश",
+      "flow": "प्रवाह",
+      "keyConcerns": "मुख्य चिंताएं",
+      "objectiveObservations": "उद्देश्यपूर्ण अवलोकन",
+      "subjectiveObservations": "व्यक्तिपरक अवलोकन",
+      "assessment": "मूल्यांकन",
+      "dominantFeelings": "प्रमुख भावनाएं",
+      "issuesWorkedOn": "जिन मुद्दों पर काम किया गया",
+      "keyTherapeuticTechniques": "मुख्य उपचारात्मक तकनीकें",
+      "referralsProvided": "प्रदान किए गए रेफरल",
+      "homeworkRecommended": "अनुशंसित होमवर्क",
+      "plansForNextCall": "अगली कॉल के लिए योजनाएं",
+      "tags": "टैग",
+      "listeningRatio": "सुनने का अनुपात",
+      "reflectiveQuestions": "पूछे गए चिंतनशील प्रश्नों की संख्या",
+      "emotionsLift": "भावनाओं का उत्थान",
+      "openEndedQuestions": "पूछे गए ओपन एंडेड प्रश्नों की संख्या",
+      "intakeNotes": "इनटेक नोट्स",
+      "riskSelfHarm": "जोखिम, खुद को नुकसान",
+      "riskSelfHarmNotes": "जोखिम, खुद को नुकसान नोट्स",
+      "riskSuicidalThoughts": "जोखिम, आत्मघाती विचार",
+      "riskSuicidalThoughtsNotes": "जोखिम, आत्मघाती विचार नोट्स",
+      "riskSuicidalPlan": "जोखिम, आत्मघाती योजना",
+      "riskSuicidalAction": "जोखिम, आत्मघाती कार्रवाई",
+      "riskRunningAway": "जोखिम, भाग जाना",
+      "riskRunningAwayNotes": "जोखिम, भागने के नोट्स",
+      "traumaPhysicalAbuse": "आघात, शारीरिक शोषण",
+      "traumaSexualAbuse": "आघात, यौन शोषण",
+      "traumaVerbalAbuse": "आघात, मौखिक दुर्व्यवहार",
+      "traumaNeglect": "आघात, उपेक्षा",
+      "traumaSeparation": "आघात, देखभाल करने वाले/माता-पिता से अलग होना",
+      "traumaDomesticViolence": "आघात, घरेलू हिंसा देखी",
+      "traumaNotes": "आघात नोट्स",
+      "assessmentPsychDiagnosis": "मूल्यांकन, मनोवैज्ञानिक निदान",
+      "assessmentPsychDiagnosisNotes": "मूल्यांकन, मनोवैज्ञानिक निदान नोट्स",
+      "assessmentPsychotropicMeds": "मूल्यांकन, साइकोट्रोपिक दवाओं का उपयोग",
+      "assessmentPsychotropicMedsNotes": "मूल्यांकन, साइकोट्रोपिक दवाओं के उपयोग के नोट्स",
+      "assessmentHallucinations": "मूल्यांकन, मतिभ्रम",
+      "assessmentHallucinationsNotes": "मूल्यांकन, मतिभ्रम नोट्स",
+      "assessmentAffect": "मूल्यांकन, प्रभाव",
+      "assessmentSpeech": "मूल्यांकन, भाषण",
+      "ongoingRiskSelfHarm": "चल रहा जोखिम, खुद को नुकसान",
+      "ongoingRiskSelfHarmNotes": "चल रहा जोखिम, खुद को नुकसान नोट्स",
+      "ongoingRiskSuicidalThoughts": "चल रहा जोखिम, आत्मघाती विचार",
+      "ongoingRiskSuicidalPlan": "चल रहा जोखिम, आत्मघाती योजना",
+      "ongoingRiskSuicidalAction": "चल रहा जोखिम, आत्मघाती कार्रवाई",
+      "ongoingRiskSuicidalThoughtsNotes": "चल रहा जोखिम, आत्मघाती विचार नोट्स",
+      "mode": "मोड",
+      "additionalNotes": "अतिरिक्त नोट्स"
+    },
+    "options": {
+      "gender": {
+        "male": "पुरुष",
+        "female": "महिला",
+        "nonBinary": "नॉन-बाइनरी",
+        "preferNotToSay": "क्लाइंट बताना नहीं चाहता"
+      },
+      "risk": {
+        "yes": "हाँ",
+        "no": "नहीं"
+      },
+      "affect": {
+        "congruent": "अनुरूप",
+        "incongruent": "असंगत",
+        "flat": "सपाट",
+        "blunted": "मंद"
+      },
+      "speech": {
+        "clearCoherent": "स्पष्ट और सुसंगत",
+        "sluttering": "हकलाना",
+        "fast": "तेज़",
+        "slow": "धीमा",
+        "difficultToUnderstand": "समझने में कठिन"
+      }
+    }
+  },
+  "summaryLoading": {
+    "generated": "सारांश उत्पन्न हो गया है",
+    "generatedDesc": "अब आप सत्र की समीक्षा कर सकते हैं।",
+    "failedTitle": "सत्र सारांश उत्पन्न करने में विफल",
+    "noAudioDetected": "कोई ऑडियो नहीं मिला",
+    "transcriptionDeleted": "ट्रांसक्रिप्शन उत्पन्न हुआ और ऑडियो हटा दिया गया",
+    "processingDescSidebar": "एक AI-जनित सारांश शीघ्र ही इस स्क्रीन पर उपलब्ध होगा। इस बीच, आप नीचे नोट्स जोड़ सकते हैं।",
+    "processingDescMain": "एक AI-जनित सारांश शीघ्र ही इस स्क्रीन और सत्र लॉग में उपलब्ध होगा। इस बीच, आप नीचे नोट्स जोड़ सकते हैं।",
+    "processingDescMain2": "इस प्रक्रिया में कुछ समय लग सकता है। कृपया बेझिझक बाद में पुनः जाँच करें।",
+    "estimatedTime": "अनुमानित समय: ~ {{time}} मिनट",
+    "settingUp": "आपकी सारांश स्क्रीन सेट की जा रही है",
+    "checkLater": "मैं बाद में जांचूंगा",
+    "seeIfReady": "देखें कि क्या यह तैयार है",
+    "backToSessionLogs": "सत्र लॉग पर वापस जाएं",
+    "addNotes": "नोट्स जोड़ें (वैकल्पिक)",
+    "autosaving": "ऑटो-सेव हो रहा है",
+    "saved": "सहेजा गया",
+    "notesTooltip": "आपके नोट्स स्वचालित रूप से सहेजे जाते हैं और सारांश बनने के बाद “अतिरिक्त नोट्स” के अंतर्गत दिखाई देंगे।",
+    "notesPlaceholder": "अपने विचार लिखें",
+    "summaryFeedbackSubmittedFailed": "सारांश फीडबैक सबमिट करने में विफल",
+    "retryStarted": "सारांश फिर से तैयार किया जा रहा है…",
+    "retryFailed": "सारांश का पुनः प्रयास नहीं किया जा सका। कृपया पुनः प्रयास करें।",
+    "processing": {
+      "generatingTranscription": "ट्रांसक्रिप्शन जनरेट हो रहा है",
+      "deletingAudio": "ऑडियो हटाया जा रहा है",
+      "segregatingUtterances": "कथनों को अलग किया जा रहा है",
+      "understandingConversation": "बातचीत को समझा जा रहा है",
+      "chartingFlow": "प्रवाह को चार्ट किया जा रहा है",
+      "extractingKeyPoints": "मुख्य बिंदु निकाले जा रहे हैं",
+      "identifyingThemes": "विषयों की पहचान की जा रही है",
+      "analysing": "विश्लेषण किया जा रहा है",
+      "generatingSummary": "सारांश उत्पन्न किया जा रहा है",
+      "enrichingSummary": "सारांश को समृद्ध किया जा रहा है",
+      "validatingSummary": "सारांश मान्य किया जा रहा है"
+    }
+  },
+  "suspended": {
+    "title": "खाता निलंबित",
+    "description": {
+      "line1": "आपका खाता निलंबित कर दिया गया है। सहायता के लिए अपने",
+      "line2": "व्यवस्थापक से संपर्क करें"
+    },
+    "goToLogin": "लॉगिन पर जाएं"
+  },
+  "TermsAndAgreement": {
+    "sections": {
+      "generalTerms": {
+        "heading": "सामान्य शर्तें (सभी उपयोगकर्ताओं के लिए)",
+        "bullets": {
+          "ageRequirement": "आप 18+ वर्ष के हैं और कानूनी रूप से अनुबंध करने में सक्षम हैं",
+          "accessMethod": "आप Ally को एक भागीदार संगठन के माध्यम से एक्सेस कर रहे हैं जो औपचारिक रूप से Ally से जुड़ा है या प्रदर्शन, परीक्षण या शोध उद्देश्यों के लिए Ally द्वारा सीधे निमंत्रण के माध्यम से।",
+          "platformUsage": "आप Ally के प्लेटफ़ॉर्म का उपयोग अपने संबद्ध संगठन के नियमों, नैतिकता और आवश्यकताओं के अनुसार कर रहे हैं।",
+          "notForEmergencies": "आप समझते हैं कि Ally वास्तविक आपात स्थितियों के लिए नहीं है। यदि आवश्यक हो तो संकटकालीन सेवाओं से संपर्क करें। अधिक जानकारी: ",
+          "crisisLink": "https://findahelpline.com/"
+        }
+      },
+      "skillsLab": {
+        "heading": "Ally स्किल्स लैब के लिए (प्रशिक्षण सिमुलेशन)",
+        "bullets": {
+          "fictionalScenarios": "आप समझते हैं कि सभी परिदृश्य काल्पनिक हैं, और केवल प्रशिक्षण उद्देश्यों के लिए हैं।",
+          "noCertification": "आप समझते हैं कि यह मानव-पर्यवेक्षित प्रशिक्षण की जगह नहीं लेता है, प्रमाणन प्रदान नहीं करता है, या आपको स्वतंत्र अभ्यास के लिए योग्य नहीं बनाता है।",
+          "consentStorage": "आप गुणवत्ता सुधार के लिए रोल-प्ले सत्रों के ऑडियो और ट्रांसक्रिप्ट को संग्रहीत करने और अपने प्रशिक्षण संगठन/पर्यवेक्षक के साथ साझा किए जाने की सहमति देते हैं।"
+        }
+      },
+      "assist": {
+        "heading": "Ally असिस्ट के लिए (सत्र नोट्स)",
+        "bullets": {
+          "authorizedSessions": "आप इसका उपयोग केवल अपने संगठन के नियमों के अनुसार अधिकृत सत्रों के लिए करेंगे",
+          "audioNotStored": "इस उत्पाद के लिए, ",
+          "audioNotStoredBold": "ऑडियो रिकॉर्डिंग Ally द्वारा सहेजी नहीं जाती हैं",
+          "audioNotStoredSuffix": "। सत्रों के ट्रांसक्रिप्ट उपयोगकर्ता संगठन के निर्णय के आधार पर संग्रहीत और हटाए जाते हैं"
+        }
+      }
+    }
+  },
+  "terms": {
+    "title": "शर्तें और समझौता",
+    "footerPrefix": "संपूर्ण विवरण के लिए, कृपया हमारी",
+    "footerLinkText": "गोपनीयता नीति और उपयोगकर्ता लाइसेंस समझौते की समीक्षा करें",
+    "agreeLabel": "मैंने इन नियमों और शर्तों को पढ़ लिया है और उनसे सहमत हूँ, और सहमति देता हूँ।",
+    "agreeButton": "सहमत हूँ",
+    "scrollToBottom": "नीचे तक स्क्रॉल करें",
+    "sections": [
+      {
+        "heading": "सामान्य शर्तें (सभी उपयोगकर्ताओं के लिए)",
+        "content": [
+          "आप 18+ वर्ष के हैं और कानूनी रूप से अनुबंध करने में सक्षम हैं",
+          "आप Ally को एक भागीदार संगठन के माध्यम से एक्सेस कर रहे हैं जो औपचारिक रूप से Ally से जुड़ा है या प्रदर्शन, परीक्षण या शोध उद्देश्यों के लिए Ally द्वारा सीधे निमंत्रण के माध्यम से।",
+          "आप Ally के प्लेटफ़ॉर्म का उपयोग अपने संबद्ध संगठन के नियमों, नैतिकता और आवश्यकताओं के अनुसार कर रहे हैं।",
+          "आप समझते हैं कि Ally वास्तविक आपात स्थितियों के लिए नहीं है। यदि आवश्यक हो तो संकटकालीन सेवाओं से संपर्क करें। अधिक जानकारी: <a>https://findahelpline.com/</a>"
+        ]
+      },
+      {
+        "heading": "Ally स्किल्स लैब के लिए (प्रशिक्षण सिमुलेशन)",
+        "content": [
+          "आप समझते हैं कि सभी परिदृश्य काल्पनिक हैं, और केवल प्रशिक्षण उद्देश्यों के लिए हैं।",
+          "आप समझते हैं कि यह मानव-पर्यवेक्षित प्रशिक्षण की जगह नहीं लेता है, प्रमाणन प्रदान नहीं करता है, या आपको स्वतंत्र अभ्यास के लिए योग्य नहीं बनाता है।",
+          "आप गुणवत्ता सुधार के लिए रोल-प्ले सत्रों के ऑडियो और ट्रांसक्रिप्ट को संग्रहीत करने और अपने प्रशिक्षण संगठन/पर्यवेक्षक के साथ साझा किए जाने की सहमति देते हैं।"
+        ]
+      },
+      {
+        "heading": "Ally असिस्ट के लिए (सत्र नोट्स)",
+        "content": [
+          "आप इसका उपयोग केवल अपने संगठन के नियमों के अनुसार अधिकृत सत्रों के लिए करेंगे",
+          "इस उत्पाद के लिए, <b>ऑडियो रिकॉर्डिंग Ally द्वारा सहेजी नहीं जाती हैं</b>। सत्रों के ट्रांसक्रिप्ट उपयोगकर्ता संगठन के निर्णय के आधार पर संग्रहीत और हटाए जाते हैं"
+        ]
+      }
+    ]
+  },
+  "transcription": {
+    "title": "एनोटेट ट्रांसक्रिप्ट",
+    "empty": "कोई ट्रांसक्रिप्ट उपलब्ध नहीं है",
+    "agentLabel": "AI एजेंट:",
+    "scribeAgentLabel": "क्लाइंट:",
+    "youLabel": "आप",
+    "clientLabel": "क्लाइंट",
+    "counsellorLabel": "काउंसलर",
+    "aiAgentName": "AI एजेंट",
+    "aiClientSuffix": "AI क्लाइंट",
+    "accuracyDisclaimer": "ट्रांसक्रिप्शन हमेशा पूरी तरह सटीक नहीं होता।"
+  },
+  "user": {
+    "creditUsage": "क्रेडिट उपयोग",
+    "logout": "लॉगआउट",
+    "profileAlt": "प्रोफ़ाइल",
+    "dataPolicy": "डेटा नीति"
+  },
+  "drawer": {
+    "dev": "(Dev)"
+  },
+  "forceUpdate": {
+    "title": "अपडेट ",
+    "titleBold": "अलर्ट!",
+    "description": "Ally का नया संस्करण उपलब्ध है। ऐप का उपयोग जारी रखने के लिए कृपया अपडेट करें।",
+    "currentVersion": "वर्तमान संस्करण:",
+    "latestVersion": "नवीनतम संस्करण:",
+    "updateButton": "अभी अपडेट करें"
+  },
+  "listeningScreen": {
+    "takingNotes": "नोट्स ले रहा है",
+    "isThisHelpful": "क्या यह मददगार है",
+    "callEndConfirmation": "क्या आप वाकई इस कॉल को समाप्त करना चाहते हैं?",
+    "microphoneModeEndConfirmation": "क्या आप वाकई इस सत्र को समाप्त करना चाहते हैं?",
+    "call": "कॉल",
+    "end": "समाप्त करें ",
+    "session": "सत्र",
+    "endCall": "कॉल समाप्त करें",
+    "endSession": "सत्र समाप्त करें",
+    "pauseTranscription": "नोट्स लेना रोकें",
+    "resumeTranscription": "नोट्स लेना फिर से शुरू करें",
+    "connecting": "कनेक्ट हो रहा है...",
+    "microphoneModeInDifferentPlatformTitle": "किसी अन्य प्लेटफ़ॉर्म पर सक्रिय माइक्रोफ़ोन सत्र",
+    "microphoneModeInDifferentPlatformDescription": "आपका किसी अन्य प्लेटफ़ॉर्म पर एक सक्रिय माइक्रोफ़ोन सत्र है। कृपया पहले वहां कॉल समाप्त करें, या यदि आप चाहें तो उस सत्र का उपयोग जारी रखें।",
+    "microphoneModeGoBack": "वापस जाएं",
+    "microphoneModeNote": "नोट: इस स्क्रीन को छोड़ने या ऐप बंद करने से कॉल समाप्त हो जाएगी।",
+    "dataSafe": "आपका डेटा सुरक्षित है",
+    "dataSafeTooltip": {
+      "noAudioRecordings": "हम ऑडियो रिकॉर्डिंग सहेजते नहीं हैं",
+      "dataEncrypted": "डेटा एन्क्रिप्टेड है",
+      "noTrainingData": "हम अपने मॉडल को प्रशिक्षित करने के लिए आपके क्लाइंट के डेटा का उपयोग नहीं करते हैं",
+      "personalInfoRemoved": "क्लाइंट की व्यक्तिगत जानकारी स्वचालित रूप से हटा दी जाती है"
+    },
+    "focus": "फोकस मोड चालू करें",
+    "focused": "फोकस मोड बंद करें",
+    "scribeStopTakingNotesBanner": "आपके द्वारा कॉल समाप्त करते ही स्क्राइब नोट्स लेना बंद कर देगा।",
+    "muteTooltip": "क्या आपको नोट्स कैप्चर करने की आवश्यकता है? AI अभी आपको सुन नहीं सकता है। इसे सुनने देने के लिए फिर से शुरू करें।"
+  },
+  "callSummary": {
+    "enterDetail": "विवरण दर्ज करें",
+    "header": {
+      "title": "सत्र",
+      "subtitle": "सारांश",
+      "callSummary": "कॉल सारांश",
+      "transcript": "ट्रांसक्रिप्ट",
+      "callTranscript": "कॉल ट्रांसक्रिप्ट",
+      "actionsMenu": {
+        "archive": "संग्रह"
+      }
+    },
+    "aiGeneratedWarning": "यह सारांश AI द्वारा उत्पन्न किया गया है। Ally AI गलतियाँ कर सकता है। सहेजने से पहले मुख्य विवरण जांचें और संपादित करें",
+    "progress": {
+      "complete": "सारांश प्रगति पूर्ण"
+    },
+    "minutes": "मिनट",
+    "customMenu": {
+      "export": "एक्सपोर्ट करें",
+      "archive": "सत्र संग्रहीत करें",
+      "unarchive": "सत्र को संग्रह से निकालें",
+      "delete": "हटाएं",
+      "dataPolicy": "डेटा नीति",
+      "deleteConfirmation": "क्या आप वाकई इस सारांश को हटाना चाहते हैं? इस क्रिया को पूर्ववत नहीं किया जा सकता"
+    },
+    "viewSummary": "सारांश देखें",
+    "info": {
+      "storagePermissionDenied": "स्टोरेज की अनुमति अस्वीकृत",
+      "fileExportedSuccess": "फ़ाइल सफलतापूर्वक एक्सपोर्ट की गई",
+      "fileExportFailed": "फ़ाइल एक्सपोर्ट करने में विफल",
+      "summaryDeletedSuccess": "कॉल सारांश सफलतापूर्वक हटाया गया",
+      "summaryDeleteFailed": "कॉल सारांश हटाने में विफल",
+      "fileSavedSuccess": "फ़ाइल यहाँ सफलतापूर्वक सहेजी गई: {{path}}",
+      "directoryPathError": "डायरेक्टरी पथ निर्धारित नहीं किया जा सका",
+      "invalidResponseFormat": "सर्वर से अमान्य प्रतिक्रिया प्रारूप",
+      "summaryNameUpdateSuccess": "सारांश का नाम सफलतापूर्वक अपडेट किया गया",
+      "summaryNameUpdateFailed": "सारांश का नाम अपडेट करने में विफल",
+      "summaryUpdatedSuccess": "कॉल सारांश सफलतापूर्वक अपडेट किया गया",
+      "summaryUpdateFailed": "कॉल सारांश अपडेट करने में विफल",
+      "enableStoragePermission": "फ़ाइल एक्सपोर्ट करने के लिए स्टोरेज की अनुमति सक्षम करें",
+      "storagePermissionTitle": "स्टोरेज की अनुमति आवश्यक",
+      "storagePermissionMessage": "आपके डिवाइस पर कॉल सारांश एक्सपोर्ट करने के लिए इस ऐप को स्टोरेज की अनुमति की आवश्यकता है",
+      "askMeLater": "मुझसे बाद में पूछें",
+      "cancel": "रद्द करें",
+      "ok": "ठीक है",
+      "confirm": "पुष्टि करें",
+      "rename": "नाम बदलें",
+      "endSession": "सत्र समाप्त करें",
+      "notesAutoSaveInfo": "आपके नोट्स स्वचालित रूप से सहेजे जाते हैं और सारांश बनने के बाद \"अतिरिक्त नोट्स\" के अंतर्गत दिखाई देंगे।",
+      "summaryFeedbackSubmittedFailed": "सारांश फीडबैक सबमिट करने में विफल"
+    },
+    "archiveActionModal": {
+      "archive": {
+        "header": {
+          "title": "इसे संग्रहीत करें",
+          "subtitle": "सत्र"
+        },
+        "description": "क्या आप वाकई इस सत्र को संग्रहीत करना चाहते हैं? यह इसे सत्र लॉग से छिपा देगा लेकिन आप इसे बाद में पुनर्स्थापित कर सकते हैं।",
+        "confirm": "संग्रहीत करें",
+        "cancel": "रद्द करें",
+        "success": "सत्र सफलतापूर्वक संग्रहीत किया गया",
+        "failed": "सत्र संग्रहीत करने में विफल"
+      },
+      "unarchive": {
+        "header": {
+          "title": "पुष्टि करें",
+          "subtitle": "संग्रह से निकालें"
+        },
+        "description": "क्या आप वाकई इस सत्र को संग्रह से निकालना चाहते हैं?",
+        "confirm": "संग्रह से निकालें",
+        "cancel": "रद्द करें",
+        "success": "सत्र सफलतापूर्वक संग्रह से निकाला गया",
+        "failed": "सत्र को संग्रह से निकालने में विफल"
+      }
+    },
+    "notesLabel": "नोट्स",
+    "notesPlaceholder": "अगली कॉल के लिए नोट्स लें (यदि कोई हो)",
+    "addConcern": "एक चिंता जोड़ें",
+    "enterNote": "नोट दर्ज करें",
+    "startedLabel": "शुरू हुआ",
+    "endedLabel": "समाप्त हुआ",
+    "scoreLabel": "स्कोर",
+    "saveChanges": "बदलाव सहेजें",
+    "noChanges": "कोई बदलाव नहीं"
+  },
+  "locationDropdown": {
+    "placeholder": "स्थान चुनें",
+    "searchPlaceholder": "स्थान खोजें...",
+    "searching": "खोजा जा रहा है...",
+    "loadingPlaces": "स्थान लोड हो रहे हैं...",
+    "noLocationsFound": "कोई स्थान नहीं मिला",
+    "startTypingToSearch": "स्थान खोजने के लिए टाइप करना शुरू करें"
+  },
+  "networkLogs": {
+    "logs": "लॉग्स"
+  },
+  "simulations": {
+    "header": {
+      "title": "Ally",
+      "subtitle": "सीखें"
+    },
+    "chooseYour": "अपना चुनें",
+    "scenario": "स्थिति",
+    "track": "ट्रैक",
+    "tracks": "सीखने के मार्ग",
+    "case": "केस",
+    "cases": "केस",
+    "learnIntro": "मानसिक स्वास्थ्य कौशल बनाने के लिए <blue>AI-आवाज़ आधारित</blue> वास्तविक दुनिया का अभ्यास <blue>परिदृश्य</blue> उपयोग करें।",
+    "scenariosCaps": "परिदृश्य",
+    "scenarioLabel": "स्थिति",
+    "start": "शुरू करें",
+    "continue": "जारी रखें",
+    "simulation": "रोल-प्ले",
+    "audioSimulation": "ऑडियो सिमुलेशन",
+    "verifyOtp": "OTP सत्यापित करें",
+    "enterTheCodeSentTo": "यहां भेजा गया कोड दर्ज करें",
+    "resend": "पुनः भेजें",
+    "noSimulationsAvailable": "कोई सिमुलेशन उपलब्ध नहीं है",
+    "noPathsAvailable": "कोई पथ उपलब्ध नहीं है",
+    "noCasesAvailable": "कोई केस उपलब्ध नहीं है",
+    "failedToLoadTrackDetails": "ट्रैक विवरण लोड करने में विफल",
+    "failedToLoadCaseDetails": "केस विवरण लोड करने में विफल",
+    "connecting": "कनेक्ट हो रहा है...",
+    "disconnecting": "डिस्कनेक्ट हो रहा है...",
+    "creatingRoom": "कमरा बनाया जा रहा है...",
+    "enterYourEmail": "अपना ईमेल दर्ज करें",
+    "emailDescription": "सिमुलेशन के साथ जारी रखने के लिए कृपया अपना पंजीकृत Ally Learn ईमेल पता दर्ज करें।",
+    "emailPlaceholder": "अपना ईमेल दर्ज करें",
+    "pleaseEnterEmail": "कृपया अपना ईमेल पता दर्ज करें",
+    "pleaseEnterValidEmail": "कृपया एक वैध ईमेल पता दर्ज करें",
+    "activeSimulation": "सक्रिय सिमुलेशन",
+    "detected": "मिला",
+    "activeSimulationDescription": "आपका एक सिमुलेशन चल रहा है। नया शुरू करने के लिए मौजूदा सत्र को समाप्त करें।",
+    "progressCompleted": "{{total}} में से {{current}} पूरे हुए",
+    "failedToLoadPathDetails": "पथ विवरण लोड करने में विफल",
+    "noActiveSimulation": "कोई सक्रिय सिमुलेशन नहीं मिला",
+    "sessionEndedSuccessfully": "सत्र सफलतापूर्वक समाप्त हुआ",
+    "triggerWarnings": "ट्रिगर चेतावनियाँ",
+    "language": "भाषा चुनें",
+    "completed_one": "पूर्ण",
+    "completed_other": "पूर्ण · {{count}}×",
+    "completedChip_one": "एक बार पूर्ण",
+    "completedChip_other": "{{count}} बार पूर्ण",
+    "course": "कोर्स",
+    "courses": "कोर्स",
+    "failedToLoadCases": "केस लोड करने में विफल",
+    "failedToLoadScenarios": "परिदृश्य लोड करने में विफल",
+    "creditsRemaining": "{{count}} क्रेडिट",
+    "scenarioFallbackTitle": "परिदृश्य {{id}}",
+    "viewFeedback": "फीडबैक देखें"
+  },
+  "replyBottomSheet": {
+    "title": "उत्तर",
+    "addReply": "उत्तर जोड़ें",
+    "noReplies": "अभी तक कोई उत्तर नहीं",
+    "deleteConfirmation": {
+      "title": "उत्तर हटाएं",
+      "description": "क्या आप वाकई इस उत्तर को हटाना चाहते हैं? इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+      "confirm": "हटाएं",
+      "cancel": "रद्द करें"
+    }
+  },
+  "commentThreadBottomSheet": {
+    "title": "टिप्पणी थ्रेड",
+    "addComment": "टिप्पणी जोड़ें",
+    "noComments": "अभी तक कोई टिप्पणी नहीं",
+    "deleteConfirmation": {
+      "title": "टिप्पणी हटाएं",
+      "description": "क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+      "confirm": "हटाएं",
+      "cancel": "रद्द करें"
+    }
+  },
+  "errors": {
+    "startSimulation": "सिमुलेशन शुरू करने में विफल",
+    "navigateAssistant": "सिमुलेशन असिस्टेंट खोलने में विफल",
+    "attachListeners": "रूम लिसनर्स जोड़ने में विफल",
+    "connect": "रूम से कनेक्ट करने में विफल",
+    "toggleMic": "माइक्रोफ़ोन टॉगल करने में विफल",
+    "pauseControl": "सत्र तक नहीं पहुँच सके — कृपया पुनः प्रयास करें",
+    "uploadProfileImage": "प्रोफ़ाइल छवि अपलोड करने में विफल",
+    "removeProfileImage": "प्रोफ़ाइल छवि हटाने में विफल",
+    "audioSession": "ऑडियो सत्र कॉन्फ़िगर करने में विफल",
+    "endSimulation": "सिमुलेशन समाप्त करने में विफल",
+    "permission": "माइक्रोफ़ोन अनुमति आवश्यक है",
+    "submitBugReport": "रिपोर्ट सबमिट करने में विफल",
+    "loadSession": "सत्र लोड करने में विफल"
+  },
+  "threadsBottomSheet": {
+    "title": "टिप्पणियाँ",
+    "tabInline": "इनलाइन",
+    "tabGeneral": "सामान्य",
+    "moreThreads": "{{count}} और टिप्पणियाँ",
+    "moreThreadsOne": "1 और टिप्पणी",
+    "noThreads": "अभी तक कोई टिप्पणी नहीं",
+    "noGeneralComments": "अभी तक कोई टिप्पणी नहीं",
+    "addComment": "टिप्पणी जोड़ें",
+    "selectedText": "चयनित पाठ:",
+    "viewMoreComments": "और टिप्पणियाँ देखें",
+    "deleteConfirmation": {
+      "title": "टिप्पणी हटाएं",
+      "description": "क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+      "confirm": "हटाएं",
+      "cancel": "रद्द करें"
+    }
+  },
+  "commentInput": {
+    "placeholder": "एक संदेश लिखें..."
+  },
+  "conversation": {
+    "noMessages": "कोई संदेश नहीं मिला।"
+  },
+  "messageThreadsBottomSheet": {
+    "noThreads": "इस संदेश के लिए कोई थ्रेड नहीं मिला"
+  },
+  "languageSelector": {
+    "title": "ऐप भाषा"
+  },
+  "accessibility": {
+    "openMenu": "मेन्यू खोलें",
+    "filter": "फ़िल्टर",
+    "refresh": "रीफ़्रेश करें"
+  },
+  "courses": {
+    "progress": "{{total}} में से {{completed}}",
+    "courseCompleted": "कोर्स पूर्ण हुआ",
+    "lockedTooltip": "इसे अनलॉक करने के लिए पिछले आइटम पूरे करें",
+    "notFound": "कोर्स नहीं मिला",
+    "viewProgress": "प्रगति देखें",
+    "progressDashboard": {
+      "title": "प्रगति",
+      "tapHint": "अपनी प्रगति और प्रतिक्रिया देखने के लिए टैप करें",
+      "notFound": "इस कोर्स की प्रगति नहीं मिली",
+      "feedbackHeading": "समेकित प्रतिक्रिया",
+      "feedbackSubheading_one": "{{count}} मूल्यांकित अभ्यास सत्र के आधार पर",
+      "feedbackSubheading_other": "{{count}} मूल्यांकित अभ्यास सत्रों के आधार पर",
+      "feedbackEmpty": "यहाँ समेकित प्रतिक्रिया देखने के लिए इस कोर्स में एक अभ्यास रोल-प्ले पूरा करें।",
+      "scoreTrendAlt": "स्कोर रुझान: {{count}} सत्रों में {{first}} से {{latest}}",
+      "latestScore": "नवीनतम: {{score}}",
+      "latestFeedbackHeading": "नवीनतम प्रतिक्रिया",
+      "readFullFeedback": "पूरी प्रतिक्रिया पढ़ें",
+      "practiceNudge": "{{category}} में और अभ्यास की जरूरत है।",
+      "sessionsHeading": "अभ्यास सत्र",
+      "sessionScore": "स्कोर {{score}}",
+      "sessionPending": "मूल्यांकन लंबित",
+      "untitledSession": "अभ्यास सत्र",
+      "classification": {
+        "demonstrated": "प्रदर्शित",
+        "needs_practice": "अभ्यास की आवश्यकता है",
+        "insufficient_data": "अभी पर्याप्त अभ्यास नहीं"
+      }
+    },
+    "status": {
+      "completed": "पूर्ण",
+      "inProgress": "जारी है"
+    },
+    "meta": {
+      "quiz": "क्विज़",
+      "questions_one": "{{count}} प्रश्न",
+      "questions_other": "{{count}} प्रश्न",
+      "passScore": "पास स्कोर {{score}}%",
+      "video": "वीडियो",
+      "videoDuration_one": "{{minutes}} मिनट का वीडियो",
+      "videoDuration_other": "{{minutes}} मिनट का वीडियो",
+      "article": "लेख",
+      "journal": "जर्नल",
+      "prompts_one": "{{count}} प्रॉम्प्ट",
+      "prompts_other": "{{count}} प्रॉम्प्ट",
+      "roleplay": "रोल-प्ले",
+      "minScore": "न्यूनतम स्कोर {{score}}%",
+      "case": "केस",
+      "game": "गेम · बस मनोरंजन के लिए",
+      "branchingScenario": "परिदृश्य प्रश्नोत्तरी",
+      "bucketSort": "बकेट सॉर्ट"
+    },
+    "player": {
+      "exit": "बाहर जाएं",
+      "prev": "पिछला",
+      "next": "अगला",
+      "finish": "समाप्त करें",
+      "overallProgress": "{{pct}}% पूर्ण",
+      "loadFailed": "यह आइटम लोड नहीं हो सका.",
+      "trackLoadFailed": "यह कोर्स लोड नहीं हो सका.",
+      "retry": "पुनः प्रयास करें",
+      "unsupportedTitle": "अभी ऐप में उपलब्ध नहीं है",
+      "unsupportedBody": "कोर्स के इस हिस्से के लिए वेब वर्ज़न चाहिए. कोर्स का बाकी सब कुछ यहाँ पहले जैसा ही चलता है.",
+      "backToCourse": "कोर्स पर वापस जाएं"
+    },
+    "discussion": {
+      "heading": "चर्चा",
+      "emptyTitle": "अभी तक कोई पोस्ट नहीं",
+      "emptyBody": "सबसे पहले साझा करें कि आप इसे कैसे करेंगे — यहाँ कोई गलत जवाब नहीं है।",
+      "composerPlaceholder": "अपने विचार अपने शब्दों में साझा करें…",
+      "post": "पोस्ट करें",
+      "reply": "जवाब दें",
+      "save": "सहेजें",
+      "delete": "हटाएं",
+      "edited": "(संपादित)",
+      "editedByModerator": "(मॉडरेटर द्वारा संपादित)",
+      "deletedByAuthor": "[लेखक द्वारा हटाया गया]",
+      "threadLocked": "यह थ्रेड लॉक है",
+      "discussionLocked": "यह चर्चा लॉक है",
+      "lockThread": "थ्रेड लॉक करें",
+      "unlockThread": "थ्रेड अनलॉक करें",
+      "lockDiscussion": "चर्चा लॉक करें",
+      "unlockDiscussion": "चर्चा अनलॉक करें",
+      "loadFailed": "यह चर्चा लोड नहीं हो सकी.",
+      "deleteConfirmTitle": "इस पोस्ट को हटाएं?",
+      "deleteConfirmBody": "इसे वापस नहीं लाया जा सकता."
+    },
+    "celebration": {
+      "sectionCompleteTitle": "सेक्शन पूर्ण!",
+      "sectionCompleteBody": "बहुत बढ़िया — आगे बढ़ते रहें.",
+      "trackCompleteTitle": "कोर्स पूर्ण!",
+      "trackCompleteBody": "आपने इस कोर्स का हर आइटम पूरा कर लिया है.",
+      "continue": "जारी रखें",
+      "backToLearn": "सीखने पर वापस जाएं",
+      "itemsCompleted_one": "{{count}} आइटम पूर्ण",
+      "itemsCompleted_other": "{{count}} आइटम पूर्ण"
+    },
+    "article": {
+      "markRead": "पढ़ा गया चिह्नित करें",
+      "keepReading": "पढ़ना जारी रखें",
+      "read": "पढ़ा गया",
+      "answerQuestionToContinue": "आगे बढ़ने के लिए प्रश्न का उत्तर दें",
+      "answerQuestionsToContinue": "आगे बढ़ने के लिए प्रश्नों के उत्तर दें",
+      "resourcesHeading": "संसाधन",
+      "openExternally": "बाहरी रूप से खोलें",
+      "question": {
+        "title": "त्वरित जाँच",
+        "submit": "उत्तर जाँचें",
+        "correct": "सही",
+        "incorrect": "गलत",
+        "correctAnswerIs": "सही उत्तर नीचे चिह्नित है।",
+        "answeredHint": "आप इसका उत्तर दे चुके हैं — इसे बदला नहीं जा सकता।"
+      }
+    },
+    "video": {
+      "markWatched": "देखा गया चिह्नित करें",
+      "watched": "देखा गया",
+      "openVideo": "वीडियो खोलें",
+      "interjection": {
+        "title": "त्वरित जाँच",
+        "submit": "सबमिट करें",
+        "continue": "जारी रखें",
+        "continueBody": "वीडियो के साथ आगे बढ़ें।",
+        "submitError": "सबमिट करने में विफल।"
+      },
+      "loadFailed": "यह वीडियो लोड नहीं हो सका।"
+    },
+    "journal": {
+      "submit": "सबमिट करें",
+      "submitted": "सबमिट किया गया",
+      "placeholder": "अपना जवाब लिखें…",
+      "required": "आवश्यक",
+      "saving": "सहेजा जा रहा है…",
+      "saved": "सहेजा गया",
+      "saveFailed": "सहेजने में विफल"
+    },
+    "roleplay": {
+      "intro": "यह रोल-प्ले शुरू करने के लिए नीचे टैप करें.",
+      "start": "शुरू करें",
+      "openCase": "केस खोलें",
+      "replay": "फिर से खेलें",
+      "completed": "पूर्ण",
+      "completedOn": "{{date}} को पूर्ण हुआ",
+      "assessmentIntro": "यह रोल-प्ले एक मूल्यांकन है।",
+      "assessmentNotice": "आपको एक ही मौका मिलेगा। रोल-प्ले खत्म करते ही आपका प्रयास जमा हो जाएगा और दोबारा नहीं किया जा सकेगा।",
+      "assessmentSubmitted": "{{date}} को जमा किया गया",
+      "assessmentNotPassed": "यह प्रयास पास होने की शर्तें पूरी नहीं कर पाया।",
+      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।"
+    },
+    "quiz": {
+      "intro": {
+        "title": "क्विज़ का समय",
+        "questionCount_one": "{{count}} प्रश्न",
+        "questionCount_other": "{{count}} प्रश्न",
+        "passScore": "पास स्कोर: {{score}}%",
+        "attemptsLeft_one": "{{count}} प्रयास शेष",
+        "attemptsLeft_other": "{{count}} प्रयास शेष",
+        "unlimitedAttempts": "असीमित प्रयास",
+        "start": "क्विज़ शुरू करें",
+        "noAttemptsLeft": "कोई प्रयास शेष नहीं"
+      },
+      "question": {
+        "progress": "प्रश्न {{current}} / {{total}}",
+        "next": "अगला",
+        "back": "पीछे",
+        "submit": "क्विज़ सबमिट करें",
+        "selectPrompt": "एक चुनें",
+        "selectMultiple": "जो लागू हो, वे सभी चुनें",
+        "true": "सही",
+        "false": "गलत",
+        "orderPrompt": "इन्हें क्रम में लगाएं",
+        "matchPrompt": "जोड़ी मिलाएं",
+        "dragHandle": "क्रम बदलने के लिए खींचें",
+        "moveUp": "ऊपर ले जाएं",
+        "moveDown": "नीचे ले जाएं",
+        "wordCount_one": "{{count}}/{{min}} शब्द",
+        "wordCount_other": "{{count}}/{{min}} शब्द",
+        "aiGraded": "इस उत्तर की जांच AI द्वारा की जाती है",
+        "likertHint": "हर कथन के लिए एक जवाब चुनें",
+        "answerAllError": "सबमिट करने से पहले कृपया हर प्रश्न का उत्तर दें।",
+        "submitError": "क्विज़ सबमिट करने में विफल।",
+        "minWordsHint": "कम से कम {{min}} शब्द",
+        "unsupportedType": "यह प्रश्न प्रकार समर्थित नहीं है।",
+        "resultBanner": "{{status}} — {{awarded}}/{{possible}} अंक"
+      },
+      "results": {
+        "title": "परिणाम",
+        "passed": "पास",
+        "failed": "फेल",
+        "correct": "सही",
+        "incorrect": "गलत",
+        "explanation": "स्पष्टीकरण",
+        "feedback": "फीडबैक",
+        "pendingGrading": "जांच जारी है",
+        "finishGrading": "जांच पूरी करें",
+        "grading": "जांच हो रही है…",
+        "retry": "क्विज़ फिर से लें",
+        "next": "अगला",
+        "attemptsUsed": "प्रयास {{used}} / {{max}}",
+        "notScored": "अंक नहीं दिए गए",
+        "correctAnswer": "सही उत्तर",
+        "yourResponses": "आपके जवाब",
+        "responsesSubmitted": "जवाब जमा हो गए",
+        "attemptsUsedNoMax": "प्रयास {{used}}",
+        "scoreSummary": "स्कोर: {{score}}% (पास: {{pass}}%)"
+      }
+    },
+    "language": {
+      "title": "कोर्स की भाषा",
+      "subtitle": "इससे सिर्फ़ यह कोर्स बदलेगा — ऐप की भाषा वही रहेगी।",
+      "readingIn": "{{language}} में पढ़ रहे हैं",
+      "change": "बदलें",
+      "fallback": {
+        "VIDEO_NOT_LOCALISED": "यह वीडियो अंग्रेज़ी में है",
+        "SCENARIO_NOT_TRANSLATED": "यह रोल प्ले अंग्रेज़ी में चलेगा",
+        "CASE_NOT_TRANSLATED": "यह केस अंग्रेज़ी में है"
+      }
+    },
+    "game": {
+      "controlsTouch": {
+        "TREX_RUNNER": "कूदने के लिए टैप करें. यहाँ कोई अंक नहीं मिलते.",
+        "TIC_TAC_TOE": "खेलने के लिए किसी खाने पर टैप करें. यहाँ कोई अंक नहीं मिलते.",
+        "MEMORY_MATCH": "जोड़ी ढूँढ़ने के लिए दो कार्ड टैप करें. जितनी कम चालें, उतना ही आठ-चाल की सही फेरी के करीब — स्कोर बस यही है, और इससे कोर्स पर कोई फ़र्क नहीं पड़ता.",
+        "CUB_N_PUP": "तारे तक पहुँचने के लिए शावक को कड़ियों पर खींचें. पूरी ग्रिड घुमाने के लिए कहीं और खींचें. आपने जितने बोर्ड हल किए उनकी गिनती होती है, पर उससे कोर्स पर कोई फ़र्क नहीं पड़ता.",
+        "SNAKE": "दिशा बदलने के लिए स्वाइप करें. यहाँ कोई अंक नहीं मिलते.",
+        "SPROUT": "झारी को मिट्टी के ऊपर दबाकर खींचें. स्तर हरी पट्टी के भीतर रखें — ज़्यादा पानी भी उतना ही बुरा है जितना कम. इससे कोर्स पर कोई फ़र्क नहीं पड़ता."
+      },
+      "lastScore": {
+        "TREX_RUNNER": "यह बारी: {{score}}",
+        "TIC_TAC_TOE": "इस बैठक में जीत: {{score}}",
+        "MEMORY_MATCH": "यह फेरी: सही फेरी का {{score}}%",
+        "CUB_N_PUP": "इस बैठक में हल किए: {{score}}",
+        "SNAKE": "यह बारी: {{score}}",
+        "SPROUT": "इस बैठक में: {{score}} बढ़त"
+      },
+      "bestScore": {
+        "TREX_RUNNER": "आपका सर्वश्रेष्ठ: {{score}}",
+        "TIC_TAC_TOE": "आपका सर्वश्रेष्ठ: {{score}}",
+        "MEMORY_MATCH": "आपका सर्वश्रेष्ठ: {{score}}%",
+        "CUB_N_PUP": "आपका सर्वश्रेष्ठ: {{score}} बोर्ड",
+        "SNAKE": "आपका सर्वश्रेष्ठ: {{score}}",
+        "SPROUT": "एक बैठक में सबसे ज़्यादा बढ़त: {{score}}"
+      },
+      "optional": "जितनी देर चाहें खेलें, या सीधे आगे बढ़ें — दोनों ही स्थिति में आप आगे जा सकते हैं.",
+      "frameStrings": {
+        "MEMORY_MATCH": {
+          "moves": "{{moves}} चालें",
+          "restart": "फिर से शुरू करें",
+          "wonTitle": "पूरा बोर्ड साफ़",
+          "wonDetail": "{{moves}} चालें — सही फेरी का {{score}}%",
+          "playAgain": "फिर खेलें",
+          "cardLabel": "कार्ड {{number}}"
+        },
+        "CUB_N_PUP": {
+          "levels": "स्तर",
+          "close": "बंद करें",
+          "nextLevel": "अगला स्तर",
+          "solved": "{{total}} में से {{solved}} हल",
+          "tutorial": "ट्यूटोरियल",
+          "hintDragToStar": "शावक को तारे तक खींचें.",
+          "hintRotate": "ग्रिड घुमाने के लिए कहीं और खींचें. शावक और तारा उसके साथ घूमते हैं — स्लेटी कड़ियाँ अपनी जगह रहती हैं.",
+          "hintFree": "नीली कड़ियाँ ग्रिड के साथ घूमती हैं. नीली और स्लेटी कड़ियों को अलग-अलग तरीकों से जोड़ने के लिए ग्रिड घुमाएँ.",
+          "hintPivot": "हरी कड़ियाँ ग्रिड के साथ घूमती हैं पर उनकी दिशा वही रहती है.",
+          "hintRotateLink": "लाल कड़ियाँ अपनी जगह रहती हैं पर ग्रिड के साथ घूमती हैं."
+        },
+        "SNAKE": {
+          "score": "स्कोर",
+          "best": "सर्वश्रेष्ठ",
+          "restart": "फिर से शुरू करें",
+          "gameOver": "गेम ओवर — {{score}}"
+        },
+        "SPROUT": {
+          "pickerLabel": "एक पौधा चुनें",
+          "plantSUCCULENT": "गूदेदार पौधा",
+          "plantMARIGOLD": "गेंदा",
+          "plantFERN": "फर्न",
+          "plantTOMATO": "टमाटर",
+          "visitorsLabel": "मेहमान",
+          "hintStart": "झारी को मिट्टी के ऊपर दबाकर रखें. पानी का स्तर हरी पट्टी के भीतर रखें — ज़्यादा पानी भी उतना ही बुरा है जितना कम.",
+          "aimSoil": "निशाना मिट्टी पर है.",
+          "aimLeaves": "निशाना पत्तों पर है. पत्तों पर पड़ा पानी जड़ों तक नहीं पहुँचता.",
+          "aimAway": "निशाना गमले से बाहर है.",
+          "stateDry": "प्यासा है. मिट्टी सूख गई है और बढ़ना रुक गया है.",
+          "stateGood": "बिल्कुल ठीक. यह बढ़ रहा है.",
+          "stateWet": "बहुत गीला. तश्तरी भर रही है — थोड़ा रुकें और इसे पानी सोखने दें.",
+          "stage0": "बीज",
+          "stage1": "अंकुर",
+          "stage2": "तना",
+          "stage3": "पत्ते",
+          "stage4": "कली",
+          "stage5": "फूल",
+          "leafDropped": "गीली मिट्टी से एक पत्ता पीला पड़कर गिर गया.",
+          "leafScorched": "तेज़ धूप में पत्ते पर पानी ठहरा और वह झुलस गया.",
+          "bloomed": "फूल खिल गया. इस बैठक में अब तक {{blooms}}.",
+          "plantAnother": "नया पौधा लगाएँ",
+          "visitorArrived": "एक {{visitor}} आया.",
+          "visitorBEE": "मधुमक्खी",
+          "visitorBUTTERFLY": "तितली",
+          "visitorLADYBIRD": "बीरबहूटी"
+        }
+      }
+    },
+    "question": {
+      "media": {
+        "imageFailed": "यह तस्वीर लोड नहीं हो सकी। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
+        "viewLarger": "बड़ा करके देखें",
+        "close": "बंद करें"
+      }
+    },
+    "branching": {
+      "endingsSeen": "{{total}} में से {{seen}} अंत देखे गए",
+      "bestScore": "सर्वश्रेष्ठ स्कोर: {{score}}",
+      "choicePrompt": "आप क्या करेंगे?",
+      "youChose": "आप: {{text}}",
+      "trailLabel": "अब तक के आपके चुनाव",
+      "outcome": {
+        "POSITIVE": "सकारात्मक परिणाम",
+        "MIXED": "मिला-जुला परिणाम",
+        "NEGATIVE": "नकारात्मक परिणाम"
+      },
+      "score": "स्कोर {{score}} / 100",
+      "passMark": "पास अंक {{score}}",
+      "attemptsLeft_one": "{{count}} प्रयास बाकी",
+      "attemptsLeft_other": "{{count}} प्रयास बाकी",
+      "passed": "पास हो गए. यह आइटम पूरा हुआ.",
+      "notPassed": "अभी पास नहीं हुए. जब तक आप पास नहीं होते, यह आइटम खुला रहेगा.",
+      "continue": "आगे बढ़ें",
+      "tryAgain": "फिर से कोशिश करें",
+      "attemptsUsedUp": "आपके अभी के सभी प्रयास पूरे हो गए हैं.",
+      "exhaustedTitle": "अभी के लिए आपके सभी प्रयास पूरे हो गए हैं",
+      "newRoundIn": "लगभग {{time}} में नया राउंड खुलेगा.",
+      "newRoundReady": "आपके लिए नया राउंड तैयार है.",
+      "newRoundLater": "नया राउंड बाद में खुलेगा. थोड़ी देर बाद फिर देखें.",
+      "untilMinutes_one": "{{count}} मिनट",
+      "untilMinutes_other": "{{count}} मिनट",
+      "untilHours_one": "{{count}} घंटा",
+      "untilHours_other": "{{count}} घंटे",
+      "untilDays_one": "{{count}} दिन",
+      "untilDays_other": "{{count}} दिन",
+      "whatYouReached": "आप यहाँ तक पहुँचे",
+      "recapLabel": "इस राउंड में आपके प्रयास",
+      "startNewRound": "नया राउंड शुरू करें",
+      "saveFailed": "आपका नतीजा सहेजा नहीं जा सका. कनेक्शन जाँचकर फिर कोशिश करें.",
+      "retrySave": "दोबारा भेजें"
+    },
+    "bucketSort": {
+      "whereDoesItGo": "यह किस श्रेणी में आता है?",
+      "progress": "{{total}} में से {{placed}} छाँटे गए",
+      "tapHint": "जिस बकेट में यह आता है उस पर टैप करें।",
+      "bucketA11y": "\"{{item}}\" को {{bucket}} में रखें",
+      "correct": "सही!",
+      "notQuite": "बिल्कुल सही नहीं",
+      "belongsIn": "यह {{bucket}} में आता है।",
+      "youChose": "आपने {{bucket}} चुना।",
+      "next": "अगला आइटम",
+      "seeResults": "नतीजे देखें",
+      "resultsHeading": "सब छँट गया",
+      "firstTry": "पहली कोशिश में {{pct}}% सही",
+      "best": "अब तक का सर्वश्रेष्ठ: {{pct}}%",
+      "reviewHeading": "इन्हें एक बार फिर देखें",
+      "allRight": "हर आइटम पहली बार में सही बकेट में गया।",
+      "practiceAgain": "फिर से छाँटें",
+      "continue": "आगे बढ़ें",
+      "placeFailed": "कुछ गलत हो गया। कृपया फिर कोशिश करें।"
+    },
+    "notAvailable": {
+      "title": "यह कोर्स आपके खाते के लिए उपलब्ध नहीं है",
+      "body": "इसे आपके संगठन या समूह के लिए उपलब्ध नहीं कराया गया है। अगर आपको लगता है कि यह आपको मिलना चाहिए, तो अपने संगठन के एडमिन से पूछें।"
+    },
+    "enroll": "नामांकन करें",
+    "listLoadFailed": "आपके कोर्स लोड नहीं हो सके।",
+    "breathing": {
+      "title": "श्वसन अभ्यास",
+      "defaultIntro": "अपनी सांसों को नियंत्रित करने के लिए कुछ समय निकालें।",
+      "start": "शुरू करें",
+      "cycleProgress": "चक्र {{current}}/{{total}}"
+    }
+  },
+  "bugReport": {
+    "menuLabel": "समस्या की रिपोर्ट करें",
+    "title": "समस्या की रिपोर्ट करें",
+    "prompt": "आप क्या करने की कोशिश कर रहे थे?",
+    "placeholder": "जब समस्या हुई थी तब आप क्या कर रहे थे, हमें बताएं...",
+    "submit": "सबमिट करें",
+    "successMessage": "धन्यवाद — आपकी रिपोर्ट सबमिट कर दी गई है।",
+    "rateLimitMessage": "आपने हाल ही में कई रिपोर्ट सबमिट की हैं — कृपया कुछ देर बाद पुनः प्रयास करें।",
+    "emptyError": "कृपया समस्या का वर्णन करें।"
+  },
+  "home": {
+    "phase0Shell": "फ़ेज़ 0 शेल — प्रमाणित।",
+    "courses": "फ़ेज़ 2: कोर्स",
+    "profile": "फ़ेज़ 2: प्रोफ़ाइल",
+    "notifications": "फ़ेज़ 2: सूचनाएं",
+    "simulations": "फ़ेज़ 3: सिमुलेशन",
+    "leaderboard": "फ़ेज़ 4: लीडरबोर्ड",
+    "achievements": "फ़ेज़ 4: उपलब्धियां",
+    "bugReport": "फ़ेज़ 4: बग की रिपोर्ट करें",
+    "search": "फ़ेज़ 4: खोजें",
+    "reviews": "फ़ेज़ 4: समीक्षाएं",
+    "callLog": "फ़ेज़ 4: कॉल लॉग",
+    "community": "फ़ेज़ 4: समुदाय",
+    "boxBreathing": "फ़ेज़ 4: बॉक्स ब्रीदिंग",
+    "cases": "फ़ेज़ 4: केस",
+    "scribe": "फ़ेज़ 1: स्क्राइब रिकॉर्डिंग",
+    "roleplay": "फ़ेज़ 1: रोलप्ले वॉइस",
+    "noAccessibleTabs": "इस खाते के लिए कोई उपलब्ध टैब नहीं है"
+  },
+  "notifications": {
+    "title": "सूचनाएं",
+    "markAllRead": "सभी को पढ़ा हुआ चिह्नित करें",
+    "empty": "आप पूरी तरह अपडेट हैं — अभी कोई सूचना नहीं है।",
+    "loadError": "सूचनाएं लोड करने में विफल"
+  },
+  "roleplayVoice": {
+    "title": "रोलप्ले वॉइस",
+    "connect": "कनेक्ट करें",
+    "disconnect": "डिस्कनेक्ट करें",
+    "connectedToRoom": "रूम से कनेक्ट है",
+    "notConnected": "कनेक्ट नहीं है"
+  },
+  "scribe": {
+    "title": "स्क्राइब रिकॉर्डिंग (फ़ेज़ 1)",
+    "notificationTitle": "सत्र रिकॉर्ड हो रहा है",
+    "notificationText": "Ally इस सत्र को रिकॉर्ड कर रहा है।",
+    "recording": "रिकॉर्डिंग",
+    "notRecording": "रिकॉर्डिंग नहीं हो रही",
+    "socketLabel": "सॉकेट",
+    "connected": "कनेक्टेड",
+    "disconnected": "डिस्कनेक्टेड",
+    "chunksSent": "भेजे गए ऑडियो चंक: {{count}}",
+    "startRecording": "रिकॉर्डिंग शुरू करें",
+    "stop": "रोकें",
+    "testingHint": "रिकॉर्डिंग के दौरान स्क्रीन लॉक करें या ऐप बदलें, ताकि पुष्टि हो सके कि फ़ोरग्राउंड सर्विस ऑडियो चंक भेजती रहती है — यही वह समस्या है जिसे ठीक करने के लिए यह री-राइट बनाया गया है।"
+  },
+  "conferenceListening": {
+    "title": "कॉन्फ़्रेंस कॉल (फ़ेज़ 1)",
+    "connecting": "कॉल से कनेक्ट हो रहा है...",
+    "socketLabel": "सॉकेट",
+    "connected": "कनेक्टेड",
+    "disconnected": "डिस्कनेक्टेड",
+    "waitingForClient": "क्लाइंट के जुड़ने की प्रतीक्षा की जा रही है",
+    "clientJoined": "क्लाइंट जुड़ गया",
+    "audioChunksReceived": "प्राप्त ऑडियो चंक: {{count}}",
+    "nudgesReceived": "प्राप्त सुझाव: {{count}}",
+    "pause": "सुझाव रोकें",
+    "resume": "सुझाव फिर से शुरू करें",
+    "endSession": "सत्र समाप्त करें",
+    "callEnded": "कॉल समाप्त हो गई है"
+  }
+}

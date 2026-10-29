@@ -1,0 +1,483 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
+
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/simulation_details_screen.dart';
+
+import '../../../support/fake_network_image.dart';
+import '../../../support/pump_router_app.dart';
+import '../../../support/fake_permission_platform.dart';
+import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
+
+class MockSimulationsRepository extends Mock implements SimulationsRepository {}
+
+DioException _dioError(int status, Map<String, dynamic> body) => DioException(
+  requestOptions: RequestOptions(path: '/learn/scenario-session-start'),
+  response: Response(
+    requestOptions: RequestOptions(path: '/learn/scenario-session-start'),
+    statusCode: status,
+    data: body,
+  ),
+);
+
+/// Start → RN's "Before you get started" → Start Session.
+Future<void> _startAndConfirm(WidgetTester tester) async {
+  await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Start Session'));
+  await tester.pumpAndSettle();
+}
+
+/// `HtmlRichText` renders via bare `RichText` widgets, which `find.text`
+/// doesn't match — same helper `html_rich_text_test.dart` uses.
+String _allText(WidgetTester tester) => tester
+    .widgetList<RichText>(find.byType(RichText))
+    .map((w) => w.text.toPlainText())
+    .join('\n');
+
+List<GoRoute> _routes() => [
+  GoRoute(
+    path: '/simulations/:scenarioId',
+    builder: (context, state) => SimulationDetailsScreen(
+      scenarioId: int.parse(state.pathParameters['scenarioId']!),
+      initialScenario: state.extra as Scenario?,
+    ),
+  ),
+  GoRoute(
+    path: '/roleplay',
+    builder: (context, state) {
+      final extra = state.extra as Map<String, Object?>;
+      return Text(
+        'ROLEPLAY:${extra['liveKitServerUrl']}:${extra['accessToken']}:${extra['scenarioSessionId']}',
+      );
+    },
+  ),
+];
+
+void main() {
+  // The start flow asks for the microphone before creating the session
+  // (RN useStartSimulation); granted unless a test says otherwise.
+  setUp(() => PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({}));
+
+  late MockSimulationsRepository repository;
+
+  setUp(() {
+    repository = MockSimulationsRepository();
+    when(() => repository.getScenarioById(5)).thenAnswer(
+      (_) async => Scenario.fromJson({
+        'id': 5,
+        'title': 'Difficult conversation',
+        'description': 'Practice de-escalation',
+      }),
+    );
+  });
+
+  testWidgets('renders the scenario title/description once loaded', (
+    tester,
+  ) async {
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('Difficult conversation'), findsOneWidget);
+    expect(_allText(tester), contains('Practice de-escalation'));
+  });
+
+  testWidgets(
+    'when reached with an already-fetched Scenario (as the catalog list always passes), '
+    'renders it directly without ever calling getScenarioById',
+    (tester) async {
+      final scenario = Scenario.fromJson({
+        'id': 42,
+        'title': 'Reused scenario',
+        'description': 'From the list, not re-fetched',
+        'availableLanguages': [
+          {'language_id': 1, 'label': 'English', 'active': true},
+        ],
+      });
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/from-list',
+        routes: [
+          GoRoute(
+            path: '/from-list',
+            builder: (context, state) => TextButton(
+              onPressed: () => context.push('/simulations/42', extra: scenario),
+              child: const Text('open'),
+            ),
+          ),
+          ..._routes(),
+        ],
+        overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reused scenario'), findsOneWidget);
+      expect(_allText(tester), contains('From the list, not re-fetched'));
+      expect(find.text('English'), findsOneWidget, reason: 'availableLanguages carried through too');
+      verifyNever(() => repository.getScenarioById(any()));
+    },
+  );
+
+  testWidgets('tapping start calls startScenarioSession and navigates to /roleplay with the session extras', (
+    tester,
+  ) async {
+    when(
+      () => repository.startScenarioSession(scenarioId: 5),
+    ).thenAnswer(
+      (_) async => SessionData(
+        id: 'session-99',
+        accessToken: 'access-tok',
+        liveKitServerUrl: 'wss://livekit.example.com',
+      ),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    // "Start" + "Role play" (RN's own literal translations) concatenated —
+    // not the separately-curated, differently-cased `common.startSimulation`
+    // key, which isn't what the real screen's header/button actually render.
+    await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
+    await tester.pumpAndSettle();
+
+    // RN's NotificationModal ("Before you get started") comes first.
+    verifyNever(() => repository.startScenarioSession(scenarioId: 5));
+    expect(find.text('Before you get started'), findsOneWidget);
+    expect(find.byKey(const Key('pre-start-modal')), findsOneWidget);
+    await tester.tap(find.text('Start Session'));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.startScenarioSession(scenarioId: 5)).called(1);
+    expect(
+      find.text('ROLEPLAY:wss://livekit.example.com:access-tok:session-99'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('closing the pre-start modal does not start anything', (tester) async {
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.widgetWithText(AppButton, 'Start Role play'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pre-start-modal-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('pre-start-modal')), findsNothing);
+    verifyNever(() => repository.startScenarioSession(scenarioId: any(named: 'scenarioId')));
+  });
+
+  testWidgets('a plain start failure shows RN\'s error toast with the backend reason', (
+    tester,
+  ) async {
+    when(
+      () => repository.startScenarioSession(scenarioId: 5),
+    ).thenThrow(_dioError(400, {'message': 'Scenario unavailable'}));
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+
+    expect(find.text('Failed to start simulation: Scenario unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('retry-session-modal')), findsNothing);
+    expect(find.byKey(const Key('active-simulation-modal')), findsNothing);
+  });
+
+  testWidgets('a 429 opens the retry modal; a successful retry opens the role play', (tester) async {
+    var calls = 0;
+    when(() => repository.startScenarioSession(scenarioId: 5)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw _dioError(429, {'message': 'Too many'});
+      return SessionData(id: 'session-2', accessToken: 'tok', liveKitServerUrl: 'wss://lk');
+    });
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+
+    expect(find.byKey(const Key('retry-session-modal')), findsOneWidget);
+    expect(find.text("We're at capacity right now"), findsOneWidget);
+    expect(find.text("We'll automatically retry in 30s"), findsOneWidget);
+    expect(find.textContaining('Failed to start simulation'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text("We'll automatically retry in 29s"), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('retry-session-modal-retry')));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.byKey(const Key('retry-session-modal')), findsNothing);
+    expect(find.text('ROLEPLAY:wss://lk:tok:session-2'), findsOneWidget);
+  });
+
+  testWidgets('a retry that is still rate-limited switches to the cooldown countdown', (tester) async {
+    when(() => repository.startScenarioSession(scenarioId: 5)).thenThrow(_dioError(429, {}));
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+    // The 30 s auto-retry fires by itself.
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+
+    verify(() => repository.startScenarioSession(scenarioId: 5)).called(2);
+    expect(find.text('You can retry in 30s'), findsOneWidget);
+    final retry = find.byKey(const Key('retry-session-modal-retry'));
+    expect(tester.widget<InkWell>(find.descendant(of: retry, matching: find.byType(InkWell))).onTap, isNull);
+
+    await tester.tap(find.byKey(const Key('retry-session-modal-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('retry-session-modal')), findsNothing);
+  });
+
+  testWidgets('an entityId in the error body opens the active-simulation modal; End session ends it', (
+    tester,
+  ) async {
+    when(
+      () => repository.startScenarioSession(scenarioId: 5),
+    ).thenThrow(_dioError(400, {'message': 'Active session exists', 'entityId': 'running-1'}));
+    when(() => repository.endScenarioSession('running-1')).thenAnswer((_) async {});
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await _startAndConfirm(tester);
+
+    expect(find.byKey(const Key('active-simulation-modal')), findsOneWidget);
+    expect(find.text('You have a running simulation. End the existing session to start a new one.'), findsOneWidget);
+    expect(find.textContaining('Failed to start simulation'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('active-simulation-end')));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.endScenarioSession('running-1')).called(1);
+    expect(find.byKey(const Key('active-simulation-modal')), findsNothing);
+    expect(find.text('Simulation ended successfully'), findsOneWidget);
+  });
+
+  testWidgets('low credits: shows the no-credits modal for 5 s and disables Start', (tester) async {
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [
+        simulationsRepositoryProvider.overrideWithValue(repository),
+        simulationCreditsProvider.overrideWith(
+          (ref) async => SimulationCredits(creditLimit: 10, consumedCredits: 10, secondsAllowedPerCredit: 60),
+        ),
+      ],
+    );
+
+    expect(find.byKey(const Key('low-credits-modal')), findsOneWidget);
+    expect(find.text('No Credits Left'), findsOneWidget);
+    expect(tester.widget<AppButton>(find.byType(AppButton)).isDisabled, isTrue);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('low-credits-modal')), findsNothing);
+  });
+
+  testWidgets('a cover video renders the video preview instead of the image', (tester) async {
+    when(() => repository.getScenarioById(10)).thenAnswer(
+      (_) async => Scenario.fromJson({
+        'id': 10,
+        'title': 'Video scenario',
+        'description': 'desc',
+        'coverImageUrl': 'https://cdn.example.com/cover.png',
+        'coverVideoUrl': 'https://cdn.example.com/cover.mp4',
+      }),
+    );
+
+    await withFakeNetworkImages(() async {
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/simulations/10',
+        routes: _routes(),
+        overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      expect(find.byKey(const Key('scenario-video-preview')), findsOneWidget);
+    });
+  });
+
+  testWidgets('shows a completed chip with the right pluralization once attempted', (tester) async {
+    when(() => repository.getScenarioById(6)).thenAnswer(
+      (_) async => Scenario.fromJson({
+        'id': 6,
+        'title': 'Repeat scenario',
+        'description': 'desc',
+        'completion': {'attemptCount': 3, 'lastCompletedAt': null},
+      }),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/6',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('Completed 3 times'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Practise again'), findsOneWidget);
+  });
+
+  testWidgets('renders trigger warning chips when present', (tester) async {
+    when(() => repository.getScenarioById(7)).thenAnswer(
+      (_) async => Scenario.fromJson({
+        'id': 7,
+        'title': 'Sensitive scenario',
+        'description': 'desc',
+        'triggerWarnings': [
+          {'id': 'tw1', 'name': 'Self-harm'},
+          {'id': 'tw2', 'name': 'Violence'},
+        ],
+      }),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/7',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('Self-harm'), findsOneWidget);
+    expect(find.text('Violence'), findsOneWidget);
+    // RN renders "Trigger warnings::" (value already ends in ':'); one colon.
+    expect(find.text('Trigger warnings:'), findsOneWidget);
+    expect(find.text('Trigger warnings::'), findsNothing);
+  });
+
+  testWidgets('tapping share copies the scenario link and shows a confirmation', (tester) async {
+    // `Clipboard.setData`/`getData` have no default handler under plain
+    // `flutter test` — without this, the call never completes and the test
+    // hangs instead of failing outright.
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.byKey(const Key('simulation-details-share')));
+    await tester.pump();
+
+    expect(copied, 'https://app.helloally.ai/scenario/5');
+    expect(find.text('Link copied to clipboard'), findsOneWidget);
+  });
+
+  testWidgets('selecting a language passes its languageId to startScenarioSession', (tester) async {
+    when(() => repository.getScenarioById(8)).thenAnswer(
+      (_) async => Scenario.fromJson({
+        'id': 8,
+        'title': 'Multilingual scenario',
+        'description': 'desc',
+        'availableLanguages': [
+          {'language_id': 1, 'label': 'English', 'active': true},
+          {'language_id': 2, 'label': 'Hindi', 'active': true},
+        ],
+      }),
+    );
+    when(() => repository.startScenarioSession(scenarioId: 8, languageId: 2)).thenAnswer(
+      (_) async => SessionData(
+        id: 'session-1',
+        accessToken: 'tok',
+        liveKitServerUrl: 'wss://livekit.example.com',
+      ),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/8',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('English'), findsOneWidget, reason: 'defaults to the first available language');
+
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hindi').last);
+    await tester.pumpAndSettle();
+
+    await _startAndConfirm(tester);
+
+    verify(() => repository.startScenarioSession(scenarioId: 8, languageId: 2)).called(1);
+  });
+
+  testWidgets('renders an HTML description with headings via HtmlRichText', (tester) async {
+    await withFakeNetworkImages(() async {
+      when(() => repository.getScenarioById(9)).thenAnswer(
+        (_) async => Scenario.fromJson({
+          'id': 9,
+          'title': 'Rich scenario',
+          'description': '<h2>What makes this hard</h2><p>Some context.</p>',
+          'coverImageUrl': 'https://cdn.example.com/cover.png',
+        }),
+      );
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/simulations/9',
+        routes: _routes(),
+        overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      expect(_allText(tester), contains('What makes this hard'));
+      expect(_allText(tester), contains('Some context.'));
+      expect(find.byType(Image), findsOneWidget);
+    });
+  });
+}

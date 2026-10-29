@@ -1,0 +1,117 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      The central architectural fix this rewrite exists to validate: the
+      React Native app (android/app/src/main/AndroidManifest.xml in
+      ally-mobile) declares NO foreground service at all. On Android 14+
+      (API 34), the OS can silently stop microphone capture once the app is
+      backgrounded unless a foreground service with the "microphone" type is
+      both declared here and actively running during recording. This is the
+      most likely root cause of the live recording reliability problems that
+      motivated the whole migration — not something fixable by better JS/
+      bridge code, since RN never had a path to declare this at all.
+    -->
+    <!-- Call summary export to Downloads on Android 9 and below (RN's
+         useStoragePermissions / fileOperations.saveFile). -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Role-play Bluetooth headset routing on Android 11 and below. RN gets
+         these merged from @livekit/react-native's manifest; LiveKit's Flutter
+         SDK documents them with maxSdkVersion 30 (Android 12+ uses the
+         runtime BLUETOOTH_CONNECT permission instead, which RN never declared). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- flutter_local_notifications: reschedule the weekly leaderboard reminder after reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:label="@string/app_name"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:requestLegacyExternalStorage="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- RN's App Links filter: summary and course share links on the
+                 flavor's web host (`appLinkHost`, set per flavor in
+                 app/build.gradle.kts like RN). Must match the paths the web
+                 app's .well-known/assetlinks.json claims. Handled in Dart by
+                 core/deeplink (app_links). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/summary" />
+                <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/course" />
+            </intent-filter>
+            <!-- Links are routed by core/deeplink, not by Flutter's built-in
+                 deep linking (which would push "/summary/1" into go_router,
+                 where no such route exists). -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
+        </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+        <!-- flutter_foreground_task's own service class — do not rename.
+             foregroundServiceType="microphone" is the specific declaration
+             Android 14+ checks for before allowing background mic capture;
+             see the top-of-file comment for why this is the whole point. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="microphone"
+            android:exported="false" />
+
+        <!-- flutter_local_notifications: show scheduled (zonedSchedule)
+             notifications and restore them after reboot/app update. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>
