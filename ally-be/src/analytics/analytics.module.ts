@@ -156,6 +156,10 @@ import { WeakMetricsAnalyticsRepository } from './repository/weak-metrics-analyt
 // a learner is graded by is actually true of their session.
 import { FeedbackGroundednessJudgeService } from './service/feedback-groundedness-judge.service';
 import { FeedbackGroundednessRepository } from './repository/feedback-groundedness.repository';
+// Debrief-quality judge: scores the whole debrief on the rubric — the score the
+// debrief quality bar is read from.
+import { DebriefQualityJudgeService } from './service/debrief-quality-judge.service';
+import { DebriefQualityRepository } from './repository/debrief-quality.repository';
 import { RagQualityJudgeService } from './service/rag-quality-judge.service';
 import { RagQualityAnalyticsService } from './service/rag-quality-analytics.service';
 import { RagQualityAnalyticsRepository } from './repository/rag-quality-analytics.repository';
@@ -202,6 +206,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     WeakMetricsAnalyticsRepository,
     FeedbackGroundednessJudgeService,
     FeedbackGroundednessRepository,
+    DebriefQualityJudgeService,
+    DebriefQualityRepository,
     RagQualityJudgeService,
     RagQualityRepository,
     RagQualityAnalyticsService,

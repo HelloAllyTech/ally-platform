@@ -33,6 +33,9 @@ class LLMTask(str, Enum):
     # in ally-be's LlmTask enum, or these rows arrive unlabelled.
     FILLER_JUDGE = "filler_judge"
     FEEDBACK_GROUNDEDNESS_JUDGE = "feedback_groundedness_judge"
+    # Debrief-quality judge: one call per debrief, scoring every rubric
+    # dimension. Needs the matching value in ally-be's LlmTask enum.
+    DEBRIEF_QUALITY_JUDGE = "debrief_quality_judge"
     # RAG-quality judge: one call per retrieval, labelling each returned
     # passage's relevance and the set's sufficiency. Priced separately because
     # its volume tracks retrievals rather than sessions.

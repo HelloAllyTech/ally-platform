@@ -4,6 +4,8 @@ import { LoggerService } from '../../logger/logger.service';
 import { RedisService } from '../../redis/service/redis.service';
 import { PlatformAnalyticsService } from './platform-analytics.service';
 import { FeedbackGroundednessJudgeService } from './feedback-groundedness-judge.service';
+import { DebriefQualityJudgeService } from './debrief-quality-judge.service';
+import { DebriefQualityRepository } from '../repository/debrief-quality.repository';
 import { LanguageJudgeService } from './language-judge.service';
 import { RagQualityJudgeService } from './rag-quality-judge.service';
 import { RecallQualityJudgeService } from './recall-quality-judge.service';
@@ -103,6 +105,16 @@ const ROUND_TRIP_CHUNK = 40;
 const DRIFT_TARGET = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v2' };
 const DRIFT_SOURCE = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' };
 const GROUNDEDNESS_TARGET = {
+  judgeModel: 'gemini-2.5-pro',
+  judgePromptVersion: 'v1',
+};
+
+/**
+ * Debrief quality is the baseline the new debrief system is measured against,
+ * so it reaches back over the same window as the other roleplay families and
+ * then keeps new debriefs scored as they arrive.
+ */
+const DEBRIEF_QUALITY_TARGET = {
   judgeModel: 'gemini-2.5-pro',
   judgePromptVersion: 'v1',
 };
@@ -218,11 +230,13 @@ export class JudgeBacklogDrainService implements OnModuleInit {
   constructor(
     private readonly analytics: PlatformAnalyticsService,
     private readonly groundedness: FeedbackGroundednessJudgeService,
+    private readonly debriefQuality: DebriefQualityJudgeService,
     private readonly language: LanguageJudgeService,
     private readonly ragQuality: RagQualityJudgeService,
     private readonly recallQuality: RecallQualityJudgeService,
     private readonly driftRepo: DriftJudgeRepository,
     private readonly groundednessRepo: FeedbackGroundednessRepository,
+    private readonly debriefQualityRepo: DebriefQualityRepository,
     private readonly languageRepo: LanguageJudgeRepository,
     private readonly ragQualityRepo: RagQualityRepository,
     private readonly recallQualityRepo: RecallQualityRepository,
@@ -233,6 +247,7 @@ export class JudgeBacklogDrainService implements OnModuleInit {
     scheduledTaskRegistry.register('30min', 'judge-backlog-drain', async () => {
       await this.drainDrift();
       await this.drainGroundedness();
+      await this.drainDebriefQuality();
       await this.drainLanguage();
       await this.drainRagQuality();
       await this.drainRecallQuality();
@@ -468,6 +483,55 @@ export class JudgeBacklogDrainService implements OnModuleInit {
     });
     this.logger.debug(
       `[backlog] groundedness started job=${job.jobId} strikes=${next.unproductive}`,
+    );
+  }
+
+  /**
+   * Score debriefs on the rubric, so the debrief quality bar has a baseline
+   * and then a running series. Same shape as groundedness: newest first,
+   * bounded chunks, attempt ledger, stops by itself when nothing is unjudged.
+   */
+  private async drainDebriefQuality(): Promise<void> {
+    const state = await this.readState('debrief-quality');
+    const lastJob = state.jobId
+      ? await this.debriefQuality.getJob(state.jobId).catch(() => undefined)
+      : undefined;
+
+    const { start, next } = await this.shouldStart(
+      'debrief-quality',
+      lastJob,
+      state,
+    );
+    if (!start) {
+      await this.writeState('debrief-quality', next);
+      return;
+    }
+
+    const eligible = await this.debriefQualityRepo.selectSessions({
+      sinceDays: BACKLOG_WINDOW_DAYS,
+      unjudgedForVersion: DEBRIEF_QUALITY_TARGET,
+      limit: 1,
+      ...SCHEDULED,
+    });
+    if (eligible.length === 0) {
+      await this.writeState('debrief-quality', { unproductive: 0 });
+      return;
+    }
+
+    const job = await this.debriefQuality.startBackfill(
+      BACKLOG_WINDOW_DAYS,
+      DEBRIEF_QUALITY_TARGET,
+      undefined,
+      BACKLOG_CHUNK,
+      SCHEDULED,
+    );
+    await this.writeState('debrief-quality', {
+      jobId: job.jobId,
+      unproductive: next.unproductive,
+      lastProcessed: undefined,
+    });
+    this.logger.debug(
+      `[backlog] debrief-quality started job=${job.jobId} strikes=${next.unproductive}`,
     );
   }
 

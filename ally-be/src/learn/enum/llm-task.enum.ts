@@ -116,6 +116,10 @@ export enum LlmTask {
   // the transcript? Emitted by ally-ai before this member existed; the
   // processor stores the raw string, so those rows already carry this value.
   FEEDBACK_GROUNDEDNESS_JUDGE = 'feedback_groundedness_judge',
+  // Debrief-quality judge in ally-ai: scores the whole debrief on the rubric's
+  // eight dimensions. The independent judge the debrief quality bar is read
+  // from; a sibling of the groundedness judge, not a replacement for it.
+  DEBRIEF_QUALITY_JUDGE = 'debrief_quality_judge',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different

@@ -486,6 +486,30 @@ export class GroundednessBackfillJobDto {
   failed!: number;
 }
 
+export class DebriefQualityBackfillJobDto {
+  @ApiProperty() jobId!: string;
+  @ApiProperty({ description: 'queued | running | done | error' })
+  status!: string;
+  @ApiProperty({ description: 'Sessions selected for this run' })
+  total!: number;
+  @ApiProperty() processed!: number;
+  @ApiProperty({ description: 'Debriefs scored' })
+  judged!: number;
+  @ApiProperty({
+    description:
+      'Sessions skipped — no debrief text or no transcript. Not scored: a ' +
+      'missing debrief must not read as a low one.',
+  })
+  skipped!: number;
+  @ApiProperty({
+    description: 'Sessions whose judge call errored or came back empty',
+  })
+  failed!: number;
+  @ApiProperty({ description: 'Scored debriefs with at least one hard fail' })
+  hardFailed!: number;
+  @ApiProperty({ nullable: true }) error!: string | null;
+}
+
 export class RagQualityBackfillJobDto {
   @ApiProperty() jobId!: string;
   @ApiProperty({ description: 'queued | running | done | error' })

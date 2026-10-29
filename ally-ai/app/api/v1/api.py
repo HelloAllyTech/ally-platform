@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     agent_memory,
     analytics_agent,
     conversation,
+    debrief_quality,
     drift,
     feedback_groundedness,
     filler_quality,
@@ -54,6 +55,11 @@ api_router.include_router(
     feedback_groundedness.router,
     prefix="/feedback-groundedness",
     tags=["feedback-groundedness"],
+)
+api_router.include_router(
+    debrief_quality.router,
+    prefix="/debrief-quality",
+    tags=["debrief-quality"],
 )
 api_router.include_router(
     analytics_agent.router, prefix="/analytics-agent", tags=["analytics_agent"]
