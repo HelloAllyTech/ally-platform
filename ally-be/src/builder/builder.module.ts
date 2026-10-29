@@ -69,6 +69,7 @@ import { BuilderReadinessService } from './service/builder-readiness.service';
 import { BuilderProductMapService } from './service/builder-product-map.service';
 import { BuilderPlatformContextService } from './service/builder-platform-context.service';
 import { BuilderNotificationService } from './service/builder-notification.service';
+import { BuilderDecisionService } from './service/builder-decision.service';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
@@ -200,6 +201,7 @@ import {
     BuilderProductMapService,
     BuilderPlatformContextService,
     BuilderNotificationService,
+    BuilderDecisionService,
     BuilderSchedulerRegistrationService,
     BuilderSessionRepository,
     BuilderMessageRepository,

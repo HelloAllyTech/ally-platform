@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 11512,
+      "words": 11859,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -168,7 +168,7 @@
         "reference"
       ],
       "last_reconciled": "2026-07-28",
-      "words": 1224,
+      "words": 1285,
       "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
       "skip_reason": ""
     },
@@ -246,7 +246,7 @@
     {
       "path": "platform/builder-agent.md",
       "title": "Builder Agent — From a Sentence to a Merged Pull Request",
-      "summary": "The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, and why so much of its machinery is about not lying to the reader.",
+      "summary": "The Builder agent takes a described change, interviews you into a PRD, writes the code in a GitHub Actions runner, and keeps the resulting pull requests moving — reviewing, approving, prompting for merge and releasing. How the loop works, what bounds it, the decision feed that clears what it is waiting on a person for, and why so much of its machinery is about not lying to the reader.",
       "tags": [
         "platform",
         "builder",
@@ -257,8 +257,8 @@
         "admin",
         "llm"
       ],
-      "last_reconciled": "2026-09-21",
-      "words": 3436,
+      "last_reconciled": "2026-10-29",
+      "words": 4293,
       "url": "https://tech.helloally.ai/#/wiki/platform/builder-agent.md",
       "skip_reason": ""
     },
@@ -509,7 +509,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3469,
+      "words": 3483,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md",
       "skip_reason": ""
     },
@@ -525,7 +525,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3158,
+      "words": 3211,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
       "skip_reason": ""
     },

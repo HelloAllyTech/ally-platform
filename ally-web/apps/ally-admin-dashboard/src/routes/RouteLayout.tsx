@@ -39,6 +39,7 @@ import {
   MobileReleases,
   BugHunter,
   Builder,
+  BuilderDecisions,
   BuilderEval,
   BuilderKnowledge,
   BuilderPipeline,
@@ -498,6 +499,14 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
               <BuilderSession />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.BUILDER_DECISIONS}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+              <BuilderDecisions />
             </PrivateLayout>
           }
         />

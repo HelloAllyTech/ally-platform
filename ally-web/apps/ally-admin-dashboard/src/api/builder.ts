@@ -1,6 +1,9 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AnswerBuilderDecisionRequest,
+  AnswerBuilderDecisionResponse,
   BuilderArchivedSessionsPage,
+  BuilderDecisionFeed,
   BuilderBudgetState,
   BuilderBuildEvent,
   BuilderBuildRun,
@@ -417,6 +420,37 @@ export const builderAPI = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.BUILDER_NOTIFICATIONS],
     }),
 
+    /* ── Decision feed ───────────────────────────────────────────────── */
+
+    getBuilderDecisions: builder.query<BuilderDecisionFeed, void>({
+      query: () => ({
+        url: ApiEndpoints.BUILDER.DECISIONS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.BUILDER_DECISIONS],
+    }),
+
+    /**
+     * Answering a decision changes whatever it was about — a session's status,
+     * its transcript, a pull request — so the session caches go with the feed.
+     */
+    answerBuilderDecision: builder.mutation<
+      AnswerBuilderDecisionResponse,
+      AnswerBuilderDecisionRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.BUILDER.DECISION_ANSWER(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [
+        TAG_TYPES.BUILDER_DECISIONS,
+        TAG_TYPES.BUILDER_SESSIONS,
+        TAG_TYPES.BUILDER_SESSION,
+        TAG_TYPES.BUILDER_NOTIFICATIONS,
+      ],
+    }),
+
     markBuilderNotificationsRead: builder.mutation<{ ok: boolean }, void>({
       query: () => ({
         url: ApiEndpoints.BUILDER.NOTIFICATIONS_READ_ALL,
@@ -525,6 +559,8 @@ export const {
   useUpdateBuilderSettingsMutation,
   useGetBuilderNotificationsQuery,
   useMarkBuilderNotificationsReadMutation,
+  useGetBuilderDecisionsQuery,
+  useAnswerBuilderDecisionMutation,
   useGetBuilderPipelineHealthQuery,
   useGetBuilderScoreboardQuery,
   useGetBuilderLessonsQuery,

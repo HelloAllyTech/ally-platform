@@ -666,6 +666,10 @@ export const ApiEndpoints = {
     SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
+    // The decision feed: every pending decision across sessions, and the one answer endpoint
+    // that routes each back to the action the session page would have taken.
+    DECISIONS: "/v1/builder/decisions",
+    DECISION_ANSWER: (id: string) => `/v1/builder/decisions/${encodeURIComponent(id)}/answer`,
     NOTIFICATION_READ: (id: string) => `/v1/builder/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/builder/notifications/read-all",
     // Scoreboard + knowledge (lessons/exemplars) — the visibility surfaces.
@@ -943,6 +947,7 @@ export const ROUTES = {
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
+  BUILDER_DECISIONS: "/builder/decisions",
   BUILDER_SCOREBOARD: "/builder/scoreboard",
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
@@ -1143,6 +1148,7 @@ export const TAG_TYPES = {
   BUILDER_PRD_VERSIONS: "builderPrdVersions",
   BUILDER_SETTINGS: "builderSettings",
   BUILDER_NOTIFICATIONS: "builderNotifications",
+  BUILDER_DECISIONS: "builderDecisions",
   BUILDER_LESSONS: "builderLessons",
   BUILDER_EXEMPLARS: "builderExemplars",
   BUILDER_EVAL_FIXTURES: "builderEvalFixtures",

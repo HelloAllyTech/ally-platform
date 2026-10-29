@@ -1,4 +1,6 @@
 export * from "./Builder";
+export * from "./BuilderDecisions";
+export * from "./decisionFeed";
 export * from "./BuilderEval";
 export * from "./BuilderKnowledge";
 export * from "./BuilderPipeline";
