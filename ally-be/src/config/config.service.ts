@@ -974,6 +974,23 @@ export class AppConfigService {
   }
 
   /**
+   * User ids allowed to put a new version of a PINNED prompt live — the judge
+   * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
+   *
+   * Deny by default: unset means nobody, not every prompt editor. A pinned
+   * prompt is an instrument other numbers are read from (the debrief quality
+   * bar, the judges' series), so changing one is a named person's decision,
+   * never something any editor — or an automated agent with no person behind
+   * it — can confirm.
+   */
+  get skillsStorePinnedEditorIds(): number[] {
+    return (this.configService.get<string>('SKILLS_STORE_PINNED_EDITORS') ?? '')
+      .split(',')
+      .map((id) => Number(id.trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  /**
    * Where the admin console is served from, used to build deep links a person
    * follows from outside the app — a Builder pull-request body, or a Slack
    * announcement, pointing back at the session that produced it.

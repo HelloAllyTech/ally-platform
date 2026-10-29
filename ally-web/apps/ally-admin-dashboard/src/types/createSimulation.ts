@@ -851,6 +851,8 @@ export type SkillsStoreErrorCode =
   | "SKILLS_STORE_TRANSLATIONS_PENDING"
   /** details: { reason } — see PinnedPromptReason */
   | "SKILLS_STORE_PROMPT_PINNED"
+  /** 403, details: { reason } — confirmed, but by someone not named as a pinned-prompt editor */
+  | "SKILLS_STORE_PINNED_LOCKED"
   | "SKILLS_STORE_NOT_A_CANDIDATE"
   /** details: { fields } */
   | "SKILLS_STORE_USE_VERSIONS";

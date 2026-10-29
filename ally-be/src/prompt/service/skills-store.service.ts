@@ -355,6 +355,9 @@ export class SkillsStoreService {
           evalApproved: true,
           requireTranslations: false,
           confirmPinnedChange: true,
+          // Copies a version that already went live in the store it was
+          // exported from, so the pinned-editor check happened there.
+          trustedImport: true,
         },
       );
       if (!result.created.includes(item.promptCode)) {
