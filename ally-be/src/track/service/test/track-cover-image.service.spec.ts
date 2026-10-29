@@ -153,4 +153,23 @@ describe('TrackCoverImageService', () => {
       BadGatewayException,
     );
   });
+
+  it("removes 'documentary-style' from the prompt before sending to the provider", async () => {
+    mockProvider.generateImage.mockResolvedValue(Buffer.from('png-bytes'));
+    const problematicPrompt =
+      'A warm, realistic documentary-style photograph of a group of people learning.';
+
+    await service.generate({
+      prompt: problematicPrompt,
+      trackTitle: 'Test Course',
+    });
+
+    const expectedPrompt =
+      'A warm, realistic photograph of a group of people learning.';
+    expect(mockProvider.generateImage).toHaveBeenCalledWith(
+      expectedPrompt,
+      '1536x1024',
+      { quality: 'medium' },
+    );
+  });
 });
