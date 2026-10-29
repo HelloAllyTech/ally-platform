@@ -13,6 +13,8 @@ import { BuilderPrdService } from '../service/builder-prd.service';
 import { BuilderSessionService } from '../service/builder-session.service';
 import { BuilderCatalogService } from '../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../service/builder-evidence-log.service';
+import { BuilderAskService } from '../service/builder-ask.service';
+import { BuilderRuleContextService } from '../service/builder-rule-context.service';
 import { createDraftingDesign } from '../util/builder-technical-design.util';
 
 describe('BuilderPipelineController', () => {
@@ -73,6 +75,17 @@ describe('BuilderPipelineController', () => {
         {
           provide: BuilderEvidenceLogService,
           useValue: { renderForPrompt: jest.fn().mockResolvedValue('') },
+        },
+        {
+          provide: BuilderAskService,
+          useValue: {
+            tellsForRun: jest.fn().mockResolvedValue(''),
+            sessionOfPullRequest: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: BuilderRuleContextService,
+          useValue: { renderRulesBlock: jest.fn().mockResolvedValue('') },
         },
       ],
     }).compile();

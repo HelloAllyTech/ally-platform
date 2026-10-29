@@ -1977,6 +1977,70 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'BUILDER_REVIEW_MODEL, falling back to BUILDER_REVIEW_FALLBACK_MODEL (Actions variables on the monorepo, read by .github/workflows/builder-review-opencode.yml)',
   },
   {
+    id: 'builder-session-ask',
+    task: LlmTask.BUILDER_SESSION_ASK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'An admin asks one Builder session a question from the Builder tab',
+    detail:
+      'Read-only: one call per question, grounded in the PRD, transcript tail, runs, pull ' +
+      "requests, the session's History and the admin's rules. Takes no turn lock and writes " +
+      'no transcript; the answer is stored in History.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_session_ask_system',
+  },
+  {
+    id: 'builder-work-ask',
+    task: LlmTask.BUILDER_WORK_ASK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'An admin asks about all of Builder’s work at once (⌘K → Ask about all work)',
+    detail:
+      'Read-only: one call per question over the sessions in progress, pending decisions, ' +
+      'rules, recent History and Up next.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_work_ask_system',
+  },
+  {
+    id: 'builder-rule-draft',
+    task: LlmTask.BUILDER_RULE_DRAFT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'An admin makes a rule from one of their answers',
+    detail:
+      'One short call: generalises the answer into a one-sentence rule and an area, which ' +
+      'the admin edits before saving. Nothing is saved by the model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_rule_draft_system',
+  },
+  {
+    id: 'builder-rule-match',
+    task: LlmTask.BUILDER_RULE_MATCH,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      '...and the rule editor previews what the rule would have applied to',
+    detail:
+      'One call per preview over up to 60 History decisions from the last 90 days; cached in ' +
+      'Redis per statement and scope for 10 minutes, so typing does not re-bill it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_rule_match_system',
+  },
+  {
     id: 'builder-lesson-curation',
     task: LlmTask.BUILDER_LESSON_CURATION,
     runtime: LlmRuntime.ALLY_BE,

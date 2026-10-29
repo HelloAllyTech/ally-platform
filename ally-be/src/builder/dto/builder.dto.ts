@@ -631,3 +631,120 @@ export class BuilderResearchDto {
   @IsIn(['technical_plan', 'draft_prd'])
   mode?: 'technical_plan' | 'draft_prd';
 }
+
+/* ── The Builder tab: Ask, Tell, Rules ───────────────────────────────────── */
+
+export class AskBuilderDto {
+  @ApiProperty({ description: 'A read-only question; changes nothing' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  question!: string;
+}
+
+export class TellBuilderDto {
+  @ApiProperty({ description: 'An instruction that changes the work' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  instruction!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Stop the run in flight and restart it with this instruction (costs a run). Default: queue it for the next run.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  applyNow?: boolean;
+}
+
+export class DraftBuilderRuleDto {
+  @ApiProperty({ description: 'The History answer to generalise' })
+  @IsUUID()
+  historyId!: string;
+}
+
+export class PreviewBuilderRuleDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(1000)
+  statement!: string;
+
+  @ApiProperty({
+    description: 'everywhere, area:<name>, session:<id> or opportunity:<id>',
+  })
+  @IsString()
+  @MaxLength(120)
+  scope!: string;
+
+  @ApiPropertyOptional({
+    description: 'The rule being edited, left out of conflicts',
+  })
+  @IsOptional()
+  @IsUUID()
+  excludeRuleId?: string;
+}
+
+export class BuilderRuleMatchDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(24)
+  kind!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  questionType?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(64)
+  optionId!: string;
+}
+
+export class CreateBuilderRuleDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(1000)
+  statement!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(120)
+  scope!: string;
+
+  @ApiPropertyOptional({ enum: ['guide', 'decide'], default: 'guide' })
+  @IsOptional()
+  @IsIn(['guide', 'decide'])
+  effect?: 'guide' | 'decide';
+
+  @ApiPropertyOptional({ type: BuilderRuleMatchDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BuilderRuleMatchDto)
+  match?: BuilderRuleMatchDto;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  sourceHistoryId?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Rules this replaces (an edit, or the loser of a conflict)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID('all', { each: true })
+  supersedes?: string[];
+}
+
+export class UpdateBuilderRuleDto {
+  @ApiProperty({ description: 'Turn the rule on or off' })
+  @IsBoolean()
+  active!: boolean;
+}

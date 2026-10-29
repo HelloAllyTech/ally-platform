@@ -78,6 +78,14 @@ import { BuilderHistoryEntry } from './entity/builder-history.entity';
 import { BuilderRoomController } from './controller/builder-room.controller';
 import { BuilderNowService } from './service/builder-now.service';
 import { BuilderLiveService } from './service/builder-live.service';
+import { BuilderRulesService } from './service/builder-rules.service';
+import {
+  BuilderRuleContextService,
+  BuilderRuleRepository,
+} from './service/builder-rule-context.service';
+import { BuilderAskService } from './service/builder-ask.service';
+import { BuilderPartnerMetricsService } from './service/builder-partner-metrics.service';
+import { BuilderRule } from './entity/builder-rule.entity';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
@@ -142,6 +150,7 @@ import {
       BuilderEvalRun,
       BuilderCorrection,
       BuilderHistoryEntry,
+      BuilderRule,
     ]),
     PromptModule,
     LlmUsageModule,
@@ -215,6 +224,11 @@ import {
     BuilderHistoryService,
     BuilderNowService,
     BuilderLiveService,
+    BuilderRulesService,
+    BuilderRuleRepository,
+    BuilderRuleContextService,
+    BuilderAskService,
+    BuilderPartnerMetricsService,
     BuilderHistoryRepository,
     BuilderSchedulerRegistrationService,
     BuilderSessionRepository,

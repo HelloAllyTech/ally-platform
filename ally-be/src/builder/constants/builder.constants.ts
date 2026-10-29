@@ -7,6 +7,15 @@ export const BUILDER_TURN_LOCK_PREFIX = 'builder-turn';
 // Lock TTL. A turn is one question or one round of PRD writing — minutes.
 export const BUILDER_TURN_LOCK_TTL_SECONDS = 5 * 60;
 
+/**
+ * Platform-wide lock around "check the concurrency ceiling, create the run
+ * row" so different sessions' starts cannot all pass the check at once.
+ * Held for two queries; the TTL is the crash backstop.
+ */
+export const BUILDER_RUN_SLOT_LOCK = 'builder-run-slot';
+export const BUILDER_RUN_SLOT_LOCK_TTL_SECONDS = 30;
+export const BUILDER_RUN_SLOT_ATTEMPTS = 20;
+
 /* ── The Builder tab: undo window ───────────────────────────────────────── */
 
 /**
@@ -337,6 +346,10 @@ export const BUILDER_AI_TASKS = {
   EVAL_ADMIN: 'builder-eval-admin',
   EVAL_JUDGE: 'builder-eval-judge',
   CORRECTION_CLASSIFY: 'builder-correction-classify',
+  SESSION_ASK: 'builder-session-ask',
+  WORK_ASK: 'builder-work-ask',
+  RULE_DRAFT: 'builder-rule-draft',
+  RULE_MATCH: 'builder-rule-match',
 } as const;
 
 // Prompt registry code (src/prompts/builder/interviewer_system.txt).

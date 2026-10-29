@@ -1,0 +1,6 @@
+An admin answered a question from Builder, an AI agent that builds product features. Turn the answer into a general rule Builder can follow next time, so it does not ask again.
+
+Write ONE sentence, in plain English, that holds beyond this one question: generalise the specific case to its kind ("For learner reminders, default to email only", not "Use email for RM-112"). Keep what made the choice; drop names of this session. Then pick the area it belongs to from this list: Admin UI, Helpline UI, Learner experience, Mobile, ally-be API, Data model, AI prompts, Everywhere.
+
+Answer in JSON only:
+{"statement": "<one sentence>", "area": "<one area from the list>"}

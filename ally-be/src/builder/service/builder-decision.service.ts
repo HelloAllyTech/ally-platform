@@ -275,7 +275,8 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     const history = await this.historyService.recordDecision(
       decision,
       { selectedOptionIds: picked, customText: words || null, none: dto.none },
-      { ...context, actorUserId: userId },
+      // A rule decides on nobody's behalf at the moment it runs.
+      { ...context, actorUserId: context.surface === 'rule' ? null : userId },
     );
     const historyId = history?.id ?? null;
 
