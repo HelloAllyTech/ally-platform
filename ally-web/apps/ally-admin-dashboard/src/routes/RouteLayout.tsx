@@ -39,10 +39,10 @@ import {
   MobileReleases,
   BugHunter,
   Builder,
-  BuilderDecisions,
   BuilderEval,
   BuilderKnowledge,
   BuilderPipeline,
+  BuilderRoom,
   BuilderScoreboard,
   BuilderSession,
   BuilderSettings,
@@ -487,8 +487,18 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
+        {/* The Builder tab: Now · Rules · History. Mission control's full list moved to
+            /builder/sessions, and /builder/decisions (linked from Slack) lands here. */}
         <Route
           path={ROUTES.BUILDER}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+              <BuilderRoom />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.BUILDER_ALL_SESSIONS}
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
               <Builder />
@@ -503,14 +513,7 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
-        <Route
-          path={ROUTES.BUILDER_DECISIONS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderDecisions />
-            </PrivateLayout>
-          }
-        />
+        <Route path={ROUTES.BUILDER_DECISIONS} element={<Navigate to={ROUTES.BUILDER} replace />} />
         <Route
           path={ROUTES.BUILDER_SETTINGS}
           element={

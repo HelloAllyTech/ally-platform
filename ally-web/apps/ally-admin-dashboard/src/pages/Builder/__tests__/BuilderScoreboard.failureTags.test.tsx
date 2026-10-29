@@ -47,6 +47,8 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 let scoreboardResult: any;
 vi.mock("@api", () => ({
   useGetBuilderScoreboardQuery: () => scoreboardResult,
+  // The partner section reads History; nothing to show for these tests.
+  useGetBuilderPartnerScoreboardQuery: () => ({ data: undefined }),
 }));
 
 /* eslint-disable import/first, import/order -- must follow the vi.mock calls,
