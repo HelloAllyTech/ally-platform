@@ -31,6 +31,7 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   ['language_quality_judge_rubric', 'judge_rubric'],
   ['recall_quality_rubric', 'judge_rubric'],
   ['feedback_groundedness_rubric', 'judge_rubric'],
+  ['debrief_quality_rubric', 'judge_rubric'],
   ['rag_quality_rubric', 'judge_rubric'],
   ['ally_ai_learn_evaluation_actor_goal_system', 'measuring_instrument'],
   ['builder_eval_admin_system', 'measuring_instrument'],

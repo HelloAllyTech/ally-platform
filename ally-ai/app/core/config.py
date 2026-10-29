@@ -208,6 +208,16 @@ class FeedbackGroundednessJudgeSettings(BaseModel):
     PROMPT_VERSION: str = Field("v1")
 
 
+class DebriefQualityJudgeSettings(BaseModel):
+    """Debrief-quality judge — how good is the whole debrief, scored per rubric
+    dimension? The independent judge the debrief quality bar is read from.
+    Sibling of the groundedness judge: separate call, separate rubric version,
+    comparisons valid only within one (MODEL, PROMPT_VERSION) pair."""
+
+    MODEL: str = Field("gemini-2.5-pro")
+    PROMPT_VERSION: str = Field("v1")
+
+
 class RagQualityJudgeSettings(BaseModel):
     """RAG-quality judge — was each retrieved passage relevant, and was the set
     enough? Sibling of the drift, language and feedback-groundedness judges:
@@ -394,6 +404,9 @@ class AppSettings(BaseSettings):
     LLM_USAGE: LLMUsageSettings = Field(default_factory=LLMUsageSettings)
     FEEDBACK_GROUNDEDNESS_JUDGE: FeedbackGroundednessJudgeSettings = Field(
         default_factory=FeedbackGroundednessJudgeSettings
+    )
+    DEBRIEF_QUALITY_JUDGE: DebriefQualityJudgeSettings = Field(
+        default_factory=DebriefQualityJudgeSettings
     )
     RAG_QUALITY_JUDGE: RagQualityJudgeSettings = Field(
         default_factory=RagQualityJudgeSettings

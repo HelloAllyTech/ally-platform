@@ -867,6 +867,19 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'FEEDBACK_GROUNDEDNESS_JUDGE__MODEL',
   },
   {
+    id: 'debrief-quality-judge',
+    task: LlmTask.DEBRIEF_QUALITY_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Scheduled: debrief quality is judged',
+    detail:
+      'How good is the whole debrief? Scores eight rubric dimensions and lists hard fails; ' +
+      'the overall out of 10 is computed in ally-be. Pinned, so scores stay comparable.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'DEBRIEF_QUALITY_JUDGE__MODEL',
+  },
+  {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,

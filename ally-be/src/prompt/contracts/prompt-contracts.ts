@@ -1187,6 +1187,19 @@ export const FEEDBACK_GROUNDEDNESS_RUBRIC = definePrompt(
   },
 );
 
+/** src/prompts/debrief_quality/rubric.txt */
+export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
+  'debrief_quality_rubric',
+  {},
+  {
+    name: 'Debrief Quality Judge Rubric',
+    description:
+      "Static rubric for the debrief-quality judge: scores a learner's whole debrief on eight dimensions and lists hard fails. The judge composes the transcript and the debrief around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/filler_quality_judge/rubric.txt */
 export const FILLER_QUALITY_JUDGE_RUBRIC = definePrompt(
   'filler_quality_judge_rubric',

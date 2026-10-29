@@ -31,6 +31,7 @@ describe('JudgeBacklogDrainService', () => {
       for (const family of [
         'drift',
         'groundedness',
+        'debrief-quality',
         'language',
         'rag-quality',
         'recall-quality',
@@ -48,6 +49,10 @@ describe('JudgeBacklogDrainService', () => {
     const groundedness = {
       getJob: jest.fn().mockResolvedValue(undefined),
       startBackfill: jest.fn().mockResolvedValue({ jobId: 'new-ground-job' }),
+    };
+    const debriefQuality = {
+      getJob: jest.fn().mockResolvedValue(undefined),
+      startBackfill: jest.fn().mockResolvedValue({ jobId: 'new-debrief-job' }),
     };
     const language = {
       getJob: jest.fn().mockResolvedValue(undefined),
@@ -69,6 +74,9 @@ describe('JudgeBacklogDrainService', () => {
     const groundednessRepo = {
       selectSessions: jest.fn().mockResolvedValue(rows),
     };
+    const debriefQualityRepo = {
+      selectSessions: jest.fn().mockResolvedValue(rows),
+    };
     const languageRepo = { selectSessions: jest.fn().mockResolvedValue(rows) };
     const ragQualityRepo = {
       selectRetrievals: jest.fn().mockResolvedValue(rows),
@@ -86,11 +94,13 @@ describe('JudgeBacklogDrainService', () => {
     const service = new JudgeBacklogDrainService(
       analytics as never,
       groundedness as never,
+      debriefQuality as never,
       language as never,
       ragQuality as never,
       recallQuality as never,
       driftRepo as never,
       groundednessRepo as never,
+      debriefQualityRepo as never,
       languageRepo as never,
       ragQualityRepo as never,
       recallQualityRepo as never,
@@ -100,11 +110,13 @@ describe('JudgeBacklogDrainService', () => {
       service,
       analytics,
       groundedness,
+      debriefQuality,
       language,
       ragQuality,
       recallQuality,
       driftRepo,
       groundednessRepo,
+      debriefQualityRepo,
       languageRepo,
       ragQualityRepo,
       recallQualityRepo,
@@ -177,6 +189,34 @@ describe('JudgeBacklogDrainService', () => {
     expect(analytics.startDriftBackfill).not.toHaveBeenCalled();
     expect(groundedness.startBackfill).not.toHaveBeenCalled();
     expect(language.startBackfill).not.toHaveBeenCalled();
+  });
+
+  it('scores debriefs under the pinned v1 rubric, in bounded chunks', async () => {
+    const { service, debriefQuality, debriefQualityRepo } = build();
+    await tick(service);
+
+    expect(debriefQualityRepo.selectSessions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unjudgedForVersion: {
+          judgeModel: 'gemini-2.5-pro',
+          judgePromptVersion: 'v1',
+        },
+        honourAttemptLedger: true,
+      }),
+    );
+    expect(debriefQuality.startBackfill).toHaveBeenCalledWith(
+      150,
+      { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' },
+      undefined,
+      80,
+      { honourAttemptLedger: true },
+    );
+  });
+
+  it('starts no debrief scoring once every debrief is scored', async () => {
+    const { service, debriefQuality } = build({ eligible: false });
+    await tick(service);
+    expect(debriefQuality.startBackfill).not.toHaveBeenCalled();
   });
 
   it('re-judges language into v2, which is what the dashboard pins to', async () => {
