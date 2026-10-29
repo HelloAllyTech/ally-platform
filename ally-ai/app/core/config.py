@@ -223,6 +223,16 @@ class DebriefSettings(BaseModel):
     ally-be may name a different approved model per step later."""
 
     SAFETY_READER_MODEL: str = Field("gemini-2.5-flash")
+    # Defaults only: ally-be's recipe names the model for every step and sends
+    # it, so these apply when a caller leaves the model out. The Writer and the
+    # Evaluator must differ from each other and from the pinned judge
+    # (DEBRIEF_QUALITY_JUDGE.MODEL), so neither grades work by its own model.
+    ANALYST_MODEL: str = Field("gemini-2.5-pro")
+    PROGRESS_READER_MODEL: str = Field("gemini-2.5-flash")
+    WRITER_MODEL: str = Field("gemini-3-flash-preview")
+    EVALUATOR_MODEL: str = Field("gemini-2.5-flash")
+    REVISER_MODEL: str = Field("gemini-3-flash-preview")
+    IMPROVER_MODEL: str = Field("gemini-2.5-pro")
 
 
 class RagQualityJudgeSettings(BaseModel):

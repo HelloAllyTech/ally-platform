@@ -122,6 +122,13 @@ export enum LlmTask {
   DEBRIEF_QUALITY_JUDGE = 'debrief_quality_judge',
   // Debrief agent steps in ally-ai, one label per step.
   DEBRIEF_SAFETY_READER = 'debrief_safety_reader',
+  DEBRIEF_ANALYST = 'debrief_analyst',
+  DEBRIEF_PROGRESS_READER = 'debrief_progress_reader',
+  DEBRIEF_WRITER = 'debrief_writer',
+  DEBRIEF_EVALUATOR = 'debrief_evaluator',
+  DEBRIEF_REVISER = 'debrief_reviser',
+  // The debrief Improver's daily analysis; learning budget, never production.
+  DEBRIEF_IMPROVER = 'debrief_improver',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different

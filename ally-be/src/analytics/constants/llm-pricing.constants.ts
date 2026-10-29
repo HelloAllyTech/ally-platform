@@ -137,6 +137,15 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1MUsd: 2.5,
     cachedInputPer1MUsd: 0.03,
   },
+  // The debrief agent's Writer and Reviser (and Builder's default coder).
+  // Google's published preview rate: $0.50 in / $3.00 out per 1M text tokens,
+  // cached input a tenth of input. Check against ai.google.dev/gemini-api/docs/pricing
+  // when the model leaves preview.
+  'gemini-3-flash-preview': {
+    inputPer1MUsd: 0.5,
+    outputPer1MUsd: 3,
+    cachedInputPer1MUsd: 0.05,
+  },
   // 2.0-flash retired 2026-06-01; kept to price historical token records —
   // including the -exp variant, which resolves here by prefix. Its cached rate
   // (a quarter of input) is UNVERIFIED: the model is no longer on Google's

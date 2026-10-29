@@ -80,6 +80,7 @@ def build_judge_prompt(
     learner_level: Optional[str] = None,
     guidance: Optional[str] = None,
     rubric: Optional[str] = None,
+    history: Optional[str] = None,
 ) -> str:
     """Assemble the debrief-quality prompt for one session's debrief."""
     lines = [rubric or DEFAULT_JUDGE_RUBRIC, ""]
@@ -99,6 +100,13 @@ def build_judge_prompt(
         lines.append("<guidance>")
         lines.append(guidance)
         lines.append("</guidance>")
+        lines.append("")
+    if history:
+        # What the writer was told about the trainee's past sessions. A
+        # reference to it is supported; anything beyond it is not.
+        lines.append("<trainee_history>")
+        lines.append(history)
+        lines.append("</trainee_history>")
         lines.append("")
     lines.append("<debrief>")
     lines.append(debrief)

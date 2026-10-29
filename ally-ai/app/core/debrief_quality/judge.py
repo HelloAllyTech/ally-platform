@@ -25,6 +25,7 @@ async def judge_debrief(
     guidance: Optional[str] = None,
     rubric: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
+    history: Optional[str] = None,
 ) -> Tuple[Optional[DebriefQualityOutput], str]:
     """Score one debrief against its transcript.
 
@@ -48,6 +49,7 @@ async def judge_debrief(
         learner_level=learner_level,
         guidance=guidance,
         rubric=rubric,
+        history=history,
     )
 
     from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured

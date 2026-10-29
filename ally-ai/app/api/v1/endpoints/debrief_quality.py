@@ -33,6 +33,9 @@ class DebriefQualityRequest(BaseModel):
     learner_level: Optional[str] = None
     # Practice guidance or tenant protocol the debrief was written against.
     guidance: Optional[str] = None
+    # The trainee's past Work-on-this points the writer was given, so a
+    # debrief that refers to them is not marked as an unsupported claim.
+    history: Optional[str] = None
     rubric: Optional[str] = None
     # Attribution only: carried onto the call's llm_usage row.
     scenario_session_id: Optional[str] = None
@@ -66,6 +69,7 @@ async def judge(req: DebriefQualityRequest) -> DebriefQualityResponse:
             req.language,
             learner_level=req.learner_level,
             guidance=req.guidance,
+            history=req.history,
             rubric=req.rubric,
             scenario_session_id=req.scenario_session_id,
         )

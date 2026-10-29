@@ -1269,6 +1269,71 @@ export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/analyst_system.txt */
+export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
+  'debrief_analyst_system',
+  {},
+  {
+    name: 'Debrief Analyst',
+    description:
+      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults). The step composes the transcript, scenario and expected behaviours around this text. Release-only: a new version reaches learners through an approved release.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/progress_reader_system.txt */
+export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
+  'debrief_progress_reader_system',
+  {},
+  {
+    name: 'Debrief Progress Reader',
+    description:
+      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/writer_system.txt */
+export const DEBRIEF_WRITER_SYSTEM = definePrompt(
+  'debrief_writer_system',
+  {},
+  {
+    name: 'Debrief Writer',
+    description:
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress. Never sees the rubric. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/reviser_system.txt */
+export const DEBRIEF_REVISER_SYSTEM = definePrompt(
+  'debrief_reviser_system',
+  {},
+  {
+    name: 'Debrief Reviser',
+    description:
+      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/improver_system.txt */
+export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
+  'debrief_improver_system',
+  {},
+  {
+    name: 'Debrief Improver',
+    description:
+      "The Improver's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/filler_quality_judge/rubric.txt */
 export const FILLER_QUALITY_JUDGE_RUBRIC = definePrompt(
   'filler_quality_judge_rubric',

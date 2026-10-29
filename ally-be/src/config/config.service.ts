@@ -974,6 +974,18 @@ export class AppConfigService {
   }
 
   /**
+   * The Debrief agent's switch (DEBRIEF_AGENT_MODE). `shadow` (the default)
+   * debriefs every ended session beside today's debrief without any learner
+   * seeing it, and live for tenants switched on in the Console; `off` stops
+   * new runs everywhere — an emergency stop, not a rollback.
+   */
+  get debriefAgentMode(): 'off' | 'shadow' {
+    return this.configService.get<string>('DEBRIEF_AGENT_MODE') === 'off'
+      ? 'off'
+      : 'shadow';
+  }
+
+  /**
    * User ids allowed to put a new version of a PINNED prompt live — the judge
    * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
    *

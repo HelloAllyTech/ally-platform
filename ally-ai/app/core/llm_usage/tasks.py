@@ -38,6 +38,13 @@ class LLMTask(str, Enum):
     DEBRIEF_QUALITY_JUDGE = "debrief_quality_judge"
     # Debrief agent steps, one label per step so each step's cost is visible.
     DEBRIEF_SAFETY_READER = "debrief_safety_reader"
+    DEBRIEF_ANALYST = "debrief_analyst"
+    DEBRIEF_PROGRESS_READER = "debrief_progress_reader"
+    DEBRIEF_WRITER = "debrief_writer"
+    DEBRIEF_EVALUATOR = "debrief_evaluator"
+    DEBRIEF_REVISER = "debrief_reviser"
+    # The Improver's own analysis; paid from the learning budget, never production.
+    DEBRIEF_IMPROVER = "debrief_improver"
     # RAG-quality judge: one call per retrieval, labelling each returned
     # passage's relevance and the set's sufficiency. Priced separately because
     # its volume tracks retrievals rather than sessions.

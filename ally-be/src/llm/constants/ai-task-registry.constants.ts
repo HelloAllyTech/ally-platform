@@ -894,6 +894,80 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'DEBRIEF__SAFETY_READER_MODEL',
   },
   {
+    id: 'debrief-analyst',
+    task: LlmTask.DEBRIEF_ANALYST,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run with an Analyst step',
+    detail:
+      "Builds the evidence map the Writer writes from: each behaviour's opportunity, observation and exact quote, the pivotal moments and the AI client's faults.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'debrief release bundle (recipes.*.steps[analyst].model)',
+  },
+  {
+    id: 'debrief-progress-reader',
+    task: LlmTask.DEBRIEF_PROGRESS_READER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Standard runs for a learner with past debriefs',
+    detail:
+      "Compares the session's evidence with the learner's past Work-on-this points; says only what the evidence supports.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (recipes.standard.steps[progress_reader].model)',
+  },
+  {
+    id: 'debrief-writer',
+    task: LlmTask.DEBRIEF_WRITER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run',
+    detail:
+      "Writes the learner's debrief cards in the session's language. Never sees the rubric; differs from the Evaluator's and the judge's model.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy: 'debrief release bundle (recipes.*.steps[writer].model)',
+  },
+  {
+    id: 'debrief-evaluator',
+    task: LlmTask.DEBRIEF_EVALUATOR,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every draft, up to three per run',
+    detail:
+      "Scores a draft on the pinned rubric with fix notes per section; the loop's guide, never the KPI (the independent judge is).",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'debrief release bundle (recipes.*.steps[evaluator].model)',
+  },
+  {
+    id: 'debrief-reviser',
+    task: LlmTask.DEBRIEF_REVISER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A draft below the bar or failing a check, with budget and time left',
+    detail: 'Edits only the flagged sections of the best draft.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy:
+      'debrief release bundle (recipes.standard.steps[reviser].model)',
+  },
+  {
+    id: 'debrief-improver',
+    task: LlmTask.DEBRIEF_IMPROVER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Daily, and on demand from the Debrief Console',
+    detail:
+      'The Improver: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.improver)',
+  },
+  {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,

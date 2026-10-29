@@ -331,6 +331,35 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['course copilot', 'author course', 'generate course'],
   },
   {
+    id: 'debrief-agent',
+    name: 'Debrief agent and its Improver (admin Debriefs)',
+    whatItIs:
+      'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
+      '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
+      'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
+      "today's debrief and live for organisations switched on. The Improver reads aggregate " +
+      'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
+      'real sessions, and a person approves each new release. Runs on the agent harness ' +
+      '(agentKey debrief).',
+    reuseWhen:
+      'A request is about post-roleplay feedback or debriefs: what learners read after a session, ' +
+      'its quality, safety (risk cues, learner distress), cost, language, or making it better over ' +
+      'time. Extend a recipe or a step rather than adding a separate feedback generator.',
+    extendVia:
+      'A new step: a stateless ally-ai endpoint under /debrief plus a DebriefStep in the release ' +
+      'bundle. A new kind of session: a new recipe, not a new agent.',
+    modules: ['ally-be:src/debrief', 'ally-ai:app/core/debrief'],
+    adminRoute: '/debriefs',
+    keywords: [
+      'debrief',
+      'feedback after roleplay',
+      'post-session feedback',
+      'improver',
+      'risk cue',
+      'important moment',
+    ],
+  },
+  {
     id: 'ally-guide',
     name: 'Ally guide (guided course experience) and the agent harness',
     whatItIs:
