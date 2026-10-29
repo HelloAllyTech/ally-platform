@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -28,6 +29,7 @@ import {
   CreateScribeSessionReviewResponseDto,
 } from '../dto/create-review.dto';
 import { GetReviewMessagesResponseDto } from 'src/review/dto/review-messages-response.dto';
+import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
 
 @Controller({
   path: 'scribe-session-reviews',
@@ -37,7 +39,10 @@ import { GetReviewMessagesResponseDto } from 'src/review/dto/review-messages-res
 @ApiSecurity('access-token')
 @ApiTags('Scribe Session Review')
 export class ScribeSessionReviewController {
-  constructor(private readonly reviewService: ScribeSessionReviewService) {}
+  constructor(
+    private readonly reviewService: ScribeSessionReviewService,
+    private readonly permissionValidator: PermissionValidator,
+  ) {}
 
   @ApiOperation({ summary: 'Create scribe session review' })
   @ApiResponse({
@@ -117,13 +122,21 @@ export class ScribeSessionReviewController {
   }
 
   @Get('/unread-count')
-  @AuthPermissions([PERMISSIONS.VIEW_SCRIBE_REVIEWS])
   @ApiOperation({ summary: 'Get unread scribe session review count' })
   @ApiResponse({
     status: 200,
     description: 'Unread review count retrieved successfully',
   })
-  async getUnreadReviewCount(): Promise<{ count: number }> {
+  async getUnreadReviewCount(
+    @Req() req: { user: { id: number } },
+  ): Promise<{ count: number }> {
+    const hasPermission = await this.permissionValidator.validatePermissions(
+      req.user.id,
+      [PERMISSIONS.VIEW_SCRIBE_REVIEWS],
+    );
+    if (!hasPermission) {
+      return { count: 0 };
+    }
     return this.reviewService.getUnreadReviewCount();
   }
 
