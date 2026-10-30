@@ -439,7 +439,7 @@ def _tavus_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
 #: times is something they watch happen.
 _BEY_CONN_OPTIONS = dataclasses.replace(DEFAULT_API_CONNECT_OPTIONS, max_retry=1)
 _BEY_CONN_OPTIONS_WITH_FIX = dataclasses.replace(
-    DEFAULT_API_CONNECT_OPTIONS, max_retry=1, timeout=20.0
+    DEFAULT_API_CONNECT_OPTIONS, max_retry=1, timeout=30.0
 )
 
 
