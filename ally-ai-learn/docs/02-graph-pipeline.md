@@ -192,6 +192,15 @@ should use `{character_backstory}`. `{competency}` and `{behavior_instructions_j
 supplied only because Prompt #1's live text renders them, and are no longer offered to authors;
 `{opening_statements}` is not supplied at all (the worker plays the opening line itself).
 
+`{thoughts}` and `{memories}` belong to Main Agent Prompt — Stage Director, and declaring
+`{thoughts}` is that prompt's whole opt-in (`prompt_declares_stage_director`). `{memories}` is
+every memory the session has unlocked (`prompt_data.memories`, falling back to the Knowledge
+Sources), rendered by `app/core/stage_director/memories.py` with locked ones as titles only;
+`retrieve_knowledge` never picks Knowledge Sources for such a prompt. `{thoughts}` is the latest
+paragraph from the Stage Director, written after each reply by `update_working_memory`'s Stage
+Director branch (`app/core/stage_director/director.py`). Design and rollout:
+[`stage-director-and-memories.md`](stage-director-and-memories.md).
+
 ### Per-state dialogue length (`dialogueLength`)
 
 A scenario state may carry `dialogueLength`: `short`, `medium` or `long`. `_build_behavior_prompt`

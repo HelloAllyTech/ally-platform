@@ -191,7 +191,10 @@ class TestWorker:
         assert worker_instance.session.tts == "TTS"
         assert worker_instance.session.vad == "VAD"
         assert worker_instance.session.turn_detection == "vad"
-        assert worker_instance.session.endpointing_kwargs == {}
+        # A one-word acknowledgement must not cut the client off mid-reply.
+        assert worker_instance.session.endpointing_kwargs == {
+            "min_interruption_words": 2
+        }
 
     # -------------------- _resolve_turn_detection --------------------
     def _bare_worker(self):

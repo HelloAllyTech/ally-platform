@@ -407,17 +407,18 @@ class FillerInterimReplyInputs(PromptInputs):
 
     prompt = PromptInfo(
         code="ally_ai_learn_filler_interim_reply",
-        name="Interim Reply Prompt (simulations WITHOUT working memory)",
+        name="Interim Reply Prompt",
         description=(
-            "Writes the interim — a short, non-committal holding line — for simulations"
-            " that do NOT use client working memory. While the learner is still "
-            "speaking on a long turn, a fast model reads the partial transcript and "
-            "drafts one line; the agent plays it after the thinking filler if it fits "
-            "the wait, and the real reply carries on from its words. Simulations WITH "
-            "working memory never use this prompt: their interim is written by the "
-            "'interim' field of the Client Working Memory Updater prompt. Runs only "
-            "when the simulation has interimReplyEnabled on. Variables: "
-            "{scenario_context}, {language_label}, {language_code}."
+            "Writes the interim — a short, non-committal holding line — for every "
+            "simulation except those on Main Agent Prompt #3 (client working "
+            "memory), including those on Main Agent Prompt — Stage Director. While "
+            "the learner is still speaking on a long turn, a fast model reads the "
+            "partial transcript and drafts one line; the agent plays it after the "
+            "thinking filler if it fits the wait, and the real reply carries on "
+            "from its words. Main Agent Prompt #3 scenarios get their interim from "
+            "the 'interim' field of the Client Working Memory Updater prompt "
+            "instead. Runs only when the simulation has interimReplyEnabled on. "
+            "Variables: {scenario_context}, {language_label}, {language_code}."
         ),
     )
 
@@ -866,6 +867,100 @@ class SystemMainAgentPromptWorkingMemorySplitInputs(PromptInputs):
     working_memory_withheld: Optional[str] = Field(
         None, title="Working Memory — Not Ready To Talk About"
     )
+
+
+class SystemMainAgentPromptStageDirectorInputs(PromptInputs):
+    """`system/main_agent_prompt_stage_director.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_learn_system_main_agent_prompt_stage_director",
+        name="Main Agent Prompt — Stage Director",
+        description=(
+            "Main-agent prompt for the Stage Director and memories "
+            "(ally-ai-learn/docs/stage-director-and-memories.md). Selecting it is "
+            "the whole opt-in: a scenario on this prompt gets {thoughts}, one "
+            'paragraph written after each reply by the separate "Stage '
+            'Director" prompt, and {memories}, every memory the session has '
+            "unlocked, on every turn, with no retrieval. Memories assigned to a "
+            "later state show only their title until the session reaches that "
+            "state, with a rule to deflect rather than invent. Scenarios on any "
+            "other prompt keep working memory and retrieval exactly as before.\n\n"
+            "{thoughts} sits last on purpose: everything above it only changes "
+            "when the state does, so it stays cached. The thought is written a "
+            "turn before it is read, which is why the text says the counsellor's "
+            "latest words win over it."
+        ),
+        prompt_type="main_agent",
+        has_states=True,
+    )
+
+    fragments: ClassVar[list[str]] = [
+        "ally_ai_learn_system_audio_tag_guidance",
+        "ally_ai_learn_system_text_chat_guidance",
+        "language_glossary",
+        "retrieved_context",
+        "rolling_summary",
+    ]
+    age: Optional[str] = Field(None, title="Age")
+    allowed_fillers: Optional[str] = Field(None, title="Allowed Filler Words")
+    character_backstory: Optional[str] = Field(None, title="Character Backstory")
+    current_location: Optional[str] = Field(None, title="Current Location")
+    dialogue_length_instruction: Optional[str] = Field(
+        None, title="Dialogue Length Instruction"
+    )
+    gender: Optional[str] = Field(None, title="Gender")
+    gender_identity: Optional[str] = Field(None, title="Gender Identity")
+    language_code: str = Field(title="Output Language Code")
+    language_glossary: Optional[str] = Field(None, title="Language Glossary")
+    language_label: str = Field(title="Output Language Label")
+    linguistic_samples: Optional[str] = Field(None, title="Tone & Style Samples")
+    memories: str = Field(title="Memories (unlocked, every turn)")
+    name: Optional[str] = Field(None, title="Name")
+    previous_memory: Optional[str] = Field(None, title="Previous Session Memory")
+    profession: Optional[str] = Field(None, title="Profession")
+    role_instructions: str = Field(title="Role Instructions")
+    sexual_orientation: Optional[str] = Field(None, title="Sexual Orientation")
+    state_x_guidelines: Optional[str] = Field(None, title="Active State Guidelines")
+    thoughts: str = Field(title="Thoughts (written by the Stage Director)")
+
+
+class SystemStageDirectorInputs(PromptInputs):
+    """`system/stage_director.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_learn_system_stage_director",
+        name="Stage Director",
+        description=(
+            'Writes {thoughts} for "Main Agent Prompt — Stage Director": one '
+            "paragraph, in the client's voice, of what is going through their "
+            "mind right now. Runs after each reply, off the reply path, and its "
+            "paragraph goes into the main prompt exactly as written: no code "
+            "edits it, so improving the client's behaviour is done here.\n\n"
+            "Every variable the main prompt can use is available here too (pick "
+            "the ones you want), plus the director's own: {recent_turns}, "
+            "{previous_thought}, {state_ladder}, {current_state}, "
+            "{rolling_summary} and {learner_behaviours}. {memories} is the same "
+            "block the main prompt gets: locked memories appear by title only, "
+            "never their content."
+        ),
+    )
+
+    character_backstory: Optional[str] = Field(None, title="Character Backstory")
+    current_state: str = Field(title="Current Stage")
+    language_label: str = Field(title="Conversation Language Label")
+    learner_behaviours: Optional[str] = Field(
+        None, title="Learner's Latest Behaviours (helpful and unhelpful)"
+    )
+    memories: Optional[str] = Field(
+        None, title="Memories (unlocked, plus locked titles)"
+    )
+    previous_memory: Optional[str] = Field(None, title="Previous Session Memory")
+    previous_thought: str = Field(title="Previous Thought")
+    recent_turns: str = Field(title="Newest Turns")
+    role_instructions: Optional[str] = Field(None, title="Role Instructions")
+    rolling_summary: Optional[str] = Field(None, title="Earlier Conversation Summary")
+    state_ladder: str = Field(title="Stages, In Order (with guidelines)")
+    state_x_guidelines: Optional[str] = Field(None, title="Active State Guidelines")
 
 
 class SystemRollingSummaryInputs(PromptInputs):

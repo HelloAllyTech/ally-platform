@@ -568,6 +568,7 @@ def create_agent_with_adapter(
     retrieved_context_store=None,
     client_working_memory_store=None,
     turn_delivery=None,
+    stage_director_store=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -625,6 +626,10 @@ def create_agent_with_adapter(
     # degrades, since it has no worker and therefore no store.
     if client_working_memory_store is not None:
         configurable["client_working_memory_store"] = client_working_memory_store
+
+    # The Stage Director's latest thought, for prompts that use {thoughts}.
+    if stage_director_store is not None:
+        configurable["stage_director_store"] = stage_director_store
 
     # How each reply starts (app/core/livekit/delivery.py): the worker records
     # the opener it played here and the working-memory updater writes the next
