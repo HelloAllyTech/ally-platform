@@ -2173,6 +2173,56 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
       );
     });
 
+    it('starts a first step whose own start never happened, instead of waiting on it forever', async () => {
+      // recordPlan dispatches step 0 at once and leaves it NEW; a dispatch
+      // that failed left the plan at "Fixing across repos" with nothing running.
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.NEW }),
+        step(1, { status: BugFindingStatus.BLOCKED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).toHaveBeenCalledTimes(1);
+      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repo: 'ally-be',
+          inputs: expect.objectContaining({ finding_id: 'step-0' }),
+        }),
+      );
+    });
+
+    it('counts a released step as merged, so the next one starts and the plan can finish', async () => {
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.RELEASED }),
+        step(1, { status: BugFindingStatus.MERGED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(findingRepository.update).toHaveBeenCalledWith('finding-1', {
+        status: BugFindingStatus.MERGED,
+      });
+    });
+
+    it('halts the plan on a step a human rejected', async () => {
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.REJECTED }),
+        step(1, { status: BugFindingStatus.BLOCKED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
+      expect(findingRepository.update).toHaveBeenCalledWith(
+        'finding-1',
+        expect.objectContaining({ status: BugFindingStatus.FAILED }),
+      );
+    });
+
     it('does not run two steps at once', async () => {
       findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
       findingRepository.listChildren.mockResolvedValue([

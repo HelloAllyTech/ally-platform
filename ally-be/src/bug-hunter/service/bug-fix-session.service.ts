@@ -99,6 +99,21 @@ import {
 const NO_CHANGE_STEP =
   /\b(no (code )?(changes?|fix(es)?) (are |is )?(required|needed|necessary)|nothing to (change|fix)|verify only|only verify)\b/i;
 
+/** A plan step past its PR merge — released or on its way counts as done. */
+const PLAN_STEP_DONE_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.MERGED,
+  BugFindingStatus.RELEASING,
+  BugFindingStatus.RELEASED,
+];
+
+/** A plan step that has not started yet and may be dispatched when its turn comes. */
+const PLAN_STEP_STARTABLE_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.BLOCKED,
+  BugFindingStatus.NEW,
+  BugFindingStatus.APPROVED,
+  BugFindingStatus.PENDING_APPROVAL,
+];
+
 @Injectable()
 export class BugFixSessionService {
   private readonly logger = LoggerService.getInstance(
@@ -1161,6 +1176,8 @@ export class BugFixSessionService {
             step.status === BugFindingStatus.FAILED ||
             step.status === BugFindingStatus.NEEDS_INPUT ||
             step.status === BugFindingStatus.DISMISSED ||
+            // A human declined the step's fix; the plan cannot build on it.
+            step.status === BugFindingStatus.REJECTED ||
             // An admin cancelling one step must stop the whole plan here —
             // without this, the next tick would read the cancelled step as
             // neither stuck nor in-flight and dispatch the step after it,
@@ -1172,7 +1189,11 @@ export class BugFixSessionService {
           continue;
         }
 
-        if (steps.every((step) => step.status === BugFindingStatus.MERGED)) {
+        // A step that has since gone out in a release is still merged —
+        // reading only MERGED left a plan whose step shipped waiting forever.
+        if (
+          steps.every((step) => PLAN_STEP_DONE_STATUSES.includes(step.status))
+        ) {
           const mergedAt = new Date();
           await this.findingRepository.update(parent.id, {
             status: BugFindingStatus.MERGED,
@@ -1203,8 +1224,13 @@ export class BugFixSessionService {
         );
         if (inFlight) continue;
 
-        const next = steps.find(
-          (step) => step.status === BugFindingStatus.BLOCKED,
+        // The first not-yet-started step, in plan order. BLOCKED is the normal
+        // case; NEW / APPROVED / PENDING_APPROVAL is a step whose start never
+        // happened (recordPlan's dispatch failed, or a sweep re-touched it).
+        // Waiting only on BLOCKED left those plans at "Fixing across repos"
+        // with nothing running and nothing to say why.
+        const next = steps.find((step) =>
+          PLAN_STEP_STARTABLE_STATUSES.includes(step.status),
         );
         if (next?.repo) await this.dispatchFix(next, next.repo, null);
       } catch (error) {
