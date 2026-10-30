@@ -1,3 +1,4 @@
+import { ImageGenerationModule } from 'src/image-generation/image-generation.module';
 import { Module } from '@nestjs/common';
 import { ReleaseModule } from 'src/release/release.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -140,6 +141,9 @@ import { BugHunterKnowledgeService } from './service/bug-hunter-knowledge.servic
     // docs/bug-hunter-memory-adr.md. Exposed here on Bug Hunter's own two auth
     // surfaces rather than by AgentMemoryModule itself.
     AgentMemoryModule,
+    // The image-generation probe calls the live image service the way the
+    // product does — see BugHunterProbeService.imageGeneration.
+    ImageGenerationModule,
   ],
   controllers: [BugHunterController, BugHunterPipelineController],
   providers: [
