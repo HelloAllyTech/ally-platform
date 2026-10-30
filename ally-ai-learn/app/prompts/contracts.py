@@ -575,6 +575,7 @@ class SystemBranchingAgentPromptInputs(PromptInputs):
     ]
     age: Optional[str] = None
     allowed_fillers: Optional[str] = None
+    character_backstory: Optional[str] = None
     character_profile_text: Optional[str] = None
     competency: Optional[str] = None
     current_location: Optional[str] = None
@@ -687,7 +688,10 @@ class SystemMainAgentPromptInputs(PromptInputs):
     behavior_instructions_json: Optional[str] = Field(
         None, title="Behavior Rules (JSON)"
     )
-    character_profile_text: Optional[str] = Field(None, title="Character Profile")
+    character_backstory: Optional[str] = Field(None, title="Character Backstory")
+    character_profile_text: Optional[str] = Field(
+        None, title="Character Backstory (old name)"
+    )
     competency: Optional[str] = Field(None, title="Competency")
     current_location: Optional[str] = Field(None, title="Current Location")
     custom_fields_text: Optional[str] = None
@@ -737,7 +741,10 @@ class SystemMainAgentPromptFullInputs(PromptInputs):
     ]
     age: Optional[str] = Field(None, title="Age")
     allowed_fillers: Optional[str] = Field(None, title="Allowed Filler Words")
-    character_profile_text: Optional[str] = Field(None, title="Character Profile")
+    character_backstory: Optional[str] = Field(None, title="Character Backstory")
+    character_profile_text: Optional[str] = Field(
+        None, title="Character Backstory (old name)"
+    )
     current_location: Optional[str] = Field(None, title="Current Location")
     gender: Optional[str] = Field(None, title="Gender")
     gender_identity: Optional[str] = Field(None, title="Gender Identity")
@@ -790,7 +797,7 @@ class SystemMainAgentPromptWorkingMemorySplitInputs(PromptInputs):
             "delivers knowledge sources as a trailing message after the "
             "conversation history instead, so adding the placeholder back "
             "would render nothing and imply retrieval had broken. "
-            "{character_profile_text} IS genuinely dropped: recalled "
+            "{character_backstory} IS genuinely dropped: recalled "
             "backstory arrives a few facts at a time through 'What is on "
             "your mind from your own life' rather than as the whole "
             "profile every turn.\n\nTHE OTHER HALF. Every "

@@ -232,6 +232,15 @@ def _build_behavior_instructions_json(
     return json.dumps(rules, indent=2, ensure_ascii=False)
 
 
+def _backstory(prompt_data: PromptData, fall_back_to_context: bool = False) -> str:
+    """The Character Backstory field, for {character_backstory} and its old
+    name {character_profile_text}."""
+    value = getattr(prompt_data, "character_profile_text", None)
+    if not value and fall_back_to_context:
+        value = getattr(prompt_data, "context", None)
+    return _coerce_block_value(value)
+
+
 def _build_branching_prompt(
     prompt_data: PromptData,
     next_instruction: str,
@@ -249,10 +258,11 @@ def _build_branching_prompt(
         age=getattr(prompt_data, "age", "") or "",
         gender=getattr(prompt_data, "gender", "") or "",
         current_location=getattr(prompt_data, "current_location", "") or "",
-        character_profile_text=_coerce_block_value(
-            getattr(prompt_data, "character_profile_text", None)
-            or getattr(prompt_data, "context", None)
-        ),
+        # `character_backstory` is the name authors see; `character_profile_text`
+        # is its old name, still supplied because older live versions (and
+        # their translations) render it.
+        character_backstory=_backstory(prompt_data, fall_back_to_context=True),
+        character_profile_text=_backstory(prompt_data, fall_back_to_context=True),
         # Multilingual fields substituted directly into the branching
         # template body (no block wrapper). Mirror of the main-agent
         # path — same kwargs go into both prompts so wording stays
@@ -652,9 +662,9 @@ def _build_behavior_prompt(
         sexual_orientation=_coerce_block_value(
             getattr(prompt_data, "sexual_orientation", None)
         ),
-        character_profile_text=_coerce_block_value(
-            getattr(prompt_data, "character_profile_text", None)
-        ),
+        # New name and old name, same value: see `_build_branching_prompt`.
+        character_backstory=_backstory(prompt_data),
+        character_profile_text=_backstory(prompt_data),
         retrieved_context=(
             _get_retrieved_context_text(effective_retrieved_context)
             if embed_retrieved_context
