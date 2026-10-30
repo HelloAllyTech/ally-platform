@@ -3290,6 +3290,15 @@ export const en = {
     planSubtitle:
       "I work through them in this order and release them in the same order — each one waits for the one before it.",
     planStepLabel: "Step {n}",
+    // A plan parked on one of its steps — what the row and the drawer say.
+    planAttentionMerge: "Step {n} verified — merge it",
+    planAttentionReview: "Step {n} refused — review it",
+    planAttentionMergeHint:
+      "Step {n} ({repo}) passed the Verifier, but I can't merge in that repo myself. Merge it and I'll carry on with the next step.",
+    planAttentionReviewHint:
+      "Step {n} ({repo}): the Verifier refused the PR and I've stopped there. Read it on GitHub, then merge it or close it.",
+    planStepVerified: "Verifier passed",
+    planStepRefused: "Verifier refused",
     // ── Fix session (on-demand) ──────────────────────────────────────────────
     drawerStartFixSession: "Put me on it",
     drawerRetryFixSession: "Ask me to try again",
@@ -3480,6 +3489,7 @@ export const en = {
     nextStepAnswer: "Answer",
     nextStepRetry: "Try again",
     nextStepMerge: "Merge",
+    nextStepReview: "Review",
     nextStepRelease: "Release",
     quickActionFailed: "Couldn't record that. Try again.",
     // Deliberately not "Approve"/"Reject" again. The button or key that opened

@@ -148,7 +148,13 @@ export const bucketOfStatus = (status: BugFindingStatus): LifecycleBucket => {
  * rather than `bucketOfStatus`, so a rule that needs more than the status — a
  * releasable merge under Needs you, say — is one edit.
  */
-export const bucketOf = (finding: BugFinding): LifecycleBucket => bucketOfStatus(finding.status);
+export const bucketOf = (finding: BugFinding): LifecycleBucket =>
+  // A plan whose open step passed or failed the Verifier is parked on a
+  // person, whatever "coordinating" suggests — two plans sat four days under
+  // In progress this way (2026-10-26 → 30). The server says so in `attention`.
+  finding.status === BugFindingStatus.COORDINATING && finding.attention
+    ? "needs_you"
+    : bucketOfStatus(finding.status);
 
 /** Every status in a tab — what the tests assert against. */
 export const statusesInBucket = (bucket: LifecycleBucket): BugFindingStatus[] =>
