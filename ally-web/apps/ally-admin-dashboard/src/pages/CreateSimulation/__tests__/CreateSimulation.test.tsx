@@ -1255,8 +1255,8 @@ describe("CreateSimulation", () => {
           { id: "ks-1", title: "KS", content: "c", unlocksFromStateId: "state-1" },
         ],
         memories: [
-          { id: "m-1", title: "My father", content: "x", unlocksFromStateId: "state-2" },
-          { id: "m-2", title: "My job", content: "y", unlocksFromStateId: "state-1" },
+          { id: "m-1", title: "My father", content: "x", unlocksInStateIds: ["state-2"] },
+          { id: "m-2", title: "My job", content: "y", unlocksInStateIds: ["state-1"] },
         ],
         triggerWarningIds: [],
       });
@@ -1272,8 +1272,20 @@ describe("CreateSimulation", () => {
                 { id: "ks-1", title: "KS", content: "c", unlocksFromStateId: "state-1" },
               ],
               memories: [
-                { id: "m-1", title: "My father", content: "x", unlocksFromStateId: null },
-                { id: "m-2", title: "My job", content: "y", unlocksFromStateId: "state-1" },
+                {
+                  id: "m-1",
+                  title: "My father",
+                  content: "x",
+                  unlocksInStateIds: [],
+                  unlocksFromStateId: null,
+                },
+                {
+                  id: "m-2",
+                  title: "My job",
+                  content: "y",
+                  unlocksInStateIds: ["state-1"],
+                  unlocksFromStateId: null,
+                },
               ],
             }),
           }),

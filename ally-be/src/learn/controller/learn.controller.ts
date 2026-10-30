@@ -447,9 +447,9 @@ export class LearnController {
   @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
   @Post('scenarios/memories/map')
   async mapScenarioMemories(@Body() dto: MapScenarioMemoriesDto) {
-    const { memories } =
-      await this.stageDirectorMemoriesService.mapMemories(dto);
-    return { memories };
+    // `mapped` is false when the agent could not be used and the Knowledge
+    // Sources were copied as they are, so the editor can say so.
+    return this.stageDirectorMemoriesService.mapMemories(dto);
   }
 
   @ApiOperation({

@@ -1,6 +1,6 @@
 import React from "react";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { useForm, UseFormReturn } from "react-hook-form";
 import { describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,11 @@ vi.mock("@api/baseApi", () => ({
     reducer: (state = {}) => state,
     middleware: () => (next: any) => (action: any) => next(action),
   },
+}));
+
+const { runMapping } = vi.hoisted(() => ({ runMapping: vi.fn() }));
+vi.mock("../useMemoriesAutoMap", () => ({
+  useMapMemories: () => ({ runMapping, isMapping: false }),
 }));
 
 import { en, MEMORIES_SIZE_WARNING_CHARS } from "@constants";
@@ -36,63 +41,82 @@ const Harness: React.FC<{ defaults: Record<string, unknown> }> = ({ defaults }) 
 };
 
 describe("MemoriesEditor", () => {
-  it("renders one row per memory with an Available-from select in ladder order", () => {
+  it("renders one row per memory with where it unlocks, in ladder order", () => {
     render(
       <Harness
         defaults={{
           states: STATES,
           memories: [
-            { id: "m-1", title: "My job", content: "Nights", unlocksFromStateId: null },
-            { id: "m-2", title: "My father", content: "He drank", unlocksFromStateId: "s-2" },
+            { id: "m-1", title: "My job", content: "Nights", unlocksInStateIds: [] },
+            {
+              id: "m-2",
+              title: "My father",
+              content: "He drank",
+              unlocksInStateIds: ["s-2", "s-1"],
+            },
+            { id: "m-3", title: "Ghost", content: "", unlocksInStateIds: ["gone"] },
           ],
         }}
       />,
     );
 
     const rows = screen.getAllByTestId("memory-row");
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(screen.getByLabelText("Memory 1 title")).toHaveValue("My job");
     expect(screen.getByLabelText("Memory 2 text")).toHaveValue("He drank");
-
-    const select = within(rows[1]).getByLabelText(en.memories.availableFrom) as HTMLSelectElement;
-    expect(select.value).toBe("s-2");
-    expect(Array.from(select.options).map(o => o.textContent)).toEqual([
+    expect(screen.getAllByTestId("memory-unlocks-at").map(el => el.textContent)).toEqual([
       en.memories.fromTheStart,
-      "Guarded",
-      "Open",
+      en.memories.unlocksAt("Guarded, Open"),
+      en.memories.unlocksAt(en.memories.missingState),
     ]);
     expect(screen.getByText(en.memories.help)).toBeInTheDocument();
   });
 
-  it("edits, assigns a state, adds and removes rows", () => {
+  it("edits, adds and removes rows", () => {
     render(
       <Harness
         defaults={{
           states: STATES,
-          memories: [{ id: "m-1", title: "My job", content: "Nights", unlocksFromStateId: null }],
+          memories: [{ id: "m-1", title: "My job", content: "Nights", unlocksInStateIds: ["s-1"] }],
         }}
       />,
     );
 
     fireEvent.change(screen.getByLabelText("Memory 1 title"), { target: { value: "Work" } });
-    fireEvent.change(screen.getByLabelText(en.memories.availableFrom), {
-      target: { value: "s-1" },
-    });
     expect(form.getValues("memories")[0]).toMatchObject({
       title: "Work",
-      unlocksFromStateId: "s-1",
+      unlocksInStateIds: ["s-1"],
     });
-
-    fireEvent.change(screen.getByLabelText(en.memories.availableFrom), { target: { value: "" } });
-    expect(form.getValues("memories")[0].unlocksFromStateId).toBeNull();
 
     fireEvent.click(screen.getByText(en.memories.add));
     expect(form.getValues("memories")).toHaveLength(2);
-    expect(form.getValues("memories")[1]).toMatchObject({ title: "", unlocksFromStateId: null });
+    expect(form.getValues("memories")[1]).toMatchObject({ title: "", unlocksInStateIds: [] });
 
     fireEvent.click(screen.getAllByLabelText(en.memories.remove)[0]);
     expect(form.getValues("memories")).toHaveLength(1);
     expect(form.getValues("memories")[0].title).toBe("");
+  });
+
+  it("re-maps from knowledge sources only after the author confirms", () => {
+    const confirm = vi.spyOn(window, "confirm");
+    render(
+      <Harness
+        defaults={{
+          states: STATES,
+          knowledgeSources: [{ id: "k-1", title: "Job", content: "" }],
+          memories: [{ id: "m-1", title: "Job", content: "", unlocksInStateIds: [] }],
+        }}
+      />,
+    );
+
+    confirm.mockReturnValueOnce(false);
+    fireEvent.click(screen.getByTestId("memories-remap"));
+    expect(runMapping).not.toHaveBeenCalled();
+
+    confirm.mockReturnValueOnce(true);
+    fireEvent.click(screen.getByTestId("memories-remap"));
+    expect(runMapping).toHaveBeenCalledWith({ replace: true });
+    confirm.mockRestore();
   });
 
   it("shows the empty state when there are no memories", () => {

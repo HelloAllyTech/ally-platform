@@ -41,8 +41,10 @@ the questions they answer.
 - **Knowledge Sources become Memories.** No retrieval on the new prompt. Every unlocked memory is in the prompt
   every turn. Backstory plus all memories is about 1.6k tokens at p90 (106 #3 scenarios: 100 have Knowledge
   Sources, average 5, p50 1.6k chars). No keyword search or reranker, even as a fallback (§3.3).
-- **A memory is either assigned to a state or not.** Assigned: unlocks at that state and stays unlocked
-  (high-water, so a score dropping back never hides it again). Not assigned: available from the first turn.
+- **A memory is picked under any number of states, or none.** Picked: unlocks once the session has been in ANY
+  of those states and stays unlocked (sticky, so a score dropping back never hides it again). The author picks
+  each state under that state in the States editor; nothing is implied about the states above or below. None
+  picked: available from the first turn.
   The backstory is always shown. Earlier states' memories stay visible.
 - **The Stage Director replaces the updater on the new prompt.** One `thoughts` paragraph instead of seven
   `working_memory_*` sections. It never decides which memories are visible; it only says what is on the
@@ -72,15 +74,18 @@ and every director prompt version scored before it is published).
 ### 3.1 Data
 
 The new prompt's memories are a new field on scenario metadata, `memories`, with the same shape as
-`knowledgeSources`: `{id, title, content, unlocksFromStateId?}`. #3 keeps reading `knowledgeSources`, untouched
-(§3.4). ally-be carries `memories` through the scenario DTOs and room metadata the way it carries
-`knowledgeSources` today. `KnowledgeUnlockTracker` (`app/core/graph/knowledge_locks.py`) already implements
-sticky, fail-closed unlocking and is reused as is.
+`knowledgeSources` plus a list of states: `{id, title, content, unlocksInStateIds?}`. #3 keeps reading
+`knowledgeSources`, untouched (§3.4). ally-be carries `memories` through the scenario DTOs and room metadata the
+way it carries `knowledgeSources` today. `KnowledgeUnlockTracker` (`app/core/graph/knowledge_locks.py`) records
+every state the session has been in, and a memory unlocks when any of its states is among them. A memory saved
+with only the older single `unlocksFromStateId` keeps that field's meaning (that state or any later one); the
+editor rewrites it as that state and every later one on load, and the mapping agent writes "from this stage on"
+the same way, so the author sees it under each state and can untick any.
 
 ### 3.2 Runtime (ally-ai-learn, new main prompt only)
 
 - Skip the title picker (`retrieve_relevant_knowledge` in `app/core/graph/knowledge_retrieval.py`) and render
-  every memory in `memories` whose lock is open at the session's high-water state, in authored order. Other prompts keep the
+  every memory in `memories` that has unlocked so far, in authored order. Other prompts keep the
   picker until no scenario uses them.
 - The memory block goes in the static part of the system prompt, not after the conversation
   (`RETRIEVED_CONTEXT_DEFER_TO_SUFFIX`). It only changes when the state does, so it stays cached.

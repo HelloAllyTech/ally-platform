@@ -3,10 +3,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
-import { TextArea, TextInput } from "@ally-ui-mono/ui-shared";
+import { FilterableMultiSelect, TextArea, TextInput } from "@ally-ui-mono/ui-shared";
 import { TrashRed } from "@assets";
 import { en, ENHANCE_TYPE, MEMORIES_PLACEHOLDER } from "@constants";
 import { useIsPlaceholderUsed } from "@hooks";
+import type { ScenarioMemory } from "@types";
 
 import { DropdownField } from "../dropdown-field";
 import { EnhanceButton } from "../enhance-button";
@@ -15,10 +16,12 @@ import { cascadeBoundEdit, removeStateAndStitch } from "./cascadeBoundEdit";
 import { seedNextState, startingStateId } from "./stateSeeds";
 import { SimulationStateFormValue } from "./types";
 import {
+  ladderOrder,
   LockableSource,
   reassignLocksForRemovedState,
   sourcesOpeningAt,
 } from "../knowledge-source/memoryLocks";
+import { removeStateFromMemories, setMemoriesForState } from "../memories/memoryUtils";
 
 // Re-export the form-value type from this barrel for legacy importers
 // (the editor used to own it). Anything new should import from
@@ -33,6 +36,11 @@ const KNOWLEDGE_SOURCES_FIELD = "knowledgeSources";
  * `@constants` barrel break under its import cycle (see ally-web CLAUDE.md).
  */
 const MEMORIES_FIELD = "memories";
+
+interface MemoryOption {
+  id: string;
+  label: string;
+}
 
 const DIALOGUE_LENGTH_OPTIONS = [
   { value: "short", label: "Short" },
@@ -146,17 +154,28 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
       // Both copies are re-pointed: states are shared between prompts, so a
       // deleted state is gone for Knowledge Sources AND Memories alike. The
       // toast speaks for the copy the author is looking at.
-      const reassign = (field: string) => {
-        const sources = (formMethods.getValues(field) as LockableSource[] | undefined) ?? [];
-        const result = reassignLocksForRemovedState(sources, states, stateId);
-        if (result.moved > 0) {
-          formMethods.setValue(field, result.sources, { shouldDirty: true });
-        }
-        return result;
-      };
-      const ksResult = reassign(KNOWLEDGE_SOURCES_FIELD);
-      const memoriesResult = reassign(MEMORIES_FIELD);
-      const { moved, movedTo } = selectedUsesMemories ? memoriesResult : ksResult;
+      const sources =
+        (formMethods.getValues(KNOWLEDGE_SOURCES_FIELD) as LockableSource[] | undefined) ?? [];
+      const ksResult = reassignLocksForRemovedState(sources, states, stateId);
+      if (ksResult.moved > 0) {
+        formMethods.setValue(KNOWLEDGE_SOURCES_FIELD, ksResult.sources, { shouldDirty: true });
+      }
+      const memories = formMethods.getValues(MEMORIES_FIELD) as ScenarioMemory[] | undefined;
+      const ladder = ladderOrder(states.filter(state => !!state?.id));
+      const memoriesResult = removeStateFromMemories(
+        memories ?? [],
+        ladder.map(state => state.id),
+        stateId,
+      );
+      if (Array.isArray(memories) && memoriesResult.memories.some((m, i) => m !== memories[i])) {
+        formMethods.setValue(MEMORIES_FIELD, memoriesResult.memories, { shouldDirty: true });
+      }
+      const { moved, movedTo } = selectedUsesMemories
+        ? {
+            moved: memoriesResult.moved,
+            movedTo: ladder.find(state => state.id === memoriesResult.movedTo) ?? null,
+          }
+        : ksResult;
       const strings = selectedUsesMemories ? en.memories : en.knowledgeSource;
       if (moved > 0) {
         if (movedTo) {
@@ -175,7 +194,14 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
 
   const watchedSources =
     (formMethods.watch(KNOWLEDGE_SOURCES_FIELD) as LockableSource[] | undefined) ?? [];
-  const watchedMemories = (formMethods.watch(MEMORIES_FIELD) as LockableSource[] | undefined) ?? [];
+  const watchedMemories = (formMethods.watch(MEMORIES_FIELD) as ScenarioMemory[] | undefined) ?? [];
+
+  /** Make exactly `memoryIds` unlock at `stateId`; other states' picks are left alone. */
+  const pickMemoriesForState = (stateId: string, memoryIds: string[]) =>
+    formMethods.setValue(MEMORIES_FIELD, setMemoriesForState(watchedMemories, stateId, memoryIds), {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
 
   // Auto-seed a single blank state ONCE per editor-mount when the editor
   // becomes visible with no states. Subsequent "Remove" actions that drop
@@ -389,9 +415,11 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
                 rows={2}
               />
 
+              <p className="text-sm text-typography-700">{en.memories.replyLength}</p>
               <DropdownField
                 id={`state-dialogue-length-${state.id}`}
                 label="Dialogue Length"
+                placeholder={en.memories.replyLengthNone}
                 value={state.dialogueLength ?? ""}
                 onChange={value =>
                   updateState(state.id, {
@@ -404,22 +432,51 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
                 data-testid={`dialogue-length-dropdown`}
               />
 
-              {/* Read-only: locks are set on each Memory ("Available from"). */}
+              {/*
+                Memories are picked per state, and one memory may be picked
+                under any number of states: it unlocks at whichever the
+                conversation reaches first. A memory picked under none is
+                available from the start.
+              */}
               {selectedUsesMemories &&
                 (() => {
-                  const opening = sourcesOpeningAt(watchedMemories, state.id);
-                  if (opening.length === 0) return null;
+                  const items: MemoryOption[] = watchedMemories.map(memory => ({
+                    id: memory.id,
+                    label: memory.title || en.memories.untitled,
+                  }));
+                  const selected = items.filter(item =>
+                    watchedMemories.some(
+                      memory =>
+                        memory.id === item.id &&
+                        (memory.unlocksInStateIds ?? []).includes(state.id),
+                    ),
+                  );
                   return (
                     <div
-                      className="text-sm text-typography-600"
+                      className="flex flex-col gap-1"
                       data-testid={`memories-unlock-here-${state.id}`}
                     >
-                      <p>{en.memories.unlockHere}</p>
-                      <ul className="ml-4 list-disc text-typography-900">
-                        {opening.map(memory => (
-                          <li key={memory.id}>{memory.title || en.memories.untitled}</li>
-                        ))}
-                      </ul>
+                      <p className="text-sm text-typography-700">{en.memories.unlockHereLabel}</p>
+                      <FilterableMultiSelect
+                        id={`state-memories-${state.id}`}
+                        titleText=""
+                        placeholder={
+                          items.length === 0
+                            ? en.memories.unlockHereNoMemories
+                            : en.memories.unlockHerePlaceholder
+                        }
+                        items={items}
+                        itemToString={(item: MemoryOption | null) => item?.label ?? ""}
+                        initialSelectedItems={selected}
+                        selectedItems={selected}
+                        disabled={items.length === 0}
+                        onChange={({ selectedItems }: { selectedItems: MemoryOption[] | null }) =>
+                          pickMemoriesForState(
+                            state.id,
+                            (selectedItems ?? []).map(item => item.id),
+                          )
+                        }
+                      />
                     </div>
                   );
                 })()}

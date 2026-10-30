@@ -68,12 +68,15 @@ export interface knowledgeSource {
  * A memory for the Stage Director main prompt (`{memories}`): an event or
  * thing the client can reveal. Same shape as a Knowledge Source but stored
  * in its own field (`metadata.memories`) so #3's `knowledgeSources` are never
- * touched. `unlocksFromStateId` unset / null = available from the start.
+ * touched. `unlocksInStateIds` lists the states at which it unlocks (any of
+ * them); empty = available from the start. `unlocksFromStateId` is the older
+ * single lock ("this state and later"), converted on load and cleared on save.
  */
 export interface ScenarioMemory {
   id: string;
   title: string;
   content?: string;
+  unlocksInStateIds?: string[];
   unlocksFromStateId?: string | null;
 }
 
@@ -88,6 +91,8 @@ export interface MapScenarioMemoriesRequest {
 
 export interface MapScenarioMemoriesResponse {
   memories: ScenarioMemory[];
+  /** False when the agent could not run and the sources were copied as they are. */
+  mapped?: boolean;
 }
 
 export type KnowledgeSourceInput = {

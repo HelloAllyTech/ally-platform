@@ -154,6 +154,38 @@ class TestMemoryBlock:
         unlocked, locked = partition_for_turn(pd, STATES[0], tracker)
         assert {m["id"] for m in unlocked} == {"m1", "m2"} and not locked
 
+    def test_a_memory_unlocks_at_any_of_its_states(self):
+        three = STATES + [
+            {"id": "s3", "name": "Trusting", "scoreLower": 150, "scoreUpper": 200}
+        ]
+        pd = _prompt_data(
+            states=three,
+            memories=[
+                {"id": "a", "title": "A", "unlocksInStateIds": []},
+                {"id": "b", "title": "B", "unlocksInStateIds": ["s1", "s3"]},
+                {"id": "c", "title": "C", "unlocksInStateIds": ["s2"]},
+                {"id": "d", "title": "D", "unlocksInStateIds": ["gone"]},
+            ],
+        )
+        tracker = KnowledgeUnlockTracker()
+        unlocked, locked = partition_for_turn(pd, three[0], tracker)
+        assert [m["id"] for m in unlocked] == ["a", "b"]
+        assert [m["id"] for m in locked] == ["c", "d"]
+        # Jumping straight past s2 does not unlock a memory picked for s2 only.
+        unlocked, _ = partition_for_turn(pd, three[2], tracker)
+        assert "c" not in {m["id"] for m in unlocked}
+        unlocked, locked = partition_for_turn(pd, three[1], tracker)
+        assert [m["id"] for m in unlocked] == ["a", "b", "c"]
+        assert [m["id"] for m in locked] == ["d"]
+
+    def test_older_single_state_lock_still_means_that_state_and_above(self):
+        three = STATES + [
+            {"id": "s3", "name": "Trusting", "scoreLower": 150, "scoreUpper": 200}
+        ]
+        pd = _prompt_data(states=three)
+        unlocked, _ = partition_for_turn(pd, three[2], KnowledgeUnlockTracker())
+        assert {m["id"] for m in unlocked} == {"m1", "m2"}
+
 
 class TestPromptRendering:
     def test_thoughts_and_memories_reach_the_prompt_and_the_sink(self):

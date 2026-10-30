@@ -118,18 +118,18 @@ describe("Memories auto-map on first switch to a {memories} prompt", () => {
       resolve({
         memories: [
           { id: "m-1", title: "My job", content: "Works nights" },
-          { id: "m-2", title: "My father", content: "He drank", unlocksFromStateId: "s-2" },
-          { id: "m-3", title: "Ghost", content: "x", unlocksFromStateId: "not-a-state" },
+          { id: "m-2", title: "My father", content: "He drank", unlocksInStateIds: ["s-2"] },
+          { id: "m-3", title: "Ghost", content: "x", unlocksInStateIds: ["not-a-state"] },
         ],
       });
     });
 
     await waitFor(() => expect(form.getValues("memories")).toHaveLength(3));
     expect(form.getValues("memories")).toEqual([
-      { id: "m-1", title: "My job", content: "Works nights", unlocksFromStateId: null },
-      { id: "m-2", title: "My father", content: "He drank", unlocksFromStateId: "s-2" },
-      // A lock naming an unknown state would hide it all session — dropped.
-      { id: "m-3", title: "Ghost", content: "x", unlocksFromStateId: null },
+      { id: "m-1", title: "My job", content: "Works nights", unlocksInStateIds: [] },
+      { id: "m-2", title: "My father", content: "He drank", unlocksInStateIds: ["s-2"] },
+      // A state that doesn't exist would hide it all session — dropped.
+      { id: "m-3", title: "Ghost", content: "x", unlocksInStateIds: [] },
     ]);
     expect(form.getValues("knowledgeSources")).toEqual(KS);
     expect(toastMock.success).toHaveBeenCalledTimes(1);
@@ -153,7 +153,13 @@ describe("Memories auto-map on first switch to a {memories} prompt", () => {
 
     pick(STAGE_DIRECTOR);
 
-    await waitFor(() => expect(form.getValues("memories")).toEqual(KS));
+    // Copied as they are: the father's lock reads as "Open and later".
+    await waitFor(() =>
+      expect(form.getValues("memories")).toEqual([
+        { id: "ks-1", title: "My job", content: "Works nights", unlocksInStateIds: [] },
+        { id: "ks-2", title: "My father", content: "He drank", unlocksInStateIds: ["s-2"] },
+      ]),
+    );
     expect(toastMock.warning).toHaveBeenCalledTimes(1);
     expect(toastMock.success).not.toHaveBeenCalled();
   });

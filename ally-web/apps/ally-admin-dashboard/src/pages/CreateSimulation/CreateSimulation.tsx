@@ -769,7 +769,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
               id: item.id,
               title: item.title ?? "",
               content: item.content ?? "",
-              unlocksFromStateId: item.unlocksFromStateId || null,
+              unlocksInStateIds: item.unlocksInStateIds ?? [],
+              // The older single lock is replaced by the list above.
+              unlocksFromStateId: null,
             })),
           }
         : {}),
@@ -852,8 +854,13 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     // Same for memories (the Stage Director prompt's copy).
     if (Array.isArray((simulationData as any).memories)) {
       (simulationData as any).memories = ((simulationData as any).memories as any[]).map(memory =>
-        memory.unlocksFromStateId && removedStateIds.includes(memory.unlocksFromStateId)
-          ? { ...memory, unlocksFromStateId: null }
+        Array.isArray(memory.unlocksInStateIds)
+          ? {
+              ...memory,
+              unlocksInStateIds: memory.unlocksInStateIds.filter(
+                (id: string) => !removedStateIds.includes(id),
+              ),
+            }
           : memory,
       );
     }

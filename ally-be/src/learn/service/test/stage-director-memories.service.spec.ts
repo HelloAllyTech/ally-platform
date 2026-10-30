@@ -57,16 +57,47 @@ describe('StageDirectorMemoriesService.mapMemories', () => {
         id: 'k2',
         title: 'My father',
         content: 'He drank every night.',
-        unlocksFromStateId: 's2',
+        unlocksInStateIds: ['s2'],
       },
       // The author's own lock wins over the model's null.
       {
         id: 'k3',
         title: 'Money',
         content: 'Debts.',
-        unlocksFromStateId: 's2',
+        unlocksInStateIds: ['s2'],
       },
     ]);
+  });
+
+  it('keeps a plain fact from a held-back memory available from the start', async () => {
+    const { service } = build(
+      JSON.stringify({
+        assignments: [
+          {
+            id: 'k2',
+            stateId: 's2',
+            publicFact:
+              "I'm not married yet; my family is looking for a match.",
+          },
+          { id: 'k1', stateId: null, publicFact: 'ignored when not locked' },
+        ],
+      }),
+    );
+    const { memories } = await service.mapMemories({
+      knowledgeSources: SOURCES.slice(0, 2),
+      states: STATES,
+    });
+    expect(memories.map((m) => [m.title, m.unlocksInStateIds ?? null])).toEqual(
+      [
+        ['Job', null],
+        ['My father (the basics)', null],
+        ['My father', ['s2']],
+      ],
+    );
+    expect(memories[1].content).toBe(
+      "I'm not married yet; my family is looking for a match.",
+    );
+    expect(memories[1].id).not.toBe('k2');
   });
 
   it('ignores unknown and first-stage assignments', async () => {
@@ -82,7 +113,18 @@ describe('StageDirectorMemoriesService.mapMemories', () => {
       knowledgeSources: SOURCES.slice(0, 2),
       states: STATES,
     });
-    expect(memories.every((m) => !m.unlocksFromStateId)).toBe(true);
+    expect(memories.every((m) => !m.unlocksInStateIds)).toBe(true);
+  });
+
+  it('writes "from this stage on" out as every stage from there', async () => {
+    const { service } = build(
+      JSON.stringify({ assignments: [{ id: 'k2', stateId: 's2' }] }),
+    );
+    const { memories } = await service.mapMemories({
+      knowledgeSources: SOURCES.slice(0, 2),
+      states: [...STATES, { id: 's3', name: 'Trusting' }],
+    });
+    expect(memories[1].unlocksInStateIds).toEqual(['s2', 's3']);
   });
 
   it('copies knowledge sources as they are when the model fails', async () => {
@@ -149,7 +191,7 @@ describe('StageDirectorMemoriesService.bulkSwitch', () => {
     expect(id).toBe(1);
     expect(userId).toBe(9);
     expect(dto.selectedMainPromptCode).toBe(STAGE_DIRECTOR_MAIN_PROMPT_CODE);
-    expect(dto.memories[1].unlocksFromStateId).toBe('s2');
+    expect(dto.memories[1].unlocksInStateIds).toEqual(['s2']);
   });
 
   it('keeps memories a scenario already has instead of mapping again', async () => {

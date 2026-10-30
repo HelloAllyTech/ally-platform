@@ -290,6 +290,9 @@ export const mapCreateScenarioRequestToEntity = (
         ...(memory.unlocksFromStateId
           ? { unlocksFromStateId: memory.unlocksFromStateId }
           : {}),
+        ...(Array.isArray(memory.unlocksInStateIds)
+          ? { unlocksInStateIds: memory.unlocksInStateIds }
+          : {}),
       })),
       stateNames: scenario.stateNames,
       selectedMainPromptCode: scenario.selectedMainPromptCode,

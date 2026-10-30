@@ -962,15 +962,14 @@ export const en = {
     label: "Memories",
     help: "The backstory says who this person is. Memories are the events and things they can reveal, one per row.",
     helpLocked:
-      'A memory set to a later state stays hidden until the conversation gets there. Until then the client only knows its title, as something they aren\'t ready to talk about — so name the topic, not the secret: "My father", not "Father\'s drinking".',
+      'Pick under each state which memories unlock there; a memory picked under no state is available from the start. Until it unlocks, the client only knows its title, as something they aren\'t ready to talk about — so name the topic, not the secret: "My father", not "Father\'s drinking".',
     titlePlaceholder: "Title (e.g. My father)",
     contentPlaceholder: "What happened, in the client's own terms",
     titleLabel: (index: number) => `Memory ${index + 1} title`,
     contentLabel: (index: number) => `Memory ${index + 1} text`,
-    availableFrom: "Available from",
     availableFromTooltip:
-      'When the client can talk about this. "From the start" means any time. Pick a state and the memory stays hidden until the conversation reaches it, then stays available. Before that, only the title is known to the client.',
-    fromTheStart: "From the start",
+      "Set under each state in States. The memory stays hidden until the conversation reaches any state it is picked under, then stays available. Before that, only the title is known to the client.",
+    fromTheStart: "Available from the start",
     missingState: "A state that no longer exists",
     add: "+ Add memory",
     remove: "Remove memory",
@@ -981,9 +980,18 @@ export const en = {
       "Memories are ready — each one is set to the state where it comes up. Check them below.",
     mapFailed:
       "Couldn't sort memories into states, so your knowledge sources were copied over as they are. Check them below.",
+    remap: "Re-map from knowledge sources",
+    remapConfirm:
+      "Re-map memories from your knowledge sources? This replaces every memory below, including any edits you made to them.",
+    remapFailed: "Couldn't re-map memories. Your memories were left as they were.",
     tooLong: (chars: number, limit: number) =>
       `Backstory and memories come to ${chars.toLocaleString()} characters, past the ${limit.toLocaleString()} we suggest. The client still runs, but long characters cost more and can lose focus — consider trimming.`,
-    unlockHere: "Memories that unlock here:",
+    unlockHereLabel: "Memories that unlock here",
+    unlockHerePlaceholder: "Pick the memories the client is ready to share in this state",
+    unlockHereNoMemories: "Add memories first",
+    unlocksAt: (states: string) => `Unlocks at: ${states}`,
+    replyLength: "Reply length",
+    replyLengthNone: "No length rule",
     locksMovedOnStateRemoval: (count: number, stateName: string) =>
       `${count} ${count === 1 ? "memory is" : "memories are"} now available from "${stateName}"`,
     locksClearedOnLastStateRemoval: (count: number) =>

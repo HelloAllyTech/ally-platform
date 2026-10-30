@@ -8,8 +8,8 @@ import { en, FORM_FIELD_IDS, MEMORIES_SIZE_WARNING_CHARS } from "@constants";
 import type { ScenarioMemory } from "@types";
 
 import { FormLabel } from "../form-label";
-import { useIsMappingMemories } from "./memoriesMappingStatus";
 import { blankMemory, memoriesCharacterCount } from "./memoryUtils";
+import { useMapMemories } from "./useMemoriesAutoMap";
 import { ladderOrder, stateLabel } from "../knowledge-source/memoryLocks";
 
 import type { SimulationStateFormValue } from "../states-editor/types";
@@ -28,7 +28,8 @@ interface MemoriesEditorProps {
 
 /**
  * The Stage Director prompt's Memories: one row per event or thing the client
- * can reveal, each available from the start or from a chosen state onward.
+ * can reveal, like Opening Dialogues. Which states unlock each one is picked
+ * under each state in the States editor; a row only shows the result.
  *
  * Rendered only when the selected prompt uses `{memories}` (FormField gate);
  * Knowledge Sources is hidden in the same case and its data left untouched.
@@ -50,10 +51,29 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
   const backstory = useWatch({ control, name: FORM_FIELD_IDS.CHARACTER_PROFILE_TEXT }) as
     | string
     | undefined;
-  const isMapping = useIsMappingMemories(control as unknown as object);
+  const { runMapping, isMapping } = useMapMemories(formMethods);
+  const knowledgeSources =
+    (useWatch({ control, name: FORM_FIELD_IDS.KNOWLEDGE_SOURCE }) as unknown[] | undefined) ?? [];
+  const canRemap = !readOnly && !isMapping && knowledgeSources.length > 0;
+  const remap = () => {
+    // Replaces every memory, including edits made since the last mapping.
+    if (window.confirm(t.remapConfirm)) void runMapping({ replace: true });
+  };
 
   const ladder = useMemo(() => ladderOrder(states.filter(state => !!state?.id)), [states]);
-  const stateIds = useMemo(() => new Set(ladder.map(state => state.id)), [ladder]);
+  const stateNames = useMemo(
+    () => new Map(ladder.map((state, index) => [state.id, stateLabel(state, index)])),
+    [ladder],
+  );
+  /** Where a memory unlocks, in ladder order; set under each state below. */
+  const unlocksAt = (memory: ScenarioMemory): string => {
+    const picked = new Set(memory.unlocksInStateIds ?? []);
+    if (picked.size === 0) return t.fromTheStart;
+    const names = ladder
+      .filter(state => picked.has(state.id))
+      .map(state => stateNames.get(state.id));
+    return t.unlocksAt(names.length ? names.join(", ") : t.missingState);
+  };
 
   const write = useCallback(
     (next: ScenarioMemory[]) => setValue(id, next, { shouldDirty: true, shouldTouch: true }),
@@ -73,6 +93,19 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
         <p>{t.helpLocked}</p>
       </div>
 
+      {canRemap && (
+        <div>
+          <button
+            type="button"
+            onClick={remap}
+            className="text-sm text-primary-600 underline-offset-2 hover:underline"
+            data-testid="memories-remap"
+          >
+            {t.remap}
+          </button>
+        </div>
+      )}
+
       {isMapping && (
         <p className="text-sm text-typography-600" role="status" data-testid="memories-mapping">
           {t.mapping}
@@ -84,9 +117,6 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
       )}
 
       {memories.map((memory, index) => {
-        const lock = memory.unlocksFromStateId ?? "";
-        const lockIsUnknown = !!lock && !stateIds.has(lock);
-        const selectId = `memory-available-from-${memory.id}`;
         return (
           <div
             key={memory.id}
@@ -130,29 +160,12 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
             />
 
             <div className="flex flex-wrap items-center gap-2 text-sm text-typography-700">
-              <label htmlFor={selectId}>{t.availableFrom}</label>
+              <span data-testid="memory-unlocks-at">{unlocksAt(memory)}</span>
               <Tooltip label={t.availableFromTooltip} align="top">
                 <button type="button" className="inline-flex cursor-pointer items-center">
                   <TooltipIcon />
                 </button>
               </Tooltip>
-              <select
-                id={selectId}
-                value={lock}
-                disabled={readOnly}
-                onChange={event =>
-                  update(memory.id, { unlocksFromStateId: event.target.value || null })
-                }
-                className="rounded border border-border-light bg-white px-2 py-1 text-sm focus:outline-none"
-              >
-                <option value="">{t.fromTheStart}</option>
-                {ladder.map((state, stateIndex) => (
-                  <option key={state.id} value={state.id}>
-                    {stateLabel(state, stateIndex)}
-                  </option>
-                ))}
-                {lockIsUnknown && <option value={lock}>{t.missingState}</option>}
-              </select>
               <span className="ml-auto text-xs text-typography-500">
                 {(memory.content ?? "").length}/{MAX_CONTENT_LENGTH}
               </span>

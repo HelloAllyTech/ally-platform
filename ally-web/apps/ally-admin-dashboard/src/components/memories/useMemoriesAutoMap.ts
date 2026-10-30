@@ -10,6 +10,7 @@ import type { MapScenarioMemoriesRequest } from "@types";
 import { setMemoriesMapping, useIsMappingMemories } from "./memoriesMappingStatus";
 import { normaliseMemories } from "./memoryUtils";
 import { getAvailableVariableName } from "../../utils/availableVariables";
+import { ladderOrder } from "../knowledge-source/memoryLocks";
 
 interface PromptLike {
   promptCode: string;
@@ -44,73 +45,107 @@ export const promptUsesMemories = (
  *    are (locks included) so the author starts from something.
  *  - Knowledge Sources themselves are only read, never written.
  */
-export const useMemoriesAutoMap = (formMethods: UseFormReturn<any>): { isMapping: boolean } => {
-  const { data: prompts } = useGetPromptsByTypeQuery("main_agent");
+/**
+ * Maps the form's Knowledge Sources into Memories through the server's agent.
+ *
+ * `replace: false` (the automatic first switch) never touches memories that
+ * already exist, including ones the author typed while the call ran.
+ * `replace: true` (the editor's "Re-map" action, which the author confirms)
+ * overwrites them with the new mapping.
+ */
+export const useMapMemories = (
+  formMethods: UseFormReturn<any>,
+): {
+  runMapping: (options?: { replace?: boolean }) => Promise<void>;
+  isMapping: boolean;
+} => {
   const [mapMemories] = useMapScenarioMemoriesMutation();
   const formKey = formMethods.control as unknown as object;
   const isMapping = useIsMappingMemories(formKey);
-
-  const promptsRef = useRef(prompts);
-  promptsRef.current = prompts;
   const inFlightRef = useRef(false);
 
-  const runMapping = useCallback(async () => {
-    const { getValues, setValue } = formMethods;
-    const hasMemories = () => {
-      const current = getValues(FORM_FIELD_IDS.MEMORIES);
-      return Array.isArray(current) && current.length > 0;
-    };
-    if (hasMemories() || inFlightRef.current) return;
+  const runMapping = useCallback(
+    async ({ replace = false }: { replace?: boolean } = {}) => {
+      const { getValues, setValue } = formMethods;
+      const hasMemories = () => {
+        const current = getValues(FORM_FIELD_IDS.MEMORIES);
+        return Array.isArray(current) && current.length > 0;
+      };
+      const mayWrite = () => replace || !hasMemories();
+      if ((!replace && hasMemories()) || inFlightRef.current) return;
 
-    const knowledgeSources = normaliseMemories(getValues(FORM_FIELD_IDS.KNOWLEDGE_SOURCE));
-    if (knowledgeSources.length === 0) return;
-
-    // Unnamed state cards are dropped on save (and any lock on them cleared),
-    // so they are not offered as targets.
-    const states = ((getValues(FORM_FIELD_IDS.STATES) as any[] | undefined) ?? [])
-      .filter(state => state?.id && typeof state.name === "string" && state.name.trim())
-      .map(state => ({
+      // Unnamed state cards are dropped on save (and any lock on them cleared),
+      // so they are not offered as targets. Sent in ladder order: the server
+      // reads "from this state on" against it.
+      const states = ladderOrder(
+        ((getValues(FORM_FIELD_IDS.STATES) as any[] | undefined) ?? []).filter(
+          state => state?.id && typeof state.name === "string" && state.name.trim(),
+        ),
+      ).map(state => ({
         id: String(state.id),
         name: String(state.name),
         guidelines: typeof state.guidelines === "string" ? state.guidelines : undefined,
       }));
-    const asText = (value: unknown) =>
-      typeof value === "string" && value.trim() ? value : undefined;
+      const ladderIds = states.map(state => state.id);
+      const knowledgeSources = normaliseMemories(
+        getValues(FORM_FIELD_IDS.KNOWLEDGE_SOURCE),
+        ladderIds,
+      );
+      if (knowledgeSources.length === 0) return;
+      const asText = (value: unknown) =>
+        typeof value === "string" && value.trim() ? value : undefined;
 
-    const body: MapScenarioMemoriesRequest = {
-      knowledgeSources: knowledgeSources.map(source => ({
-        id: source.id,
-        title: source.title,
-        content: source.content ?? "",
-        unlocksFromStateId: source.unlocksFromStateId ?? null,
-      })),
-      states,
-      characterProfileText: asText(getValues(FORM_FIELD_IDS.CHARACTER_PROFILE_TEXT)),
-      roleInstructions: asText(getValues(FORM_FIELD_IDS.PROMPT)),
-      title: asText(getValues(FORM_FIELD_IDS.TITLE)),
-    };
+      const body: MapScenarioMemoriesRequest = {
+        // A Knowledge Source lock is one state, "from here on": the first of
+        // the states it was read as.
+        knowledgeSources: knowledgeSources.map(source => ({
+          id: source.id,
+          title: source.title,
+          content: source.content ?? "",
+          unlocksFromStateId: source.unlocksInStateIds?.[0] ?? null,
+        })),
+        states,
+        characterProfileText: asText(getValues(FORM_FIELD_IDS.CHARACTER_PROFILE_TEXT)),
+        roleInstructions: asText(getValues(FORM_FIELD_IDS.PROMPT)),
+        title: asText(getValues(FORM_FIELD_IDS.TITLE)),
+      };
 
-    inFlightRef.current = true;
-    setMemoriesMapping(formKey, true);
-    try {
-      const response = await mapMemories(body).unwrap();
-      const mapped = normaliseMemories(response?.memories, new Set(states.map(state => state.id)));
-      if (mapped.length === 0) throw new Error("Mapping returned no memories");
-      // The author may have started typing memories while this ran — theirs win.
-      if (!hasMemories()) {
-        setValue(FORM_FIELD_IDS.MEMORIES, mapped, { shouldDirty: true });
+      inFlightRef.current = true;
+      setMemoriesMapping(formKey, true);
+      try {
+        const response = await mapMemories(body).unwrap();
+        const mapped = normaliseMemories(response?.memories, ladderIds);
+        if (mapped.length === 0) throw new Error("Mapping returned no memories");
+        if (mayWrite()) {
+          setValue(FORM_FIELD_IDS.MEMORIES, mapped, { shouldDirty: true });
+        }
+        // The server copies the sources as they are when its agent fails; the
+        // memories are usable, but the author should know none were assigned.
+        if (response?.mapped === false) toast.warning(en.memories.mapFailed);
+        else toast.success(en.memories.mapped);
+      } catch {
+        // A failed re-map keeps what the author had; a failed first switch
+        // starts them from their Knowledge Sources.
+        if (!replace && mayWrite()) {
+          setValue(FORM_FIELD_IDS.MEMORIES, knowledgeSources, { shouldDirty: true });
+        }
+        toast.warning(replace ? en.memories.remapFailed : en.memories.mapFailed);
+      } finally {
+        inFlightRef.current = false;
+        setMemoriesMapping(formKey, false);
       }
-      toast.success(en.memories.mapped);
-    } catch {
-      if (!hasMemories()) {
-        setValue(FORM_FIELD_IDS.MEMORIES, knowledgeSources, { shouldDirty: true });
-      }
-      toast.warning(en.memories.mapFailed);
-    } finally {
-      inFlightRef.current = false;
-      setMemoriesMapping(formKey, false);
-    }
-  }, [formMethods, formKey, mapMemories]);
+    },
+    [formMethods, formKey, mapMemories],
+  );
+
+  return { runMapping, isMapping };
+};
+
+export const useMemoriesAutoMap = (formMethods: UseFormReturn<any>): { isMapping: boolean } => {
+  const { data: prompts } = useGetPromptsByTypeQuery("main_agent");
+  const { runMapping, isMapping } = useMapMemories(formMethods);
+  const promptsRef = useRef(prompts);
+  promptsRef.current = prompts;
 
   useEffect(() => {
     const subscription = formMethods.watch((values, { name, type }) => {

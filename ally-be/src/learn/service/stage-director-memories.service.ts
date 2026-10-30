@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
@@ -21,13 +22,23 @@ export const WORKING_MEMORY_MAIN_PROMPT_CODE =
 /** AI-task-registry row id; the key for per-task model config. */
 const AI_TASK_ID = 'stage-director-memory-mapping';
 const MAPPING_TIMEOUT_MS = 45_000;
-const MAPPING_MAX_TOKENS = 2048;
+// The mapping runs on a reasoning model, whose reasoning counts against this
+// limit: at 2048 the JSON answer came back cut off on a 6-memory simulation.
+const MAPPING_MAX_TOKENS = 8000;
+const MAX_PUBLIC_FACT_CHARS = 300;
+
+interface MappingAnswer {
+  stateId: string | null;
+  publicFact?: string;
+}
 
 export interface ScenarioMemory {
   id: string;
   title: string;
   content?: string;
   unlocksFromStateId?: string | null;
+  /** States at which the memory unlocks (any of them); see MemoryDto. */
+  unlocksInStateIds?: string[];
 }
 
 export interface MapMemoriesInput {
@@ -99,17 +110,42 @@ export class StageDirectorMemoriesService {
 
     try {
       const assignments = await this.askModel(input, sources, states);
-      const stateIds = new Set(states.map((st) => String(st.id)));
-      const firstStateId = String(states[0].id);
-      const memories = copies.map((memory) => {
+      const order = states.map((st) => String(st.id));
+      // "From this stage on" written out as the stages themselves, so the
+      // editor shows the memory under each and the author can untick any.
+      const fromStage = (stateId: string) =>
+        order.slice(order.indexOf(stateId));
+      const memories: ScenarioMemory[] = [];
+      for (const memory of copies) {
         // An author's own lock wins over the model.
-        if (memory.unlocksFromStateId) return memory;
-        const stateId = assignments.get(memory.id);
-        if (!stateId || !stateIds.has(stateId) || stateId === firstStateId) {
-          return memory;
+        if (memory.unlocksFromStateId) {
+          const { unlocksFromStateId, ...rest } = memory;
+          memories.push(
+            order.includes(unlocksFromStateId)
+              ? { ...rest, unlocksInStateIds: fromStage(unlocksFromStateId) }
+              : memory,
+          );
+          continue;
         }
-        return { ...memory, unlocksFromStateId: stateId };
-      });
+        const answer = assignments.get(memory.id);
+        const stateId = answer?.stateId;
+        if (!stateId || !order.includes(stateId) || stateId === order[0]) {
+          memories.push(memory);
+          continue;
+        }
+        // A plain fact inside a held-back memory (marital status, children,
+        // job) stays available from the start as its own memory, so locking
+        // the feelings never hides the fact and makes the client invent one.
+        const publicFact = answer?.publicFact?.trim();
+        if (publicFact) {
+          memories.push({
+            id: randomUUID(),
+            title: `${memory.title} (the basics)`,
+            content: publicFact.slice(0, MAX_PUBLIC_FACT_CHARS),
+          });
+        }
+        memories.push({ ...memory, unlocksInStateIds: fromStage(stateId) });
+      }
       return { memories, mapped: true };
     } catch (error) {
       this.logger.warn(
@@ -125,7 +161,7 @@ export class StageDirectorMemoriesService {
     input: MapMemoriesInput,
     sources: ScenarioMemory[],
     states: { id?: string; name?: string; guidelines?: unknown }[],
-  ): Promise<Map<string, string | null>> {
+  ): Promise<Map<string, MappingAnswer>> {
     const template =
       (await this.promptSharedService.getPromptByCode(
         STAGE_DIRECTOR_MEMORY_MAPPING.code,
@@ -164,11 +200,21 @@ export class StageDirectorMemoriesService {
     const raw = response.text ?? '';
     const parsed = JSON.parse(
       raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1),
-    ) as { assignments?: { id?: string; stateId?: string | null }[] };
-    const out = new Map<string, string | null>();
+    ) as {
+      assignments?: {
+        id?: string;
+        stateId?: string | null;
+        publicFact?: string | null;
+      }[];
+    };
+    const out = new Map<string, MappingAnswer>();
     for (const row of parsed.assignments ?? []) {
-      if (row?.id)
-        out.set(String(row.id), row.stateId ? String(row.stateId) : null);
+      if (!row?.id) continue;
+      out.set(String(row.id), {
+        stateId: row.stateId ? String(row.stateId) : null,
+        publicFact:
+          typeof row.publicFact === 'string' ? row.publicFact : undefined,
+      });
     }
     return out;
   }
@@ -230,13 +276,19 @@ export class StageDirectorMemoriesService {
         const nameById = new Map(
           states.map((st: any) => [String(st.id), String(st.name ?? '')]),
         );
-        const summary = memories.map((m: ScenarioMemory) => ({
-          title: m.title,
-          unlocksAt: m.unlocksFromStateId
-            ? (nameById.get(String(m.unlocksFromStateId)) ??
-              m.unlocksFromStateId)
-            : null,
-        }));
+        const summary = memories.map((m: ScenarioMemory) => {
+          const ids = Array.isArray(m.unlocksInStateIds)
+            ? m.unlocksInStateIds
+            : m.unlocksFromStateId
+              ? [m.unlocksFromStateId]
+              : [];
+          return {
+            title: m.title,
+            unlocksAt: ids.length
+              ? ids.map((id) => nameById.get(String(id)) ?? id).join(', ')
+              : null,
+          };
+        });
         if (!params.dryRun) {
           await this.scenarioService.updateScenario(
             scenario.id,

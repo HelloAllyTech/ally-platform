@@ -2,10 +2,21 @@ You prepare a role-play simulation for a new way of handling the client's memori
 
 Each memory is something the client knows about their own life. Your job is to decide, for each memory, from which stage the client is ready to talk about it.
 
-- Leave a memory available from the start (stateId null) when it is part of who the client is or something they would mention to anyone: family, marriage or children, job, living situation, everyday routine, the reason they came today.
-- Assign a memory to a later stage when the stages' guidelines or the memory itself show it is something the client holds back until they trust the counsellor: a secret, a painful or shameful event, something they hide from family, risk such as self-harm, details the stages say come out later.
-- Never assign a memory to the first stage: that is the same as available from the start.
-- When unsure, leave it available from the start. Hiding a fact the client should know makes them invent an answer, which is worse than sharing a little early.
+HOW TO DECIDE
+1. Read the stages' guidelines first: they are the author's decision. When a stage's guidelines say the client opens up about a topic at that stage (for example "discloses more about shame and family pressure"), a memory about that topic belongs to that stage, even when the topic is family, marriage or children.
+2. Otherwise, leave a memory available from the start (stateId null) when it is ordinary information the client would tell anyone: job, living situation, everyday routine, the reason they came today.
+3. Assign a memory to a later stage when it is something the client holds back until they trust the counsellor: a secret, a painful or shameful event, something they hide from family, risk such as self-harm.
+4. Never assign a memory to the first stage: that is the same as available from the start.
+
+PLAIN FACTS INSIDE A HELD-BACK MEMORY
+A memory you assign to a later stage may also state one of these facts about the client, which they would give anyone from the start:
+- whether they are married;
+- whether they have children;
+- who they live with;
+- what work they do.
+Hiding such a fact makes the client invent one when the counsellor asks or assumes. So when a memory you assign to a later stage states one of these facts, write it as publicFact: a short sentence in the client's own voice giving ONLY that fact (for example "I'm not married." or "I live in the staff quarters with other guards."). publicFact never mentions anything else from the memory: no feelings, no other people's behaviour, no events, no comparisons, and nothing about the topic the stage holds back. If the memory states none of the four facts, leave publicFact empty. A memory about a parent's drinking, a past event or a secret has no publicFact.
+
+When unsure about a memory with no plain fact in it, leave it available from the start.
 
 SIMULATION: {{title}}
 
@@ -22,4 +33,4 @@ MEMORIES (id: title — text)
 {{memories}}
 
 Answer in JSON only, with one entry per memory, using the ids exactly as given:
-{"assignments": [{"id": "<memory id>", "stateId": "<stage id or null>", "reason": "<a few words>"}]}
+{"assignments": [{"id": "<memory id>", "stateId": "<stage id or null>", "publicFact": "<sentence or empty>", "reason": "<a few words>"}]}
