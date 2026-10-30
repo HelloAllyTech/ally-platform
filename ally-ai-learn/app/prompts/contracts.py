@@ -833,6 +833,7 @@ class SystemMainAgentPromptWorkingMemorySplitInputs(PromptInputs):
     language_label: str = Field(title="Output Language Label")
     linguistic_samples: Optional[str] = Field(None, title="Tone & Style Samples")
     name: Optional[str] = Field(None, title="Name")
+    previous_memory: Optional[str] = Field(None, title="Previous Session Memory")
     profession: Optional[str] = Field(None, title="Profession")
     role_instructions: str = Field(title="Role Instructions")
     sexual_orientation: Optional[str] = Field(None, title="Sexual Orientation")
