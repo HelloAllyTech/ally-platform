@@ -38,6 +38,7 @@ describe('XpAwardService', () => {
   let userProgressRepository: jest.Mocked<UserProgressRepository>;
   let sessionEngagement: jest.Mocked<SessionEngagementRepository>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
+  let dataSource: DataSource;
 
   /** Whatever the transaction callback returns, run it against a stub manager. */
   const manager = {} as never;
@@ -95,6 +96,7 @@ describe('XpAwardService', () => {
     userProgressRepository = module.get(UserProgressRepository);
     sessionEngagement = module.get(SessionEngagementRepository);
     eventEmitter = module.get(EventEmitter2);
+    dataSource = module.get(DataSource);
   });
 
   const awardSession = (durationMs: number) =>
@@ -290,10 +292,24 @@ describe('XpAwardService', () => {
       );
     });
 
-    it('throws when the ledger write fails', async () => {
-      xpEventRepository.insertAwards.mockRejectedValue(new Error('pg down'));
+    it('retries on a transient database error and succeeds', async () => {
+      const error = new Error('pg down');
+      const transactionMock = jest
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockRejectedValueOnce(error)
+        .mockImplementation(async (cb: (m: unknown) => Promise<void>) =>
+          cb(manager),
+        );
 
-      await expect(awardSession(10 * 60 * 1000)).rejects.toThrow('pg down');
+      (dataSource.transaction as jest.Mock).mockImplementation(transactionMock);
+
+      xpEventRepository.insertAwards.mockResolvedValue(20);
+
+      await awardSession(10 * 60 * 1000);
+
+      expect(transactionMock).toHaveBeenCalledTimes(4);
+      expect(xpEventRepository.insertAwards).toHaveBeenCalled();
     });
   });
 
