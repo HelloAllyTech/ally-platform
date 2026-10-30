@@ -543,7 +543,12 @@ export class CharacterInterviewToolsService {
     }
 
     return (key: string): string => {
-      const raw = String(key ?? '').trim();
+      // Models sometimes quote the key itself ({ "'14'": … }); the create
+      // endpoint's numeric-key constraint then 400s at the trainer's save.
+      const raw = String(key ?? '')
+        .trim()
+        .replace(/^['"'""`]+|['"'""`]+$/g, '')
+        .trim();
       if (!raw) return raw;
       if (/^\d+$/.test(raw)) return raw;
       const exact = byCode.get(raw.toLowerCase());
@@ -870,6 +875,24 @@ export class CharacterInterviewToolsService {
           'per language, keyed by the numeric languageId, each in that ' +
           "language's own script",
       );
+    }
+
+    // The character create/update endpoint accepts only numeric languageId
+    // keys, so a key the resolver could not place (a misspelt locale, an
+    // invented name) must bounce back to the agent now — passing it through
+    // 400s at the trainer when the reviewed character is finally saved.
+    for (const [field, map] of [
+      ['languageCharacteristics', languageCharacteristics],
+      ['linguisticStyleSamples', samplesByLanguage],
+    ] as const) {
+      for (const key of Object.keys(map)) {
+        if (!/^\d+$/.test(key)) {
+          errors.push(
+            `${field}["${key}"] is not a language — key every entry by the ` +
+              'numeric languageId from get_voices',
+          );
+        }
+      }
     }
 
     const knowledgeSources = (
