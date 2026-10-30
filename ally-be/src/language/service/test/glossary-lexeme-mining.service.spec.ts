@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { GlossaryEntryStatus } from '../../entity/language-glossary-section.entity';
@@ -368,6 +369,7 @@ describe('GlossaryLexemeMiningService jobs', () => {
   let store: Map<string, string>;
   let mine: jest.SpyInstance;
   let assertLanguageExists: jest.Mock;
+  let errorSpy: jest.SpyInstance;
 
   /** Let the fire-and-forget run settle. */
   const settle = async () => {
@@ -375,6 +377,7 @@ describe('GlossaryLexemeMiningService jobs', () => {
   };
 
   beforeEach(() => {
+    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     store = new Map();
     const redis: any = {
       get: jest.fn(async (k: string) => store.get(k) ?? null),
@@ -396,6 +399,10 @@ describe('GlossaryLexemeMiningService jobs', () => {
       new GlossaryJobService(redis),
     );
     mine = jest.spyOn(service, 'mineLexemes');
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
   });
 
   it('returns a running job at once and records the result when done', async () => {
