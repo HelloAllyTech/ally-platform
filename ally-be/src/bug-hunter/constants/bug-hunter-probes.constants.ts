@@ -72,6 +72,25 @@ export const renderProductionProbes = (apiBaseUrl: string): string[] =>
  * counts and authored text (titles, locations, permission names) — never a
  * learner's data — and every call recorded against the run.
  */
+/** Longest prompt the image-generation probe will send; matches the course cover limit. */
+export const IMAGE_PROBE_PROMPT_MAX = 4000;
+
+/** Real, billed provider calls the image-generation probe may make per hour, across every run. */
+export const IMAGE_PROBE_CALLS_PER_HOUR = 20;
+
+/**
+ * Symptoms that live in the image service's answer, not in our code.
+ *
+ * On 2026-10-28/29 two fixes merged for one bug without anybody calling the
+ * service: OpenAI had retired gpt-image-1, and the fixes swapped in
+ * dall-e-3 (also retired) and then stripped "documentary-style" from the
+ * prompt. Every link of both chains was a reading of the code. A finding that
+ * matches this does not merge itself until the image-generation probe has
+ * been called on its run and come back ok.
+ */
+export const IMAGE_SERVICE_SYMPTOM =
+  /\b(?:gpt-image|dall-e|image (?:service|generation|model|request)|cover image|generate (?:a |an )?(?:cover )?image)\b/i;
+
 export interface PipelineProbe {
   name: string;
   answers: string;
@@ -117,6 +136,12 @@ export const PIPELINE_PROBES: PipelineProbe[] = [
       "a backend service's logged errors in a window, filtered by a phrase — the first look for a 500 or a DATABASE_ERROR",
     params:
       'service (ally-be | ally-ai | ally-ai-learn), minutes (default 60, max 1440), search (optional phrase), limit (default 30)',
+  },
+  {
+    name: 'image-generation',
+    answers:
+      "what the LIVE image service says to one real generation call made exactly the way ally-be makes it (configured provider and model, moderation, size): ok, or the provider's own status, code and message. Never returns the image. The only way to see a model retired, a size refused or a prompt blocked — reading the code cannot tell you what the provider accepts today. Pass `model` to test a candidate before a fix proposes it. Costs a real call: at most a few per bug",
+    params: `prompt (default a neutral test scene, max ${IMAGE_PROBE_PROMPT_MAX} chars), provider (openai | gemini, default the configured one), model (optional — try this one instead of the configured one), size (default 1536x1024)`,
   },
 ];
 

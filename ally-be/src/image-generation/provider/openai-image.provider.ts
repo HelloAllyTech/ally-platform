@@ -38,7 +38,7 @@ export class OpenAiImageProvider implements ImageGenerationProvider {
     size: string,
     options?: ImageGenerationOptions,
   ): Promise<Buffer> {
-    const model = this.getModel();
+    const model = options?.model ?? this.getModel();
     const isGptImage = model.startsWith('gpt-image');
     const response = await this.getClient().images.generate({
       model,

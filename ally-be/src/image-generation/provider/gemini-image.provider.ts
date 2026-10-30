@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import { AppConfigService } from 'src/config/config.service';
-import { ImageGenerationProvider } from '../interface/image-generation-provider.interface';
+import {
+  ImageGenerationOptions,
+  ImageGenerationProvider,
+} from '../interface/image-generation-provider.interface';
 
 @Injectable()
 export class GeminiImageProvider implements ImageGenerationProvider {
@@ -46,9 +49,13 @@ export class GeminiImageProvider implements ImageGenerationProvider {
     return ratio > 1 ? '16:9' : ratio < 1 ? '3:4' : '1:1';
   }
 
-  async generateImage(prompt: string, size: string): Promise<Buffer> {
+  async generateImage(
+    prompt: string,
+    size: string,
+    options?: ImageGenerationOptions,
+  ): Promise<Buffer> {
     const response = await this.getClient().models.generateContent({
-      model: this.getModel(),
+      model: options?.model ?? this.getModel(),
       contents: prompt,
       config: {
         imageConfig: { aspectRatio: this.toAspectRatio(size) },
