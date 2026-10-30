@@ -1,3 +1,4 @@
+import { StageDirectorMemoriesService } from './service/stage-director-memories.service';
 import { CohortModule } from 'src/cohort/cohort.module';
 import { forwardRef, Module } from '@nestjs/common';
 import { LanguageModule } from '../language/language.module';
@@ -234,6 +235,7 @@ import { SettingsModule } from 'src/settings/settings.module';
   ],
   providers: [
     ScenarioService,
+    StageDirectorMemoriesService,
     PreviewMonologueService,
     ScenarioVersionService,
     ScenarioVersionRepository,

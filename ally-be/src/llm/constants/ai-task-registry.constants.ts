@@ -231,6 +231,20 @@ const AI_LEARN_TASKS: AiTaskEntry[] = [
     configuredBy: 'Inherits the agent_turn client',
   },
   {
+    id: 'stage-director',
+    task: LlmTask.STAGE_DIRECTOR,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'Every learner turn, off the reply path',
+    detail:
+      'Scenarios on Main Agent Prompt — Stage Director only: one paragraph of the ' +
+      "client's thoughts, passed to the next reply as written. Replaces " +
+      'client-working-memory for those scenarios; it plans no fillers or interims.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: "the scenario's main LLM",
+    configuredBy: 'Inherits the agent_turn client',
+  },
+  {
     id: 'client-working-memory',
     task: LlmTask.CLIENT_WORKING_MEMORY,
     runtime: LlmRuntime.AI_LEARN,
@@ -1331,6 +1345,22 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     defaultModel: 'gemini-2.5-pro',
     configuredBy: 'prompts.model on glossary_lexeme_pairing',
     promptOverride: 'glossary_lexeme_pairing',
+  },
+  {
+    id: 'stage-director-memory-mapping',
+    task: LlmTask.STAGE_DIRECTOR_MEMORY_MAPPING,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'An author switches a simulation to the Stage Director prompt',
+    detail:
+      'Once per simulation (and once per simulation in the bulk switch): assigns ' +
+      'each memory to the stage the client is ready to share it from. Falls back ' +
+      'to every memory available from the start if it fails.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'stage_director_memory_mapping',
   },
   {
     id: 'track-memory-fold',

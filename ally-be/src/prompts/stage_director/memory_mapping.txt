@@ -1,0 +1,25 @@
+You prepare a role-play simulation for a new way of handling the client's memories. The client is a character a learner (a counsellor in training) talks to. The client moves through the stages below, in order, as the counsellor earns their trust.
+
+Each memory is something the client knows about their own life. Your job is to decide, for each memory, from which stage the client is ready to talk about it.
+
+- Leave a memory available from the start (stateId null) when it is part of who the client is or something they would mention to anyone: family, marriage or children, job, living situation, everyday routine, the reason they came today.
+- Assign a memory to a later stage when the stages' guidelines or the memory itself show it is something the client holds back until they trust the counsellor: a secret, a painful or shameful event, something they hide from family, risk such as self-harm, details the stages say come out later.
+- Never assign a memory to the first stage: that is the same as available from the start.
+- When unsure, leave it available from the start. Hiding a fact the client should know makes them invent an answer, which is worse than sharing a little early.
+
+SIMULATION: {{title}}
+
+ROLE INSTRUCTIONS
+{{roleInstructions}}
+
+BACKSTORY
+{{backstory}}
+
+STAGES, IN ORDER (id: name — guidelines)
+{{states}}
+
+MEMORIES (id: title — text)
+{{memories}}
+
+Answer in JSON only, with one entry per memory, using the ids exactly as given:
+{"assignments": [{"id": "<memory id>", "stateId": "<stage id or null>", "reason": "<a few words>"}]}

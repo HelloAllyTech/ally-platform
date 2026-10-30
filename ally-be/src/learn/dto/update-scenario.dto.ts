@@ -837,6 +837,22 @@ export class UpdateScenarioDto {
   knowledgeSources?: KnowledgeSourceDto[];
 
   @ApiProperty({
+    description:
+      "The client's memories for Main Agent Prompt — Stage Director, kept " +
+      'separately from knowledgeSources so switching prompts loses neither. ' +
+      'Same shape; a memory with unlocksFromStateId shows only its title ' +
+      'until the session reaches that state.',
+    type: [KnowledgeSourceDto],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_KNOWLEDGE_SOURCES_COUNT)
+  @ValidateNested({ each: true })
+  @Type(() => KnowledgeSourceDto)
+  memories?: KnowledgeSourceDto[];
+
+  @ApiProperty({
     description: 'State names map',
     example: [
       {

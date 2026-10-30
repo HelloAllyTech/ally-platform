@@ -25,6 +25,13 @@ export enum LlmTask {
   // AGENT_TURN but off the reply path, so it has to be separable from turn cost
   // for the feature's spend to be arguable against its benefit.
   CLIENT_WORKING_MEMORY = 'client_working_memory',
+  // Stage Director in ally-ai-learn: the same detached call per learner turn
+  // for scenarios on Main Agent Prompt — Stage Director, writing one paragraph
+  // of the client's thoughts.
+  STAGE_DIRECTOR = 'stage_director',
+  // Once per simulation, when it is switched to the Stage Director prompt:
+  // assigns each memory to the stage the client is ready to share it from.
+  STAGE_DIRECTOR_MEMORY_MAPPING = 'stage_director_memory_mapping',
   // Back-channel phrases in ally-ai-learn: one call per session, at session
   // start, generating the listener affirmations ("mm-hmm") the character plays
   // while the learner holds the floor. Its own label rather than AGENT_TURN

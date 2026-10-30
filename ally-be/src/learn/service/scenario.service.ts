@@ -1093,10 +1093,16 @@ export class ScenarioService {
       }
     }
 
-    const unlockErrors = validateKnowledgeSourceUnlocks(
-      createScenarioDto.knowledgeSources,
-      createScenarioDto.states,
-    );
+    const unlockErrors = [
+      ...validateKnowledgeSourceUnlocks(
+        createScenarioDto.knowledgeSources,
+        createScenarioDto.states,
+      ),
+      ...validateKnowledgeSourceUnlocks(
+        createScenarioDto.memories,
+        createScenarioDto.states,
+      ),
+    ];
     if (unlockErrors.length > 0) {
       throw new BadRequestException(unlockErrors.join(' '));
     }
@@ -2012,16 +2018,26 @@ export class ScenarioService {
     // Memory locks are checked against the EFFECTIVE pair: a payload may carry
     // only one of knowledgeSources / states, and a lock must still resolve
     // against whichever of the two is already stored.
-    const unlockErrors = validateKnowledgeSourceUnlocks(
-      updateScenarioDto.knowledgeSources !== undefined
-        ? updateScenarioDto.knowledgeSources
-        : (
-            scenario.metadata as
-              | { knowledgeSources?: KnowledgeSourceDto[] }
-              | undefined
-          )?.knowledgeSources,
-      effectiveStates as SimulationState[] | undefined,
-    );
+    const storedMetadata = scenario.metadata as
+      | {
+          knowledgeSources?: KnowledgeSourceDto[];
+          memories?: KnowledgeSourceDto[];
+        }
+      | undefined;
+    const unlockErrors = [
+      ...validateKnowledgeSourceUnlocks(
+        updateScenarioDto.knowledgeSources !== undefined
+          ? updateScenarioDto.knowledgeSources
+          : storedMetadata?.knowledgeSources,
+        effectiveStates as SimulationState[] | undefined,
+      ),
+      ...validateKnowledgeSourceUnlocks(
+        updateScenarioDto.memories !== undefined
+          ? updateScenarioDto.memories
+          : storedMetadata?.memories,
+        effectiveStates as SimulationState[] | undefined,
+      ),
+    ];
     if (unlockErrors.length > 0) {
       throw new BadRequestException(unlockErrors.join(' '));
     }

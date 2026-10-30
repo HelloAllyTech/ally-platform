@@ -1098,6 +1098,29 @@ export const TRACK_MEMORY_FACTS = definePrompt(
   { output: 'json' },
 );
 
+/** src/prompts/stage_director/memory_mapping.txt */
+export const STAGE_DIRECTOR_MEMORY_MAPPING = definePrompt(
+  'stage_director_memory_mapping',
+  {
+    title: 'optional',
+    roleInstructions: 'optional',
+    backstory: 'optional',
+    states: 'required',
+    memories: 'required',
+  },
+  {
+    name: 'Stage Director: map memories to stages',
+    description:
+      'Runs once when a simulation is switched to Main Agent Prompt — Stage ' +
+      'Director: decides, for each of its memories (its Knowledge Sources), ' +
+      'from which stage the client is ready to talk about it. The author can ' +
+      'change every assignment afterwards in the editor.',
+    category: 'Simulation Studio',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/track_memory/fold.txt */
 export const TRACK_MEMORY_FOLD = definePrompt('track_memory_fold', {
   sessionMemories: 'required',

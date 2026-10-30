@@ -21,6 +21,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ScenarioService } from '../service/scenario.service';
+import { StageDirectorMemoriesService } from '../service/stage-director-memories.service';
+import {
+  MapScenarioMemoriesDto,
+  StageDirectorBulkSwitchDto,
+} from '../dto/stage-director-memories.dto';
 import { ScenarioSessionService } from '../service/scenario-session.service';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
@@ -122,6 +127,7 @@ import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-togg
 })
 export class LearnController {
   constructor(
+    private readonly stageDirectorMemoriesService: StageDirectorMemoriesService,
     private readonly elevenLabsVoiceSyncService: ElevenLabsVoiceSyncService,
     private readonly ttsCatalogService: TtsCatalogService,
     private readonly videoActorCatalogService: VideoActorCatalogService,
@@ -429,6 +435,41 @@ export class LearnController {
     @Body() enhanceScenarioFieldDto: EnhanceScenarioFieldDto,
   ): Promise<EnhanceScenarioFieldResponseDto> {
     return this.scenarioService.enhanceField(enhanceScenarioFieldDto);
+  }
+
+  @ApiOperation({
+    summary:
+      "Build a simulation's memories for Main Agent Prompt — Stage Director " +
+      'from its Knowledge Sources, each assigned to the stage the client is ' +
+      'ready to share it from. Called by the editor when an author first ' +
+      'picks the prompt; writes nothing.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Post('scenarios/memories/map')
+  async mapScenarioMemories(@Body() dto: MapScenarioMemoriesDto) {
+    const { memories } =
+      await this.stageDirectorMemoriesService.mapMemories(dto);
+    return { memories };
+  }
+
+  @ApiOperation({
+    summary:
+      'Switch simulations from Main Agent Prompt #3 to the Stage Director ' +
+      'prompt, mapping their memories the same way the editor does. ' +
+      'dryRun (the default) reports and writes nothing.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SUPER_DUPER_ADMINS])
+  @Post('scenarios/stage-director/bulk-switch')
+  async stageDirectorBulkSwitch(
+    @CurrentUser() tokenUser: TokenUser,
+    @Body() dto: StageDirectorBulkSwitchDto,
+  ) {
+    return this.stageDirectorMemoriesService.bulkSwitch({
+      userId: tokenUser.id,
+      scenarioIds: dto.scenarioIds,
+      dryRun: dto.dryRun !== false,
+      onlyWithStates: dto.onlyWithStates,
+    });
   }
 
   @ApiOperation({
