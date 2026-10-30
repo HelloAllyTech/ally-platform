@@ -6,7 +6,12 @@ import {
   SIMULATION_CREATOR_FIELD_GROUPS,
   TEMPERATURE_DEFAULT,
 } from "@constants";
-import { CreatorFieldGroups, GetSimulationByIdResponse, knowledgeSource } from "@types";
+import {
+  CreatorFieldGroups,
+  GetSimulationByIdResponse,
+  knowledgeSource,
+  ScenarioMemory,
+} from "@types";
 
 export const getCreateSimulationSubSectionById = (id: string) => {
   return SIMULATION_CREATOR_FIELD_GROUPS.find(section => section.id === id);
@@ -279,6 +284,14 @@ export const formatSimulationResponseData = (data: GetSimulationByIdResponse) =>
       title: source.title,
       content: source.content,
       unlocksFromStateId: source.unlocksFromStateId ?? null,
+    })),
+    // Stage Director prompt's memories. Left undefined when never set, which
+    // is what tells the editor to map them on the first switch to that prompt.
+    memories: data?.metadata?.memories?.map((memory: ScenarioMemory) => ({
+      id: memory.id,
+      title: memory.title ?? "",
+      content: memory.content ?? "",
+      unlocksFromStateId: memory.unlocksFromStateId ?? null,
     })),
   };
 };

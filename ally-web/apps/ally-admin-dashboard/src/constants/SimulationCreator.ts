@@ -154,6 +154,21 @@ export const StepperList = [
   { id: SIMULATION_CREATOR_STEP_IDS.report, title: "Report" },
 ];
 
+/**
+ * Placeholder a main-agent prompt declares to run on Memories instead of
+ * Knowledge Sources + retrieval (the Stage Director prompt). The editor swaps
+ * Knowledge Sources for the Memories editor whenever the selected prompt body
+ * uses it — driven by the body, never by a hard-coded prompt code.
+ */
+export const MEMORIES_PLACEHOLDER = "memories";
+
+/**
+ * Backstory + every memory's title and text, in characters, above which the
+ * Memories editor warns that the character is getting long. 3x the largest
+ * scenario at design time (7.1k). A warning, never a block.
+ */
+export const MEMORIES_SIZE_WARNING_CHARS = 21000;
+
 export const FORM_FIELD_TYPES = {
   TEXT: "text",
   NUMBER: "number",
@@ -177,6 +192,7 @@ export const FORM_FIELD_TYPES = {
     TITLE_PANEL: "title_panel",
     COMFORT_AUDIO_TRACK: "comfort_audio_track",
     VIDEO_ACTOR_PICKER: "video_actor_picker",
+    MEMORIES_EDITOR: "memories_editor",
   },
   TOGGLE_BUTTON: "toggle_button",
   TAG_AND_DROPDOWN: "tag_and_dropdown",
@@ -229,6 +245,7 @@ export const FORM_FIELD_IDS = {
   CURRENT_STATE: "currentState",
   REMINDERS_ENABLED: "remindersEnabled",
   KNOWLEDGE_SOURCE: "knowledgeSources",
+  MEMORIES: "memories",
   STATE_NAMES: "stateNames",
   FILLER_ENABLED: "fillerEnabled",
   LANGUAGE_GLOSSARY_ENABLED: "languageGlossaryEnabled",
@@ -711,6 +728,25 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         // or not the body names the placeholder. Prompt #3 omits the
         // placeholder for precisely that reason. Gating on it hid a field that
         // was still fully wired.
+        //
+        // The one exception: a prompt that uses `{memories}` (the Stage
+        // Director prompt) doesn't retrieve at all, so Memories below replaces
+        // this editor there. The stored knowledgeSources are left untouched —
+        // switching back to #3 shows them exactly as they were.
+        hideWhenPromptUses: MEMORIES_PLACEHOLDER,
+      },
+      {
+        // The Stage Director prompt's replacement for Knowledge Sources. A
+        // separate field (metadata.memories), so switching prompts never
+        // edits the other prompt's copy. Shown only when the selected prompt
+        // body uses `{memories}`.
+        id: "memories",
+        label: "Memories",
+        type: FORM_FIELD_TYPES.CUSTOM.MEMORIES_EDITOR,
+        fullWidth: true,
+        isMandatory: false,
+        promptVariable: MEMORIES_PLACEHOLDER,
+        showOnlyWhenUsed: true,
       },
       {
         id: "coverImageUrl",

@@ -61,6 +61,7 @@ import {
   triggerWarning,
   behaviourInstruction,
   knowledgeSource,
+  ScenarioMemory,
   TranslationProgressPayload,
   ScenarioVersionStatus,
   formatVersionLabel,
@@ -758,6 +759,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
             unlocksFromStateId: item.unlocksFromStateId || null,
           }))
         : [],
+      // The Stage Director prompt's memories — a separate copy from
+      // knowledgeSources. Sent only once the form has them (never on a
+      // scenario that hasn't been on that prompt), so the stored value is
+      // never blanked by a save from another prompt.
+      ...(Array.isArray(restForm.memories)
+        ? {
+            memories: (restForm.memories as ScenarioMemory[]).map(item => ({
+              id: item.id,
+              title: item.title ?? "",
+              content: item.content ?? "",
+              unlocksFromStateId: item.unlocksFromStateId || null,
+            })),
+          }
+        : {}),
       // Which post-session tabs this roleplay shows. Always send both keys —
       // a partial object leans on the backend resolver's "absent means on"
       // default for whichever key is missing, which is right for a legacy
@@ -780,6 +795,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     // top-level booleans.
     delete (simulationData as any).feedbackTabDebrief;
     delete (simulationData as any).feedbackTabTranscript;
+    // extractValidData turns an absent `memories` into null; never send that —
+    // ally-be would read it as "clear the Stage Director prompt's memories".
+    if (!Array.isArray(restForm.memories)) delete (simulationData as any).memories;
 
     if (Array.isArray((simulationData as any).stateNames)) {
       const filtered = ((simulationData as any).stateNames as any[]).filter(sn =>
@@ -829,6 +847,14 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         ks.unlocksFromStateId && removedStateIds.includes(ks.unlocksFromStateId)
           ? { ...ks, unlocksFromStateId: null }
           : ks,
+      );
+    }
+    // Same for memories (the Stage Director prompt's copy).
+    if (Array.isArray((simulationData as any).memories)) {
+      (simulationData as any).memories = ((simulationData as any).memories as any[]).map(memory =>
+        memory.unlocksFromStateId && removedStateIds.includes(memory.unlocksFromStateId)
+          ? { ...memory, unlocksFromStateId: null }
+          : memory,
       );
     }
 

@@ -11,6 +11,7 @@ import {
   Competency,
   SimulationCustomField,
   knowledgeSource,
+  ScenarioMemory,
 } from "./simulation";
 import { TriggerCondition } from "./triggerConditions";
 
@@ -91,6 +92,8 @@ export type FormData = {
   currentState?: boolean;
   remindersEnabled?: boolean;
   knowledgeSources?: knowledgeSource[];
+  /** Stage Director prompt's memories — separate from knowledgeSources. */
+  memories?: ScenarioMemory[];
   /** Per-language main-agent prompt variant choice (GENERIC vs MULTILINGUAL). */
   mainPromptVariantByLanguage?: Record<string, "GENERIC" | "MULTILINGUAL">;
   /**
@@ -420,6 +423,22 @@ export interface FormFieldConfig {
    * fields with parallel consumers (evaluator / branching).
    */
   hideWhenUnused?: boolean;
+  /**
+   * Stricter sibling of `hideWhenUnused`: render the field ONLY when the
+   * selected prompt is loaded and references `promptVariable`. Hidden while
+   * nothing is selected or the list is loading, because the default prompt
+   * doesn't use it. For editors that only mean something on one prompt
+   * family (e.g. Memories on the Stage Director prompt).
+   */
+  showOnlyWhenUsed?: boolean;
+  /**
+   * Placeholder name whose presence in the selected prompt HIDES this field —
+   * the inverse gate. Used when a newer prompt replaces a field with another
+   * (Knowledge Sources give way to Memories when the prompt uses
+   * `{memories}`). Only hides once the prompt list has loaded, so the field
+   * stays put while nothing is known.
+   */
+  hideWhenPromptUses?: string;
   /**
    * Gate this field behind a per-user feature flag (key under the current
    * user's `featureFlags` from /users/me). When set and the user lacks the

@@ -64,6 +64,32 @@ export interface knowledgeSource {
   unlocksFromStateId?: string | null;
 }
 
+/**
+ * A memory for the Stage Director main prompt (`{memories}`): an event or
+ * thing the client can reveal. Same shape as a Knowledge Source but stored
+ * in its own field (`metadata.memories`) so #3's `knowledgeSources` are never
+ * touched. `unlocksFromStateId` unset / null = available from the start.
+ */
+export interface ScenarioMemory {
+  id: string;
+  title: string;
+  content?: string;
+  unlocksFromStateId?: string | null;
+}
+
+/** Body of POST /v1/learn/scenarios/memories/map — the editor's current form values. */
+export interface MapScenarioMemoriesRequest {
+  knowledgeSources: KnowledgeSourceInput[];
+  states: Array<{ id: string; name: string; guidelines?: string }>;
+  characterProfileText?: string;
+  roleInstructions?: string;
+  title?: string;
+}
+
+export interface MapScenarioMemoriesResponse {
+  memories: ScenarioMemory[];
+}
+
 export type KnowledgeSourceInput = {
   id?: string;
   title: string;
@@ -155,6 +181,8 @@ export interface SimulationInput {
   stateInstructions?: stateInstruction[];
   behaviorInstructions?: behaviourInstruction[];
   knowledgeSources?: KnowledgeSourceInput[];
+  /** Stage Director prompt's memories — separate from knowledgeSources. */
+  memories?: ScenarioMemory[];
   stateNames?: stateInstruction[];
   translationOpeningStatements?: Record<string, string[]>;
   translationDescription?: Record<string, string>;
@@ -278,6 +306,8 @@ export interface GetSimulationByIdResponse {
     stateInstructions?: stateInstruction[];
     characterProfileText?: string;
     knowledgeSources?: knowledgeSource[];
+    /** Stage Director prompt's memories — separate from knowledgeSources. */
+    memories?: ScenarioMemory[];
     stateNames?: stateInstruction[];
     linguisticStyleSamples?: Record<string, string[]>;
     allowedFillerWords?: Record<string, string[]>;

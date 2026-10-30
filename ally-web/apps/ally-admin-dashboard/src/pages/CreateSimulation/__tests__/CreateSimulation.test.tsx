@@ -1242,5 +1242,60 @@ describe("CreateSimulation", () => {
         );
       });
     });
+    it("sends memories as their own field and clears locks on unnamed states, leaving knowledge sources alone", async () => {
+      mockParams.id = "existing-id";
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        states: [
+          { id: "state-1", name: "Named State" },
+          { id: "state-2", name: "" },
+        ],
+        knowledgeSources: [
+          { id: "ks-1", title: "KS", content: "c", unlocksFromStateId: "state-1" },
+        ],
+        memories: [
+          { id: "m-1", title: "My father", content: "x", unlocksFromStateId: "state-2" },
+          { id: "m-2", title: "My job", content: "y", unlocksFromStateId: "state-1" },
+        ],
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+
+      await waitFor(() => {
+        expect(mockUpdateSimulation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            simulation: expect.objectContaining({
+              knowledgeSources: [
+                { id: "ks-1", title: "KS", content: "c", unlocksFromStateId: "state-1" },
+              ],
+              memories: [
+                { id: "m-1", title: "My father", content: "x", unlocksFromStateId: null },
+                { id: "m-2", title: "My job", content: "y", unlocksFromStateId: "state-1" },
+              ],
+            }),
+          }),
+        );
+      });
+    });
+
+    it("does not send memories at all when the form never had them", async () => {
+      mockParams.id = "existing-id";
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        memories: undefined,
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+
+      await waitFor(() => expect(mockUpdateSimulation).toHaveBeenCalled());
+      const payload = mockUpdateSimulation.mock.calls[0][0].simulation;
+      expect(payload).not.toHaveProperty("memories");
+    });
   });
 });

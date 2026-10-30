@@ -224,4 +224,30 @@ describe("PreviewMonologueRuns", () => {
 
     expect(onClose).toHaveBeenCalled();
   });
+  it("reads a Stage Director run through the same panel", () => {
+    mockRun({
+      ...RUN,
+      turns: [
+        {
+          type: "monologue.turn",
+          mode: "stage_director",
+          turn: 1,
+          thought: "I am not ready to talk about my father.",
+          thoughtTurnsOld: 0,
+          missed: false,
+          events: [],
+          score: 0,
+          stanceTo: "Guarded",
+          arc: ["Guarded"],
+          counsellorSaid: "Tell me about home.",
+          clientSaid: "It's fine.",
+        },
+      ],
+    });
+
+    render(<PreviewMonologueRuns scenarioId={450} isOpen onClose={vi.fn()} />);
+
+    expect(screen.getByText("I am not ready to talk about my father.")).toBeInTheDocument();
+    expect(screen.queryByText(en.internalMonologue.sentToActor)).not.toBeInTheDocument();
+  });
 });

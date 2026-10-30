@@ -15,6 +15,8 @@ import {
   SessionEventResponse,
   GetSimulationsQueryParams,
   GetSimulationsResponse,
+  MapScenarioMemoriesRequest,
+  MapScenarioMemoriesResponse,
   CreateSimulationInput,
   CreateSimulationResponse,
   GetSimulationByIdResponse,
@@ -1715,11 +1717,26 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
         body,
       }),
     }),
+
+    /**
+     * Build the Stage Director prompt's memories from the form's Knowledge
+     * Sources, assigning each to the state where the client is ready to share
+     * it. Called by the editor the first time an author switches a simulation
+     * to a prompt that uses `{memories}`. Writes nothing server-side.
+     */
+    mapScenarioMemories: builder.mutation<MapScenarioMemoriesResponse, MapScenarioMemoriesRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.MAP_SCENARIO_MEMORIES,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
   }),
 });
 
 export const {
   useGetSimulationsQuery,
+  useMapScenarioMemoriesMutation,
   useLazyGetAdminSimulationByIdQuery,
   useCreateSimulationMutation,
   useUpdateSimulationByIdMutation,

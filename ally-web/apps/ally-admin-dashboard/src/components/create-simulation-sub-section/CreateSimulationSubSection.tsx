@@ -63,7 +63,9 @@ export const CreateSimulationSubSection: FC<CreateSimulationSubSectionProps> = (
     | undefined;
   const { data: mainAgentPrompts } = useGetPromptsByTypeQuery("main_agent", {
     // Only worth the query when at least one field could be gated.
-    skip: !items?.some(i => i.hideWhenUnused && i.promptVariable),
+    skip: !items?.some(
+      i => ((i.hideWhenUnused || i.showOnlyWhenUsed) && i.promptVariable) || i.hideWhenPromptUses,
+    ),
   });
   const usedPlaceholders = useMemo<Set<string> | null>(() => {
     if (!mainAgentPrompts) return null; // not loaded yet → no hiding
@@ -106,6 +108,25 @@ export const CreateSimulationSubSection: FC<CreateSimulationSubSectionProps> = (
       !field.isMandatory &&
       usedPlaceholders !== null &&
       !usedPlaceholders.has(field.promptVariable)
+    ) {
+      return false;
+    }
+    // Strict variant: only when the selected prompt is known to use it —
+    // hidden while unselected / loading / missing as well.
+    if (
+      field.showOnlyWhenUsed &&
+      field.promptVariable &&
+      !field.isMandatory &&
+      !usedPlaceholders?.has(field.promptVariable)
+    ) {
+      return false;
+    }
+    // Inverse gate: a field another placeholder replaces (Knowledge Sources
+    // when the prompt uses `{memories}`). Its stored value is left alone.
+    if (
+      field.hideWhenPromptUses &&
+      !field.isMandatory &&
+      usedPlaceholders?.has(field.hideWhenPromptUses)
     ) {
       return false;
     }

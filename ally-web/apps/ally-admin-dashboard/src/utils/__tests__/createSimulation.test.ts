@@ -1144,3 +1144,25 @@ describe("createSimulation utils", () => {
     });
   });
 });
+
+describe("Stage Director memories hydration", () => {
+  it("loads memories from a version snapshot as their own field, next to knowledge sources", () => {
+    const form = formatVersionConfigToForm({
+      knowledgeSources: [{ id: "k-1", title: "KS", content: "c", unlocksFromStateId: "s-1" }],
+      memories: [{ id: "m-1", title: "My father", content: "x", unlocksFromStateId: "s-2" }],
+    });
+    expect(form.memories).toEqual([
+      { id: "m-1", title: "My father", content: "x", unlocksFromStateId: "s-2" },
+    ]);
+    expect(form.knowledgeSources).toEqual([
+      { id: "k-1", title: "KS", content: "c", unlocksFromStateId: "s-1" },
+    ]);
+  });
+
+  it("leaves memories undefined when the scenario never had them (first switch maps them)", () => {
+    const form = formatSimulationResponseData({
+      metadata: {},
+    } as unknown as GetSimulationByIdResponse);
+    expect(form.memories).toBeUndefined();
+  });
+});

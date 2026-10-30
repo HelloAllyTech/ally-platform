@@ -958,6 +958,37 @@ export const en = {
     locksClearedOnLastStateRemoval: (count: number) =>
       `${count} locked ${count === 1 ? "memory is" : "memories are"} now always available — there are no states left to unlock at`,
   },
+  memories: {
+    label: "Memories",
+    help: "The backstory says who this person is. Memories are the events and things they can reveal, one per row.",
+    helpLocked:
+      'A memory set to a later state stays hidden until the conversation gets there. Until then the client only knows its title, as something they aren\'t ready to talk about — so name the topic, not the secret: "My father", not "Father\'s drinking".',
+    titlePlaceholder: "Title (e.g. My father)",
+    contentPlaceholder: "What happened, in the client's own terms",
+    titleLabel: (index: number) => `Memory ${index + 1} title`,
+    contentLabel: (index: number) => `Memory ${index + 1} text`,
+    availableFrom: "Available from",
+    availableFromTooltip:
+      'When the client can talk about this. "From the start" means any time. Pick a state and the memory stays hidden until the conversation reaches it, then stays available. Before that, only the title is known to the client.',
+    fromTheStart: "From the start",
+    missingState: "A state that no longer exists",
+    add: "+ Add memory",
+    remove: "Remove memory",
+    untitled: "Untitled",
+    empty: "No memories yet. Add the events and things this person could reveal.",
+    mapping: "Sorting your knowledge sources into memories…",
+    mapped:
+      "Memories are ready — each one is set to the state where it comes up. Check them below.",
+    mapFailed:
+      "Couldn't sort memories into states, so your knowledge sources were copied over as they are. Check them below.",
+    tooLong: (chars: number, limit: number) =>
+      `Backstory and memories come to ${chars.toLocaleString()} characters, past the ${limit.toLocaleString()} we suggest. The client still runs, but long characters cost more and can lose focus — consider trimming.`,
+    unlockHere: "Memories that unlock here:",
+    locksMovedOnStateRemoval: (count: number, stateName: string) =>
+      `${count} ${count === 1 ? "memory is" : "memories are"} now available from "${stateName}"`,
+    locksClearedOnLastStateRemoval: (count: number) =>
+      `${count} ${count === 1 ? "memory is" : "memories are"} now available from the start — there are no states left`,
+  },
   badge: {
     badgeAddedToTenant: "Badge added to tenant successfully",
     badgeRemovedFromTenant: "Badge removed from tenant successfully",
@@ -8304,6 +8335,12 @@ export const en = {
     finished: (topics: string) => `Finished with: ${topics}.`,
     onMind: (facts: string) => `On her mind from her own life: ${facts}.`,
     willLookFor: (cues: string) => `Listening next for: ${cues}.`,
+    thoughtHeading: "What's on the client's mind",
+    noThought: "No thought for this turn yet.",
+    thoughtMissed:
+      "The thought for this turn didn't arrive in time, so the client used an earlier one.",
+    thoughtAge: (turns: number) =>
+      `Written ${turns} ${turns === 1 ? "turn" : "turns"} ago — the client is still going on it.`,
   },
   previewMonologueRuns: {
     trigger: "Past runs",

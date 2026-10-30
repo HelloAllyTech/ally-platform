@@ -78,6 +78,38 @@ export interface InternalMonologueTurn {
   updatesMissed: number;
 }
 
+/**
+ * One turn from the Stage Director (main prompts that use `{thoughts}`).
+ *
+ * The director writes a short paragraph of where the client's head is, which
+ * goes into the actor's prompt as written. There is no working memory behind
+ * it, so none of the working-memory sections exist on this shape.
+ */
+export interface StageDirectorMonologueTurn {
+  type: "monologue.turn";
+  mode: "stage_director";
+  turn: number;
+  /** The paragraph the actor received in `{thoughts}` this turn. */
+  thought: string;
+  /** How many turns ago `thought` was written (0 = fresh for this turn). */
+  thoughtTurnsOld: number;
+  /** True when this turn's thought didn't arrive in time. */
+  missed: boolean;
+  events: Array<{ label: string; score: number | null }>;
+  score: number | null;
+  stanceTo: string | null;
+  arc: string[];
+  /** Same last-exchange keys as the working-memory payload. */
+  counsellorSaid?: string | null;
+  clientSaid?: string | null;
+}
+
+/** Any monologue payload the panel can render. */
+export type MonologueTurn = InternalMonologueTurn | StageDirectorMonologueTurn;
+
+export const isStageDirectorTurn = (turn: MonologueTurn): turn is StageDirectorMonologueTurn =>
+  (turn as StageDirectorMonologueTurn).mode === "stage_director";
+
 /** LiveKit data-channel topic carrying monologue turns. */
 export const MONOLOGUE_TOPIC = "internal-monologue";
 
@@ -105,5 +137,5 @@ export interface PreviewMonologueRunSummary {
 }
 
 export interface PreviewMonologueRun extends PreviewMonologueRunSummary {
-  turns: InternalMonologueTurn[];
+  turns: MonologueTurn[];
 }

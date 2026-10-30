@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { TextArea, TextInput } from "@ally-ui-mono/ui-shared";
 import { TrashRed } from "@assets";
-import { en, ENHANCE_TYPE } from "@constants";
+import { en, ENHANCE_TYPE, MEMORIES_PLACEHOLDER } from "@constants";
 import { useIsPlaceholderUsed } from "@hooks";
 
 import { DropdownField } from "../dropdown-field";
@@ -27,6 +27,12 @@ export type { SimulationStateFormValue };
 
 /** RHF field holding the simulation's Knowledge Sources (the client's memories). */
 const KNOWLEDGE_SOURCES_FIELD = "knowledgeSources";
+/**
+ * RHF field holding the Stage Director prompt's Memories (separate copy).
+ * A literal, not FORM_FIELD_IDS.MEMORIES: module-load reads of the
+ * `@constants` barrel break under its import cycle (see ally-web CLAUDE.md).
+ */
+const MEMORIES_FIELD = "memories";
 
 const DIALOGUE_LENGTH_OPTIONS = [
   { value: "short", label: "Short" },
@@ -72,6 +78,12 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
   const { isUsed: selectedHasStates } = useIsPlaceholderUsed(
     selectedPromptCode,
     "state_x_guidelines",
+  );
+  // On a `{memories}` prompt the per-state read-only list shows Memories
+  // instead of Knowledge Sources (which that prompt doesn't use).
+  const { isUsed: selectedUsesMemories } = useIsPlaceholderUsed(
+    selectedPromptCode,
+    MEMORIES_PLACEHOLDER,
   );
 
   const watchedStates = (formMethods.watch(id) as SimulationStateFormValue[] | undefined) ?? [];
@@ -131,36 +143,39 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
       // Memories locked to this state move with it (see
       // reassignLocksForRemovedState) — a lock naming a deleted state would
       // otherwise hide the memory all session and be rejected on save.
-      const sources =
-        (formMethods.getValues(KNOWLEDGE_SOURCES_FIELD) as LockableSource[] | undefined) ?? [];
-      const {
-        sources: nextSources,
-        moved,
-        movedTo,
-      } = reassignLocksForRemovedState(sources, states, stateId);
+      // Both copies are re-pointed: states are shared between prompts, so a
+      // deleted state is gone for Knowledge Sources AND Memories alike. The
+      // toast speaks for the copy the author is looking at.
+      const reassign = (field: string) => {
+        const sources = (formMethods.getValues(field) as LockableSource[] | undefined) ?? [];
+        const result = reassignLocksForRemovedState(sources, states, stateId);
+        if (result.moved > 0) {
+          formMethods.setValue(field, result.sources, { shouldDirty: true });
+        }
+        return result;
+      };
+      const ksResult = reassign(KNOWLEDGE_SOURCES_FIELD);
+      const memoriesResult = reassign(MEMORIES_FIELD);
+      const { moved, movedTo } = selectedUsesMemories ? memoriesResult : ksResult;
+      const strings = selectedUsesMemories ? en.memories : en.knowledgeSource;
       if (moved > 0) {
-        formMethods.setValue(KNOWLEDGE_SOURCES_FIELD, nextSources, { shouldDirty: true });
         if (movedTo) {
-          toast.info(
-            en.knowledgeSource.locksMovedOnStateRemoval(
-              moved,
-              movedTo.name?.trim() || "next state",
-            ),
-          );
+          toast.info(strings.locksMovedOnStateRemoval(moved, movedTo.name?.trim() || "next state"));
         } else {
           // The last state went, so there is nothing left to lock against.
-          toast.warning(en.knowledgeSource.locksClearedOnLastStateRemoval(moved));
+          toast.warning(strings.locksClearedOnLastStateRemoval(moved));
         }
       }
       // Re-stitch so deleting a middle card doesn't leave a score gap
       // between its neighbours (the previous state absorbs the band).
       writeBack(removeStateAndStitch(states, stateId));
     },
-    [states, writeBack, formMethods],
+    [states, writeBack, formMethods, selectedUsesMemories],
   );
 
   const watchedSources =
     (formMethods.watch(KNOWLEDGE_SOURCES_FIELD) as LockableSource[] | undefined) ?? [];
+  const watchedMemories = (formMethods.watch(MEMORIES_FIELD) as LockableSource[] | undefined) ?? [];
 
   // Auto-seed a single blank state ONCE per editor-mount when the editor
   // becomes visible with no states. Subsequent "Remove" actions that drop
@@ -389,21 +404,42 @@ export const StatesEditor: React.FC<StatesEditorProps> = ({
                 data-testid={`dialogue-length-dropdown`}
               />
 
+              {/* Read-only: locks are set on each Memory ("Available from"). */}
+              {selectedUsesMemories &&
+                (() => {
+                  const opening = sourcesOpeningAt(watchedMemories, state.id);
+                  if (opening.length === 0) return null;
+                  return (
+                    <div
+                      className="text-sm text-typography-600"
+                      data-testid={`memories-unlock-here-${state.id}`}
+                    >
+                      <p>{en.memories.unlockHere}</p>
+                      <ul className="ml-4 list-disc text-typography-900">
+                        {opening.map(memory => (
+                          <li key={memory.id}>{memory.title || en.memories.untitled}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
+
               {/* Read-only: locks are set on each Knowledge Source ("Unlocks at"). */}
-              {(() => {
-                const opening = sourcesOpeningAt(watchedSources, state.id);
-                if (opening.length === 0) return null;
-                return (
-                  <p className="text-sm text-typography-600">
-                    {en.knowledgeSource.opensUpHere}{" "}
-                    <span className="text-typography-900">
-                      {opening
-                        .map(source => source.title || en.knowledgeSource.untitled)
-                        .join(", ")}
-                    </span>
-                  </p>
-                );
-              })()}
+              {!selectedUsesMemories &&
+                (() => {
+                  const opening = sourcesOpeningAt(watchedSources, state.id);
+                  if (opening.length === 0) return null;
+                  return (
+                    <p className="text-sm text-typography-600">
+                      {en.knowledgeSource.opensUpHere}{" "}
+                      <span className="text-typography-900">
+                        {opening
+                          .map(source => source.title || en.knowledgeSource.untitled)
+                          .join(", ")}
+                      </span>
+                    </p>
+                  );
+                })()}
             </div>
           );
         });
