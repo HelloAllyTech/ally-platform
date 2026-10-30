@@ -2,6 +2,7 @@ import { EntityManager, In, Repository } from 'typeorm';
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -146,7 +147,9 @@ export class BadgeTenantService {
         `Failed to assign badge ${badge.id} to tenants`,
         error.stack,
       );
-      throw error;
+      throw new InternalServerErrorException(
+        `Failed to assign badge ${badge.id} to tenants`,
+      );
     }
   }
 
