@@ -233,6 +233,7 @@ class TimeEventScheduler:
                                 agent_graph.update_state(
                                     {"configurable": {"thread_id": thread_id}},
                                     values=state_updates,
+                                    as_node=True,
                                 )
                     except Exception as e:
                         logger.exception(
@@ -361,6 +362,7 @@ class TimeEventScheduler:
                         agent_graph.update_state(
                             {"configurable": {"thread_id": thread_id}},
                             values=state_updates,
+                            as_node=True,
                         )
             except Exception as e:
                 logger.exception(
