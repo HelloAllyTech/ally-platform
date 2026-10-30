@@ -626,6 +626,10 @@ export function parsePairingOutput(raw: string): PairingVerdict[] {
     .replace(/\s*```$/, '');
   let parsed: unknown;
   try {
+    Logger.debug(
+      `[GLOSSARY_LEXEME_MINING] Attempting to parse cleaned output: """${cleaned}"""`,
+      GlossaryLexemeMiningService.name,
+    );
     parsed = JSON.parse(cleaned);
   } catch {
     // A sentence before or after the array is common; the array itself is

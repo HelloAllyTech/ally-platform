@@ -482,9 +482,10 @@ export class PromptTranslationService {
 
     // 6. Translate with bounded retry + token guard.
     let lastError = 'no attempt made';
+    let output: string | undefined = undefined; // Move output declaration here
     for (let attempt = 1; attempt <= MAX_TRANSLATION_ATTEMPTS; attempt++) {
       try {
-        const output = await this.providerService.translate(
+        output = await this.providerService.translate(
           systemPrompt,
           body,
           engine,
@@ -538,6 +539,15 @@ export class PromptTranslationService {
       `[TRANSLATION_FAILED] ${source.promptCode} -> ${language.translationCode}: ${lastError}. ` +
         'That language keeps serving English until it is retried.',
     );
+    if (lastError.includes('token mismatch')) {
+      this.logger.error(
+        `[TRANSLATION_DEBUG] System Prompt: """${systemPrompt}"""` +
+          `
+[TRANSLATION_DEBUG] English Body: """${body}"""` +
+          `
+[TRANSLATION_DEBUG] Translated Output (problematic): """${output ?? 'undefined'}"""`,
+      );
+    }
     return {
       status: PromptTranslationStatus.FAILED,
       provider: engine.provider,

@@ -191,8 +191,8 @@ export class GlossaryAdherenceService {
 
     const languageId = parseInt(sessionInfo.languageId, 10);
     if (isNaN(languageId)) {
-      this.logger.warn(
-        `[GLOSSARY_ADHERENCE] Session ${scenarioSessionId} has non-integer languageId '${sessionInfo.languageId}'. Skipping.`,
+      this.logger.error(
+        `[GLOSSARY_ADHERENCE] Session ${scenarioSessionId} has non-integer languageId '${sessionInfo.languageId}'. Skipping due to data integrity issue.`,
       );
       return null;
     }

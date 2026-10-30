@@ -96,19 +96,27 @@ export class BadgeTenantService {
     }
 
     if (badgeTenants.length > 0) {
-      await this.badgeTenantRepository.save(badgeTenants);
-      this.badgeUserService.awardBadgeToUsersByTenant(badge, tenantIdsToAdd);
+      try {
+        await this.badgeTenantRepository.save(badgeTenants);
+        this.badgeUserService.awardBadgeToUsersByTenant(badge, tenantIdsToAdd);
 
-      if (isMultiTenantAdmin) {
-        this.auditLogService.log({
-          eventType: AUDIT_EVENTS.MULTI_TENANT_ADMIN_ASSIGNED_BADGE_TO_TENANT,
-          details: {
-            action: AUDIT_ACTIONS.ASSIGN_BADGE_TO_TENANT,
-            tenantIdsToAdd,
-            userId,
-            badgeId,
-          },
-        });
+        if (isMultiTenantAdmin) {
+          this.auditLogService.log({
+            eventType: AUDIT_EVENTS.MULTI_TENANT_ADMIN_ASSIGNED_BADGE_TO_TENANT,
+            details: {
+              action: AUDIT_ACTIONS.ASSIGN_BADGE_TO_TENANT,
+              tenantIdsToAdd,
+              userId,
+              badgeId,
+            },
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to add badge ${badge.id} to tenants ${tenantIdsToAdd.join(', ')}`,
+          error.stack,
+        );
+        throw error;
       }
     }
 

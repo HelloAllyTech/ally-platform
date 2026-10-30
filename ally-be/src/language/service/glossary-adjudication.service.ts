@@ -573,7 +573,7 @@ export class GlossaryAdjudicationService {
       parsed = JSON.parse(cleaned);
     } catch {
       this.logger.warn(
-        '[GLOSSARY_ADJUDICATE] unparseable adjudicator output — batch deferred',
+        `[GLOSSARY_ADJUDICATE] unparseable adjudicator output — batch deferred: """${raw}"""`,
       );
       return [];
     }

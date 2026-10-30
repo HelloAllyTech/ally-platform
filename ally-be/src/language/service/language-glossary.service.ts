@@ -593,7 +593,7 @@ export class LanguageGlossaryService {
 
     if (contradictedLines > 0) {
       this.logger.warn(
-        `[GLOSSARY_SEED] language=${language.value} ${contradictedLines} seeded ` +
+        `[GLOSSARY_SEED] language=${language.value} created=${created.length} updated=${updated.length} skipped=${skipped.length} ${contradictedLines} seeded ` +
           `avoid-line(s) CONTRADICTED by the learner corpus — review before publishing ` +
           `(provenance.seedEvidence on the draft sections)`,
       );
@@ -1126,9 +1126,11 @@ export class LanguageGlossaryService {
       try {
         await this.assertTier0WithinCap(languageId, candidate);
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `[GLOSSARY_CONSOLIDATE] auto-accept skipped for '${section.sectionCode}'` +
-            `${section.profileId ? `@${section.profileId}` : ''}: ${error}`,
+            `${section.profileId ? `@${section.profileId}` : ''}: ${errorMessage}`,
         );
         return 0;
       }

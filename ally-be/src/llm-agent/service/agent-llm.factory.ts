@@ -96,7 +96,7 @@ export class AgentLlmProviderFactory {
     const apiKey = this.apiKeyFor(normalised);
     if (!apiKey) {
       throw new BadRequestException(
-        `${normalised} is not configured on this environment (no API key), ` +
+        `${normalised} is not configured on this environment (no API key for ${this.envVarFor(normalised)}), ` +
           'so it cannot be used. Please contact your administrator.',
       );
     }
@@ -131,6 +131,19 @@ export class AgentLlmProviderFactory {
         return this.configService.gemini.apiKey;
       default:
         return undefined;
+    }
+  }
+
+  private envVarFor(provider: AgentLlmProviderName): string {
+    switch (provider) {
+      case AgentLlmProviderName.ANTHROPIC:
+        return 'ANTHROPIC_API_KEY';
+      case AgentLlmProviderName.OPENAI:
+        return 'OPENAI_API_KEY';
+      case AgentLlmProviderName.GEMINI:
+        return 'GEMINI_API_KEY';
+      default:
+        return '<unknown>';
     }
   }
 }
