@@ -955,7 +955,9 @@ class SystemStageDirectorInputs(PromptInputs):
         None, title="Memories (unlocked, plus locked titles)"
     )
     previous_memory: Optional[str] = Field(None, title="Previous Session Memory")
-    previous_thought: str = Field(title="Previous Thought")
+    # Optional: fed the last note, the director carried its worries forward
+    # turn after turn (harness 2026-10-31), so the default text leaves it out.
+    previous_thought: Optional[str] = Field(None, title="Previous Thought")
     recent_turns: str = Field(title="Newest Turns")
     role_instructions: Optional[str] = Field(None, title="Role Instructions")
     rolling_summary: Optional[str] = Field(None, title="Earlier Conversation Summary")

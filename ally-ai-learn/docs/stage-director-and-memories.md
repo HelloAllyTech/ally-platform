@@ -404,3 +404,21 @@ The same failure can hit any Sarvam-voiced scenario on the old prompts.
 Not covered: the "Okay." barge-in setting live (the LLM tester never speaks over the client; covered by a unit
 test and livekit's code), and fillers/interims in a Sarvam-voiced run (the clip policy turns them off for
 Sarvam v3 voices).
+
+### 9.x Director prompt tuning (2026-10-31, local harness)
+
+Same scripted conversations (Manoj 466 en/hi, 482, 517), two runs each, scored on the director's own notes
+and, with the gpt-4o judge, on the client's replies.
+
+| Director text | Words per note (en / hi) | Content carried from the previous note | Notes in the wrong language |
+|---|---|---|---|
+| v1 (released) | ~105 / 146 | 0.19–0.33 | 0 |
+| v2: shorter, "move on" rule, script example | ~71 / 88 | 0.17–0.40 | 15 of 20 on 482 (English session) |
+| v3: no example language, one worry at most | ~66 / 92 | 0.15–0.32 | 0 |
+| v4 (default now): v3 without the previous note as input | ~70 / 95 | 0.09–0.18 | 0 |
+
+The script example in v2 ("Hindi in Devanagari") pulled an English session with some Hindi scenario text into
+Hindi; naming no example language fixed it. Feeding the director its own previous note is what made it restate
+the same worries every turn, so the default text no longer uses `{previous_thought}` (still offered as an
+optional variable). Reply-level judge counts did not move beyond run-to-run noise at two runs per scenario;
+the gain is in the notes, which is what the prod V2V showed as the problem (the same marriage worry every turn).

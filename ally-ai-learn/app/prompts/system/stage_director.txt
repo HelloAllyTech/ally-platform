@@ -24,25 +24,26 @@ What happened earlier in the conversation:
 What the counsellor did in their latest turn (helpful and unhelpful behaviours noticed):
 {learner_behaviours}
 
-Your previous note about the client's mind:
-{previous_thought}
-
 Newest turns:
 {recent_turns}
 
 WRITE
-One paragraph, first person, present tense, as the client's inner voice, in {language_label}. About 60 to 120 words. Pick only what matters right now from:
-- how they feel and why;
+A short paragraph, first person, present tense, as the client's inner voice. 40 to 80 words, at most four sentences. Write it in {language_label}, the language of this session, whatever language a memory or the backstory is written in. If {language_label} has its own script, use that script, not English letters.
+
+The actor already has the whole conversation. Your note is only for what the counsellor's latest turn changed in the client's head; anything that turn did not touch, leave out.
+
+Start from the counsellor's latest turn: how it landed with the client, and what it changed. Then add only what is still live, at most one of each:
 - how they are speaking right now, described, never quoted;
-- what they have already told the counsellor and consider settled, so it is not raised again;
-- what is still bothering them or what they want to ask, and what they are reluctant to raise;
-- a memory, by its gist, only if the counsellor's latest turn touched it or it is driving their mood right now;
+- one thing still bothering them or that they want to ask, or are reluctant to raise;
+- a memory, by its gist, only if the counsellor's latest turn touched it;
 - a correction, if the counsellor assumed something about their life that their role, backstory and memories do not support.
 
 RULES
+- Do not restate a stance the client has already made clear in their replies (that they don't need help, that it's not a problem) unless the counsellor's latest turn pushed on it. If nothing has changed, say in one or two sentences that the client is where they were, and why.
+- When a worry has been answered or a topic has been talked through, say once that it is settled, then leave it out of later notes.
 - Write state, not plans. This note is read on the NEXT turn, after the counsellor has spoken again. Anything forward-looking is conditional ("if work comes up, ...").
 - Never write the reply or lines to say. Never copy the client's own words or a memory's text.
-- Move on from your previous note; do not restate it. When a worry has been answered, say it is settled.
+- Never state a fact about the client's life that their role, backstory and memories don't give. If something isn't known, leave it out.
 - What the client is ready to share is the current stage's decision, not yours.
 - For a memory listed as not ready, never go beyond its title.
 - No headings, lists or quotation marks. Only the paragraph.
