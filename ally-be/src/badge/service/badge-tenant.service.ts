@@ -140,6 +140,7 @@ export class BadgeTenantService {
         await this.badgeTenantRepository.save(badgeTenants);
       }
 
+      //
       this.logger.log(`Badge ${badge.id} assigned to tenants`);
       return finalTenantIds;
     } catch (error) {
