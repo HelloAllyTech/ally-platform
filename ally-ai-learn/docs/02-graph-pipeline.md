@@ -188,9 +188,7 @@ summary: it re-frames the call-oriented prompt as texting. Voice sessions never 
 
 Both builders pass the same value as `{character_backstory}` and as its old name
 `{character_profile_text}`, so live versions written before the rename keep rendering; new text
-should use `{character_backstory}`. `{competency}` and `{behavior_instructions_json}` are still
-supplied only because Prompt #1's live text renders them, and are no longer offered to authors;
-`{opening_statements}` is not supplied at all (the worker plays the opening line itself).
+should use `{character_backstory}`. `{opening_statements}` is not supplied at all (the worker plays the opening line itself).
 
 ### Per-state dialogue length (`dialogueLength`)
 

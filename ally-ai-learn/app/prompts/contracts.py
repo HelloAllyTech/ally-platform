@@ -685,14 +685,10 @@ class SystemMainAgentPromptInputs(PromptInputs):
     ]
     age: Optional[str] = Field(None, title="Age")
     allowed_fillers: Optional[str] = Field(None, title="Allowed Filler Words")
-    behavior_instructions_json: Optional[str] = Field(
-        None, title="Behavior Rules (JSON)"
-    )
     character_backstory: Optional[str] = Field(None, title="Character Backstory")
     character_profile_text: Optional[str] = Field(
         None, title="Character Backstory (old name)"
     )
-    competency: Optional[str] = Field(None, title="Competency")
     current_location: Optional[str] = Field(None, title="Current Location")
     custom_fields_text: Optional[str] = None
     dialogue_length_instruction: Optional[str] = None

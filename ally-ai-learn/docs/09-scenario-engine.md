@@ -58,7 +58,6 @@ Defines the simulated client persona:
 | `language_dialogue_samples` | No | Sample utterances for linguistic style; when present for non-English, injected into prompt |
 | `previous_memory` | No | Summary from a previous session |
 | `prompts` | No | Backend prompt overrides (keys: `ally_ai_learn_system_main_agent_prompt`, etc.) |
-| `competency` | No | Counseling competency being trained; shapes the simulation |
 
 ### ScenarioVoice and VoiceConfig
 
@@ -154,7 +153,6 @@ Steps:
 | `promptData.responseLength` | `response_length` |
 | `promptData.previousMemory` | `previous_memory` |
 | `promptData.prompts` | `prompts` |
-| `promptData.competency` | `competency` |
 
 ## Simulation Instructions
 
