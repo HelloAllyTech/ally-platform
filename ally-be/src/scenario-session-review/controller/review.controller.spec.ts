@@ -65,15 +65,18 @@ describe('ScenarioSessionReviewController', () => {
       const req = { user: { id: 1 } };
       const result = await controller.getUnreadReviewCount(req as any);
       expect(result).toEqual({ count: 0 });
+
       expect(mockReviewService.getUnreadReviewCount).not.toHaveBeenCalled();
     });
 
     it('should return the count if user has permission', async () => {
       mockPermissionValidator.validatePermissions.mockResolvedValue(true);
       mockReviewService.getUnreadReviewCount.mockResolvedValue({ count: 10 });
+
       const req = { user: { id: 1 } };
       const result = await controller.getUnreadReviewCount(req as any);
       expect(result).toEqual({ count: 10 });
+
       expect(mockReviewService.getUnreadReviewCount).toHaveBeenCalled();
     });
   });
