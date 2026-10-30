@@ -42,7 +42,7 @@
 //
 // Not scanned: node_modules, CHANGELOG*, wiki/log.md (append-only history that is
 // supposed to name files as they were), and any file that announces itself as generated
-// ("Generated — do not edit" near the top, as WIKI-ROUTING.md does): its paths belong to
+// ("Generated — do not edit" near the top, as ROUTING.md does): its paths belong to
 // the generator, which writes them relative to a different repo, and a hand edit would be
 // overwritten on the next sync.
 
@@ -58,6 +58,7 @@ const SIBLING_REPOS = [
   "ally-ai",
   "ally-ai-learn",
   "ally-mobile",
+  "ally-mobile-flutter",
   "helloallytech.github.io",
   "infra",
   "ally-changelog",
