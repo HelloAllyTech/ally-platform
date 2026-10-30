@@ -12,7 +12,7 @@
 > live in the separate **`ally-ai`** repository (`HelloAllyTech/ally-ai`), checked out alongside
 > this one in the workspace.
 >
-> Last reconciled with the codebase: **2026-10-30**.
+> Last reconciled with the codebase: **2026-10-20**.
 
 ---
 
