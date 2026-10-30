@@ -48,6 +48,7 @@ import {
   FORM_FIELD_IDS,
   isValidStateInstructionId,
   ROLE_INSTRUCTION_PROMPT_CODE,
+  NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
   BEHAVIOUR_STATES,
   SIMULATION_CATEGORY,
   TooltipLocation,
@@ -377,9 +378,16 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // field groups come from the `@constants` barrel, which several test files
   // mock wholesale (see CLAUDE.md). useForm only reads `defaultValues` on the
   // first render, and the field groups are static, so the memo is just hygiene.
-  const toggleDefaultValues = useMemo(
-    () => buildToggleDefaultValues(SIMULATION_CREATOR_FIELD_GROUPS),
-    [],
+  // A new simulation (no `id` in the route) also starts on
+  // NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE. Seeded here, not in the picker: the
+  // picker's own fallback is for loaded simulations with no saved selection,
+  // which must keep showing the runtime default they actually run on.
+  const formDefaultValues = useMemo(
+    () => ({
+      ...buildToggleDefaultValues(SIMULATION_CREATOR_FIELD_GROUPS),
+      ...(id ? {} : { selectedMainPromptCode: NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE }),
+    }),
+    [id],
   );
 
   // `FieldValues` is pinned explicitly: without it, `defaultValues` narrows the
@@ -389,7 +397,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   const formMethods = useForm<FieldValues>({
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: toggleDefaultValues,
+    defaultValues: formDefaultValues,
   });
 
   const managedRoleInstruction = useMemo(

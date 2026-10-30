@@ -220,6 +220,8 @@ vi.mock("@constants", () => ({
   // utils/__tests__/createSimulation.test.ts.
   resolveSttConfigFromPreset: (presetId: any, existing: any) => (presetId ? existing : null),
   ROLE_INSTRUCTION_PROMPT_CODE: "openai_simulation_role_instruction",
+  NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE:
+    "ally_ai_learn_system_main_agent_prompt_working_memory_split",
   SIMULATION_CATEGORY: { PARTNER_SIM: "PARTNER_SIM" },
   ROUTES: {
     SIMULATION_STUDIO: "/simulation-studio",
@@ -368,6 +370,23 @@ describe("CreateSimulation", () => {
       expect(screen.getByTestId("tabs")).toBeInTheDocument();
       expect(screen.getByText("Save Draft")).toBeInTheDocument();
       expect(screen.getByText("Publish")).toBeInTheDocument();
+    });
+
+    it("starts a new simulation on Main Agent Prompt #3", () => {
+      renderCreateSimulation();
+
+      expect((useForm as any).mock.calls[0][0].defaultValues.selectedMainPromptCode).toBe(
+        "ally_ai_learn_system_main_agent_prompt_working_memory_split",
+      );
+    });
+
+    it("leaves an existing simulation's prompt to what it loads with", () => {
+      mockParams.id = "existing-id";
+      renderCreateSimulation();
+
+      expect((useForm as any).mock.calls[0][0].defaultValues).not.toHaveProperty(
+        "selectedMainPromptCode",
+      );
     });
 
     it("should not render the deprecated 'Voice' standalone field", () => {

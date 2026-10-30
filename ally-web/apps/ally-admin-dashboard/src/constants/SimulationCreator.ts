@@ -528,6 +528,12 @@ export const COMFORT_AUDIO_VOLUME_STEP = 0.1;
 
 export const ROLE_INSTRUCTION_PROMPT_CODE = "openai_simulation_role_instruction_default";
 export const DEFAULT_MAIN_AGENT_PROMPT_CODE = "ally_ai_learn_system_main_agent_prompt";
+// What a brand-new simulation starts on. Distinct from the default above, which
+// is what a simulation with no saved selection runs on at runtime: existing
+// unset simulations must keep showing (and saving) that, or opening one would
+// quietly move it to a different skill.
+export const NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE =
+  "ally_ai_learn_system_main_agent_prompt_working_memory_split";
 
 export const DEFAULT_ROLE_INSTRUCTION = `You are an AI roleplay assistant for counselor training. In this simulation, you must act ONLY as the client in a therapy session. Stay fully in character, provide realistic dialogue, and do not switch roles unless explicitly instructed.
 
