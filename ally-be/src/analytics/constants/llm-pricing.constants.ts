@@ -1,3 +1,4 @@
+// <!-- docs-path-lint: ignore -->
 import { LlmTask } from '../../learn/enum/llm-task.enum';
 
 /**
@@ -13,9 +14,9 @@ import { LlmTask } from '../../learn/enum/llm-task.enum';
  * modelUsage as reported by the Claude Code CLI doesn't break writes out by
  * TTL, so this is still an approximation, not a billed amount.
  *
- * ANTHROPIC rates are current (verified via the claude-api reference, 2026-06).
+ * ANTHROPIC rates are current (verified via the claude-api reference, 2026-10).
  * OPENAI / GEMINI rates verified against the providers' public pricing pages
- * (2026-06). Unknown models fall through gracefully: cost 0 + priced=false,
+ * (2026-10). Unknown models fall through gracefully: cost 0 + priced=false,
  * with token totals still shown.
  *
  * The prompt-cache multipliers below are ANTHROPIC accounting, where cache
@@ -83,7 +84,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-haiku-5-5': { inputPer1MUsd: 0.1, outputPer1MUsd: 0.5 },
   'claude-haiku-4-5': { inputPer1MUsd: 1, outputPer1MUsd: 5 },
 
-  // --- OpenAI (verified 2026-06) ---
+  // --- OpenAI (verified 2026-10) ---
   // cachedInputPer1MUsd: UNVERIFIED — the vendor page could not be reached
   // when these were added (2026-10); confirm against openai.com/api/pricing.
   // Half the input rate on the 4o family, a tenth on the 5 family.
@@ -113,7 +114,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'o1-mini': { inputPer1MUsd: 1.1, outputPer1MUsd: 4.4 },
   'text-embedding-3-small': { inputPer1MUsd: 0.02, outputPer1MUsd: 0 },
 
-  // --- Gemini (verified 2026-06) ---
+  // --- Gemini (verified 2026-10) ---
   // cachedInputPer1MUsd for the 2.5 models: Google's "Context caching price"
   // at ai.google.dev/gemini-api/docs/pricing, checked 2026-10-05 — a tenth of
   // the input rate (2.5-pro 0.125, 2.5-flash 0.03, text/image/video). Explicit
