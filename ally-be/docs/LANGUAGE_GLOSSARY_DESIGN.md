@@ -992,4 +992,3 @@ as deliberate); judge baseline (captured; but see the segmentation warning in §
 *Rewritten from source in this pass: the Status block, §2 decisions 5/8/9/10/11, §4, §5.1/5.2,
 §6 (all of it), §8 API, §9, §10, §11 items 6/10/11 plus new 12–14, §12 banner, §13.
 Re-read and left standing: §1, §1a, §3, §5.3, §7, §11 items 1–5/7–9, §12 phase list.*
-<!-- Test-only change for docs-guard. See PR #149. -->

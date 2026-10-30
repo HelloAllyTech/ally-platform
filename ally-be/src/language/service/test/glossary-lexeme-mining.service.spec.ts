@@ -369,7 +369,6 @@ describe('GlossaryLexemeMiningService jobs', () => {
   let store: Map<string, string>;
   let mine: jest.SpyInstance;
   let assertLanguageExists: jest.Mock;
-  let errorSpy: jest.SpyInstance;
 
   /** Let the fire-and-forget run settle. */
   const settle = async () => {
@@ -377,7 +376,6 @@ describe('GlossaryLexemeMiningService jobs', () => {
   };
 
   beforeEach(() => {
-    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     store = new Map();
     const redis: any = {
       get: jest.fn(async (k: string) => store.get(k) ?? null),
@@ -401,10 +399,6 @@ describe('GlossaryLexemeMiningService jobs', () => {
     mine = jest.spyOn(service, 'mineLexemes');
   });
 
-  afterEach(() => {
-    errorSpy.mockRestore();
-  });
-
   it('returns a running job at once and records the result when done', async () => {
     let finish!: (v: any) => void;
     mine.mockReturnValue(new Promise((r) => (finish = r)));
@@ -424,6 +418,7 @@ describe('GlossaryLexemeMiningService jobs', () => {
   });
 
   it('records a failure with its message and frees the language', async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     mine.mockRejectedValue(new Error('pairing exploded'));
     const job = await service.startJob(6, {});
     await settle();
@@ -433,6 +428,7 @@ describe('GlossaryLexemeMiningService jobs', () => {
     expect(failed.error).toBe('pairing exploded');
     mine.mockResolvedValue({});
     await expect(service.startJob(6, {})).resolves.toBeDefined();
+    errorSpy.mockRestore();
   });
 
   it('refuses a second concurrent run for the same language', async () => {
