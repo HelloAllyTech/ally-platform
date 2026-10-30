@@ -379,6 +379,14 @@ export const API_ROUTES = {
     GET_SKILLS: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/skills`,
   },
+  // The Debrief agent's debrief, for the learner's own session.
+  DEBRIEFS: {
+    GET: (sessionId: string) => `/debriefs/sessions/${sessionId}`,
+    HELPFUL: (sessionId: string) => `/debriefs/sessions/${sessionId}/helpful`,
+    FLAGS: (sessionId: string) => `/debriefs/sessions/${sessionId}/flags`,
+    FLAG: (sessionId: string, flagId: string) =>
+      `/debriefs/sessions/${sessionId}/flags/${flagId}`,
+  },
   APP_VERSION: {
     ANDROID: '/app-version/android',
     IOS: '/app-version/ios',

@@ -10,6 +10,7 @@ import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import 'package:ally_mobile_flutter/features/reactions/data/reactions_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
@@ -29,6 +30,8 @@ class MockReviewsRepository extends Mock implements ReviewsRepository {}
 class MockReactionsRepository extends Mock implements ReactionsRepository {}
 
 class MockAskAiChatApi extends Mock implements AskAiChatApi {}
+
+class MockLearnerDebriefRepository extends Mock implements LearnerDebriefRepository {}
 
 const allPermissions = [
   UserPermissions.viewSessionScenarioMessages,
@@ -89,6 +92,9 @@ class FeedbackHarness {
         .thenAnswer((_) async => (threads: const <ReviewThread>[], count: 0));
     when(() => reactions.getReactionsCount(any())).thenAnswer((_) async => <String, int>{});
     when(() => chatApi.getHistory(any())).thenAnswer((_) async => <AskAiChatMessage>[]);
+    // Most organisations aren't on the Debrief agent: today's debrief shows.
+    when(() => learnerDebrief.getDebrief(any()))
+        .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
     when(() => simulations.getEventChecklist(any())).thenAnswer((_) async => <EventChecklistItem>[]);
     when(
       () => simulations.addSimulationFeedback(
@@ -105,6 +111,7 @@ class FeedbackHarness {
   final reviews = MockReviewsRepository();
   final reactions = MockReactionsRepository();
   final chatApi = MockAskAiChatApi();
+  final learnerDebrief = MockLearnerDebriefRepository();
 
   /// `GET /scenario-session-reviews/:id` (the share switch reads it).
   void stubReview({String status = 'IN_REVIEW', String createdAt = '2026-01-01T10:10:00.000Z'}) {
@@ -177,6 +184,7 @@ class FeedbackHarness {
         reviewsRepositoryProvider.overrideWithValue(reviews),
         reactionsRepositoryProvider.overrideWithValue(reactions),
         askAiChatApiProvider.overrideWithValue(chatApi),
+        learnerDebriefRepositoryProvider.overrideWithValue(learnerDebrief),
         userPermissionsProvider.overrideWith((ref) async => permissions),
       ],
     );

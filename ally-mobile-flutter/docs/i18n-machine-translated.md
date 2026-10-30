@@ -119,3 +119,7 @@ These keys are in `en.json` but no code in `lib/` refers to them by name. Most a
 | `conferenceListening.resume` | Resume nudges | सुझाव फिर से शुरू करें | ಸಲಹೆಗಳನ್ನು ಪುನರಾರಂಭಿಸಿ | सूचना पुन्हा सुरू करा | பரிந்துரைகளைத் தொடர் |
 | `conferenceListening.endSession` | End session | सत्र समाप्त करें | ಸೆಷನ್ ಕೊನೆಗೊಳಿಸಿ | सत्र थांबवा | அமர்வை முடி |
 | `conferenceListening.callEnded` | The call has ended | कॉल समाप्त हो गई है | ಕಾಲ್ ಕೊನೆಗೊಂಡಿದೆ | कॉल संपला आहे | அழைப்பு முடிந்தது |
+
+## "Your debrief" (Debrief agent) (40)
+
+`postSim.debriefCards.*`, added 2026-10-30: one machine translation (gpt-4.1) shared by the web helpline, the React Native app and this app, written to match the words the existing Debrief tab already uses for "debrief" and "Ally" in each language. Needs a native speaker's read like the rest of this page.

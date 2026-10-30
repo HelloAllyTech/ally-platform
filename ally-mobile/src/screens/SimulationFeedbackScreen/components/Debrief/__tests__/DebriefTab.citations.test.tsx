@@ -32,6 +32,10 @@ jest.mock('../DebriefReplyInput', () => {
   return {DebriefReplyInput: () => <View testID="reply-input" />};
 });
 
+// The learner's organisation isn't on the Debrief agent here: today's view stays.
+jest.mock('../useLearnerDebrief', () => ({useLearnerDebrief: () => null}));
+jest.mock('@/services/learnerDebriefApi', () => ({}));
+
 jest.mock('react-native-linear-gradient', () => {
   const {View} = require('react-native');
   return {__esModule: true, default: View};

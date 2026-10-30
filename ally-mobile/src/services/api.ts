@@ -185,6 +185,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   tagTypes: [
+    'LearnerDebrief',
     'SimulationCredits',
     'SimulationPaths',
     'SimulationPathDetails',

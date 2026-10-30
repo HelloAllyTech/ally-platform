@@ -18,9 +18,11 @@ import {SimulationSummaryData} from '@/types';
 import {CitationsTable} from '../AskAI/ChatElements';
 import {AskAIChatMessage, ChatMessageRole} from '../AskAI/types';
 import {useAskAIChat} from '../AskAI/useAskAIChat';
+import {DebriefCards} from './DebriefCards';
 import {DebriefReplyInput} from './DebriefReplyInput';
 import {styles} from './styles';
 import {SupervisorNote} from './SupervisorNote';
+import {useLearnerDebrief} from './useLearnerDebrief';
 
 interface DebriefTabProps {
   scenarioSessionId: string;
@@ -332,6 +334,16 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
   );
 
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
+
+  // The Debrief agent's debrief replaces everything here once the learner's
+  // organisation is switched on. `null` — not switched on, request failed or
+  // still loading — keeps today's debrief exactly as it was. Asked on the
+  // read-only Logs view too: a learner reopening their own session should see
+  // the debrief they got, and anyone else gets a 403, which falls back.
+  const learnerDebrief = useLearnerDebrief(scenarioSessionId);
+  if (learnerDebrief) {
+    return <DebriefCards view={learnerDebrief} sessionId={scenarioSessionId} />;
+  }
 
   return (
     <View style={styles.container}>

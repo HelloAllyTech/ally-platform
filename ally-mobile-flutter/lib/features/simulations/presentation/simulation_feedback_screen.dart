@@ -720,6 +720,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       case FeedbackTab.debrief:
         return DebriefTab(
           chat: _chat,
+          sessionId: widget.scenarioSessionId,
           summary: _summary,
           retryLimitReached: _retryLimitReached,
           readOnly: widget.fromLogs,

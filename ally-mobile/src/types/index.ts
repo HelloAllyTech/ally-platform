@@ -74,3 +74,4 @@ export * from './discussion';
 
 // Learner progress (XP / levels) types
 export * from './progress';
+export * from './learnerDebrief';

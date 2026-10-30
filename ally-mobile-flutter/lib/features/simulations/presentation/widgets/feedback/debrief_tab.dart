@@ -5,7 +5,10 @@ import '../../../../../core/localization/translate_ref.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
 import '../../../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
+import '../../../data/learner_debrief_repository.dart';
 import '../../../data/simulation_models.dart';
+import 'debrief_cards.dart';
+import 'learner_debrief_controller.dart';
 import 'supervisor_note.dart';
 
 /// Port of RN `Debrief/DebriefTab.tsx`: the landing surface after a
@@ -16,10 +19,17 @@ import 'supervisor_note.dart';
 /// While the note is still being generated (and polling hasn't given up) a
 /// skeleton + "Ally is writing your debrief…" shows; a failed or missing
 /// note says so plainly. Read-only (opened from Logs) shows the note alone.
+///
+/// The Debrief agent's debrief ([DebriefCards], the web helpline's
+/// `DebriefTab` → `useLearnerDebrief`) replaces all of that once the
+/// learner's organisation is switched on. Until its first answer lands — and
+/// for `not_available` or any failed request — today's debrief shows exactly
+/// as before. Read-only (Logs) never asks, matching RN.
 class DebriefTab extends ConsumerStatefulWidget {
   const DebriefTab({
     super.key,
     required this.chat,
+    required this.sessionId,
     required this.summary,
     required this.retryLimitReached,
     this.onOpenMoment,
@@ -27,6 +37,9 @@ class DebriefTab extends ConsumerStatefulWidget {
   });
 
   final AskAiChatController chat;
+
+  /// The scenario session, for the Debrief agent's debrief.
+  final String sessionId;
   final SimulationSummary? summary;
   final bool retryLimitReached;
   final ValueChanged<String>? onOpenMoment;
@@ -38,10 +51,18 @@ class DebriefTab extends ConsumerStatefulWidget {
 
 class _DebriefTabState extends ConsumerState<DebriefTab> {
   final _scrollController = ScrollController();
+  late final LearnerDebriefController _learnerDebrief = LearnerDebriefController(
+    repository: ref.read(learnerDebriefRepositoryProvider),
+    // Asked on the Logs view too, as RN: the endpoint answers only the
+    // learner themself, and anyone else's 403 falls back to the note.
+    sessionId: widget.sessionId,
+  );
 
   @override
   void initState() {
     super.initState();
+    _learnerDebrief.addListener(_onLearnerDebrief);
+    _learnerDebrief.load();
     widget.chat.addListener(_onChat);
     if (!widget.readOnly) widget.chat.loadHistory();
   }
@@ -58,8 +79,21 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
   @override
   void dispose() {
     widget.chat.removeListener(_onChat);
+    _learnerDebrief
+      ..removeListener(_onLearnerDebrief)
+      ..dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Only the switch between today's debrief and the new one matters here;
+  /// [DebriefCards] listens for everything else itself.
+  bool _showingLearnerDebrief = false;
+
+  void _onLearnerDebrief() {
+    final showing = _learnerDebrief.view != null;
+    if (!mounted || showing == _showingLearnerDebrief) return;
+    setState(() => _showingLearnerDebrief = showing);
   }
 
   /// RN scrolls to the bottom on every content-size change (each streamed
@@ -78,6 +112,7 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showingLearnerDebrief) return DebriefCards(controller: _learnerDebrief);
     final chat = widget.chat;
     final note = widget.summary?.supervisorNote;
     final hasNote = note != null && note.isNotEmpty;

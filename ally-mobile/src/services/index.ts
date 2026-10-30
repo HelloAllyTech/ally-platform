@@ -25,3 +25,4 @@ export * from './coursesApi';
 export * from './bugReportApi';
 export * from './progressApi';
 export * from './discussionApi';
+export * from './learnerDebriefApi';
