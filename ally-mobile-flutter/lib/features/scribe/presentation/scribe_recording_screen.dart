@@ -341,8 +341,22 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     if (!mounted) return;
     // MICROPHONE_AUDIO_SAMPLE_RATE / channels / bitsPerSample in RN's
     // constants/general.ts — the backend's audio pipeline expects this.
+    //
+    // audioInterruption: pauseResume — the `record` package's default
+    // (`pause`) auto-pauses on any transient AUDIOFOCUS_LOSS (a
+    // notification sound, a Bluetooth route change, …) and never resumes
+    // on its own, silently halting capture for the rest of the session
+    // with no error, no socket disconnect, and the on-screen timer still
+    // ticking (RN's native module has no such concept, so this never
+    // happened there). `pauseResume` makes the platform auto-resume once
+    // focus returns, matching RN's behavior of simply not stopping.
     final stream = await _recorder.startStream(
-      const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: 16000, numChannels: 1),
+      const RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        audioInterruption: AudioInterruptionMode.pauseResume,
+      ),
     );
     stream.listen(_onAudioChunk);
   }
