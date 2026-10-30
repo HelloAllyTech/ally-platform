@@ -142,6 +142,12 @@ describe('debrief checks', () => {
     expect(run(c)).toContain(DebriefCheckCode.WRONG_SPEAKER);
   });
 
+  it('refuses turn numbers the learner cannot see', () => {
+    const c = good();
+    c.what_worked[0].body = 'You asked this in turn 5, which helped.';
+    expect(run(c)).toContain(DebriefCheckCode.TURN_NUMBER);
+  });
+
   it('requires every risk cue to be covered, not only the most serious', () => {
     const twoCues = {
       risk_cues: [

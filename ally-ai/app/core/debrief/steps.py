@@ -264,6 +264,11 @@ async def write(
         )
     if safety.get("learner_distress"):
         lines.append("LEARNER DISTRESS: noted in this session.")
+    # Code-owned: the learner never sees turn numbers, whatever the prompt says.
+    lines.append(
+        "Never mention turn numbers in what you write; the quote is how the "
+        "learner finds the moment."
+    )
     cue_turns = sorted({c.get("turn_index") for c in safety.get("risk_cues", [])})
     if cue_turns:
         # Code-owned, not prompt-owned: a debrief that leaves any cue out is

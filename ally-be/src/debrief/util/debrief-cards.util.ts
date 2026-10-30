@@ -79,6 +79,7 @@ export enum DebriefCheckCode {
   NO_TRY_SAYING = 'no_try_saying',
   UNSUPPORTED_PROGRESS = 'unsupported_progress',
   EXCLAMATION = 'exclamation',
+  TURN_NUMBER = 'turn_number',
 }
 
 export interface DebriefCheckFailure {
@@ -135,6 +136,9 @@ const SCORE_RE =
 
 const DIAGNOSIS_RE =
   /\byou (are|seem|sound|might be|may be) (anxious|depressed|insecure|avoidant|narcissistic|codependent|traumati[sz]ed)\b|\byou (have|suffer from) (anxiety|depression|ptsd|adhd|a disorder)\b|\b(personality|attachment) (disorder|style)\b/i;
+
+/** Learners never see turn numbers; quotes are what point at the moment. */
+const TURN_NUMBER_RE = /\b(turns?|टर्न|ಟರ್ನ್|டர்ன்)\s*\d+/i;
 
 const PROGRESS_CLAIM_RE =
   /\b(than last time|since last time|compared (with|to) (last|your last|previous)|you('ve| have) (improved|got better|gotten better)|getting better at|more consistent)\b/i;
@@ -386,6 +390,13 @@ export function runDebriefChecks(input: {
         DebriefCheckCode.DIAGNOSES_TRAINEE,
         t.section,
         'labels or diagnoses the trainee',
+      );
+    }
+    if (TURN_NUMBER_RE.test(t.text)) {
+      fail(
+        DebriefCheckCode.TURN_NUMBER,
+        t.section,
+        'mentions a turn number the learner cannot see',
       );
     }
     if (t.ownWords && t.text.includes('!')) {
