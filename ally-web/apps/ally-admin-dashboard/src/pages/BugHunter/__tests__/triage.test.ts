@@ -162,6 +162,27 @@ describe("nextStep", () => {
     );
     expect(nextStep(finding({ id: "a", status: BugFindingStatus.NEEDS_INPUT }))).toBe("answer");
     expect(nextStep(finding({ id: "a", status: BugFindingStatus.FAILED }))).toBe("retry");
+    // A plan parked on a step: the step's own move, or nothing while it runs.
+    const attention = { stepId: "s", stepIndex: 1, repo: "ally-ai", prUrl: "u" };
+    expect(
+      nextStep(
+        finding({
+          id: "a",
+          status: BugFindingStatus.COORDINATING,
+          attention: { ...attention, kind: "merge" },
+        }),
+      ),
+    ).toBe("merge");
+    expect(
+      nextStep(
+        finding({
+          id: "a",
+          status: BugFindingStatus.COORDINATING,
+          attention: { ...attention, kind: "review" },
+        }),
+      ),
+    ).toBe("review");
+    expect(nextStep(finding({ id: "a", status: BugFindingStatus.COORDINATING }))).toBeNull();
     expect(nextStep(finding({ id: "a", status: BugFindingStatus.RELEASE_FAILED }))).toBe("release");
     expect(
       nextStep(

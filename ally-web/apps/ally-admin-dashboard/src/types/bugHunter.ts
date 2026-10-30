@@ -550,6 +550,11 @@ export interface BugFinding {
   /** The Verifier's latest verdict on the current fix PR, or null until one has run. */
   latestFixVerdict: BugFixVerdict | null;
   /**
+   * On a coordinating plan, the step waiting on a person (see PlanAttention).
+   * Null while Bug Hunter has it; absent on a backend one release behind.
+   */
+  attention?: PlanAttention | null;
+  /**
    * Where an unproven finding stands with the independent verifier (OPP-0780).
    * Null for proven findings, human reports, and findings from before it existed.
    */
@@ -621,8 +626,24 @@ export interface ListBugHunterNotificationsResponse {
 }
 
 /** One repo's worth of a multi-repo fix. The array order IS the ship order. */
+/**
+ * What a person has to do on a multi-repo plan — derived by the server from
+ * the plan's steps. `merge`: the step's PR passed the Verifier in a repo Bug
+ * Hunter may not merge in. `review`: the Verifier refused it and the
+ * orchestrator handed it to a person.
+ */
+export interface PlanAttention {
+  kind: "merge" | "review";
+  stepId: string;
+  stepIndex: number;
+  repo: string | null;
+  prUrl: string | null;
+}
+
 export interface BugFixStep {
   id: string;
+  /** The Verifier's latest verdict on this step's current PR. Absent on a backend one release behind. */
+  fixVerdict?: "pass" | "fail" | null;
   stepIndex: number;
   repo: string | null;
   stepSummary: string | null;

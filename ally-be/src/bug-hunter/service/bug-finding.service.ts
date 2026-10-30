@@ -405,6 +405,11 @@ export class BugFindingService {
     return this.findingRepository.listChildren(parentFindingId);
   }
 
+  /** Steps of several coordinated fixes at once — see BugHunterController.attachSteps. */
+  listStepsForParents(parentFindingIds: string[]): Promise<BugFinding[]> {
+    return this.findingRepository.listChildrenOf(parentFindingIds);
+  }
+
   /**
    * Record a test that was ALREADY failing when another agent found it.
    *

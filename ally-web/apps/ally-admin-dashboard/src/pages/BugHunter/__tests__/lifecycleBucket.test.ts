@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BugFinding, BugFindingStatus } from "@types";
 
 import {
+  bucketOf,
   bucketOfStatus,
   countByBucket,
   defaultBucket,
@@ -14,6 +15,17 @@ import {
 
 const finding = (status: BugFindingStatus, id: string, createdAt = "2026-08-17"): BugFinding =>
   ({ id, status, createdAt, title: id, repo: null }) as unknown as BugFinding;
+
+describe("bucketOf", () => {
+  it("puts a plan parked on a person under Needs you, and a working plan under In progress", () => {
+    const parked = {
+      ...finding(BugFindingStatus.COORDINATING, "plan"),
+      attention: { kind: "merge", stepId: "s", stepIndex: 1, repo: "ally-ai", prUrl: "u" },
+    } as BugFinding;
+    expect(bucketOf(parked)).toBe("needs_you");
+    expect(bucketOf(finding(BugFindingStatus.COORDINATING, "plan"))).toBe("in_progress");
+  });
+});
 
 describe("bucketOfStatus", () => {
   /**

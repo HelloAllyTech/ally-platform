@@ -10,7 +10,8 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { BugFindingSource } from '../enum/bug-finding.enum';
+import { planAttention, stepFixVerdict } from '../util/plan-attention.util';
+import { BugFindingSource, BugFindingStatus } from '../enum/bug-finding.enum';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -460,7 +461,9 @@ export class BugHunterController {
       limit: query.limit ?? 1000,
       offset: query.offset ?? 0,
     });
-    const enriched = await this.bugFindingService.enrich(items);
+    const enriched = await this.attachSteps(
+      await this.bugFindingService.enrich(items),
+    );
     return { items: enriched.map(toFindingDto), count, countsByStatus };
   }
 
@@ -833,6 +836,25 @@ export class BugHunterController {
   }
 
   /**
+   * A page's coordinating parents get their steps, so each row can say which
+   * step is waiting on a person (`attention`) — one read for the whole page.
+   */
+  private async attachSteps<T extends BugFinding>(
+    rows: T[],
+  ): Promise<(T & { steps?: BugFinding[] })[]> {
+    const parentIds = rows
+      .filter((row) => row.status === BugFindingStatus.COORDINATING)
+      .map((row) => row.id);
+    if (!parentIds.length) return rows;
+    const steps = await this.bugFindingService.listStepsForParents(parentIds);
+    return rows.map((row) =>
+      parentIds.includes(row.id)
+        ? { ...row, steps: steps.filter((s) => s.parentFindingId === row.id) }
+        : row,
+    );
+  }
+
+  /**
    * The drawer needs to know not just the finding but whether the release
    * button applies to it — a judgement that depends on repo/file mapping and
    * on whether this environment has GitHub credentials at all, neither of
@@ -850,7 +872,7 @@ export class BugHunterController {
       ],
     );
     return {
-      ...toFindingDto(enriched),
+      ...toFindingDto({ ...enriched, steps }),
       events: events.map(toEventDto),
       steps: steps.map(toStepDto),
       releasable,
@@ -1285,7 +1307,7 @@ function readConfidence(metadata?: Record<string, any> | null): number | null {
 }
 
 export function toFindingDto(
-  row: BugFinding & Partial<BugFindingEnrichment>,
+  row: BugFinding & Partial<BugFindingEnrichment> & { steps?: BugFinding[] },
 ): BugFindingDto {
   return {
     id: row.id,
@@ -1353,6 +1375,7 @@ export function toFindingDto(
       row.metadata?.fixVerdicts,
       row.prUrl ?? null,
     ) as Record<string, any> | null,
+    attention: planAttention(row, row.steps ?? []),
     postmortem:
       row.metadata?.postmortem && typeof row.metadata.postmortem === 'object'
         ? (row.metadata.postmortem as Record<string, unknown>)
@@ -1399,6 +1422,7 @@ export function toRunDto(row: BugHuntRun): BugHuntRunDto {
 
 export function toStepDto(row: BugFinding): BugFixStepDto {
   return {
+    fixVerdict: stepFixVerdict(row),
     id: row.id,
     stepIndex: row.stepIndex ?? 0,
     repo: row.repo ?? null,
