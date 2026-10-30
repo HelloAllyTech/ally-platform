@@ -517,6 +517,15 @@ class TestVendorConstructorMapping:
 
         assert kwargs["conn_options"].retry_interval == default.retry_interval
 
+    @pytest.mark.unit
+    def test_bey_gets_a_30_second_timeout(self):
+        """Bey's conn_options timeout is now 30.0 seconds."""
+        import livekit.plugins.bey as bey
+
+        build = video_actor.HOSTED_PROVIDER_KWARGS["bey"]
+        kwargs = build(bey, avatar_id="face-123", api_key="k", character_name="Asha")
+        assert kwargs["conn_options"].timeout == 30.0
+
     def test_persona_id_is_omitted_unless_configured(self, monkeypatch):
         """Unset by design — the character comes from our prompt, not a vendor."""
         import livekit.plugins.tavus as tavus
