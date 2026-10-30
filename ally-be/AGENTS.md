@@ -46,7 +46,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Real-time / WebSocket work | `src/**/*.gateway.ts` — namespaces are `/microphone-chat`, `/cloud-telephony-chat`, `/scenario-report` |
 | Writing or fixing tests | [`TESTING.md`](TESTING.md); Docker variant in [`DOCKER_TESTING_SETUP.md`](DOCKER_TESTING_SETUP.md) |
 | Releasing | [`.github/RELEASE_GUIDE.md`](.github/RELEASE_GUIDE.md) |
-| Anything else | [`WIKI-ROUTING.md`](WIKI-ROUTING.md) — one line per wiki page, tells you which to fetch |
+| Anything else | [`ROUTING.md`](ROUTING.md) — one line per wiki page, tells you which to fetch |
 
 ## Repo shape
 

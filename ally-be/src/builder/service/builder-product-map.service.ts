@@ -31,7 +31,7 @@ const ROOT_DOCS_DROPPED = new Set([
   'DOCKER_TESTING_SETUP.md',
   'SECURITY.md',
   'TESTING.md',
-  'WIKI-ROUTING.md',
+  'ROUTING.md',
   'pr_body.md',
 ]);
 
