@@ -1715,6 +1715,21 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configuredBy: 'BUG_HUNTER_CLASSIFY_REPO_MODEL (compiled in)',
   },
   {
+    id: 'bug-hunter-image-probe',
+    task: LlmTask.BUG_HUNTER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A Bug Hunter run calls the image-generation probe on a bug about the image service',
+    detail:
+      'One real image call made the way the product makes it, to see what the provider accepts today (a retired model, a refused size, a blocked prompt); the image is discarded. Quality low; capped at 20 calls an hour across every run.',
+    kind: AiTaskKind.IMAGE,
+    provider: 'openai',
+    defaultModel: 'gpt-image-1.5',
+    configuredBy:
+      "OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL (or the probe's model parameter)",
+    configPath: 'openai.imageModel',
+  },
+  {
     id: 'bug-hunter-miss-classifier',
     task: LlmTask.BUG_HUNTER,
     runtime: LlmRuntime.ALLY_BE,

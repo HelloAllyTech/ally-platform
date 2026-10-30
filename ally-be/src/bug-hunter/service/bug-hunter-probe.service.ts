@@ -5,9 +5,13 @@ import { AwsLogServiceKey } from 'src/config/config.service';
 import { LogsService } from 'src/logs/logs.service';
 
 import {
+  IMAGE_PROBE_CALLS_PER_HOUR,
+  IMAGE_PROBE_PROMPT_MAX,
   PIPELINE_PROBES,
   PIPELINE_PROBE_NAMES,
 } from '../constants/bug-hunter-probes.constants';
+import { ImageGenerationProviderFactory } from 'src/image-generation/provider/image-generation-provider.factory';
+import { DEFAULT_IMAGE_SIZE } from 'src/image-generation/interface/image-generation-provider.interface';
 import { redactPii } from '../util/redact-pii.util';
 import { ELIGBLE_APP_LANGUAGES } from 'src/common/constants/translation.constants';
 
@@ -52,7 +56,11 @@ export class BugHunterProbeService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly logsService: LogsService,
+    private readonly imageProviders: ImageGenerationProviderFactory,
   ) {}
+
+  /** Start times of recent image-generation probe calls, for the hourly cap. */
+  private imageCalls: number[] = [];
 
   catalogue() {
     return PIPELINE_PROBES;
@@ -75,6 +83,8 @@ export class BugHunterProbeService {
         return this.languages();
       case 'recent-errors':
         return this.recentErrors(params);
+      case 'image-generation':
+        return this.imageGeneration(params);
       default:
         throw new BadRequestException(
           `No probe called "${name}". Probes: ${PIPELINE_PROBE_NAMES.join(', ')}.`,
@@ -328,5 +338,63 @@ export class BugHunterProbeService {
         message: clip(redactPii(String(e.message ?? '')), 600),
       })),
     };
+  }
+
+  /**
+   * One real call to the image service, made the way the product makes it,
+   * reporting only what the provider said. The bug behind it lives outside
+   * this codebase — which models exist, what sizes and prompts the provider
+   * accepts today — so it can only be seen by asking. Low quality keeps each
+   * call cheap and quick; the image itself is discarded.
+   */
+  private async imageGeneration(params: ProbeParams) {
+    const now = Date.now();
+    this.imageCalls = this.imageCalls.filter((t) => now - t < 60 * 60 * 1000);
+    if (this.imageCalls.length >= IMAGE_PROBE_CALLS_PER_HOUR) {
+      throw new BadRequestException(
+        `The image-generation probe has made ${IMAGE_PROBE_CALLS_PER_HOUR} real calls in the last hour, its cap. Use the answers you already have.`,
+      );
+    }
+    const prompt =
+      clip(params.prompt, IMAGE_PROBE_PROMPT_MAX) ??
+      'A calm, softly lit photograph of two people talking at a kitchen table. No text anywhere in the image.';
+    const size = clip(params.size, 16) ?? DEFAULT_IMAGE_SIZE;
+    const { provider, providerType } = this.imageProviders.getProvider(
+      clip(params.provider, 16) ?? undefined,
+    );
+    const model = clip(params.model, 64) ?? provider.getModel();
+    this.imageCalls.push(now);
+    const startedAt = Date.now();
+    try {
+      const image = await provider.generateImage(prompt, size, {
+        model,
+        quality: 'low',
+      });
+      return {
+        ok: true,
+        provider: providerType,
+        model,
+        size,
+        ms: Date.now() - startedAt,
+        bytes: image.length,
+      };
+    } catch (error) {
+      const err = error as {
+        status?: number;
+        code?: string;
+        type?: string;
+        message?: string;
+      };
+      return {
+        ok: false,
+        provider: providerType,
+        model,
+        size,
+        ms: Date.now() - startedAt,
+        status: err?.status ?? null,
+        code: err?.code ?? err?.type ?? null,
+        message: clip(err?.message ?? String(error), 600),
+      };
+    }
   }
 }
