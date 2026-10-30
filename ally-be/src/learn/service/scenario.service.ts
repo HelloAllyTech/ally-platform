@@ -107,6 +107,8 @@ import { ScenarioCompletionSummary } from '../interface/scenario-completion.inte
 import { ScenarioSessionRepository } from '../repository/scenario-session.repository';
 import { TriggerWarningsService } from './trigger-warnings.service';
 import { ScenarioTranslationsRepository } from '../repository/scenario-translations.repository';
+import { ScenarioTranslations } from '../entity/scenario-translation.entity';
+import { ScenarioEventsTranslation } from '../entity/scenario-events-translation.entity';
 import { GoogleTranslationsService } from 'src/common/service/google-translation.service';
 import { SharedLanguageService } from '../../language/service/shared-language.service';
 import { ScenarioSharedService } from './scenario-shared.service';
@@ -1931,6 +1933,8 @@ export class ScenarioService {
         }
       }
 
+      await this.copyScenarioTranslations(manager, id, newScenarioData.id);
+
       // Copy behavior instructions from the original scenario
       if (
         originalBehaviorInstructions &&
@@ -1973,6 +1977,56 @@ export class ScenarioService {
       this.logger.info(`Scenario ${id} duplicated successfully`);
       return newScenarioData;
     });
+  }
+
+  /**
+   * Copy a scenario's per-language text to its duplicate: opening statements,
+   * description, state names and Knowledge Sources (`scenario_translations`),
+   * and its events' messages (`scenario_events_translations`). Without them a
+   * copy plays its English opening statement in a Hindi session and shows
+   * English text in every other language until each field is edited again.
+   *
+   * The translated title is left behind: the copy's own title is "Copy of …",
+   * and a translation of the source's title would hide that it is a copy.
+   */
+  private async copyScenarioTranslations(
+    manager: EntityManager,
+    sourceId: number,
+    copyId: number,
+  ): Promise<void> {
+    const scenarioRepo = manager.getRepository(ScenarioTranslations);
+    const rows = await scenarioRepo.find({ where: { scenarioId: sourceId } });
+    if (rows.length > 0) {
+      await scenarioRepo.save(
+        rows.map(({ languageId, metadata }) => {
+          const rest = { ...(metadata ?? {}) };
+          delete rest.title;
+          return scenarioRepo.create({
+            scenarioId: copyId,
+            languageId,
+            metadata: rest,
+          });
+        }),
+      );
+    }
+
+    const eventRepo = manager.getRepository(ScenarioEventsTranslation);
+    const eventRows = await eventRepo.find({
+      where: { scenarioId: sourceId },
+    });
+    if (eventRows.length > 0) {
+      await eventRepo.save(
+        eventRows.map(({ eventId, languageId, message, branchInstruction }) =>
+          eventRepo.create({
+            scenarioId: copyId,
+            eventId,
+            languageId,
+            message,
+            branchInstruction,
+          }),
+        ),
+      );
+    }
   }
 
   async validateUpdateScenario(
