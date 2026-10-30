@@ -42,7 +42,6 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
   // Scenario meta
   { name: "title", label: "Title", group: "scenario" },
   { name: "challenge_description", label: "Challenge Description", group: "scenario" },
-  { name: "competency", label: "Competency", group: "scenario" },
   { name: "role_instructions", label: "Role Instructions", group: "scenario" },
 
   // Persona (identity)
@@ -73,13 +72,11 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
   // wrapper.
   { name: "previous_memory", label: "Previous Memory", group: "character" },
 
-  // Behavior / session
-  //
-  // `session_behavior_guidelines`, `agent_goal`, and `response_length` were
-  // also part of the deprecated simulator-creator inputs and were removed
-  // alongside the character-side fields above. Behaviour Instructions
-  // table + Behavior Rules JSON cover the same runtime intent end-to-end.
-  { name: "opening_statements", label: "Opening Statements", group: "behavior" },
+  // `competency` and `opening_statements` are deliberately absent: both are
+  // scenario fields (the skill being trained; what the client says first),
+  // not actor direction, so they are not offered as prompt variables. So is
+  // `behavior_instructions_json`, which only Prompt #1's legacy per-state
+  // coaching uses; #1's own text still references it.
 
   // System-computed (filled by the prompt builder, not the studio)
   //
@@ -150,12 +147,6 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
   {
     name: "custom_fields_text",
     label: "Custom Fields",
-    group: "system",
-    systemComputed: true,
-  },
-  {
-    name: "behavior_instructions_json",
-    label: "Behavior Rules (JSON)",
     group: "system",
     systemComputed: true,
   },

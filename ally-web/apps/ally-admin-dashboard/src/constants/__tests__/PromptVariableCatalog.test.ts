@@ -38,7 +38,6 @@ const PROMPT_BUILDER_KWARGS: ReadonlySet<string> = new Set([
   "language_label",
   "multilingual_instructions_block",
   "name",
-  "opening_statements",
   "previous_memory",
   "previous_memory_block",
   "profession",
@@ -65,6 +64,16 @@ const PROMPT_BUILDER_BLOCK_KWARGS: ReadonlySet<string> = new Set([
   "profession_block",
 ]);
 
+/**
+ * Kwargs the builder still supplies for live prompt text that references
+ * them, but which are deliberately not offered to authors: Prompt #1's
+ * live text still renders both.
+ */
+const UNADVERTISED_KWARGS: ReadonlySet<string> = new Set([
+  "behavior_instructions_json",
+  "competency",
+]);
+
 describe("MAIN_AGENT_PROMPT_VARIABLE_CATALOG", () => {
   it("every catalog entry maps to a real kwarg in _build_behavior_prompt", () => {
     const missingFromBuilder: string[] = [];
@@ -88,6 +97,7 @@ describe("MAIN_AGENT_PROMPT_VARIABLE_CATALOG", () => {
       // intentionally live in the "Used Blocks" panel instead of the
       // variables picker. Exempt them from the bijection check.
       if (PROMPT_BUILDER_BLOCK_KWARGS.has(kwarg)) continue;
+      if (UNADVERTISED_KWARGS.has(kwarg)) continue;
       if (!catalogNames.has(kwarg)) {
         missingFromCatalog.push(kwarg);
       }

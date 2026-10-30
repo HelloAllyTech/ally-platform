@@ -755,13 +755,8 @@ class SystemMainAgentPromptFullInputs(PromptInputs):
     state_x_guidelines: Optional[str] = Field(None, title="Active State Guidelines")
     title: Optional[str] = Field(None, title="Title")
     challenge_description: Optional[str] = Field(None, title="Challenge Description")
-    competency: Optional[str] = Field(None, title="Competency")
     previous_memory: Optional[str] = Field(None, title="Previous Memory")
-    opening_statements: Optional[str] = Field(None, title="Opening Statements")
     custom_fields_text: Optional[str] = Field(None, title="Custom Fields")
-    behavior_instructions_json: Optional[str] = Field(
-        None, title="Behavior Rules (JSON)"
-    )
     helpful_behaviours: Optional[str] = Field(None, title="Helpful Behaviours")
     unhelpful_behaviours: Optional[str] = Field(None, title="Unhelpful Behaviours")
 

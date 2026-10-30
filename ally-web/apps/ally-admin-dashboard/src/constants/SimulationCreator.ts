@@ -772,16 +772,11 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         label: "Pick Competency",
         type: FORM_FIELD_TYPES.COMPETENCY,
         options: [],
-        // Competency stays mandatory and always visible. It's not just
-        // a prompt placeholder — it's a first-class scenario attribute
-        // (identifies the counselor skill being trained, used by
-        // analytics / organization / filtering). The `promptVariable`
-        // declaration below is intentionally kept so studio authors
-        // see `{competency}` in the chip list when editing a variant,
-        // but there's no `hideWhenUnused` because the field is
-        // structural metadata, not a prompt-only feeder field.
+        // Competency stays mandatory and always visible. It's a scenario
+        // attribute (the counselor skill being trained, used by analytics,
+        // organization and filtering), not a prompt variable, so it carries
+        // no `promptVariable` and no skill version can hide it.
         isMandatory: true,
-        promptVariable: "competency",
       },
       // The unified Behaviour Instructions table is always rendered.
       // Its rows drive the score-keeper via the SHOULD_DO/SHOULD_NOT_DO
@@ -817,7 +812,8 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         tooltipLocation: TooltipLocation.OPENING_DIALOGUE_TEMPLATES,
         fullWidth: true,
         isMandatory: false,
-        promptVariable: "opening_statements",
+        // What the client says first, played by the runtime itself. Not a
+        // prompt variable, so no skill version can hide it.
         enhanceType: ENHANCE_TYPE.OPENING_STATEMENTS,
       },
       // Plain-text reminders shown to the learner during the live session —

@@ -663,16 +663,11 @@ def _build_behavior_prompt(
         custom_fields_text=_format_custom_fields_text(
             getattr(prompt_data, "custom_fields", []) or []
         ),
+        # Not offered to authors any more (absent from the studio catalog and
+        # from Prompt #2's catalog-style contract): the competency is scenario
+        # metadata, not actor direction. Still supplied because Prompt #1's
+        # live text renders `{competency}`.
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
-        # Additional persona/style fields exposed for prompt variants.
-        # Not referenced by the default main_agent_prompt.txt today; SafeFormatter
-        # silently ignores unused kwargs. Future variants can reference any of
-        # these as {placeholder} in their prompt text. These attributes are
-        # populated on PromptData by app/core/scenario/base.py and otherwise
-        # feed evaluator / worker subsystems.
-        opening_statements=_coerce_block_value(
-            getattr(prompt_data, "opening_statements", None)
-        ),
         # Persona + language variables used directly by the prompt
         # template body. `previous_memory` is preformatted on the BE
         # side (full "You remember from your last session: …" sentence
