@@ -133,11 +133,21 @@ jobs:
           set -e
           # The app's tests run only on master pushes that touch ally-mobile/, so master's
           # head (often another service's commit) has no run at all. What ships is the app as
-          # of its newest commit, and that commit's run is the one that has to be green.
+          # of its newest commit, and a run on that exact app tree is the one that has to be green.
+          # Matched by tree rather than sha: a push that merges master forward lands the run on
+          # the merge commit, while `git log -- .` names the app commit beneath it.
           APP_HEAD=$(git log -1 --format=%H -- .)
-          CONCLUSION=$(gh run list --repo "${{ github.repository }}" --workflow test-ally-mobile.yml --branch master --limit 20 --json headSha,conclusion \
-            --jq "[.[] | select(.headSha == \"$APP_HEAD\")] | .[0].conclusion // \"\"")
-          echo "Tests conclusion for $APP_HEAD: '$CONCLUSION'"
+          APP_TREE=$(git rev-parse "$APP_HEAD:./")
+          CONCLUSION=""
+          for row in $(gh run list --repo "${{ github.repository }}" --workflow test-ally-mobile.yml --branch master --limit 20 --json headSha,conclusion \
+            --jq '.[] | "\(.headSha):\(.conclusion)"'); do
+            sha=${row%%:*}
+            if [ "$(git rev-parse "$sha:./" 2>/dev/null)" = "$APP_TREE" ]; then
+              CONCLUSION=${row#*:}
+              break
+            fi
+          done
+          echo "Tests conclusion for $APP_HEAD (tree $APP_TREE): '$CONCLUSION'"
           if [ "$CONCLUSION" != "success" ]; then
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           else
