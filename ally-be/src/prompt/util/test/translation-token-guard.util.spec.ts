@@ -109,6 +109,12 @@ describe('translation-token-guard', () => {
         output: 'ठीक है [Laughs]',
         ok: true,
       },
+      {
+        name: 'zero-width spaces around tokens are tolerated',
+        source: 'Hello {name} [laughs]',
+        output: 'नमस्ते {\u200Bname\u200B} [\u200Blaughs\u200B]',
+        ok: true,
+      },
     ];
 
     cases.forEach((c) => {
@@ -153,6 +159,14 @@ describe('translation-token-guard', () => {
       expect(normaliseTranslationTokens(output)).toBe(
         'आप {name} हैं। [laughs]',
       );
+    });
+
+    it('strips zero-width spaces from tokens', () => {
+      expect(
+        normaliseTranslationTokens(
+          'नमस्ते {\u200Bname\u200B} [\u200Blaughs\u200B]',
+        ),
+      ).toBe('नमस्ते {name} [laughs]');
     });
   });
 });

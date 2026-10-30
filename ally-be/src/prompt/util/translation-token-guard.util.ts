@@ -15,8 +15,8 @@
  * source must appear N times in the output.
  */
 
-const PLACEHOLDER_RE = /\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}/g;
-const AUDIO_TAG_RE = /\[\s*([a-z][a-z0-9_-]*)\s*\]/gi;
+const PLACEHOLDER_RE = /\{[\s\u200B]*([a-zA-Z_][a-zA-Z0-9_]*)[\s\u200B]*\}/g;
+const AUDIO_TAG_RE = /\[[\s\u200B]*([a-z][a-z0-9_-]*)[\s\u200B]*\]/gi;
 
 export interface TokenDiff {
   /** Tokens present in source but missing (or under-represented) in output. */
