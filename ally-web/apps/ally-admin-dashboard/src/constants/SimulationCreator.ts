@@ -526,7 +526,6 @@ export const COMFORT_AUDIO_VOLUME_MIN = 0;
 export const COMFORT_AUDIO_VOLUME_MAX = 1;
 export const COMFORT_AUDIO_VOLUME_STEP = 0.1;
 
-export const ROLE_INSTRUCTION_PROMPT_CODE = "openai_simulation_role_instruction_default";
 export const DEFAULT_MAIN_AGENT_PROMPT_CODE = "ally_ai_learn_system_main_agent_prompt";
 // What a brand-new simulation starts on. Distinct from the default above, which
 // is what a simulation with no saved selection runs on at runtime: existing
@@ -692,11 +691,10 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         type: FORM_FIELD_TYPES.CUSTOM_FIELDS,
         tooltipLocation: TooltipLocation.CUSTOM_FIELDS,
         fullWidth: true,
-        // Custom fields exist solely to render `{custom_fields_text}` in the
-        // prompt — no other consumer reads them. Hide the editor when the
-        // selected variant doesn't reference that placeholder.
-        promptVariable: "custom_fields_text",
-        hideWhenUnused: true,
+        // Always shown, whatever the selected prompt. Besides
+        // `{custom_fields_text}`, ai-learn reads custom fields directly: event
+        // branch instructions substitute them by name, and the session report
+        // scores against them as part of the character description.
       },
       {
         id: "knowledgeSources",

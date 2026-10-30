@@ -197,6 +197,8 @@ export const VARIABLES_USED_OUTSIDE_THE_PROMPT: Record<string, string> = {
   name: "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies, and guardrail replies include it.",
   profession:
     "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies.",
+  custom_fields_text:
+    "Used even if this prompt leaves it out: event branch instructions can refer to a custom field by name, and session reports score against custom fields.",
 };
 
 /** Human-readable header for a catalog group. */

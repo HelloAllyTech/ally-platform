@@ -106,7 +106,6 @@ vi.mock("@api", () => ({
   ],
   useDeleteCoverImageMutation: () => [mockDeleteCoverImage],
   useGetAvailableLanguageVoicesQuery: () => ({ data: [] }),
-  useGetPromptsQuery: () => ({ data: [] }),
   useGetMappedScenarioEventsQuery: () => ({
     data: { data: Array.from({ length: mockMappedEvents.count }, (_, i) => ({ id: String(i) })) },
   }),
@@ -219,7 +218,7 @@ vi.mock("@constants", () => ({
   // whatever is already stored. The real preset expansion is covered in
   // utils/__tests__/createSimulation.test.ts.
   resolveSttConfigFromPreset: (presetId: any, existing: any) => (presetId ? existing : null),
-  ROLE_INSTRUCTION_PROMPT_CODE: "openai_simulation_role_instruction",
+  DEFAULT_ROLE_INSTRUCTION: "You are the client.",
   NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE:
     "ally_ai_learn_system_main_agent_prompt_working_memory_split",
   SIMULATION_CATEGORY: { PARTNER_SIM: "PARTNER_SIM" },
@@ -380,13 +379,19 @@ describe("CreateSimulation", () => {
       );
     });
 
-    it("leaves an existing simulation's prompt to what it loads with", () => {
+    it("starts a new simulation with the default role instruction", () => {
+      renderCreateSimulation();
+
+      expect((useForm as any).mock.calls[0][0].defaultValues.prompt).toBe("You are the client.");
+    });
+
+    it("leaves an existing simulation's prompt and role to what it loads with", () => {
       mockParams.id = "existing-id";
       renderCreateSimulation();
 
-      expect((useForm as any).mock.calls[0][0].defaultValues).not.toHaveProperty(
-        "selectedMainPromptCode",
-      );
+      const { defaultValues } = (useForm as any).mock.calls[0][0];
+      expect(defaultValues).not.toHaveProperty("selectedMainPromptCode");
+      expect(defaultValues).not.toHaveProperty("prompt");
     });
 
     it("should not render the deprecated 'Voice' standalone field", () => {

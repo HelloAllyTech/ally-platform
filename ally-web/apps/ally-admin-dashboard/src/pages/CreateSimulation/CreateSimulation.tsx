@@ -11,7 +11,6 @@ import {
   useDeleteCoverImageMutation,
   useGetAvailableLanguageVoicesQuery,
   useGetMappedScenarioEventsQuery,
-  useGetPromptsQuery,
   useLazyGetAdminSimulationByIdQuery,
   useUpdateSimulationByIdMutation,
   useUpdateScenarioVersionMutation,
@@ -47,7 +46,7 @@ import {
   SESSION_TIMER_CONFIG,
   FORM_FIELD_IDS,
   isValidStateInstructionId,
-  ROLE_INSTRUCTION_PROMPT_CODE,
+  DEFAULT_ROLE_INSTRUCTION,
   NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
   BEHAVIOUR_STATES,
   SIMULATION_CATEGORY,
@@ -354,12 +353,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     active: true,
     voicesNeeded: true,
   }) as { data: Array<{ language_id: number; value: string; label: string }> };
-  const { data: roleInstructionPrompts = [] } = useGetPromptsQuery({
-    searchName: ROLE_INSTRUCTION_PROMPT_CODE,
-    limit: 20,
-    offset: 0,
-    includeBlocks: false,
-  });
 
   // Advanced (mapped) event count, sourced from the same RTK Query cache the
   // Advanced Settings tab's event table uses (shared SIMULATION_EVENTS tag), so
@@ -382,10 +375,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE. Seeded here, not in the picker: the
   // picker's own fallback is for loaded simulations with no saved selection,
   // which must keep showing the runtime default they actually run on.
+  //
+  // It starts with the default role instruction too. The Role instruction
+  // input applies its own default only once mounted, and it sits in an
+  // accordion that starts closed, so an author who never opened it saved a
+  // blank role and the client ran with an empty "## Role" section.
   const formDefaultValues = useMemo(
     () => ({
       ...buildToggleDefaultValues(SIMULATION_CREATOR_FIELD_GROUPS),
-      ...(id ? {} : { selectedMainPromptCode: NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE }),
+      ...(id
+        ? {}
+        : {
+            selectedMainPromptCode: NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
+            prompt: DEFAULT_ROLE_INSTRUCTION,
+          }),
     }),
     [id],
   );
@@ -399,13 +402,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     reValidateMode: "onChange",
     defaultValues: formDefaultValues,
   });
-
-  const managedRoleInstruction = useMemo(
-    () =>
-      roleInstructionPrompts.find(prompt => prompt.promptCode === ROLE_INSTRUCTION_PROMPT_CODE)
-        ?.prompt ?? "",
-    [roleInstructionPrompts],
-  );
 
   const uploadsInProgress = useSelector(selectUploadsInProgress);
   const isReportGenerationInProgress = uploadsInProgress.some(
@@ -436,18 +432,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
       formMethods.reset(formatSimulationResponseData(adminSimulationByIdData));
     }
   }, [adminSimulationByIdData, formMethods, activeVersionId]);
-
-  useEffect(() => {
-    if (simulationId) return;
-    if (!isNonEmptyString(managedRoleInstruction)) return;
-    if (isNonEmptyString(formMethods.getValues("prompt"))) return;
-
-    formMethods.setValue("prompt", managedRoleInstruction, {
-      shouldDirty: false,
-      shouldTouch: false,
-      shouldValidate: false,
-    });
-  }, [simulationId, managedRoleInstruction, formMethods]);
 
   const {
     formState: { dirtyFields },
