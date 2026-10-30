@@ -121,4 +121,50 @@ describe('PromptSharedService', () => {
       expect(result[1].contentHash).toBeDefined();
     });
   });
+
+  describe('getPromptsByOptions performance', () => {
+    it('should handle a large number of prompts without timing out', async () => {
+      const NUM_PROMPTS = 5000;
+      const mockPrompts: Prompt[] = [];
+      const promptCodes: string[] = [];
+
+      for (let i = 0; i < NUM_PROMPTS; i++) {
+        const promptCode = `perf_test_${i}`;
+        promptCodes.push(promptCode);
+        mockPrompts.push({
+          id: `prompt-id-${i}`,
+          promptCode,
+          name: `Perf Test ${i}`,
+          description: 'A test prompt',
+          isObsolete: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          useDashboardOverride: true,
+          availableVariables: [],
+          hasStates: false,
+          provider: 'openai',
+          model: 'gpt-4',
+          temperature: 0.7,
+          defaultPrompt: `Default prompt text ${i}`,
+          currentVersion: 1,
+        } as Prompt);
+      }
+
+      const options: PromptSearchOptions = { promptCode: promptCodes };
+
+      mockPromptsQueryBuilder.getMany.mockResolvedValue(mockPrompts);
+      // For simplicity in this test, we assume no live versions are found
+      // The goal is to test the performance of the first query
+      mockVersionsQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      const result = await service.getPromptsByOptions(options);
+
+      expect(result).toHaveLength(NUM_PROMPTS);
+      expect(repository.createQueryBuilder).toHaveBeenCalledWith('prompt');
+      expect(mockPromptsQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'prompt.promptCode IN (:...promptCodes)',
+        { promptCodes: options.promptCode },
+      );
+    }, 30000); // 30 second timeout
+  });
 });
