@@ -7,8 +7,7 @@ vi.mock("@api", () => ({
 }));
 vi.mock("@components", () => ({ cellTypes: {} }));
 const carbonCharts = vi.hoisted(() => ({
-  GroupedBarChart: vi.fn(() => null),
-  LineChart: vi.fn(() => null),
+  ComboChart: vi.fn(() => null),
 }));
 vi.mock("@carbon/charts-react", () => carbonCharts);
 
@@ -48,25 +47,23 @@ const mockQuery = (data: unknown, extra = {}) =>
   });
 
 describe("CourseUnitsCard", () => {
-  it("plots units, learners and the average, and leaves the in-progress period off", () => {
+  it("plots units, target and learners, and leaves the in-progress period off", () => {
     mockQuery(response);
     render(<CourseUnitsCard />);
 
     expect(screen.getByText("Course units consumed")).toBeTruthy();
-    const [units, learners, average] = [
-      carbonCharts.GroupedBarChart.mock.calls[0][0],
-      carbonCharts.GroupedBarChart.mock.calls[1][0],
-      carbonCharts.LineChart.mock.calls[0][0],
-    ];
-    // October is still accruing: it must not be drawn in any panel.
-    const keys = (d: { data: { key: string }[] }) => d.data.map(x => x.key);
-    expect(keys(units)).not.toContain("Oct");
-    expect(learners.data.map((d: { value: number }) => d.value)).toEqual([450, 500]);
-    expect(average.data.map((d: { value: number }) => d.value)).toEqual([2.56, 2.64]);
+    const { data, options } = carbonCharts.ComboChart.mock.calls[0][0];
+    const of = (group: string) => data.filter((d: { group: string }) => d.group === group);
+    // October is still accruing: it must not be drawn in any series.
+    expect(data.some((d: { key: string }) => d.key === "Oct")).toBe(false);
+    expect(of("Course units").map((d: { value: number }) => d.value)).toEqual([1150, 1320]);
+    expect(of("Unique learners").map((d: { value: number }) => d.value)).toEqual([450, 500]);
     // Only September has a target (goal / 100); August has none, so no datum, not 0.
-    expect(units.data.filter((d: { group: string }) => d.group.startsWith("Target"))).toEqual([
-      { group: "Target", key: "Sep", value: 1500 },
-    ]);
+    expect(of("Target")).toEqual([{ group: "Target", key: "Sep", value: 1500 }]);
+    // One value axis only; the average rides in the tooltip, not on a second axis.
+    expect(options.axes.right).toBeUndefined();
+    expect(options.tooltip.customHTML([{ key: "Sep" }], "<p/>")).toContain("2.64");
+    expect(options.tooltip.customHTML([{ key: "Oct" }], "<p/>")).toBe("<p/>");
   });
 
   it("asks for a 12-month window at the default month grain", () => {

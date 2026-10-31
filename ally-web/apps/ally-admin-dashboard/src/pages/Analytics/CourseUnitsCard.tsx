@@ -1,21 +1,13 @@
 import { useMemo, useState } from "react";
 
-import { GroupedBarChart, LineChart } from "@carbon/charts-react";
+import { ScaleTypes } from "@carbon/charts";
+import { ComboChart } from "@carbon/charts-react";
 
 import { useGetCourseUnitsQuery } from "@api";
 
 import { bucketTitle, withoutInProgress } from "./analyticsGrouping";
 import { ChartDetailModal } from "./ChartDetailModal";
-import {
-  ChartCard,
-  ColorScale,
-  GroupingPicker,
-  buildSource,
-  context,
-  lineOpts,
-  single,
-  timeBarOpts,
-} from "./chartKit";
+import { ChartCard, ColorScale, GroupingPicker, buildSource, context, single } from "./chartKit";
 import {
   COURSE_UNITS_COLORS,
   COURSE_UNITS_RANGE,
@@ -26,6 +18,7 @@ import {
   buildCourseUnitsTable,
   courseUnitsEmptyText,
   courseUnitsTakeaway,
+  formatAverage,
 } from "./courseUnitsChart";
 
 const EMPTY_POINTS: CourseUnitsPoint[] = [];
@@ -44,11 +37,11 @@ const asOfStamp = (computedAt?: string): string | undefined => {
 const UNITS_GROUP = "Course units";
 const TARGET_GROUP = "Target";
 const LEARNERS_GROUP = "Unique learners";
-const AVERAGE_GROUP = "Avg units per learner";
 
-const unitsScale: ColorScale = {
+const comboScale: ColorScale = {
   ...single(UNITS_GROUP, COURSE_UNITS_COLORS.units),
   ...context(TARGET_GROUP),
+  ...single(LEARNERS_GROUP, COURSE_UNITS_COLORS.learners),
 };
 
 interface Datum {
@@ -58,9 +51,12 @@ interface Datum {
 }
 
 /**
- * One datum per period per panel. A missing target or average is simply absent
- * (never 0): Carbon leaves a gap, which is what "no target set" / "nobody earned
- * XP" looks like on the plot.
+ * One datum per period per series. A missing target is simply absent (never 0):
+ * Carbon leaves a gap, which is what "no target set" looks like on the plot.
+ * The average units per learner is not plotted — it is a different quantity
+ * (units ÷ learners) and a second value axis would let it float against the bars
+ * wherever the scale happens to put it — so it rides in the tooltip, keyed by
+ * the same period label.
  */
 const buildSeries = (points: CourseUnitsPoint[], grain: CourseUnitsGrain) => {
   const labels = points.map((p, i) => bucketAxisLabel(p.bucket, grain, i === 0));
@@ -69,32 +65,24 @@ const buildSeries = (points: CourseUnitsPoint[], grain: CourseUnitsGrain) => {
   const unique = new Set(labels).size === labels.length;
   const key = (i: number) => (unique ? labels[i] : points[i].bucket);
 
-  const units: Datum[] = [
+  const data: Datum[] = [
     ...points.map((p, i) => ({ group: UNITS_GROUP, key: key(i), value: p.units })),
     ...points.flatMap((p, i) =>
       p.targetUnits === null || p.targetUnits <= 0
         ? []
         : [{ group: TARGET_GROUP, key: key(i), value: p.targetUnits }],
     ),
+    ...points.map((p, i) => ({ group: LEARNERS_GROUP, key: key(i), value: p.learners })),
   ];
-  const learners: Datum[] = points.map((p, i) => ({
-    group: LEARNERS_GROUP,
-    key: key(i),
-    value: p.learners,
-  }));
-  const average: Datum[] = points.flatMap((p, i) =>
-    p.avgUnitsPerLearner === null
-      ? []
-      : [{ group: AVERAGE_GROUP, key: key(i), value: p.avgUnitsPerLearner }],
-  );
-  return { units, learners, average };
+  const averages = new Map(points.map((p, i) => [key(i), p.avgUnitsPerLearner]));
+  return { data, averages };
 };
 
 /**
- * Three Carbon charts on one shared period axis: course units (columns, with the
- * target beside them), unique learners (columns), and average units per learner
- * (a line). Each has its own value axis — units run into the thousands and the
- * average sits near 2, so one shared axis would flatten one of them.
+ * One Carbon combo chart: course units and the target as grouped bars, unique
+ * learners as a line, all on one value axis (units and learners are both counts,
+ * so the line and the bars compare honestly). The average units per learner is
+ * in the hover tooltip.
  */
 const CourseUnitsPlot = ({
   points,
@@ -105,49 +93,52 @@ const CourseUnitsPlot = ({
   grain: CourseUnitsGrain;
   expanded?: boolean;
 }) => {
-  const series = useMemo(() => buildSeries(points, grain), [points, grain]);
+  const { data, averages } = useMemo(() => buildSeries(points, grain), [points, grain]);
   const bottomTitle = bucketTitle(grain);
 
-  const unitsOpts = useMemo(
-    () =>
-      timeBarOpts({
-        leftTitle: "Course units",
-        bottomTitle: "",
-        colorScale: unitsScale,
-        legend: true,
-        height: expanded ? "340px" : "260px",
-      }),
-    [expanded],
-  );
-  const learnersOpts = useMemo(
-    () =>
-      timeBarOpts({
-        leftTitle: "Unique learners",
-        bottomTitle: "",
-        colorScale: single(LEARNERS_GROUP, COURSE_UNITS_COLORS.learners),
-        height: expanded ? "260px" : "200px",
-      }),
-    [expanded],
-  );
-  const averageOpts = useMemo(
-    () =>
-      lineOpts({
-        leftTitle: "Avg units per learner",
-        bottomTitle,
-        colorScale: single(AVERAGE_GROUP, COURSE_UNITS_COLORS.average),
-        legend: false,
-        height: expanded ? "260px" : "200px",
-      }),
-    [bottomTitle, expanded],
+  const options = useMemo(
+    () => ({
+      height: expanded ? "520px" : "420px",
+      axes: {
+        left: {
+          mapsTo: "value",
+          scaleType: ScaleTypes.LINEAR,
+          title: "Course units · learners",
+          includeZero: true,
+          main: true,
+          correspondingDatasets: [UNITS_GROUP, TARGET_GROUP, LEARNERS_GROUP],
+        },
+        bottom: { mapsTo: "key", scaleType: ScaleTypes.LABELS, title: bottomTitle },
+      },
+      comboChartTypes: [
+        { type: "grouped-bar", correspondingDatasets: [UNITS_GROUP, TARGET_GROUP] },
+        {
+          type: "line",
+          // Markers on: a reader cannot tell a flat stretch from a segment drawn
+          // across missing periods without them.
+          options: { points: { enabled: true } },
+          correspondingDatasets: [LEARNERS_GROUP],
+        },
+      ],
+      curve: "curveLinear",
+      color: { scale: comboScale },
+      legend: { enabled: true },
+      toolbar: { enabled: false },
+      tooltip: {
+        customHTML: (hovered: Datum[], defaultHTML: string) => {
+          const avg = averages.get(hovered[0]?.key);
+          if (avg === null || avg === undefined) return defaultHTML;
+          return (
+            `${defaultHTML}<div class="cds--cc--tooltip" style="padding:0 16px 12px">` +
+            `Avg units per learner: <strong>${formatAverage(avg)}</strong></div>`
+          );
+        },
+      },
+    }),
+    [averages, bottomTitle, expanded],
   );
 
-  return (
-    <div className="flex flex-col gap-4">
-      <GroupedBarChart data={series.units} options={unitsOpts} />
-      <GroupedBarChart data={series.learners} options={learnersOpts} />
-      <LineChart data={series.average} options={averageOpts} />
-    </div>
-  );
+  return <ComboChart data={data} options={options as never} />;
 };
 
 /**
@@ -190,7 +181,7 @@ export const CourseUnitsCard = () => {
   const caption =
     `A course unit is ${COURSE_UNIT_XP} XP, so units are the XP learners earned in the period ` +
     `÷ ${COURSE_UNIT_XP}, from every XP source. Where an XP target is set for the period (month and year grain), the grey column beside each period's units is that target ÷ ${COURSE_UNIT_XP} — the same goal as the Utilization chart, not configured twice. Unique learners are the people who earned any ` +
-    `XP in that period; the average is units ÷ learners. Units rising with learners flat means ` +
+    `XP in that period; the average (units ÷ learners) is in the hover tooltip. Units rising with learners flat means ` +
     `a few people are doing more. Platform-wide, no tenant filter. The current ` +
     `${bucketTitle(grain).toLowerCase()} is still accruing and is left off the plot.`;
 
@@ -226,7 +217,7 @@ export const CourseUnitsCard = () => {
           />
         }
         onExpand={() => setExpanded(true)}
-        height="660px"
+        height="460px"
         chartId="AAQ-252"
       >
         <CourseUnitsPlot points={plotted} grain={grain} />
