@@ -280,13 +280,13 @@ describe('XpAwardService', () => {
       xpEventRepository.insertAwards.mockResolvedValue(200);
       userProgressRepository.addXp.mockResolvedValue({
         totalXp: 300,
-        previousLevel: 2,
+        previousLevel: 1,
       });
       await awardSession(10 * 60 * 1000);
 
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         PROGRESS_EVENTS.LEVEL_UP,
-        expect.objectContaining({ previousLevel: 2, level: 3 }),
+        expect.objectContaining({ previousLevel: 1, level: 2 }),
       );
     });
 

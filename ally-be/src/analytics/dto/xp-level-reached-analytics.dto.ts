@@ -12,7 +12,7 @@ import { MAX_LEVEL } from 'src/progress/progress.constants';
 /**
  * Grains this chart accepts — the shared `ANALYTICS_BUCKETS` plus `quarter`.
  * The level ladder is sparse at the top (see `LEVEL_THRESHOLDS`'s doc comment:
- * most of the platform sits at L1-L2 today), so a coarser read is often the
+ * most of the platform sits at L0-L1 today), so a coarser read is often the
  * only one with anything to show past the first couple of levels. Declared
  * locally rather than added to the shared `ANALYTICS_BUCKETS` list, which
  * several other charts rely on staying at its current four values.
@@ -86,20 +86,18 @@ export class XpLevelReachedQueryDto {
 export class XpLevelReachedLevelCountDto {
   @ApiProperty({
     description:
-      '1-indexed level number (1 = LEVEL_THRESHOLDS[0], the account default).',
+      'Level number, 1 or higher (LEVEL_THRESHOLDS[level]). Level 0 is the ' +
+      'starting state every account has, so nobody "reaches" it and it is ' +
+      'not charted.',
   })
   level!: number;
 
   @ApiProperty({
     description:
-      'Learners who FIRST reached this level during this bucket. For level 1 ' +
-      '(threshold 0 XP) this is, in practice, learners earning their first-ever ' +
-      'XP award in the bucket — every account already starts at level 1, so ' +
-      'there is no later "crossing" into it from a ledger read; see the ' +
-      'repository doc comment. Never fabricated as zero for the high levels: ' +
-      "the platform's level curve is known to be mis-scaled today (most " +
-      'learners sit at L1-L2), so an empty L8-L10 series is a fact about the ' +
-      'population, not a bug.',
+      'Learners who FIRST reached this level during this bucket. Never ' +
+      "fabricated as zero for the high levels: the platform's level curve is " +
+      'known to be mis-scaled today (most learners sit at L0-L1), so an empty ' +
+      'series for the upper levels is a fact about the population, not a bug.',
   })
   users!: number;
 }
@@ -111,7 +109,7 @@ export class XpLevelReachedPointDto {
 
   @ApiProperty({
     description:
-      `Every level from 1 through ${MAX_LEVEL} (LEVEL_THRESHOLDS.length), in ` +
+      `Every level from 1 through ${MAX_LEVEL}, in ` +
       'ascending order, whether or not any learner crossed it in this bucket — ' +
       'a chart control can always draw all series without checking which ones ' +
       'happen to have data this window.',

@@ -11,9 +11,9 @@ import { TrackItemType } from 'src/track/type/track.type';
  * would launder authoring choices into rewards.
  *
  * The ladder is written out rather than computed so that a change to the curve is a
- * reviewable diff and never drifts with floating point. It was generated from
- * delta(n) = round(100 * 1.6^(n-2)), which advances quickly at first and then demands
- * exponentially more practice per level.
+ * reviewable diff and never drifts with floating point. Levels 1-9 were generated from
+ * delta(n) = round(100 * 1.6^(n-1)); levels 10-50 from delta(n) = 4295 * 1.1^(n-9),
+ * rounding the running total at each rung.
  */
 
 export const XP_RULE = {
@@ -192,17 +192,25 @@ export const PEER_COMMENT_MIN_CHARS = 40;
 export const isSubstantivePeerComment = (content: string): boolean =>
   (content ?? '').trim().length >= PEER_COMMENT_MIN_CHARS;
 
-export const MAX_LEVEL = 10;
+/** The highest level. Levels run 0 (the starting state) through this. */
+export const MAX_LEVEL = 50;
 
 /**
- * Cumulative XP required to have reached each level. Index 0 is level 1.
+ * Cumulative XP required to have reached each level. Index = level, so index 0 is level 0
+ * — where every learner starts, with no XP — and index MAX_LEVEL is the top.
  *
- * NOT yet rescaled for v2, deliberately. v2 adds four earning sources, so totals will
+ * Levels 1-9 are the original ten-rung curve shifted down one: the old level 2 (100 XP)
+ * is now level 1, and so on up to 11,287 XP at level 9. Levels 10-50 extend it with each
+ * step costing 10% more than the one before (4,295 XP at 9 -> 10 grows by x1.10 per
+ * level), rounding the cumulative total at each rung. Level 50 needs 2,316,145 XP, well
+ * inside the integer `totalXp` column.
+ *
+ * Not rescaled for XP v2, deliberately. v2 adds four earning sources, so totals will
  * inflate and the ladder should stretch to match — but production says the curve is
  * already mis-scaled in the other direction, and doubling it would make that worse:
  * at the time of writing 134 learners had earned 18,434 XP between them, an average
- * lifetime total of ~138, against a level-2 threshold of 100 and a level-10 threshold
- * of 11,287. Essentially the whole population sits at level 1 or 2 and the top of the
+ * lifetime total of ~138, against a level-1 threshold of 100 and a level-9 threshold
+ * of 11,287. Essentially the whole population sits at level 0 or 1 and the top of the
  * ladder is unreachable.
  *
  * `scripts/recompute-xp-v2.ts` prints the exact inflation ratio off real history.
@@ -211,16 +219,57 @@ export const MAX_LEVEL = 10;
  * Whatever is chosen, change the array and the generating formula in one diff.
  */
 export const LEVEL_THRESHOLDS: readonly number[] = [
-  0, // level 1
-  100, // level 2
-  260, // level 3
-  516, // level 4
-  926, // level 5
-  1581, // level 6
-  2630, // level 7
-  4308, // level 8
-  6992, // level 9
-  11287, // level 10
+  0, // level 0
+  100, // level 1
+  260, // level 2
+  516, // level 3
+  926, // level 4
+  1581, // level 5
+  2630, // level 6
+  4308, // level 7
+  6992, // level 8
+  11287, // level 9
+  16012, // level 10
+  21209, // level 11
+  26926, // level 12
+  33214, // level 13
+  40131, // level 14
+  47740, // level 15
+  56110, // level 16
+  65317, // level 17
+  75444, // level 18
+  86584, // level 19
+  98838, // level 20
+  112318, // level 21
+  127146, // level 22
+  143456, // level 23
+  161397, // level 24
+  181132, // level 25
+  202841, // level 26
+  226721, // level 27
+  252989, // level 28
+  281884, // level 29
+  313668, // level 30
+  348630, // level 31
+  387089, // level 32
+  429394, // level 33
+  475929, // level 34
+  527118, // level 35
+  583425, // level 36
+  645363, // level 37
+  713495, // level 38
+  788440, // level 39
+  870880, // level 40
+  961564, // level 41
+  1061316, // level 42
+  1171043, // level 43
+  1291743, // level 44
+  1424513, // level 45
+  1570560, // level 46
+  1731212, // level 47
+  1907929, // level 48
+  2102318, // level 49
+  2316145, // level 50
 ];
 
 export interface LevelStanding {
@@ -246,17 +295,17 @@ export interface LevelStanding {
 export function resolveLevel(totalXp: number): LevelStanding {
   const xp = Number.isFinite(totalXp) && totalXp > 0 ? Math.floor(totalXp) : 0;
 
-  let level = 1;
+  let level = 0;
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i -= 1) {
     if (xp >= LEVEL_THRESHOLDS[i]) {
-      level = i + 1;
+      level = i;
       break;
     }
   }
 
-  const levelFloorXp = LEVEL_THRESHOLDS[level - 1];
+  const levelFloorXp = LEVEL_THRESHOLDS[level];
   const isMaxLevel = level >= MAX_LEVEL;
-  const nextLevelXp = isMaxLevel ? null : LEVEL_THRESHOLDS[level];
+  const nextLevelXp = isMaxLevel ? null : LEVEL_THRESHOLDS[level + 1];
   const xpIntoLevel = xp - levelFloorXp;
   const xpToNextLevel = nextLevelXp === null ? null : nextLevelXp - xp;
 
