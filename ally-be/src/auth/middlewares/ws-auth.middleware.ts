@@ -46,6 +46,15 @@ export class WebSocketAuthMiddleware {
         const payload = await this.jwtService.verifyAsync(token, {
           secret: this.configService.jwt.accessToken.secret,
         });
+        // Redact sensitive info before logging
+        const redactedPayload = {
+          ...payload,
+          sub: '***REDACTED***',
+          tenantId: '***REDACTED***',
+        };
+        this.logger.info(
+          `Token payload for socket ${socket.id}: ${JSON.stringify(redactedPayload)}`,
+        );
 
         // A token minted for another purpose (an AI Lab evaluator token,
         // say) is not a platform session, even if it verified.
@@ -120,11 +129,17 @@ export class WebSocketAuthMiddleware {
   private extractToken(socket: Socket): string | null {
     // 1. Try from socket.handshake.auth.token (standard for socket.io auth)
     if (socket.handshake.auth?.token) {
+      this.logger.info(
+        `Token extracted from handshake.auth for socket ${socket.id}`,
+      );
       return socket.handshake.auth.token as string;
     }
 
     // 2. Try from socket.handshake.query.token (common for browser clients)
     if (socket.handshake.query?.token) {
+      this.logger.info(
+        `Token extracted from handshake.query for socket ${socket.id}`,
+      );
       return socket.handshake.query.token as string;
     }
 
@@ -135,9 +150,15 @@ export class WebSocketAuthMiddleware {
       typeof authHeader === 'string' &&
       authHeader.startsWith('Bearer ')
     ) {
+      this.logger.info(
+        `Token extracted from Authorization header for socket ${socket.id}`,
+      );
       return authHeader.substring(7);
     }
 
+    this.logger.info(
+      `No JWT token found by any method for socket ${socket.id}`,
+    );
     return null;
   }
 }
