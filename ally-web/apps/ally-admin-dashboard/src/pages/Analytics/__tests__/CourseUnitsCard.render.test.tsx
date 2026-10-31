@@ -6,6 +6,11 @@ vi.mock("@api", () => ({
   useGetCourseUnitsQuery: (args: unknown) => useGetCourseUnitsQuery(args),
 }));
 vi.mock("@components", () => ({ cellTypes: {} }));
+const carbonCharts = vi.hoisted(() => ({
+  GroupedBarChart: vi.fn(() => null),
+  LineChart: vi.fn(() => null),
+}));
+vi.mock("@carbon/charts-react", () => carbonCharts);
 
 import { CourseUnitsCard } from "../CourseUnitsCard";
 
@@ -45,19 +50,23 @@ const mockQuery = (data: unknown, extra = {}) =>
 describe("CourseUnitsCard", () => {
   it("plots units, learners and the average, and leaves the in-progress period off", () => {
     mockQuery(response);
-    const { container } = render(<CourseUnitsCard />);
+    render(<CourseUnitsCard />);
 
     expect(screen.getByText("Course units consumed")).toBeTruthy();
-    const plot = container.querySelector("svg[aria-label^='Three stacked panels']")!;
-    expect(plot.textContent).toContain("1,320");
-    expect(plot.textContent).toContain("500");
-    expect(plot.textContent).toContain("2.64");
-    // October is still accruing: its 40 units / 12 learners must not be drawn.
-    expect(plot.textContent).not.toContain("3.33");
-    expect(plot.querySelectorAll("title")).toHaveLength(2);
-    // The September column carries its configured target (goal / 100).
-    expect(plot.textContent).toContain("target 1,500");
-    expect(plot.querySelectorAll("line[stroke-width='2.5']")).toHaveLength(1);
+    const [units, learners, average] = [
+      carbonCharts.GroupedBarChart.mock.calls[0][0],
+      carbonCharts.GroupedBarChart.mock.calls[1][0],
+      carbonCharts.LineChart.mock.calls[0][0],
+    ];
+    // October is still accruing: it must not be drawn in any panel.
+    const keys = (d: { data: { key: string }[] }) => d.data.map(x => x.key);
+    expect(keys(units)).not.toContain("Oct");
+    expect(learners.data.map((d: { value: number }) => d.value)).toEqual([450, 500]);
+    expect(average.data.map((d: { value: number }) => d.value)).toEqual([2.56, 2.64]);
+    // Only September has a target (goal / 100); August has none, so no datum, not 0.
+    expect(units.data.filter((d: { group: string }) => d.group.startsWith("Target"))).toEqual([
+      { group: "Target (XP target ÷ 100)", key: "Sep", value: 1500 },
+    ]);
   });
 
   it("asks for a 12-month window at the default month grain", () => {

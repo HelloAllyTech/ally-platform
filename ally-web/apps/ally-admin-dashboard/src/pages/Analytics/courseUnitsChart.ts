@@ -90,15 +90,6 @@ export const bucketAxisLabel = (
   return `${d} ${month}`;
 };
 
-/** Round a max up to a tidy axis ceiling (1, 2, 2.5, 5 x 10^n). */
-export const niceCeiling = (max: number): number => {
-  if (!Number.isFinite(max) || max <= 0) return 1;
-  const pow = Math.pow(10, Math.floor(Math.log10(max)));
-  const f = max / pow;
-  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-  return nice * pow;
-};
-
 /** Whole numbers for big values, two decimals for fractions of a unit. */
 export const formatUnits = (n: number): string =>
   n >= 100
