@@ -182,9 +182,10 @@ def build_default_coherence_guardrail(*, model: str, llm_base_url, prompt_data=N
             detection_config=DetectionConfig(min_gap_time=min_gap_s()),
             prompt_data=prompt_data,
         )
-    except Exception:  # noqa: BLE001
-        logger.exception(
+    except (ValueError, TypeError, RuntimeError, ImportError):
+        logger.warning(
             "[COHERENCE] failed to build the platform-default guardrail; "
-            "scenario continues without it"
+            "scenario continues without it",
+            exc_info=True,
         )
         return None
