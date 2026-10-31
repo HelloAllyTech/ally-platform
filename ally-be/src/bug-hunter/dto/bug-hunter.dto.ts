@@ -683,7 +683,10 @@ export class DecisionOwnersDto {
 }
 
 export class UpdateDecisionOwnerDto {
-  @ApiProperty({ enum: ['D1', 'D2', 'D3', 'D5', 'D6', 'D7'] })
+  @ApiProperty({
+    enum: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8'],
+    description: 'D4 and D8 are fixed in code and cannot change owner.',
+  })
   @IsIn(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8'])
   point!: 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7' | 'D8';
 
