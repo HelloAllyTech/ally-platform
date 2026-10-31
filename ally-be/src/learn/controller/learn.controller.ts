@@ -1352,15 +1352,7 @@ export class LearnController {
   // The STT registry is language-platform configuration, so it reuses the
   // language permissions rather than introducing a permission nobody has been
   // granted yet.
-  @ApiOperation({
-    summary: 'List STT configs',
-    description:
-      'Named speech-to-text configurations. Pass activeOnly=true for pickers, which must not offer retired configs.',
-  })
-  @ApiQuery({ name: 'activeOnly', required: false, type: Boolean })
-  @RequireFeatureToggle(FeatureToggleKey.MANAGE_STT_CONFIGS, {
-    permissions: [PERMISSIONS.VIEW_ADMIN_LANGUAGES],
-  })
+  @Public()
   @Get('stt-configs')
   async getSttConfigs(@Query('activeOnly') activeOnly?: string) {
     return this.sttConfigService.getConfigs(activeOnly === 'true');
