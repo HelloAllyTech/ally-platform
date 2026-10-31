@@ -2,13 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ScenarioSessionReviewController } from './review.controller';
 import { ScenarioSessionReviewService } from '../service/review.service';
 import { AuthGuard } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
+import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
 
 describe('ScenarioSessionReviewController', () => {
   let controller: ScenarioSessionReviewController;
-  let reflector: Reflector;
 
   const mockReviewService = {
     getUnreadReviewCount: jest.fn(),
@@ -16,6 +15,10 @@ describe('ScenarioSessionReviewController', () => {
 
   const mockPermissionsService = {
     getUserPermissions: jest.fn(),
+  };
+
+  const mockPermissionValidator = {
+    validatePermissions: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -29,6 +32,10 @@ describe('ScenarioSessionReviewController', () => {
         {
           provide: PermissionsService,
           useValue: mockPermissionsService,
+        },
+        {
+          provide: PermissionValidator,
+          useValue: mockPermissionValidator,
         },
         PermissionsGuard,
       ],
@@ -46,7 +53,6 @@ describe('ScenarioSessionReviewController', () => {
     controller = module.get<ScenarioSessionReviewController>(
       ScenarioSessionReviewController,
     );
-    reflector = module.get<Reflector>(Reflector);
   });
 
   afterEach(() => {
@@ -54,23 +60,24 @@ describe('ScenarioSessionReviewController', () => {
   });
 
   describe('getUnreadReviewCount', () => {
-    it('should pass if user has singular permission and controller requires singular', async () => {
-      mockPermissionsService.getUserPermissions.mockResolvedValue([
-        'view:simulation-review',
-      ]);
-      const guard = new PermissionsGuard(
-        reflector,
-        mockPermissionsService as any,
-      );
-      const context = {
-        getHandler: () => controller.getUnreadReviewCount,
-        getClass: () => ScenarioSessionReviewController,
-        switchToHttp: () => ({
-          getRequest: () => ({ user: { id: 1 } }),
-        }),
-      } as any;
+    it('should return { count: 0 } if user does not have permission', async () => {
+      mockPermissionValidator.validatePermissions.mockResolvedValue(false);
+      const req = { user: { id: 1 } };
+      const result = await controller.getUnreadReviewCount(req as any);
+      expect(result).toEqual({ count: 0 });
 
-      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(mockReviewService.getUnreadReviewCount).not.toHaveBeenCalled();
+    });
+
+    it('should return the count if user has permission', async () => {
+      mockPermissionValidator.validatePermissions.mockResolvedValue(true);
+      mockReviewService.getUnreadReviewCount.mockResolvedValue({ count: 10 });
+
+      const req = { user: { id: 1 } };
+      const result = await controller.getUnreadReviewCount(req as any);
+      expect(result).toEqual({ count: 10 });
+
+      expect(mockReviewService.getUnreadReviewCount).toHaveBeenCalled();
     });
   });
 });

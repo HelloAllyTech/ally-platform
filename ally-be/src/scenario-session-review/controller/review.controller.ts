@@ -9,6 +9,8 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -30,6 +32,8 @@ import { SortOrder, SuccessResponse } from 'src/common/type/common.type';
 import { UpdateReviewDto } from 'src/review/dto/update-review.dto';
 import { ReadFilter, ReviewSortBy } from 'src/review/type/review.type';
 import { GetReviewMessagesResponseDto } from 'src/review/dto/review-messages-response.dto';
+import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller({
   path: 'scenario-session-reviews',
@@ -39,7 +43,10 @@ import { GetReviewMessagesResponseDto } from 'src/review/dto/review-messages-res
 @ApiSecurity('access-token')
 @ApiTags('Scenario Session Review')
 export class ScenarioSessionReviewController {
-  constructor(private readonly reviewService: ScenarioSessionReviewService) {}
+  constructor(
+    private readonly reviewService: ScenarioSessionReviewService,
+    private readonly permissionValidator: PermissionValidator,
+  ) {}
 
   @ApiOperation({ summary: 'Create scenario session review' })
   @ApiResponse({
@@ -145,13 +152,23 @@ export class ScenarioSessionReviewController {
   }
 
   @Get('/unread-count')
-  @AuthPermissions([PERMISSIONS.VIEW_SIMULATION_REVIEW])
+  @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Get unread review count' })
   @ApiResponse({
     status: 200,
     description: 'Unread review count retrieved successfully',
   })
-  async getUnreadReviewCount(): Promise<{ count: number }> {
+  async getUnreadReviewCount(
+    @Req() req: { user: { id: number } },
+  ): Promise<{ count: number }> {
+    const hasPermission = await this.permissionValidator.validatePermissions(
+      req.user.id,
+      [PERMISSIONS.VIEW_SIMULATION_REVIEW],
+    );
+
+    if (!hasPermission) {
+      return { count: 0 };
+    }
     return this.reviewService.getUnreadReviewCount();
   }
 
