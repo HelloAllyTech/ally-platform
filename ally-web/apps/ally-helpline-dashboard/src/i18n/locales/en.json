@@ -645,7 +645,7 @@
       "tooltips": {
         "status": "Based on when the learner was last active anywhere: Active within 14 days, At risk 15–30 days, Dormant over 30 days, Never started if they have never done anything. All-time, not affected by the period above.",
         "lastActive": "The later of their last roleplay and their last course activity — so a learner doing only quizzes still counts as active. All-time.",
-        "level": "Position on the 1–10 level ladder, earned from practice minutes, completed sessions and course items. All-time. This is the same level the learner sees in the app.",
+        "level": "Position on the 0–50 level ladder, earned from practice minutes, completed sessions and course items. All-time. This is the same level the learner sees in the app.",
         "totalXp": "Lifetime XP: 1 per practice minute, 10 per completed session, 25 per course item, 50 for a personal best, with a daily cap so no single activity can be farmed. All-time.",
         "roleplaySessions": "Roleplays completed of roleplays started, in the selected period.",
         "totalPracticeMinutes": "Minutes spent in completed roleplays, in the selected period.",

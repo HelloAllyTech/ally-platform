@@ -5,6 +5,8 @@ import {
   XpLevelReachedPoint,
   buildXpLevelReachedSeries,
   buildXpLevelReachedTable,
+  pointsInLevelRange,
+  xpLevelRanges,
   xpLevelReachedEmptyText,
   xpLevelReachedScale,
   xpLevelReachedTakeaway,
@@ -30,6 +32,39 @@ describe("buildXpLevelReachedSeries", () => {
   });
 });
 
+describe("xpLevelRanges", () => {
+  it("splits L1-L50 into five ranges of ten, starting at L1", () => {
+    const ranges = xpLevelRanges();
+    expect(ranges.map(r => r.label)).toEqual([
+      "L1–L10",
+      "L11–L20",
+      "L21–L30",
+      "L31–L40",
+      "L41–L50",
+    ]);
+    expect(ranges[0].from).toBe(1);
+    expect(ranges.at(-1)?.to).toBe(XP_LEVEL_REACHED_MAX_LEVEL);
+  });
+
+  it("ends a short final range at the top level instead of overshooting", () => {
+    expect(xpLevelRanges(25).at(-1)).toMatchObject({ from: 21, to: 25, label: "L21–L25" });
+  });
+});
+
+describe("pointsInLevelRange", () => {
+  const fifty = Array.from({ length: XP_LEVEL_REACHED_MAX_LEVEL }, (_, i) => i + 1);
+
+  it("keeps only the levels in the range and leaves the buckets alone", () => {
+    const points = [point("2026-06-01", fifty), point("2026-07-01", fifty)];
+    const [, second] = xpLevelRanges();
+
+    const ranged = pointsInLevelRange(points, second);
+
+    expect(ranged.map(p => p.bucket)).toEqual(["2026-06-01", "2026-07-01"]);
+    expect(ranged[0].levelCounts.map(lc => lc.level)).toEqual(fifty.slice(10, 20));
+  });
+});
+
 describe("xpLevelReachedScale", () => {
   it("gives every level its own colour, ordered low to high saturation", () => {
     const scale = xpLevelReachedScale([1, 2, 3]);
@@ -49,6 +84,11 @@ describe("xpLevelReachedEmptyText", () => {
       point("2026-07-01", [0, 0, 0]),
     ]);
     expect(text).toBeDefined();
+  });
+
+  it("names the level range when that range is empty", () => {
+    const text = xpLevelReachedEmptyText([point("2026-06-01", [0, 0])], "L11–L20");
+    expect(text).toContain("L11–L20");
   });
 
   it("does not read an all-zero L8-L10 tail as empty when L1 has crossings — that's expected, not broken", () => {
