@@ -68,13 +68,6 @@ async def judge_debrief(
         max_tokens=None,
         scenario_session_id=scenario_session_id,
     )
-    if meta.get("fell_back_from"):
-        logger.warning(
-            "debrief quality judge fell back from %s to %s/%s",
-            meta["fell_back_from"],
-            meta["provider"],
-            meta["model"],
-        )
     if output is None:
         logger.warning("[debrief-quality] judge returned no output")
         return None, meta["model"]
