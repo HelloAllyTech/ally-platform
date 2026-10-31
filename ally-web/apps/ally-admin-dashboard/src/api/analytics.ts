@@ -71,6 +71,7 @@ import {
   KnowledgeVsSkillResponse,
   ProgressCurveResponse,
 } from "../pages/Analytics/courseProgressChart";
+import { CourseUnitsQuery, CourseUnitsResponse } from "../pages/Analytics/courseUnitsChart";
 import {
   CourseFunnelResponse,
   QuizOutcomesResponse,
@@ -243,6 +244,7 @@ type StartLatencyQuery = AnalyticsWindowQuery & {
  */
 const GOALS_TAB_PATHS = {
   ACTIVE_USERS_XP: "/v1/analytics/active-users-xp",
+  COURSE_UNITS: "/v1/analytics/course-units",
   XP_LEVEL_REACHED: "/v1/analytics/xp-level-reached",
   BUG_HUNTER_VOLUME: "/v1/analytics/bug-hunter-volume",
   XP_BY_TENANT: "/v1/analytics/xp-by-tenant",
@@ -1149,6 +1151,15 @@ export const analyticsAPI = baseAPI.injectEndpoints({
         params: windowParams(q),
       }),
     }),
+    // Course units (XP / 100) per bucket with the learners behind them. Standard
+    // window params minus `tenantId`/`compare`: platform-wide only.
+    getCourseUnits: builder.query<CourseUnitsResponse, CourseUnitsQuery>({
+      query: (q = {}) => ({
+        url: GOALS_TAB_PATHS.COURSE_UNITS,
+        method: HttpMethod.GET,
+        params: windowParams(q),
+      }),
+    }),
     // Learners reaching each XP level (L1-L10) for the first time, per bucket.
     // Standard window params minus `tenantId`/`compare`: platform-wide only.
     getXpLevelReached: builder.query<XpLevelReachedResponse, XpLevelReachedQuery>({
@@ -1282,6 +1293,7 @@ export const {
   useGetChartPreferencesQuery,
   useSaveChartPreferencesMutation,
   useGetActiveUsersXpQuery,
+  useGetCourseUnitsQuery,
   useGetXpLevelReachedQuery,
   useGetBugHunterVolumeQuery,
   useGetXpByTenantQuery,

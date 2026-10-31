@@ -6,6 +6,7 @@ import { UsageLevelAnalyticsService } from '../../service/usage-level-analytics.
 import { XpGrowthAnalyticsService } from '../../service/xp-growth-analytics.service';
 import { GoalsXpAnalyticsService } from '../../service/goals-xp-analytics.service';
 import { ActiveUsersXpAnalyticsService } from '../../service/active-users-xp-analytics.service';
+import { CourseUnitsAnalyticsService } from '../../service/course-units-analytics.service';
 import { XpLevelReachedAnalyticsService } from '../../service/xp-level-reached-analytics.service';
 import { BugHunterVolumeAnalyticsService } from '../../service/bug-hunter-volume-analytics.service';
 import { XpByTenantAnalyticsService } from '../../service/xp-by-tenant-analytics.service';
@@ -153,6 +154,10 @@ describe('AnalyticsController', () => {
         {
           provide: ActiveUsersXpAnalyticsService,
           useValue: { getActiveUsers: jest.fn() },
+        },
+        {
+          provide: CourseUnitsAnalyticsService,
+          useValue: { getCourseUnits: jest.fn() },
         },
         {
           provide: XpLevelReachedAnalyticsService,
