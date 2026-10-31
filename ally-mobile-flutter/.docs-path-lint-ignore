@@ -1,8 +1,5 @@
-# Paths that docs-path-lint should not check. One per line; `#` starts a comment.
-# See scripts/docs-path-lint.mjs for the full rules and the inline `planned` / `ignore` markers.
-
-# PARITY_LEDGER.md names the audit's own scratch outputs (the re-audit scripts and
-# their result files). They lived in the auditor's scratchpad and were never committed.
+# Scratch files from the RN-vs-Flutter parity audits (docs/PARITY_LEDGER.md). They live in
+# the auditor's working directory, were never committed, and are named as provenance.
 v3/scripts/endpoints_out.txt
 v3/scripts/callers_out.txt
 scratchpad/scripts/i18n.py
