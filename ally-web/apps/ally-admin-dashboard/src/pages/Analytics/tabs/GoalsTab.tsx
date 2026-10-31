@@ -3,6 +3,7 @@ import { ActiveUsersXpCard } from "../ActiveUsersXpCard";
 import { AverageRatingCard } from "../AverageRatingCard";
 import { BugHunterVolumeCard } from "../BugHunterVolumeCard";
 import { ScrollNoteContext } from "../chartKit";
+import { CourseUnitsCard } from "../CourseUnitsCard";
 import { CumulativeUsersCard } from "../CumulativeUsersCard";
 import { FoundationalSkillsCard } from "../FoundationalSkillsCard";
 import { GoalsXpCard } from "../GoalsXpCard";
@@ -66,6 +67,9 @@ import { XpPerMinuteCard } from "../XpPerMinuteCard";
  *  - `XpPerMinuteCard` — new (AAQ-165): all XP per roleplay minute, stacked by
  *    XP source. Sits directly under `RoleplayMinutesCard` because it divides by
  *    the same minutes; opens on All time.
+ *  - `CourseUnitsCard` — new (AAQ-252): course units consumed (XP / 100) per
+ *    period, the unique learners behind them and the average per learner, as
+ *    three panels on one axis. Sits under the XP charts it is derived from.
  *  - `FoundationalSkillsCard` — new (AAQ-166): learners' foundational helping
  *    skills by practice volume, scored against one fixed rubric independent of
  *    every scenario's competencies. The scenario-specific counterpart is the
@@ -85,6 +89,7 @@ export const GoalsTab = () => (
       <GoalsXpCard />
       <RoleplayMinutesCard />
       <XpPerMinuteCard />
+      <CourseUnitsCard />
       <RoleplayVoiceLatencyCard />
       <RoleplayQualityCard />
       <FoundationalSkillsCard />

@@ -15,6 +15,8 @@ import { GoalsXpAnalyticsRepository } from './repository/goals-xp-analytics.repo
 // Highlights → Goals: additional charts beside the XP-vs-goal chart above.
 import { ActiveUsersXpAnalyticsService } from './service/active-users-xp-analytics.service';
 import { ActiveUsersXpAnalyticsRepository } from './repository/active-users-xp-analytics.repository';
+import { CourseUnitsAnalyticsService } from './service/course-units-analytics.service';
+import { CourseUnitsAnalyticsRepository } from './repository/course-units-analytics.repository';
 import { XpLevelReachedAnalyticsService } from './service/xp-level-reached-analytics.service';
 import { XpLevelReachedAnalyticsRepository } from './repository/xp-level-reached-analytics.repository';
 import { BugHunterVolumeAnalyticsService } from './service/bug-hunter-volume-analytics.service';
@@ -233,6 +235,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     GoalsXpAnalyticsRepository,
     ActiveUsersXpAnalyticsService,
     ActiveUsersXpAnalyticsRepository,
+    CourseUnitsAnalyticsService,
+    CourseUnitsAnalyticsRepository,
     XpLevelReachedAnalyticsService,
     XpLevelReachedAnalyticsRepository,
     BugHunterVolumeAnalyticsService,

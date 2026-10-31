@@ -149,6 +149,7 @@ import {
   withholdPlatformWideHighlights,
 } from '../service/highlights-analytics.service';
 import { ActiveUsersXpAnalyticsService } from '../service/active-users-xp-analytics.service';
+import { CourseUnitsAnalyticsService } from '../service/course-units-analytics.service';
 import { XpLevelReachedAnalyticsService } from '../service/xp-level-reached-analytics.service';
 import { BugHunterVolumeAnalyticsService } from '../service/bug-hunter-volume-analytics.service';
 import { XpByTenantAnalyticsService } from '../service/xp-by-tenant-analytics.service';
@@ -246,6 +247,10 @@ import {
   ActiveUsersXpQueryDto,
   ActiveUsersXpResponseDto,
 } from '../dto/active-users-xp-analytics.dto';
+import {
+  CourseUnitsQueryDto,
+  CourseUnitsResponseDto,
+} from '../dto/course-units-analytics.dto';
 import {
   XpLevelReachedQueryDto,
   XpLevelReachedResponseDto,
@@ -424,6 +429,7 @@ export class AnalyticsController {
     private readonly xpGrowthAnalyticsService: XpGrowthAnalyticsService,
     private readonly goalsXpAnalyticsService: GoalsXpAnalyticsService,
     private readonly activeUsersXpAnalyticsService: ActiveUsersXpAnalyticsService,
+    private readonly courseUnitsAnalyticsService: CourseUnitsAnalyticsService,
     private readonly xpLevelReachedAnalyticsService: XpLevelReachedAnalyticsService,
     private readonly bugHunterVolumeAnalyticsService: BugHunterVolumeAnalyticsService,
     private readonly xpByTenantAnalyticsService: XpByTenantAnalyticsService,
@@ -686,6 +692,29 @@ export class AnalyticsController {
     @Query() query: ActiveUsersXpQueryDto,
   ): Promise<ActiveUsersXpResponseDto> {
     return this.activeUsersXpAnalyticsService.getActiveUsers(query);
+  }
+
+  @Get('course-units')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Course units consumed per period, with learners (super-admin)',
+    description:
+      'A course unit is a fixed amount of XP (see `CourseUnitsResponseDto.' +
+      'unitXp`). Per bucket: units consumed (XP / unit size), the distinct ' +
+      'learners who earned XP, and the average units per learner. Derived ' +
+      'from the `xp_events` ledger. Test organisations are excluded, ' +
+      'platform-wide only. Honours the standard `range`/`bucket`/`from`/`to` ' +
+      'window params.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Course-units series retrieved successfully',
+    type: CourseUnitsResponseDto,
+  })
+  async getCourseUnits(
+    @Query() query: CourseUnitsQueryDto,
+  ): Promise<CourseUnitsResponseDto> {
+    return this.courseUnitsAnalyticsService.getCourseUnits(query);
   }
 
   @Get('xp-level-reached')

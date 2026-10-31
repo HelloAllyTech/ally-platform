@@ -2328,6 +2328,16 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/tabs/AllyGuideTab.tsx'),
       note: 'Learners, turns, model cost and cost per learner for each course with Ally conversations in the window; courses under 5 learners fold into one unnamed row. /v1/analytics/ally-guide/courses',
     },
+    {
+      id: 'AAQ-252',
+      tab: 'Highlights',
+      subTab: 'Goals',
+      title: 'Course units consumed',
+      kind: 'chart',
+      chartType: 'custom SVG',
+      componentFile: f('Analytics/CourseUnitsCard.tsx'),
+      note: 'Three panels on one period axis: course units (XP / 100), unique learners earning XP, average units per learner. /v1/analytics/course-units units, learners, avgUnitsPerLearner',
+    },
   ];
 
 /** Total number of registered charts — handy for the guard test and the UI. */
