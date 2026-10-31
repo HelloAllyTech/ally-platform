@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { BadgeTenantService } from '../badge-tenant.service';
 import { BadgeTenant } from '../../entity/badge-tenant.entity';
 import { Badge } from '../../entity/badge.entity';
@@ -284,7 +288,7 @@ describe('BadgeTenantService', () => {
       mockTenantsRepository.find.mockRejectedValue(new Error('DB error'));
 
       await expect(service.assignBadgeToTenants(badge)).rejects.toThrow(
-        'DB error',
+        InternalServerErrorException,
       );
     });
   });
