@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 
+import { ScaleTypes } from "@carbon/charts";
+import { ComboChart } from "@carbon/charts-react";
+
 import { useGetCourseUnitsQuery } from "@api";
 
 import { bucketTitle, withoutInProgress } from "./analyticsGrouping";
 import { ChartDetailModal } from "./ChartDetailModal";
-import { ChartCard, GroupingPicker, buildSource } from "./chartKit";
-import { CONTEXT } from "./chartScales";
+import { ChartCard, ColorScale, GroupingPicker, buildSource, context, single } from "./chartKit";
 import {
   COURSE_UNITS_COLORS,
   COURSE_UNITS_RANGE,
@@ -17,8 +19,6 @@ import {
   courseUnitsEmptyText,
   courseUnitsTakeaway,
   formatAverage,
-  formatUnits,
-  niceCeiling,
 } from "./courseUnitsChart";
 
 const EMPTY_POINTS: CourseUnitsPoint[] = [];
@@ -34,252 +34,112 @@ const asOfStamp = (computedAt?: string): string | undefined => {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 };
 
-/* Plot geometry, in viewBox units. The SVG scales to the card width. */
-const W = 680;
-const LEFT = 44;
-const RIGHT = 8;
-const BAR_MAX = 30;
-/** Minimum horizontal room per period before value labels would collide. */
-const LABEL_MIN_STEP = 30;
-const PANELS = {
-  units: { title: 14, top: 30, height: 160 },
-  learners: { title: 232, top: 244, height: 60 },
-  average: { title: 336, top: 348, height: 56 },
-} as const;
-const AXIS_Y = 428;
-const H = 440;
+const UNITS_GROUP = "Course units";
+const TARGET_GROUP = "Target";
+const LEARNERS_GROUP = "Unique learners";
 
-const INK = "#161616";
-const MUTED = "#6f6f6f";
-const GRID = "#e0e0e0";
+const comboScale: ColorScale = {
+  ...single(UNITS_GROUP, COURSE_UNITS_COLORS.units),
+  ...context(TARGET_GROUP),
+  ...single(LEARNERS_GROUP, COURSE_UNITS_COLORS.learners),
+};
 
-const Label = ({
-  x,
-  y,
-  anchor = "middle",
-  size = 11,
-  fill = MUTED,
-  children,
-}: {
-  x: number;
-  y: number;
-  anchor?: "start" | "middle" | "end";
-  size?: number;
-  fill?: string;
-  children: React.ReactNode;
-}) => (
-  <text x={x} y={y} textAnchor={anchor} fontSize={size} fill={fill}>
-    {children}
-  </text>
-);
+interface Datum {
+  group: string;
+  key: string;
+  value: number;
+}
 
-/** Rounded data end, square at the baseline. */
-const Column = ({
-  x,
-  y,
-  w,
-  h,
-  fill,
-}: {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fill: string;
-}) => {
-  if (h <= 0) return null;
-  const r = Math.min(4, w / 2, h);
-  return (
-    <path
-      d={`M${x} ${y + h} V${y + r} Q${x} ${y} ${x + r} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h} Z`}
-      fill={fill}
-    />
-  );
+/**
+ * One datum per period per series. A missing target is simply absent (never 0):
+ * Carbon leaves a gap, which is what "no target set" looks like on the plot.
+ * The average units per learner is not plotted — it is a different quantity
+ * (units ÷ learners) and a second value axis would let it float against the bars
+ * wherever the scale happens to put it — so it rides in the tooltip, keyed by
+ * the same period label.
+ */
+const buildSeries = (points: CourseUnitsPoint[], grain: CourseUnitsGrain) => {
+  const labels = points.map((p, i) => bucketAxisLabel(p.bucket, grain, i === 0));
+  // The short labels repeat across a long axis (a year grain, or months spanning
+  // two Januaries); fall back to the full date so no two periods share a tick.
+  const unique = new Set(labels).size === labels.length;
+  const key = (i: number) => (unique ? labels[i] : points[i].bucket);
+
+  const data: Datum[] = [
+    ...points.map((p, i) => ({ group: UNITS_GROUP, key: key(i), value: p.units })),
+    ...points.flatMap((p, i) =>
+      p.targetUnits === null || p.targetUnits <= 0
+        ? []
+        : [{ group: TARGET_GROUP, key: key(i), value: p.targetUnits }],
+    ),
+    ...points.map((p, i) => ({ group: LEARNERS_GROUP, key: key(i), value: p.learners })),
+  ];
+  const averages = new Map(points.map((p, i) => [key(i), p.avgUnitsPerLearner]));
+  return { data, averages };
 };
 
 /**
- * Three panels on one shared period axis: course units (columns), unique
- * learners behind them (columns), and average units per learner (line). Each
- * panel has its own scale — units run into the thousands and the average sits
- * near 2, so one shared axis would flatten one of them — and the shared x
- * position is what lets a reader go straight down a period.
+ * One Carbon combo chart: course units and the target as grouped bars, unique
+ * learners as a line, all on one value axis (units and learners are both counts,
+ * so the line and the bars compare honestly). The average units per learner is
+ * in the hover tooltip.
  */
 const CourseUnitsPlot = ({
   points,
   grain,
+  expanded = false,
 }: {
   points: CourseUnitsPoint[];
   grain: CourseUnitsGrain;
+  expanded?: boolean;
 }) => {
-  const n = points.length;
-  const step = (W - LEFT - RIGHT) / Math.max(n, 1);
-  const bw = Math.min(BAR_MAX, step * 0.6);
-  const cx = (i: number) => LEFT + step * i + step / 2;
-  const showValues = step >= LABEL_MIN_STEP;
-  // Thin the axis so labels never overlap on a long (daily / weekly) axis.
-  const every = Math.max(1, Math.ceil(44 / step));
+  const { data, averages } = useMemo(() => buildSeries(points, grain), [points, grain]);
+  const bottomTitle = bucketTitle(grain);
 
-  const unitsMax = niceCeiling(Math.max(...points.flatMap(p => [p.units, p.targetUnits ?? 0]), 0));
-  const learnersMax = niceCeiling(Math.max(...points.map(p => p.learners), 0));
-  const averages = points.map(p => p.avgUnitsPerLearner).filter((a): a is number => a !== null);
-  // A line, not bars, so its scale need not start at zero: pad the observed
-  // range so a drift from 2.0 to 2.7 reads as a drift. Every point is labelled.
-  const lo = averages.length ? Math.min(...averages) : 0;
-  const hi = averages.length ? Math.max(...averages) : 1;
-  const avgMin = lo - Math.max(hi - lo, hi * 0.1) * 0.5;
-  const avgMax = hi + Math.max(hi - lo, hi * 0.1) * 0.2;
-
-  const { units: U, learners: L, average: A } = PANELS;
-  const uy = (v: number) => U.top + U.height - (v / unitsMax) * U.height;
-  const ly = (v: number) => L.top + L.height - (v / learnersMax) * L.height;
-  const ay = (v: number) => A.top + A.height - ((v - avgMin) / (avgMax - avgMin)) * A.height;
-
-  const line = points.reduce<string[]>((segs, p, i) => {
-    if (p.avgUnitsPerLearner === null) return segs;
-    const prevBroken = i === 0 || points[i - 1].avgUnitsPerLearner === null;
-    segs.push(`${prevBroken ? "M" : "L"}${cx(i)} ${ay(p.avgUnitsPerLearner)}`);
-    return segs;
-  }, []);
-
-  const baseline = (y: number) => (
-    <line x1={LEFT} x2={W - RIGHT} y1={y} y2={y} stroke={CONTEXT.faint} strokeWidth={1} />
+  const options = useMemo(
+    () => ({
+      height: expanded ? "520px" : "420px",
+      axes: {
+        left: {
+          mapsTo: "value",
+          scaleType: ScaleTypes.LINEAR,
+          title: "Course units · learners",
+          includeZero: true,
+          main: true,
+          correspondingDatasets: [UNITS_GROUP, TARGET_GROUP, LEARNERS_GROUP],
+        },
+        bottom: { mapsTo: "key", scaleType: ScaleTypes.LABELS, title: bottomTitle },
+      },
+      comboChartTypes: [
+        { type: "grouped-bar", correspondingDatasets: [UNITS_GROUP, TARGET_GROUP] },
+        {
+          type: "line",
+          // Markers on: a reader cannot tell a flat stretch from a segment drawn
+          // across missing periods without them.
+          options: { points: { enabled: true } },
+          correspondingDatasets: [LEARNERS_GROUP],
+        },
+      ],
+      curve: "curveLinear",
+      color: { scale: comboScale },
+      legend: { enabled: true },
+      toolbar: { enabled: false },
+      tooltip: {
+        customHTML: (hovered: Datum[], defaultHTML: string) => {
+          const avg = averages.get(hovered[0]?.key);
+          if (avg === null || avg === undefined) return defaultHTML;
+          return (
+            `${defaultHTML}<div class="cds--cc--tooltip" style="padding:0 16px 12px">` +
+            `Avg units per learner: <strong>${formatAverage(avg)}</strong></div>`
+          );
+        },
+      },
+    }),
+    [averages, bottomTitle, expanded],
   );
 
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      width="100%"
-      role="img"
-      aria-label="Three stacked panels sharing a period axis: course units as columns, unique learners as columns, average units per learner as a line"
-    >
-      <Label x={LEFT} y={U.title} anchor="start" size={12} fill={INK}>
-        Course units (XP ÷ {COURSE_UNIT_XP})
-      </Label>
-      {[0, unitsMax / 2, unitsMax].map(v => (
-        <g key={v}>
-          <line x1={LEFT} x2={W - RIGHT} y1={uy(v)} y2={uy(v)} stroke={GRID} strokeWidth={0.5} />
-          <Label x={LEFT - 6} y={uy(v) + 4} anchor="end">
-            {formatUnits(v)}
-          </Label>
-        </g>
-      ))}
-      {points.map((p, i) => (
-        <g key={p.bucket}>
-          <title>{`${p.bucket}: ${formatUnits(p.units)} units${p.targetUnits === null ? "" : ` (target ${formatUnits(p.targetUnits)})`}, ${p.learners} learners, ${formatAverage(p.avgUnitsPerLearner)} per learner`}</title>
-          <Column
-            x={cx(i) - bw / 2}
-            y={uy(p.units)}
-            w={bw}
-            h={U.top + U.height - uy(p.units)}
-            fill={COURSE_UNITS_COLORS.units}
-          />
-          {showValues && (
-            <Label x={cx(i)} y={uy(Math.max(p.units, p.targetUnits ?? 0)) - 8} fill={INK}>
-              {formatUnits(p.units)}
-            </Label>
-          )}
-        </g>
-      ))}
-      {points.map((p, i) =>
-        p.targetUnits === null || p.targetUnits <= 0 ? null : (
-          <line
-            key={p.bucket}
-            x1={cx(i) - bw / 2 - 4}
-            x2={cx(i) + bw / 2 + 4}
-            y1={uy(p.targetUnits)}
-            y2={uy(p.targetUnits)}
-            stroke={COURSE_UNITS_COLORS.target}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-          />
-        ),
-      )}
-      {baseline(U.top + U.height)}
-
-      <Label x={LEFT} y={L.title} anchor="start" size={12} fill={INK}>
-        Unique learners earning XP
-      </Label>
-      {points.map((p, i) => (
-        <g key={p.bucket}>
-          <Column
-            x={cx(i) - bw / 2}
-            y={ly(p.learners)}
-            w={bw}
-            h={L.top + L.height - ly(p.learners)}
-            fill={COURSE_UNITS_COLORS.learners}
-          />
-          {showValues && (
-            <Label x={cx(i)} y={ly(p.learners) - 5} fill={INK}>
-              {p.learners.toLocaleString()}
-            </Label>
-          )}
-        </g>
-      ))}
-      {baseline(L.top + L.height)}
-
-      <Label x={LEFT} y={A.title} anchor="start" size={12} fill={INK}>
-        Average units per learner
-      </Label>
-      <path
-        d={line.join(" ")}
-        fill="none"
-        stroke={COURSE_UNITS_COLORS.average}
-        strokeWidth={2}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      {points.map((p, i) =>
-        p.avgUnitsPerLearner === null ? null : (
-          <g key={p.bucket}>
-            <circle
-              cx={cx(i)}
-              cy={ay(p.avgUnitsPerLearner)}
-              r={4.5}
-              fill={COURSE_UNITS_COLORS.average}
-              stroke="#fff"
-              strokeWidth={2}
-            />
-            {showValues && (
-              <Label x={cx(i)} y={ay(p.avgUnitsPerLearner) - 10} fill={INK}>
-                {formatAverage(p.avgUnitsPerLearner)}
-              </Label>
-            )}
-          </g>
-        ),
-      )}
-      {baseline(A.top + A.height)}
-
-      {points.map((p, i) =>
-        i % every === 0 ? (
-          <Label key={p.bucket} x={cx(i)} y={AXIS_Y} size={12}>
-            {bucketAxisLabel(p.bucket, grain, i === 0)}
-          </Label>
-        ) : null,
-      )}
-    </svg>
-  );
+  return <ComboChart data={data} options={options as never} />;
 };
-
-const Legend = () => (
-  <div className="mb-2 flex flex-wrap gap-4 text-xs text-typography-500">
-    {(
-      [
-        ["Course units", COURSE_UNITS_COLORS.units],
-        ["Target (XP target ÷ 100)", COURSE_UNITS_COLORS.target],
-        ["Unique learners", COURSE_UNITS_COLORS.learners],
-        ["Avg units per learner", COURSE_UNITS_COLORS.average],
-      ] as const
-    ).map(([label, color]) => (
-      <span key={label} className="flex items-center gap-1">
-        <span
-          className={`inline-block rounded-sm ${label.startsWith("Target") ? "h-0.5 w-3.5" : "h-2.5 w-2.5"}`}
-          style={{ background: color }}
-        />
-        {label}
-      </span>
-    ))}
-  </div>
-);
 
 /**
  * Course units consumed per period, the learners they came from, and the
@@ -320,8 +180,8 @@ export const CourseUnitsCard = () => {
 
   const caption =
     `A course unit is ${COURSE_UNIT_XP} XP, so units are the XP learners earned in the period ` +
-    `÷ ${COURSE_UNIT_XP}, from every XP source. Where an XP target is set for the period (month and year grain), the dark mark on each column is that target ÷ ${COURSE_UNIT_XP} — the same goal as the Utilization chart, not configured twice. Unique learners are the people who earned any ` +
-    `XP in that period; the average is units ÷ learners. Units rising with learners flat means ` +
+    `÷ ${COURSE_UNIT_XP}, from every XP source. Where an XP target is set for the period (month and year grain), the grey column beside each period's units is that target ÷ ${COURSE_UNIT_XP} — the same goal as the Utilization chart, not configured twice. Unique learners are the people who earned any ` +
+    `XP in that period; the average (units ÷ learners) is in the hover tooltip. Units rising with learners flat means ` +
     `a few people are doing more. Platform-wide, no tenant filter. The current ` +
     `${bucketTitle(grain).toLowerCase()} is still accruing and is left off the plot.`;
 
@@ -357,10 +217,9 @@ export const CourseUnitsCard = () => {
           />
         }
         onExpand={() => setExpanded(true)}
-        height="440px"
+        height="460px"
         chartId="AAQ-252"
       >
-        <Legend />
         <CourseUnitsPlot points={plotted} grain={grain} />
       </ChartCard>
 
@@ -378,8 +237,7 @@ export const CourseUnitsCard = () => {
           ]}
           render={() => (
             <>
-              <Legend />
-              <CourseUnitsPlot points={plotted} grain={grain} />
+              <CourseUnitsPlot points={plotted} grain={grain} expanded />
             </>
           )}
         />

@@ -8,7 +8,6 @@ import {
   courseUnitsEmptyText,
   courseUnitsTakeaway,
   formatUnits,
-  niceCeiling,
 } from "../courseUnitsChart";
 
 const point = (o: Partial<CourseUnitsPoint> & { bucket: string }): CourseUnitsPoint => ({
@@ -30,20 +29,6 @@ describe("bucketAxisLabel", () => {
     expect(bucketAxisLabel("2026-10-31", "day", false)).toBe("31 Oct");
     expect(bucketAxisLabel("2026-10-26", "week", false)).toBe("26 Oct");
     expect(bucketAxisLabel("2026-01-01", "year", false)).toBe("2026");
-  });
-});
-
-describe("niceCeiling", () => {
-  it("rounds up to a tidy ceiling", () => {
-    expect(niceCeiling(1480)).toBe(2000);
-    expect(niceCeiling(540)).toBe(1000);
-    expect(niceCeiling(2.74)).toBe(5);
-    expect(niceCeiling(1000)).toBe(1000);
-  });
-
-  it("never returns zero", () => {
-    expect(niceCeiling(0)).toBe(1);
-    expect(niceCeiling(Number.NaN)).toBe(1);
   });
 });
 
