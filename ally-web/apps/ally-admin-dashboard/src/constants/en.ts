@@ -976,6 +976,9 @@ export const en = {
     untitled: "Untitled",
     empty: "No memories yet. Add the events and things this person could reveal.",
     mapping: "Sorting your knowledge sources into memories…",
+    mappingBanner:
+      "Sorting your knowledge sources into memories and states. This takes about 30 seconds. Saving, Preview and Publish are paused until it's done.",
+    pausedWhileMapping: "Paused while memories are being sorted into states (about 30 seconds)",
     mapped:
       "Memories are ready — each one is set to the state where it comes up. Check them below.",
     mapFailed:

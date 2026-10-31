@@ -5,7 +5,7 @@ import { useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Tabs } from "@ally-ui-mono/ui-shared";
+import { InlineLoading, Tabs } from "@ally-ui-mono/ui-shared";
 import {
   useCreateSimulationMutation,
   useDeleteCoverImageMutation,
@@ -78,6 +78,8 @@ import {
   isNonEmptyArray,
   validateTimeRange,
 } from "@utils";
+
+import { useIsMappingMemories } from "../../components/memories/memoriesMappingStatus";
 
 const stepIds: any = SIMULATION_CREATOR_STEP_IDS;
 
@@ -403,6 +405,10 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     reValidateMode: "onChange",
     defaultValues: formDefaultValues,
   });
+  // True while the first-switch (or "Re-map") memory mapping runs, ~20-35s.
+  // Saving, previewing or publishing in that window would store or run the
+  // simulation without the memories the author is waiting for.
+  const isMappingMemories = useIsMappingMemories(formMethods.control as unknown as object);
 
   const uploadsInProgress = useSelector(selectUploadsInProgress);
   const isReportGenerationInProgress = uploadsInProgress.some(
@@ -1001,6 +1007,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     if (isAutosavingRef.current) return; // an autosave is already running
     if (isCreatingSimulation) return; // a create/publish is in flight
     if (isReportGenerationInProgress) return; // don't fight report generation
+    if (isMappingMemories) return; // memories land when mapping ends; save them with the rest
     if (Object.keys(dirtyFields).length === 0) return; // nothing to save
 
     isAutosavingRef.current = true;
@@ -1028,14 +1035,14 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // CreateTrack.tsx's guard.
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!viewMode && Object.keys(dirtyFields).length > 0) {
+      if (!viewMode && (Object.keys(dirtyFields).length > 0 || isMappingMemories)) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [viewMode, dirtyFields]);
+  }, [viewMode, dirtyFields, isMappingMemories]);
 
   // Note: a brand-new roleplay is NOT persisted on mount. Nothing is saved until
   // the user actually edits a field — at which point the interval autosave above
@@ -1083,6 +1090,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   };
 
   const handlePublish = () => {
+    if (isMappingMemories) return;
     if (emptyOptionalFields.length > 0) {
       pendingActionRef.current = doPublish;
       setShowOptionalFieldsWarning(true);
@@ -1117,6 +1125,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // Header Save. On a live roleplay it confirms first: it saves as a draft,
   // which takes the roleplay offline for learners.
   const handleSaveClick = () => {
+    if (isMappingMemories) return;
     if (isEditingLiveRoleplay) {
       setPendingOfflineSave("save");
       return;
@@ -1338,6 +1347,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   };
 
   const handlePreview = () => {
+    if (isMappingMemories) return;
     if (!viewMode && emptyOptionalFields.length > 0) {
       pendingActionRef.current = doPreview;
       setShowOptionalFieldsWarning(true);
@@ -1423,7 +1433,12 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
               <button
                 type="button"
                 onClick={() => setIsVersionPanelOpen(o => !o)}
-                title={en.simulation.versions.switchVersion}
+                disabled={isMappingMemories}
+                title={
+                  isMappingMemories
+                    ? en.memories.pausedWhileMapping
+                    : en.simulation.versions.switchVersion
+                }
                 className={`flex items-center gap-1.5 h-[40px] px-3 rounded text-typography-900 transition-colors ${
                   isVersionPanelOpen ? "bg-secondary-50" : "hover:bg-secondary-50"
                 }`}
@@ -1497,6 +1512,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
             <Button
               variant={ButtonVariant.TEXT}
               onClick={handleSaveClick}
+              disabled={isMappingMemories}
+              title={isMappingMemories ? en.memories.pausedWhileMapping : undefined}
               className="px-4 h-[40px] text-typography-900"
             >
               {en.simulation.save}
@@ -1505,8 +1522,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           <Button
             variant={ButtonVariant.TEXT}
             onClick={handlePreview}
-            disabled={!areAllMandatoryFieldsFilled}
-            className={`px-4 h-[40px] ${areAllMandatoryFieldsFilled ? "text-primary-500" : "text-typography-600 cursor-not-allowed"}`}
+            disabled={!areAllMandatoryFieldsFilled || isMappingMemories}
+            title={isMappingMemories ? en.memories.pausedWhileMapping : undefined}
+            className={`px-4 h-[40px] ${areAllMandatoryFieldsFilled && !isMappingMemories ? "text-primary-500" : "text-typography-600 cursor-not-allowed"}`}
           >
             {en.simulation.preview}
           </Button>
@@ -1539,8 +1557,12 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
                 variant={ButtonVariant.PRIMARY}
                 onClick={handlePublish}
                 disabled={
-                  !areAllMandatoryFieldsFilled || isCreatingSimulation || isPublishingVersion
+                  !areAllMandatoryFieldsFilled ||
+                  isCreatingSimulation ||
+                  isPublishingVersion ||
+                  isMappingMemories
                 }
+                title={isMappingMemories ? en.memories.pausedWhileMapping : undefined}
                 className="transition-colors h-[40px] pr-[20px]"
               >
                 {isCreatingSimulation || isPublishingVersion
@@ -1551,6 +1573,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           )}
         </div>
       </div>
+
+      {/* Memory mapping in progress. Page-level, not only next to the prompt
+          picker, so it is seen from any tab, and it says how long and what is
+          paused, so nobody starts the simulation half-mapped. */}
+      {isMappingMemories && (
+        <div
+          role="status"
+          data-testid="memories-mapping-banner"
+          className="mt-4 flex items-start gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 md:px-4 py-3 text-sm text-typography-900 shrink-0 font-primary"
+        >
+          <InlineLoading className="!w-auto shrink-0" status="active" />
+          <span>{en.memories.mappingBanner}</span>
+        </div>
+      )}
 
       {/* Latency warning — shown before the tab strip when this simulation has
           more advanced (mapped) events than the recommended threshold, since a

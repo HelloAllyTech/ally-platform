@@ -14,6 +14,10 @@ import reportUploadReducer from "@reducer/reportUploadReducer";
 const mockEn = vi.hoisted(() => ({
   // The header's "Past runs" control opens the recorded preview monologues.
   previewMonologueRuns: { trigger: "Past runs" },
+  memories: {
+    mappingBanner: "Sorting memories — about 30 seconds",
+    pausedWhileMapping: "Paused while memories are sorted",
+  },
   simulation: {
     unsaved: "Unsaved",
     changes: "Changes",
@@ -129,8 +133,14 @@ vi.mock("@hooks", () => ({
   }),
 }));
 
+const mapping = vi.hoisted(() => ({ inFlight: false }));
+vi.mock("../../../components/memories/memoriesMappingStatus", () => ({
+  useIsMappingMemories: () => mapping.inFlight,
+}));
+
 // Mock components
 vi.mock("@ally-ui-mono/ui-shared", () => ({
+  InlineLoading: () => <span data-testid="inline-loading" />,
   Tabs: ({ items, activeId, onChange }: any) => (
     <div data-testid="tabs">
       {items.map((item: any) => (
@@ -627,6 +637,54 @@ describe("CreateSimulation", () => {
         mockFormMethods.formState = { dirtyFields: {} };
         vi.useRealTimers();
       }
+    });
+  });
+
+  // Mapping memories takes ~30s after a switch to the Stage Director prompt.
+  // Saving, previewing or publishing in that window would store or run the
+  // simulation without them, so the editor pauses all three and says why.
+  describe("While memories are being mapped", () => {
+    afterEach(() => {
+      mapping.inFlight = false;
+      mockFormMethods.formState = { dirtyFields: {} };
+      vi.useRealTimers();
+    });
+
+    it("shows the banner and pauses Save, Preview and Publish", () => {
+      mapping.inFlight = true;
+      mockParams.id = "existing-id";
+      renderCreateSimulation();
+
+      expect(screen.getByTestId("memories-mapping-banner")).toHaveTextContent(
+        "Sorting memories — about 30 seconds",
+      );
+      expect(screen.getByText("Save Draft").closest("button")).toBeDisabled();
+      expect(screen.getByText("Preview").closest("button")).toBeDisabled();
+      expect(screen.getByText("Publish").closest("button")).toBeDisabled();
+    });
+
+    it("does not autosave until mapping ends", async () => {
+      vi.useFakeTimers();
+      mapping.inFlight = true;
+      mockParams.id = "existing-id";
+      mockFormMethods.formState = { dirtyFields: { title: true } } as any;
+      mockUpdateSimulation.mockResolvedValue({ data: [{ id: "existing-id" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+      renderCreateSimulation();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+    });
+
+    it("shows no banner when nothing is being mapped", () => {
+      renderCreateSimulation();
+      expect(screen.queryByTestId("memories-mapping-banner")).not.toBeInTheDocument();
     });
   });
 
