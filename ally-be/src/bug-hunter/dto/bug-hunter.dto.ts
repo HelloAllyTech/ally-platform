@@ -700,6 +700,10 @@ export class UpdateDecisionOwnerDto {
   owner?: 'rule' | 'model' | null;
 }
 
+/**
+ * The model settings for Bug Hunter (OPP-0784). Which CLI to run, and which
+ * models within it.
+ */
 export class BugHunterModelSettingsDto {
   @ApiProperty({
     description:
