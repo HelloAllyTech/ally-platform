@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Prompt } from '../entity/prompt.entity';
+import { PromptVersion } from '../entity/prompt-version.entity';
 import { PromptsRepository } from '../repository/prompt.repository';
 import {
   PromptSearchOptions,
@@ -139,39 +141,34 @@ export class PromptSharedService {
   private async resolveFromStore(
     promptCode: string,
   ): Promise<ResolvedPrompt | null> {
-    const row = (await this.promptsRepository
-      .createQueryBuilder('prompt')
-      .leftJoin(
-        'prompts_versions',
-        'pv',
-        '"prompt"."id" = "pv"."promptId" AND "pv"."version" = "prompt"."currentVersion"',
-      )
-      .select('pv.prompt', 'prompt')
-      .addSelect('pv.version', 'version')
-      .addSelect('pv.provider', 'provider')
-      .addSelect('pv.model', 'model')
-      .addSelect('CAST(pv.temperature AS double precision)', 'temperature')
-      .addSelect('prompt.defaultPrompt', 'defaultPrompt')
-      .addSelect('prompt.provider', 'rowProvider')
-      .addSelect('prompt.model', 'rowModel')
-      .addSelect(
-        'CAST(prompt.temperature AS double precision)',
-        'rowTemperature',
-      )
-      .where('prompt.promptCode = :promptCode', { promptCode })
-      .getRawOne()) as
-      | {
-          prompt?: string | null;
-          version?: number | null;
-          provider?: string | null;
-          model?: string | null;
-          temperature?: number | null;
-          defaultPrompt?: string | null;
-          rowProvider?: string | null;
-          rowModel?: string | null;
-          rowTemperature?: number | null;
+    const prompt = await this.promptsRepository.findOne({
+      where: { promptCode },
+    });
+
+    let version: PromptVersion | null = null;
+    if (
+      prompt &&
+      prompt.currentVersion !== null &&
+      prompt.currentVersion !== undefined
+    ) {
+      version = await this.promptsRepository.manager.findOne(PromptVersion, {
+        where: { promptId: prompt.id, version: prompt.currentVersion },
+      });
+    }
+
+    const row = prompt
+      ? {
+          prompt: version?.prompt,
+          version: version?.version,
+          provider: version?.provider,
+          model: version?.model,
+          temperature: version?.temperature,
+          defaultPrompt: prompt.defaultPrompt,
+          rowProvider: prompt.provider,
+          rowModel: prompt.model,
+          rowTemperature: prompt.temperature,
         }
-      | undefined;
+      : undefined;
 
     const settings = (r: NonNullable<typeof row>) => ({
       provider: r.provider ?? r.rowProvider ?? undefined,
@@ -220,10 +217,15 @@ export class PromptSharedService {
       source: 'default',
       ...(settingsRow
         ? settings({
-            ...settingsRow,
-            rowProvider: settingsRow.provider,
-            rowModel: settingsRow.model,
-            rowTemperature: settingsRow.temperature,
+            prompt: undefined,
+            version: undefined,
+            defaultPrompt: undefined,
+            provider: (settingsRow as any).provider,
+            model: (settingsRow as any).model,
+            temperature: (settingsRow as any).temperature,
+            rowProvider: (settingsRow as Prompt).provider,
+            rowModel: (settingsRow as Prompt).model,
+            rowTemperature: (settingsRow as Prompt).temperature,
           })
         : {}),
     };
@@ -313,22 +315,17 @@ export class PromptSharedService {
   ): Promise<Array<PromptsWithPromptCode>> {
     const query = this.promptsRepository
       .createQueryBuilder('prompt')
-      .leftJoin(
-        'prompts_versions',
-        'pv',
-        '"prompt"."id" = "pv"."promptId" AND "pv"."version" = "prompt"."currentVersion"',
-      )
-      .select(['pv.prompt AS prompt', 'prompt.promptCode AS "promptCode"'])
-      .addSelect('prompt.useDashboardOverride', 'useDashboardOverride')
-      .addSelect('prompt.availableVariables', 'availableVariables')
-      .addSelect('prompt.hasStates', 'hasStates')
-      .addSelect('prompt.provider', 'provider')
-      .addSelect('prompt.model', 'model')
-      .addSelect('prompt.temperature', 'temperature')
-      .addSelect('prompt.defaultPrompt', 'defaultPrompt')
-      .addSelect('prompt.currentVersion', 'currentVersion');
-    // Model settings come from the live version, which the row mirrors on
-    // every promotion; the row's values cover rows with no version yet.
+      .select([
+        'prompt.id',
+        'prompt.promptCode',
+        'prompt.availableVariables',
+        'prompt.hasStates',
+        'prompt.provider',
+        'prompt.model',
+        'prompt.temperature',
+        'prompt.defaultPrompt',
+        'prompt.currentVersion',
+      ]);
 
     if (options.promptCode && options.promptCode.length > 0) {
       query.andWhere('prompt.promptCode IN (:...promptCodes)', {
@@ -341,18 +338,55 @@ export class PromptSharedService {
       });
     }
 
-    const rows = await query.getRawMany<
-      PromptsWithPromptCode & {
-        useDashboardOverride: boolean;
-        availableVariables?: (
-          | string
-          | { name: string; label?: string; required?: boolean }
-        )[];
-        hasStates?: boolean;
+    const prompts = await query.getMany();
+    if (prompts.length === 0) {
+      return [];
+    }
+
+    const versionTuples = prompts
+      .map((p) => ({
+        promptId: p.id,
+        version: p.currentVersion,
+      }))
+      .filter(
+        (t): t is { promptId: string; version: number } =>
+          t.version !== null && t.version !== undefined,
+      );
+
+    const versions =
+      versionTuples.length > 0
+        ? await this.promptsRepository.manager
+            .createQueryBuilder(PromptVersion, 'pv')
+            .select(['pv.promptId', 'pv.prompt'])
+            .where(versionTuples)
+            .getRawMany<{ promptId: string; prompt: string }>()
+        : [];
+
+    const versionsMap = new Map<string, string>();
+    for (const version of versions) {
+      versionsMap.set(version.promptId, version.prompt);
+    }
+
+    const rows = prompts.map((prompt) => {
+      const livePrompt = versionsMap.get(prompt.id);
+      const row: Omit<PromptsWithPromptCode, 'prompt'> & {
+        prompt?: string;
         defaultPrompt?: string;
         currentVersion?: number;
-      }
-    >();
+      } = {
+        promptCode: prompt.promptCode,
+        prompt: livePrompt,
+        availableVariables: prompt.availableVariables as any,
+        hasStates: prompt.hasStates,
+        provider: prompt.provider,
+        model: prompt.model,
+        temperature: prompt.temperature,
+        defaultPrompt: prompt.defaultPrompt,
+        currentVersion: prompt.currentVersion,
+        version: null, // will be set below
+      };
+      return row;
+    });
 
     for (const row of rows) {
       // Raw query returns the numeric `temperature` column as a string; coerce
@@ -372,6 +406,6 @@ export class PromptSharedService {
       row.contentHash = row.prompt ? hashPromptBody(row.prompt) : undefined;
     }
 
-    return rows;
+    return rows as Array<PromptsWithPromptCode>;
   }
 }
