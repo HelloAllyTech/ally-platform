@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ScribeSessionReviewController } from './review.controller';
 import { ScribeSessionReviewService } from '../service/review.service';
 import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
-import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 describe('ScribeSessionReviewController', () => {
   let controller: ScribeSessionReviewController;
@@ -41,7 +41,10 @@ describe('ScribeSessionReviewController', () => {
         PermissionsGuard,
         Reflector,
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<ScribeSessionReviewController>(
       ScribeSessionReviewController,
@@ -53,28 +56,10 @@ describe('ScribeSessionReviewController', () => {
   });
 
   describe('getUnreadReviewCount', () => {
-    it('should return unread count for user with permission', async () => {
-      mockPermissionValidator.validatePermissions.mockResolvedValue(true);
-      const req = { user: { id: 1 } };
-      const result = await controller.getUnreadReviewCount(req as any);
-      expect(mockPermissionValidator.validatePermissions).toHaveBeenCalledWith(
-        1,
-        [PERMISSIONS.VIEW_SCRIBE_REVIEWS],
-      );
+    it('should return unread count', async () => {
+      const result = await controller.getUnreadReviewCount();
       expect(mockReviewService.getUnreadReviewCount).toHaveBeenCalled();
       expect(result).toEqual({ count: 5 });
-    });
-
-    it('should return 0 for user without permission', async () => {
-      mockPermissionValidator.validatePermissions.mockResolvedValue(false);
-      const req = { user: { id: 2 } };
-      const result = await controller.getUnreadReviewCount(req as any);
-      expect(mockPermissionValidator.validatePermissions).toHaveBeenCalledWith(
-        2,
-        [PERMISSIONS.VIEW_SCRIBE_REVIEWS],
-      );
-      expect(mockReviewService.getUnreadReviewCount).not.toHaveBeenCalled();
-      expect(result).toEqual({ count: 0 });
     });
   });
 });
