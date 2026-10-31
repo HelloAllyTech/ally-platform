@@ -42,7 +42,7 @@ const asOfStamp = (computedAt?: string): string | undefined => {
 };
 
 const UNITS_GROUP = "Course units";
-const TARGET_GROUP = "Target (XP target ÷ 100)";
+const TARGET_GROUP = "Target";
 const LEARNERS_GROUP = "Unique learners";
 const AVERAGE_GROUP = "Avg units per learner";
 
@@ -112,22 +112,22 @@ const CourseUnitsPlot = ({
     () =>
       timeBarOpts({
         leftTitle: "Course units",
-        bottomTitle,
+        bottomTitle: "",
         colorScale: unitsScale,
         legend: true,
         height: expanded ? "340px" : "260px",
       }),
-    [bottomTitle, expanded],
+    [expanded],
   );
   const learnersOpts = useMemo(
     () =>
       timeBarOpts({
         leftTitle: "Unique learners",
-        bottomTitle,
+        bottomTitle: "",
         colorScale: single(LEARNERS_GROUP, COURSE_UNITS_COLORS.learners),
         height: expanded ? "260px" : "200px",
       }),
-    [bottomTitle, expanded],
+    [expanded],
   );
   const averageOpts = useMemo(
     () =>

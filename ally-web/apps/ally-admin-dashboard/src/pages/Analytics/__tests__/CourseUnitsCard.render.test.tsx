@@ -65,7 +65,7 @@ describe("CourseUnitsCard", () => {
     expect(average.data.map((d: { value: number }) => d.value)).toEqual([2.56, 2.64]);
     // Only September has a target (goal / 100); August has none, so no datum, not 0.
     expect(units.data.filter((d: { group: string }) => d.group.startsWith("Target"))).toEqual([
-      { group: "Target (XP target ÷ 100)", key: "Sep", value: 1500 },
+      { group: "Target", key: "Sep", value: 1500 },
     ]);
   });
 
