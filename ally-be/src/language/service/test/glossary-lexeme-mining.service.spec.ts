@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { GlossaryEntryStatus } from '../../entity/language-glossary-section.entity';
@@ -417,6 +418,7 @@ describe('GlossaryLexemeMiningService jobs', () => {
   });
 
   it('records a failure with its message and frees the language', async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     mine.mockRejectedValue(new Error('pairing exploded'));
     const job = await service.startJob(6, {});
     await settle();
@@ -426,6 +428,7 @@ describe('GlossaryLexemeMiningService jobs', () => {
     expect(failed.error).toBe('pairing exploded');
     mine.mockResolvedValue({});
     await expect(service.startJob(6, {})).resolves.toBeDefined();
+    errorSpy.mockRestore();
   });
 
   it('refuses a second concurrent run for the same language', async () => {
