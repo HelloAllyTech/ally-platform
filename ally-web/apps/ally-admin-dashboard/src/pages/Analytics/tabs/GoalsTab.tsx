@@ -7,6 +7,7 @@ import { CourseUnitsCard } from "../CourseUnitsCard";
 import { CumulativeUsersCard } from "../CumulativeUsersCard";
 import { FoundationalSkillsCard } from "../FoundationalSkillsCard";
 import { GoalsXpCard } from "../GoalsXpCard";
+import { LevelReachCumulativeCard } from "../LevelReachCumulativeCard";
 import { NewUsersCard } from "../NewUsersCard";
 import { NewVsReturningUsersCard } from "../NewVsReturningUsersCard";
 import { PlayTimeCard } from "../PlayTimeCard";
@@ -97,6 +98,7 @@ export const GoalsTab = () => (
       <AverageRatingCard />
       <ActiveUsersXpCard />
       <XpLevelReachedCard />
+      <LevelReachCumulativeCard />
       <ShipVolumeCard />
       <BugHunterVolumeCard />
       <XpByTenantCard />
