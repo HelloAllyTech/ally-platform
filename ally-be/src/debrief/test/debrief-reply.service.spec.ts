@@ -41,9 +41,11 @@ function build(opts: {
       return m;
     }),
   };
+  const kept = jest.fn(async (..._a: any[]) => []);
   const chats = {
     findOne: jest.fn(async () => ({ id: 'chat-1' })),
     save: jest.fn(),
+    manager: { query: kept },
   };
   const aiChat = {
     streamResponse: jest.fn(() =>
@@ -138,7 +140,16 @@ function build(opts: {
     { record: jest.fn() } as any,
     knowledge as any,
   );
-  return { svc, saved, aiChat, feedback, events, getCompletion, knowledge };
+  return {
+    svc,
+    saved,
+    aiChat,
+    feedback,
+    events,
+    getCompletion,
+    knowledge,
+    kept,
+  };
 }
 
 const run = async (svc: DebriefReplyService, message: string) => {
@@ -235,6 +246,21 @@ describe('DebriefReplyService (Ask Ally)', () => {
       (e) => e.type === 'done',
     );
     expect(done.content).not.toContain('leave home tonight');
+  });
+
+  it('keeps the replaced reply and its unmatched quote on the run, for a person to read', async () => {
+    const { svc, kept } = build({
+      reply: 'She said "I am going to leave home tonight" there.',
+    });
+    await run(svc, 'What did she say?');
+    await new Promise((r) => setImmediate(r));
+    const [sql, [runId, entry]] = kept.mock.calls[0] as any[];
+    expect(sql).toContain('replacedReplies');
+    expect(runId).toBe('run-1');
+    expect(JSON.parse(entry)).toMatchObject({
+      fails: ['quote_mismatch'],
+      unmatched: ['I am going to leave home tonight'],
+    });
   });
 
   it('keeps a quote that is in the transcript', async () => {

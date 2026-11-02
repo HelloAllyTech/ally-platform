@@ -472,7 +472,7 @@ export class DebriefAgentService implements OnModuleInit {
           state: 'working',
           steps: [...new Set(run.steps.map((x) => x.label).filter(Boolean))],
           progress: learnerProgress(
-            run.workspace?.progress as DebriefProgress | undefined,
+            run.workspace?.liveProgress as DebriefProgress | undefined,
             !!run.hasRiskCue,
           ),
         };

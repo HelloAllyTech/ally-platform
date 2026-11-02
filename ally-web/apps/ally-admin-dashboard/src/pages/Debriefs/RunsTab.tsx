@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { Button, ContentSwitcher, InlineNotification, Switch } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefOverviewQuery, useGetDebriefRunsQuery } from "@api";
@@ -21,9 +21,15 @@ export const RunsTab: React.FC = () => {
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const overview = useGetDebriefOverviewQuery();
-  const runs = useGetDebriefRunsQuery({
-    status: filter === "all" ? "" : (filter as DebriefRunStatus),
-  });
+  const [polling, setPolling] = useState(false);
+  // Fresh on every visit, and every 15 s while a debrief is being written,
+  // so a run that has just started shows up and moves on without a reload.
+  const runs = useGetDebriefRunsQuery(
+    { status: filter === "all" ? "" : (filter as DebriefRunStatus) },
+    { refetchOnMountOrArgChange: true, pollingInterval: polling ? 15_000 : 0 },
+  );
+  const anyRunning = !!runs.data?.some(r => r.status === "running" || r.status === "queued");
+  useEffect(() => setPolling(anyRunning), [anyRunning]);
   const o = overview.data;
   const tile = {
     loading: overview.isLoading,

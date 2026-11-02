@@ -42,6 +42,7 @@ import {
   cardTexts,
   replyCheckFailures,
   speakerRuns,
+  unmatchedQuotes,
 } from '../util/debrief-cards.util';
 import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefAiClient } from './debrief-ai.client';
@@ -239,6 +240,12 @@ export class DebriefReplyService {
                 this.logger.warn(
                   `[debrief] Ask Ally reply replaced for run ${run.id}: ${fails.join(', ')}`,
                 );
+                void this.keepReplaced(run.id, {
+                  at: new Date().toISOString(),
+                  fails,
+                  unmatched: unmatchedQuotes(full, sources),
+                  reply: full,
+                });
               }
               if (await distress) {
                 void this.feedback.raiseChatDistress(
@@ -261,6 +268,35 @@ export class DebriefReplyService {
         },
       });
     return subject.pipe(startWith(event({ type: 'start' })));
+  }
+
+  /**
+   * A reply the checks replaced, kept on the run (the last 20) so a person
+   * can see what was wrong: the words stay in the database beside the
+   * transcript, never in the logs. Never throws.
+   */
+  private async keepReplaced(
+    runId: string,
+    entry: { at: string; fails: string[]; unmatched: string[]; reply: string },
+  ): Promise<void> {
+    try {
+      await this.chats.manager.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(
+              coalesce(workspace, '{}'::jsonb), '{replacedReplies}',
+              (SELECT coalesce(jsonb_agg(x.e ORDER BY x.n), '[]'::jsonb)
+                 FROM jsonb_array_elements(
+                        coalesce(workspace->'replacedReplies', '[]'::jsonb) || jsonb_build_array($2::jsonb)
+                      ) WITH ORDINALITY AS x(e, n)
+                WHERE x.n > jsonb_array_length(coalesce(workspace->'replacedReplies', '[]'::jsonb)) + 1 - 20))
+          WHERE id = $1`,
+        [runId, JSON.stringify(entry)],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not keep a replaced reply for run ${runId}: ${(e as Error).message}`,
+      );
+    }
   }
 
   /**

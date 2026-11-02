@@ -231,6 +231,19 @@ export class DebriefRunnerService {
         language: session.language,
         learnerTurns: session.learnerTurns,
       });
+      // The Console lists a running debrief with its organisation and
+      // language, not only once it finishes. Never awaited, never fails it.
+      try {
+        void Promise.resolve(
+          this.runs.update(run.id, {
+            tenantId: session.tenantId,
+            language: session.language,
+            learnerTurns: session.learnerTurns,
+          } as Partial<DebriefRun>),
+        ).catch(() => undefined);
+      } catch {
+        // The finish writes them anyway.
+      }
       if (session.learnerTurns === 0) {
         return await finish(DebriefRunStatus.SKIPPED, {
           skipReason: 'too_short',
@@ -321,7 +334,7 @@ export class DebriefRunnerService {
           void Promise.resolve(
             this.runs.query(
               `UPDATE debrief_runs
-                  SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{progress}', $2::jsonb),
+                  SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{liveProgress}', $2::jsonb),
                       "hasRiskCue" = $3
                 WHERE id = $1 AND status = 'running'`,
               [run.id, JSON.stringify(p), !!run.hasRiskCue],

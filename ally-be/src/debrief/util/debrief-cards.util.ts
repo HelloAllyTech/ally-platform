@@ -674,15 +674,19 @@ export function replyCheckFailures(
   if (SCORE_RE.test(reply)) fails.push(DebriefCheckCode.SCORE_MENTIONED);
   if (DIAGNOSIS_RE.test(reply)) fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
   if (TURN_NUMBER_RE.test(reply)) fails.push(DebriefCheckCode.TURN_NUMBER);
-  const said = sources.map(normaliseForQuote);
-  const quotes = [...reply.matchAll(/[“"]([^”"]{12,})[”"]/g)].map((m) => m[1]);
-  if (
-    quotes.some((q) => {
-      const n = normaliseForQuote(q);
-      return !said.some((src) => src.includes(n));
-    })
-  ) {
+  if (unmatchedQuotes(reply, sources).length) {
     fails.push(DebriefCheckCode.QUOTE_MISMATCH);
   }
   return fails;
+}
+
+/** The quotes in a reply that appear in none of the sources. */
+export function unmatchedQuotes(reply: string, sources: string[]): string[] {
+  const said = sources.map(normaliseForQuote);
+  return [...reply.matchAll(/[“"]([^”"]{12,})[”"]/g)]
+    .map((m) => m[1])
+    .filter((q) => {
+      const n = normaliseForQuote(q);
+      return !said.some((src) => src.includes(n));
+    });
 }
