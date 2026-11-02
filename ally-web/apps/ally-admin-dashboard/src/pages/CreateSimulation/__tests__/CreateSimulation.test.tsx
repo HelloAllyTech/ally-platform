@@ -1334,7 +1334,7 @@ describe("CreateSimulation", () => {
                   id: "m-1",
                   title: "My father",
                   content: "x",
-                  unlocksInStateIds: [],
+                  unlocksInStateIds: null,
                   unlocksFromStateId: null,
                 },
                 {

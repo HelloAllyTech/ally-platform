@@ -6,6 +6,7 @@ import {
   toBusinessDateString,
   toBusinessWeekKey,
 } from 'src/common/util/date.util';
+import { RetryOnFail } from 'src/common/decorator/retry.decorator';
 import { ProgressTenantResolver } from './progress-tenant.resolver';
 import { UserProgressRepository } from '../repository/user-progress.repository';
 import { SessionEngagementRepository } from '../repository/session-engagement.repository';
@@ -131,6 +132,7 @@ export class XpAwardService {
    * matters — XP v2 never reads the score. What it must still have is turns: the learner
    * either did the practice or they did not, and the sweeper does not change that.
    */
+  @RetryOnFail()
   async awardForSession(params: {
     userId: number;
     tenantId: string;
