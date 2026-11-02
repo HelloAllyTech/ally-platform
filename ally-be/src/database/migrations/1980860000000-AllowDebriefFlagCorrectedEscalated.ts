@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * v9 FR-31/FR-38: a reviewer can now correct a flagged card, or escalate the
  * flag to the clinical advisor. Widen the status check to take both.
  */
-export class AllowDebriefFlagCorrectedEscalated1980850000000 implements MigrationInterface {
-  name = 'AllowDebriefFlagCorrectedEscalated1980850000000';
+export class AllowDebriefFlagCorrectedEscalated1980860000000 implements MigrationInterface {
+  name = 'AllowDebriefFlagCorrectedEscalated1980860000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
