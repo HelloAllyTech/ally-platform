@@ -641,6 +641,31 @@ export function keepOfferedPractice(
  * no turn numbers, and anything it puts in quotation marks is said
  * somewhere — in the transcript, or in the debrief it is talking about.
  */
+/**
+ * Each transcript turn, plus each run of consecutive turns by one speaker
+ * joined up. Speech-to-text often splits one spoken turn across messages, so
+ * a true quote may span them — as the card check allows. It may never reach
+ * into the other speaker's words.
+ */
+export function speakerRuns(transcript: TranscriptTurn[]): string[] {
+  const out = transcript.map((t) => t.text);
+  let run: string[] = [];
+  let role: TranscriptTurn['role'] | null = null;
+  const flush = () => {
+    if (run.length > 1) out.push(run.join(' '));
+  };
+  for (const t of transcript) {
+    if (t.role !== role) {
+      flush();
+      run = [];
+      role = t.role;
+    }
+    run.push(t.text);
+  }
+  flush();
+  return out;
+}
+
 export function replyCheckFailures(
   reply: string,
   sources: string[],

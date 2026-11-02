@@ -41,6 +41,7 @@ import {
   DebriefCards,
   cardTexts,
   replyCheckFailures,
+  speakerRuns,
 } from '../util/debrief-cards.util';
 import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefAiClient } from './debrief-ai.client';
@@ -180,7 +181,7 @@ export class DebriefReplyService {
     // Read alongside the reply, never in front of it: first words stay fast.
     const distress = this.readDistress(message, language, sessionId);
     const sources = [
-      ...transcript.map((t) => t.text),
+      ...speakerRuns(transcript),
       ...extra,
       ...cardTexts(run.cards as unknown as DebriefCards).map((c) => c.text),
     ];

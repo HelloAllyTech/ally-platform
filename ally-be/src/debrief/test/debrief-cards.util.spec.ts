@@ -7,7 +7,9 @@ import {
   isTranscriptGap,
   normaliseForQuote,
   renderCards,
+  replyCheckFailures,
   runDebriefChecks,
+  speakerRuns,
   TranscriptTurn,
   withPointIds,
 } from '../util/debrief-cards.util';
@@ -206,6 +208,30 @@ describe('debrief checks', () => {
     c.work_on_this[0].quote = '[inaudible]';
     expect(run(c, { transcript: gapped })).toContain(
       DebriefCheckCode.QUOTE_FROM_GAP,
+    );
+  });
+
+  it("lets an Ask Ally quote span one speaker's split turns, never the other's", () => {
+    const split: TranscriptTurn[] = [
+      { turn_index: 1, role: 'counselor', text: 'Tell me something' },
+      {
+        turn_index: 2,
+        role: 'counselor',
+        text: 'silly that happened recently.',
+      },
+      { turn_index: 3, role: 'client', text: 'I burnt a cake.' },
+    ];
+    const ok = 'You asked, "Tell me something silly that happened recently."';
+    expect(replyCheckFailures(ok, speakerRuns(split))).toEqual([]);
+    expect(
+      replyCheckFailures(
+        ok,
+        split.map((t) => t.text),
+      ),
+    ).toContain(DebriefCheckCode.QUOTE_MISMATCH);
+    const across = 'You said "silly that happened recently. I burnt a cake."';
+    expect(replyCheckFailures(across, speakerRuns(split))).toContain(
+      DebriefCheckCode.QUOTE_MISMATCH,
     );
   });
 
