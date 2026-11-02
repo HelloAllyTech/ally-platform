@@ -265,7 +265,7 @@ class _Frame extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [AppColors.primary, AppColors.blue100, AppColors.brandLogo],
@@ -516,8 +516,8 @@ class _Working extends ConsumerWidget {
               width: 20,
               height: 20,
               child: reduceMotion
-                  ? const Icon(Icons.edit_note, key: Key('debrief-working-static'), size: 20, color: AppColors.primary)
-                  : const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  ? Icon(Icons.edit_note, key: Key('debrief-working-static'), size: 20, color: AppColors.primary)
+                  : CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -670,7 +670,7 @@ class _ReadyCards extends ConsumerWidget {
           key: const Key('debrief-card-practise-next'),
           reading: readAloud.isBeingRead('practise_next'),
           title: practiseTitle,
-          icon: const Icon(Icons.eco_outlined, size: 20, color: AppColors.primary),
+          icon: Icon(Icons.eco_outlined, size: 20, color: AppColors.primary),
           children: [
             _Lead(practise.skill),
             _Body(practise.reason),
@@ -683,7 +683,7 @@ class _ReadyCards extends ConsumerWidget {
         _Card(
           key: const Key('debrief-card-skill-words'),
           title: ref.t('$_k.skillWords.title'),
-          icon: const Icon(Icons.star_outline, size: 20, color: AppColors.primary),
+          icon: Icon(Icons.star_outline, size: 20, color: AppColors.primary),
           children: [
             for (final entry in cards.skillWords)
               Wrap(
@@ -713,14 +713,14 @@ class _ReadyCards extends ConsumerWidget {
         _Card(
           key: const Key('debrief-card-progress-note'),
           title: ref.t('$_k.progressNote'),
-          icon: const Icon(Icons.trending_up, size: 20, color: AppColors.primary),
+          icon: Icon(Icons.trending_up, size: 20, color: AppColors.primary),
           children: [_Body(cards.progressNote!)],
         ),
       _Card(
         key: const Key('debrief-card-reflective-question'),
         reading: readAloud.isBeingRead('reflective_question'),
         title: ref.t('$_k.reflectiveQuestion'),
-        icon: const Icon(Icons.help_outline, size: 20, color: AppColors.primary),
+        icon: Icon(Icons.help_outline, size: 20, color: AppColors.primary),
         children: [
           _Body(cards.reflectiveQuestion),
           Align(
@@ -841,7 +841,7 @@ class _SupportLines extends StatelessWidget {
                     constraints: const BoxConstraints(minHeight: 44),
                     child: Row(
                       children: [
-                        const Icon(Icons.phone_outlined, size: 16, color: AppColors.primary),
+                        Icon(Icons.phone_outlined, size: 16, color: AppColors.primary),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
@@ -1051,7 +1051,7 @@ class _DistressFirstState extends ConsumerState<_DistressFirst> {
                 header: true,
                 child: Row(
                   children: [
-                    const Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
+                    Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
                     const SizedBox(width: 8),
                     Expanded(child: Text(ref.t('$_k.title'), style: _leadStyle.copyWith(fontSize: 16))),
                   ],
