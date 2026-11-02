@@ -149,7 +149,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   },
   // 2.0-flash retired 2026-06-01; kept to price historical token records —
   // including the -exp variant, which resolves here by prefix. Its cached rate
-  // (a quarter of input) is UNVERIFIED: the model is no longer on Google's
+  // is an estimate (a quarter of input), as the model is no longer on Google's
   // pricing page (checked 2026-10-05).
   'gemini-2.0-flash': {
     inputPer1MUsd: 0.1,
