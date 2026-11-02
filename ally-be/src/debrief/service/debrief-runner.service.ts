@@ -198,9 +198,16 @@ export class DebriefRunnerService {
       }
 
       const recipe: DebriefRecipe =
-        session.learnerTurns >= settings.standardMinLearnerTurns
-          ? bundle.recipes[DebriefRecipeKey.STANDARD]
-          : bundle.recipes[DebriefRecipeKey.SHORT];
+        session.learnerTurns < settings.standardMinLearnerTurns
+          ? bundle.recipes[DebriefRecipeKey.SHORT]
+          : // A release from before Case and Assessment runs Standard.
+            (bundle.recipes[
+              session.assessment
+                ? DebriefRecipeKey.ASSESSMENT
+                : session.inCase
+                  ? DebriefRecipeKey.CASE
+                  : DebriefRecipeKey.STANDARD
+            ] ?? bundle.recipes[DebriefRecipeKey.STANDARD]);
       run.recipeKey = recipe.key;
 
       let ceiling = settings.runCeilingUsd;
@@ -466,8 +473,15 @@ export class DebriefRunnerService {
       );
       const offered = new Set(practiceOptions.map((o) => o.id));
       const writerStep = stepOf(DebriefStep.WRITER)!;
+      const caseMemory =
+        recipe.key === DebriefRecipeKey.CASE
+          ? await this.context.caseMemory(session.id)
+          : null;
+      if (caseMemory) run.workspace = { ...run.workspace, caseMemory };
       const writerInput = {
         practice_options: practiceOptions,
+        case_memory: caseMemory,
+        assessment: recipe.key === DebriefRecipeKey.ASSESSMENT,
         evidence,
         safety,
         transcript,

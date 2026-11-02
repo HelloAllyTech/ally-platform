@@ -262,6 +262,8 @@ async def write(
     system: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
     practice_options: Optional[List[Dict[str, Any]]] = None,
+    case_memory: Optional[str] = None,
+    assessment: bool = False,
 ) -> Tuple[Optional[DebriefCards], str]:
     """Write the cards. The transcript is sent so quotes can be copied exactly;
     the Writer is still told to write from the evidence map."""
@@ -295,11 +297,28 @@ async def write(
             "every other one in important_moment.others."
         )
     lines += _practice_instruction(practice_options)
+    if case_memory:
+        # Code-owned: a case is one client across sessions; the debrief must
+        # agree with what that client already carries from earlier ones.
+        lines.append(
+            "CASE: this session continues a case. CASE MEMORY is what the "
+            "client carries from the trainee's earlier sessions. Never "
+            "contradict it; where it helps, connect a point to it."
+        )
+    if assessment:
+        # Code-owned: the debrief explains a graded attempt, never re-grades it.
+        lines.append(
+            "ASSESSMENT: this session was a graded attempt. Never mention, "
+            "imply or argue with a grade, a pass or a result. Every point you "
+            "make rests on a quoted moment from the transcript."
+        )
     lines.append("")
     lines += _json_block("evidence_map", evidence)
     lines += _json_block("safety_reading", safety)
     if practice_options:
         lines += _json_block("practice_options", practice_options)
+    if case_memory:
+        lines += ["CASE MEMORY:", case_memory, ""]
     if passages:
         lines += _json_block("guidance", passages)
     if progress:

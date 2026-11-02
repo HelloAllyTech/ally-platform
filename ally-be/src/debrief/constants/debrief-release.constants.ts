@@ -30,7 +30,17 @@ export enum DebriefStep {
 export enum DebriefRecipeKey {
   STANDARD = 'standard',
   SHORT = 'short',
+  /** A session in a case: the client's earlier sessions are memory to respect. */
+  CASE = 'case',
+  /** A graded course roleplay: every point anchored, the grade never touched. */
+  ASSESSMENT = 'assessment',
 }
+
+/** Recipes a release may leave out (made before they existed): Standard runs instead. */
+export const OPTIONAL_RECIPES: readonly DebriefRecipeKey[] = [
+  DebriefRecipeKey.CASE,
+  DebriefRecipeKey.ASSESSMENT,
+];
 
 export interface RecipeStep {
   step: DebriefStep;
@@ -72,7 +82,9 @@ export interface DebriefReplyConfig {
 }
 
 export interface DebriefBundle {
-  recipes: Record<DebriefRecipeKey, DebriefRecipe>;
+  /** Standard and Short always; Case and Assessment from the release that added them. */
+  recipes: Partial<Record<DebriefRecipeKey, DebriefRecipe>> &
+    Record<DebriefRecipeKey.STANDARD | DebriefRecipeKey.SHORT, DebriefRecipe>;
   prompts: Record<string, number | null>;
   settings: DebriefSettings;
   /** Absent in releases made before Ask Ally: the code default then applies. */
@@ -154,7 +166,7 @@ const step = (
   backupModel: backupModel ?? null,
 });
 
-export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
+const SEED_RECIPES_BASE = {
   recipes: {
     [DebriefRecipeKey.STANDARD]: {
       key: DebriefRecipeKey.STANDARD,
@@ -250,6 +262,20 @@ export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
   reply: DEBRIEF_REPLY_DEFAULT,
 };
 
+const standardSeed = SEED_RECIPES_BASE.recipes[DebriefRecipeKey.STANDARD]!;
+
+export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
+  ...SEED_RECIPES_BASE,
+  recipes: {
+    ...SEED_RECIPES_BASE.recipes,
+    [DebriefRecipeKey.CASE]: { ...standardSeed, key: DebriefRecipeKey.CASE },
+    [DebriefRecipeKey.ASSESSMENT]: {
+      ...standardSeed,
+      key: DebriefRecipeKey.ASSESSMENT,
+    },
+  },
+};
+
 /** Steps no recipe may drop (plan §8.2): safety, writing, the checks and the evaluation. */
 export const MANDATORY_STEPS: readonly DebriefStep[] = [
   DebriefStep.SAFETY_READER,
@@ -278,7 +304,9 @@ export function validateDebriefBundle(bundle: unknown): string[] {
   for (const key of Object.values(DebriefRecipeKey)) {
     const recipe = b.recipes?.[key];
     if (!recipe) {
-      problems.push(`recipe ${key} is missing`);
+      if (!OPTIONAL_RECIPES.includes(key)) {
+        problems.push(`recipe ${key} is missing`);
+      }
       continue;
     }
     const steps = (recipe.steps ?? []).map((s) => s.step);

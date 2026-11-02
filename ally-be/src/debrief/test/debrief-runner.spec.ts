@@ -78,6 +78,9 @@ function build(opts: {
   steps: Record<string, Array<unknown | Error>>;
   existing?: boolean;
   practice?: Array<{ id: number; title: string; skills: string[] }>;
+  assessment?: boolean;
+  inCase?: boolean;
+  bundle?: unknown;
 }) {
   const saved: any[] = [];
   const calls: string[] = [];
@@ -120,7 +123,10 @@ function build(opts: {
       learnerTurns: opts.learnerTurns ?? 8,
       scenario: { title: 'x', description: 'y' },
       expectedBehaviours: [],
+      assessment: opts.assessment ?? false,
+      inCase: opts.inCase ?? false,
     }),
+    caseMemory: async () => 'Meena told you about her exams last time.',
     transcript: async () => transcript,
     pastWorkOnThis: async () => [],
     promptText: async () => null,
@@ -141,7 +147,11 @@ function build(opts: {
     searchGuidance: jest.fn(async () => []),
   };
   const releases = {
-    getGa: async () => ({ id: 'rel', version: 1, bundle: DEBRIEF_SEED_BUNDLE }),
+    getGa: async () => ({
+      id: 'rel',
+      version: 1,
+      bundle: opts.bundle ?? DEBRIEF_SEED_BUNDLE,
+    }),
   };
   const svc = new DebriefRunnerService(
     runs as any,
@@ -231,6 +241,56 @@ describe('DebriefRunnerService', () => {
     expect(run.cards?.work_on_this[0].scenario_id).toBe(41);
     // 99 was never offered to this learner, so it is dropped.
     expect(run.cards?.practise_next?.scenario_id).toBeNull();
+  });
+
+  describe('Case and Assessment recipes', () => {
+    const steps = () => ({
+      'safety-reader': [safetyWithCue],
+      analyst: [analyst],
+      writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+      evaluator: [evaluation(9)],
+    });
+    const writerInput = (ai: any) =>
+      (
+        ai.step.mock.calls.find((c: unknown[]) => c[0] === 'writer') as any[]
+      )[1];
+
+    it('runs Assessment for a graded course roleplay, and tells the Writer', async () => {
+      const { svc, ai } = build({ assessment: true, steps: steps() });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('assessment');
+      expect(writerInput(ai).assessment).toBe(true);
+    });
+
+    it('runs Case for a case session, with the case memory', async () => {
+      const { svc, ai } = build({ inCase: true, steps: steps() });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('case');
+      expect(writerInput(ai).case_memory).toBe(
+        'Meena told you about her exams last time.',
+      );
+    });
+
+    it('runs Standard under a release made before Case existed', async () => {
+      const {
+        case: _c,
+        assessment: _a,
+        ...older
+      } = DEBRIEF_SEED_BUNDLE.recipes;
+      const { svc } = build({
+        inCase: true,
+        bundle: { ...DEBRIEF_SEED_BUNDLE, recipes: older },
+        steps: steps(),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('standard');
+    });
+
+    it('keeps a short session short, case or not', async () => {
+      const { svc } = build({ inCase: true, learnerTurns: 3, steps: steps() });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('short');
+    });
   });
 
   it('revises a draft below the bar and keeps the better one', async () => {

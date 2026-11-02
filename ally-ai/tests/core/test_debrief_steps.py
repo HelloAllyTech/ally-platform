@@ -282,3 +282,27 @@ async def test_writer_may_point_only_to_the_learners_own_roleplays(dispatch_retu
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
     assert "PRACTICE OPTIONS: none. Set every scenario_id to null." in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_respects_case_memory_and_never_regrades(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {},
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+        case_memory="Meena told you about her exams last time.",
+        assessment=True,
+    )
+    assert "CASE MEMORY:\nMeena told you about her exams last time." in calls["prompt"]
+    assert "Never contradict it" in calls["prompt"]
+    assert "Never mention, imply or argue with a grade" in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "CASE MEMORY" not in calls["prompt"]
+    assert "ASSESSMENT" not in calls["prompt"]
