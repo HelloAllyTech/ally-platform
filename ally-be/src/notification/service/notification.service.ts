@@ -166,8 +166,15 @@ export class NotificationService {
     otp: string,
     magicLinkToken?: string,
     appType?: AppType,
+    orgName?: string,
   ) {
-    await this.emailService.sendEmailOTP({ to, otp, magicLinkToken, appType });
+    await this.emailService.sendEmailOTP({
+      to,
+      otp,
+      magicLinkToken,
+      appType,
+      orgName,
+    });
   }
 
   async sendEmailSummaryNotification({

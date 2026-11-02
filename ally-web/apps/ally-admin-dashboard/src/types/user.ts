@@ -45,6 +45,8 @@ export interface Tenant {
   brandingEnabled: boolean;
   /** Resolved branding: always complete, Ally defaults while the switch is off. */
   branding: TenantBranding;
+  /** `/login?org=<code>` on the consumer app; null when the backend has no app base URL. */
+  brandedSignInUrl: string | null;
 }
 
 /** Light-to-dark ramp derived server-side from the one brand hex, keyed like Tailwind. */

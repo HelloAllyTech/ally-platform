@@ -56,6 +56,22 @@ describe('NotificationEventConsumer', () => {
         mockOtpPayload.otp,
         undefined,
         undefined,
+        undefined,
+      );
+    });
+
+    it('passes the branded org name through so the email can speak in its name', () => {
+      consumer.handleOtpGenerated({
+        ...mockOtpPayload,
+        orgName: 'Acme Helpline',
+      });
+
+      expect(mockNotificationService.sendEmailOTP).toHaveBeenCalledWith(
+        mockOtpPayload.email,
+        mockOtpPayload.otp,
+        undefined,
+        undefined,
+        'Acme Helpline',
       );
     });
   });

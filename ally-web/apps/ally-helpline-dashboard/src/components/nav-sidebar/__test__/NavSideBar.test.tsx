@@ -275,6 +275,7 @@ const mockOnClose = vi.fn();
 
 // Import component and types after mocks are set up
 import NavSideBar from "../NavSideBar";
+import { ALLY_BRANDING, BrandingContext } from "../../../branding";
 import { NavSideBarProps } from "../types";
 
 const getDefaultProps = (): NavSideBarProps => {
@@ -296,6 +297,22 @@ const renderComponent = (props: Partial<NavSideBarProps> = {}) => {
 };
 
 const PINNED_KEY = "navSidebarPinned";
+
+// Org branding: rendered with the context the BrandingProvider would supply
+// for an org whose switch is on. The provider itself is covered in src/branding.
+const renderBranded = (enabled: boolean, props: Partial<NavSideBarProps> = {}) => {
+  localStorage.setItem(PINNED_KEY, "true");
+  const branding = enabled
+    ? { ...ALLY_BRANDING, enabled: true, displayName: "Acme Helpline" }
+    : ALLY_BRANDING;
+  return render(
+    <BrowserRouter>
+      <BrandingContext.Provider value={{ branding, enabled }}>
+        <NavSideBar {...getDefaultProps()} {...props} />
+      </BrandingContext.Provider>
+    </BrowserRouter>,
+  );
+};
 
 // The desktop rail starts collapsed, where tabs are bare icons. Tests about a
 // tab's visible label render it the way a user who pinned it open sees it.
@@ -872,5 +889,21 @@ describe("NavSideBar", () => {
       expect(mockOnTabChange).toHaveBeenCalledWith("/analytics");
       expect(screen.getByTestId(`nav-tab-${TabId.ANALYTICS}`).tagName).toBe("DIV");
     });
+  });
+});
+
+describe("NavSideBar — organization branding", () => {
+  it("shows the org's display name beside the logo and a Powered by Ally line when branded", () => {
+    renderBranded(true);
+
+    expect(screen.getByTestId("nav-sidebar-org-name")).toHaveTextContent("Acme Helpline");
+    expect(screen.getByTestId("nav-sidebar-powered-by")).toHaveTextContent(/powered by ally/i);
+  });
+
+  it("shows neither for an org on Ally's own look", () => {
+    renderBranded(false);
+
+    expect(screen.queryByTestId("nav-sidebar-org-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-sidebar-powered-by")).not.toBeInTheDocument();
   });
 });

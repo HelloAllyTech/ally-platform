@@ -77,6 +77,15 @@ export class TenantResponseDto {
   branding!: TenantBrandingResponseDto;
 
   @ApiProperty({
+    nullable: true,
+    description:
+      'Sign-in link that lands on the web app branded for this organization ' +
+      '(`/login?org=<code>`). Null when the app base URL is not configured.',
+    example: 'https://app.example.com/login?org=acme',
+  })
+  brandedSignInUrl!: string | null;
+
+  @ApiProperty({
     description: 'Whether audio upload is enabled',
     example: true,
   })

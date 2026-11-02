@@ -4,6 +4,8 @@ import { AllyThemeProvider } from "@ally-ui-mono/ui-shared";
 import { ErrorBoundary } from "@components/error-boundary/ErrorBoundary";
 import RouteLayout from "@routes/RouteLayout";
 
+import { BrandingProvider } from "./branding";
+
 const App = () => {
   return (
     // Single centralised Carbon "White" design-system boundary (serif), shared
@@ -22,9 +24,13 @@ const App = () => {
           },
         }}
       />
-      <ErrorBoundary variant="page">
-        <RouteLayout />
-      </ErrorBoundary>
+      {/* Paints the signed-in org's (or the sign-in link's) branding over the
+          Ally tokens above; see src/branding. Outside the router on purpose. */}
+      <BrandingProvider>
+        <ErrorBoundary variant="page">
+          <RouteLayout />
+        </ErrorBoundary>
+      </BrandingProvider>
     </AllyThemeProvider>
   );
 };

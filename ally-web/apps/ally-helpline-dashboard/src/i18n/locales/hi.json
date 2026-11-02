@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Ally",
+    "poweredByAlly": "एली द्वारा संचालित",
     "or": "या",
     "loading": "लोड हो रहा है…",
     "loadMore": "और लोड करें",

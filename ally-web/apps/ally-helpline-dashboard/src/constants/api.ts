@@ -13,6 +13,9 @@ export const ApiEndpoints = {
     PROFILE_IMAGE_URL: "/v1/users/profile-image-url",
     PROFILE_IMAGE: "/v1/users/profile-image",
     LOGO_URL: "/v1/users/tenant",
+    /** Signed-out branding for the login page, by org code (`?org=<code>`). */
+    PUBLIC_TENANT_BRANDING: (code: string) =>
+      `/v1/public/tenants/${encodeURIComponent(code)}/branding`,
   },
   AUTHORIZATION: {
     GET_PERMISSIONS: "/v1/authorization/permissions",

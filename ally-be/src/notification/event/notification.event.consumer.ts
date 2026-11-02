@@ -44,6 +44,8 @@ export class NotificationEventConsumer {
     otp: string;
     magicLinkToken?: string;
     appType?: AppType;
+    /** Branded org display name, present only when the org's branding is on. */
+    orgName?: string;
   }): Promise<boolean> {
     try {
       await this.notificationService.sendEmailOTP(
@@ -51,6 +53,7 @@ export class NotificationEventConsumer {
         payload.otp,
         payload.magicLinkToken,
         payload.appType,
+        payload.orgName,
       );
       return true;
     } catch (error) {

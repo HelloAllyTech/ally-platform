@@ -273,6 +273,7 @@ export class TenantService {
         tenant.settings?.engagementReminder?.remindersEnabled ?? false,
       brandingEnabled: tenant.settings?.branding?.enabled === true,
       branding: resolveBranding(tenant, tenant.settings?.branding),
+      brandedSignInUrl: this.brandedSignInUrl(tenant.code),
       enableAudioUpload: !hiddenChatTypes.includes(ChatTypes.AUDIO_UPLOAD),
       enableMicrophoneMode: !hiddenChatTypes.includes(
         ChatTypes.MICROPHONE_CHAT,
@@ -671,6 +672,19 @@ export class TenantService {
   }
 
   /** Signed-out lookup by org code: what the login and talker pages paint. */
+  /**
+   * The link an org shares so its people land on a sign-in page already
+   * wearing its branding (`?org=<code>` is what the web app reads). Built
+   * here because only the backend knows the consumer app's base URL. Null
+   * when that URL is not configured, so the admin tab shows nothing rather
+   * than a broken link.
+   */
+  private brandedSignInUrl(code: string | null | undefined): string | null {
+    const baseUrl = this.configService.app?.baseUrl;
+    if (!baseUrl || !code) return null;
+    return `${baseUrl.replace(/\/+$/, '')}/login?org=${encodeURIComponent(code)}`;
+  }
+
   async getPublicBranding(code: string): Promise<TenantBrandingResponseDto> {
     const tenant = await this.tenantRepository.findOne({ where: { code } });
     if (!tenant || tenant.status !== TenantStatus.ACTIVE) {

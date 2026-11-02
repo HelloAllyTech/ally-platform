@@ -10,6 +10,7 @@ import { getGuestTokenStorageKey, HELPLINE_QUICK_EXIT_URL } from "@constants/hel
 import type { GuestChatDto, PublicStatusEnabled } from "@types";
 
 import { HelplineTalk } from "../HelplineTalk";
+import { ALLY_BRANDING } from "../../../branding";
 
 const { sockets, trackMock } = vi.hoisted(() => ({
   sockets: [] as any[],
@@ -17,6 +18,17 @@ const { sockets, trackMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@hooks/useAnalytics", () => ({ useAnalytics: () => ({ track: trackMock }) }));
+
+// The page brands itself from the public branding route. Ally by default; a
+// test flips this to see the org's name and welcome line in the header.
+const mockPublicBranding = vi.hoisted(() => ({ current: undefined as any, isError: false }));
+vi.mock("@api", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetPublicBrandingQuery: () => ({
+    data: mockPublicBranding.current,
+    isError: mockPublicBranding.isError,
+  }),
+}));
 
 // A socket that never connects unless a test says so, and acks every emit.
 vi.mock("socket.io-client", () => ({
@@ -135,6 +147,8 @@ describe("HelplineTalk — the anonymous talker page", () => {
     sessionStorage.clear();
     sockets.length = 0;
     trackMock.mockReset();
+    mockPublicBranding.current = undefined;
+    mockPublicBranding.isError = false;
     routes = {
       [`GET /api/v1/helpline/public/${TENANT}/status`]: () => json(status),
     };
@@ -151,6 +165,29 @@ describe("HelplineTalk — the anonymous talker page", () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     Object.defineProperty(window, "location", { value: originalLocation, writable: true });
+  });
+
+  it("wears the org's branding when its switch is on: display name and welcome line in the header, colours on the document", async () => {
+    mockPublicBranding.current = {
+      ...ALLY_BRANDING,
+      enabled: true,
+      displayName: "Acme Helpline",
+      welcomeLine: "You are not alone",
+    };
+    const { unmount } = renderPage();
+
+    expect(await screen.findByText("Acme Helpline")).toBeInTheDocument();
+    expect(screen.getByText("You are not alone")).toBeInTheDocument();
+    expect(document.documentElement.style.getPropertyValue("--color-primary-500")).toBe(
+      "38 77 142",
+    );
+    // The consent copy still names the org as the helpline registered it.
+    expect(
+      screen.getByRole("heading", { name: "Talk to someone at Acme Care" }),
+    ).toBeInTheDocument();
+
+    unmount();
+    expect(document.documentElement.style.getPropertyValue("--color-primary-500")).toBe("");
   });
 
   it("shows the consent points, with confidentiality limits and emergency numbers before any way to write", async () => {

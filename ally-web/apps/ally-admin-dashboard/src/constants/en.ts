@@ -21,6 +21,11 @@ export const en = {
     offBody:
       "Switch branding on to give this organization its own logo, name, colour, favicon and welcome line on the web app. Anything saved earlier is kept and comes back when it is switched on.",
     switchedOn: "Branding switched on",
+    signInLink: "Branded sign-in link",
+    signInLinkHint:
+      "Share this link with the organization's people. The sign-in page it opens already shows the organization's logo, name, colour and welcome line; a plain visit to the app shows Ally's until they sign in.",
+    copyLink: "Copy link",
+    linkCopied: "Link copied",
     switchedOff: "Branding switched off",
     failedToSwitch: "Failed to update the branding switch",
     logo: "Logo",

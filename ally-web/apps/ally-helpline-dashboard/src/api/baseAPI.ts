@@ -59,6 +59,7 @@ export const handleLogout = () => {
   // Clear tokens
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.ORG_BRANDING);
 
   const params = new URLSearchParams();
   params.set("sessionExpired", "1");

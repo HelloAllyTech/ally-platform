@@ -20,6 +20,12 @@ export class EmailService {
     otp: string;
     magicLinkToken?: string;
     appType?: AppType;
+    /**
+     * The org's branded display name, only when its branding switch is on.
+     * The email then speaks in the org's name and carries a "Powered by
+     * Ally" line, so a learner whose org brands the app recognises it.
+     */
+    orgName?: string;
   }): Promise<boolean> {
     if (this.config.isDevelopment) {
       // TODO: Remove this once email otp is verified in dev
@@ -43,14 +49,17 @@ export class EmailService {
       ? `${baseUrl}/auth/verify?token=${params.magicLinkToken}`
       : undefined;
 
-    const subject = 'Your Ally Verification Code';
-    const body = `Your Ally Verification Code is:
+    const brand = params.orgName?.trim();
+    const subject = brand
+      ? `Your ${brand} sign-in code`
+      : 'Your Ally Verification Code';
+    const body = `${brand ? `Your ${brand} sign-in code is:` : 'Your Ally Verification Code is:'}
 ${params.otp}
 ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''}
 ⏱️ This security code is valid for the next ${minutes} minutes.
 🚫 Do not share this code with anyone.
 ❌ If you did not request this code, you can safely ignore this email.
-`;
+${brand ? '\nPowered by Ally\n' : ''}`;
 
     return this.sesService.sendEmail({
       from: this.config.email.sourceEmail,

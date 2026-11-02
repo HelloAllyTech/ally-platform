@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Ally",
+    "poweredByAlly": "Powered by Ally",
     "or": "OR",
     "loading": "Loading…",
     "loadMore": "Load More",

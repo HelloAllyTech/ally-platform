@@ -52,10 +52,17 @@ export const LOCAL_STORAGE_KEYS = {
   // leaves it collapsed and opening on hover. Survives logout on purpose — it
   // is a per-browser layout preference, not account state.
   NAV_SIDEBAR_PINNED: "navSidebarPinned",
+  // The last resolved organization branding, applied before React mounts so
+  // a branded org never flashes Ally Blue on reload. Cleared on logout and
+  // whenever the org resolves to Ally defaults.
+  ORG_BRANDING: "orgBranding",
 };
 
 export const SESSION_STORAGE_KEYS = {
   TRANSCRIPTION_GENERATION_VIDEO_SEEN: "transcription-generation-video-seen",
+  // The `?org=<code>` an org put on its sign-in link, kept for this tab so the
+  // OTP step and a session-expiry bounce back to /login stay branded.
+  LOGIN_ORG_CODE: "loginOrgCode",
 };
 
 export const AUTH_RETRY_CONFIG = {

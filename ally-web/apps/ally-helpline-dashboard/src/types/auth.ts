@@ -42,4 +42,41 @@ export interface profileUrlRequest {
 export interface logoUrlResponse {
   name: string;
   logoUrl: string;
+  /** Resolved organization branding; absent on backends that predate it. */
+  branding?: TenantBranding;
+}
+
+/** Light-to-dark ramp the backend derives from the org's one brand hex. */
+export interface BrandColourRamp {
+  DEFAULT: string;
+  50: string;
+  100: string;
+  200: string;
+  300: string;
+  400: string;
+  500: string;
+  600: string;
+  700: string;
+  800: string;
+  900: string;
+}
+
+/**
+ * What the app paints for an organization. Always complete: Ally defaults
+ * while the org's branding switch is off, so `enabled` is the only thing a
+ * caller has to check before trusting the rest.
+ */
+export interface TenantBranding {
+  enabled: boolean;
+  displayName: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  primaryColor: string;
+  welcomeLine: string | null;
+  poweredByAlly: true;
+  tokens: {
+    primary: BrandColourRamp;
+    /** Label colour that reads on the brand colour. */
+    onPrimary: string;
+  };
 }

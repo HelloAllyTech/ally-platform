@@ -104,6 +104,33 @@ describe('EmailService', () => {
       expect(result).toBe(true);
     });
 
+    it('speaks in the org name and signs off Powered by Ally when the org is branded', async () => {
+      mockSESService.sendEmail.mockResolvedValue(true);
+
+      await service.sendEmailOTP({
+        to: 'test@example.com',
+        otp: '123456',
+        orgName: 'Acme Helpline',
+      });
+
+      expect(mockSESService.sendEmail).toHaveBeenCalledWith({
+        from: 'test@example.com',
+        to: 'test@example.com',
+        subject: 'Your Acme Helpline sign-in code',
+        body: `Your Acme Helpline sign-in code is:
+123456
+
+⏱️ This security code is valid for the next 5 minutes.
+🚫 Do not share this code with anyone.
+❌ If you did not request this code, you can safely ignore this email.
+
+Powered by Ally
+`,
+        isHtml: false,
+        purpose: 'login OTP',
+      });
+    });
+
     it('should emit event in development mode', async () => {
       mockConfig.isDevelopment = true;
       const params = { to: 'test@example.com', otp: '123456' };

@@ -48,6 +48,7 @@ import {
 } from "@hooks";
 
 import { NavSideBarProps, TabProps } from "./types";
+import { useBranding } from "../../branding";
 import { ButtonVariant } from "../button";
 import LanguageSelector from "../language-selector/LanguageSelector";
 import NotificationBadge from "../notification-badge/NotificationBadge";
@@ -281,6 +282,10 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
 
   const navigate = useNavigate();
   const { data: tenantData } = useGetLogoUrlQuery();
+  // Org branding: the display name beside the logo and the "Powered by Ally"
+  // line, both only while the org's switch is on. Colours come through the
+  // tokens, so nothing else here changes.
+  const { branding, enabled: isBranded } = useBranding();
 
   const [isPinned, setIsPinned] = useState(readPinned);
   const [isPeeking, setIsPeeking] = useState(false);
@@ -615,18 +620,28 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
               inline (Carbon Tooltip is not portaled), so an overflow-hidden
               ancestor would clip it off-screen. The logo image is still clipped
               to the rounded box by the inner wrapper's own overflow-hidden. */}
-            <div className="relative w-14 h-14 border-[0.5px] ml-2 rounded-md box-border flex items-center justify-center">
-              <Tooltip label={tenantData?.name ?? ""} align="right">
-                <div className="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center">
-                  <CustomImage
-                    src={tenantData?.logoUrl}
-                    alt="org-logo"
-                    className="object-cover w-full h-full rounded-md"
-                    fallbackClassName="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center bg-neutral-100"
-                    fallbackText={tenantData?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
-                  />
-                </div>
-              </Tooltip>
+            <div className="flex items-center min-w-0 gap-2">
+              <div className="relative shrink-0 w-14 h-14 border-[0.5px] ml-2 rounded-md box-border flex items-center justify-center">
+                <Tooltip label={tenantData?.name ?? ""} align="right">
+                  <div className="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center">
+                    <CustomImage
+                      src={tenantData?.logoUrl}
+                      alt="org-logo"
+                      className="object-cover w-full h-full rounded-md"
+                      fallbackClassName="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center bg-neutral-100"
+                      fallbackText={tenantData?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
+                    />
+                  </div>
+                </Tooltip>
+              </div>
+              {isBranded && isExpanded && (
+                <span
+                  className="truncate text-sm font-medium text-typography-900"
+                  data-testid="nav-sidebar-org-name"
+                >
+                  {branding.displayName}
+                </span>
+              )}
             </div>
 
             {/* The pin. Expanded — hover-opened or pinned — it sits beside the
@@ -686,6 +701,15 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
               profileUrl={user?.profileImageUrl}
               name={user?.name}
             />
+
+            {isBranded && (
+              <span
+                className={`text-xs text-typography-500 ${isExpanded ? "" : "sr-only"}`}
+                data-testid="nav-sidebar-powered-by"
+              >
+                {t("common.poweredByAlly")}
+              </span>
+            )}
           </div>
         </div>
       </div>

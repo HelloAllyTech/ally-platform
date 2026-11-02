@@ -99,6 +99,7 @@ describe('TenantService', () => {
     hideRankInCommunity: false,
     engagementReminderEnabled: false,
     brandingEnabled: false,
+    brandedSignInUrl: 'https://app.example/login?org=test-tenant',
     branding: resolveBranding({ name: 'Test Tenant' }, undefined),
     enableAudioUpload: true,
     enableMicrophoneMode: true,
@@ -180,6 +181,8 @@ describe('TenantService', () => {
       aws: {
         region: 'ap-south-1',
       },
+      // Trailing slash on purpose: the branded sign-in link must not double it.
+      app: { baseUrl: 'https://app.example/' },
     };
 
     const mockS3Service = {

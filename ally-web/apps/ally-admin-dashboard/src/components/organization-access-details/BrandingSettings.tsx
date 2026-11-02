@@ -121,6 +121,16 @@ const BrandingSkeleton = () => (
 const inputClass =
   "h-10 w-full rounded-none border-0 border-b border-border-dark bg-secondary-50 px-3 py-2 text-base placeholder:text-typography-placeholder focus:outline-none focus-visible:border-b-2 focus-visible:border-primary-500";
 
+const copySignInLink = async (url: string) => {
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success(en.orgBranding.linkCopied);
+  } catch {
+    // Clipboard blocked (http, permissions): the link is on screen to select by hand.
+    toast.error(en.orgBranding.uploadFailed.replace("Upload", "Copy"));
+  }
+};
+
 const linkButtonClass =
   "text-primary-600 text-sm font-medium hover:text-primary-700 disabled:text-typography-disabled";
 
@@ -188,15 +198,37 @@ export const BrandingSettings: FC<BrandingSettingsProps> = ({ tenantId, onUpdate
           <p className="text-sm text-typography-600">{en.orgBranding.offBody}</p>
         </div>
       ) : (
-        // Keyed on the loaded values: a refetch after Save or Reset remounts the
-        // editor with fresh state instead of syncing it through an effect.
-        <BrandingEditor
-          key={JSON.stringify(initial)}
-          tenantId={tenantId}
-          orgName={tenant.name}
-          initial={initial}
-          onSaved={handleSaved}
-        />
+        <>
+          {tenant.brandedSignInUrl && (
+            <div
+              className="flex flex-col gap-2 w-full md:w-2/3"
+              data-testid="branding-sign-in-link"
+            >
+              <FieldLabel label={en.orgBranding.signInLink} hint={en.orgBranding.signInLinkHint} />
+              <div className="flex flex-row items-center gap-3">
+                <code className="text-sm text-typography-800 truncate">
+                  {tenant.brandedSignInUrl}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copySignInLink(tenant.brandedSignInUrl as string)}
+                  className={linkButtonClass}
+                >
+                  {en.orgBranding.copyLink}
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Keyed on the loaded values: a refetch after Save or Reset remounts the
+              editor with fresh state instead of syncing it through an effect. */}
+          <BrandingEditor
+            key={JSON.stringify(initial)}
+            tenantId={tenantId}
+            orgName={tenant.name}
+            initial={initial}
+            onSaved={handleSaved}
+          />
+        </>
       )}
     </div>
   );

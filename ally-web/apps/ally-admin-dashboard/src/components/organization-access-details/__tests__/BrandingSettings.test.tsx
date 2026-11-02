@@ -105,6 +105,7 @@ const tenant = (over: Partial<any> = {}) => ({
   logoUrl: "",
   brandingEnabled: false,
   branding: resolved(),
+  brandedSignInUrl: "https://app.example/login?org=acme",
   ...over,
 });
 
@@ -170,6 +171,24 @@ describe("BrandingSettings — editor", () => {
         welcomeLine: "Welcome back",
       }),
     });
+  });
+
+  it("shows the branded sign-in link only while the switch is on, and copies it", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { unmount } = renderTab();
+    expect(screen.getByTestId("branding-sign-in-link")).toHaveTextContent(
+      "https://app.example/login?org=acme",
+    );
+    fireEvent.click(screen.getByText("Copy link"));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("https://app.example/login?org=acme"),
+    );
+    unmount();
+
+    mockTenant.current = tenant();
+    renderTab();
+    expect(screen.queryByTestId("branding-sign-in-link")).not.toBeInTheDocument();
   });
 
   it("loads the stored values and mirrors them in the preview", () => {
@@ -246,27 +265,40 @@ describe("BrandingSettings — editor", () => {
     const { toast } = await import("sonner");
     mockUpdateBranding.mockResolvedValueOnce({
       branding: resolved({ enabled: true }),
-      warnings: ["primaryColor passes for buttons and links (3.92:1) but would be hard to read as text."],
+      warnings: [
+        "primaryColor passes for buttons and links (3.92:1) but would be hard to read as text.",
+      ],
     });
     renderTab();
     fireEvent.change(screen.getByLabelText("Brand colour hex"), { target: { value: "#CC5500" } });
     fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("3.92:1")));
+    await waitFor(() =>
+      expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("3.92:1")),
+    );
 
     mockUpdateBranding.mockRejectedValueOnce({
-      data: { message: ["primaryColor is too close to the page background to read (2.1:1; needs at least 3:1)."] },
+      data: {
+        message: [
+          "primaryColor is too close to the page background to read (2.1:1; needs at least 3:1).",
+        ],
+      },
     });
     // No remount happened (the mocked tenant is unchanged), so pick a colour
     // that differs from both the loaded value and the one just saved.
     fireEvent.change(screen.getByLabelText("Brand colour hex"), { target: { value: "#1A6B3C" } });
     fireEvent.click(screen.getByText("Save"));
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("too close to the page background")),
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining("too close to the page background"),
+      ),
     );
   });
 
   it("uploads a new logo through the presign route and persists it with the org edit on Save", async () => {
-    mockPostLogoUrl.mockResolvedValue({ presignedUrl: "https://s3/put", logoUrl: "https://x/new.png" });
+    mockPostLogoUrl.mockResolvedValue({
+      presignedUrl: "https://s3/put",
+      logoUrl: "https://x/new.png",
+    });
     renderTab();
     const file = new File(["png"], "logo.png", { type: "image/png" });
     fireEvent.change(screen.getByTestId("logo-input"), { target: { files: [file] } });
@@ -275,7 +307,10 @@ describe("BrandingSettings — editor", () => {
 
     fireEvent.click(screen.getByText("Save"));
     await waitFor(() =>
-      expect(mockUpdateTenant).toHaveBeenCalledWith({ id: "t1", data: { logoUrl: "https://x/new.png" } }),
+      expect(mockUpdateTenant).toHaveBeenCalledWith({
+        id: "t1",
+        data: { logoUrl: "https://x/new.png" },
+      }),
     );
     expect(mockDeleteLogo).toHaveBeenCalledWith({ logoUrl: "https://x/logo.png" });
     expect(mockUpdateBranding).toHaveBeenCalled();
@@ -291,7 +326,10 @@ describe("BrandingSettings — editor", () => {
   });
 
   it("uploads a favicon through the org-scoped presign route", async () => {
-    mockPostFaviconUrl.mockResolvedValue({ presignedUrl: "https://s3/put", faviconUrl: "https://x/fav.png" });
+    mockPostFaviconUrl.mockResolvedValue({
+      presignedUrl: "https://s3/put",
+      faviconUrl: "https://x/fav.png",
+    });
     renderTab();
     const file = new File(["png"], "fav.png", { type: "image/png" });
     fireEvent.change(screen.getByTestId("favicon-input"), { target: { files: [file] } });
@@ -305,7 +343,9 @@ describe("BrandingSettings — editor", () => {
     fireEvent.click(screen.getByText("Save"));
     await waitFor(() =>
       expect(mockUpdateBranding).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ faviconUrl: "https://x/fav.png" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ faviconUrl: "https://x/fav.png" }),
+        }),
       ),
     );
   });

@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Ally",
+    "poweredByAlly": "अलीद्वारे समर्थित",
     "or": "किंवा",
     "loading": "लोड करत आहे…",
     "loadMore": "अधिक लोड करा",
