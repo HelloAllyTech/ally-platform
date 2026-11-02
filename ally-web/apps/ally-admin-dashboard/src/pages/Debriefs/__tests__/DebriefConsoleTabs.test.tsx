@@ -454,6 +454,16 @@ describe("Debrief Console tabs", () => {
     );
   });
 
+  it("Review: every item links to its roleplay's session log, in a new tab", () => {
+    render(<ReviewTab />);
+    const links = screen.getAllByRole("link", { name: "Open session log" });
+    expect(links).toHaveLength(2);
+    links.forEach(l => {
+      expect(l).toHaveAttribute("href", `/roleplay-session-logs/${RUN_ROW.scenarioSessionId}`);
+      expect(l).toHaveAttribute("target", "_blank");
+    });
+  });
+
   it("Review: correcting a card needs new words and a reason, and sends only the card's fields (FR-38)", async () => {
     render(<ReviewTab />);
     const flag = screen.getByTestId("review-flag");

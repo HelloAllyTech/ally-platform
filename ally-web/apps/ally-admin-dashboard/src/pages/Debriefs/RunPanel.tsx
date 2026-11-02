@@ -5,10 +5,25 @@ import { useGetDebriefRunQuery } from "@api";
 import { formatMs, formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
-import { en } from "@constants";
+import { en, ROUTES } from "@constants";
 import { DebriefCardsData, DebriefRunDetail } from "@types";
 
 import { score } from "./consoleTable";
+
+/**
+ * The roleplay itself — transcript, audio and scored events — in a new tab, so
+ * a reviewer can check the debrief against what actually happened.
+ */
+export const SessionLogLink: React.FC<{ sessionId: string }> = ({ sessionId }) => (
+  <a
+    href={ROUTES.ROLEPLAY_SESSION_LOG_DETAIL(sessionId)}
+    target="_blank"
+    rel="noreferrer"
+    className="text-primary-600 underline"
+  >
+    {en.debriefs.run.sessionLog}
+  </a>
+);
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <section className="flex flex-col gap-2">
@@ -98,6 +113,7 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
         </Pill>
         <span>{run.recipeKey ?? "—"}</span>
         <span>· {s.fallback(run.fallbackRung)}</span>
+        <SessionLogLink sessionId={run.scenarioSessionId} />
         <span>· {s.cost(formatUsd(run.estimatedCostUsd), formatUsd(run.actualCostUsd))}</span>
         {run.skipReason && <span>· {run.skipReason}</span>}
       </div>

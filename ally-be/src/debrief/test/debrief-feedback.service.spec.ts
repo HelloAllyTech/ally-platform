@@ -258,6 +258,18 @@ describe('debrief feedback', () => {
     expect(sql).toMatch(/ORDER BY r\."learnerDistress" DESC/);
   });
 
+  it('keeps an escalated flag in the queue; only an open one waits out the undo window', async () => {
+    const { svc } = build();
+    const query = (svc as any).dataSource.query as jest.Mock;
+    query.mockResolvedValue([]);
+    await svc.queue();
+    const [sql] = query.mock.calls[1] as [string];
+    expect(sql).toMatch(/f\.status = 'escalated'\s+-- /);
+    expect(sql).toContain(
+      `(f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => $1))`,
+    );
+  });
+
   describe('supervisorView (FR-26)', () => {
     const viewer = (tenantId: string | null, platformAdmin = false) => ({
       tenantId,

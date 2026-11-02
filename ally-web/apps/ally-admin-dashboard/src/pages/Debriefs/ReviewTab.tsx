@@ -18,7 +18,7 @@ import { DebriefCardCorrection, DebriefReviewFlag, DebriefReviewRun } from "@typ
 import { getErrorMessage } from "@utils";
 
 import { formatWhen, score } from "./consoleTable";
-import { RunPanel } from "./RunPanel";
+import { RunPanel, SessionLogLink } from "./RunPanel";
 
 type RunAction = "publish" | "todays-debrief" | "reviewed";
 
@@ -62,6 +62,7 @@ const RunItem: React.FC<{
         {run.learnerDistress && <Pill tone="warning">{s.distress}</Pill>}
         {run.escalation && <Pill tone="info">{s.escalated}</Pill>}
         <span className="font-mono text-xs">{shortId(run.scenarioSessionId)}</span>
+        <SessionLogLink sessionId={run.scenarioSessionId} />
         <span>{run.tenantName ?? "—"}</span>
         <span>· {run.language ?? "—"}</span>
         <span>· {formatWhen(run.createdAt)}</span>
@@ -149,6 +150,7 @@ const FlagItem: React.FC<{ flag: DebriefReviewFlag; onOpenRun: () => void }> = (
         {flag.status === "escalated" && <Pill tone="info">{s.escalated}</Pill>}
         <Pill tone="neutral">{s.reasons[flag.reason]}</Pill>
         <span className="font-mono text-xs">{flag.section}</span>
+        <SessionLogLink sessionId={flag.scenarioSessionId} />
         <span>{flag.tenantName ?? "—"}</span>
         <span>· {formatWhen(flag.createdAt)}</span>
       </div>

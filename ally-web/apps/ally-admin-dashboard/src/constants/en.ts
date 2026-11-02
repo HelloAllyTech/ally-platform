@@ -9585,6 +9585,7 @@ export const en = {
     run: {
       title: "Run",
       close: "Close run",
+      sessionLog: "Open session log",
       loadFailed: "this run",
       timeline: "Steps",
       checks: "Checks",

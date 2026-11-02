@@ -481,8 +481,11 @@ export class DebriefFeedbackService {
          FROM debrief_run_feedback f
          JOIN debrief_runs r ON r.id = f."runId"
          LEFT JOIN tenants t ON t.id::text = f.tenant_id
-        WHERE f.kind = 'flag' AND f.status IN ('open','escalated')
-          AND f."updatedAt" < now() - make_interval(secs => $1)
+        WHERE f.kind = 'flag'
+          AND (f.status = 'escalated'
+               -- The undo window counts from the learner's last change; an
+               -- escalation is the team's, and must not hide the flag again.
+               OR (f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => $1)))
         ORDER BY f.urgent DESC, f."createdAt" ASC
         LIMIT 200`,
       // Flags still inside the learner's undo window are not work yet.
