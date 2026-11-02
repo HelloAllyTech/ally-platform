@@ -223,6 +223,9 @@ export const ApiEndpoints = {
     FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
     FLAG: (sessionId: string, flagId: string) =>
       `/v1/debriefs/sessions/${sessionId}/flags/${flagId}`,
+    // Read-aloud: a short-lived link to one card's audio.
+    AUDIO: (sessionId: string, section: string) =>
+      `/v1/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,
     // Ask Ally: replies about the Debrief agent's debrief, streamed.
     REPLY_STREAM: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/reply/stream`,
   },

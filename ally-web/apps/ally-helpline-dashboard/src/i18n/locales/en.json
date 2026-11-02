@@ -889,6 +889,17 @@
       "reply": {
         "placeholder": "Answer here, or ask Ally anything about this session…"
       },
+      "listen": {
+        "all": "Listen all",
+        "card": "Listen",
+        "cardLabel": "Listen to \"{{card}}\"",
+        "pause": "Pause",
+        "resume": "Resume",
+        "stop": "Stop",
+        "speed": "Speed",
+        "loading": "Getting the audio ready…",
+        "error": "Couldn't play the audio. You can still read it below."
+      },
       "whatWorked": "What worked",
       "workOnThis": "Work on this",
       "trySaying": "Try saying:",

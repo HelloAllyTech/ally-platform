@@ -54,10 +54,23 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
       ],
     }),
+    /** Read-aloud: one card's audio, made on the first request and cached. */
+    getDebriefCardAudio: builder.query<
+      { url: string; cached: boolean },
+      { sessionId: string; section: string }
+    >({
+      query: ({ sessionId, section }) => ({
+        url: ApiEndpoints.DEBRIEFS.AUDIO(sessionId, section),
+        method: HttpMethod.GET,
+      }),
+      // A signed link lives an hour; re-ask well before it expires.
+      keepUnusedDataFor: 30 * 60,
+    }),
   }),
 });
 
 export const {
+  useLazyGetDebriefCardAudioQuery,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
   useFlagDebriefCardMutation,

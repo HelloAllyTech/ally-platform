@@ -69,6 +69,8 @@ export type AiTaskProvider =
   | 'google'
   /** Legacy: unfunded since 2026-10, kept so an old row still reads. */
   | 'deepgram'
+  /** Sarvam AI speech (Indic TTS/STT). */
+  | 'sarvam'
   | 'multiple'
   | 'resolved';
 
@@ -984,6 +986,19 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'DEBRIEF_REPLY_MODEL in debrief-release.constants.ts',
     promptOverride: 'debrief_reply_system',
+  },
+  {
+    id: 'debrief-read-aloud',
+    task: LlmTask.DEBRIEF_READ_ALOUD,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'A learner taps Listen on a card of a Debrief-agent debrief',
+    detail:
+      'Speech of one card, generated on the first tap and cached in the private audio bucket ' +
+      'by its exact text and voice, so a second play makes no TTS call (≤ $0.05 a debrief).',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
   },
   {
     id: 'debrief-improver',

@@ -11,6 +11,7 @@ import { DebriefTab } from "../DebriefTab";
  */
 
 const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
+const mockFetchAudio = vi.hoisted(() => vi.fn());
 const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
 
 vi.mock("react-i18next", () => ({
@@ -36,6 +37,7 @@ vi.mock("@api", () => ({
   useSetDebriefHelpfulMutation: () => [mockMutations.helpful, { isLoading: false }],
   useFlagDebriefCardMutation: () => [mockMutations.flag, { isLoading: false }],
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
+  useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
   LEARNER_DEBRIEF_POLL_MS: 5000,
 }));
 
@@ -447,6 +449,65 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
       expect(screen.queryByTestId("debrief-practise-next")).not.toBeInTheDocument();
       expect(screen.queryByTestId("debrief-practise-this")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("read-aloud", () => {
+    const plays: string[] = [];
+    beforeEach(() => {
+      plays.length = 0;
+      class FakeAudio {
+        src: string;
+        playbackRate = 1;
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(src: string) {
+          this.src = src;
+        }
+        play() {
+          plays.push(this.src);
+          return Promise.resolve();
+        }
+        pause() {}
+      }
+      vi.stubGlobal("Audio", FakeAudio);
+    });
+
+    it("Listen all fetches the first card's audio and highlights it", async () => {
+      mockFetchAudio.mockImplementation(({ section }: { section: string }) => ({
+        unwrap: () => Promise.resolve({ url: `https://a/${section}.mp3`, cached: true }),
+      }));
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en" },
+      });
+      renderTab();
+
+      fireEvent.click(screen.getByText("postSim.debriefCards.listen.all"));
+      await waitFor(() => expect(plays).toEqual(["https://a/important_moment.mp3"]));
+      expect(mockFetchAudio).toHaveBeenCalledWith(
+        { sessionId: "s-1", section: "important_moment" },
+        true,
+      );
+      expect(screen.getByTestId("debrief-card-important-moment")).toHaveAttribute(
+        "data-reading",
+        "true",
+      );
+    });
+
+    it("says the audio failed and leaves every card readable", async () => {
+      mockFetchAudio.mockImplementation(() => ({
+        unwrap: () => Promise.reject(new Error("503")),
+      }));
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en" },
+      });
+      renderTab();
+
+      fireEvent.click(screen.getAllByTestId("debrief-listen-card")[0]);
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "postSim.debriefCards.listen.error",
+      );
+      expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
     });
   });
 });

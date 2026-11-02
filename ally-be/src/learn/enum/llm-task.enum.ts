@@ -136,6 +136,8 @@ export enum LlmTask {
   DEBRIEF_REVISER = 'debrief_reviser',
   // Ask Ally: the Debrief agent answering the learner's replies, streamed.
   DEBRIEF_REPLY = 'debrief_reply',
+  // Read-aloud of a debrief card (Sarvam TTS), cached per card text.
+  DEBRIEF_READ_ALOUD = 'debrief_read_aloud',
   // The debrief Improver's daily analysis; learning budget, never production.
   DEBRIEF_IMPROVER = 'debrief_improver',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the

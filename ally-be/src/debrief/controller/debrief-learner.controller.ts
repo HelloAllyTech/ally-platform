@@ -32,6 +32,7 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { DebriefFlagReason } from '../enum/debrief-run.enum';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
+import { DebriefAudioService } from '../service/debrief-audio.service';
 import { DebriefReplyService } from '../service/debrief-reply.service';
 
 class HelpfulDto {
@@ -79,7 +80,23 @@ export class DebriefLearnerController {
     private readonly agent: DebriefAgentService,
     private readonly feedback: DebriefFeedbackService,
     private readonly replies: DebriefReplyService,
+    private readonly audio: DebriefAudioService,
   ) {}
+
+  @Get('sessions/:sessionId/audio/:section')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'Read-aloud: a short-lived link to one card read aloud',
+    description:
+      'Generated on the first request and cached by the card text, so a second play makes no TTS call.',
+  })
+  readAloud(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('section') section: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.audio.audioUrl(sessionId, user.id, section);
+  }
 
   @Get('sessions/:sessionId')
   // Same permission as reading the session's existing debrief chat; the
