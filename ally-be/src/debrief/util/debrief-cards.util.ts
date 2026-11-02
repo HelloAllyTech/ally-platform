@@ -680,6 +680,17 @@ export function replyCheckFailures(
   return fails;
 }
 
+/** Every skill a debrief names: its cards', Practise next's and the skill words'. */
+export function cardSkills(cards: DebriefCards | null | undefined): string[] {
+  if (!cards) return [];
+  return [
+    ...(cards.what_worked ?? []).map((c) => c.skill),
+    ...(cards.work_on_this ?? []).map((c) => c.skill),
+    cards.practise_next?.skill,
+    ...(cards.skill_words ?? []).map((w) => w.skill),
+  ].filter((s): s is string => typeof s === 'string' && !!s.trim());
+}
+
 /** The quotes in a reply that appear in none of the sources. */
 export function unmatchedQuotes(reply: string, sources: string[]): string[] {
   const said = sources.map(normaliseForQuote);

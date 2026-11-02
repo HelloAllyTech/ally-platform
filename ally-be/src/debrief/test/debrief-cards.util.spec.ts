@@ -1,5 +1,6 @@
 import {
   ADVISORY_CHECKS,
+  cardSkills,
   checkWeight,
   DebriefCards,
   DebriefCheckCode,
@@ -233,6 +234,14 @@ describe('debrief checks', () => {
     expect(replyCheckFailures(across, speakerRuns(split))).toContain(
       DebriefCheckCode.QUOTE_MISMATCH,
     );
+  });
+
+  it('lets Ask Ally quote a card by its skill name', () => {
+    const reply = 'That sits under "exploring risk." on your card.';
+    expect(replyCheckFailures(reply, [])).toContain(
+      DebriefCheckCode.QUOTE_MISMATCH,
+    );
+    expect(replyCheckFailures(reply, cardSkills(good()))).toEqual([]);
   });
 
   it('refuses turn numbers the learner cannot see', () => {

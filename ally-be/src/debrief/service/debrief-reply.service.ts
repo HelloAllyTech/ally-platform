@@ -41,6 +41,7 @@ import {
   DebriefCards,
   cardTexts,
   replyCheckFailures,
+  cardSkills,
   speakerRuns,
   unmatchedQuotes,
 } from '../util/debrief-cards.util';
@@ -185,6 +186,9 @@ export class DebriefReplyService {
       ...speakerRuns(transcript),
       ...extra,
       ...cardTexts(run.cards as unknown as DebriefCards).map((c) => c.text),
+      // A card's skill is its name ("Giving Advice"), and Ally quotes it
+      // when it names the card.
+      ...cardSkills(run.cards as unknown as DebriefCards),
     ];
 
     let full = '';
