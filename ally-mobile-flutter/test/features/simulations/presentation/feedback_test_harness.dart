@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
@@ -95,6 +96,7 @@ class FeedbackHarness {
     // Most organisations aren't on the Debrief agent: today's debrief shows.
     when(() => learnerDebrief.getDebrief(any()))
         .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
+    when(() => learnerDebrief.markRead(any())).thenAnswer((_) async {});
     when(() => simulations.getEventChecklist(any())).thenAnswer((_) async => <EventChecklistItem>[]);
     when(
       () => simulations.addSimulationFeedback(
@@ -137,6 +139,7 @@ class FeedbackHarness {
     String? pathId,
     String? caseId,
     List<String> permissions = allPermissions,
+    List<Override> overrides = const [],
   }) {
     usePhoneViewport(tester);
     return pumpRouterApp(
@@ -163,6 +166,10 @@ class FeedbackHarness {
         GoRoute(path: '/home', builder: (context, state) => const Text('HOME')),
         GoRoute(path: '/simulations', builder: (context, state) => const Text('SIMULATIONS_LIST')),
         GoRoute(
+          path: '/simulations/:scenarioId',
+          builder: (context, state) => Text('SIMULATION_DETAILS:${state.pathParameters['scenarioId']}'),
+        ),
+        GoRoute(
           path: '/reviews/:reviewId',
           builder: (context, state) => Text('REVIEW_DETAILS:${state.pathParameters['reviewId']}:${state.extra}'),
         ),
@@ -186,6 +193,7 @@ class FeedbackHarness {
         askAiChatApiProvider.overrideWithValue(chatApi),
         learnerDebriefRepositoryProvider.overrideWithValue(learnerDebrief),
         userPermissionsProvider.overrideWith((ref) async => permissions),
+        ...overrides,
       ],
     );
   }

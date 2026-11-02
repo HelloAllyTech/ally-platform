@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   Text,
   TextInput,
@@ -9,23 +10,38 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-import {useTranslate} from '@/hooks';
+import {SCREEN_NAMES} from '@/constants';
+import {useAppNavigation, useTranslate} from '@/hooks';
 import {
   useFlagDebriefCardMutation,
   useSetDebriefHelpfulMutation,
   useUndoDebriefFlagMutation,
 } from '@/services/learnerDebriefApi';
+import {useLazyGetScenarioByIdQuery} from '@/services/simulationsApi';
 import {colors} from '@/theme';
 import {
+  DebriefCardsData,
   DebriefCorrection,
   DebriefFlagReason,
   DebriefMyFlag,
+  DebriefPractice,
   DebriefSkillWord,
+  DebriefSupportLine,
   LearnerDebriefView,
 } from '@/types';
 
 import {cardStyles as s} from './cardStyles';
+import {
+  ListenAllBar,
+  ListenButton,
+  ReadAloudContext,
+  ReadAloudPlayer,
+  ReadAloudStatusLine,
+  useIsBeingRead,
+} from './ReadAloudControls';
 import {styles} from './styles';
+import {useDebriefReadAloud} from './useDebriefReadAloud';
+import {useReadToTheEnd} from './useReadToTheEnd';
 
 const REASONS: DebriefFlagReason[] = [
   'didnt_say',
@@ -237,19 +253,373 @@ const Card: React.FC<{
   title: string;
   attention?: boolean;
   testID?: string;
+  /** The section read-aloud reads for this card, for its highlight. */
+  readSection?: string;
   children: React.ReactNode;
-}> = ({title, attention, testID, children}) => (
-  <View style={[s.card, attention && s.cardAttention]} testID={testID}>
-    <Text style={s.cardTitle} accessibilityRole="header">
-      {title}
-    </Text>
-    {children}
-  </View>
-);
+}> = ({title, attention, testID, readSection, children}) => {
+  const reading = useIsBeingRead(readSection ?? '');
+  return (
+    <View
+      style={[s.card, attention && s.cardAttention, reading && s.reading]}
+      testID={testID}
+      accessibilityState={reading ? {selected: true} : undefined}>
+      <Text style={s.cardTitle} accessibilityRole="header">
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+};
+
+/** A card item that gets a highlight while read-aloud is reading it. */
+const ReadableItem: React.FC<{section: string; children: React.ReactNode}> = ({
+  section,
+  children,
+}) => {
+  const reading = useIsBeingRead(section);
+  return (
+    <View
+      style={[s.item, s.readableItem, reading && s.reading]}
+      accessibilityState={reading ? {selected: true} : undefined}>
+      {children}
+    </View>
+  );
+};
 
 const Quote: React.FC<{text: string}> = ({text}) => (
   <Text style={s.quote}>“{text}”</Text>
 );
+
+/** The organisation's support lines, each number a tap-to-call link. */
+const SupportLines: React.FC<{lines: DebriefSupportLine[]}> = ({lines}) => (
+  <View style={s.supportLines} testID="debrief-support-lines">
+    {lines.map(line => (
+      <View key={`${line.name}-${line.phone}`}>
+        <TouchableOpacity
+          accessibilityRole="link"
+          style={s.supportLine}
+          onPress={() => {
+            Linking.openURL(`tel:${line.phone.replace(/[^\d+]/g, '')}`).catch(
+              () => {},
+            );
+          }}>
+          <Text style={s.supportLineText}>
+            {line.name} · {line.phone}
+          </Text>
+        </TouchableOpacity>
+        {!!line.hours && <Text style={s.supportHours}>{line.hours}</Text>}
+      </View>
+    ))}
+  </View>
+);
+
+/**
+ * "Practise this next" / "Practise this": opens the roleplay's own details
+ * screen — the same one the Simulations list opens — so its language choice
+ * and trigger warnings come first. Rendered only for a roleplay the server
+ * says the learner can still open. The details screen takes the whole
+ * scenario, so it is fetched by id on the tap.
+ */
+const PractiseButton: React.FC<{
+  scenario: DebriefPractice;
+  primary?: boolean;
+}> = ({scenario, primary}) => {
+  const {t} = useTranslate();
+  const navigation = useAppNavigation();
+  const [getScenario, {isFetching}] = useLazyGetScenarioByIdQuery();
+  const open = async () => {
+    try {
+      const full = await getScenario({id: String(scenario.id)}, true).unwrap();
+      navigation.navigate(SCREEN_NAMES.SIMULATION_DETAILS, {scenario: full});
+    } catch {
+      // Nothing to open; the button stays for another try.
+    }
+  };
+  return (
+    <TouchableOpacity
+      accessibilityRole="link"
+      accessibilityLabel={t('postSim.debriefCards.practise.label', {
+        title: scenario.title,
+      })}
+      accessibilityState={{disabled: isFetching}}
+      disabled={isFetching}
+      testID={primary ? 'debrief-practise-next' : 'debrief-practise-this'}
+      style={[
+        primary ? s.primaryButton : s.practiseLink,
+        primary && s.practiseLink,
+        isFetching && s.disabled,
+      ]}
+      onPress={() => {
+        open();
+      }}>
+      <Text style={primary ? s.primaryButtonText : s.practiseLinkText}>
+        {primary
+          ? t('postSim.debriefCards.practise.next')
+          : t('postSim.debriefCards.practise.this')}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+/** The cards "Listen all" reads, in the order they appear; removed ones never. */
+export const readableSections = (view: LearnerDebriefView): string[] => {
+  const cards = view.cards;
+  if (!cards) {
+    return [];
+  }
+  const removed = new Set(
+    (view.corrections ?? [])
+      .filter(c => c.outcome === 'removed')
+      .map(c => c.section),
+  );
+  return [
+    cards.important_moment ? 'important_moment' : null,
+    'opening',
+    ...cards.what_worked.map((_, i) => `what_worked[${i}]`),
+    ...cards.work_on_this.map((_, i) => `work_on_this[${i}]`),
+    cards.practise_next ? 'practise_next' : null,
+    cards.reflective_question ? 'reflective_question' : null,
+  ].filter((x): x is string => !!x && !removed.has(x));
+};
+
+const ReadyCards: React.FC<{
+  cards: DebriefCardsData;
+  view: LearnerDebriefView;
+  sessionId: string;
+  replyThread?: React.ReactNode;
+  /** The end of the last Work-on-this card, for DEBRIEF_READ XP. */
+  readEndRef: React.RefObject<View | null>;
+  onReadEndLayout: () => void;
+}> = ({cards, view, sessionId, replyThread, readEndRef, onReadEndLayout}) => {
+  const {t} = useTranslate();
+  const corrections = view.corrections ?? [];
+  // Sections keep their stored index — the one a flag and a correction name.
+  const removed = new Set(
+    corrections.filter(c => c.outcome === 'removed').map(c => c.section),
+  );
+  const flagControl = (section: string, cardLabel: string) => (
+    <View style={s.controlsRow}>
+      <ListenButton section={section} cardLabel={cardLabel} />
+      <CardFlag
+        sessionId={sessionId}
+        section={section}
+        cardLabel={cardLabel}
+        flag={view.feedback?.flags.find(f => f.section === section)}
+        correction={corrections.find(c => c.section === section)}
+      />
+    </View>
+  );
+  const practiceFor = (id?: number | null) =>
+    id === null || id === undefined
+      ? undefined
+      : view.practice?.find(p => p.id === id);
+  const moment = removed.has('important_moment')
+    ? null
+    : cards.important_moment;
+  const worked = cards.what_worked
+    .map((item, index) => ({item, index}))
+    .filter(({index}) => !removed.has(`what_worked[${index}]`));
+  const growth = cards.work_on_this
+    .map((item, index) => ({item, index}))
+    .filter(({index}) => !removed.has(`work_on_this[${index}]`));
+  const practise = removed.has('practise_next') ? null : cards.practise_next;
+  const practiseNextScenario = practiceFor(practise?.scenario_id);
+
+  return (
+    <View style={s.stack}>
+      {moment && (
+        <Card
+          title={t('postSim.debriefCards.importantMoment.title')}
+          attention
+          readSection="important_moment"
+          testID="debrief-card-important-moment">
+          <Text style={s.lead}>{moment.lead}</Text>
+          <Quote text={moment.quote} />
+          <Text style={s.bodyText}>{moment.body}</Text>
+          {!!moment.others?.length && (
+            <View testID="debrief-other-moments">
+              <Text style={s.lead}>
+                {t('postSim.debriefCards.importantMoment.others')}
+              </Text>
+              {moment.others.map(other => (
+                <View key={other.turn_index} style={s.item}>
+                  <Quote text={other.quote} />
+                  <Text style={s.bodyText}>{other.note}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={s.bodyText}>
+            {t('postSim.debriefCards.importantMoment.support')}
+          </Text>
+          {!!view.supportLines?.length && (
+            <SupportLines lines={view.supportLines} />
+          )}
+          {flagControl(
+            'important_moment',
+            t('postSim.debriefCards.importantMoment.title'),
+          )}
+        </Card>
+      )}
+
+      <Text style={s.opening} testID="debrief-card-opening">
+        {cards.opening}
+      </Text>
+
+      {worked.length > 0 && (
+        <Card
+          title={t('postSim.debriefCards.whatWorked')}
+          testID="debrief-card-what-worked">
+          {worked.map(({item, index}) => (
+            <ReadableItem
+              key={`${item.turn_index}-${index}`}
+              section={`what_worked[${index}]`}>
+              <Text style={s.lead}>{item.lead}</Text>
+              <Quote text={item.quote} />
+              <Text style={s.bodyText}>{item.body}</Text>
+              {flagControl(`what_worked[${index}]`, item.lead)}
+            </ReadableItem>
+          ))}
+        </Card>
+      )}
+
+      {growth.length > 0 && (
+        <Card
+          title={t('postSim.debriefCards.workOnThis')}
+          testID="debrief-card-work-on-this">
+          {growth.map(({item, index}) => {
+            const scenario = practiceFor(item.scenario_id);
+            return (
+              <ReadableItem
+                key={`${item.turn_index}-${index}`}
+                section={`work_on_this[${index}]`}>
+                <Text style={s.lead}>{item.lead}</Text>
+                <Quote text={item.quote} />
+                <Text style={s.bodyText}>{item.why}</Text>
+                <Text style={s.trySaying} testID="debrief-try-saying">
+                  <Text style={s.trySayingLabel}>
+                    {t('postSim.debriefCards.trySaying')}
+                  </Text>{' '}
+                  {item.try_saying}
+                </Text>
+                {scenario && <PractiseButton scenario={scenario} />}
+                {flagControl(`work_on_this[${index}]`, item.lead)}
+              </ReadableItem>
+            );
+          })}
+          <View
+            ref={readEndRef}
+            onLayout={onReadEndLayout}
+            testID="debrief-read-end"
+          />
+        </Card>
+      )}
+
+      {practise && (
+        <Card
+          title={t('postSim.debriefCards.practiseNext')}
+          readSection="practise_next"
+          testID="debrief-card-practise-next">
+          <Text style={s.lead}>{practise.skill}</Text>
+          <Text style={s.bodyText}>{practise.reason}</Text>
+          {practiseNextScenario && (
+            <PractiseButton scenario={practiseNextScenario} primary />
+          )}
+          {flagControl('practise_next', t('postSim.debriefCards.practiseNext'))}
+        </Card>
+      )}
+
+      {cards.skill_words.length > 0 && (
+        <Card
+          title={t('postSim.debriefCards.skillWords.title')}
+          testID="debrief-card-skill-words">
+          {cards.skill_words.map(({skill, word}) => (
+            <Text key={skill} style={s.bodyText}>
+              <Text style={s.lead}>{skill}</Text>
+              {'  '}
+              {SKILL_WORD_SYMBOL[word]}{' '}
+              {t(`postSim.debriefCards.skillWords.${word}`)}
+            </Text>
+          ))}
+        </Card>
+      )}
+
+      {!!cards.progress_note && (
+        <Card title={t('postSim.debriefCards.progressNote')}>
+          <Text style={s.bodyText}>{cards.progress_note}</Text>
+        </Card>
+      )}
+
+      <Card
+        title={t('postSim.debriefCards.reflectiveQuestion')}
+        readSection="reflective_question"
+        testID="debrief-card-reflective-question">
+        <Text style={s.bodyText}>{cards.reflective_question}</Text>
+        <ListenButton
+          section="reflective_question"
+          cardLabel={t('postSim.debriefCards.reflectiveQuestion')}
+        />
+        {replyThread}
+      </Card>
+
+      {removed.size > 0 && (
+        <Text style={s.smallText} testID="debrief-removed-note">
+          {t('postSim.debriefCards.corrections.removed')}
+        </Text>
+      )}
+      <Helpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+    </View>
+  );
+};
+
+/**
+ * When the learner stepped out of the role in distress, care comes before
+ * coaching: an acknowledgement and the support lines first, and the debrief
+ * collapsed until the learner chooses to open it — mirrors ally-web.
+ */
+const DistressFirst: React.FC<{
+  view: LearnerDebriefView;
+  children: React.ReactNode;
+}> = ({view, children}) => {
+  const {t} = useTranslate();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={s.stack}>
+      <View style={s.distress} testID="debrief-distress">
+        <Text style={s.cardTitle} accessibilityRole="header">
+          {t('postSim.debriefCards.distress.title')}
+        </Text>
+        <Text style={s.bodyText}>
+          {t('postSim.debriefCards.distress.body')}
+        </Text>
+        {!!view.supportLines?.length && (
+          <>
+            <Text style={s.bodyText}>
+              {t('postSim.debriefCards.distress.supportLead')}
+            </Text>
+            <SupportLines lines={view.supportLines} />
+          </>
+        )}
+      </View>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{expanded: open}}
+        style={s.whenReady}
+        testID="debrief-when-ready"
+        onPress={() => setOpen(o => !o)}>
+        <Text style={s.lead}>
+          {t('postSim.debriefCards.distress.whenReady')}
+        </Text>
+        <Text style={s.lead} importantForAccessibility="no">
+          {open ? '▴' : '▾'}
+        </Text>
+      </TouchableOpacity>
+      {/* Not merely hidden: collapsed cards aren't laid out, so their end
+          can't count as read. */}
+      {open && children}
+    </View>
+  );
+};
 
 /**
  * The Debrief agent's debrief as cards, in the plan's order. No score and no
@@ -259,8 +629,13 @@ const Quote: React.FC<{text: string}> = ({text}) => (
 export const DebriefCards: React.FC<{
   view: LearnerDebriefView;
   sessionId: string;
-}> = ({view, sessionId}) => {
+  /** Ask Ally's thread and composer, under the reflective question. */
+  replyThread?: React.ReactNode;
+}> = ({view, sessionId, replyThread}) => {
   const {t} = useTranslate();
+  const readAloud = useDebriefReadAloud(sessionId);
+  const ready = view.state === 'ready' && !!view.cards;
+  const readToTheEnd = useReadToTheEnd(sessionId, ready);
   const latestStep = view.steps?.length
     ? view.steps[view.steps.length - 1]
     : undefined;
@@ -292,186 +667,61 @@ export const DebriefCards: React.FC<{
       <Text style={s.bodyText}>{t('postSim.debriefCards.tooShort')}</Text>
     );
   } else if (view.state === 'ready' && view.cards) {
-    const cards = view.cards;
-    const corrections = view.corrections ?? [];
-    // Sections keep their stored index — the one a flag and a correction name.
-    const removed = new Set(
-      corrections.filter(c => c.outcome === 'removed').map(c => c.section),
-    );
-    const flagControl = (section: string, cardLabel: string) => (
-      <CardFlag
+    const cards = (
+      <ReadyCards
+        cards={view.cards}
+        view={view}
         sessionId={sessionId}
-        section={section}
-        cardLabel={cardLabel}
-        flag={view.feedback?.flags.find(f => f.section === section)}
-        correction={corrections.find(c => c.section === section)}
+        replyThread={replyThread}
+        readEndRef={readToTheEnd.endRef}
+        onReadEndLayout={readToTheEnd.measureEnd}
       />
     );
-    const moment = removed.has('important_moment')
-      ? null
-      : cards.important_moment;
-    const worked = cards.what_worked
-      .map((item, index) => ({item, index}))
-      .filter(({index}) => !removed.has(`what_worked[${index}]`));
-    const growth = cards.work_on_this
-      .map((item, index) => ({item, index}))
-      .filter(({index}) => !removed.has(`work_on_this[${index}]`));
-    const practise = removed.has('practise_next') ? null : cards.practise_next;
-
-    content = (
-      <View style={s.stack}>
-        {moment && (
-          <Card
-            title={t('postSim.debriefCards.importantMoment.title')}
-            attention
-            testID="debrief-card-important-moment">
-            <Text style={s.lead}>{moment.lead}</Text>
-            <Quote text={moment.quote} />
-            <Text style={s.bodyText}>{moment.body}</Text>
-            {!!moment.others?.length && (
-              <View testID="debrief-other-moments">
-                <Text style={s.lead}>
-                  {t('postSim.debriefCards.importantMoment.others')}
-                </Text>
-                {moment.others.map(other => (
-                  <View key={other.turn_index} style={s.item}>
-                    <Quote text={other.quote} />
-                    <Text style={s.bodyText}>{other.note}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            <Text style={s.bodyText}>
-              {t('postSim.debriefCards.importantMoment.support')}
-            </Text>
-            {flagControl(
-              'important_moment',
-              t('postSim.debriefCards.importantMoment.title'),
-            )}
-          </Card>
-        )}
-
-        <Text style={s.opening} testID="debrief-card-opening">
-          {cards.opening}
-        </Text>
-
-        {worked.length > 0 && (
-          <Card
-            title={t('postSim.debriefCards.whatWorked')}
-            testID="debrief-card-what-worked">
-            {worked.map(({item, index}) => (
-              <View key={`${item.turn_index}-${index}`} style={s.item}>
-                <Text style={s.lead}>{item.lead}</Text>
-                <Quote text={item.quote} />
-                <Text style={s.bodyText}>{item.body}</Text>
-                {flagControl(`what_worked[${index}]`, item.lead)}
-              </View>
-            ))}
-          </Card>
-        )}
-
-        {growth.length > 0 && (
-          <Card
-            title={t('postSim.debriefCards.workOnThis')}
-            testID="debrief-card-work-on-this">
-            {growth.map(({item, index}) => (
-              <View key={`${item.turn_index}-${index}`} style={s.item}>
-                <Text style={s.lead}>{item.lead}</Text>
-                <Quote text={item.quote} />
-                <Text style={s.bodyText}>{item.why}</Text>
-                <Text style={s.trySaying} testID="debrief-try-saying">
-                  <Text style={s.trySayingLabel}>
-                    {t('postSim.debriefCards.trySaying')}
-                  </Text>{' '}
-                  {item.try_saying}
-                </Text>
-                {flagControl(`work_on_this[${index}]`, item.lead)}
-              </View>
-            ))}
-          </Card>
-        )}
-
-        {practise && (
-          <Card
-            title={t('postSim.debriefCards.practiseNext')}
-            testID="debrief-card-practise-next">
-            <Text style={s.lead}>{practise.skill}</Text>
-            <Text style={s.bodyText}>{practise.reason}</Text>
-            {flagControl(
-              'practise_next',
-              t('postSim.debriefCards.practiseNext'),
-            )}
-          </Card>
-        )}
-
-        {cards.skill_words.length > 0 && (
-          <Card
-            title={t('postSim.debriefCards.skillWords.title')}
-            testID="debrief-card-skill-words">
-            {cards.skill_words.map(({skill, word}) => (
-              <Text key={skill} style={s.bodyText}>
-                <Text style={s.lead}>{skill}</Text>
-                {'  '}
-                {SKILL_WORD_SYMBOL[word]}{' '}
-                {t(`postSim.debriefCards.skillWords.${word}`)}
-              </Text>
-            ))}
-          </Card>
-        )}
-
-        {!!cards.progress_note && (
-          <Card title={t('postSim.debriefCards.progressNote')}>
-            <Text style={s.bodyText}>{cards.progress_note}</Text>
-          </Card>
-        )}
-
-        <Card
-          title={t('postSim.debriefCards.reflectiveQuestion')}
-          testID="debrief-card-reflective-question">
-          <Text style={s.bodyText}>{cards.reflective_question}</Text>
-        </Card>
-
-        {removed.size > 0 && (
-          <Text style={s.smallText} testID="debrief-removed-note">
-            {t('postSim.debriefCards.corrections.removed')}
-          </Text>
-        )}
-        <Helpful
-          sessionId={sessionId}
-          helpful={view.feedback?.helpful ?? null}
-        />
-      </View>
+    content = view.distress ? (
+      <DistressFirst view={view}>{cards}</DistressFirst>
+    ) : (
+      cards
     );
   }
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={[
-          colors.ds.blue[500],
-          colors.ds.blue[100],
-          colors.ds.brand.logo,
-        ]}
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 1}}
-        style={styles.gradientContainer}>
-        <View style={[styles.header, s.headerRow]}>
-          <Text style={styles.headerText}>
-            {t('postSim.debriefCards.header')}
-          </Text>
-          <Text style={s.aiLabel}>{t('postSim.debriefCards.aiLabel')}</Text>
-        </View>
-        <View style={styles.contentContainer}>
-          <View style={styles.content}>
-            <ScrollView
-              contentContainerStyle={s.scroll}
-              keyboardShouldPersistTaps="handled"
-              testID="debrief-cards">
-              {content}
-            </ScrollView>
+    <ReadAloudContext.Provider value={ready ? readAloud : null}>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={[
+            colors.ds.blue[500],
+            colors.ds.blue[100],
+            colors.ds.brand.logo,
+          ]}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.gradientContainer}>
+          <View style={[styles.header, s.headerRow]}>
+            <Text style={styles.headerText}>
+              {t('postSim.debriefCards.header')}
+            </Text>
+            <Text style={s.aiLabel}>{t('postSim.debriefCards.aiLabel')}</Text>
           </View>
-        </View>
-      </LinearGradient>
-    </View>
+          {ready && <ListenAllBar sections={readableSections(view)} />}
+          <View style={styles.contentContainer}>
+            <View style={styles.content}>
+              <ScrollView
+                contentContainerStyle={s.scroll}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+                onContentSizeChange={readToTheEnd.measureEnd}
+                {...readToTheEnd.scrollProps}
+                testID="debrief-cards">
+                <View ref={readToTheEnd.contentRef} style={s.stack}>
+                  <ReadAloudStatusLine />
+                  {content}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </LinearGradient>
+        <ReadAloudPlayer />
+      </View>
+    </ReadAloudContext.Provider>
   );
 };

@@ -3,8 +3,14 @@ import {DebriefFlagReason, LearnerDebriefView} from '@/types';
 
 import {api} from './api';
 
-/** How often to ask again while the Debrief agent is still writing. */
-export const LEARNER_DEBRIEF_POLL_MS = 5000;
+/**
+ * How often to re-ask while waiting: every 3 s while the Debrief agent
+ * writes, for up to 4 minutes, then every 30 s — also while a person
+ * finishes a debrief that is "on its way". Mirrors ally-web.
+ */
+export const LEARNER_DEBRIEF_POLL_MS = 3000;
+export const LEARNER_DEBRIEF_SLOW_POLL_MS = 30_000;
+export const LEARNER_DEBRIEF_FAST_FOR_MS = 4 * 60_000;
 
 /**
  * The Debrief agent's debrief for one of the learner's own sessions, and the
@@ -65,6 +71,25 @@ export const learnerDebriefApi = api.injectEndpoints({
         {type: 'LearnerDebrief', id: sessionId},
       ],
     }),
+    /** The learner read the debrief to the end: earns DEBRIEF_READ XP once. */
+    markDebriefRead: builder.mutation<unknown, string>({
+      query: sessionId => ({
+        url: API_ROUTES.DEBRIEFS.READ(sessionId),
+        method: API_METHODS.POST,
+      }),
+    }),
+    /** Read-aloud: one card's audio, made on the first request and cached. */
+    getDebriefCardAudio: builder.query<
+      {url: string; cached: boolean},
+      {sessionId: string; section: string}
+    >({
+      query: ({sessionId, section}) => ({
+        url: API_ROUTES.DEBRIEFS.AUDIO(sessionId, section),
+        method: API_METHODS.GET,
+      }),
+      // A signed link lives an hour; re-ask well before it expires.
+      keepUnusedDataFor: 30 * 60,
+    }),
   }),
 });
 
@@ -73,4 +98,6 @@ export const {
   useSetDebriefHelpfulMutation,
   useFlagDebriefCardMutation,
   useUndoDebriefFlagMutation,
+  useMarkDebriefReadMutation,
+  useLazyGetDebriefCardAudioQuery,
 } = learnerDebriefApi;

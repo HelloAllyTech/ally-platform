@@ -26,8 +26,9 @@ jest.mock('../chatSessionManager', () => ({
   subscribe: (id: string, cb: () => void) => mockSubscribe(id, cb),
   getSnapshot: (_id: string) => mockGetSnapshot(),
   loadHistory: (id: string) => mockLoadHistory(id),
-  sendMessage: (id: string, text: string) => mockSendMessage(id, text),
-  retry: (id: string) => mockRetry(id),
+  sendMessage: (id: string, text: string, streamPath?: string) =>
+    mockSendMessage(id, text, streamPath),
+  retry: (id: string, streamPath?: string) => mockRetry(id, streamPath),
   cleanup: (id: string) => mockCleanup(id),
   destroySession: (id: string) => mockDestroySession(id),
 }));
@@ -77,7 +78,22 @@ describe('useAskAIChat', () => {
       result.current.sendMessage('hello');
     });
 
-    expect(mockSendMessage).toHaveBeenCalledWith('sess-1', 'hello');
+    expect(mockSendMessage).toHaveBeenCalledWith('sess-1', 'hello', undefined);
+  });
+
+  it('sends and retries to a different stream path when given one', () => {
+    const path = '/debriefs/sessions/sess-1/reply/stream';
+    const {result} = renderHook(() =>
+      useAskAIChat({scenarioSessionId: 'sess-1', streamPath: path}),
+    );
+
+    act(() => {
+      result.current.sendMessage('hello');
+      result.current.retry();
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledWith('sess-1', 'hello', path);
+    expect(mockRetry).toHaveBeenCalledWith('sess-1', path);
   });
 
   it('retry delegates to chatSessionManager', () => {
@@ -89,7 +105,7 @@ describe('useAskAIChat', () => {
       result.current.retry();
     });
 
-    expect(mockRetry).toHaveBeenCalledWith('sess-1');
+    expect(mockRetry).toHaveBeenCalledWith('sess-1', undefined);
   });
 
   it('cleanup delegates to chatSessionManager', () => {

@@ -386,6 +386,11 @@ export const API_ROUTES = {
     FLAGS: (sessionId: string) => `/debriefs/sessions/${sessionId}/flags`,
     FLAG: (sessionId: string, flagId: string) =>
       `/debriefs/sessions/${sessionId}/flags/${flagId}`,
+    REPLY_STREAM: (sessionId: string) =>
+      `/debriefs/sessions/${sessionId}/reply/stream`,
+    AUDIO: (sessionId: string, section: string) =>
+      `/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,
+    READ: (sessionId: string) => `/debriefs/sessions/${sessionId}/read`,
   },
   APP_VERSION: {
     ANDROID: '/app-version/android',

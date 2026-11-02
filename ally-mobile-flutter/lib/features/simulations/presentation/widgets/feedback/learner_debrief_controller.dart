@@ -14,23 +14,34 @@ import '../../../data/learner_debrief_repository.dart';
 /// the first answer hasn't arrived yet. Falling back is silent on purpose —
 /// an org that isn't on the new debrief must see exactly today's screen.
 ///
-/// Polls every [pollInterval] while the state is `working`, and stops once
-/// it isn't. Once an answer has landed, a later failed request keeps it
+/// Polls every [pollInterval] (3 s) while the state is `working`, for up to
+/// [fastPollFor] (4 minutes), then every [slowPollInterval] (30 s); every
+/// [slowPollInterval] while a person finishes one (`on_its_way`); and not at
+/// all otherwise (v9 FR-33, web `useLearnerDebrief`). Once an answer has landed, a later failed request keeps it
 /// (like RTK Query keeps the last good `data`), so a blip mid-poll doesn't
 /// swap the learner back to the old view.
 class LearnerDebriefController extends ChangeNotifier {
   LearnerDebriefController({
     required LearnerDebriefRepository repository,
     required this.sessionId,
-    this.pollInterval = const Duration(seconds: 5),
+    this.pollInterval = const Duration(seconds: 3),
+    this.slowPollInterval = const Duration(seconds: 30),
+    this.fastPollFor = const Duration(minutes: 4),
   }) : _repository = repository;
 
   final LearnerDebriefRepository _repository;
   final String sessionId;
   final Duration pollInterval;
+  final Duration slowPollInterval;
+  final Duration fastPollFor;
 
   LearnerDebriefView? _latest;
   Timer? _pollTimer;
+
+  /// Runs out [fastPollFor] after `working` is seen; like the web, it
+  /// restarts if `working` comes back, but once slow, polling stays slow.
+  Timer? _fastTimer;
+  bool _slow = false;
   bool _disposed = false;
   bool _helpfulSending = false;
 
@@ -56,8 +67,19 @@ class LearnerDebriefController extends ChangeNotifier {
       // Keep whatever we had (null → today's debrief stays).
       if (_disposed) return;
     }
-    if (_latest?.state == LearnerDebriefState.working) {
-      _pollTimer = Timer(pollInterval, _fetch);
+    if (_disposed) return;
+    if (_latest?.state != LearnerDebriefState.working) {
+      _fastTimer?.cancel();
+      _fastTimer = null;
+    }
+    switch (_latest?.state) {
+      case LearnerDebriefState.working:
+        _fastTimer ??= Timer(fastPollFor, () => _slow = true);
+        _pollTimer = Timer(_slow ? slowPollInterval : pollInterval, _fetch);
+      case LearnerDebriefState.onItsWay:
+        _pollTimer = Timer(slowPollInterval, _fetch);
+      default:
+        break;
     }
   }
 
@@ -101,6 +123,23 @@ class LearnerDebriefController extends ChangeNotifier {
     unawaited(_refresh());
   }
 
+  /// Read-aloud: one card's audio link (see [LearnerDebriefRepository.getCardAudioUrl]).
+  Future<String> cardAudioUrl(String section) => _repository.getCardAudioUrl(sessionId, section);
+
+  bool _readSent = false;
+
+  /// DEBRIEF_READ XP, at most once per controller; a failure is silent (the
+  /// web fires and forgets too).
+  Future<void> markRead() async {
+    if (_readSent) return;
+    _readSent = true;
+    try {
+      await _repository.markRead(sessionId);
+    } catch (_) {
+      // Nothing to show: XP is a bonus, not part of the debrief.
+    }
+  }
+
   /// Takes a flag back. A failure leaves the flag as it was.
   Future<void> undoFlag(String flagId) async {
     try {
@@ -134,6 +173,7 @@ class LearnerDebriefController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _pollTimer?.cancel();
+    _fastTimer?.cancel();
     super.dispose();
   }
 }

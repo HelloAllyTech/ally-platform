@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../core/localization/translate_ref.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
 import '../../../data/learner_debrief_repository.dart';
+import 'debrief_read_aloud.dart';
 import 'learner_debrief_controller.dart';
 
 /// Port of the web helpline's `DebriefCards.tsx` + `DebriefCardFeedback.tsx`:
@@ -16,38 +19,138 @@ import 'learner_debrief_controller.dart';
 ///
 /// No score, no percentage and no red anywhere: amber marks what needs
 /// attention, and every status carries text plus an icon, never colour alone.
-class DebriefCards extends ConsumerWidget {
-  const DebriefCards({super.key, required this.controller});
+class DebriefCards extends ConsumerStatefulWidget {
+  const DebriefCards({super.key, required this.controller, this.replyThread});
 
   final LearnerDebriefController controller;
 
-  static const _k = 'postSim.debriefCards';
+  /// Ask Ally's thread and composer, under the reflective question. Shown
+  /// only once the debrief is `ready`; null on the read-only (Logs) view.
+  final Widget? replyThread;
+
+  /// v9 FR-65: the debrief must have been open this long to earn
+  /// DEBRIEF_READ XP.
+  static const readMinOpen = Duration(seconds: 30);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DebriefCards> createState() => _DebriefCardsState();
+}
+
+class _DebriefCardsState extends ConsumerState<DebriefCards> {
+  static const _k = 'postSim.debriefCards';
+
+  late final DebriefReadAloud _readAloud = DebriefReadAloud(
+    fetchUrl: widget.controller.cardAudioUrl,
+    createPlayer: ref.read(debriefAudioPlayerFactoryProvider),
+  );
+
+  // DEBRIEF_READ XP (web `useReadToTheEnd`): once the end of the last
+  // Work-on-this card has been on screen and the cards have been open for
+  // [DebriefCards.readMinOpen], tell the server — once.
+  final _listKey = GlobalKey();
+  final _readEndKey = GlobalKey();
+  Timer? _openTimer;
+  bool _openLongEnough = false;
+  bool _readEndSeen = false;
+
+  @override
+  void dispose() {
+    _openTimer?.cancel();
+    _readAloud.dispose();
+    super.dispose();
+  }
+
+  void _afterReadyFrame() {
+    _openTimer ??= Timer(DebriefCards.readMinOpen, () {
+      _openLongEnough = true;
+      _maybeMarkRead();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkReadEnd());
+  }
+
+  /// Whether the read-end marker is inside the list's visible area.
+  void _checkReadEnd() {
+    if (!mounted || _readEndSeen) return;
+    final marker = _readEndKey.currentContext?.findRenderObject();
+    final list = _listKey.currentContext?.findRenderObject();
+    if (marker is! RenderBox || list is! RenderBox || !marker.attached || !marker.hasSize || !list.hasSize) return;
+    final top = marker.localToGlobal(Offset.zero).dy;
+    final listTop = list.localToGlobal(Offset.zero).dy;
+    if (top >= listTop && top <= listTop + list.size.height) {
+      _readEndSeen = true;
+      _maybeMarkRead();
+    }
+  }
+
+  void _maybeMarkRead() {
+    if (_readEndSeen && _openLongEnough) widget.controller.markRead();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([widget.controller, _readAloud]),
       builder: (context, _) {
-        final view = controller.view;
+        final view = widget.controller.view;
         if (view == null) return const SizedBox.shrink();
-        final Widget content = switch (view.state) {
+        final ready = view.state == LearnerDebriefState.ready && view.cards != null;
+        Widget content = switch (view.state) {
           LearnerDebriefState.working => _Working(latestStep: view.steps.isEmpty ? null : view.steps.last),
           LearnerDebriefState.onItsWay => _Body(ref.t('$_k.onItsWay'), key: const Key('debrief-on-its-way')),
           LearnerDebriefState.tooShort => _Body(ref.t('$_k.tooShort'), key: const Key('debrief-too-short')),
           LearnerDebriefState.ready when view.cards != null => _ReadyCards(
             cards: view.cards!,
             view: view,
-            controller: controller,
+            controller: widget.controller,
+            readAloud: _readAloud,
+            readEndKey: _readEndKey,
+            replyThread: widget.replyThread,
           ),
           _ => const SizedBox.shrink(),
         };
+        if (ready && view.distress) content = _DistressFirst(view: view, child: content);
+        if (ready) _afterReadyFrame();
+        final status = _readAloud.status;
         return _Frame(
           title: ref.t('$_k.header'),
           aiLabel: ref.t('$_k.aiLabel'),
-          child: ListView(
-            key: const Key('debrief-cards'),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [content],
+          controls: ready
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ListenAllBar(readAloud: _readAloud, sections: readableSections(view)),
+                    // Above the scrolling cards (the web puts it atop the
+                    // cards), so a "Listen" tapped far down still sees why
+                    // it stopped.
+                    if (status == DebriefReadAloudStatus.loading || status == DebriefReadAloudStatus.error)
+                      Semantics(
+                        liveRegion: true,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                          child: Text(
+                            ref.t(status == DebriefReadAloudStatus.error ? '$_k.listen.error' : '$_k.listen.loading'),
+                            key: const Key('debrief-listen-status'),
+                            style: _smallStyle.copyWith(color: Colors.white, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              : null,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (_) {
+              // The new offset is laid out on the next frame.
+              WidgetsBinding.instance.addPostFrameCallback((_) => _checkReadEnd());
+              return false;
+            },
+            child: KeyedSubtree(
+              key: _listKey,
+              child: ListView(
+                key: const Key('debrief-cards'),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [content],
+              ),
+            ),
           ),
         );
       },
@@ -55,14 +158,33 @@ class DebriefCards extends ConsumerWidget {
   }
 }
 
+/// The cards "Listen all" reads, in the order they appear; removed ones
+/// never (web `readableSections`).
+List<String> readableSections(LearnerDebriefView view) {
+  final cards = view.cards;
+  if (cards == null) return const [];
+  final removed = {for (final c in view.corrections) if (c.removed) c.section};
+  return [
+    if (cards.importantMoment != null) 'important_moment',
+    'opening',
+    for (var i = 0; i < cards.whatWorked.length; i++) 'what_worked[$i]',
+    for (var i = 0; i < cards.workOnThis.length; i++) 'work_on_this[$i]',
+    if (cards.practiseNext != null) 'practise_next',
+    if (cards.reflectiveQuestion.isNotEmpty) 'reflective_question',
+  ].where((s) => !removed.contains(s)).toList();
+}
+
 /// The same gradient frame as today's debrief ([AskAiGradientCard]), with
 /// the "Written by Ally (AI)" label beside the title.
 class _Frame extends StatelessWidget {
-  const _Frame({required this.title, required this.aiLabel, required this.child});
+  const _Frame({required this.title, required this.aiLabel, required this.child, this.controls});
 
   final String title;
   final String aiLabel;
   final Widget child;
+
+  /// "Listen all" and its controls, on a row under the title.
+  final Widget? controls;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +239,8 @@ class _Frame extends StatelessWidget {
               ],
             ),
           ),
+          if (controls != null)
+            Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 4), child: controls),
           Expanded(
             child: Container(
               margin: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
@@ -195,38 +319,73 @@ class _Quote extends StatelessWidget {
 
 /// One card: a heading with an icon, then its content.
 class _Card extends StatelessWidget {
-  const _Card({super.key, required this.title, required this.icon, required this.children, this.attention = false});
+  const _Card({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.children,
+    this.attention = false,
+    this.reading = false,
+  });
 
   final String title;
   final Widget icon;
   final List<Widget> children;
   final bool attention;
 
+  /// Read-aloud is reading this card: a ring, so the eye can follow the voice.
+  final bool reading;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: attention ? _amberFill : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: attention ? _amberBorder : AppColors.blue50, width: attention ? 2 : 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            header: true,
-            child: Row(
-              children: [
-                icon,
-                const SizedBox(width: 8),
-                Expanded(child: Text(title, style: _leadStyle.copyWith(fontSize: 16))),
-              ],
+    return _ReadingRing(
+      reading: reading,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: attention ? _amberFill : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: attention ? _amberBorder : AppColors.blue50, width: attention ? 2 : 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              header: true,
+              child: Row(
+                children: [
+                  icon,
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(title, style: _leadStyle.copyWith(fontSize: 16))),
+                ],
+              ),
             ),
-          ),
-          for (final child in children) ...[const SizedBox(height: 12), child],
-        ],
+            for (final child in children) ...[const SizedBox(height: 12), child],
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// The web's `ring-2 ring-primary-400 ring-offset-2` on whatever is being read.
+class _ReadingRing extends StatelessWidget {
+  const _ReadingRing({required this.reading, required this.child});
+
+  final bool reading;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!reading) return child;
+    return Container(
+      key: const Key('debrief-reading'),
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary, width: 2),
+      ),
+      child: child,
     );
   }
 }
@@ -283,11 +442,23 @@ class _Working extends ConsumerWidget {
 }
 
 class _ReadyCards extends ConsumerWidget {
-  const _ReadyCards({required this.cards, required this.view, required this.controller});
+  const _ReadyCards({
+    required this.cards,
+    required this.view,
+    required this.controller,
+    required this.readAloud,
+    required this.readEndKey,
+    this.replyThread,
+  });
 
   final DebriefCardsData cards;
   final LearnerDebriefView view;
   final LearnerDebriefController controller;
+  final DebriefReadAloud readAloud;
+
+  /// Marks the end of the last Work-on-this card, for DEBRIEF_READ XP.
+  final GlobalKey readEndKey;
+  final Widget? replyThread;
 
   static const _k = 'postSim.debriefCards';
 
@@ -298,13 +469,20 @@ class _ReadyCards extends ConsumerWidget {
     DebriefMyFlag? flagFor(String section) => view.flags.where((f) => f.section == section).firstOrNull;
     DebriefCorrection? correctionFor(String section) =>
         view.corrections.where((c) => c.section == section).firstOrNull;
-    Widget flag(String section, String cardLabel) => CardFlag(
-      key: ValueKey('debrief-flag-$section'),
-      controller: controller,
-      section: section,
-      cardLabel: cardLabel,
-      flag: flagFor(section),
-      correction: correctionFor(section),
+    Widget flag(String section, String cardLabel) => Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 4,
+      children: [
+        _ListenButton(readAloud: readAloud, section: section, cardLabel: cardLabel),
+        CardFlag(
+          key: ValueKey('debrief-flag-$section'),
+          controller: controller,
+          section: section,
+          cardLabel: cardLabel,
+          flag: flagFor(section),
+          correction: correctionFor(section),
+        ),
+      ],
     );
 
     final moment = removed.contains('important_moment') ? null : cards.importantMoment;
@@ -325,6 +503,7 @@ class _ReadyCards extends ConsumerWidget {
         _Card(
           key: const Key('debrief-card-important-moment'),
           attention: true,
+          reading: readAloud.isBeingRead('important_moment'),
           title: momentTitle,
           icon: const Icon(Icons.bookmark_outline, size: 20, color: _amberStrong),
           children: [
@@ -346,6 +525,7 @@ class _ReadyCards extends ConsumerWidget {
                 ],
               ),
             _Body(ref.t('$_k.importantMoment.support')),
+            if (view.supportLines.isNotEmpty) _SupportLines(lines: view.supportLines),
             flag('important_moment', momentTitle),
           ],
         ),
@@ -358,6 +538,7 @@ class _ReadyCards extends ConsumerWidget {
           children: [
             for (final (:index, :item) in worked)
               _Item(
+                reading: readAloud.isBeingRead('what_worked[$index]'),
                 children: [
                   _Lead(item.lead),
                   _Quote(item.quote),
@@ -375,24 +556,30 @@ class _ReadyCards extends ConsumerWidget {
           children: [
             for (final (:index, :item) in growth)
               _Item(
+                reading: readAloud.isBeingRead('work_on_this[$index]'),
                 children: [
                   _Lead(item.lead),
                   _Quote(item.quote),
                   _Body(item.why),
                   _TrySaying(label: ref.t('$_k.trySaying'), text: item.trySaying),
+                  if (view.practiceFor(item.scenarioId) case final scenario?) _PractiseLink(scenario: scenario),
                   flag('work_on_this[$index]', item.lead),
                 ],
               ),
+            SizedBox(key: readEndKey, height: 0),
           ],
         ),
       if (practise != null)
         _Card(
           key: const Key('debrief-card-practise-next'),
+          reading: readAloud.isBeingRead('practise_next'),
           title: practiseTitle,
           icon: const Icon(Icons.eco_outlined, size: 20, color: AppColors.primary),
           children: [
             _Lead(practise.skill),
             _Body(practise.reason),
+            if (view.practiceFor(practise.scenarioId) case final scenario?)
+              _PractiseLink(scenario: scenario, primary: true),
             flag('practise_next', practiseTitle),
           ],
         ),
@@ -435,9 +622,21 @@ class _ReadyCards extends ConsumerWidget {
         ),
       _Card(
         key: const Key('debrief-card-reflective-question'),
+        reading: readAloud.isBeingRead('reflective_question'),
         title: ref.t('$_k.reflectiveQuestion'),
         icon: const Icon(Icons.help_outline, size: 20, color: AppColors.primary),
-        children: [_Body(cards.reflectiveQuestion)],
+        children: [
+          _Body(cards.reflectiveQuestion),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _ListenButton(
+              readAloud: readAloud,
+              section: 'reflective_question',
+              cardLabel: ref.t('$_k.reflectiveQuestion'),
+            ),
+          ),
+          ?replyThread,
+        ],
       ),
       if (removed.isNotEmpty)
         Text(ref.t('$_k.corrections.removed'), key: const Key('debrief-removed-note'), style: _smallStyle),
@@ -461,17 +660,21 @@ class _ReadyCards extends ConsumerWidget {
 
 /// One point inside a card that holds several.
 class _Item extends StatelessWidget {
-  const _Item({required this.children});
+  const _Item({required this.children, this.reading = false});
 
   final List<Widget> children;
+  final bool reading;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 8), children[i]],
-      ],
+    return _ReadingRing(
+      reading: reading,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 8), children[i]],
+        ],
+      ),
     );
   }
 }
@@ -513,6 +716,294 @@ class _TrySaying extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The organisation's support lines, each number a tap-to-call link.
+class _SupportLines extends StatelessWidget {
+  const _SupportLines({required this.lines});
+
+  final List<DebriefSupportLine> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('debrief-support-lines'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final line in lines)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                link: true,
+                child: InkWell(
+                  key: ValueKey('debrief-support-line-${line.phone}'),
+                  onTap: () => launchUrl(line.telUri),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.phone_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            '${line.name} · ${line.phone}',
+                            style: _leadStyle.copyWith(decoration: TextDecoration.underline),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (line.hours != null)
+                Padding(padding: const EdgeInsets.only(left: 24), child: Text(line.hours!, style: _smallStyle)),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// "Practise this next" / "Practise this": opens the roleplay's own detail
+/// screen (the Simulations list's route), so its language choice and
+/// trigger warnings come first. Only for a roleplay the server says the
+/// learner can still open.
+class _PractiseLink extends ConsumerWidget {
+  const _PractiseLink({required this.scenario, this.primary = false});
+
+  final DebriefPracticeScenario scenario;
+  final bool primary;
+
+  static const _k = 'postSim.debriefCards.practise';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    void open() => context.push('/simulations/${scenario.id}');
+    final label = ref.t(primary ? '$_k.next' : '$_k.this');
+    final button = primary
+        ? FilledButton(
+            key: const Key('debrief-practise-next'),
+            onPressed: open,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(64, 44),
+              backgroundColor: AppColors.primary,
+              textStyle: _leadStyle,
+            ),
+            child: Text(label),
+          )
+        : TextButton(
+            key: const Key('debrief-practise-this'),
+            onPressed: open,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(44, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              foregroundColor: AppColors.primary,
+              textStyle: _leadStyle,
+            ),
+            child: Text(label),
+          );
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Semantics(
+        label: ref.t('$_k.label', {'title': scenario.title}),
+        button: true,
+        excludeSemantics: true,
+        child: button,
+      ),
+    );
+  }
+}
+
+/// "Listen" on one card; "Pause" while that card is playing.
+class _ListenButton extends ConsumerWidget {
+  const _ListenButton({required this.readAloud, required this.section, required this.cardLabel});
+
+  final DebriefReadAloud readAloud;
+  final String section;
+  final String cardLabel;
+
+  static const _k = 'postSim.debriefCards.listen';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reading = readAloud.current == section && readAloud.status == DebriefReadAloudStatus.playing;
+    return _LinkButton(
+      key: ValueKey('debrief-listen-$section'),
+      label: ref.t(reading ? '$_k.pause' : '$_k.card'),
+      icon: reading ? Icons.pause : Icons.volume_up_outlined,
+      semanticLabel: reading ? ref.t('$_k.pause') : ref.t('$_k.cardLabel', {'card': cardLabel}),
+      onPressed: () => reading ? readAloud.pause() : readAloud.play([section]),
+    );
+  }
+}
+
+/// "Listen all" under the header: plays every card in order, with pause,
+/// stop and speed (0.75 / 1 / 1.25×). Audio is never the only way to the
+/// content; on an error the cards stay as they are.
+class _ListenAllBar extends ConsumerWidget {
+  const _ListenAllBar({required this.readAloud, required this.sections});
+
+  final DebriefReadAloud readAloud;
+  final List<String> sections;
+
+  static const _k = 'postSim.debriefCards.listen';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (sections.isEmpty) return const SizedBox.shrink();
+    final status = readAloud.status;
+    final active = status == DebriefReadAloudStatus.playing ||
+        status == DebriefReadAloudStatus.paused ||
+        status == DebriefReadAloudStatus.loading;
+    Widget button(String key, String label, IconData icon, VoidCallback onPressed) => TextButton.icon(
+      key: Key(key),
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        foregroundColor: Colors.white,
+        textStyle: _smallStyle.copyWith(fontSize: 13),
+      ),
+    );
+    return Wrap(
+      key: const Key('debrief-listen-all'),
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 2,
+      children: [
+        if (!active) button('debrief-listen-all-play', ref.t('$_k.all'), Icons.volume_up_outlined, () => readAloud.play(sections)),
+        if (status == DebriefReadAloudStatus.playing)
+          button('debrief-listen-all-pause', ref.t('$_k.pause'), Icons.pause, readAloud.pause),
+        if (status == DebriefReadAloudStatus.paused)
+          button('debrief-listen-all-resume', ref.t('$_k.resume'), Icons.play_arrow, readAloud.resume),
+        if (active) button('debrief-listen-all-stop', ref.t('$_k.stop'), Icons.stop, readAloud.stop),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(ref.t('$_k.speed'), style: _smallStyle.copyWith(color: Colors.white)),
+            const SizedBox(width: 2),
+            for (final speed in debriefReadAloudSpeeds)
+              Semantics(
+                selected: readAloud.speed == speed,
+                button: true,
+                child: InkWell(
+                  key: ValueKey('debrief-listen-speed-$speed'),
+                  onTap: () => readAloud.setSpeed(speed),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                    child: Center(
+                      child: Text(
+                        '${speed == speed.roundToDouble() ? speed.toInt() : speed}×',
+                        style: _smallStyle.copyWith(
+                          color: Colors.white,
+                          fontFamily: readAloud.speed == speed ? AppFonts.ibmPlexSerifMedium : null,
+                          decoration: readAloud.speed == speed ? TextDecoration.underline : null,
+                          decorationColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// When the learner stepped out of the role in distress, care comes before
+/// coaching: an acknowledgement and the support lines first, and the debrief
+/// collapsed until the learner chooses to open it.
+class _DistressFirst extends ConsumerStatefulWidget {
+  const _DistressFirst({required this.view, required this.child});
+
+  final LearnerDebriefView view;
+  final Widget child;
+
+  @override
+  ConsumerState<_DistressFirst> createState() => _DistressFirstState();
+}
+
+class _DistressFirstState extends ConsumerState<_DistressFirst> {
+  static const _k = 'postSim.debriefCards.distress';
+
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = widget.view.supportLines;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          key: const Key('debrief-distress'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.blue50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.blue100),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                header: true,
+                child: Row(
+                  children: [
+                    const Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(ref.t('$_k.title'), style: _leadStyle.copyWith(fontSize: 16))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _Body(ref.t('$_k.body')),
+              if (lines.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _Body(ref.t('$_k.supportLead')),
+                const SizedBox(height: 4),
+                _SupportLines(lines: lines),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Semantics(
+          button: true,
+          expanded: _open,
+          child: InkWell(
+            key: const Key('debrief-when-ready'),
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.blue50),
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: Text(ref.t('$_k.whenReady'), style: _leadStyle)),
+                  AnimatedRotation(
+                    turns: _open ? 0.5 : 0,
+                    duration: (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 150),
+                    child: const Icon(Icons.expand_more, size: 20, color: AppColors.highEmphasis),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_open) ...[const SizedBox(height: 16), widget.child],
+      ],
     );
   }
 }
@@ -679,16 +1170,14 @@ class _CardFlagState extends ConsumerState<CardFlag> {
       );
     }
 
+    // Sits beside "Listen" in the card's control row.
     if (!_open) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: _LinkButton(
-          key: const Key('debrief-flag-open'),
-          label: ref.t('$_k.open'),
-          icon: Icons.outlined_flag,
-          semanticLabel: ref.t('$_k.openLabel', {'card': widget.cardLabel}),
-          onPressed: () => setState(() => _open = true),
-        ),
+      return _LinkButton(
+        key: const Key('debrief-flag-open'),
+        label: ref.t('$_k.open'),
+        icon: Icons.outlined_flag,
+        semanticLabel: ref.t('$_k.openLabel', {'card': widget.cardLabel}),
+        onPressed: () => setState(() => _open = true),
       );
     }
 

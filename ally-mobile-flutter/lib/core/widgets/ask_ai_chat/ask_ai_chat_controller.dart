@@ -28,6 +28,11 @@ class AskAiChatController extends ChangeNotifier {
   /// loads history for a truthy session id), used by the read-only debrief.
   final String sessionId;
 
+  /// Where replies are sent, when not the scenario-session chat stream. Set
+  /// by the Debrief tab while the Debrief agent's debrief is `ready`, so a
+  /// reply goes to its Ask Ally (same thread, same events).
+  String? streamPath;
+
   List<AskAiChatMessage> _messages = const [];
   AskAiChatMessage? _streamingMessage;
   bool _isStreaming = false;
@@ -136,7 +141,10 @@ class AskAiChatController extends ChangeNotifier {
 
     Stream<AskAiSseEvent> stream;
     try {
-      stream = _api().streamChat(sessionId, content, cancelToken: cancelToken);
+      final path = streamPath;
+      stream = path == null
+          ? _api().streamChat(sessionId, content, cancelToken: cancelToken)
+          : _api().streamChatAt(path, content, cancelToken: cancelToken);
     } catch (_) {
       stream = Stream.error(const AskAiChatException(AskAiChatApi.networkErrorMessage));
     }

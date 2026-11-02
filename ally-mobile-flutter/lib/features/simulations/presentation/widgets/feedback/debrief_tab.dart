@@ -24,7 +24,10 @@ import 'supervisor_note.dart';
 /// `DebriefTab` → `useLearnerDebrief`) replaces all of that once the
 /// learner's organisation is switched on. Until its first answer lands — and
 /// for `not_available` or any failed request — today's debrief shows exactly
-/// as before. Read-only (Logs) never asks, matching RN.
+/// as before. Once it is `ready` (and not read-only), the same reply thread
+/// moves under its reflective question as Ask Ally: replies go to the Debrief
+/// agent (`POST /debriefs/sessions/:id/reply/stream`, web `DebriefTab`'s
+/// `askAlly`) on the same history.
 class DebriefTab extends ConsumerStatefulWidget {
   const DebriefTab({
     super.key,
@@ -91,16 +94,33 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
   bool _showingLearnerDebrief = false;
 
   void _onLearnerDebrief() {
-    final showing = _learnerDebrief.view != null;
+    final view = _learnerDebrief.view;
+    final askAlly = !widget.readOnly && view?.state == LearnerDebriefState.ready;
+    widget.chat.streamPath = askAlly ? LearnerDebriefRepository.replyStreamPath(widget.sessionId) : null;
+    final showing = view != null;
     if (!mounted || showing == _showingLearnerDebrief) return;
     setState(() => _showingLearnerDebrief = showing);
   }
 
+  /// The end of Ask Ally's thread inside the cards, followed while a reply
+  /// streams in.
+  final _threadEndKey = GlobalKey();
+
   /// RN scrolls to the bottom on every content-size change (each streamed
-  /// token included).
+  /// token included). Under the cards only a streaming reply is followed —
+  /// jumping on the history's arrival would skip past the debrief itself.
   void _onChat() {
     if (!mounted) return;
     setState(() {});
+    if (_showingLearnerDebrief) {
+      if (widget.chat.streamingMessage == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final end = _threadEndKey.currentContext;
+        if (!mounted || end == null) return;
+        Scrollable.ensureVisible(end, alignment: 1, duration: const Duration(milliseconds: 200));
+      });
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       final max = _scrollController.position.maxScrollExtent;
@@ -110,10 +130,43 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     });
   }
 
+  /// Ask Ally: the thread and its composer, inside the reflective-question card.
+  Widget _askAlly(AskAiChatController chat) {
+    return Column(
+      key: const Key('ask-ally'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final message in chat.allMessages) ...[
+          message.role == AskAiChatRole.user
+              ? AskAiLearnerBubble(key: ValueKey(message.id), message: message)
+              : AskAiAllyReply(
+                  key: ValueKey(message.id),
+                  message: message,
+                  clientName: widget.summary?.scenario?.clientName,
+                  onOpenMoment: widget.onOpenMoment,
+                ),
+          const SizedBox(height: 12),
+        ],
+        if (chat.error != null) ...[
+          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry),
+          const SizedBox(height: 12),
+        ],
+        SizedBox(key: _threadEndKey, height: 0),
+        AskAiReplyInput(
+          placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
+          disabled: chat.isStreaming,
+          onSend: chat.sendMessage,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_showingLearnerDebrief) return DebriefCards(controller: _learnerDebrief);
     final chat = widget.chat;
+    if (_showingLearnerDebrief) {
+      return DebriefCards(controller: _learnerDebrief, replyThread: widget.readOnly ? null : _askAlly(chat));
+    }
     final note = widget.summary?.supervisorNote;
     final hasNote = note != null && note.isNotEmpty;
     final errorMessage = widget.summary?.errorMessage;

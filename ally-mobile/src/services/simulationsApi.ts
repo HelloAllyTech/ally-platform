@@ -279,6 +279,7 @@ export const {
   useListRoomsQuery,
   useGetScenariosQuery,
   useGetScenarioByIdQuery,
+  useLazyGetScenarioByIdQuery,
   useAddSimulationFeedbackMutation,
   useGetSimulationLogsQuery,
   useLazyGetSimulationLogsQuery,
