@@ -8,7 +8,7 @@ import {
   Patch,
   Post,
   Query,
-  Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -30,6 +30,7 @@ import {
 } from '../dto/create-review.dto';
 import { GetReviewMessagesResponseDto } from 'src/review/dto/review-messages-response.dto';
 import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller({
   path: 'scribe-session-reviews',
@@ -122,21 +123,14 @@ export class ScribeSessionReviewController {
   }
 
   @Get('/unread-count')
+  @UseGuards(JwtAuthGuard)
+  @AuthPermissions([PERMISSIONS.VIEW_SCRIBE_REVIEWS])
   @ApiOperation({ summary: 'Get unread scribe session review count' })
   @ApiResponse({
     status: 200,
     description: 'Unread review count retrieved successfully',
   })
-  async getUnreadReviewCount(
-    @Req() req: { user: { id: number } },
-  ): Promise<{ count: number }> {
-    const hasPermission = await this.permissionValidator.validatePermissions(
-      req.user.id,
-      [PERMISSIONS.VIEW_SCRIBE_REVIEWS],
-    );
-    if (!hasPermission) {
-      return { count: 0 };
-    }
+  async getUnreadReviewCount(): Promise<{ count: number }> {
     return this.reviewService.getUnreadReviewCount();
   }
 
