@@ -999,4 +999,31 @@ describe('AnalyticsController', () => {
       );
     });
   });
+
+  describe('getXpLevelReached', () => {
+    let xpLevelReachedAnalyticsService: jest.Mocked<XpLevelReachedAnalyticsService>;
+
+    beforeEach(() => {
+      xpLevelReachedAnalyticsService = controller[
+        'xpLevelReachedAnalyticsService'
+      ] as jest.Mocked<XpLevelReachedAnalyticsService>;
+    });
+
+    it('should include maxLevel in the response', async () => {
+      const mockResponse = {
+        window: { start: '2026-01-01', end: '2026-01-31', bucket: 'day' },
+        points: [],
+        scoping: { tenantId: null, unscopedSections: [] },
+        maxLevel: 50,
+        computedAt: new Date().toISOString(),
+      } as any;
+      xpLevelReachedAnalyticsService.getLevelsReached.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await controller.getXpLevelReached({});
+      expect(result).toHaveProperty('maxLevel');
+      expect(result.maxLevel).toBe(50);
+    });
+  });
 });

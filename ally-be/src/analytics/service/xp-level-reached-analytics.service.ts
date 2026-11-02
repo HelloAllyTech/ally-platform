@@ -95,6 +95,7 @@ export class XpLevelReachedAnalyticsService {
       points: this.buildPoints(rows, window),
       // Platform-wide leadership chart — no tenant filter is offered.
       scoping: { tenantId: null, unscopedSections: [] },
+      maxLevel: MAX_LEVEL,
       computedAt: new Date().toISOString(),
     };
   }
