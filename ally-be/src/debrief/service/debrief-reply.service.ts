@@ -86,6 +86,16 @@ const event = (data: Record<string, unknown>): SseMessageEvent => ({
  * keywords miss, and adds the support lines and the review item when it
  * finds some. A reply that fails the code checks is replaced, not shown.
  */
+/** What the learner sees each part of a debrief called (English; the rest are translations). */
+const CARD_SECTION_NAMES = [
+  'An important moment',
+  'What worked',
+  'Work on this',
+  'Try saying',
+  'Practise this next',
+  'One question to think about',
+];
+
 /**
  * The prompt's own length rule, said again after the debrief, transcript and
  * context it is followed by: from the top of a long prompt the model drifted
@@ -189,6 +199,11 @@ export class DebriefReplyService {
       // A card's skill is its name ("Giving Advice"), and Ally quotes it
       // when it names the card.
       ...cardSkills(run.cards as unknown as DebriefCards),
+      // The learner's own words in this thread, and the card names they
+      // read: echoing either back in quotes is not a misquote.
+      message,
+      ...prior.filter((m) => m.senderId !== ALLY_SENDER).map((m) => m.content),
+      ...CARD_SECTION_NAMES,
     ];
 
     let full = '';

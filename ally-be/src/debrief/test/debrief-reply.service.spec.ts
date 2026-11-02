@@ -263,6 +263,17 @@ describe('DebriefReplyService (Ask Ally)', () => {
     });
   });
 
+  it("keeps a quote of the learner's own question or a card's name", async () => {
+    const { svc } = build({
+      reply:
+        'You asked "what was the important moment" and it is under "An important moment".',
+    });
+    const done = (await run(svc, 'What was the important moment?')).find(
+      (e) => e.type === 'done',
+    );
+    expect(done.content).toContain('You asked');
+  });
+
   it('keeps a quote that is in the transcript', async () => {
     const reply =
       'When she said "I just feel so tired of everything" you stayed.';
