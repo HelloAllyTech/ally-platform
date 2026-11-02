@@ -152,6 +152,11 @@ export class LlmCompletionService {
         // exists only to stop one such key from flooding the logs.
         const reenableAt = new Date(now.getTime() + 5 * 60 * 1000);
         this.deadProviders.set(target.provider, reenableAt);
+      } else {
+        // A shorter cooldown for anything else retryable — a socket hangup, a
+        // DNS failure, a 503. These are more likely to be transient.
+        const reenableAt = new Date(now.getTime() + 30 * 1000);
+        this.deadProviders.set(target.provider, reenableAt);
       }
 
       return this.fallback(

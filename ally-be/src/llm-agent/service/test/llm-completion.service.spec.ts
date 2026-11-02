@@ -293,6 +293,39 @@ describe('LlmCompletionService', () => {
       expect(streamCalls).toHaveLength(3);
       expect(streamCalls[2].provider).toBe('openai');
     });
+
+    it('caches a provider that fails on a connection error', async () => {
+      jest.useFakeTimers();
+
+      const { service, streamCalls } = build({
+        providers: {
+          anthropic: { fail: new Error('socket hang up') },
+          openai: { text: 'saved' },
+        },
+      });
+
+      // First call fails, falls back, and caches the failure.
+      const result1 = await service.complete(request);
+      expect(result1.provider).toBe('openai');
+      expect(streamCalls).toHaveLength(2);
+      expect(streamCalls[0].provider).toBe('anthropic');
+      expect(streamCalls[1].provider).toBe('openai');
+
+      // Second call should go straight to fallback.
+      const result2 = await service.complete(request);
+      expect(result2.provider).toBe('openai');
+      expect(streamCalls).toHaveLength(3);
+      expect(streamCalls[2].provider).toBe('openai');
+
+      // After the cooldown, the primary provider is tried again.
+      jest.advanceTimersByTime(30 * 1000);
+      await service.complete(request);
+      expect(streamCalls).toHaveLength(5);
+      expect(streamCalls[3].provider).toBe('anthropic');
+      expect(streamCalls[4].provider).toBe('openai');
+
+      jest.useRealTimers();
+    });
   });
 
   describe('reading the registry row, not just the resolved target', () => {
