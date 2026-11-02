@@ -12,6 +12,17 @@ export class UpdateTenantBrandingDto {
   @ApiProperty({
     required: false,
     nullable: true,
+    description:
+      'URL returned by POST /v1/tenants/logo-url. Null removes the logo. ' +
+      'Stored on the organization itself (every client reads it from there), ' +
+      'so the branding editor can set it without the org edit route.',
+  })
+  @IsOptional()
+  logoUrl?: string | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
     maxLength: 60,
     description: 'Shown in place of the registered org name. Null = org name.',
   })

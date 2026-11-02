@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { CanActivate } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PromptsController } from '../prompts.controller';
@@ -68,6 +69,12 @@ describe('PromptsController', () => {
           useValue: { isEnabledForTenant: jest.fn().mockResolvedValue(false) },
         },
         { provide: TenantScopeService, useValue: {} },
+        // The guard's own-org branch (orgAdminPermission) reads permissions;
+        // no route here uses it, so the stub is never called.
+        {
+          provide: PermissionsService,
+          useValue: { getUserPermissions: jest.fn().mockResolvedValue([]) },
+        },
         {
           provide: PromptsService,
           useValue: {

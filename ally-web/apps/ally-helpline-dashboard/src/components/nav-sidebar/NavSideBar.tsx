@@ -41,6 +41,7 @@ import {
   useAnalytics,
   useCanUseTextHelpline,
   useCanViewAnalytics,
+  useCanEditOrgBranding,
   useCanViewCharacterLibrary,
   usePracticeStreakSummary,
   useProgressSummary,
@@ -232,7 +233,14 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
   const { canView: canViewCharacterLibrary } = useCanViewCharacterLibrary();
   const { canView: canViewAnalytics } = useCanViewAnalytics();
   const { canView: canUseTextHelpline } = useCanUseTextHelpline();
+  const { canEdit: canEditOrgBranding } = useCanEditOrgBranding();
   const permittedTabs = navBarOptions.filter(tab => {
+    // Branding needs edit:tenant-branding AND the org's branding switch on —
+    // see useCanEditOrgBranding.
+    if (tab.id === TabId.ORG_BRANDING) {
+      return canEditOrgBranding;
+    }
+
     // Text helpline needs a helpline permission AND the tenant's
     // TEXT_HELPLINE_ENABLED toggle — see useCanUseTextHelpline.
     if (tab.id === TabId.HELPLINE) {

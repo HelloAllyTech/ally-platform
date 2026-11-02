@@ -64,6 +64,12 @@ export enum Permissions {
   VIEW_CHARACTER_LIBRARY = "view:scenario-character",
   CREATE_CHARACTER_LIBRARY = "create:scenario-character",
 
+  // Own-organization branding editor (Branding tab). Granted to the tenant
+  // ADMIN group by ally-be migration 1980850000000-AddOrgAdminBrandingPermission;
+  // the tab also needs the org's branding switch on, which only an Ally
+  // platform admin flips — see useCanEditOrgBranding.
+  EDIT_TENANT_BRANDING = "edit:tenant-branding",
+
   // Text helpline (ally-be docs/text-helpline.md §2). LISTENER holds the first
   // eight; HELPLINE_SUPERVISOR adds monitor/whisper/transfer/qa; tenant ADMIN
   // holds team alone, which it can only use once it also holds one of those two

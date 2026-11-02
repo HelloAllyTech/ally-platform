@@ -167,6 +167,8 @@ export class NotificationService {
     magicLinkToken?: string,
     appType?: AppType,
     orgName?: string,
+    orgLogoUrl?: string,
+    orgColor?: string,
   ) {
     await this.emailService.sendEmailOTP({
       to,
@@ -174,6 +176,8 @@ export class NotificationService {
       magicLinkToken,
       appType,
       orgName,
+      orgLogoUrl,
+      orgColor,
     });
   }
 

@@ -421,9 +421,11 @@ export class AuthService {
    * its branding switch is off (the email then speaks as Ally, as today).
    * Never lets a branding lookup stop a code from going out.
    */
-  private async brandedOrgName(
+  private async brandedOrg(
     tenantId: string | null | undefined,
-  ): Promise<string | undefined> {
+  ): Promise<
+    { orgName: string; orgLogoUrl?: string; orgColor: string } | undefined
+  > {
     if (!tenantId) return undefined;
     try {
       const tenant = await this.dataSource.getRepository(Tenant).findOne({
@@ -432,7 +434,12 @@ export class AuthService {
       });
       if (!tenant) return undefined;
       const branding = resolveBranding(tenant, tenant.settings?.branding);
-      return branding.enabled ? branding.displayName : undefined;
+      if (!branding.enabled) return undefined;
+      return {
+        orgName: branding.displayName,
+        ...(branding.logoUrl ? { orgLogoUrl: branding.logoUrl } : {}),
+        orgColor: branding.primaryColor,
+      };
     } catch (error) {
       this.logger.warn(
         `Branding lookup skipped for the sign-in email: ${
@@ -534,13 +541,13 @@ export class AuthService {
     // The credentials above are already cached, deliberately: if the send fails
     // the user can retry and the SAME attempt record is reused, and a code that
     // did go out despite a reported failure still verifies.
-    const orgName = await this.brandedOrgName(user.tenantId);
+    const orgBrand = await this.brandedOrg(user.tenantId);
     const results = await this.eventEmitter.emitAsync('otp.generated', {
       email,
       otp,
       magicLinkToken: magicToken,
       appType,
-      ...(orgName ? { orgName } : {}),
+      ...(orgBrand ?? {}),
     });
 
     // The notification consumer resolves `false` when the send failed (it

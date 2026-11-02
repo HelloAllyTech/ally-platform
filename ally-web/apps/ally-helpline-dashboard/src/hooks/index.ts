@@ -30,3 +30,4 @@ export * from "./useCanViewCharacterLibrary";
 export * from "./useCanViewAnalytics";
 export * from "./useCanUseTextHelpline";
 export * from "./useHelplineSocket";
+export * from "./useCanEditOrgBranding";

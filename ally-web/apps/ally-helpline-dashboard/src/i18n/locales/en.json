@@ -98,7 +98,8 @@
       "allyAdmin": "Ally Admin",
       "characterLibrary": "Character Library",
       "progress": "Progress",
-      "helpline": "Helpline"
+      "helpline": "Helpline",
+      "branding": "Branding"
     },
     "logout": {
       "title": {
@@ -810,11 +811,41 @@
           "4": "Yes",
           "5": "5 — Absolutely",
           "tags": {
-            "1": ["Poor", "Not helpful", "Very bad", "Disappointing", "Unhelpful"],
-            "2": ["Below average", "Lacking", "Unsatisfying", "Weak", "Needs improvement"],
-            "3": ["Neutral", "Okay", "Average", "Moderate", "Acceptable"],
-            "4": ["Good", "Helpful", "Satisfying", "Effective", "Worthwhile"],
-            "5": ["Excellent", "Amazing", "Highly useful", "Outstanding", "Very effective"]
+            "1": [
+              "Poor",
+              "Not helpful",
+              "Very bad",
+              "Disappointing",
+              "Unhelpful"
+            ],
+            "2": [
+              "Below average",
+              "Lacking",
+              "Unsatisfying",
+              "Weak",
+              "Needs improvement"
+            ],
+            "3": [
+              "Neutral",
+              "Okay",
+              "Average",
+              "Moderate",
+              "Acceptable"
+            ],
+            "4": [
+              "Good",
+              "Helpful",
+              "Satisfying",
+              "Effective",
+              "Worthwhile"
+            ],
+            "5": [
+              "Excellent",
+              "Amazing",
+              "Highly useful",
+              "Outstanding",
+              "Very effective"
+            ]
           }
         }
       }
@@ -3629,5 +3660,54 @@
       "failed": "That didn't save. Try again.",
       "fromOthers": "From people who finished before you"
     }
+  },
+  "orgBranding": {
+    "title": "Organization branding",
+    "intro": "How the app looks for everyone in your organization: logo, name, colour, browser icon and a welcome line. Ally keeps a small \"Powered by Ally\" line.",
+    "signInLink": "Your organization's sign-in link",
+    "signInLinkHint": "Share this link with your people. The sign-in page it opens already shows your logo, name, colour and welcome line.",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied",
+    "copyFailed": "Could not copy. Select the link and copy it by hand.",
+    "logo": "Logo",
+    "logoHint": "PNG or JPG, 2 MB max. Shown in the sidebar and on the sign-in page.",
+    "changeLogo": "Change logo",
+    "uploadLogo": "Upload logo",
+    "noLogo": "No logo yet",
+    "logoWrongType": "The logo must be a PNG or JPG file",
+    "logoTooLarge": "The logo must be 2 MB or smaller",
+    "displayName": "Display name",
+    "displayNameHint": "Shown in place of your organization's registered name. Leave blank to use the registered name.",
+    "primaryColor": "Brand colour",
+    "primaryColorHint": "One colour, used for the main button, links and selected items. The rest of the palette comes from it.",
+    "invalidHex": "Enter a hex colour like #264D8E",
+    "contrastFail": "{{ratio}}:1 against the page background. Too low to read; needs at least 3:1. Pick a darker or more saturated shade.",
+    "contrastWeak": "{{ratio}}:1 against the page background. Fine for buttons and links, hard to read as text. A darker shade is safer.",
+    "contrastPass": "{{ratio}}:1 against the page background. Reads well.",
+    "favicon": "Browser icon",
+    "faviconHint": "PNG, ICO, WebP or JPG, 512 KB max, square. Shown in the browser tab next to the display name. Leave empty for Ally's.",
+    "uploadFavicon": "Upload icon",
+    "changeFavicon": "Change icon",
+    "removeFavicon": "Remove",
+    "allyFavicon": "Ally icon",
+    "faviconWrongType": "The icon must be a PNG, ICO, WebP or JPG file",
+    "faviconTooLarge": "The icon must be 512 KB or smaller",
+    "uploadFailed": "Upload failed. Try again.",
+    "welcomeLine": "Welcome line",
+    "welcomeLineHint": "One line under the logo on the sign-in page.",
+    "welcomeLinePlaceholder": "e.g. Welcome to the Acme Helpline training space",
+    "preview": "Preview",
+    "previewHint": "Approximate. The app applies the values once saved.",
+    "previewNavHome": "Home",
+    "previewNavRoleplays": "Roleplays",
+    "previewNavProgress": "Progress",
+    "previewButton": "Start a roleplay",
+    "previewLink": "View all roleplays",
+    "resetToDefaults": "Reset to Ally defaults",
+    "resetConfirm": "Confirm reset",
+    "resetHint": "Clears the display name, colour, browser icon and welcome line. The logo stays.",
+    "saved": "Branding saved",
+    "failedToSave": "Could not save branding",
+    "saving": "Saving..."
   }
 }

@@ -568,8 +568,13 @@ describe('AuthService', () => {
         {
           id: '1',
           name: 'Acme',
+          logoUrl: 'https://assets.example/logo.png',
           settings: {
-            branding: { enabled: true, displayName: 'Acme Helpline' },
+            branding: {
+              enabled: true,
+              displayName: 'Acme Helpline',
+              primaryColor: '#8E2626',
+            },
           },
         },
         async () => {
@@ -578,8 +583,35 @@ describe('AuthService', () => {
       );
 
       expect(lastOtpPayload()).toEqual(
-        expect.objectContaining({ orgName: 'Acme Helpline' }),
+        expect.objectContaining({
+          orgName: 'Acme Helpline',
+          orgLogoUrl: 'https://assets.example/logo.png',
+          orgColor: '#8E2626',
+        }),
       );
+    });
+
+    it('omits the logo key when the branded org has no logo', async () => {
+      userRepository.findOne.mockResolvedValue(mockUser);
+      groupService.getUserGroupNames.mockResolvedValue([UserRole.CLIENT]);
+      (AuthUtil.generateOtp as jest.Mock).mockReturnValue('123456');
+      redisService.get.mockResolvedValue(null);
+
+      await withTenant(
+        {
+          id: '1',
+          name: 'Acme',
+          settings: { branding: { enabled: true } },
+        },
+        async () => {
+          await authService.generateOtpV2(mockGenerateOtpDto);
+        },
+      );
+
+      expect(lastOtpPayload()).toEqual(
+        expect.objectContaining({ orgName: 'Acme', orgColor: '#264D8E' }),
+      );
+      expect(lastOtpPayload()).not.toHaveProperty('orgLogoUrl');
     });
 
     it('leaves the org name out while branding is off, and when the lookup fails', async () => {

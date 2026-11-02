@@ -20,6 +20,14 @@ export const ApiEndpoints = {
   AUTHORIZATION: {
     GET_PERMISSIONS: "/v1/authorization/permissions",
   },
+  /** Own-organization branding editor; the same routes the admin console uses. */
+  TENANTS: {
+    BRANDING: (id: string) => `/v1/tenants/${encodeURIComponent(id)}/branding`,
+    BRANDING_FAVICON_URL: (id: string) =>
+      `/v1/tenants/${encodeURIComponent(id)}/branding/favicon-url`,
+    LOGO_URL: "/v1/tenants/logo-url",
+    LOGO: "/v1/tenants/logo",
+  },
   ANALYTICS: {
     GET_DASHBOARD: "/v1/analytics/dashboard",
     GET_COUNSELLOR_STATS: "/v1/analytics/counselor-stats",

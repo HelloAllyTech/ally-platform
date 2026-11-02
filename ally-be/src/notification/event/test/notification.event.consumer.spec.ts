@@ -57,13 +57,17 @@ describe('NotificationEventConsumer', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
+        undefined,
       );
     });
 
-    it('passes the branded org name through so the email can speak in its name', () => {
+    it('passes the branded org name, logo and colour through for the branded email', () => {
       consumer.handleOtpGenerated({
         ...mockOtpPayload,
         orgName: 'Acme Helpline',
+        orgLogoUrl: 'https://assets.example/logo.png',
+        orgColor: '#8E2626',
       });
 
       expect(mockNotificationService.sendEmailOTP).toHaveBeenCalledWith(
@@ -72,6 +76,8 @@ describe('NotificationEventConsumer', () => {
         undefined,
         undefined,
         'Acme Helpline',
+        'https://assets.example/logo.png',
+        '#8E2626',
       );
     });
   });

@@ -32,3 +32,4 @@ export * from "./publicRoadmap";
 export * from "./helpline";
 export * from "./helplineGuest";
 export * from "./learnerDebrief";
+export * from "./orgBranding";

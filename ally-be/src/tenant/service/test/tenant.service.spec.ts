@@ -1205,6 +1205,33 @@ describe('TenantService', () => {
         expect(res.branding.tokens.primary[500]).toBe('#8E2626');
       });
 
+      it('writes the logo to the tenant row, never into settings.branding', async () => {
+        tenantRepository.findOne.mockResolvedValue(brandedTenant);
+
+        const res = await service.updateBranding('test-tenant-id', {
+          logoUrl: ASSET,
+          displayName: 'Acme',
+        });
+
+        expect(tenantRepository.update).toHaveBeenCalledWith(
+          'test-tenant-id',
+          expect.objectContaining({
+            logoUrl: ASSET,
+            settings: expect.objectContaining({
+              branding: { enabled: true, displayName: 'Acme' },
+            }),
+          }),
+        );
+        expect(res.branding.logoUrl).toBe(ASSET);
+
+        tenantRepository.update.mockClear();
+        await service.updateBranding('test-tenant-id', { logoUrl: null });
+        expect(tenantRepository.update).toHaveBeenCalledWith(
+          'test-tenant-id',
+          expect.objectContaining({ logoUrl: '' }),
+        );
+      });
+
       it('clears a field with null and returns contrast warnings', async () => {
         tenantRepository.findOne.mockResolvedValue(brandedTenant);
 

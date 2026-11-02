@@ -28,6 +28,7 @@ import {
   AchievementsViewAll,
   Progress,
   CharacterLibrary,
+  OrgBranding,
   CharacterInterview,
   HelplineLayout,
   HelplineLobby,
@@ -308,6 +309,10 @@ const PrivateRouteLayout: FC = () => {
             useCanViewCharacterLibrary) — not a plain permission array. */}
         <Route path={ROUTES.CHARACTER_LIBRARY} element={<CharacterLibrary />} />
         <Route path={ROUTES.CHARACTER_LIBRARY_INTERVIEW} element={<CharacterInterview />} />
+        {/* Own-org branding editor. Access is enforced inside the page:
+            edit:tenant-branding permission AND the org's branding switch on
+            (see useCanEditOrgBranding). */}
+        <Route path={ROUTES.ORG_BRANDING} element={<OrgBranding />} />
         {/* Text helpline workspace. Access is enforced in HelplineLayout: a
             helpline permission AND the tenant's TEXT_HELPLINE_ENABLED toggle
             (useCanUseTextHelpline), for every child route. One layout so the
