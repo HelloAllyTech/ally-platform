@@ -58,16 +58,15 @@ describe('DebriefConsoleService models', () => {
       model: DEBRIEF_MODELS.writer,
     });
     expect(m.judge).toBe(DEBRIEF_MODELS.judge);
-    // ally-ai has no Anthropic key yet: no Claude for the steps.
+    // The Anthropic account has no credit: Claude is offered nowhere yet.
     expect(m.choices.steps.map((c) => c.provider)).not.toContain('anthropic');
-    // ally-be has one: Ask Ally may run on Claude.
-    expect(m.choices.reply.map((c) => c.model)).toContain('claude-sonnet-4-6');
+    expect(m.choices.reply.map((c) => c.provider)).not.toContain('anthropic');
   });
 
   it('makes a new live release with the chosen models, in every recipe', async () => {
     const { svc, releases } = build();
     const r = await svc.setModels(
-      { steps: { writer: 'gpt-4.1' }, reply: 'claude-sonnet-4-6' },
+      { steps: { writer: 'gpt-4.1' }, reply: 'gpt-4.1-mini' },
       7,
       'try GPT for writing',
     );
@@ -78,8 +77,8 @@ describe('DebriefConsoleService models', () => {
       if (w) expect(w.model).toBe('gpt-4.1');
     }
     expect(bundle.reply).toMatchObject({
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      provider: 'openai',
+      model: 'gpt-4.1-mini',
     });
     expect(releases.makeGa).toHaveBeenCalledWith(
       'r3',

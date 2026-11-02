@@ -9785,7 +9785,7 @@ export const en = {
         saved: (version: number) => `Release v${version} is live`,
         failed: "That release was refused",
         anthropicNote:
-          "Claude models are offered for Ask Ally. They come to the other steps once ally-ai has an Anthropic key.",
+          "Claude models will be offered here once the Anthropic account has credit; today every Claude call is refused.",
       },
       loadFailed: "the releases",
       live: "Live",

@@ -42,13 +42,13 @@ export const PICKABLE_STEPS = [
   DebriefStep.REVISER,
 ];
 /**
- * Providers each place can call in production today. ally-be has an
- * Anthropic key, so Ask Ally may run on Claude. ally-ai, which runs the
- * steps, does not yet: add `ANTHROPIC__API_KEY` to its env, redeploy it, then
- * add 'anthropic' here.
+ * Providers each place can call in production today. Both ally-be and
+ * ally-ai have an Anthropic key (ally-ai's added 2 Nov 2026), and both can
+ * run Claude, but the Anthropic account has no credit: every call is refused
+ * ("credit balance is too low"). Add 'anthropic' to both once it has credit.
  */
 const STEP_PROVIDERS: string[] = ['gemini', 'openai'];
-const REPLY_PROVIDERS: string[] = ['gemini', 'openai', 'anthropic'];
+const REPLY_PROVIDERS: string[] = ['gemini', 'openai'];
 
 /** Read models for the Debrief Console: overview, runs, releases, tenants. */
 @Injectable()
