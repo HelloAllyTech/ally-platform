@@ -9607,7 +9607,8 @@ export const en = {
       ran: "The Improver has finished",
       skipped: (why: string) => `The Improver did not run: ${why}`,
       runFailed: "The Improver could not run",
-      budget: (spent: string, of: string) => `Learning budget: ${spent} of ${of} this month`,
+      budget: (spent: string, of: string) =>
+        `Learning budget: ${spent} spent of ${of} set aside this month (20% of every debrief's budget)`,
       testSets: "Test sets",
       testSetsHelp:
         "Real sessions, split three ways. The Improver screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",

@@ -13,10 +13,7 @@ import { DebriefRun } from '../entity/debrief-run.entity';
 import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
-import {
-  LEARNING_BUDGET_USD,
-  DebriefImproverService,
-} from './debrief-improver.service';
+import { DebriefImproverService } from './debrief-improver.service';
 
 const num = (v: unknown, d = 2) =>
   v == null ? null : Math.round(Number(v) * 10 ** d) / 10 ** d;
@@ -100,7 +97,7 @@ export class DebriefConsoleService {
         monthlyCapUsd: settings.monthlyCapUsd,
         runCeilingUsd: settings.runCeilingUsd,
         learningSpentUsd: num(await this.improver.learningSpentThisMonth()),
-        learningBudgetUsd: LEARNING_BUDGET_USD,
+        learningBudgetUsd: num(await this.improver.learningBudgetThisMonth()),
       },
       testSets: await this.testSets.counts(),
       liveTenants: await this.liveTenants(),
