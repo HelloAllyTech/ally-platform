@@ -859,16 +859,18 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     }
     // Same for memories (the Stage Director prompt's copy).
     if (Array.isArray((simulationData as any).memories)) {
-      (simulationData as any).memories = ((simulationData as any).memories as any[]).map(memory =>
-        Array.isArray(memory.unlocksInStateIds)
-          ? {
-              ...memory,
-              unlocksInStateIds: memory.unlocksInStateIds.filter(
-                (id: string) => !removedStateIds.includes(id),
-              ),
-            }
-          : memory,
-      );
+      (simulationData as any).memories = ((simulationData as any).memories as any[]).map(memory => {
+        if (!Array.isArray(memory.unlocksInStateIds)) {
+          return memory;
+        }
+        const filteredUnlocks = memory.unlocksInStateIds.filter(
+          (id: string) => !removedStateIds.includes(id),
+        );
+        return {
+          ...memory,
+          unlocksInStateIds: filteredUnlocks.length > 0 ? filteredUnlocks : null,
+        };
+      });
     }
 
     // The partner-org tag only means something for Partner Sim entries; when
