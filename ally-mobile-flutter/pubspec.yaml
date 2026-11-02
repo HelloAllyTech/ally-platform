@@ -16,11 +16,15 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-# Marketing version 2.0.0 sits above every React Native release (1.23.x), so
-# the store accepts this app as an update to RN's listing. The build number
-# here is a placeholder: release workflows pass --build-number (scheme in
+# Marketing version continues React Native's own numbering (1.23.47 live at
+# the time of writing) one patch ahead, instead of jumping to a fresh major
+# version, so the store listing's version history reads as one continuous
+# sequence across the RN -> Flutter switch. This only stays collision-free
+# while RN's own scheduled-mobile-release.yml is paused (AUTO_RELEASE_ENABLED
+# repo variable); see docs/RELEASE.md. The build number here is a
+# placeholder: release workflows pass --build-number (scheme in
 # docs/RELEASE.md) so it always exceeds RN's.
-version: 2.0.0+1
+version: 1.23.48+109
 
 environment:
   sdk: ^3.13.5
