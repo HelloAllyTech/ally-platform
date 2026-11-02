@@ -72,6 +72,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.17",
+    "@octokit/auth-app": "^8.3.1",
     "@opentelemetry/api": "^1.9.1",
     "@types/sanitize-html": "^2.16.1",
     "axios": "^1.13.6",
