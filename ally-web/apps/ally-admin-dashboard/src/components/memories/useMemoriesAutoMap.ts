@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
+import { MEMORIES_PLACEHOLDER } from "@ally-ui-mono/ui-shared";
 import { useGetPromptsByTypeQuery, useMapScenarioMemoriesMutation } from "@api";
-import { en, FORM_FIELD_IDS, MEMORIES_PLACEHOLDER } from "@constants";
+import { en, FORM_FIELD_IDS } from "@constants";
 import type { MapScenarioMemoriesRequest } from "@types";
 
 import { setMemoriesMapping, useIsMappingMemories } from "./memoriesMappingStatus";
