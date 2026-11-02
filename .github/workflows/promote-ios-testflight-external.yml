@@ -24,9 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       wait_minutes:
-        description: "How long to wait for the build to finish processing on
-
-          Apple's side before giving up (default 25)."
+        description: "Minutes to wait for Apple to finish processing the build before giving up (default 25)."
         required: false
         type: string
 
