@@ -180,7 +180,13 @@ export class DebriefReplyService {
         chatHistory: this.history(prior),
         userMessage: message,
         providerType: model.provider,
-        llmConfig: { model: model.model, maxTokens: model.maxTokens },
+        // No thinking: it would spend the reply's tokens (a Gemini 2.5 reply
+        // was cut mid-sentence) and delay the first words.
+        llmConfig: {
+          model: model.model,
+          maxTokens: model.maxTokens,
+          thinkingBudget: 0,
+        },
         usage: {
           task: LlmTask.DEBRIEF_REPLY,
           scenarioSessionId: sessionId,

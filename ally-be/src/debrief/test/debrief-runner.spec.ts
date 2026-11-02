@@ -323,6 +323,20 @@ describe('DebriefRunnerService', () => {
     );
   });
 
+  it('reads the language from the transcript when the session recorded none, and keeps that on the run', async () => {
+    const { svc } = build({
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [analyst],
+        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+        evaluator: [evaluation(9)],
+      },
+    });
+    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    expect(run.workspace?.languageSource).toMatch(/^detected/);
+    expect(run.workspace?.safety).toBeDefined();
+  });
+
   it('revises a draft below the bar and keeps the better one', async () => {
     const { svc, calls } = build({
       steps: {

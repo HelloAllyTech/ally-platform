@@ -401,7 +401,7 @@ export class DebriefRunnerService {
         rung = Math.max(rung, FallbackRung.WRITER_AND_CHECKS_ONLY);
         if (analystEst === null) skipped(analystStep, 'budget');
       }
-      run.workspace = { safety, evidence };
+      run.workspace = { ...run.workspace, safety, evidence };
 
       // 2. Progress reader, when the learner has history.
       let progress: Record<string, any> | null = null;

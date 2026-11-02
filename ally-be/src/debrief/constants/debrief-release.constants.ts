@@ -114,6 +114,7 @@ export interface DebriefReplyConfig {
   /** A provider the in-process chat can run. */
   provider: 'gemini' | 'openai';
   model: string;
+  /** Room for a 120-word reply in an Indic script, which costs far more tokens than English. */
   maxTokens: number;
 }
 
@@ -148,7 +149,7 @@ export const DEBRIEF_REFLECTION_CHECK_MODEL = {
 export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
   provider: 'gemini',
   model: 'gemini-2.5-flash',
-  maxTokens: 400,
+  maxTokens: 900,
 };
 
 /**

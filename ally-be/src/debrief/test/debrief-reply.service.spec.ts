@@ -204,7 +204,11 @@ describe('DebriefReplyService (Ask Ally)', () => {
     await run(svc, 'question');
     const call = (aiChat.streamResponse.mock.calls[0] as any[])[0];
     expect(call.providerType).toBe('openai');
-    expect(call.llmConfig).toEqual({ model: 'gpt-4.1-mini', maxTokens: 300 });
+    expect(call.llmConfig).toEqual({
+      model: 'gpt-4.1-mini',
+      maxTokens: 300,
+      thinkingBudget: 0,
+    });
   });
 
   describe('XP for the reflective answer (v9 FR-65)', () => {
