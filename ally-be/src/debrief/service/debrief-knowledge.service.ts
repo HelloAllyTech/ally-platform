@@ -4,7 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AppConfigService } from '../../config/config.service';
+import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
+import { FeatureToggleService } from '../../authorization/service/feature-toggle.service';
 import { KbCorpus } from '../../knowledge-base/enum/knowledge-base.enum';
 
 export interface DebriefKnowledgeDocument {
@@ -34,14 +35,14 @@ export interface DebriefKnowledgeDocument {
 export class DebriefKnowledgeService {
   constructor(
     private readonly dataSource: DataSource,
-    private readonly config: AppConfigService,
+    private readonly toggles: FeatureToggleService,
   ) {}
 
   /** The list, saying whether this person may sign off. */
   async listFor(userId: number) {
     return {
       documents: await this.rows(),
-      canSignOff: this.config.debriefClinicalAdvisorIds.includes(userId),
+      canSignOff: await this.canSignOff(userId),
     };
   }
 
@@ -64,7 +65,7 @@ export class DebriefKnowledgeService {
 
   /** The clinical advisor signs off the document's current text. */
   async signOff(id: string, userId: number) {
-    if (!this.config.debriefClinicalAdvisorIds.includes(userId)) {
+    if (!(await this.canSignOff(userId))) {
       throw new ForbiddenException(
         'Only the clinical advisor can sign off clinical guidance',
       );
@@ -83,6 +84,17 @@ export class DebriefKnowledgeService {
       throw new NotFoundException('No clinical document with that id');
     }
     return (await this.rows(id))[0];
+  }
+
+  /**
+   * The clinical advisor: a platform admin with the "Debriefs — Clinical
+   * sign-off" toggle on (Admin → Ally admins), off for everyone by default.
+   */
+  private canSignOff(userId: number): Promise<boolean> {
+    return this.toggles.hasToggle(
+      userId,
+      FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+    );
   }
 
   private updated(res: unknown): boolean {

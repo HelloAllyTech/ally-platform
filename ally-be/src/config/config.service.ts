@@ -995,18 +995,6 @@ export class AppConfigService {
    * never something any editor — or an automated agent with no person behind
    * it — can confirm.
    */
-  /**
-   * The clinical advisor(s) who may sign off clinical debrief knowledge (plan
-   * §8.5). User ids, comma-separated; empty means nobody, so nothing clinical is
-   * served until someone is named.
-   */
-  get debriefClinicalAdvisorIds(): number[] {
-    return (this.configService.get<string>('DEBRIEF_CLINICAL_ADVISORS') ?? '')
-      .split(',')
-      .map((id) => Number(id.trim()))
-      .filter((id) => Number.isInteger(id) && id > 0);
-  }
-
   get skillsStorePinnedEditorIds(): number[] {
     return (this.configService.get<string>('SKILLS_STORE_PINNED_EDITORS') ?? '')
       .split(',')

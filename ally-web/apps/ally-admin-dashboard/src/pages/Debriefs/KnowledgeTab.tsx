@@ -41,7 +41,7 @@ const EditPanel: React.FC<{ id: string; onClose: () => void }> = ({ id, onClose 
  * Debriefs → Knowledge (v9 FR-16, plan §12): the guidance the Debrief agent looks up, and the
  * clinical advisor's sign-off. Adding, editing and targeting a document reuse the knowledge
  * base's own panel with corpus `debrief_knowledge`; this tab adds the clinical mark and the
- * sign-off, which only the people named in DEBRIEF_CLINICAL_ADVISORS see.
+ * sign-off, which only an admin with the "Debriefs — Clinical sign-off" toggle sees.
  */
 export const KnowledgeTab: React.FC = () => {
   const { data, isLoading, isError, error, refetch } = useGetDebriefKnowledgeQuery();

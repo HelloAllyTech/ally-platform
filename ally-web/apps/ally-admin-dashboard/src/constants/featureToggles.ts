@@ -58,6 +58,8 @@ export const FeatureToggleKey = {
   ADMIN_USER_MANAGEMENT: "admin_user_management",
   MULTI_TENANT_ALLOWLIST_MANAGEMENT: "multi_tenant_allowlist_management",
   BUG_HUNTER: "bug_hunter",
+  /** Signs off clinical guidance in Debriefs → Knowledge (the clinical advisor). */
+  DEBRIEF_CLINICAL_SIGN_OFF: "debrief_clinical_sign_off",
   BUILDER: "builder",
   COURSE_COPILOT: "course_copilot",
   // Ally guide: the Ally Console, the per-organisation Ally tab, and redacted
@@ -172,6 +174,8 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.ANALYTICS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   [FeatureToggleKey.ANALYTICS_AGENT]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   [FeatureToggleKey.ANALYTICS_SUGGESTIONS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
+  // The Debriefs console sits on Analytics access; sign-off rides with it.
+  [FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
 
   [FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES]:
     FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,

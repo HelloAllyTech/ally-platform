@@ -29,7 +29,13 @@ function build(opts: { advisors?: number[]; updated?: boolean; row?: object }) {
   };
   const svc = new DebriefKnowledgeService(
     dataSource as any,
-    { debriefClinicalAdvisorIds: opts.advisors ?? [] } as any,
+    {
+      hasToggle: jest.fn(
+        async (userId: number, key: string) =>
+          key === 'debrief_clinical_sign_off' &&
+          (opts.advisors ?? []).includes(userId),
+      ),
+    } as any,
   );
   return { svc, queries };
 }

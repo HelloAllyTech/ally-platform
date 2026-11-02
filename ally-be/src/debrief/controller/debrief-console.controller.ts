@@ -342,7 +342,7 @@ export class DebriefConsoleController {
     summary:
       "The clinical advisor signs off a clinical document's current text",
     description:
-      'Only people named in DEBRIEF_CLINICAL_ADVISORS. An edit afterwards needs a new sign-off.',
+      'Only a platform admin with the "Debriefs — Clinical sign-off" toggle on. An edit afterwards needs a new sign-off.',
   })
   signOff(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     return this.knowledge.signOff(id, req.user.id);

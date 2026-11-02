@@ -127,6 +127,12 @@ export enum FeatureToggleKey {
   // Bug Hunter: the autonomous find-and-fix agent (formerly SUPER_DUPER_ADMIN-only)
   BUG_HUNTER = 'bug_hunter',
 
+  // The clinical advisor's sign-off on clinical debrief guidance (plan §8.5):
+  // a document marked clinical is served to the Debrief agent only once
+  // someone holding this has signed off its current text. Off for everyone
+  // until named here, one person at a time.
+  DEBRIEF_CLINICAL_SIGN_OFF = 'debrief_clinical_sign_off',
+
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
 
@@ -468,6 +474,19 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
       'Restrict a platform admin to a specific set of tenants (or clear the restriction).',
     legacyGrants: SDA_ONLY,
     // Could lift their own organization restriction.
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+    label: 'Debriefs — Clinical sign-off',
+    description:
+      'Sign off clinical guidance in Debriefs → Knowledge, which the Debrief agent then uses for every organisation. For the clinical advisor.',
+    legacyGrants: {
+      superAdmin: false,
+      superDuperAdmin: false,
+      multiTenantAdmin: false,
+    },
+    // Signed-off guidance reaches every organisation's debriefs.
     platformOnly: true,
   },
   {
