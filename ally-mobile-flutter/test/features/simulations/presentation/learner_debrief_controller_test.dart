@@ -141,6 +141,21 @@ void main() {
     c.dispose();
   });
 
+  test('supervisor: reads the supervisor view only, and never marks read or opened', () async {
+    when(() => repo.getSupervisorDebrief('s-1')).thenAnswer(
+      (_) async => LearnerDebriefView.fromSupervisorJson({'state': 'ready', 'cards': readyDebriefJson()['cards']}),
+    );
+    final c = LearnerDebriefController(repository: repo, sessionId: 's-1', supervisor: true);
+    await c.load();
+    expect(c.view?.supervisor, isNotNull);
+    await c.markRead();
+    await c.markOpened();
+    verifyNever(() => repo.getDebrief(any()));
+    verifyNever(() => repo.markRead(any()));
+    verifyNever(() => repo.markOpened(any()));
+    c.dispose();
+  });
+
   test('helpful shows the pressed state once the server accepts', () async {
     when(() => repo.getDebrief('s-1')).thenAnswer((_) async => LearnerDebriefView.fromJson(readyDebriefJson()));
     when(() => repo.setHelpful('s-1', helpful: true)).thenAnswer((_) async {});

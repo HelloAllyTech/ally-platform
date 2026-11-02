@@ -96,6 +96,9 @@ class FeedbackHarness {
     // Most organisations aren't on the Debrief agent: today's debrief shows.
     when(() => learnerDebrief.getDebrief(any()))
         .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
+    // Roleplay Logs asks for the supervisor's view; most orgs aren't on it.
+    when(() => learnerDebrief.getSupervisorDebrief(any()))
+        .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
     when(() => learnerDebrief.markRead(any())).thenAnswer((_) async {});
     when(() => learnerDebrief.markOpened(any())).thenAnswer((_) async {});
     when(() => simulations.getEventChecklist(any())).thenAnswer((_) async => <EventChecklistItem>[]);

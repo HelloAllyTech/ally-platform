@@ -1342,6 +1342,17 @@
         "thanks": "Thanks for telling us."
       },
       "supervisor": {
+        "flagged": "The learner flagged this: {{reason}}",
+        "note": "Their note: {{note}}",
+        "waiting": "Waiting for the Ally team's review",
+        "kept": "Kept after review: {{note}}",
+        "corrected": "Corrected after review: {{note}}",
+        "removed": "Removed after review",
+        "helpfulYes": "The learner found this debrief helpful.",
+        "helpfulNo": "The learner found this debrief not helpful.",
+        "helpfulNone": "The learner didn't say whether this debrief helped.",
+        "thread": "The learner's conversation with Ally",
+        "noThread": "The learner didn't reply to Ally.",
         "canRead": "Your supervisor can read this conversation."
       },
       "ready": {

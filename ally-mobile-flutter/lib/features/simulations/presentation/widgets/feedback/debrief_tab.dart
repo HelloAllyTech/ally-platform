@@ -28,6 +28,12 @@ import 'supervisor_note.dart';
 /// moves under its reflective question as Ask Ally: replies go to the Debrief
 /// agent (`POST /debriefs/sessions/:id/reply/stream`, web `DebriefTab`'s
 /// `askAlly`) on the same history.
+///
+/// Read-only (Roleplay Logs) asks for the supervisor's view instead
+/// (`GET /debriefs/sessions/:id/supervisor`, v9 FR-26): the same cards with
+/// no controls, the learner's flags and outcomes under each card, their
+/// "Was this helpful?" answer and their Ask Ally thread. A 403 or
+/// `not_available` keeps the note.
 class DebriefTab extends ConsumerStatefulWidget {
   const DebriefTab({
     super.key,
@@ -56,9 +62,10 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
   final _scrollController = ScrollController();
   late final LearnerDebriefController _learnerDebrief = LearnerDebriefController(
     repository: ref.read(learnerDebriefRepositoryProvider),
-    // Asked on the Logs view too, as RN: the endpoint answers only the
-    // learner themself, and anyone else's 403 falls back to the note.
     sessionId: widget.sessionId,
+    // Roleplay Logs: the supervisor's view of the learner's debrief (v9
+    // FR-26); a 403 (another organisation) or not_available keeps the note.
+    supervisor: widget.readOnly,
   );
 
   @override
@@ -174,13 +181,53 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     );
   }
 
+  /// Roleplay Logs: the learner's Ask Ally thread, read-only (web
+  /// `supervisor-thread`).
+  Widget? _supervisorThread(SupervisorDebriefExtras? supervisor) {
+    if (supervisor == null) return null;
+    const style = TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 13, color: AppColors.mediumEmphasis);
+    return Column(
+      key: const Key('supervisor-thread'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          ref.t('postSim.debriefCards.supervisor.thread'),
+          style: style.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium, color: AppColors.highEmphasis),
+        ),
+        const SizedBox(height: 12),
+        if (supervisor.thread.isEmpty)
+          Text(ref.t('postSim.debriefCards.supervisor.noThread'), style: style)
+        else
+          for (final (index, turn) in supervisor.thread.indexed) ...[
+            if (turn.fromLearner)
+              AskAiLearnerBubble(key: ValueKey('supervisor-thread-$index'), message: _threadMessage(index, turn))
+            else
+              AskAiAllyReply(
+                key: ValueKey('supervisor-thread-$index'),
+                message: _threadMessage(index, turn),
+                clientName: widget.summary?.scenario?.clientName,
+                onOpenMoment: widget.onOpenMoment,
+              ),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+
+  static AskAiChatMessage _threadMessage(int index, SupervisorThreadMessage turn) => AskAiChatMessage(
+    id: 'supervisor-$index',
+    role: turn.fromLearner ? AskAiChatRole.user : AskAiChatRole.assistant,
+    content: turn.content,
+    createdAt: turn.at,
+  );
+
   @override
   Widget build(BuildContext context) {
     final chat = widget.chat;
     if (_showingLearnerDebrief) {
       return DebriefCards(
         controller: _learnerDebrief,
-        replyThread: widget.readOnly ? null : _askAlly(chat),
+        replyThread: widget.readOnly ? _supervisorThread(_learnerDebrief.view?.supervisor) : _askAlly(chat),
         readOnly: widget.readOnly,
       );
     }

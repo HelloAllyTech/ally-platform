@@ -141,6 +141,49 @@ void main() {
       expect(LearnerDebriefView.fromJson({'state': 'working'}).progress, isNull);
     });
 
+    test('the supervisor\'s view: cards, corrections, flags, helpful, thread', () {
+      final view = LearnerDebriefView.fromSupervisorJson({
+        'state': 'ready',
+        'readOnly': true,
+        'cards': readyDebriefJson()['cards'],
+        'language': 'hi',
+        'corrections': [
+          {'section': 'what_worked[0]', 'outcome': 'corrected', 'note': 'Reworded.', 'at': '2026-10-30T12:00:00Z'},
+        ],
+        'flags': [
+          {'section': 'what_worked[0]', 'reason': 'didnt_say', 'note': 'Not mine.', 'status': 'corrected', 'resolutionNote': 'Reworded.'},
+          {'section': 'practise_next', 'reason': 'not_a_reason', 'note': null, 'status': 'escalated', 'resolutionNote': null},
+        ],
+        'helpful': false,
+        'thread': [
+          {'role': 'learner', 'content': 'Why?', 'at': '2026-10-30T12:00:00Z'},
+          {'role': 'ally', 'content': 'Because.', 'at': '2026-10-30T12:00:05Z'},
+        ],
+      });
+      expect(view.state, LearnerDebriefState.ready);
+      expect(view.isShowable, isTrue);
+      expect(view.language, 'hi');
+      expect(view.cards!.whatWorked, hasLength(2));
+      expect(view.corrections.single.outcome, DebriefCorrectionOutcome.corrected);
+      expect(view.distress, isFalse);
+      expect(view.practice, isEmpty);
+      final supervisor = view.supervisor!;
+      expect(supervisor.helpful, isFalse);
+      final flag = supervisor.flagFor('what_worked[0]')!;
+      expect(flag.reason, DebriefFlagReason.didntSay);
+      expect(flag.note, 'Not mine.');
+      expect(flag.status, 'corrected');
+      expect(flag.resolutionNote, 'Reworded.');
+      expect(supervisor.flagFor('practise_next')!.reason, isNull);
+      expect(supervisor.flagFor('important_moment'), isNull);
+      expect(supervisor.thread.map((m) => (m.fromLearner, m.content)), [(true, 'Why?'), (false, 'Because.')]);
+
+      final none = LearnerDebriefView.fromSupervisorJson({'state': 'not_available', 'readOnly': true});
+      expect(none.isShowable, isFalse);
+      expect(none.supervisor!.helpful, isNull);
+      expect(none.supervisor!.thread, isEmpty);
+    });
+
     test('corrections and the learner\'s own flags', () {
       final view = LearnerDebriefView.fromJson({
         ...readyDebriefJson(),
@@ -184,6 +227,14 @@ void main() {
           .thenAnswer((_) async => _response({'state': 'not_available'}));
       final view = await repository.getDebrief('s-1');
       expect(view.state, LearnerDebriefState.notAvailable);
+    });
+
+    test('GET the supervisor\'s view', () async {
+      when(() => dio.get<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => _response({'state': 'not_available', 'readOnly': true}));
+      final view = await repository.getSupervisorDebrief('s-1');
+      expect(view.state, LearnerDebriefState.notAvailable);
+      verify(() => dio.get<Map<String, dynamic>>('/debriefs/sessions/s-1/supervisor')).called(1);
     });
 
     test('PUT helpful', () async {

@@ -27,7 +27,8 @@ class DebriefCards extends ConsumerStatefulWidget {
 
   final LearnerDebriefController controller;
 
-  /// Opened from Logs: the debrief is not marked opened.
+  /// Opened from Logs: the debrief is not marked opened. (The supervisor's
+  /// view, [LearnerDebriefView.supervisor], also shows no controls.)
   final bool readOnly;
 
   /// Ask Ally's thread and composer, under the reflective question. Shown
@@ -162,7 +163,8 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
       builder: (context, _) {
         final view = widget.controller.view;
         if (view == null) return const SizedBox.shrink();
-        final ready = view.state == LearnerDebriefState.ready && view.cards != null;
+        // A supervisor (Roleplay Logs) reads: no read-aloud, no read XP, no opened.
+        final ready = view.state == LearnerDebriefState.ready && view.cards != null && view.supervisor == null;
         Widget content = switch (view.state) {
           LearnerDebriefState.working => _Working(
             progress: view.progress,
@@ -565,7 +567,10 @@ class _ReadyCards extends ConsumerWidget {
     DebriefMyFlag? flagFor(String section) => view.flags.where((f) => f.section == section).firstOrNull;
     DebriefCorrection? correctionFor(String section) =>
         view.corrections.where((c) => c.section == section).firstOrNull;
-    Widget flag(String section, String cardLabel) => Wrap(
+    final supervisor = view.supervisor;
+    Widget flag(String section, String cardLabel) => supervisor != null
+        ? _SupervisorFlag(flag: supervisor.flagFor(section))
+        : Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 4,
       children: [
@@ -723,20 +728,32 @@ class _ReadyCards extends ConsumerWidget {
         icon: Icon(Icons.help_outline, size: 20, color: AppColors.primary),
         children: [
           _Body(cards.reflectiveQuestion),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _ListenButton(
-              readAloud: readAloud,
-              section: 'reflective_question',
-              cardLabel: ref.t('$_k.reflectiveQuestion'),
+          if (supervisor == null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _ListenButton(
+                readAloud: readAloud,
+                section: 'reflective_question',
+                cardLabel: ref.t('$_k.reflectiveQuestion'),
+              ),
             ),
-          ),
           ?replyThread,
         ],
       ),
       if (removed.isNotEmpty)
         Text(ref.t('$_k.corrections.removed'), key: const Key('debrief-removed-note'), style: _smallStyle),
-      _Helpful(controller: controller, helpful: view.helpful),
+      if (supervisor != null)
+        Text(
+          ref.t(switch (supervisor.helpful) {
+            true => '$_k.supervisor.helpfulYes',
+            false => '$_k.supervisor.helpfulNo',
+            null => '$_k.supervisor.helpfulNone',
+          }),
+          key: const Key('debrief-supervisor-helpful'),
+          style: _smallStyle,
+        )
+      else
+        _Helpful(controller: controller, helpful: view.helpful),
     ];
 
     return Column(
@@ -755,6 +772,53 @@ class _ReadyCards extends ConsumerWidget {
 }
 
 /// One point inside a card that holds several.
+/// What the learner said about one card, and the outcome — for a
+/// supervisor (web `SupervisorFlag`). Nothing when the card wasn't flagged.
+class _SupervisorFlag extends ConsumerWidget {
+  const _SupervisorFlag({required this.flag});
+
+  final SupervisorDebriefFlag? flag;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const k = 'postSim.debriefCards';
+    final flag = this.flag;
+    if (flag == null) return const SizedBox.shrink();
+    final outcome = switch (flag.status) {
+      'kept' => ref.t('$k.supervisor.kept', {'note': flag.resolutionNote ?? ''}),
+      'corrected' => ref.t('$k.supervisor.corrected', {'note': flag.resolutionNote ?? ''}),
+      'removed' => ref.t('$k.supervisor.removed'),
+      _ => ref.t('$k.supervisor.waiting'),
+    };
+    return Container(
+      key: const Key('debrief-supervisor-flag'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(
+        color: _amberFill,
+        border: Border(left: BorderSide(color: _amberBorder, width: 4)),
+        borderRadius: BorderRadius.all(Radius.circular(6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            ref.t('$k.supervisor.flagged', {
+              'reason': flag.reason == null ? '' : ref.t('$k.flag.reasons.${flag.reason!.wire}'),
+            }).trim(),
+            style: _smallStyle.copyWith(color: AppColors.highEmphasis),
+          ),
+          if (flag.note != null)
+            Text(
+              ref.t('$k.supervisor.note', {'note': flag.note}),
+              style: _smallStyle.copyWith(color: AppColors.highEmphasis),
+            ),
+          Text(outcome.trim(), style: _smallStyle.copyWith(color: AppColors.highEmphasis)),
+        ],
+      ),
+    );
+  }
+}
+
 class _Item extends StatelessWidget {
   const _Item({required this.children, this.reading = false});
 

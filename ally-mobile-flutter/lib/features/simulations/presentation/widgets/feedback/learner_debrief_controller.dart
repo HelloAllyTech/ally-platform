@@ -27,7 +27,13 @@ class LearnerDebriefController extends ChangeNotifier {
     this.pollInterval = const Duration(seconds: 3),
     this.slowPollInterval = const Duration(seconds: 30),
     this.fastPollFor = const Duration(minutes: 4),
+    this.supervisor = false,
   }) : _repository = repository;
+
+  /// Roleplay Logs: read the supervisor's view
+  /// (`GET /debriefs/sessions/:id/supervisor`, v9 FR-26) instead of the
+  /// learner's, and send nothing back (no read, opened or XP).
+  final bool supervisor;
 
   final LearnerDebriefRepository _repository;
   final String sessionId;
@@ -59,7 +65,9 @@ class LearnerDebriefController extends ChangeNotifier {
   Future<void> _fetch() async {
     _pollTimer?.cancel();
     try {
-      final next = await _repository.getDebrief(sessionId);
+      final next = supervisor
+          ? await _repository.getSupervisorDebrief(sessionId)
+          : await _repository.getDebrief(sessionId);
       if (_disposed) return;
       _latest = next;
       notifyListeners();
@@ -131,7 +139,7 @@ class LearnerDebriefController extends ChangeNotifier {
   /// DEBRIEF_READ XP, at most once per controller; a failure is silent (the
   /// web fires and forgets too).
   Future<void> markRead() async {
-    if (_readSent) return;
+    if (_readSent || supervisor) return;
     _readSent = true;
     try {
       await _repository.markRead(sessionId);
@@ -145,7 +153,7 @@ class LearnerDebriefController extends ChangeNotifier {
   /// v9 FR-31 `openedAt`, at most once per controller (one screen visit); a
   /// failure is silent, as [markRead].
   Future<void> markOpened() async {
-    if (_openedSent) return;
+    if (_openedSent || supervisor) return;
     _openedSent = true;
     try {
       await _repository.markOpened(sessionId);

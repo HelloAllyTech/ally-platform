@@ -113,11 +113,18 @@ void main() {
       expect(find.byKey(const Key('debrief-cards')), findsNothing);
     });
 
-    testWidgets('from Logs it asks too, and a 403 keeps the note, as RN', (tester) async {
-      when(() => h.learnerDebrief.getDebrief(any())).thenThrow(Exception('403'));
+    testWidgets('from Logs a 403 on the supervisor view keeps the note', (tester) async {
+      when(() => h.learnerDebrief.getSupervisorDebrief(any())).thenThrow(Exception('403'));
       await h.pump(tester, fromLogs: true);
       expect(find.text('from Ally'), findsOneWidget);
-      verify(() => h.learnerDebrief.getDebrief(any())).called(1);
+      verify(() => h.learnerDebrief.getSupervisorDebrief('session-1')).called(1);
+      verifyNever(() => h.learnerDebrief.getDebrief(any()));
+    });
+
+    testWidgets('from Logs not_available keeps the note', (tester) async {
+      await h.pump(tester, fromLogs: true);
+      expect(find.text('from Ally'), findsOneWidget);
+      expect(find.byKey(const Key('debrief-cards')), findsNothing);
     });
 
     testWidgets('when ready has no cards', (tester) async {
@@ -483,8 +490,134 @@ void main() {
     );
   });
 
+  void stubSupervisor(Map<String, dynamic> json) {
+    when(() => h.learnerDebrief.getSupervisorDebrief('session-1'))
+        .thenAnswer((_) async => LearnerDebriefView.fromSupervisorJson(json));
+  }
+
+  Map<String, dynamic> supervisorJson({Object? flags, Object? helpful, Object? thread, Object? corrections}) {
+    final ready = readyDebriefJson();
+    return {
+      'state': 'ready',
+      'readOnly': true,
+      'cards': ready['cards'],
+      'language': 'en',
+      'corrections': corrections ?? <Object>[],
+      'flags': flags ?? <Object>[],
+      'helpful': helpful,
+      'thread': thread ?? <Object>[],
+    };
+  }
+
+  group('supervisor view from Roleplay Logs (v9 FR-26)', () {
+    testWidgets('the same cards, read-only: no controls and no learner-only calls', (tester) async {
+      stubSupervisor(supervisorJson());
+      await h.pump(tester, fromLogs: true);
+      await tester.pump(const Duration(seconds: 35));
+
+      expect(find.text('from Ally'), findsNothing);
+      expect(find.byKey(const Key('debrief-card-reflective-question')), findsOneWidget);
+      expect(find.text('You named the feeling.'), findsOneWidget);
+      expect(find.byKey(const Key('debrief-flag-open')), findsNothing);
+      expect(find.byKey(const Key('debrief-listen-all-play')), findsNothing);
+      expect(find.byKey(const Key('debrief-helpful-yes')), findsNothing);
+      expect(find.byKey(const Key('ask-ally')), findsNothing);
+      expect(find.byKey(const Key('ask-ai-input')), findsNothing);
+      expect(find.text('Your supervisor can read this conversation.'), findsNothing);
+
+      await tester.ensureVisible(find.byKey(const Key('debrief-try-saying')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 35));
+      verify(() => h.learnerDebrief.getSupervisorDebrief('session-1')).called(1);
+      verifyNever(() => h.learnerDebrief.getDebrief(any()));
+      verifyNever(() => h.learnerDebrief.markRead(any()));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
+      verifyNever(() => h.learnerDebrief.getCardAudioUrl(any(), any()));
+      verifyNever(() => h.chatApi.getHistory(any()));
+    });
+
+    testWidgets('each flagged card shows the learner\'s reason, note and the outcome', (tester) async {
+      stubSupervisor(
+        supervisorJson(
+          flags: [
+            {'section': 'important_moment', 'reason': 'didnt_say', 'note': 'Not my words.', 'status': 'open', 'resolutionNote': null},
+            {'section': 'what_worked[0]', 'reason': 'described_wrongly', 'note': null, 'status': 'escalated', 'resolutionNote': null},
+            {'section': 'what_worked[1]', 'reason': 'advice_doesnt_fit', 'note': null, 'status': 'kept', 'resolutionNote': 'It fits.'},
+            {'section': 'work_on_this[0]', 'reason': 'something_else', 'note': null, 'status': 'corrected', 'resolutionNote': 'Reworded.'},
+            {'section': 'practise_next', 'reason': null, 'note': null, 'status': 'removed', 'resolutionNote': null},
+          ],
+        ),
+      );
+      await h.pump(tester, fromLogs: true);
+
+      expect(find.byKey(const Key('debrief-supervisor-flag')), findsNWidgets(5));
+      expect(find.text('The learner flagged this: I didn\'t say this'), findsOneWidget);
+      expect(find.text('Their note: Not my words.'), findsOneWidget);
+      expect(find.text('The learner flagged this: This moment is described wrongly'), findsOneWidget);
+      expect(find.text('Waiting for the Ally team\'s review'), findsNWidgets(2));
+      expect(find.text('Kept after review: It fits.'), findsOneWidget);
+      expect(find.text('Corrected after review: Reworded.'), findsOneWidget);
+      expect(find.text('Removed after review'), findsOneWidget);
+      // A flag with no reason still says it was flagged.
+      expect(find.text('The learner flagged this:'), findsOneWidget);
+    });
+
+    testWidgets('a removed card is hidden, as on the web, with the removed note', (tester) async {
+      stubSupervisor(
+        supervisorJson(
+          corrections: [
+            {'section': 'what_worked[0]', 'outcome': 'removed', 'note': null, 'at': '2026-10-30T12:00:00Z'},
+          ],
+          flags: [
+            {'section': 'what_worked[0]', 'reason': 'didnt_say', 'note': null, 'status': 'removed', 'resolutionNote': null},
+          ],
+        ),
+      );
+      await h.pump(tester, fromLogs: true);
+      expect(find.text('You named the feeling.'), findsNothing);
+      expect(find.text('You slowed down.'), findsOneWidget);
+      expect(find.text('A point was removed after a review by the Ally team.'), findsOneWidget);
+    });
+
+    testWidgets('the learner\'s helpful answer and their thread with Ally', (tester) async {
+      stubSupervisor(
+        supervisorJson(
+          helpful: true,
+          thread: [
+            {'role': 'learner', 'content': 'Why was that closed?', 'at': '2026-10-30T12:00:00Z'},
+            {'role': 'ally', 'content': 'Because it asked for a yes or no.', 'at': '2026-10-30T12:00:05Z'},
+          ],
+        ),
+      );
+      await h.pump(tester, fromLogs: true);
+
+      expect(find.text('The learner found this debrief helpful.'), findsOneWidget);
+      final thread = find.byKey(const Key('supervisor-thread'));
+      expect(
+        find.descendant(of: find.byKey(const Key('debrief-card-reflective-question')), matching: thread),
+        findsOneWidget,
+      );
+      expect(find.text('The learner\'s conversation with Ally'), findsOneWidget);
+      expect(find.text('Why was that closed?'), findsOneWidget);
+      expect(find.textContaining('yes or no', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('helpful no / unanswered, and no thread', (tester) async {
+      stubSupervisor(supervisorJson(helpful: false));
+      await h.pump(tester, fromLogs: true);
+      expect(find.text('The learner found this debrief not helpful.'), findsOneWidget);
+      expect(find.text('The learner didn\'t reply to Ally.'), findsOneWidget);
+    });
+
+    testWidgets('helpful unanswered', (tester) async {
+      stubSupervisor(supervisorJson());
+      await h.pump(tester, fromLogs: true);
+      expect(find.text('The learner didn\'t say whether this debrief helped.'), findsOneWidget);
+    });
+  });
+
   testWidgets('read-only (Logs): no Ask Ally', (tester) async {
-    stubDebrief(readyDebriefJson());
+    stubSupervisor(supervisorJson());
     await h.pump(tester, fromLogs: true);
     expect(find.byKey(const Key('debrief-card-reflective-question')), findsOneWidget);
     expect(find.byKey(const Key('ask-ally')), findsNothing);
@@ -593,7 +726,7 @@ void main() {
     });
 
     testWidgets('not sent from Logs (read-only)', (tester) async {
-      stubDebrief(readyDebriefJson());
+      stubSupervisor(supervisorJson());
       await h.pump(tester, fromLogs: true);
       await tester.pump(const Duration(seconds: 5));
       verifyNever(() => h.learnerDebrief.markOpened(any()));

@@ -311,6 +311,69 @@ class DebriefMyFlag {
   bool canUndoAt(DateTime now) => canUndoUntil != null && canUndoUntil!.isAfter(now);
 }
 
+/// One of the learner's flags as a supervisor reads it (v9 FR-26): why,
+/// their note, and where the Ally team's review stands. `withdrawn` flags
+/// never arrive (the server drops them).
+class SupervisorDebriefFlag {
+  const SupervisorDebriefFlag({
+    required this.section,
+    required this.status,
+    this.reason,
+    this.note,
+    this.resolutionNote,
+  });
+
+  factory SupervisorDebriefFlag.fromJson(Map<String, dynamic> json) => SupervisorDebriefFlag(
+    section: _str(json['section']),
+    status: _str(json['status']),
+    reason: _flagReason(json['reason']),
+    note: _optStr(json['note']),
+    resolutionNote: _optStr(json['resolutionNote']),
+  );
+
+  final String section;
+
+  /// `open`, `escalated`, `kept`, `removed` or `corrected`.
+  final String status;
+  final DebriefFlagReason? reason;
+  final String? note;
+  final String? resolutionNote;
+}
+
+DebriefFlagReason? _flagReason(Object? value) {
+  for (final reason in DebriefFlagReason.values) {
+    if (reason.wire == value) return reason;
+  }
+  return null;
+}
+
+/// One turn of the learner's Ask Ally thread, as a supervisor reads it.
+class SupervisorThreadMessage {
+  const SupervisorThreadMessage({required this.fromLearner, required this.content, required this.at});
+
+  factory SupervisorThreadMessage.fromJson(Map<String, dynamic> json) => SupervisorThreadMessage(
+    fromLearner: json['role'] == 'learner',
+    content: _str(json['content']),
+    at: _str(json['at']),
+  );
+
+  final bool fromLearner;
+  final String content;
+  final String at;
+}
+
+/// What a supervisor sees besides the cards (web `SupervisorView`): the
+/// learner's flags, their "Was this helpful?" answer and their thread.
+class SupervisorDebriefExtras {
+  const SupervisorDebriefExtras({this.flags = const [], this.helpful, this.thread = const []});
+
+  final List<SupervisorDebriefFlag> flags;
+  final bool? helpful;
+  final List<SupervisorThreadMessage> thread;
+
+  SupervisorDebriefFlag? flagFor(String section) => flags.where((f) => f.section == section).firstOrNull;
+}
+
 /// One of the organisation's support lines, shown with the important
 /// moment and when the learner stepped out of the role in distress.
 class DebriefSupportLine {
@@ -355,7 +418,27 @@ class LearnerDebriefView {
     this.distress = false,
     this.supportLines = const [],
     this.practice = const [],
+    this.supervisor,
   });
+
+  /// `GET /debriefs/sessions/:id/supervisor` (v9 FR-26), as a read-only
+  /// view: `ready` or `not_available` only, so it never polls; no distress,
+  /// support lines or roleplays (web `DebriefTab`'s supervisor branch).
+  factory LearnerDebriefView.fromSupervisorJson(Map<String, dynamic> json) {
+    final cards = json['cards'];
+    final helpful = json['helpful'];
+    return LearnerDebriefView(
+      state: json['state'] == 'ready' ? LearnerDebriefState.ready : LearnerDebriefState.notAvailable,
+      cards: cards is Map<String, dynamic> ? DebriefCardsData.fromJson(cards) : null,
+      language: _optStr(json['language']),
+      corrections: _maps(json['corrections']).map(DebriefCorrection.fromJson).toList(),
+      supervisor: SupervisorDebriefExtras(
+        flags: _maps(json['flags']).map(SupervisorDebriefFlag.fromJson).toList(),
+        helpful: helpful is bool ? helpful : null,
+        thread: _maps(json['thread']).map(SupervisorThreadMessage.fromJson).toList(),
+      ),
+    );
+  }
 
   factory LearnerDebriefView.fromJson(Map<String, dynamic> json) {
     final cards = json['cards'];
@@ -404,6 +487,10 @@ class LearnerDebriefView {
   /// The roleplays a card may link to; anything else gets no button.
   final List<DebriefPracticeScenario> practice;
 
+  /// Set when a supervisor reads the debrief from Roleplay Logs: the cards
+  /// are read-only and show the learner's feedback instead of controls.
+  final SupervisorDebriefExtras? supervisor;
+
   DebriefPracticeScenario? practiceFor(int? scenarioId) =>
       scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
@@ -424,6 +511,7 @@ class LearnerDebriefView {
     distress: distress,
     supportLines: supportLines,
     practice: practice,
+    supervisor: supervisor,
   );
 }
 
@@ -438,6 +526,13 @@ class LearnerDebriefRepository {
   Future<LearnerDebriefView> getDebrief(String sessionId) async {
     final response = await _dio.get<Map<String, dynamic>>('/debriefs/sessions/$sessionId');
     return LearnerDebriefView.fromJson(response.data ?? const {});
+  }
+
+  /// A supervisor's read-only view of a learner's debrief, from Roleplay
+  /// Logs (needs VIEW_ADMIN_SCENARIO_SESSION; 403 for another organisation).
+  Future<LearnerDebriefView> getSupervisorDebrief(String sessionId) async {
+    final response = await _dio.get<Map<String, dynamic>>('/debriefs/sessions/$sessionId/supervisor');
+    return LearnerDebriefView.fromSupervisorJson(response.data ?? const {});
   }
 
   /// One answer per debrief; answering again changes it.
