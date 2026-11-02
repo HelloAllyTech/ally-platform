@@ -211,4 +211,30 @@ describe("Memories auto-map on first switch to a {memories} prompt", () => {
     expect(mapMock).not.toHaveBeenCalled();
     expect(form.getValues("memories")).toBeUndefined();
   });
+
+  it("falls back to copying knowledge sources when the mapping returns malformed memories", async () => {
+    mapMock.mockResolvedValue({
+      // Not ScenarioMemory[] — nulls, not-an-object, missing id/title.
+      memories: [
+        { id: "m-1", title: "My job", content: "Works nights" },
+        null,
+        "not-a-memory",
+        { title: "No id" },
+        { id: "m-5" },
+      ],
+    });
+    render(<Harness defaults={baseDefaults()} />);
+
+    pick(STAGE_DIRECTOR);
+
+    // Copied as they are: the father's lock reads as "Open and later".
+    await waitFor(() =>
+      expect(form.getValues("memories")).toEqual([
+        { id: "ks-1", title: "My job", content: "Works nights", unlocksInStateIds: [] },
+        { id: "ks-2", title: "My father", content: "He drank", unlocksInStateIds: ["s-2"] },
+      ]),
+    );
+    expect(toastMock.warning).toHaveBeenCalledTimes(1);
+    expect(toastMock.success).not.toHaveBeenCalled();
+  });
 });

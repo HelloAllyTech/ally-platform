@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { useGetPromptsByTypeQuery, useMapScenarioMemoriesMutation } from "@api";
 import { en, FORM_FIELD_IDS, MEMORIES_PLACEHOLDER } from "@constants";
-import type { MapScenarioMemoriesRequest } from "@types";
+import { MapScenarioMemoriesRequest, ScenarioMemory } from "@types";
 
 import { setMemoriesMapping, useIsMappingMemories } from "./memoriesMappingStatus";
 import { normaliseMemories } from "./memoryUtils";
@@ -28,6 +28,23 @@ export const promptUsesMemories = (
     .map(getAvailableVariableName)
     .includes(MEMORIES_PLACEHOLDER);
 };
+
+/**
+ * Type guard: true if every element of the array is a valid ScenarioMemory.
+ * A valid memory has at least an id and a title. The other fields are
+ * optional, but these two are required for the editor to work.
+ */
+const isValidScenarioMemoryArray = (value: unknown): value is ScenarioMemory[] =>
+  Array.isArray(value) &&
+  value.every(
+    item =>
+      item != null &&
+      typeof item === "object" &&
+      "id" in item &&
+      "title" in item &&
+      typeof item.id === "string" &&
+      typeof item.title === "string",
+  );
 
 /**
  * First switch to a `{memories}` prompt fills Memories automatically.
@@ -114,7 +131,10 @@ export const useMapMemories = (
       setMemoriesMapping(formKey, true);
       try {
         const response = await mapMemories(body).unwrap();
-        const mapped = normaliseMemories(response?.memories, ladderIds);
+        if (!isValidScenarioMemoryArray(response?.memories)) {
+          throw new Error("Mapping returned malformed memories");
+        }
+        const mapped = normaliseMemories(response.memories, ladderIds);
         if (mapped.length === 0) throw new Error("Mapping returned no memories");
         if (mayWrite()) {
           setValue(FORM_FIELD_IDS.MEMORIES, mapped, { shouldDirty: true });
