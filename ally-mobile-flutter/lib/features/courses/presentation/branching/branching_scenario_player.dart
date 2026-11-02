@@ -581,7 +581,7 @@ class _BranchingScenarioPlayerState extends ConsumerState<BranchingScenarioPlaye
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.only(left: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
             ),
             child: Text(

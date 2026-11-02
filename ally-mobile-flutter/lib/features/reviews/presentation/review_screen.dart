@@ -42,7 +42,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final permissionsAsync = ref.watch(userPermissionsProvider);
 
     return permissionsAsync.when(
-      loading: () => const Scaffold(
+      loading: () => Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
       ),
@@ -345,7 +345,7 @@ class _ReviewListState extends ConsumerState<_ReviewList> {
                       padding: EdgeInsets.only(top: _reviews.isEmpty ? 0 : 10, bottom: 0),
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: rn.s(16)),
-                        child: const Center(
+                        child: Center(
                           child: SizedBox(
                             width: 20,
                             height: 20,

@@ -149,7 +149,7 @@ class _CourseProgressSheetContent extends ConsumerWidget {
           ),
           Expanded(
             child: progressAsync.when(
-              loading: () => const Align(
+              loading: () => Align(
                 alignment: Alignment.topCenter,
                 child: Padding(
                   key: Key('progress-sheet-loading'),

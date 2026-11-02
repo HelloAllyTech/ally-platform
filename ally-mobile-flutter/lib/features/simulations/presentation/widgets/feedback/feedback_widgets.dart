@@ -105,7 +105,7 @@ class EventChecklist extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final checklist = ref.watch(eventChecklistProvider(scenarioSessionId));
     if (checklist.isLoading && !checklist.hasValue) {
-      return const Center(
+      return Center(
         child: SizedBox(
           width: 20,
           height: 20,
@@ -313,7 +313,7 @@ class ShortSessionSummary extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final data = summary;
     if (data == null && !retryLimitReached) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
     final sessionName = data?.sessionName ?? data?.id ?? '';
     final cover = data?.scenario?.coverImageUrl;

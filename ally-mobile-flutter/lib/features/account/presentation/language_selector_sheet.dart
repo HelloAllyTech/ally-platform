@@ -102,7 +102,7 @@ class _LanguageOption extends StatelessWidget {
               ),
             ),
             if (selected)
-              const DecoratedBox(
+              DecoratedBox(
                 decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                 child: SizedBox(width: 8, height: 8),
               ),

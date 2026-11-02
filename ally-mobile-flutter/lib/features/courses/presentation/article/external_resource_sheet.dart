@@ -134,7 +134,7 @@ class _ExternalResourceSheetState extends ConsumerState<ExternalResourceSheet> {
             children: [
               if (controller != null) Positioned.fill(child: WebViewWidget(controller: controller)),
               if (_loading)
-                const Positioned.fill(
+                Positioned.fill(
                   child: ColoredBox(
                     key: Key('external-resource-loading'),
                     color: Colors.white,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,6 +68,45 @@ void main() {
 
       expect(tenant.name, 'Acme Health');
       expect(tenant.logoUrl, 'https://cdn.example.com/logo.png');
+      expect(tenant.branding.enabled, isFalse, reason: 'no branding block (older backend) reads as Ally');
+    });
+
+    test('parses the org branding beside the logo', () async {
+      when(() => dio.get<Map<String, dynamic>>('/users/tenant')).thenAnswer(
+        (_) async => _response({
+          'name': 'Acme Health',
+          'logoUrl': null,
+          'branding': {
+            'enabled': true,
+            'displayName': 'Acme Helpline',
+            'logoUrl': null,
+            'primaryColor': '#8E2626',
+            'welcomeLine': null,
+            'tokens': {
+              'primary': {
+                'DEFAULT': '#8E2626',
+                '50': '#F6EEEE',
+                '100': '#EDDCDC',
+                '200': '#DBBABA',
+                '300': '#C79393',
+                '400': '#AE6363',
+                '500': '#8E2626',
+                '600': '#741F1F',
+                '700': '#591818',
+                '800': '#3C1010',
+                '900': '#250A0A',
+              },
+              'onPrimary': '#FAF9F5',
+            },
+          },
+        }),
+      );
+
+      final tenant = await repository.getTenant();
+
+      expect(tenant.branding.enabled, isTrue);
+      expect(tenant.branding.displayName, 'Acme Helpline');
+      expect(tenant.branding.primaryColor, const Color(0xFF8E2626));
     });
   });
 

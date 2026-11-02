@@ -35,7 +35,7 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
     // RN returns a bare full-screen spinner while the dashboards load, and a
     // bare centred message on error — neither renders the header.
     if (dashboardsAsync.isLoading && !dashboardsAsync.hasValue) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator(color: AppColors.azureBlue)),
       );
@@ -118,7 +118,7 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
                           ),
                         Expanded(
                           child: urls.isEmpty
-                              ? const Center(child: CircularProgressIndicator(color: AppColors.azureBlue))
+                              ? Center(child: CircularProgressIndicator(color: AppColors.azureBlue))
                               : ListView(
                                   padding: const EdgeInsets.all(16),
                                   children: [

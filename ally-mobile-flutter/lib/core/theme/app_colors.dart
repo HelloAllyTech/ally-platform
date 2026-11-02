@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../branding/brand_controller.dart';
+
 /// Direct port of ally-mobile (React Native)'s
 /// `src/theme/designSystem/colors.ts` semantic tokens — same hex values,
 /// same names where Dart naming allows. The app has no real dark theme
@@ -10,12 +12,20 @@ class AppColors {
   AppColors._();
 
   // theme
-  static const primary = Color(0xFF0957D0);
-  static const primaryLight = Color(0xFF5F99FC);
-  static const primaryDark = Color(0xFF0143A8);
-  static const onPrimary = Colors.white;
+  //
+  // The brand tokens are getters over [Brand.current]: an org with
+  // branding switched on paints its own colour (and the server-computed
+  // tints/shades of it) everywhere the app says "primary"; everyone else
+  // gets the constants below, unchanged. The mapping follows the consumer
+  // web's token split — the brand colour on primary actions and accents,
+  // neutrals and status colours untouched.
+  static const primaryDefault = Color(0xFF0957D0);
+  static Color get primary => Brand.current?.primaryColor ?? primaryDefault;
+  static Color get primaryLight => Brand.current?.ramp[300] ?? const Color(0xFF5F99FC);
+  static Color get primaryDark => Brand.current?.ramp[600] ?? const Color(0xFF0143A8);
+  static Color get onPrimary => Brand.current?.onPrimary ?? Colors.white;
   // ds.blue[50] — LeaderboardScreen's highlighted-row background.
-  static const blue50 = Color(0xFFE2F2FF);
+  static Color get blue50 => Brand.current?.ramp[50] ?? const Color(0xFFE2F2FF);
   static const primaryAccent = Color(0xFF536DFE);
   static const primaryAccentLight = Color(0xFF8C9EFF);
   static const primaryAccentDark = Color(0xFF3D5AFE);
@@ -53,8 +63,8 @@ class AppColors {
   static const infoContainer = Color(0xFFB7D7FF);
 
   // system
-  static const statusBar = Color(0xFF0143A8);
-  static const appBar = Color(0xFF0957D0);
+  static Color get statusBar => Brand.current?.ramp[600] ?? const Color(0xFF0143A8);
+  static Color get appBar => Brand.current?.primaryColor ?? const Color(0xFF0957D0);
   static const scrim = Color(0x52000000); // rgba(0,0,0,0.32)
 
   // typography emphasis (on light surfaces)
@@ -187,7 +197,8 @@ class AppColors {
   // reviews parity (src/theme/colors.ts + designSystem/colors.ts)
   static const lightGray9 = Color(0xFFFBFBFB); // ReviewScreen list background
   static const lightGray11 = Color(0xFF6C6C6C); // ActionsMenu shadow
-  static const azureBlue = Color(0xFF0957D0); // ReactionFilterTabs indicator
+  // Same hex as `primary` in RN; follows the brand with it.
+  static Color get azureBlue => Brand.current?.primaryColor ?? const Color(0xFF0957D0); // ReactionFilterTabs indicator
   static const amber500 = Color(0xFFFFC107); // transcript comment underline
   static const transcriptHighlight = Color(0x80FFF8E1); // rgba(255,248,225,0.5)
   static const whiteTransparent40 = Color(0x66FFFFFF); // thread card fade

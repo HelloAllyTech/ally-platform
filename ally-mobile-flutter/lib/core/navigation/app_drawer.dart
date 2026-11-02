@@ -8,6 +8,7 @@ import '../../features/account/data/account_repository.dart';
 import '../../features/account/data/user_profile.dart';
 import '../../features/simulations/data/simulations_repository.dart';
 import '../auth/auth_state.dart';
+import '../branding/brand_controller.dart';
 import '../config/app_config.dart';
 import '../localization/translate_ref.dart';
 import '../permissions/user_permissions.dart';
@@ -55,7 +56,7 @@ class AppDrawer extends ConsumerWidget {
             tenantAsync.when(
               data: (tenant) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [_OrgLogo(tenant: tenant), separator],
+                children: [_OrgHeader(tenant: tenant), separator],
               ),
               loading: () => const SizedBox.shrink(),
               error: (_, _) => const SizedBox.shrink(),
@@ -151,6 +152,25 @@ class AppDrawer extends ConsumerWidget {
               padding: EdgeInsets.only(bottom: 16),
               child: Center(child: _VersionFooter()),
             ),
+            // A branded org keeps the Ally mark, labelled: the org's name
+            // is at the top of the drawer, Ally's is here, as on the web.
+            if (ref.watch(brandControllerProvider).enabled)
+              Padding(
+                padding: EdgeInsets.only(top: rn.mvs(8)),
+                child: Center(
+                  child: Text(
+                    ref.t('common.poweredByAlly'),
+                    key: const Key('drawer-powered-by-ally'),
+                    style: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 12,
+                      height: 16 / 12,
+                      letterSpacing: 0.2,
+                      color: AppColors.mediumEmphasis,
+                    ),
+                  ),
+                ),
+              ),
             // styles.logoContainer: 0.5pt stroke, radius lg (8), 12pt
             // padding, 15pt sides, 8@mvs above, 30 below; logo at its
             // intrinsic 72x35.
@@ -186,6 +206,63 @@ class AppDrawer extends ConsumerWidget {
         Navigator.of(context).pop(); // closes the drawer itself
         ref.read(authControllerProvider.notifier).logout();
       },
+    );
+  }
+}
+
+/// The org logo (RN's drawer header) and, for an org with branding on,
+/// its display name and welcome line beside it. An unbranded org keeps
+/// RN's logo-only header.
+class _OrgHeader extends StatelessWidget {
+  const _OrgHeader({required this.tenant});
+
+  final TenantInfo tenant;
+
+  @override
+  Widget build(BuildContext context) {
+    final branding = tenant.branding;
+    if (!branding.enabled) return _OrgLogo(tenant: tenant);
+    final welcomeLine = branding.welcomeLine;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _OrgLogo(tenant: tenant),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                branding.displayName,
+                key: const Key('drawer-org-display-name'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: AppFonts.replayProHeadline,
+                  fontSize: 16,
+                  height: 24 / 16,
+                  letterSpacing: 0.5,
+                  color: AppColors.highEmphasis,
+                ),
+              ),
+              if (welcomeLine != null)
+                Text(
+                  welcomeLine,
+                  key: const Key('drawer-org-welcome-line'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifRegular,
+                    fontSize: 12,
+                    height: 16 / 12,
+                    letterSpacing: 0.2,
+                    color: AppColors.mediumEmphasis,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

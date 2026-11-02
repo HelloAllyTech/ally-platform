@@ -358,7 +358,7 @@ class _LearnIntro extends StatelessWidget {
       color: AppColors.darkSlate,
     );
     // styles.blueBold: REPLAY_PRO.BOLD, medium, azureBlue.
-    const blueStyle = TextStyle(
+    final blueStyle = TextStyle(
       fontFamily: AppFonts.replayProBold,
       fontWeight: FontWeight.w500,
       color: AppColors.primary,

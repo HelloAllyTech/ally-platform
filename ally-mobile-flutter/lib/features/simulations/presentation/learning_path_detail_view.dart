@@ -283,7 +283,7 @@ class _ScenarioRow extends ConsumerWidget {
                               // styles.nextBadgeText: ROBOTO.REGULAR + body.tiny.
                               child: Text(
                                 ref.t('common.next'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: AppFonts.robotoRegular,
                                   fontSize: 10,
                                   height: 14 / 10,

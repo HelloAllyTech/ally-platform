@@ -518,7 +518,7 @@ class SummaryProgressButtons extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (isBusy) ...[
-                        const SizedBox(
+                        SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator.adaptive(

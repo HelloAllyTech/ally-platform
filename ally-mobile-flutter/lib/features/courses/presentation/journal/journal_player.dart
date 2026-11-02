@@ -188,7 +188,7 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                             width: 28,
                             height: 28,
                             alignment: Alignment.center,
-                            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                            decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                             child: Text(
                               '${i + 1}',
                               style: CourseText.serifMedium(CourseType.bodySmall, Colors.white, weight: FontWeight.w500),

@@ -1,3 +1,5 @@
+import '../../../core/branding/tenant_branding.dart';
+
 /// Mirrors ally-mobile (React Native)'s `src/types/user.ts` `User` interface.
 class UserProfile {
   UserProfile({
@@ -36,15 +38,23 @@ class UserProfile {
 }
 
 /// Mirrors ally-mobile (React Native)'s `authApi.ts` `LogoUrlResponse` —
-/// the signed-in user's organization, shown in the drawer header.
+/// the signed-in user's organization, shown in the drawer header — plus
+/// the resolved org [branding] ally-be now returns beside it.
 class TenantInfo {
-  TenantInfo({required this.name, required this.logoUrl});
+  TenantInfo({required this.name, required this.logoUrl, this.branding = TenantBranding.ally});
 
   factory TenantInfo.fromJson(Map<String, dynamic> json) => TenantInfo(
         name: json['name'] as String? ?? '',
         logoUrl: json['logoUrl'] as String?,
+        branding: switch (json['branding']) {
+          final Map<String, dynamic> raw => TenantBranding.fromJson(raw),
+          _ => TenantBranding.ally,
+        },
       );
 
   final String name;
   final String? logoUrl;
+
+  /// Ally's own values unless the org's branding switch is on.
+  final TenantBranding branding;
 }

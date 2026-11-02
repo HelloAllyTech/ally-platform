@@ -443,7 +443,7 @@ class _CourseItemRow extends ConsumerWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: !isLocked && isCurrent
-            ? const BorderSide(color: AppColors.primary, width: 1.5)
+            ? BorderSide(color: AppColors.primary, width: 1.5)
             : const BorderSide(color: AppColors.strokePrimary),
       ),
       clipBehavior: Clip.antiAlias,

@@ -215,7 +215,7 @@ class _TermsAndAgreementModalState extends ConsumerState<TermsAndAgreementModal>
   }
 
   Widget _buildContent(BuildContext context) {
-    final linkStyle = const TextStyle(
+    final linkStyle = TextStyle(
       color: AppColors.primary,
       decoration: TextDecoration.underline,
       decorationColor: AppColors.primary,

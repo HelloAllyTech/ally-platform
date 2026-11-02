@@ -549,7 +549,8 @@
     "checkInternet": "कृपया तुमचे इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
     "unknownError": "अज्ञात त्रुटी",
     "practiceAgain": "पुन्हा सराव करा",
-    "backToHome": "होमवर परत जा"
+    "backToHome": "होमवर परत जा",
+    "poweredByAlly": "अलीद्वारे समर्थित"
   },
   "months": {
     "short": [

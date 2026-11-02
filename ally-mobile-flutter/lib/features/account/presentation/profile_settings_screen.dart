@@ -398,7 +398,7 @@ class _ProfileImageSection extends ConsumerWidget {
             children: [
               image,
               if (isSaving)
-                const ColoredBox(
+                ColoredBox(
                   color: Color(0xCCFFFFFF),
                   child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
                 ),
@@ -423,7 +423,7 @@ class _ProfileImageSection extends ConsumerWidget {
           onTap: isSaving ? null : onEdit,
           child: Text(
             ref.t('profile.settings.upload_image'),
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppFonts.robotoRegular,
               fontSize: 14,
               height: 22 / 14,

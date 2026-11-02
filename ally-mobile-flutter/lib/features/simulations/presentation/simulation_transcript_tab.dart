@@ -323,7 +323,7 @@ class _SimulationTranscriptTabState extends ConsumerState<SimulationTranscriptTa
         itemCount: _messages.length + (_isLoadingMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= _messages.length) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           final message = _messages[index];
           return TranscriptItem(
@@ -362,7 +362,7 @@ class _SimulationTranscriptTabState extends ConsumerState<SimulationTranscriptTa
         padding: const EdgeInsets.only(bottom: 12),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 56),
-          child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
         ),
       );
     } else if (_recordingUrl != null && _playback != null) {

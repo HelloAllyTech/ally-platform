@@ -24,7 +24,7 @@ class AllyAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: AppColors.rankBadgeBorder, width: 0.6),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [AppColors.blue50, Colors.white],
@@ -118,7 +118,7 @@ class SupervisorNote extends ConsumerWidget {
                       ),
                       child: Text(
                         ref.t('postSim.debrief.aiLabel').toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: AppFonts.ibmPlexSerifMedium,
                           fontSize: 10,
                           letterSpacing: 0.3,
@@ -202,7 +202,7 @@ class _Section extends ConsumerWidget {
                     color: AppColors.blue50,
                     child: Text(
                       ' $momentLabel ',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppFonts.ibmPlexSerifMedium,
                         fontSize: 11,
                         color: AppColors.primary,

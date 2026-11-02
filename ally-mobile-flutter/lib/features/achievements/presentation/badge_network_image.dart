@@ -19,7 +19,8 @@ class BadgeNetworkImage extends StatelessWidget {
   final double? width;
   final double? height;
 
-  static const _spinner = Center(
+  // A getter, not a const: the spinner wears the brand colour.
+  static Widget get _spinner => Center(
     child: SizedBox(
       width: 20,
       height: 20,

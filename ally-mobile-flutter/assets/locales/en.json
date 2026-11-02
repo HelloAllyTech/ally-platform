@@ -549,7 +549,8 @@
     "unableToOpenLink": "Unable to open the link",
     "checkInternet": "Please check your internet connection and try again.",
     "unknownError": "Unknown error",
-    "practiceAgain": "Practise again"
+    "practiceAgain": "Practise again",
+    "poweredByAlly": "Powered by Ally"
   },
   "months": {
     "short": [

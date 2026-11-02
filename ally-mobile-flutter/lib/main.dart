@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_update/force_update_modal.dart';
 import 'core/auth/auth_state.dart';
+import 'core/branding/brand_controller.dart';
 import 'core/chat/active_chat_discovery.dart';
 import 'core/chat/cloud_telephony_listener.dart';
 import 'core/config/app_config.dart';
@@ -58,6 +59,10 @@ Future<void> main() async {
   // The store build replaces the React Native app in place: carry its
   // sign-in and preferences over once, before anything reads them.
   if (AppConfig.isProdFlavor) await migrateFromReactNativeApp(TokenStorage());
+
+  // Paint the signed-in org's colours from the first frame; the live
+  // `/users/tenant` answer corrects this before Home opens.
+  await Brand.restoreFromPrefs();
 
   // Universal / App Links (RN RootNavigator's Linking listener). Created
   // before runApp so the link that cold-started the app isn't missed.
@@ -119,6 +124,9 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     ref.watch(leaderboardNotificationSyncProvider);
     // Summary and course share links (core/deeplink).
     ref.watch(deepLinkBindingProvider);
+    // The signed-in org's branding: watched so the theme below is rebuilt
+    // when it is applied (sign-in, a changed brand) or reset (sign-out).
+    final branding = ref.watch(brandControllerProvider);
 
     // Mirrors RN's cold-launch discovery check, run once auth first
     // resolves to authenticated (no literal Splash screen exists here to
@@ -138,7 +146,7 @@ class _AllyAppState extends ConsumerState<AllyApp> with WidgetsBindingObserver {
     });
 
     return MaterialApp.router(
-      title: 'Ally',
+      title: branding.enabled ? branding.displayName : 'Ally',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: router,

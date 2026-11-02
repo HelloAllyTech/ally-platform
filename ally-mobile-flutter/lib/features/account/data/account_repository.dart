@@ -103,6 +103,13 @@ final currentUserProvider = FutureProvider<UserProfile>((ref) {
   return ref.watch(accountRepositoryProvider).getUser();
 });
 
+/// The signed-in org (drawer header, and the branding `BrandController`
+/// paints). Auth-aware like [currentUserProvider]: pending while signed
+/// out, fetched on sign-in, and a sign-out drops the previous org.
 final tenantInfoProvider = FutureProvider<TenantInfo>((ref) {
+  final isAuthenticated = ref.watch(
+    authControllerProvider.select((state) => state.isAuthenticated),
+  );
+  if (!isAuthenticated) return Completer<TenantInfo>().future;
   return ref.watch(accountRepositoryProvider).getTenant();
 });

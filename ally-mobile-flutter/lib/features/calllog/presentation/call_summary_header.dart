@@ -246,7 +246,7 @@ class CallSummaryTabBar extends StatelessWidget {
                     bottom: 0,
                     width: tabWidth,
                     height: 2,
-                    child: const ColoredBox(color: AppColors.primary),
+                    child: ColoredBox(color: AppColors.primary),
                   ),
                 ],
               );

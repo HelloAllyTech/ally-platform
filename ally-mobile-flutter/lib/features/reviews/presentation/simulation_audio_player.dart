@@ -174,9 +174,9 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
               width: 32,
               height: 32,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(color: AppColors.blue50, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: AppColors.blue50, shape: BoxShape.circle),
               child: _isLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
@@ -187,7 +187,7 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
                     child: SvgPicture.asset(
                         _isPlaying ? 'assets/icons/pausePlayer.svg' : 'assets/icons/playWhite.svg',
                         key: ValueKey(_isPlaying ? 'simulation-audio-player-pause' : 'simulation-audio-player-play'),
-                        colorFilter: const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
+                        colorFilter: ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
                       ),
                   ),
             ),
@@ -204,7 +204,7 @@ class _SimulationAudioPlayerState extends State<SimulationAudioPlayer> {
               decoration: BoxDecoration(color: AppColors.blue50, borderRadius: BorderRadius.circular(12)),
               child: Text(
                 _rateLabel(_rates[_rateIndex]),
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppFonts.ibmPlexSerifMedium,
                   fontSize: 10,
                   color: AppColors.primary,

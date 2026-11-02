@@ -366,7 +366,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                                     itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
                                     itemBuilder: (context, index) {
                                       if (index >= page.items.length) {
-                                        return const Padding(
+                                        return Padding(
                                           padding: EdgeInsets.symmetric(vertical: 20),
                                           child: Center(
                                             child: SizedBox(
@@ -472,7 +472,7 @@ class _BadgesButton extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppFonts.ibmPlexSerifRegular,
                 fontSize: 12,
                 height: 20 / 12,
@@ -493,7 +493,7 @@ class _LeaderboardLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 40),
       child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
     );
