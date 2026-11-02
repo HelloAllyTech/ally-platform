@@ -9621,7 +9621,7 @@ export const en = {
       distress: "Learner distress",
       judgeBelow: "Judge below the bar",
       judgeHelp:
-        "The learner already has this one. The independent judge scored it below the bar or found a hard fail after it was published; read it and correct a card if needed.",
+        "The learner already has this one. After it was published, the independent judge scored it below the bar or found a hard fail. Read it and mark it checked; there is no way to edit a card that has no flag yet.",
       waitingHelp: 'The learner sees "on its way" until you act.',
       belowBarHelp: "The learner already has this one; it scored below the bar.",
       distressHelp:
