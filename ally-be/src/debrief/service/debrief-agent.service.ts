@@ -17,6 +17,8 @@ import {
   DEBRIEF_SEED_BUNDLE,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
+import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
+import { resolveSupportLines } from '../../guide/safety/fixed-responses';
 import {
   ScenarioSessionLeaderboardEndedEventParams,
   ScenarioSessionLeaderboardEvent,
@@ -56,6 +58,10 @@ export interface LearnerDebriefView {
   cards?: Record<string, any> | null;
   language?: string | null;
   steps?: string[];
+  /** The learner stepped out of the role in distress: support comes first. */
+  distress?: boolean;
+  /** The organisation's support lines (the Guide's), crisis lines first. */
+  supportLines?: GuideSupportLine[];
 }
 
 /**
@@ -279,6 +285,8 @@ export class DebriefAgentService implements OnModuleInit {
           runId: run.id,
           cards: run.cards,
           language: run.language,
+          distress: run.learnerDistress === true,
+          supportLines: await this.supportLines(s.tenant_id, run.language),
         };
       case DebriefRunStatus.SKIPPED:
         return {
@@ -287,6 +295,22 @@ export class DebriefAgentService implements OnModuleInit {
       default:
         return { state: 'on_its_way' };
     }
+  }
+
+  /**
+   * The support lines a learner sees: the organisation's own from its Guide
+   * profile for this language, else its English ones, else Tele-MANAS.
+   */
+  private async supportLines(
+    tenantId: string,
+    language?: string | null,
+  ): Promise<GuideSupportLine[]> {
+    const rows = await this.dataSource.query(
+      `SELECT profile FROM guide_org_profiles WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const lang = (language ?? 'en').split(/[-_]/)[0].toLowerCase() || 'en';
+    return resolveSupportLines(rows?.[0]?.profile ?? null, lang);
   }
 
   /**

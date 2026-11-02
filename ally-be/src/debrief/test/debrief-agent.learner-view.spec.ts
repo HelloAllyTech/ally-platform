@@ -9,17 +9,24 @@ function build(opts: {
   live?: boolean;
   runs?: Array<Record<string, unknown>>;
   endedMinutesAgo?: number;
+  profile?: Record<string, unknown> | null;
 }) {
   const ended = new Date(Date.now() - (opts.endedMinutesAgo ?? 10) * 60_000);
   const dataSource = {
-    query: jest.fn(async () => [
-      {
-        counselor_id: opts.owner ?? 7,
-        tenant_id: 't1',
-        status: 'ENDED',
-        ended_at: ended,
-      },
-    ]),
+    query: jest.fn(async (sql: string) =>
+      sql.includes('guide_org_profiles')
+        ? opts.profile
+          ? [{ profile: opts.profile }]
+          : []
+        : [
+            {
+              counselor_id: opts.owner ?? 7,
+              tenant_id: 't1',
+              status: 'ENDED',
+              ended_at: ended,
+            },
+          ],
+    ),
   };
   const runs = { find: jest.fn(async () => opts.runs ?? []) };
   const overrides = {
@@ -67,7 +74,66 @@ describe('DebriefAgentService.learnerView', () => {
       state: 'ready',
       cards: { opening: 'x' },
       language: 'hi',
+      distress: false,
+      supportLines: expect.any(Array),
     });
+  });
+
+  it('gives Tele-MANAS when the organisation set no support lines', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {},
+          language: 'hi-IN',
+          steps: [],
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.supportLines?.[0]).toMatchObject({
+      phone: '14416',
+      isCrisis: true,
+    });
+  });
+
+  it('gives the organisation’s own lines, in the debrief’s language', async () => {
+    const view = await build({
+      profile: {
+        supportLines: {
+          en: [{ name: 'Org line (en)', phone: '111' }],
+          hi: [{ name: 'Org line (hi)', phone: '222' }],
+        },
+      },
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {},
+          language: 'hi-IN',
+          steps: [],
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.supportLines).toEqual([
+      { name: 'Org line (hi)', phone: '222' },
+    ]);
+  });
+
+  it('says when the learner was in distress, so support comes first', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {},
+          language: 'en',
+          steps: [],
+          learnerDistress: true,
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.distress).toBe(true);
   });
 
   it('is working only while the drain will still pick the session up', async () => {

@@ -73,6 +73,15 @@ export interface DebriefMyFlag {
   canUndoUntil: string | null;
 }
 
+/** A crisis or wellbeing line: the organisation's own, else Tele-MANAS. */
+export interface DebriefSupportLine {
+  name: string;
+  phone: string;
+  hours?: string | null;
+  url?: string | null;
+  isCrisis?: boolean;
+}
+
 export interface LearnerDebriefView {
   state: LearnerDebriefState;
   cards?: DebriefCardsData | null;
@@ -80,4 +89,7 @@ export interface LearnerDebriefView {
   steps?: string[];
   corrections?: DebriefCorrection[];
   feedback?: { helpful: boolean | null; flags: DebriefMyFlag[] };
+  /** The learner stepped out of the role in distress: support comes first. */
+  distress?: boolean;
+  supportLines?: DebriefSupportLine[];
 }

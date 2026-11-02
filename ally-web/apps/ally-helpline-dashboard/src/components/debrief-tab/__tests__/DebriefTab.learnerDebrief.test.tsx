@@ -351,4 +351,45 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(mockMutations.helpful).toHaveBeenCalledWith({ sessionId: "s-1", helpful: false });
     });
   });
+
+  describe("support and distress", () => {
+    const TELE_MANAS = { name: "Tele-MANAS (free, 24×7)", phone: "14416", isCrisis: true };
+
+    it("ends the important moment with the organisation's support lines, tap to call", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en", supportLines: [TELE_MANAS] },
+      });
+      renderTab();
+
+      const moment = screen.getByTestId("debrief-card-important-moment");
+      const call = within(moment).getByRole("link", { name: /Tele-MANAS/ });
+      expect(call).toHaveAttribute("href", "tel:14416");
+      expect(screen.queryByTestId("debrief-distress")).not.toBeInTheDocument();
+    });
+
+    it("puts care first when the learner was in distress, and the debrief opens on request", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: CARDS,
+          language: "en",
+          distress: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      renderTab();
+
+      const care = screen.getByTestId("debrief-distress");
+      expect(within(care).getByText("postSim.debriefCards.distress.title")).toBeInTheDocument();
+      expect(within(care).getByRole("link", { name: /Tele-MANAS/ })).toBeInTheDocument();
+
+      const toggle = screen.getByRole("button", { name: "postSim.debriefCards.distress.whenReady" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByTestId("debrief-card-opening")).not.toBeVisible();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
+    });
+  });
 });

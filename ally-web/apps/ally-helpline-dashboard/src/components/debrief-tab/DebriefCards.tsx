@@ -1,11 +1,14 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useState } from "react";
 
 import {
   Bookmark,
+  ChevronDown,
   CircleDashed,
+  HeartHandshake,
   HelpCircle,
   Loader2,
   MessageSquareQuote,
+  Phone,
   Sprout,
   Star,
   Target,
@@ -14,7 +17,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { DebriefCardsData, DebriefSkillWord, LearnerDebriefView } from "@types";
+import { DebriefCardsData, DebriefSkillWord, DebriefSupportLine, LearnerDebriefView } from "@types";
 
 import { CardFlag, DebriefHelpful } from "./DebriefCardFeedback";
 
@@ -68,6 +71,24 @@ const Body: FC<{ children: ReactNode }> = ({ children }) => (
 
 const Lead: FC<{ children: ReactNode }> = ({ children }) => (
   <h4 className="font-primary text-sm font-semibold text-typography-900">{children}</h4>
+);
+
+/** The organisation's support lines, each number a tap-to-call link. */
+const SupportLines: FC<{ lines: DebriefSupportLine[] }> = ({ lines }) => (
+  <ul className="flex flex-col gap-2" data-testid="debrief-support-lines">
+    {lines.map(line => (
+      <li key={`${line.name}-${line.phone}`} className="flex flex-col font-primary text-sm">
+        <a
+          href={`tel:${line.phone.replace(/[^\d+]/g, "")}`}
+          className="inline-flex min-h-[44px] items-center gap-2 font-semibold text-typography-900 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+        >
+          <Phone aria-hidden="true" className="h-4 w-4 shrink-0 text-primary-600" />
+          {line.name} · {line.phone}
+        </a>
+        {line.hours && <span className="pl-6 text-xs text-typography-700">{line.hours}</span>}
+      </li>
+    ))}
+  </ul>
 );
 
 const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessionId: string }> = ({
@@ -126,6 +147,7 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
               </div>
             )}
             <Body>{t("postSim.debriefCards.importantMoment.support")}</Body>
+            {!!view.supportLines?.length && <SupportLines lines={view.supportLines} />}
             {flagControl("important_moment", t("postSim.debriefCards.importantMoment.title"))}
           </Card>
         </ul>
@@ -255,6 +277,59 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
   );
 };
 
+/**
+ * When the learner stepped out of the role in distress (plan flow C), care
+ * comes before coaching: an acknowledgement and the support lines first, and
+ * the debrief collapsed until the learner chooses to open it.
+ */
+const DistressFirst: FC<{ view: LearnerDebriefView; children: ReactNode }> = ({
+  view,
+  children,
+}) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-4">
+      <section
+        data-testid="debrief-distress"
+        aria-labelledby="debrief-distress-title"
+        className="flex flex-col gap-3 rounded-lg border border-primary-200 bg-primary-50 p-4"
+      >
+        <h3
+          id="debrief-distress-title"
+          className="flex items-center gap-2 font-primary text-base font-semibold text-typography-900"
+        >
+          <HeartHandshake aria-hidden="true" className="h-5 w-5 text-primary-600" />
+          {t("postSim.debriefCards.distress.title")}
+        </h3>
+        <Body>{t("postSim.debriefCards.distress.body")}</Body>
+        {!!view.supportLines?.length && (
+          <>
+            <Body>{t("postSim.debriefCards.distress.supportLead")}</Body>
+            <SupportLines lines={view.supportLines} />
+          </>
+        )}
+      </section>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="debrief-when-ready"
+        onClick={() => setOpen(o => !o)}
+        className="flex min-h-[44px] items-center justify-between gap-2 rounded-md border border-primary-100 px-4 font-primary text-sm font-semibold text-typography-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+      >
+        {t("postSim.debriefCards.distress.whenReady")}
+        <ChevronDown
+          aria-hidden="true"
+          className={`h-4 w-4 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      <div id="debrief-when-ready" hidden={!open}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 interface DebriefCardsProps {
   view: LearnerDebriefView;
   sessionId: string;
@@ -300,7 +375,8 @@ export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId }) => {
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
   } else if (view.state === "ready" && view.cards) {
-    content = <ReadyCards cards={view.cards} view={view} sessionId={sessionId} />;
+    const cards = <ReadyCards cards={view.cards} view={view} sessionId={sessionId} />;
+    content = view.distress ? <DistressFirst view={view}>{cards}</DistressFirst> : cards;
   }
 
   return (
