@@ -11,6 +11,67 @@ const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
 };
 
 export const en = {
+  orgBranding: {
+    tabLabel: "Branding",
+    switchLabel: "Organization branding",
+    switchHint:
+      "When on, learners in this organization see its logo, name, colour, favicon and welcome line on the web app instead of Ally's. Only an Ally platform admin can switch it on or off; anything saved below is kept while it is off.",
+    switchRestricted: "Only an Ally platform admin can switch branding on or off.",
+    offTitle: "Learners see Ally's standard look",
+    offBody:
+      "Switch branding on to give this organization its own logo, name, colour, favicon and welcome line on the web app. Anything saved earlier is kept and comes back when it is switched on.",
+    switchedOn: "Branding switched on",
+    switchedOff: "Branding switched off",
+    failedToSwitch: "Failed to update the branding switch",
+    logo: "Logo",
+    logoHint: "PNG or JPG, 2 MB max. Shown in the sidebar and on the login page.",
+    changeLogo: "Change logo",
+    uploadLogo: "Upload logo",
+    noLogo: "No logo yet",
+    logoWrongType: "Logo must be a PNG or JPG file",
+    logoTooLarge: "Logo must be 2 MB or smaller",
+    displayName: "Display name",
+    displayNameHint:
+      "Shown in place of the organization's registered name. Leave blank to use the registered name.",
+    primaryColor: "Brand colour",
+    primaryColorHint:
+      "One colour, used for the primary button, links, focus rings and selected states. The rest of the palette is derived from it.",
+    hexPlaceholder: "#264D8E",
+    invalidHex: "Enter a hex colour like #264D8E",
+    contrastFail: (ratio: number) =>
+      `${ratio}:1 against the page background. Too low to read; needs at least 3:1. Pick a darker or more saturated shade.`,
+    contrastWeak: (ratio: number) =>
+      `${ratio}:1 against the page background. Fine for buttons and links, hard to read as text. A darker shade is safer.`,
+    contrastPass: (ratio: number) => `${ratio}:1 against the page background. Reads well.`,
+    favicon: "Favicon",
+    faviconHint:
+      "PNG, ICO, WebP or JPG, 512 KB max, square. Shown in the browser tab next to the display name. Leave empty for Ally's.",
+    uploadFavicon: "Upload favicon",
+    changeFavicon: "Change favicon",
+    removeFavicon: "Remove",
+    allyFavicon: "Ally favicon",
+    faviconWrongType: "Favicon must be a PNG, ICO, WebP or JPG file",
+    faviconTooLarge: "Favicon must be 512 KB or smaller",
+    uploadFailed: "Upload failed. Try again.",
+    welcomeLine: "Welcome line",
+    welcomeLineHint: "One line under the logo on the login page and the talker page.",
+    welcomeLinePlaceholder: "e.g. Welcome to the Acme Helpline training space",
+    preview: "Preview",
+    previewHint: "Approximate. The live app applies the values once saved.",
+    previewTab: (name: string) => `${name}`,
+    previewNavHome: "Home",
+    previewNavRoleplays: "Roleplays",
+    previewNavProgress: "Progress",
+    previewButton: "Start a roleplay",
+    previewLink: "View all roleplays",
+    poweredBy: "Powered by Ally",
+    resetToDefaults: "Reset to Ally defaults",
+    resetConfirm: "Confirm reset",
+    resetHint: "Clears the display name, colour, favicon and welcome line. The logo stays.",
+    saved: "Branding saved",
+    failedToSave: "Failed to save branding",
+    saving: "Saving...",
+  },
   common: {
     apply: "Apply",
     search: "Search",

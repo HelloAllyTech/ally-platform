@@ -252,6 +252,8 @@ export const ApiEndpoints = {
     TENANT: "/v1/tenant",
     TENANTS: "/v1/tenants",
     TENANTS_BY_ID: (id: string) => `/v1/tenants/${id}`,
+    TENANT_BRANDING: (id: string) => `/v1/tenants/${id}/branding`,
+    TENANT_BRANDING_FAVICON_URL: (id: string) => `/v1/tenants/${id}/branding/favicon-url`,
     ADD_USER: "/v1/users",
     BULK_ADD_USERS: "/v1/users/bulk",
     SIMULATION_CREDITS: "/v1/simulation-credits",
