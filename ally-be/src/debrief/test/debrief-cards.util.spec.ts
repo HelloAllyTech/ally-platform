@@ -236,6 +236,24 @@ describe('debrief checks', () => {
     );
   });
 
+  it('ignores punctuation at the edges of a quote, never inside it', () => {
+    const said = [
+      'And you should always support the affirmative about those kind of things.',
+    ];
+    expect(
+      replyCheckFailures(
+        'You said "And you should always support the affirmative about those kind of things," which…',
+        said,
+      ),
+    ).toEqual([]);
+    expect(
+      replyCheckFailures(
+        'You said "And you should, always support the affirmative"',
+        said,
+      ),
+    ).toContain(DebriefCheckCode.QUOTE_MISMATCH);
+  });
+
   it('lets Ask Ally quote a card by its skill name', () => {
     const reply = 'That sits under "exploring risk." on your card.';
     expect(replyCheckFailures(reply, [])).toContain(

@@ -124,17 +124,23 @@ export const WHY_MAX_WORDS = 40;
 export const DEBRIEF_MAX_WORDS = 220;
 export const SHORT_DEBRIEF_MAX_WORDS = 120;
 
-/** Whitespace and quote-mark differences are not a different quote; anything else is. */
+/**
+ * Whitespace, quote marks and punctuation at a quote's edges are not a
+ * different quote; anything else is.
+ */
 export function normaliseForQuote(s: string): string {
-  return (s ?? '')
-    .normalize('NFC')
-    .replace(/[‘’‛]/g, "'")
-    .replace(/[“”‟]/g, '"')
-    .replace(/[…]/g, '...')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^["'.\s]+|["'.\s]+$/g, '')
-    .toLowerCase();
+  return (
+    (s ?? '')
+      .normalize('NFC')
+      .replace(/[‘’‛]/g, "'")
+      .replace(/[“”‟]/g, '"')
+      .replace(/[…]/g, '...')
+      .replace(/\s+/g, ' ')
+      .trim()
+      // A quote's own edges: a comma or full stop where the sentence was cut.
+      .replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, '')
+      .toLowerCase()
+  );
 }
 
 const wordCount = (s: string | null | undefined) =>
