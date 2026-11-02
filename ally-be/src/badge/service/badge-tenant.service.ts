@@ -144,10 +144,7 @@ export class BadgeTenantService {
       this.logger.log(`Badge ${badge.id} assigned to tenants`);
       return finalTenantIds;
     } catch (error) {
-      this.logger.error(
-        `Failed to assign badge ${badge.id} to tenants`,
-        error.stack,
-      );
+      this.logger.error(`Failed to assign badge ${badge.id} to tenants`, error);
       throw new InternalServerErrorException(
         `Failed to assign badge ${badge.id} to tenants`,
       );
