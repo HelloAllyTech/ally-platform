@@ -272,11 +272,9 @@ describe('DebriefRunnerService', () => {
     });
 
     it('runs Standard under a release made before Case existed', async () => {
-      const {
-        case: _c,
-        assessment: _a,
-        ...older
-      } = DEBRIEF_SEED_BUNDLE.recipes;
+      const older = { ...DEBRIEF_SEED_BUNDLE.recipes };
+      delete older.case;
+      delete older.assessment;
       const { svc } = build({
         inCase: true,
         bundle: { ...DEBRIEF_SEED_BUNDLE, recipes: older },
