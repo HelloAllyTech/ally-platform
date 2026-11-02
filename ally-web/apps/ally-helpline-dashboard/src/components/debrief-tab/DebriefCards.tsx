@@ -1,4 +1,4 @@
-import { FC, ReactNode, useState } from "react";
+import { FC, ReactNode, useRef, useState } from "react";
 
 import {
   Bookmark,
@@ -29,6 +29,7 @@ import {
   useIsBeingRead,
 } from "./ReadAloudControls";
 import { useDebriefReadAloud } from "./useDebriefReadAloud";
+import { useReadToTheEnd } from "./useReadToTheEnd";
 
 /** 'hi-IN' → 'hi'; anything unusable → undefined (inherit the page's lang). */
 export const toLangAttribute = (language?: string | null): string | undefined => {
@@ -175,6 +176,9 @@ const ReadyCards: FC<{
   replyThread?: ReactNode;
 }> = ({ cards, view, sessionId, replyThread }) => {
   const { t } = useTranslation();
+  // The end of the last Work-on-this card, for DEBRIEF_READ XP.
+  const readEndRef = useRef<HTMLDivElement>(null);
+  useReadToTheEnd(sessionId, readEndRef);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
@@ -301,6 +305,7 @@ const ReadyCards: FC<{
                 </ReadableItem>
               ))}
             </ul>
+            <div ref={readEndRef} data-testid="debrief-read-end" aria-hidden="true" />
           </Card>
         )}
 

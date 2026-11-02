@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DebriefTab } from "../DebriefTab";
 
@@ -12,6 +12,7 @@ import { DebriefTab } from "../DebriefTab";
 
 const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
 const mockFetchAudio = vi.hoisted(() => vi.fn());
+const mockMarkRead = vi.hoisted(() => vi.fn());
 const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
 
 vi.mock("react-i18next", () => ({
@@ -38,6 +39,7 @@ vi.mock("@api", () => ({
   useFlagDebriefCardMutation: () => [mockMutations.flag, { isLoading: false }],
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
+  useMarkDebriefReadMutation: () => [mockMarkRead],
   LEARNER_DEBRIEF_POLL_MS: 5000,
 }));
 
@@ -508,6 +510,42 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
         "postSim.debriefCards.listen.error",
       );
       expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
+    });
+  });
+
+  describe("XP for reading to the end", () => {
+    let visible: (() => void) | null = null;
+    beforeEach(() => {
+      vi.useFakeTimers();
+      visible = null;
+      class FakeObserver {
+        constructor(cb: (e: Array<{ isIntersecting: boolean }>) => void) {
+          visible = () => cb([{ isIntersecting: true }]);
+        }
+        observe() {}
+        disconnect() {}
+      }
+      vi.stubGlobal("IntersectionObserver", FakeObserver);
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en" },
+      });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("tells the server once the end was seen and the debrief open 30 seconds", () => {
+      renderTab();
+      visible?.();
+      vi.advanceTimersByTime(29_000);
+      expect(mockMarkRead).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1_000);
+      expect(mockMarkRead).toHaveBeenCalledTimes(1);
+      expect(mockMarkRead).toHaveBeenCalledWith("s-1");
+    });
+
+    it("earns nothing when the end was never on screen", () => {
+      renderTab();
+      vi.advanceTimersByTime(60_000);
+      expect(mockMarkRead).not.toHaveBeenCalled();
     });
   });
 });

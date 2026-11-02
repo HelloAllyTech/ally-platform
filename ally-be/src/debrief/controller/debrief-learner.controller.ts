@@ -10,6 +10,11 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  DebriefEngagementEvent,
+  DebriefThreadQualifiedEventParams,
+} from 'src/learn/type/debrief-engagement-event.type';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -81,7 +86,28 @@ export class DebriefLearnerController {
     private readonly feedback: DebriefFeedbackService,
     private readonly replies: DebriefReplyService,
     private readonly audio: DebriefAudioService,
+    private readonly events: EventEmitter2,
   ) {}
+
+  @Post('sessions/:sessionId/read')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'The learner read the debrief to the end (earns XP once)',
+    description:
+      'Sent by the app once the end of the last Work-on-this card has been on screen with the debrief open for at least 30 seconds.',
+  })
+  async read(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const run = await this.feedback.ownLiveRun(sessionId, user.id);
+    this.events.emit(DebriefEngagementEvent.READ_QUALIFIED, {
+      userId: user.id,
+      tenantId: run.tenantId as string,
+      scenarioSessionId: sessionId,
+    } as DebriefThreadQualifiedEventParams);
+    return { ok: true };
+  }
 
   @Get('sessions/:sessionId/audio/:section')
   @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])

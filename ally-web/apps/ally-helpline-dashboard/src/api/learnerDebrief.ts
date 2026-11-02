@@ -54,6 +54,13 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
       ],
     }),
+    /** The learner read the debrief to the end: earns DEBRIEF_READ XP once. */
+    markDebriefRead: builder.mutation<unknown, string>({
+      query: sessionId => ({
+        url: ApiEndpoints.DEBRIEFS.READ(sessionId),
+        method: HttpMethod.POST,
+      }),
+    }),
     /** Read-aloud: one card's audio, made on the first request and cached. */
     getDebriefCardAudio: builder.query<
       { url: string; cached: boolean },
@@ -71,6 +78,7 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
 
 export const {
   useLazyGetDebriefCardAudioQuery,
+  useMarkDebriefReadMutation,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
   useFlagDebriefCardMutation,

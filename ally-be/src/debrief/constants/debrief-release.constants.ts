@@ -63,10 +63,20 @@ export interface DebriefSettings {
   guidanceMinSimilarity: number;
 }
 
+/** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
+export interface DebriefReplyConfig {
+  /** A provider the in-process chat can run. */
+  provider: 'gemini' | 'openai';
+  model: string;
+  maxTokens: number;
+}
+
 export interface DebriefBundle {
   recipes: Record<DebriefRecipeKey, DebriefRecipe>;
   prompts: Record<string, number | null>;
   settings: DebriefSettings;
+  /** Absent in releases made before Ask Ally: the code default then applies. */
+  reply?: DebriefReplyConfig;
 }
 
 export const DEBRIEF_PROMPT_CODES = {
@@ -80,12 +90,18 @@ export const DEBRIEF_PROMPT_CODES = {
   reply: 'debrief_reply_system',
 } as const;
 
-/** Ask Ally's model: fast first words matter more than depth for a reply. */
-export const DEBRIEF_REPLY_MODEL = {
-  providerType: 'gemini',
+/** The on-topic check for reflection XP: a yes or no, cheap and fast. */
+export const DEBRIEF_REFLECTION_CHECK_MODEL = {
+  provider: 'gemini',
+  model: 'gemini-2.5-flash',
+} as const;
+
+/** Ask Ally's default: fast first words matter more than depth for a reply. */
+export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
+  provider: 'gemini',
   model: 'gemini-2.5-flash',
   maxTokens: 400,
-} as const;
+};
 
 /**
  * Prompts the Improver may propose edits to. The rubric and the Safety
@@ -231,6 +247,7 @@ export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
     guidancePassagesPerMoment: 2,
     guidanceMinSimilarity: 0.35,
   },
+  reply: DEBRIEF_REPLY_DEFAULT,
 };
 
 /** Steps no recipe may drop (plan §8.2): safety, writing, the checks and the evaluation. */
@@ -249,6 +266,15 @@ export function validateDebriefBundle(bundle: unknown): string[] {
   const problems: string[] = [];
   const b = bundle as Partial<DebriefBundle> | null;
   if (!b || typeof b !== 'object') return ['bundle is not an object'];
+  if (b.reply) {
+    if (!['gemini', 'openai'].includes(b.reply.provider)) {
+      problems.push(`Ask Ally cannot run on provider ${b.reply.provider}`);
+    }
+    if (!b.reply.model) problems.push('Ask Ally has no model');
+    if (!(b.reply.maxTokens > 0 && b.reply.maxTokens <= 1000)) {
+      problems.push('Ask Ally replies must be 1 to 1000 tokens');
+    }
+  }
   for (const key of Object.values(DebriefRecipeKey)) {
     const recipe = b.recipes?.[key];
     if (!recipe) {

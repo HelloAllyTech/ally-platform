@@ -984,7 +984,8 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'DEBRIEF_REPLY_MODEL in debrief-release.constants.ts',
+    configuredBy:
+      'debrief release bundle (reply.model); default DEBRIEF_REPLY_DEFAULT',
     promptOverride: 'debrief_reply_system',
   },
   {
@@ -999,6 +1000,22 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'sarvam',
     defaultModel: 'bulbul:v3',
     configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
+  },
+  {
+    id: 'debrief-reflection-check',
+    task: LlmTask.DEBRIEF_REFLECTION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner message in Ask Ally that is 15+ words and not copied from the debrief',
+    detail:
+      'Says only whether the message is an on-topic answer to the reflective question, for ' +
+      'DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity. Off the reply path.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'DEBRIEF_REFLECTION_CHECK_MODEL in debrief-release.constants.ts',
+    promptOverride: 'debrief_reflection_check_system',
   },
   {
     id: 'debrief-improver',

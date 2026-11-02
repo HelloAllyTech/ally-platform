@@ -19,6 +19,8 @@ function build(opts: {
   reply?: string;
   distress?: boolean;
   safetyFails?: boolean;
+  bundleReply?: Record<string, unknown>;
+  onTopic?: boolean;
 }) {
   const saved: any[] = [];
   const messages = {
@@ -60,7 +62,9 @@ function build(opts: {
     promptText: jest.fn(async () => 'REPLY PROMPT'),
   };
   const runner = {
-    resolveRelease: jest.fn(async () => ({ bundle: { prompts: {} } })),
+    resolveRelease: jest.fn(async () => ({
+      bundle: { prompts: {}, reply: opts.bundleReply },
+    })),
   };
   const agent = {
     supportLines: jest.fn(async () => [
@@ -75,6 +79,11 @@ function build(opts: {
     responseText: jest.fn(async () => ({ text: 'APPROVED CRISIS COPY' })),
   };
   const prompts = { getPromptByCode: jest.fn(async () => null) };
+  const events = { emit: jest.fn() };
+  const getCompletion = jest.fn(async () =>
+    JSON.stringify({ on_topic: opts.onTopic ?? false }),
+  );
+  const llm = { getProvider: jest.fn(() => ({ getCompletion })) };
   const svc = new DebriefReplyService(
     chats as any,
     messages as any,
@@ -86,8 +95,11 @@ function build(opts: {
     feedback as any,
     crisis as any,
     prompts as any,
+    events as any,
+    llm as any,
+    { record: jest.fn() } as any,
   );
-  return { svc, saved, aiChat, feedback };
+  return { svc, saved, aiChat, feedback, events, getCompletion };
 }
 
 const run = async (svc: DebriefReplyService, message: string) => {
@@ -178,5 +190,57 @@ describe('DebriefReplyService (Ask Ally)', () => {
     const { svc } = build({ reply: 'Fine.', safetyFails: true });
     const done = (await run(svc, 'ok')).find((e) => e.type === 'done');
     expect(done.content).toBe('Fine.');
+  });
+
+  it('runs on the model the release names', async () => {
+    const { svc, aiChat } = build({
+      reply: 'ok',
+      bundleReply: {
+        provider: 'openai',
+        model: 'gpt-4.1-mini',
+        maxTokens: 300,
+      },
+    });
+    await run(svc, 'question');
+    const call = (aiChat.streamResponse.mock.calls[0] as any[])[0];
+    expect(call.providerType).toBe('openai');
+    expect(call.llmConfig).toEqual({ model: 'gpt-4.1-mini', maxTokens: 300 });
+  });
+
+  describe('XP for the reflective answer (v9 FR-65)', () => {
+    const answer =
+      'I think I rushed to fix things because the silence made me anxious, and next time I want to stay with her feelings first.';
+    const flush = () => new Promise((r) => setImmediate(r));
+
+    it('pays a genuine, on-topic answer', async () => {
+      const { svc, events, getCompletion } = build({
+        reply: 'ok',
+        onTopic: true,
+      });
+      await run(svc, answer);
+      await flush();
+      expect(getCompletion).toHaveBeenCalledTimes(1);
+      expect(events.emit).toHaveBeenCalledWith(
+        'DEBRIEF_REFLECTION_QUALIFIED',
+        expect.objectContaining({ userId: 7, scenarioSessionId: 's1' }),
+      );
+    });
+
+    it('pays nothing when the model says it is off topic', async () => {
+      const { svc, events } = build({ reply: 'ok', onTopic: false });
+      await run(svc, answer);
+      await flush();
+      expect(events.emit).not.toHaveBeenCalledWith(
+        'DEBRIEF_REFLECTION_QUALIFIED',
+        expect.anything(),
+      );
+    });
+
+    it('asks no model about a short message', async () => {
+      const { svc, getCompletion } = build({ reply: 'ok', onTopic: true });
+      await run(svc, 'thanks, makes sense');
+      await flush();
+      expect(getCompletion).not.toHaveBeenCalled();
+    });
   });
 });

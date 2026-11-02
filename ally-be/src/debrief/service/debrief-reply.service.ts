@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Observable, ReplaySubject, startWith } from 'rxjs';
 import { Repository } from 'typeorm';
@@ -7,16 +8,28 @@ import {
   SseMessageEvent,
 } from '../../ai-chat/service/ai-chat.service';
 import { LlmMessage } from '../../ai-chat/interface/llm-provider.interface';
+import { LlmProviderFactory } from '../../ai-chat/provider/llm-provider.factory';
+import { LlmUsageService } from '../../analytics/service/llm-usage.service';
+import { DEBRIEF_REFLECTION_CHECK_SYSTEM } from '../../prompt/contracts/prompt-contracts';
+import { renderPrompt } from '../../prompt/contracts/define-prompt';
 import { matchFirstPersonRisk } from '../../common/safety/first-person-risk.matcher';
 import { GuideCrisisService } from '../../guide/safety/guide-crisis.service';
 import { ScenarioSessionChat } from '../../learn/entity/scenario-session-chat.entity';
 import { ScenarioSessionChatMessage } from '../../learn/entity/scenario-session-chat-message.entity';
 import { LlmTask } from '../../learn/enum/llm-task.enum';
+import {
+  DEBRIEF_MIN_SUBSTANTIVE_REPLIES,
+  DebriefEngagementEvent,
+  DebriefThreadQualifiedEventParams,
+  isGenuineReflection,
+  isSubstantiveDebriefReply,
+} from '../../learn/type/debrief-engagement-event.type';
 import { LoggerService } from '../../logger/logger.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
   DEBRIEF_PROMPT_CODES,
-  DEBRIEF_REPLY_MODEL,
+  DEBRIEF_REFLECTION_CHECK_MODEL,
+  DEBRIEF_REPLY_DEFAULT,
 } from '../constants/debrief-release.constants';
 import {
   DebriefCards,
@@ -81,6 +94,9 @@ export class DebriefReplyService {
     private readonly feedback: DebriefFeedbackService,
     private readonly crisis: GuideCrisisService,
     private readonly prompts: PromptSharedService,
+    private readonly events: EventEmitter2,
+    private readonly llm: LlmProviderFactory,
+    private readonly usage: LlmUsageService,
   ) {}
 
   async stream(
@@ -110,6 +126,7 @@ export class DebriefReplyService {
       content: message,
       tenantId,
     });
+    this.announceEngagement(prior, message, run, userId);
 
     // Replayed: the crisis reply, and a fast model, can emit before the
     // controller has subscribed, and nothing the learner should see is lost.
@@ -134,10 +151,13 @@ export class DebriefReplyService {
       return subject.pipe(startWith(event({ type: 'start' })));
     }
 
-    const [transcript, system] = await Promise.all([
+    const [transcript, system, { bundle }] = await Promise.all([
       this.context.transcript(sessionId),
       this.systemPrompt(),
+      this.runner.resolveRelease(),
     ]);
+    // The release names Ask Ally's model, as it names every step's.
+    const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
     // Read alongside the reply, never in front of it: first words stay fast.
     const distress = this.readDistress(message, language, sessionId);
     const sources = [
@@ -159,16 +179,13 @@ export class DebriefReplyService {
         ].join('\n'),
         chatHistory: this.history(prior),
         userMessage: message,
-        providerType: DEBRIEF_REPLY_MODEL.providerType,
-        llmConfig: {
-          model: DEBRIEF_REPLY_MODEL.model,
-          maxTokens: DEBRIEF_REPLY_MODEL.maxTokens,
-        },
+        providerType: model.provider,
+        llmConfig: { model: model.model, maxTokens: model.maxTokens },
         usage: {
           task: LlmTask.DEBRIEF_REPLY,
           scenarioSessionId: sessionId,
           tenantId,
-          metadata: { chatId: chat.id, runId: run.id },
+          metadata: { chatId: chat.id, runId: run.id, model: model.model },
         },
       })
       .subscribe({
@@ -214,6 +231,110 @@ export class DebriefReplyService {
         },
       });
     return subject.pipe(startWith(event({ type: 'start' })));
+  }
+
+  /**
+   * XP, as today's debrief chat earns it: a thread of three substantive
+   * replies (DEBRIEF_THREAD), and — new with the Debrief agent — a genuine
+   * answer to the reflective question (DEBRIEF_REFLECTION). Both awards are
+   * idempotent per session, so repeating the event costs nothing. Never
+   * throws: a reward must not break the conversation.
+   */
+  private announceEngagement(
+    prior: ScenarioSessionChatMessage[],
+    message: string,
+    run: {
+      tenantId?: string | null;
+      scenarioSessionId: string;
+      cards?: unknown;
+    },
+    userId: number,
+  ): void {
+    try {
+      const params: DebriefThreadQualifiedEventParams = {
+        userId,
+        tenantId: run.tenantId as string,
+        scenarioSessionId: run.scenarioSessionId,
+      };
+      const substantive =
+        prior.filter(
+          (m) => m.senderId === userId && isSubstantiveDebriefReply(m.content),
+        ).length + (isSubstantiveDebriefReply(message) ? 1 : 0);
+      if (substantive >= DEBRIEF_MIN_SUBSTANTIVE_REPLIES) {
+        this.events.emit(DebriefEngagementEvent.THREAD_QUALIFIED, params);
+      }
+      const cards = run.cards as DebriefCards;
+      const debriefTexts = cardTexts(cards).map((c) => c.text);
+      if (isGenuineReflection(message, debriefTexts)) {
+        // Off the reply path: the learner never waits on their XP.
+        void this.onTopic(
+          message,
+          cards.reflective_question,
+          run.scenarioSessionId,
+          params.tenantId,
+        ).then((yes) => {
+          if (yes) {
+            this.events.emit(
+              DebriefEngagementEvent.REFLECTION_QUALIFIED,
+              params,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] engagement not announced: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * v9 FR-65's on-topic check: a model says only whether the message answers
+   * the reflective question — never how well or how sincerely. Any failure
+   * pays nothing; the learner can still earn it with a later answer.
+   */
+  private async onTopic(
+    message: string,
+    question: string,
+    sessionId: string,
+    tenantId: string,
+  ): Promise<boolean> {
+    try {
+      const template =
+        (await this.prompts.getPromptByCode(
+          DEBRIEF_REFLECTION_CHECK_SYSTEM.code,
+        )) ?? '';
+      const system = renderPrompt(DEBRIEF_REFLECTION_CHECK_SYSTEM, template, {
+        question,
+      });
+      const answer = await this.llm
+        .getProvider(DEBRIEF_REFLECTION_CHECK_MODEL.provider)
+        .getCompletion(
+          [
+            { role: 'system', content: system },
+            { role: 'user', content: message },
+          ],
+          {
+            model: DEBRIEF_REFLECTION_CHECK_MODEL.model,
+            maxTokens: 20,
+            responseFormat: 'json',
+            thinkingBudget: 0,
+          },
+          (u) =>
+            void this.usage.record({
+              provider: DEBRIEF_REFLECTION_CHECK_MODEL.provider,
+              model: DEBRIEF_REFLECTION_CHECK_MODEL.model,
+              task: LlmTask.DEBRIEF_REFLECTION_CHECK,
+              promptTokens: u.promptTokens,
+              completionTokens: u.completionTokens,
+              tenantId,
+              scenarioSessionId: sessionId,
+            }),
+        );
+      return JSON.parse(answer)?.on_topic === true;
+    } catch {
+      return false;
+    }
   }
 
   /** The prompt the GA release pins, else the store's current, else the default file. */
