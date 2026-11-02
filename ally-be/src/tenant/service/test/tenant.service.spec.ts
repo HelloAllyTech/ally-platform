@@ -1,3 +1,5 @@
+import { FaviconUploadContentType } from '../../constants/tenant-branding.constants';
+import { resolveBranding } from '../../util/tenant-branding.util';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -96,6 +98,8 @@ describe('TenantService', () => {
     enabledDashboardIds: [],
     hideRankInCommunity: false,
     engagementReminderEnabled: false,
+    brandingEnabled: false,
+    branding: resolveBranding({ name: 'Test Tenant' }, undefined),
     enableAudioUpload: true,
     enableMicrophoneMode: true,
     // Retired feature: the response always reports it disabled.
@@ -1111,6 +1115,285 @@ describe('TenantService', () => {
       } as any);
 
       expect(res).toEqual({ success: false });
+    });
+  });
+  describe('organization branding', () => {
+    const ASSET =
+      'https://test-assets-bucket.s3.ap-south-1.amazonaws.com/org-branding/t/favicon-1-f.png';
+    const brandedTenant = {
+      ...mockTenant,
+      settings: {
+        setting: 'value',
+        branding: { enabled: true, displayName: 'Old name' },
+      },
+    } as Tenant;
+
+    beforeEach(() => {
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('7');
+      tenantRepository.update.mockResolvedValue({ affected: 1 } as any);
+    });
+
+    describe('updateBranding', () => {
+      it('refuses while the org switch is off, naming who can turn it on', async () => {
+        tenantRepository.findOne.mockResolvedValue({
+          ...mockTenant,
+          settings: { branding: { enabled: false, displayName: 'X' } },
+        } as Tenant);
+
+        await expect(
+          service.updateBranding('test-tenant-id', { displayName: 'New' }),
+        ).rejects.toThrow(/switched off for this organization/);
+        expect(tenantRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('refuses when nothing is stored at all (switch never set)', async () => {
+        tenantRepository.findOne.mockResolvedValue(mockTenant);
+        await expect(
+          service.updateBranding('test-tenant-id', { displayName: 'New' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('404s an unknown organization', async () => {
+        tenantRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.updateBranding('missing', { displayName: 'New' }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      });
+
+      it('rejects an unreadable colour as a bad request and writes nothing', async () => {
+        tenantRepository.findOne.mockResolvedValue(brandedTenant);
+        await expect(
+          service.updateBranding('test-tenant-id', { primaryColor: '#F0EEE7' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(tenantRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('merges the patch into settings.branding, keeps the switch, and resolves', async () => {
+        tenantRepository.findOne.mockResolvedValue(brandedTenant);
+
+        const res = await service.updateBranding('test-tenant-id', {
+          displayName: 'Acme Helpline',
+          primaryColor: '#8e2626',
+          faviconUrl: ASSET,
+          welcomeLine: '  Welcome  ',
+        });
+
+        expect(tenantRepository.update).toHaveBeenCalledWith('test-tenant-id', {
+          settings: {
+            setting: 'value',
+            branding: {
+              enabled: true,
+              displayName: 'Acme Helpline',
+              primaryColor: '#8E2626',
+              faviconUrl: ASSET,
+              welcomeLine: 'Welcome',
+            },
+          },
+          updatedBy: 7,
+        });
+        expect(res.warnings).toEqual([]);
+        expect(res.branding).toMatchObject({
+          enabled: true,
+          displayName: 'Acme Helpline',
+          primaryColor: '#8E2626',
+          welcomeLine: 'Welcome',
+          poweredByAlly: true,
+        });
+        expect(res.branding.tokens.primary[500]).toBe('#8E2626');
+      });
+
+      it('clears a field with null and returns contrast warnings', async () => {
+        tenantRepository.findOne.mockResolvedValue(brandedTenant);
+
+        const res = await service.updateBranding('test-tenant-id', {
+          displayName: null,
+          primaryColor: '#CC5500',
+        });
+
+        expect(tenantRepository.update).toHaveBeenCalledWith(
+          'test-tenant-id',
+          expect.objectContaining({
+            settings: expect.objectContaining({
+              branding: {
+                enabled: true,
+                displayName: null,
+                primaryColor: '#CC5500',
+              },
+            }),
+          }),
+        );
+        expect(res.branding.displayName).toBe('Test Tenant');
+        expect(res.warnings.length).toBeGreaterThan(0);
+      });
+
+      it('audits as a multi-tenant admin edit when the caller is restricted', async () => {
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+        allowlistedTenantIds = ['test-tenant-id'];
+        tenantRepository.findOne.mockResolvedValue(brandedTenant);
+
+        await service.updateBranding('test-tenant-id', { displayName: 'A' });
+
+        expect(mockAuditLogService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventType: AUDIT_EVENTS.MULTI_TENANT_ADMIN_EDITED_TENANT_BRANDING,
+            details: expect.objectContaining({
+              action: AUDIT_ACTIONS.UPDATE_TENANT_BRANDING,
+              tenantId: 'test-tenant-id',
+              userId: 7,
+              fields: ['displayName'],
+            }),
+          }),
+        );
+      });
+
+      it('audits as a platform edit when the caller is unrestricted', async () => {
+        tenantRepository.findOne.mockResolvedValue(brandedTenant);
+
+        await service.updateBranding('test-tenant-id', { displayName: 'A' });
+
+        expect(mockAuditLogService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventType: AUDIT_EVENTS.TENANT_BRANDING_UPDATED,
+          }),
+        );
+      });
+    });
+
+    describe('updateTenant brandingEnabled', () => {
+      let mockEntityManager: { update: jest.Mock };
+      beforeEach(() => {
+        mockEntityManager = {
+          update: jest.fn().mockResolvedValue({ affected: 1 }),
+        };
+        dataSource.transaction.mockImplementation((async (callback: any) =>
+          callback(mockEntityManager)) as any);
+      });
+
+      it('writes the switch under settings.branding and audits the flip', async () => {
+        tenantRepository.findOne
+          .mockResolvedValueOnce({
+            ...mockTenant,
+            settings: { branding: { displayName: 'Kept' } },
+          } as Tenant)
+          .mockResolvedValueOnce(mockTenant);
+
+        await service.updateTenant('test-tenant-id', {
+          brandingEnabled: true,
+        } as any);
+
+        expect(mockEntityManager.update).toHaveBeenCalledWith(
+          Tenant,
+          'test-tenant-id',
+          expect.objectContaining({
+            settings: { branding: { displayName: 'Kept', enabled: true } },
+          }),
+        );
+        expect(mockAuditLogService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventType: AUDIT_EVENTS.TENANT_BRANDING_UPDATED,
+            details: expect.objectContaining({
+              action: AUDIT_ACTIONS.UPDATE_TENANT_BRANDING_ENABLED,
+              enabled: true,
+            }),
+          }),
+        );
+      });
+
+      it('ignores the switch from a restricted admin', async () => {
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+        allowlistedTenantIds = ['test-tenant-id'];
+        tenantRepository.findOne
+          .mockResolvedValueOnce(mockTenant)
+          .mockResolvedValueOnce(mockTenant);
+
+        await service.updateTenant('test-tenant-id', {
+          description: 'd',
+          brandingEnabled: true,
+        } as any);
+
+        const written = mockEntityManager.update.mock.calls[0][2];
+        expect(written.settings).toBeUndefined();
+        expect(written.brandingEnabled).toBeUndefined();
+      });
+
+      it('reports brandingEnabled and resolved branding on the response', async () => {
+        tenantRepository.findOne.mockResolvedValue({
+          ...mockTenant,
+          settings: { branding: { enabled: true, primaryColor: '#8E2626' } },
+        } as Tenant);
+
+        const res = await service.findById('test-tenant-id');
+
+        expect(res?.brandingEnabled).toBe(true);
+        expect(res?.branding.primaryColor).toBe('#8E2626');
+      });
+    });
+
+    describe('getPublicBranding', () => {
+      it('resolves by code for an active org', async () => {
+        tenantRepository.findOne.mockResolvedValue({
+          ...mockTenant,
+          settings: { branding: { enabled: true, welcomeLine: 'Hi' } },
+        } as Tenant);
+
+        const res = await service.getPublicBranding('test-tenant');
+
+        expect(tenantRepository.findOne).toHaveBeenCalledWith({
+          where: { code: 'test-tenant' },
+        });
+        expect(res.welcomeLine).toBe('Hi');
+        expect(res.displayName).toBe('Test Tenant');
+      });
+
+      it('404s an unknown or inactive org', async () => {
+        tenantRepository.findOne.mockResolvedValueOnce(null);
+        await expect(service.getPublicBranding('x')).rejects.toBeInstanceOf(
+          NotFoundException,
+        );
+        tenantRepository.findOne.mockResolvedValueOnce({
+          ...mockTenant,
+          status: TenantStatus.SUSPENDED,
+        } as Tenant);
+        await expect(service.getPublicBranding('x')).rejects.toBeInstanceOf(
+          NotFoundException,
+        );
+      });
+    });
+
+    describe('getPresignedUrlForBrandingFavicon', () => {
+      it('presigns under the org folder and returns the public URL', async () => {
+        s3Service.generatePresignedUrl.mockResolvedValue(
+          'https://presigned.url',
+        );
+
+        const res = await service.getPresignedUrlForBrandingFavicon('t1', {
+          fileName: 'fav.png',
+          fileSize: 1000,
+          contentType: FaviconUploadContentType.PNG,
+        });
+
+        expect(res.presignedUrl).toBe('https://presigned.url');
+        expect(res.faviconUrl).toMatch(
+          /^https:\/\/test-assets-bucket\.s3\.ap-south-1\.amazonaws\.com\/org-branding\/t1\/favicon-.*fav\.png$/,
+        );
+        expect(s3Service.generatePresignedUrl).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bucket: 'test-assets-bucket',
+            contentType: 'image/png',
+            operation: 'put',
+          }),
+        );
+      });
+
+      it('refuses a file over the favicon cap', async () => {
+        await expect(
+          service.getPresignedUrlForBrandingFavicon('t1', {
+            fileName: 'fav.png',
+            fileSize: 600 * 1024,
+            contentType: FaviconUploadContentType.PNG,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
     });
   });
 });

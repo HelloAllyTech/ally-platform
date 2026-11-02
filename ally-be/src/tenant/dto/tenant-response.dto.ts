@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TenantStatus } from '../entity/tenant.entity';
+import { TenantBrandingResponseDto } from './tenant-branding-response.dto';
 
 export class TenantResponseDto {
   @ApiProperty({ example: '1e5a76d2-4b3c-44b5-8af0-4a9b6e593b09' })
@@ -60,6 +61,20 @@ export class TenantResponseDto {
     example: false,
   })
   isTestOrganization!: boolean;
+
+  @ApiProperty({
+    description:
+      'Org-level branding switch. Off = every client shows Ally defaults, ' +
+      'whatever is stored. Super-admins only.',
+    example: false,
+  })
+  brandingEnabled!: boolean;
+
+  @ApiProperty({
+    type: TenantBrandingResponseDto,
+    description: 'Resolved branding: Ally defaults unless brandingEnabled.',
+  })
+  branding!: TenantBrandingResponseDto;
 
   @ApiProperty({
     description: 'Whether audio upload is enabled',

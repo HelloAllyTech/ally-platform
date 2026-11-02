@@ -1,3 +1,4 @@
+import { TenantBrandingResolved } from 'src/tenant/type/tenant-branding.types';
 import { SortOrder, UserSortBy } from '../enum/user.enum';
 
 export interface UserFilterOptions {
@@ -24,4 +25,6 @@ export interface UserFilterOptions {
 export interface MinimalTenantData {
   name: string;
   logoUrl?: string;
+  /** Resolved org branding — Ally defaults unless the org's switch is on. */
+  branding: TenantBrandingResolved;
 }

@@ -37,6 +37,12 @@ import {
   LogoUploadRequestDto,
   OrganizationLogoUploadResponseDto,
 } from '../dto/organization-logo-upload.dto';
+import { UpdateTenantBrandingDto } from '../dto/update-tenant-branding.dto';
+import { UpdateTenantBrandingResponseDto } from '../dto/tenant-branding-response.dto';
+import {
+  FaviconUploadRequestDto,
+  FaviconUploadResponseDto,
+} from '../dto/branding-favicon-upload.dto';
 
 import { SuccessResponse } from 'src/common/type/common.type';
 import { DeleteLogoDto } from '../dto/delete-organization-logo.dto';
@@ -205,6 +211,37 @@ export class TenantController {
   ): Promise<TenantResponseDto | null> {
     await this.tenantScopeService.assertTenantInScope(id);
     return this.tenantService.updateTenant(id, updateTenantDto);
+  }
+
+  // Organization branding. Same gate as the org edit: EDIT_TENANT under the
+  // USERS toggle, and the org must be in the caller's scope — an assigned
+  // multi-tenant admin brands their own orgs only. The org-level switch is
+  // checked in the service, not here, so the refusal can name the fix.
+  @ApiOperation({ summary: 'Update organization branding' })
+  @ApiResponse({ status: 200, type: UpdateTenantBrandingResponseDto })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_TENANT],
+  })
+  @Patch(':id/branding')
+  async updateBranding(
+    @Param('id') id: string,
+    @Body() dto: UpdateTenantBrandingDto,
+  ): Promise<UpdateTenantBrandingResponseDto> {
+    await this.tenantScopeService.assertTenantInScope(id);
+    return this.tenantService.updateBranding(id, dto);
+  }
+
+  @ApiOperation({ summary: 'Get presigned URL for a branding favicon upload' })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_TENANT],
+  })
+  @Post(':id/branding/favicon-url')
+  async getPresignedUrlForBrandingFavicon(
+    @Param('id') id: string,
+    @Body() dto: FaviconUploadRequestDto,
+  ): Promise<FaviconUploadResponseDto> {
+    await this.tenantScopeService.assertTenantInScope(id);
+    return this.tenantService.getPresignedUrlForBrandingFavicon(id, dto);
   }
 
   @ApiOperation({ summary: 'Get presigned URL for organization logo upload' })
