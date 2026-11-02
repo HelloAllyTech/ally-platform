@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { In } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
@@ -153,7 +153,9 @@ export class StageDirectorMemoriesService {
           (error as Error)?.message ?? error
         }`,
       );
-      return { memories: copies, mapped: false };
+      throw new InternalServerErrorException(
+        `Failed to map memories: ${(error as Error)?.message ?? error}`,
+      );
     }
   }
 
