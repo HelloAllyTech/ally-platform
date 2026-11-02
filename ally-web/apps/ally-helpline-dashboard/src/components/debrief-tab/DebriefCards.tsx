@@ -35,7 +35,7 @@ import {
   useIsBeingRead,
 } from "./ReadAloudControls";
 import { useDebriefReadAloud } from "./useDebriefReadAloud";
-import { useReadToTheEnd } from "./useReadToTheEnd";
+import { useMarkOpened, useReadToTheEnd } from "./useReadToTheEnd";
 
 /** 'hi-IN' → 'hi'; anything unusable → undefined (inherit the page's lang). */
 export const toLangAttribute = (language?: string | null): string | undefined => {
@@ -214,6 +214,7 @@ const ReadyCards: FC<{
   // The end of the last Work-on-this card, for DEBRIEF_READ XP.
   const readEndRef = useRef<HTMLDivElement>(null);
   useReadToTheEnd(sessionId, readEndRef, !supervisor);
+  useMarkOpened(sessionId, !supervisor);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));

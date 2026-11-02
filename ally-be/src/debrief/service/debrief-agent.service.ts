@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -57,7 +62,18 @@ export const DEBRIEF_POLICY: PolicySchema = {
     overridableBy: ['org'],
     group: 'Launch',
   },
+  region: {
+    type: 'enum',
+    enum: ['india', 'outside_india'],
+    default: 'india',
+    description:
+      'Where the organisation works. Outside India there is no default support line, so it needs its own before it can be switched on (v9 FR-25).',
+    overridableBy: ['org'],
+    group: 'Launch',
+  },
 };
+
+export type DebriefRegion = 'india' | 'outside_india';
 
 /** What a learner can read: cards only once published, nothing about the run. */
 export interface LearnerDebriefView {
@@ -201,6 +217,7 @@ export class DebriefAgentService implements OnModuleInit {
     live: boolean,
     userId: number,
   ): Promise<void> {
+    if (live) await this.requireSupportContact(tenantId);
     await this.overrides.save({
       agentKey: DEBRIEF_AGENT_KEY,
       layer: AgentConfigLayer.ORG,
@@ -209,6 +226,67 @@ export class DebriefAgentService implements OnModuleInit {
       change: live ? { set: { live: true } } : { clear: ['live'] },
       actorUserId: userId,
     });
+  }
+
+  /** v9 FR-25: where an organisation works; India unless the Ally team says otherwise. */
+  async regions(): Promise<Map<string, DebriefRegion>> {
+    const rows: Array<{ scopeId: string; region: string }> =
+      await this.dataSource.query(
+        `SELECT "scopeId", "values"->>'region' AS region FROM agent_config_overrides
+          WHERE "agentKey" = $1 AND layer = 'org' AND "values" ? 'region'`,
+        [DEBRIEF_AGENT_KEY],
+      );
+    return new Map(rows.map((r) => [r.scopeId, r.region as DebriefRegion]));
+  }
+
+  async setRegion(
+    tenantId: string,
+    region: DebriefRegion,
+    userId: number,
+  ): Promise<void> {
+    if (
+      region === 'outside_india' &&
+      (await this.liveTenants()).includes(tenantId) &&
+      !(await this.hasOwnSupportLines(tenantId))
+    ) {
+      throw new BadRequestException(
+        'This organisation is switched on and has no support line of its own. Add one in its Ally guide settings first, or switch it off.',
+      );
+    }
+    await this.overrides.save({
+      agentKey: DEBRIEF_AGENT_KEY,
+      layer: AgentConfigLayer.ORG,
+      scopeId: tenantId,
+      schema: DEBRIEF_POLICY,
+      change: region === 'india' ? { clear: ['region'] } : { set: { region } },
+      actorUserId: userId,
+    });
+  }
+
+  /** Whether the organisation set support lines of its own in its Guide profile. */
+  async hasOwnSupportLines(tenantId: string): Promise<boolean> {
+    const [row] = await this.dataSource.query(
+      `SELECT profile FROM guide_org_profiles WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const byLanguage = (row?.profile?.supportLines ?? {}) as Record<
+      string,
+      unknown[]
+    >;
+    return Object.values(byLanguage).some(
+      (lines) => Array.isArray(lines) && lines.length > 0,
+    );
+  }
+
+  /** v9 FR-25: outside India there is no default line to fall back on. */
+  private async requireSupportContact(tenantId: string): Promise<void> {
+    const region = (await this.regions()).get(tenantId) ?? 'india';
+    if (region === 'india') return;
+    if (!(await this.hasOwnSupportLines(tenantId))) {
+      throw new BadRequestException(
+        'This organisation works outside India, so it needs its own support line before it can be switched on. Add one in its Ally guide settings.',
+      );
+    }
   }
 
   async liveTenants(): Promise<string[]> {
@@ -424,7 +502,8 @@ export class DebriefAgentService implements OnModuleInit {
 
   /**
    * The support lines a learner sees: the organisation's own from its Guide
-   * profile for this language, else its English ones, else Tele-MANAS.
+   * profile for this language, else its English ones, else Tele-MANAS —
+   * except outside India, where there is no default.
    */
   async supportLines(
     tenantId: string,
@@ -435,6 +514,13 @@ export class DebriefAgentService implements OnModuleInit {
       [tenantId],
     );
     const lang = (language ?? 'en').split(/[-_]/)[0].toLowerCase() || 'en';
+    // Outside India, Tele-MANAS is not a line anyone can call: no default.
+    if (
+      (await this.regions()).get(tenantId) === 'outside_india' &&
+      !(await this.hasOwnSupportLines(tenantId))
+    ) {
+      return [];
+    }
     return resolveSupportLines(rows?.[0]?.profile ?? null, lang);
   }
 

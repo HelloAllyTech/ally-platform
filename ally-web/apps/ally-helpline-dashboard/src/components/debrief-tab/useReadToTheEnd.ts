@@ -1,6 +1,6 @@
 import { RefObject, useEffect, useRef } from "react";
 
-import { useMarkDebriefReadMutation } from "@api";
+import { useMarkDebriefOpenedMutation, useMarkDebriefReadMutation } from "@api";
 
 /** v9 FR-65: the debrief must have been open this long. */
 export const READ_MIN_OPEN_MS = 30_000;
@@ -43,4 +43,31 @@ export const useReadToTheEnd = (sessionId: string, endRef: RefObject<Element>, e
       observer.disconnect();
     };
   }, [endRef, markRead, sessionId, enabled]);
+};
+
+/** v9 FR-31: "opened" is the ready debrief in the foreground for 2 s. */
+export const OPENED_AFTER_MS = 2000;
+
+/** Tells the server, once, that the learner opened their debrief. */
+export const useMarkOpened = (sessionId: string, enabled: boolean) => {
+  const [markOpened] = useMarkDebriefOpenedMutation();
+  const sent = useRef(false);
+  useEffect(() => {
+    if (!enabled || sent.current) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      timer = setTimeout(() => {
+        sent.current = true;
+        void markOpened(sessionId);
+      }, OPENED_AFTER_MS);
+    };
+    arm();
+    document.addEventListener("visibilitychange", arm);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", arm);
+    };
+  }, [enabled, markOpened, sessionId]);
 };

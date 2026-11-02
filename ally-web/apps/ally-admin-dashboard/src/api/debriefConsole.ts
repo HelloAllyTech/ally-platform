@@ -101,6 +101,17 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    setDebriefTenantRegion: builder.mutation<
+      unknown,
+      { tenantId: string; region: "india" | "outside_india" }
+    >({
+      query: ({ tenantId, region }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.TENANT_REGION(tenantId),
+        method: HttpMethod.PUT,
+        body: { region },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefReview: builder.query<DebriefReviewQueue, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.REVIEW, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -189,5 +200,6 @@ export const {
   useGetDebriefReviewQuery,
   useActOnDebriefRunMutation,
   useResolveDebriefFlagMutation,
+  useSetDebriefTenantRegionMutation,
   useEscalateDebriefMutation,
 } = debriefConsoleAPI;

@@ -211,6 +211,20 @@ describe('debrief feedback', () => {
     expect(again.saved[0]).toMatchObject({ status: 'removed' });
   });
 
+  it('records when the learner first opened the debrief, once (FR-31)', async () => {
+    const ctx = build();
+    const query = (ctx.svc as any).dataSource.query as jest.Mock;
+    const first = await ctx.svc.markOpened('s', 7);
+    expect(first.openedAt).toEqual(expect.any(String));
+    expect(query.mock.calls.slice(-1)[0][0]).toContain(`'{openedAt}'`);
+    const again = build({
+      run: { workspace: { openedAt: '2026-11-01T00:00:00Z' } },
+    });
+    expect(await again.svc.markOpened('s', 7)).toEqual({
+      openedAt: '2026-11-01T00:00:00Z',
+    });
+  });
+
   it('a person can publish a live draft or send the learner back to today’s debrief', async () => {
     const a = build({ run: { status: 'needs_person' } });
     await a.svc.publishRun('run-1', 1);

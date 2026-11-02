@@ -154,6 +154,26 @@ export class DebriefFeedbackService {
   ) {}
 
   /** The learner's own published live debrief, or a refusal. */
+  /**
+   * v9 FR-31: the learner opened the debrief — the ready cards were in the
+   * foreground for at least 2 s. Recorded once, as `openedAt`; from then on
+   * only a reviewer's correction (with its banner) changes what they read.
+   */
+  async markOpened(sessionId: string, userId: number) {
+    const run = await this.ownLiveRun(sessionId, userId);
+    if (run.workspace?.openedAt) {
+      return { openedAt: run.workspace.openedAt as string };
+    }
+    const openedAt = new Date().toISOString();
+    await this.dataSource.query(
+      `UPDATE debrief_runs
+          SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{openedAt}', to_jsonb($2::text))
+        WHERE id = $1 AND NOT (coalesce(workspace, '{}'::jsonb) ? 'openedAt')`,
+      [run.id, openedAt],
+    );
+    return { openedAt };
+  }
+
   async ownLiveRun(sessionId: string, userId: number): Promise<DebriefRun> {
     const [s] = await this.dataSource.query(
       `SELECT "counselorId" AS counselor_id FROM scenario_sessions WHERE id = $1`,

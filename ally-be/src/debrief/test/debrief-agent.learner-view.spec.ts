@@ -11,26 +11,34 @@ function build(opts: {
   runs?: Array<Record<string, unknown>>;
   endedMinutesAgo?: number;
   profile?: Record<string, unknown> | null;
+  region?: 'india' | 'outside_india';
 }) {
   const ended = new Date(Date.now() - (opts.endedMinutesAgo ?? 10) * 60_000);
   const dataSource = {
     query: jest.fn(async (sql: string) =>
-      sql.includes('guide_org_profiles')
-        ? opts.profile
-          ? [{ profile: opts.profile }]
+      sql.includes(`->>'region'`)
+        ? opts.region
+          ? [{ scopeId: 't1', region: opts.region }]
           : []
-        : [
-            {
-              counselor_id: opts.owner ?? 7,
-              tenant_id: 't1',
-              status: 'ENDED',
-              ended_at: ended,
-            },
-          ],
+        : sql.includes(`->>'live'`)
+          ? []
+          : sql.includes('guide_org_profiles')
+            ? opts.profile
+              ? [{ profile: opts.profile }]
+              : []
+            : [
+                {
+                  counselor_id: opts.owner ?? 7,
+                  tenant_id: 't1',
+                  status: 'ENDED',
+                  ended_at: ended,
+                },
+              ],
     ),
   };
   const runs = { find: jest.fn(async () => opts.runs ?? []) };
   const overrides = {
+    save: jest.fn(async () => undefined),
     get: jest.fn(async () =>
       opts.live === false ? null : { values: { live: true } },
     ),
@@ -105,6 +113,31 @@ describe('DebriefAgentService.learnerView', () => {
       phone: '14416',
       isCrisis: true,
     });
+  });
+
+  it('outside India, gives no default line and refuses to switch on without one (FR-25)', async () => {
+    const run = {
+      mode: 'live',
+      status: 'published',
+      cards: {},
+      language: 'en',
+      steps: [],
+    };
+    const away = build({ runs: [run], region: 'outside_india' });
+    expect((await away.learnerView('s', 7)).supportLines).toEqual([]);
+    await expect(away.setLive('t1', true, 1)).rejects.toThrow(
+      'needs its own support line',
+    );
+    await expect(away.setLive('t1', false, 1)).resolves.toBeUndefined();
+    const withLines = build({
+      runs: [run],
+      region: 'outside_india',
+      profile: { supportLines: { en: [{ name: 'Local line', phone: '1' }] } },
+    });
+    await expect(withLines.setLive('t1', true, 1)).resolves.toBeUndefined();
+    await expect(
+      build({ runs: [run] }).setLive('t1', true, 1),
+    ).resolves.toBeUndefined();
   });
 
   it('gives the organisation’s own lines, in the debrief’s language', async () => {

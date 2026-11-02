@@ -3,7 +3,11 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@ally-ui-mono/ui-shared";
-import { useGetDebriefTenantsQuery, useSetDebriefTenantLiveMutation } from "@api";
+import {
+  useGetDebriefTenantsQuery,
+  useSetDebriefTenantLiveMutation,
+  useSetDebriefTenantRegionMutation,
+} from "@api";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
@@ -19,6 +23,22 @@ export const OrganisationsTab: React.FC = () => {
   const tenants = useGetDebriefTenantsQuery();
   const [setLive, { isLoading }] = useSetDebriefTenantLiveMutation();
   const [target, setTarget] = useState<DebriefTenantRow | null>(null);
+  const [setRegion, { isLoading: savingRegion }] = useSetDebriefTenantRegionMutation();
+
+  const toggleRegion = async (t: DebriefTenantRow) => {
+    try {
+      await setRegion({
+        tenantId: t.id,
+        region: t.region === "india" ? "outside_india" : "india",
+      }).unwrap();
+      toast.success(s.saved);
+    } catch (e) {
+      toast.error(getErrorMessage(e, s.failed));
+    }
+  };
+  // v9 FR-25: outside India there is no default line to fall back on.
+  const blocked = (t: DebriefTenantRow) =>
+    !t.live && t.region === "outside_india" && !t.hasSupportContact;
 
   const confirm = async () => {
     if (!target) return;
@@ -48,7 +68,7 @@ export const OrganisationsTab: React.FC = () => {
       ) : (
         <ConsoleTable
           testId="organisations-table"
-          headers={[s.columns.name, s.columns.state, ""]}
+          headers={[s.columns.name, s.columns.state, s.columns.region, ""]}
           rows={tenants.data.map(t => ({
             key: t.id,
             testId: "organisation-row",
@@ -60,9 +80,33 @@ export const OrganisationsTab: React.FC = () => {
               <Pill key="s" tone={t.live ? "success" : "neutral"}>
                 {t.live ? s.newDebrief : s.todays}
               </Pill>,
-              <Button key="b" kind="tertiary" size="sm" onClick={() => setTarget(t)}>
-                {t.live ? s.switchOff : s.switchOn}
-              </Button>,
+              <span key="r" className="flex flex-wrap items-center gap-2">
+                {t.region === "india" ? s.india : s.outsideIndia}
+                {t.region === "outside_india" && !t.hasSupportContact && (
+                  <Pill tone="warning">{s.noSupportLine}</Pill>
+                )}
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  disabled={savingRegion}
+                  onClick={() => void toggleRegion(t)}
+                >
+                  {t.region === "india" ? s.markOutside : s.markIndia}
+                </Button>
+              </span>,
+              <span key="b" className="flex flex-col items-start gap-1">
+                <Button
+                  kind="tertiary"
+                  size="sm"
+                  disabled={blocked(t)}
+                  onClick={() => setTarget(t)}
+                >
+                  {t.live ? s.switchOff : s.switchOn}
+                </Button>
+                {blocked(t) && (
+                  <span className="max-w-xs text-xs text-typography-700">{s.needsSupportLine}</span>
+                )}
+              </span>,
             ],
           }))}
         />

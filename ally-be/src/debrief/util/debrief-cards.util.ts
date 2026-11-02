@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 /**
  * The cards a debrief is made of (the Writer's output), the rule checks every
  * draft must pass before it can be published, and the plain-text rendering
@@ -16,6 +17,8 @@ export interface TranscriptTurn {
 }
 
 export interface ImportantMomentCard {
+  /** v9 C-11: stable across versions of this debrief; set by code at publish. */
+  point_id?: string;
   turn_index: number;
   quote: string;
   handled_well: boolean;
@@ -26,6 +29,7 @@ export interface ImportantMomentCard {
 }
 
 export interface WorkedCard {
+  point_id?: string;
   skill: string;
   turn_index: number;
   quote: string;
@@ -34,6 +38,7 @@ export interface WorkedCard {
 }
 
 export interface WorkOnThisCard {
+  point_id?: string;
   skill: string;
   turn_index: number;
   quote: string;
@@ -86,7 +91,25 @@ export enum DebriefCheckCode {
   UNSUPPORTED_PROGRESS = 'unsupported_progress',
   EXCLAMATION = 'exclamation',
   TURN_NUMBER = 'turn_number',
+  /** v9 C-13: the quote points at a stretch the transcript did not catch. */
+  QUOTE_FROM_GAP = 'quote_from_gap',
+  /** v9 C-12: a term of art the learner was never taught. */
+  JARGON = 'jargon',
+  /** v9 C-11: two cards share one point id. */
+  DUPLICATE_POINT = 'duplicate_point',
+  /** v9 C-4: the whole debrief before "Practise this next" is over its word budget. */
+  TOTAL_TOO_LONG = 'total_too_long',
 }
+
+/**
+ * Recorded on the run and shown in the Console, but they neither block
+ * publishing nor start a revision. C-4 is here until the Writer is asked for
+ * the total: 33 of 39 standard debriefs in October ran over 220 words, so a
+ * blocking check would mostly buy revision rounds.
+ */
+export const ADVISORY_CHECKS: ReadonlySet<DebriefCheckCode> = new Set([
+  DebriefCheckCode.TOTAL_TOO_LONG,
+]);
 
 export interface DebriefCheckFailure {
   code: DebriefCheckCode;
@@ -97,6 +120,9 @@ export interface DebriefCheckFailure {
 export const LEAD_MAX_WORDS = 25;
 export const BODY_MAX_WORDS = 60;
 export const WHY_MAX_WORDS = 40;
+/** v9 C-4: everything before "Practise this next", in words. */
+export const DEBRIEF_MAX_WORDS = 220;
+export const SHORT_DEBRIEF_MAX_WORDS = 120;
 
 /** Whitespace and quote-mark differences are not a different quote; anything else is. */
 export function normaliseForQuote(s: string): string {
@@ -142,6 +168,22 @@ const SCORE_RE =
 
 const DIAGNOSIS_RE =
   /\byou (are|seem|sound|might be|may be) (anxious|depressed|insecure|avoidant|narcissistic|codependent|traumati[sz]ed)\b|\byou (have|suffer from) (anxiety|depression|ptsd|adhd|a disorder)\b|\b(personality|attachment) (disorder|style)\b/i;
+
+/**
+ * v9 C-12: clinical terms of art a lay counsellor was never taught. Skill
+ * names are explained in "skill words", so they are not here.
+ */
+const JARGON_RE =
+  /\b(counter-?transference|transference|psycho-?education(al)?|cognitive distortions?|defen[cs]e mechanisms?|somati[sz]ation|therapeutic alliance|affective (state|response)|ego[- ]?(state|defen[cs]e)s?|dichotomous thinking|catastrophi[sz]ing)\b/i;
+
+/**
+ * v9 C-13: a turn the transcript did not catch — a placeholder such as
+ * "[inaudible]" or "...", with no words in it. Nothing may be quoted from it.
+ */
+export function isTranscriptGap(text: string): boolean {
+  const t = (text ?? '').trim();
+  return !/[\p{L}\p{N}]/u.test(t) || /^[[(<{][^\])>}]{0,40}[\])>}]$/u.test(t);
+}
 
 /** Learners never see turn numbers; quotes are what point at the moment. */
 const TURN_NUMBER_RE = /\b(turns?|टर्न|ಟರ್ನ್|டர்ன்)\s*\d+/i;
@@ -208,6 +250,14 @@ export function runDebriefChecks(input: {
         DebriefCheckCode.BROKEN_ANCHOR,
         section,
         `turn ${turnIndex} does not exist`,
+      );
+      return;
+    }
+    if (isTranscriptGap(turn.text)) {
+      fail(
+        DebriefCheckCode.QUOTE_FROM_GAP,
+        section,
+        `turn ${turnIndex} is a gap in the transcript`,
       );
       return;
     }
@@ -376,6 +426,34 @@ export function runDebriefChecks(input: {
 
   // Text-wide rules.
   const texts = cardTexts(cards);
+  const beforePractise = texts
+    .filter(
+      (t) =>
+        !['practise_next', 'reflective_question', 'progress_note'].includes(
+          t.section,
+        ),
+    )
+    .reduce((n, t) => n + wordCount(t.text), 0);
+  const maxWords = shortForm ? SHORT_DEBRIEF_MAX_WORDS : DEBRIEF_MAX_WORDS;
+  if (beforePractise > maxWords) {
+    fail(
+      DebriefCheckCode.TOTAL_TOO_LONG,
+      'cards',
+      `${beforePractise} words before Practise next; at most ${maxWords}`,
+    );
+  }
+  const ids = [
+    cards.important_moment?.point_id,
+    ...worked.map((c) => c.point_id),
+    ...wot.map((c) => c.point_id),
+  ].filter((x): x is string => !!x);
+  if (new Set(ids).size !== ids.length) {
+    fail(
+      DebriefCheckCode.DUPLICATE_POINT,
+      'cards',
+      'two cards share a point id',
+    );
+  }
   const ownWords = texts
     .filter((t) => t.ownWords)
     .map((t) => t.text)
@@ -405,6 +483,13 @@ export function runDebriefChecks(input: {
         'mentions a turn number the learner cannot see',
       );
     }
+    if (t.ownWords && JARGON_RE.test(t.text)) {
+      fail(
+        DebriefCheckCode.JARGON,
+        t.section,
+        `uses "${t.text.match(JARGON_RE)![0]}"`,
+      );
+    }
     if (t.ownWords && t.text.includes('!')) {
       fail(DebriefCheckCode.EXCLAMATION, t.section, 'uses an exclamation mark');
     }
@@ -426,16 +511,50 @@ export function runDebriefChecks(input: {
   return fails;
 }
 
+/**
+ * v9 C-11: give every card a point id that stays the same across versions of
+ * this debrief (a revision or a reviewer's correction keeps the skill and the
+ * moment). Kind, skill and turn, so two cards on one moment still differ.
+ */
+export function withPointIds(cards: DebriefCards): DebriefCards {
+  const id = (kind: string, skill: string, turn: number) =>
+    `${kind}:${createHash('sha1')
+      .update(`${skill.trim().toLowerCase()}|${turn}`)
+      .digest('hex')
+      .slice(0, 10)}`;
+  return {
+    ...cards,
+    important_moment: cards.important_moment
+      ? {
+          ...cards.important_moment,
+          point_id:
+            cards.important_moment.point_id ??
+            id('moment', '', cards.important_moment.turn_index),
+        }
+      : cards.important_moment,
+    what_worked: (cards.what_worked ?? []).map((c) => ({
+      ...c,
+      point_id: c.point_id ?? id('worked', c.skill ?? '', c.turn_index),
+    })),
+    work_on_this: (cards.work_on_this ?? []).map((c) => ({
+      ...c,
+      point_id: c.point_id ?? id('grow', c.skill ?? '', c.turn_index),
+    })),
+  };
+}
+
 /** Fewer failures is a better draft; safety-relevant ones count most. */
 export function checkWeight(fails: DebriefCheckFailure[]): number {
   return fails.reduce(
     (n, f) =>
       n +
-      (f.code === DebriefCheckCode.RISK_CUE_UNCOVERED ||
-      f.code === DebriefCheckCode.QUOTE_MISMATCH ||
-      f.code === DebriefCheckCode.DIAGNOSES_TRAINEE
-        ? 10
-        : 1),
+      (ADVISORY_CHECKS.has(f.code)
+        ? 0
+        : f.code === DebriefCheckCode.RISK_CUE_UNCOVERED ||
+            f.code === DebriefCheckCode.QUOTE_MISMATCH ||
+            f.code === DebriefCheckCode.DIAGNOSES_TRAINEE
+          ? 10
+          : 1),
     0,
   );
 }

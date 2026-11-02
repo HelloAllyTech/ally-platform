@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   decide: vi.fn(),
   rollback: vi.fn(),
   setLive: vi.fn(),
+  setRegion: vi.fn(),
   build: vi.fn(),
   review: vi.fn(),
   act: vi.fn(),
@@ -58,6 +59,7 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefReviewQuery: () => h.review(),
   useActOnDebriefRunMutation: () => [h.act, { isLoading: false }],
   useResolveDebriefFlagMutation: () => [h.resolve, { isLoading: false }],
+  useSetDebriefTenantRegionMutation: () => [h.setRegion, { isLoading: false }],
   useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
   useGetDebriefKnowledgeQuery: () => h.knowledge(),
   useSetDebriefKnowledgeClinicalMutation: () => [h.setClinical, { isLoading: false }],
@@ -254,7 +256,26 @@ describe("Debrief Console tabs", () => {
         },
       ]),
     );
-    h.tenants.mockReturnValue(ok([{ id: "t1", name: "Sangath", live: false, isTest: false }]));
+    h.tenants.mockReturnValue(
+      ok([
+        {
+          id: "t1",
+          name: "Sangath",
+          live: false,
+          isTest: false,
+          region: "india",
+          hasSupportContact: false,
+        },
+        {
+          id: "t2",
+          name: "Abroad",
+          live: false,
+          isTest: false,
+          region: "outside_india",
+          hasSupportContact: false,
+        },
+      ]),
+    );
     h.review.mockReturnValue(
       ok({
         runs: [
@@ -284,9 +305,17 @@ describe("Debrief Console tabs", () => {
         ],
       }),
     );
-    [h.decide, h.rollback, h.setLive, h.screen, h.build, h.act, h.resolve, h.escalate].forEach(f =>
-      f.mockReturnValue(resolves()),
-    );
+    [
+      h.decide,
+      h.rollback,
+      h.setLive,
+      h.screen,
+      h.build,
+      h.act,
+      h.resolve,
+      h.escalate,
+      h.setRegion,
+    ].forEach(f => f.mockReturnValue(resolves()));
     h.runImprover.mockReturnValue(resolves({ report: "r", ideas: [] }));
   });
 
@@ -383,12 +412,26 @@ describe("Debrief Console tabs", () => {
   it("Organisations switches one on after confirming", async () => {
     render(<OrganisationsTab />);
     fireEvent.click(
-      within(screen.getByTestId("organisation-row")).getByRole("button", { name: "Switch on" }),
+      within(screen.getAllByTestId("organisation-row")[0]).getByRole("button", {
+        name: "Switch on",
+      }),
     );
     expect(screen.getByText("Switch Sangath to the new debrief?")).toBeInTheDocument();
     const dialogButtons = screen.getAllByRole("button", { name: "Switch on" });
     fireEvent.click(dialogButtons[dialogButtons.length - 1]);
     await waitFor(() => expect(h.setLive).toHaveBeenCalledWith({ tenantId: "t1", live: true }));
+  });
+
+  it("Organisations: one outside India can't be switched on without its own support line (FR-25)", async () => {
+    render(<OrganisationsTab />);
+    const [india, abroad] = screen.getAllByTestId("organisation-row");
+    expect(within(india).getByRole("button", { name: "Switch on" })).toBeEnabled();
+    expect(within(abroad).getByRole("button", { name: "Switch on" })).toBeDisabled();
+    expect(abroad).toHaveTextContent("No support line");
+    fireEvent.click(within(india).getByRole("button", { name: "Mark as outside India" }));
+    await waitFor(() =>
+      expect(h.setRegion).toHaveBeenCalledWith({ tenantId: "t1", region: "outside_india" }),
+    );
   });
 
   it("Review: a debrief waiting for a person can be published after confirming", async () => {

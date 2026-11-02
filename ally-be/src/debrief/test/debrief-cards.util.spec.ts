@@ -1,11 +1,15 @@
 import {
+  ADVISORY_CHECKS,
+  checkWeight,
   DebriefCards,
   DebriefCheckCode,
   inLanguageScript,
+  isTranscriptGap,
   normaliseForQuote,
   renderCards,
   runDebriefChecks,
   TranscriptTurn,
+  withPointIds,
 } from '../util/debrief-cards.util';
 
 const transcript: TranscriptTurn[] = [
@@ -140,6 +144,69 @@ describe('debrief checks', () => {
     c.what_worked[0].turn_index = 4;
     c.what_worked[0].quote = 'Exams, mostly.';
     expect(run(c)).toContain(DebriefCheckCode.WRONG_SPEAKER);
+  });
+
+  it('C-4: records a debrief over 220 words without blocking it', () => {
+    const c = good();
+    c.opening = Array(230).fill('word').join(' ');
+    const fails = runDebriefChecks({
+      cards: c,
+      transcript,
+      safety,
+      language: 'en',
+      shortForm: false,
+      hasProgress: false,
+    });
+    const total = fails.filter(
+      (f) => f.code === DebriefCheckCode.TOTAL_TOO_LONG,
+    );
+    expect(total).toHaveLength(1);
+    expect(ADVISORY_CHECKS.has(DebriefCheckCode.TOTAL_TOO_LONG)).toBe(true);
+    expect(checkWeight(total)).toBe(0);
+    // Short form: 120.
+    const s = good();
+    s.opening = Array(100).fill('word').join(' ');
+    expect(run(s, { shortForm: true })).toContain(
+      DebriefCheckCode.TOTAL_TOO_LONG,
+    );
+    expect(run(s)).not.toContain(DebriefCheckCode.TOTAL_TOO_LONG);
+  });
+
+  it('C-11: gives every card a point id that survives a rewrite, and refuses duplicates', () => {
+    const c = withPointIds(good());
+    const ids = [
+      c.important_moment!.point_id,
+      c.what_worked[0].point_id,
+      c.work_on_this[0].point_id,
+    ];
+    expect(new Set(ids).size).toBe(3);
+    const reworded = good();
+    reworded.work_on_this[0].lead = 'Different words, same point.';
+    expect(withPointIds(reworded).work_on_this[0].point_id).toBe(ids[2]);
+    expect(run(c)).toEqual([]);
+    c.what_worked[0].point_id = c.work_on_this[0].point_id;
+    expect(run(c)).toContain(DebriefCheckCode.DUPLICATE_POINT);
+  });
+
+  it('C-12: refuses terms of art a lay counsellor was never taught', () => {
+    const c = good();
+    c.work_on_this[0].why = 'This is classic countertransference.';
+    expect(run(c)).toContain(DebriefCheckCode.JARGON);
+    expect(run(good())).not.toContain(DebriefCheckCode.JARGON);
+  });
+
+  it('C-13: never quotes from a gap in the transcript', () => {
+    expect(isTranscriptGap('[inaudible]')).toBe(true);
+    expect(isTranscriptGap('...')).toBe(true);
+    expect(isTranscriptGap('Exams, mostly.')).toBe(false);
+    const gapped = transcript.map((t) =>
+      t.turn_index === 3 ? { ...t, text: '[inaudible]' } : t,
+    );
+    const c = good();
+    c.work_on_this[0].quote = '[inaudible]';
+    expect(run(c, { transcript: gapped })).toContain(
+      DebriefCheckCode.QUOTE_FROM_GAP,
+    );
   });
 
   it('refuses turn numbers the learner cannot see', () => {

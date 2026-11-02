@@ -10,7 +10,7 @@ import {
   DEBRIEF_SEED_BUNDLE,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
-import { DebriefAgentService } from './debrief-agent.service';
+import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
 import { DebriefImproverService } from './debrief-improver.service';
@@ -219,16 +219,37 @@ export class DebriefConsoleService {
   }
 
   async tenants(): Promise<
-    Array<{ id: string; name: string; live: boolean; isTest: boolean }>
+    Array<{
+      id: string;
+      name: string;
+      live: boolean;
+      isTest: boolean;
+      region: DebriefRegion;
+      hasSupportContact: boolean;
+    }>
   > {
-    const live = new Set(await this.agent.liveTenants());
+    const [live, regions] = await Promise.all([
+      this.agent.liveTenants().then((ids) => new Set(ids)),
+      this.agent.regions(),
+    ]);
     const rows = await this.dataSource.query(
-      `SELECT id::text AS id, name, COALESCE("isTestOrganization", false) AS "isTest"
-         FROM tenants WHERE "deletedAt" IS NULL ORDER BY name`,
+      `SELECT t.id::text AS id, t.name, COALESCE(t."isTestOrganization", false) AS "isTest",
+              EXISTS (SELECT 1 FROM guide_org_profiles g, jsonb_each(COALESCE(g.profile->'supportLines', '{}'::jsonb)) l
+                       WHERE g.tenant_id = t.id::text AND jsonb_typeof(l.value) = 'array'
+                         AND jsonb_array_length(l.value) > 0) AS "hasSupportContact"
+         FROM tenants t WHERE t."deletedAt" IS NULL ORDER BY t.name`,
     );
-    return rows.map((t: { id: string; name: string; isTest: boolean }) => ({
-      ...t,
-      live: live.has(t.id),
-    }));
+    return rows.map(
+      (t: {
+        id: string;
+        name: string;
+        isTest: boolean;
+        hasSupportContact: boolean;
+      }) => ({
+        ...t,
+        live: live.has(t.id),
+        region: regions.get(t.id) ?? 'india',
+      }),
+    );
   }
 }

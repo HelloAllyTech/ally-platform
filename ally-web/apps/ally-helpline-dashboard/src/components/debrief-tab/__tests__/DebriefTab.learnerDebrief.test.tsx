@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DebriefTab } from "../DebriefTab";
@@ -13,6 +13,7 @@ import { DebriefTab } from "../DebriefTab";
 const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
 const mockFetchAudio = vi.hoisted(() => vi.fn());
 const mockMarkRead = vi.hoisted(() => vi.fn());
+const mockMarkOpened = vi.hoisted(() => vi.fn());
 const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
 
 vi.mock("react-i18next", () => ({
@@ -39,6 +40,7 @@ vi.mock("@api", () => ({
   useFlagDebriefCardMutation: () => [mockMutations.flag, { isLoading: false }],
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
+  useMarkDebriefOpenedMutation: () => [mockMarkOpened],
   useMarkDebriefReadMutation: () => [mockMarkRead],
   useGetSupervisorDebriefQuery: () => ({ data: undefined }),
   LEARNER_DEBRIEF_POLL_MS: 3000,
@@ -381,6 +383,21 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(screen.getByTestId("debrief-correction")).toHaveTextContent(
         "postSim.debriefCards.corrections.kept",
       );
+    });
+
+    it("records that the learner opened it after 2 s on screen (FR-31)", () => {
+      vi.useFakeTimers();
+      try {
+        ready({});
+        renderTab();
+        expect(mockMarkOpened).not.toHaveBeenCalled();
+        act(() => {
+          vi.advanceTimersByTime(2000);
+        });
+        expect(mockMarkOpened).toHaveBeenCalledWith("s-1");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("says a corrected card was updated after a review, with the reason (FR-31)", () => {

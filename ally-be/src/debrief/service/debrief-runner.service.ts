@@ -36,7 +36,9 @@ import {
   checkWeight,
   DebriefCards,
   DebriefCheckFailure,
+  ADVISORY_CHECKS,
   keepOfferedPractice,
+  withPointIds,
   renderCards,
   runDebriefChecks,
   SafetyReading,
@@ -95,7 +97,8 @@ interface Draft {
 }
 
 /** A draft is publishable when it passes every check. */
-const passesChecks = (d: Draft) => d.checks.length === 0;
+const passesChecks = (d: Draft) =>
+  d.checks.every((c) => ADVISORY_CHECKS.has(c.code));
 
 /** Better = passes the checks, then fewer weighted failures, then higher overall, then no hard fail. */
 export function betterDraft(a: Draft | null, b: Draft): Draft {
@@ -784,10 +787,9 @@ export class DebriefRunnerService {
 
       run.workspace = { ...run.workspace, evaluations, bestRound: best.round };
       const patch: Partial<DebriefRun> = {
-        cards: keepOfferedPractice(best.cards, offered) as unknown as Record<
-          string,
-          any
-        >,
+        cards: withPointIds(
+          keepOfferedPractice(best.cards, offered),
+        ) as unknown as Record<string, any>,
         revisionRounds: round,
         checkFailures: best.checks,
         evaluatorOverall:

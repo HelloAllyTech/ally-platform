@@ -110,6 +110,12 @@ class TenantLiveDto {
   live!: boolean;
 }
 
+class TenantRegionDto {
+  @ApiProperty({ enum: ['india', 'outside_india'] })
+  @IsIn(['india', 'outside_india'])
+  region!: 'india' | 'outside_india';
+}
+
 class RunsQueryDto {
   @IsOptional()
   @IsIn(Object.values(DebriefRunMode))
@@ -383,6 +389,22 @@ export class DebriefConsoleController {
   ) {
     await this.agent.setLive(tenantId, body.live, req.user.id);
     return { tenantId, live: body.live };
+  }
+
+  @Put('tenants/:tenantId/region')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Where an organisation works (v9 FR-25)',
+    description:
+      'Outside India there is no default support line: the organisation needs its own before it can be switched on.',
+  })
+  async setRegion(
+    @Param('tenantId') tenantId: string,
+    @Body() body: TenantRegionDto,
+    @Req() req: AuthedRequest,
+  ) {
+    await this.agent.setRegion(tenantId, body.region, req.user.id);
+    return { tenantId, region: body.region };
   }
 
   @Get('knowledge')

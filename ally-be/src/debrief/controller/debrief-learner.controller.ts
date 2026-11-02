@@ -111,6 +111,20 @@ export class DebriefLearnerController {
     return { ok: true };
   }
 
+  @Post('sessions/:sessionId/opened')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'The learner opened the debrief (v9 FR-31), recorded once',
+    description:
+      'Sent by the app once the ready debrief has been on screen, in the foreground, for at least 2 seconds.',
+  })
+  opened(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.feedback.markOpened(sessionId, user.id);
+  }
+
   @Get('sessions/:sessionId/supervisor')
   @AuthPermissions([PERMISSIONS.VIEW_ADMIN_SCENARIO_SESSION])
   @ApiOperation({

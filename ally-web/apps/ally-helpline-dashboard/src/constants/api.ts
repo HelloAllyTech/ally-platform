@@ -230,6 +230,7 @@ export const ApiEndpoints = {
     SUPERVISOR: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/supervisor`,
     // The learner read the debrief to the end (XP, once).
     READ: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/read`,
+    OPENED: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/opened`,
     // Read-aloud: a short-lived link to one card's audio.
     AUDIO: (sessionId: string, section: string) =>
       `/v1/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,

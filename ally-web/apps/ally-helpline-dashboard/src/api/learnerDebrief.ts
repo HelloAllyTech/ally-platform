@@ -74,6 +74,13 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
       }),
     }),
+    /** v9 FR-31: the ready debrief was on screen for 2 s; recorded once. */
+    markDebriefOpened: builder.mutation<unknown, string>({
+      query: sessionId => ({
+        url: ApiEndpoints.DEBRIEFS.OPENED(sessionId),
+        method: HttpMethod.POST,
+      }),
+    }),
     /** Read-aloud: one card's audio, made on the first request and cached. */
     getDebriefCardAudio: builder.query<
       { url: string; cached: boolean },
@@ -93,6 +100,7 @@ export const {
   useGetSupervisorDebriefQuery,
   useLazyGetDebriefCardAudioQuery,
   useMarkDebriefReadMutation,
+  useMarkDebriefOpenedMutation,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
   useFlagDebriefCardMutation,

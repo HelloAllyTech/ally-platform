@@ -223,6 +223,10 @@ export interface DebriefTenantRow {
   name: string;
   live: boolean;
   isTest: boolean;
+  /** v9 FR-25: outside India there is no default support line. */
+  region: "india" | "outside_india";
+  /** The organisation set support lines of its own in its Ally guide settings. */
+  hasSupportContact: boolean;
 }
 
 export interface DebriefReviewRun {

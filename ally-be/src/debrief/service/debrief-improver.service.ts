@@ -1,3 +1,4 @@
+import { ADVISORY_CHECKS, DebriefCheckCode } from '../util/debrief-cards.util';
 import {
   BadRequestException,
   ConflictException,
@@ -681,7 +682,9 @@ export class DebriefImproverService implements OnModuleInit {
         pairs.push({
           base: b.judged,
           chal: c.judged,
-          chalChecks: c.run.checkFailures.length,
+          chalChecks: c.run.checkFailures.filter(
+            (f) => !ADVISORY_CHECKS.has(f.code as DebriefCheckCode),
+          ).length,
           cost: Number(b.run.estimatedCostUsd) + Number(c.run.estimatedCostUsd),
         });
       },
