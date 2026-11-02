@@ -31,9 +31,6 @@ export type XpLevelReachedBucket = "day" | "week" | "month" | "quarter" | "year"
  * together (separate repos); keep them in sync by hand if the ladder ever
  * grows.
  */
-export const XP_LEVEL_REACHED_MAX_LEVEL = 50;
-
-/** Levels plotted at once: fifty grouped series in one chart is unreadable. */
 export const XP_LEVEL_RANGE_SIZE = 10;
 
 export interface XpLevelRange {
@@ -44,8 +41,7 @@ export interface XpLevelRange {
   to: number;
 }
 
-/** The picker's choices — L1-L10, L11-L20, … through the top of the ladder. */
-export const xpLevelRanges = (maxLevel = XP_LEVEL_REACHED_MAX_LEVEL): XpLevelRange[] =>
+export const xpLevelRanges = (maxLevel: number): XpLevelRange[] =>
   Array.from({ length: Math.ceil(maxLevel / XP_LEVEL_RANGE_SIZE) }, (_, i) => {
     const from = i * XP_LEVEL_RANGE_SIZE + 1;
     const to = Math.min(maxLevel, from + XP_LEVEL_RANGE_SIZE - 1);
@@ -74,7 +70,7 @@ export interface XpLevelReachedLevelCount {
 export interface XpLevelReachedPoint {
   /** Bucket start (yyyy-mm-dd). */
   bucket: string;
-  /** Every level 1 through {@link XP_LEVEL_REACHED_MAX_LEVEL}, ascending,
+  /** Every level 1 through the current max, ascending,
    *  whether or not anyone crossed it this bucket. */
   levelCounts: XpLevelReachedLevelCount[];
 }
@@ -85,6 +81,7 @@ export interface XpLevelReachedResponse {
   /** Always platform-wide — this chart has no tenant filter. */
   scoping: AnalyticsScoping;
   computedAt: string;
+  maxLevel: number;
 }
 
 /** No `tenantId`, no `compare`: platform-wide only (see the backend query

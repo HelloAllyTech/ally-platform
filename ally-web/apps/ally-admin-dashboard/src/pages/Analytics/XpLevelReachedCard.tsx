@@ -15,7 +15,6 @@ import {
   timeBarOpts,
 } from "./chartKit";
 import {
-  XP_LEVEL_RANGE_SIZE,
   XpLevelRange,
   XpLevelReachedBucket,
   buildXpLevelReachedSeries,
@@ -57,10 +56,6 @@ const GRAIN_ITEMS: { key: XpLevelReachedBucket; label: string }[] = [
 const grainLabel = (grain: XpLevelReachedBucket): string =>
   GRAIN_ITEMS.find(i => i.key === grain)?.label ?? "Week";
 
-const LEVEL_RANGES = xpLevelRanges();
-
-const DEFAULT_LEVELS = Array.from({ length: XP_LEVEL_RANGE_SIZE }, (_, i) => i + 1);
-
 const TITLE = "New Levels Reached per Period";
 
 /**
@@ -79,14 +74,16 @@ export const XpLevelReachedCard = () => {
   const [grain, setGrain] = useState<XpLevelReachedBucket>("month");
   const { data, isLoading, isError, refetch } = useGetXpLevelReachedQuery({ bucket: grain });
   const selectedGrainItem = GRAIN_ITEMS.find(i => i.key === grain) ?? GRAIN_ITEMS[0];
-  const [levelRange, setLevelRange] = useState<XpLevelRange>(LEVEL_RANGES[0]);
+
+  const levelRanges = useMemo(() => xpLevelRanges(data?.maxLevel ?? 50), [data]);
+  const [levelRange, setLevelRange] = useState<XpLevelRange | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
 
   const allPoints = data?.points ?? EMPTY_POINTS;
   const inProgressBucket = data?.window.inProgressBucket;
   const rangePoints = useMemo(
-    () => pointsInLevelRange(allPoints, levelRange),
-    [allPoints, levelRange],
+    () => pointsInLevelRange(allPoints, levelRange ?? levelRanges[0]),
+    [allPoints, levelRange, levelRanges],
   );
   const plottedPoints = useMemo(
     () => withoutInProgress(rangePoints, p => p.bucket, inProgressBucket),
@@ -94,7 +91,7 @@ export const XpLevelReachedCard = () => {
   );
 
   const levels = useMemo(
-    () => rangePoints[0]?.levelCounts.map(lc => lc.level) ?? DEFAULT_LEVELS,
+    () => rangePoints[0]?.levelCounts.map(lc => lc.level) ?? [],
     [rangePoints],
   );
   const scale = useMemo(() => xpLevelReachedScale(levels), [levels]);
@@ -168,8 +165,8 @@ export const XpLevelReachedCard = () => {
                 titleText="Levels"
                 hideLabel
                 label="Levels"
-                items={LEVEL_RANGES}
-                selectedItem={levelRange}
+                items={levelRanges}
+                selectedItem={levelRange ?? levelRanges[0]}
                 itemToString={item => item?.label ?? ""}
                 onChange={({ selectedItem: picked }) => {
                   if (picked) setLevelRange(picked);
