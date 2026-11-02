@@ -39,6 +39,8 @@ const DRAIN_CONCURRENCY = 2;
 export const LIVE_START_DELAY_MS = 45_000;
 /** Only recent sessions: a debrief days late is not what a learner waits for. */
 const DRAIN_WINDOW_HOURS = 48;
+/** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
+const STUCK_AFTER_MINUTES = 10;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */
 export const DEBRIEF_POLICY: PolicySchema = {
@@ -107,6 +109,9 @@ export class DebriefAgentService implements OnModuleInit {
     scheduledTaskRegistry.register('daily', 'debrief-cost-reconcile', () =>
       this.reconcileCosts(),
     );
+    scheduledTaskRegistry.register('5min', 'debrief-stuck-sweep', async () => {
+      await this.sweepStuckRuns();
+    });
   }
 
   /** Seed version 1 from code; a deploy never undoes a deliberate rollback. */
@@ -253,6 +258,36 @@ export class DebriefAgentService implements OnModuleInit {
         `[debrief] live run for session ${sessionId} failed to start: ${(e as Error).message}`,
       );
     }
+  }
+
+  /**
+   * The sweeper (v9 FR-3): a run still "running" well past every deadline
+   * lost its worker — a deploy or a crash. A live one goes to a person to
+   * finish (the learner sees "on its way", never an endless progress panel);
+   * a shadow or replay one is marked failed. Resuming mid-run is not built:
+   * the paid steps' results are not checkpointed yet.
+   */
+  async sweepStuckRuns(): Promise<number> {
+    const res = await this.dataSource.query(
+      `UPDATE debrief_runs
+          SET status = CASE WHEN mode = 'live' THEN $1 ELSE $2 END,
+              "skipReason" = 'stuck',
+              "finishedAt" = now(),
+              "updatedAt" = now()
+        WHERE status = $3
+          AND COALESCE("startedAt", "createdAt") < now() - interval '${STUCK_AFTER_MINUTES} minutes'
+        RETURNING id, mode`,
+      [
+        DebriefRunStatus.NEEDS_PERSON,
+        DebriefRunStatus.FAILED,
+        DebriefRunStatus.RUNNING,
+      ],
+    );
+    const rows = Array.isArray(res?.[0]) ? res[0] : (res ?? []);
+    if (rows.length) {
+      this.logger.warn(`[debrief] swept ${rows.length} stuck run(s)`);
+    }
+    return rows.length;
   }
 
   /** What the learner sees on the Debrief tab, for their own session only. */

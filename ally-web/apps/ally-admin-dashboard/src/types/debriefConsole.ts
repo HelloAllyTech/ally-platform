@@ -43,6 +43,14 @@ export interface DebriefOverview {
   };
   testSets: Record<"debrief_open" | "debrief_gate" | "debrief_sealed", number>;
   liveTenants: Array<{ id: string; name: string }>;
+  /** Organisations where over 5% of today's debriefs guessed the language (v9 FR-40). */
+  languageIncidents?: Array<{
+    tenantId: string;
+    tenantName: string | null;
+    runs: number;
+    detected: number;
+    unsure: number;
+  }>;
 }
 
 export interface DebriefRunRow {

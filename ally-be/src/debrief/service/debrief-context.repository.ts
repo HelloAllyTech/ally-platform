@@ -18,6 +18,8 @@ export interface DebriefSessionContext {
   assessment: boolean;
   /** Played as one session of a case: earlier sessions are the client's memory. */
   inCase: boolean;
+  /** False when the session recorded no language and `language` is only a default. */
+  languageRecorded: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export class DebriefContextRepository {
     const rows = await this.dataSource.query(
       `SELECT s.id, s.tenant_id, s."counselorId" AS counselor_id, s.status,
               COALESCE(l.value, 'en') AS language,
+              l.value IS NOT NULL AS language_recorded,
               u.metadata AS user_metadata,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
@@ -75,6 +78,7 @@ export class DebriefContextRepository {
       expectedBehaviours: competencies.map((c: { name: string }) => c.name),
       assessment: r.assessment === true,
       inCase: r.in_case === true,
+      languageRecorded: r.language_recorded === true,
     };
   }
 

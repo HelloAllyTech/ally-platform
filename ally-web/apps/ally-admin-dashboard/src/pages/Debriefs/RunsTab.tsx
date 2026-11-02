@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { Button, ContentSwitcher, Switch } from "@ally-ui-mono/ui-shared";
+import { Button, ContentSwitcher, InlineNotification, Switch } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefOverviewQuery, useGetDebriefRunsQuery } from "@api";
 import { formatPercent, formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
@@ -39,6 +39,22 @@ export const RunsTab: React.FC = () => {
       </div>
 
       {o?.mode === "off" && <EmptyPanel title={s.offTitle} message={s.offMessage} />}
+
+      {!!o?.languageIncidents?.length && (
+        <div data-testid="language-incidents">
+          <InlineNotification
+            kind="warning"
+            lowContrast
+            hideCloseButton
+            title={s.languageIncident.title}
+            subtitle={o.languageIncidents
+              .map(i =>
+                s.languageIncident.line(i.tenantName ?? i.tenantId, i.detected, i.runs, i.unsure),
+              )
+              .join(" ")}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <KpiTile

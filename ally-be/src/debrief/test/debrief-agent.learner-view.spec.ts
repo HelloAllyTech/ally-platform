@@ -244,3 +244,30 @@ describe('DebriefAgentService.onSessionEnded', () => {
     expect(view.practice).toEqual([{ id: 41, title: 'Exam stress' }]);
   });
 });
+
+describe('DebriefAgentService.sweepStuckRuns', () => {
+  it('sends a stuck live run to a person and fails a stuck shadow run', async () => {
+    const query = jest.fn(async () => [
+      [
+        { id: 'a', mode: 'live' },
+        { id: 'b', mode: 'shadow' },
+      ],
+      2,
+    ]);
+    const svc = new DebriefAgentService(
+      { query } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    expect(await svc.sweepStuckRuns()).toBe(2);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, string[]];
+    expect(sql).toContain("CASE WHEN mode = 'live' THEN $1 ELSE $2 END");
+    expect(sql).toContain("interval '10 minutes'");
+    expect(params).toEqual(['needs_person', 'failed', 'running']);
+  });
+});

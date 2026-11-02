@@ -9464,6 +9464,11 @@ export const en = {
     } as Record<string, string>,
     mode: { shadow: "Shadow", live: "Live", replay: "Replay" } as Record<string, string>,
     runs: {
+      languageIncident: {
+        title: "Some sessions are not recording their language",
+        line: (org: string, detected: number, runs: number, unsure: number) =>
+          `${org}: ${detected} of today's ${runs} debriefs read the language from the transcript${unsure ? `, ${unsure} of them unsure` : ""}.`,
+      },
       heading: "What the Debrief agent wrote",
       help: "Every run of the Debrief agent. Shadow runs sit beside today's debrief and no learner sees them; live runs are what learners in a switched-on organisation read. The judge score is the independent judge's, out of 10; the bar is 8 with no hard fail.",
       loadFailed: "the runs",

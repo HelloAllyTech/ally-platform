@@ -42,6 +42,12 @@ import {
 } from '../util/debrief-budget.util';
 import { DebriefAiClient, DebriefStepError } from './debrief-ai.client';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { LanguageSource, detectLanguage } from '../util/detect-language';
+import {
+  modelsToTry,
+  recordModelFailure,
+  recordModelSuccess,
+} from '../util/model-circuit';
 import { isUUID } from 'class-validator';
 import {
   KbCorpus,
@@ -203,6 +209,18 @@ export class DebriefRunnerService {
           skipReason: 'no_transcript',
         });
       }
+      // v9 FR-39: no recorded language → read it from what the learner wrote,
+      // and say so on the run (the Console counts these per organisation).
+      let languageSource: LanguageSource = 'recorded';
+      if (!session.languageRecorded) {
+        const detected = detectLanguage(
+          transcript.filter((t) => t.role === 'counselor').map((t) => t.text),
+        );
+        session.language = detected.language;
+        languageSource = detected.source;
+        run.language = detected.language;
+      }
+      run.workspace = { ...run.workspace, languageSource };
 
       const recipe: DebriefRecipe =
         session.learnerTurns < settings.standardMinLearnerTurns
@@ -268,7 +286,8 @@ export class DebriefRunnerService {
         est: number,
         round?: number,
       ): Promise<T | null> => {
-        const models = [s.model, s.backupModel ?? s.model];
+        // A model whose breaker is open goes after its backup, not before.
+        const models = modelsToTry(s.model, s.backupModel);
         for (let attempt = 0; attempt < 2; attempt++) {
           const t0 = now();
           try {
@@ -277,6 +296,7 @@ export class DebriefRunnerService {
               model: models[attempt],
               scenario_session_id: sessionId,
             });
+            if (models[attempt]) recordModelSuccess(models[attempt]!);
             steps.push({
               step: s.step,
               label: s.label,
@@ -291,6 +311,7 @@ export class DebriefRunnerService {
             return res;
           } catch (e) {
             const err = e as DebriefStepError;
+            if (models[attempt]) recordModelFailure(models[attempt]!);
             steps.push({
               step: s.step,
               label: s.label,

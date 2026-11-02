@@ -12,7 +12,43 @@
  * uses so the first release runs whatever the store serves.
  */
 
+import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
+
 export const DEBRIEF_AGENT_KEY = 'debrief';
+
+/**
+ * The gateway's approved providers (plan §8.9): learner data goes only to
+ * providers under a zero-retention, no-training agreement. Adding one is a
+ * person's decision, made here in code review.
+ */
+export const DEBRIEF_APPROVED_PROVIDERS = [
+  'gemini',
+  'openai',
+  'anthropic',
+] as const;
+export type DebriefProvider = (typeof DEBRIEF_APPROVED_PROVIDERS)[number];
+
+/** Which provider serves a model id; null for one no approved provider serves. */
+export function providerOfModel(model: string): DebriefProvider | null {
+  const id = model.replace(/^models\//, '').toLowerCase();
+  if (id.startsWith('gemini')) return 'gemini';
+  if (id.startsWith('claude')) return 'anthropic';
+  if (/^(gpt-|o\d)/.test(id)) return 'openai';
+  return null;
+}
+
+/**
+ * Why a model may not run in a release, or null when it may: an approved
+ * provider, a pinned id (no "-latest"), and a known price — a model whose
+ * price is unknown is never used (v9 NFR-10, plan §8.9).
+ */
+export function modelProblem(model: string): string | null {
+  if (!providerOfModel(model))
+    return `${model} is not from an approved provider`;
+  if (/latest/i.test(model)) return `${model} is not a pinned model id`;
+  if (!computeCostUsd(model, 1, 1).priced) return `${model} has no known price`;
+  return null;
+}
 /** Learning-loop calls (Improver, screens) are ledgered apart from production. */
 export const DEBRIEF_LEARNING_AGENT_KEY = 'debrief_learning';
 
@@ -292,6 +328,18 @@ export function validateDebriefBundle(bundle: unknown): string[] {
   const problems: string[] = [];
   const b = bundle as Partial<DebriefBundle> | null;
   if (!b || typeof b !== 'object') return ['bundle is not an object'];
+  const models = new Set<string>();
+  for (const recipe of Object.values(b.recipes ?? {})) {
+    for (const st of recipe?.steps ?? []) {
+      if (st.model) models.add(st.model);
+      if (st.backupModel) models.add(st.backupModel);
+    }
+  }
+  if (b.reply?.model) models.add(b.reply.model);
+  for (const m of models) {
+    const problem = modelProblem(m);
+    if (problem) problems.push(problem);
+  }
   if (b.reply) {
     if (!['gemini', 'openai'].includes(b.reply.provider)) {
       problems.push(`Ask Ally cannot run on provider ${b.reply.provider}`);

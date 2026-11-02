@@ -150,7 +150,11 @@ async def _call(
     model: str,
     scenario_session_id: Optional[str],
 ) -> Tuple[Optional[T], Dict[str, Any]]:
-    from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
+    from app.core.llm.dispatch import (
+        PROVIDER_GEMINI,
+        generate_structured,
+        infer_provider_from_model,
+    )
 
     # never_fallback: the recipe names the model and its backup, and ally-be
     # retries on the backup itself. A silent substitute here would make the
@@ -160,7 +164,9 @@ async def _call(
         schema=schema,
         prompt=prompt,
         task=task,
-        provider=PROVIDER_GEMINI,
+        # The gateway: the release names the model, and the model names its
+        # provider (Google, OpenAI or Anthropic; ally-be refuses any other).
+        provider=infer_provider_from_model(model) or PROVIDER_GEMINI,
         never_fallback=True,
         model=model,
         temperature=0,

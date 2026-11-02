@@ -3,8 +3,14 @@ import { DebriefFlagReason, LearnerDebriefView } from "@types";
 
 import { baseAPI } from "./baseAPI";
 
-/** How often to re-ask while the Debrief agent is still writing. */
-export const LEARNER_DEBRIEF_POLL_MS = 5000;
+/**
+ * How often to re-ask while waiting (v9 FR-33): every 3 s while the Debrief
+ * agent writes, for up to 4 minutes, then every 30 s — also while a person
+ * finishes a debrief that is "on its way".
+ */
+export const LEARNER_DEBRIEF_POLL_MS = 3000;
+export const LEARNER_DEBRIEF_SLOW_POLL_MS = 30_000;
+export const LEARNER_DEBRIEF_FAST_FOR_MS = 4 * 60_000;
 
 const learnerDebriefAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({

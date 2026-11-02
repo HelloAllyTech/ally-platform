@@ -306,3 +306,20 @@ async def test_writer_respects_case_memory_and_never_regrades(dispatch_returns):
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
     assert "CASE MEMORY" not in calls["prompt"]
     assert "ASSESSMENT" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_each_step_runs_on_the_provider_its_model_names(monkeypatch):
+    import app.core.llm.dispatch as dispatch
+    from app.core.debrief.steps import write
+
+    seen = []
+
+    async def fake(**kwargs):
+        seen.append(kwargs["provider"])
+        return DebriefCards(opening="Hi"), {"model": kwargs["model"]}
+
+    monkeypatch.setattr(dispatch, "generate_structured", fake)
+    for model in ("claude-sonnet-5-5", "gpt-5-mini", "gemini-2.5-flash"):
+        await write({}, {}, "en", model, TRANSCRIPT)
+    assert seen == ["anthropic", "openai", "gemini"]

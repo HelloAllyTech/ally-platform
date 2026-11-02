@@ -104,7 +104,44 @@ export class DebriefConsoleService {
       },
       testSets: await this.testSets.counts(),
       liveTenants: await this.liveTenants(),
+      languageIncidents: await this.languageIncidents(),
     };
+  }
+
+  /**
+   * v9 FR-40: an organisation where more than 5% of today's debriefs had to
+   * read the language from the transcript — its sessions are not recording
+   * one, so the debrief language is a guess (flagged when unsure).
+   */
+  async languageIncidents(): Promise<
+    Array<{
+      tenantId: string;
+      tenantName: string | null;
+      runs: number;
+      detected: number;
+      unsure: number;
+    }>
+  > {
+    const rows = await this.dataSource.query(
+      `SELECT r.tenant_id, t.name,
+              count(*)::int AS runs,
+              count(*) FILTER (WHERE r.workspace->>'languageSource' LIKE 'detected%')::int AS detected,
+              count(*) FILTER (WHERE r.workspace->>'languageSource' = 'detected_low_confidence')::int AS unsure
+         FROM debrief_runs r
+         LEFT JOIN tenants t ON t.id::text = r.tenant_id
+        WHERE r.mode IN ('shadow','live') AND r.status <> 'skipped'
+          AND r."createdAt" >= date_trunc('day', now())
+        GROUP BY r.tenant_id, t.name
+       HAVING count(*) FILTER (WHERE r.workspace->>'languageSource' LIKE 'detected%')
+              > 0.05 * count(*)`,
+    );
+    return rows.map((r: any) => ({
+      tenantId: r.tenant_id,
+      tenantName: r.name ?? null,
+      runs: Number(r.runs),
+      detected: Number(r.detected),
+      unsure: Number(r.unsure),
+    }));
   }
 
   async listRuns(opts: { mode?: string; status?: string; limit?: number }) {

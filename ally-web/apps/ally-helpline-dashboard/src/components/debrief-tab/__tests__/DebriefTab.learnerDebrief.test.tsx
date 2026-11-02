@@ -40,7 +40,9 @@ vi.mock("@api", () => ({
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
   useMarkDebriefReadMutation: () => [mockMarkRead],
-  LEARNER_DEBRIEF_POLL_MS: 5000,
+  LEARNER_DEBRIEF_POLL_MS: 3000,
+  LEARNER_DEBRIEF_SLOW_POLL_MS: 30000,
+  LEARNER_DEBRIEF_FAST_FOR_MS: 240000,
 }));
 
 vi.mock("@assets", () => ({
@@ -246,7 +248,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
     expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
       "s-1",
-      expect.objectContaining({ pollingInterval: 5000 }),
+      expect.objectContaining({ pollingInterval: 3000 }),
     );
   });
 
