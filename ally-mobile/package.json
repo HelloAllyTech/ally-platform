@@ -10,7 +10,7 @@
     "build:prod": "cd android && ./gradlew assembleProdRelease --stacktrace",
     "android:clean": "cd android && ./gradlew clean",
     "ios": "react-native run-ios",
-    "lint": "eslint .",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
     "i18n:sync": "node scripts/i18n-sync.mjs",
     "i18n:parity": "node scripts/i18n-parity.mjs",
