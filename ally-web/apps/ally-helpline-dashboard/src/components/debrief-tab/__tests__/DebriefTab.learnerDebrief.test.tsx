@@ -17,6 +17,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
 vi.mock("react-redux", () => ({
   useDispatch: () => vi.fn(),
   useSelector: () => undefined,
@@ -390,6 +398,43 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       fireEvent.click(toggle);
       expect(toggle).toHaveAttribute("aria-expanded", "true");
       expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
+    });
+  });
+
+  describe("practise this next", () => {
+    const withLinks = {
+      ...CARDS,
+      practise_next: { skill: "Open questions", reason: "It came up twice.", scenario_id: 41 },
+      work_on_this: CARDS.work_on_this.map((c: any, i: number) => ({
+        ...c,
+        scenario_id: i === 0 ? 41 : 7,
+      })),
+    };
+
+    it("opens the roleplay's own page, only for roleplays the learner can still open", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+
+      expect(screen.getByTestId("debrief-practise-next")).toHaveAttribute("href", "/scenario/41");
+      // Roleplay 7 is gone or locked for this learner: no button for it.
+      expect(screen.getAllByTestId("debrief-practise-this")).toHaveLength(1);
+    });
+
+    it("shows no button when no linked roleplay is available", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: withLinks, language: "en", practice: [] },
+      });
+      renderTab();
+
+      expect(screen.queryByTestId("debrief-practise-next")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("debrief-practise-this")).not.toBeInTheDocument();
     });
   });
 });

@@ -881,6 +881,11 @@
         "supportLead": "If you'd like to talk to someone now:",
         "whenReady": "Your debrief, when you're ready"
       },
+      "practise": {
+        "next": "Practise this next",
+        "this": "Practise this",
+        "label": "Practise this in the roleplay \"{{title}}\""
+      },
       "whatWorked": "What worked",
       "workOnThis": "Work on this",
       "trySaying": "Try saying:",

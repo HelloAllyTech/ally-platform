@@ -25,6 +25,7 @@ import {
 } from '../../learn/type/scenario-session-leaderboard-event.type';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
+import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 
 /** Sessions per 5-minute tick; at today's volume the backlog clears in one or two ticks. */
@@ -62,6 +63,19 @@ export interface LearnerDebriefView {
   distress?: boolean;
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
+  /** Roleplays the cards link to that the learner can still open. */
+  practice?: Array<{ id: number; title: string }>;
+}
+
+/** The roleplays a debrief's cards link to, once each. */
+function practiceIds(cards: Record<string, any> | null): number[] {
+  const ids = [
+    cards?.practise_next?.scenario_id,
+    ...(
+      (cards?.work_on_this ?? []) as Array<{ scenario_id?: number | null }>
+    ).map((c) => c.scenario_id),
+  ].filter((id): id is number => id != null);
+  return [...new Set(ids.map(Number))];
 }
 
 /**
@@ -83,6 +97,7 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly releases: AgentReleaseService,
     private readonly overrides: AgentConfigOverrideService,
     private readonly config: AppConfigService,
+    private readonly practice: DebriefPracticeService,
   ) {}
 
   onModuleInit(): void {
@@ -287,6 +302,11 @@ export class DebriefAgentService implements OnModuleInit {
           language: run.language,
           distress: run.learnerDistress === true,
           supportLines: await this.supportLines(s.tenant_id, run.language),
+          practice: await this.practice.available(
+            userId,
+            s.tenant_id,
+            practiceIds(run.cards),
+          ),
         };
       case DebriefRunStatus.SKIPPED:
         return {

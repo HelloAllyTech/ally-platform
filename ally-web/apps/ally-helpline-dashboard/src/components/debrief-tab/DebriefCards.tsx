@@ -16,6 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { DebriefCardsData, DebriefSkillWord, DebriefSupportLine, LearnerDebriefView } from "@types";
 
@@ -73,6 +74,38 @@ const Lead: FC<{ children: ReactNode }> = ({ children }) => (
   <h4 className="font-primary text-sm font-semibold text-typography-900">{children}</h4>
 );
 
+/**
+ * `ROUTES.SCENARIO` for one roleplay. Built here rather than imported: the
+ * routes module loads icons at import time, which this card list must not.
+ */
+const scenarioPath = (id: number) => `/scenario/${id}`;
+
+/**
+ * "Practise this next" / "Practise this": opens the roleplay's own page, so
+ * its language choice and trigger warnings come first. Rendered only for a
+ * roleplay the server says the learner can still open.
+ */
+const PractiseLink: FC<{ scenario: { id: number; title: string }; primary?: boolean }> = ({
+  scenario,
+  primary,
+}) => {
+  const { t } = useTranslation();
+  return (
+    <Link
+      to={scenarioPath(scenario.id)}
+      data-testid={primary ? "debrief-practise-next" : "debrief-practise-this"}
+      aria-label={t("postSim.debriefCards.practise.label", { title: scenario.title })}
+      className={
+        primary
+          ? "inline-flex min-h-[44px] items-center justify-center self-start rounded-md bg-primary-600 px-4 font-primary text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+          : "inline-flex min-h-[44px] items-center gap-1 self-start rounded-md px-2 font-primary text-sm font-semibold text-primary-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+      }
+    >
+      {primary ? t("postSim.debriefCards.practise.next") : t("postSim.debriefCards.practise.this")}
+    </Link>
+  );
+};
+
 /** The organisation's support lines, each number a tap-to-call link. */
 const SupportLines: FC<{ lines: DebriefSupportLine[] }> = ({ lines }) => (
   <ul className="flex flex-col gap-2" data-testid="debrief-support-lines">
@@ -111,6 +144,8 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
       correction={correctionFor(section)}
     />
   );
+  const practiceFor = (id?: number | null) =>
+    id == null ? undefined : view.practice?.find(p => p.id === id);
   const moment = removed.has("important_moment") ? null : cards.important_moment;
   const worked = cards.what_worked
     .map((item, index) => ({ item, index }))
@@ -207,6 +242,9 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
                       {item.try_saying}
                     </span>
                   </p>
+                  {practiceFor(item.scenario_id) && (
+                    <PractiseLink scenario={practiceFor(item.scenario_id)!} />
+                  )}
                   {flagControl(`work_on_this[${index}]`, item.lead)}
                 </li>
               ))}
@@ -222,6 +260,9 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
           >
             <Lead>{practise.skill}</Lead>
             <Body>{practise.reason}</Body>
+            {practiceFor(practise.scenario_id) && (
+              <PractiseLink scenario={practiceFor(practise.scenario_id)!} primary />
+            )}
             {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
           </Card>
         )}

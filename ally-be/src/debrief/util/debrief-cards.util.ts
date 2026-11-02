@@ -40,6 +40,8 @@ export interface WorkOnThisCard {
   lead: string;
   why: string;
   try_saying: string;
+  /** A roleplay the learner can open that practises this skill. */
+  scenario_id?: number | null;
 }
 
 export interface DebriefCards {
@@ -47,7 +49,11 @@ export interface DebriefCards {
   important_moment?: ImportantMomentCard | null;
   what_worked: WorkedCard[];
   work_on_this: WorkOnThisCard[];
-  practise_next?: { skill: string; reason: string } | null;
+  practise_next?: {
+    skill: string;
+    reason: string;
+    scenario_id?: number | null;
+  } | null;
   skill_words: Array<{
     skill: string;
     word: 'strength' | 'keep_practising' | 'didnt_come_up';
@@ -484,4 +490,29 @@ export function renderCards(cards: DebriefCards): string {
     lines.push(`One question to think about: ${cards.reflective_question}`);
   }
   return lines.join('\n').trim();
+}
+
+/**
+ * Keep a roleplay link only when it is one of the learner's own options:
+ * the Writer chose from that list, and anything else is dropped, never shown.
+ */
+export function keepOfferedPractice(
+  cards: DebriefCards,
+  offered: ReadonlySet<number>,
+): DebriefCards {
+  const keep = (id?: number | null) =>
+    id != null && offered.has(Number(id)) ? Number(id) : null;
+  return {
+    ...cards,
+    work_on_this: (cards.work_on_this ?? []).map((c) => ({
+      ...c,
+      scenario_id: keep(c.scenario_id),
+    })),
+    practise_next: cards.practise_next
+      ? {
+          ...cards.practise_next,
+          scenario_id: keep(cards.practise_next.scenario_id),
+        }
+      : cards.practise_next,
+  };
 }

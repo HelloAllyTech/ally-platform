@@ -265,3 +265,20 @@ async def test_writer_is_told_every_risk_cue_turn_to_cover(dispatch_returns):
         TRANSCRIPT,
     )
     assert "RISK CUES TO COVER: turns 2, 9." in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_may_point_only_to_the_learners_own_roleplays(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    options = [{"id": 41, "title": "Exam stress", "skills": ["Open questions"]}]
+    await write(
+        {}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, practice_options=options
+    )
+    assert "PRACTICE OPTIONS: practice_options lists roleplays" in calls["prompt"]
+    assert '"Exam stress"' in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "PRACTICE OPTIONS: none. Set every scenario_id to null." in calls["prompt"]

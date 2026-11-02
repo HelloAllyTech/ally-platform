@@ -178,6 +178,7 @@ class WriterRequest(StepRequest):
     learner_level: Optional[str] = None
     tone: Optional[str] = None
     short: bool = False
+    practice_options: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class CardsResponse(BaseModel):
@@ -202,6 +203,7 @@ async def writer(req: WriterRequest) -> CardsResponse:
             short=req.short,
             system=req.system_prompt,
             scenario_session_id=req.scenario_session_id,
+            practice_options=req.practice_options,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("writer", exc) from exc

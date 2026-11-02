@@ -234,6 +234,20 @@ async def read_progress(
     return output, meta["model"]
 
 
+def _practice_instruction(options: Optional[List[Dict[str, Any]]]) -> List[str]:
+    """Code-owned: "Practise this next" may only point to a roleplay this
+    learner can open, which ally-be lists and checks again afterwards."""
+    if not options:
+        return ["PRACTICE OPTIONS: none. Set every scenario_id to null."]
+    return [
+        "PRACTICE OPTIONS: practice_options lists roleplays this learner can "
+        "open, with the skills each one practises. Set practise_next.scenario_id, "
+        "and scenario_id on a work_on_this card, to the id of the option that "
+        "best practises that skill, or null when none fits. Never mention an id "
+        "or a roleplay's title in the text."
+    ]
+
+
 async def write(
     evidence: Dict[str, Any],
     safety: Dict[str, Any],
@@ -247,6 +261,7 @@ async def write(
     short: bool = False,
     system: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
+    practice_options: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[Optional[DebriefCards], str]:
     """Write the cards. The transcript is sent so quotes can be copied exactly;
     the Writer is still told to write from the evidence map."""
@@ -279,9 +294,12 @@ async def write(
             + ". The important_moment card covers the most serious one; list "
             "every other one in important_moment.others."
         )
+    lines += _practice_instruction(practice_options)
     lines.append("")
     lines += _json_block("evidence_map", evidence)
     lines += _json_block("safety_reading", safety)
+    if practice_options:
+        lines += _json_block("practice_options", practice_options)
     if passages:
         lines += _json_block("guidance", passages)
     if progress:
@@ -364,7 +382,13 @@ async def revise(
 ) -> Tuple[Optional[DebriefCards], str]:
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_REVISER_SYSTEM, "", f"SESSION LANGUAGE: {language}", ""]
+    lines = [system or DEFAULT_REVISER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
+    # Code-owned: the roleplay a card points to is the learner's own list.
+    lines.append(
+        "Keep every scenario_id as it is in the draft; if you change a card's "
+        "skill, set its scenario_id to null."
+    )
+    lines.append("")
     lines += _json_block("draft", draft)
     lines += _json_block("critique", critique)
     lines += _json_block("evidence_map", evidence)

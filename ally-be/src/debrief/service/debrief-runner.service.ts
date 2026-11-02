@@ -29,6 +29,7 @@ import {
   checkWeight,
   DebriefCards,
   DebriefCheckFailure,
+  keepOfferedPractice,
   renderCards,
   runDebriefChecks,
   SafetyReading,
@@ -40,6 +41,7 @@ import {
   FallbackRung,
 } from '../util/debrief-budget.util';
 import { DebriefAiClient, DebriefStepError } from './debrief-ai.client';
+import { DebriefPracticeService } from './debrief-practice.service';
 import {
   DebriefContextRepository,
   DebriefSessionContext,
@@ -116,6 +118,7 @@ export class DebriefRunnerService {
     private readonly context: DebriefContextRepository,
     private readonly ai: DebriefAiClient,
     private readonly releases: AgentReleaseService,
+    private readonly practice: DebriefPracticeService,
   ) {}
 
   /** The GA bundle, or the seed when GA is missing or does not validate. */
@@ -456,9 +459,15 @@ export class DebriefRunnerService {
       }
       if (progress) run.workspace = { ...run.workspace, progress, history };
 
-      // 4. Writer.
+      // 4. Writer, with the roleplays "Practise this next" may point to.
+      const practiceOptions = await this.practice.optionsFor(
+        session.counselorId,
+        session.tenantId,
+      );
+      const offered = new Set(practiceOptions.map((o) => o.id));
       const writerStep = stepOf(DebriefStep.WRITER)!;
       const writerInput = {
+        practice_options: practiceOptions,
         evidence,
         safety,
         transcript,
@@ -675,7 +684,10 @@ export class DebriefRunnerService {
 
       run.workspace = { ...run.workspace, evaluations, bestRound: best.round };
       const patch: Partial<DebriefRun> = {
-        cards: best.cards as unknown as Record<string, any>,
+        cards: keepOfferedPractice(best.cards, offered) as unknown as Record<
+          string,
+          any
+        >,
         revisionRounds: round,
         checkFailures: best.checks,
         evaluatorOverall:

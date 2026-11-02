@@ -77,6 +77,7 @@ function build(opts: {
   learnerTurns?: number;
   steps: Record<string, Array<unknown | Error>>;
   existing?: boolean;
+  practice?: Array<{ id: number; title: string; skills: string[] }>;
 }) {
   const saved: any[] = [];
   const calls: string[] = [];
@@ -147,6 +148,7 @@ function build(opts: {
     context as any,
     ai as any,
     releases as any,
+    { optionsFor: async () => opts.practice ?? [] } as any,
   );
   return { svc, saved, calls, ai };
 }
@@ -194,6 +196,41 @@ describe('DebriefRunnerService', () => {
       ]),
     );
     expect(Number(run.estimatedCostUsd)).toBeGreaterThan(0);
+  });
+
+  it("offers the learner's own roleplays and keeps only links to them", async () => {
+    const base = cards();
+    const { svc, ai } = build({
+      practice: [{ id: 41, title: 'Exam stress', skills: ['Exploring risk'] }],
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [analyst],
+        writer: [
+          {
+            model: 'gemini-3-flash-preview',
+            cards: cards({
+              work_on_this: [{ ...base.work_on_this[0], scenario_id: 41 }],
+              practise_next: {
+                skill: 'exploring risk',
+                reason: 'x',
+                scenario_id: 99,
+              },
+            }),
+          },
+        ],
+        evaluator: [evaluation(9)],
+      },
+    });
+    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    const writerCall = ai.step.mock.calls.find(
+      (c: unknown[]) => c[0] === 'writer',
+    ) as unknown[];
+    expect((writerCall[1] as any).practice_options).toEqual([
+      { id: 41, title: 'Exam stress', skills: ['Exploring risk'] },
+    ]);
+    expect(run.cards?.work_on_this[0].scenario_id).toBe(41);
+    // 99 was never offered to this learner, so it is dropped.
+    expect(run.cards?.practise_next?.scenario_id).toBeNull();
   });
 
   it('revises a draft below the bar and keeps the better one', async () => {

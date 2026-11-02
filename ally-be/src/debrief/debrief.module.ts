@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
+import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
@@ -12,6 +13,7 @@ import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
 import { DebriefImproverService } from './service/debrief-improver.service';
+import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
@@ -26,6 +28,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     TypeOrmModule.forFeature([DebriefRun, DebriefFeedback]),
     AgentHarnessModule,
     PromptModule,
+    // "Practise this next" reads the learner's roleplays as their list does.
+    LearnModule,
   ],
   controllers: [DebriefConsoleController, DebriefLearnerController],
   providers: [
@@ -38,6 +42,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefImproverService,
     DebriefConsoleService,
     DebriefFeedbackService,
+    DebriefPracticeService,
   ],
   exports: [DebriefAgentService],
 })

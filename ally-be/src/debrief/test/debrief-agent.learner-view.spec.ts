@@ -42,6 +42,13 @@ function build(opts: {
     {} as any,
     overrides as any,
     { debriefAgentMode: 'shadow' } as any,
+    {
+      available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
+        ids
+          .filter((id) => id === 41)
+          .map((id) => ({ id, title: 'Exam stress' })),
+      ),
+    } as any,
   );
 }
 
@@ -76,6 +83,7 @@ describe('DebriefAgentService.learnerView', () => {
       language: 'hi',
       distress: false,
       supportLines: expect.any(Array),
+      practice: [],
     });
   });
 
@@ -215,5 +223,23 @@ describe('DebriefAgentService.onSessionEnded', () => {
       await jest.advanceTimersByTimeAsync(LIVE_START_DELAY_MS);
       expect(runner.run).not.toHaveBeenCalled();
     }
+  });
+
+  it('links only roleplays the learner can still open', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          language: 'en',
+          steps: [],
+          cards: {
+            practise_next: { skill: 'x', reason: 'y', scenario_id: 41 },
+            work_on_this: [{ scenario_id: 41 }, { scenario_id: 7 }],
+          },
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.practice).toEqual([{ id: 41, title: 'Exam stress' }]);
   });
 });
