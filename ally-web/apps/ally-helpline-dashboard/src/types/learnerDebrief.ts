@@ -88,6 +88,8 @@ export interface LearnerDebriefView {
   cards?: DebriefCardsData | null;
   language?: string | null;
   steps?: string[];
+  /** What the debrief is doing now (v9 FR-27); the app words it. */
+  progress?: DebriefProgress | null;
   corrections?: DebriefCorrection[];
   feedback?: { helpful: boolean | null; flags: DebriefMyFlag[] };
   /** The learner stepped out of the role in distress: support comes first. */
@@ -117,3 +119,9 @@ export interface SupervisorDebriefView {
   helpful?: boolean | null;
   thread?: Array<{ role: "learner" | "ally"; content: string; at: string }>;
 }
+
+/** A running debrief's current step, as a key the app words in the learner's language. */
+export type DebriefProgress =
+  | { key: "reading" | "past_sessions" | "writing" | "reviewing" | "care" }
+  | { key: "guidance"; topic?: string }
+  | { key: "revising"; round: number };

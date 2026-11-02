@@ -116,6 +116,33 @@ export class DebriefContextRepository {
     return turns;
   }
 
+  /**
+   * The organisation's own words for Ask Ally (from its Guide profile):
+   * who their supervisor is, how to refer to them, its procedures and tone.
+   * Null when it has set none.
+   */
+  async orgWording(tenantId: string): Promise<string | null> {
+    const [row] = await this.dataSource.query(
+      `SELECT profile FROM guide_org_profiles WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const p = (row?.profile ?? {}) as Record<string, unknown>;
+    const text = (v: unknown) =>
+      typeof v === 'string' && v.trim() ? v.trim() : null;
+    const lines = [
+      text(p.supervisorWording) &&
+        `How to refer to their supervisor: ${text(p.supervisorWording)}`,
+      text(p.supervisorContact) &&
+        `Supervisor contact: ${text(p.supervisorContact)}`,
+      text(p.protocols) && `Procedures: ${text(p.protocols)}`,
+      text(p.toneNotes) && `Tone: ${text(p.toneNotes)}`,
+      Array.isArray(p.avoidTopics) && p.avoidTopics.length
+        ? `Topics to avoid: ${(p.avoidTopics as string[]).join(', ')}`
+        : null,
+    ].filter(Boolean) as string[];
+    return lines.length ? lines.join('\n').slice(0, 1500) : null;
+  }
+
   /** The learner's last few Work-on-this points, newest first, for the Progress reader. */
   async pastWorkOnThis(
     counselorId: number,

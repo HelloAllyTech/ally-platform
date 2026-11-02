@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import {
   DebriefAgentService,
   LIVE_START_DELAY_MS,
+  learnerProgress,
 } from '../service/debrief-agent.service';
 
 function build(opts: {
@@ -167,6 +168,29 @@ describe('DebriefAgentService.learnerView', () => {
         }).learnerView('s', 7)
       ).state,
     ).toBe('on_its_way');
+  });
+});
+
+describe('learnerProgress (FR-27)', () => {
+  it('names the topic, the round, and the careful path', () => {
+    expect(
+      learnerProgress(
+        { step: 'guidance_lookup', topic: 'Exploring risk' },
+        false,
+      ),
+    ).toEqual({ key: 'guidance', topic: 'Exploring risk' });
+    expect(learnerProgress({ step: 'reviser', round: 2 }, true)).toEqual({
+      key: 'revising',
+      round: 2,
+    });
+    expect(learnerProgress({ step: 'writer' }, true)).toEqual({ key: 'care' });
+    expect(learnerProgress({ step: 'writer' }, false)).toEqual({
+      key: 'writing',
+    });
+    expect(learnerProgress({ step: 'evaluator' }, false)).toEqual({
+      key: 'reviewing',
+    });
+    expect(learnerProgress(undefined, false)).toBeNull();
   });
 });
 

@@ -255,6 +255,22 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     );
   });
 
+  it.each([
+    [
+      { key: "guidance", topic: "Exploring risk" },
+      "postSim.debriefCards.working.steps.guidanceTopic",
+    ],
+    [{ key: "guidance" }, "postSim.debriefCards.working.steps.guidance"],
+    [{ key: "care" }, "postSim.debriefCards.working.steps.care"],
+    [{ key: "revising", round: 2 }, "postSim.debriefCards.working.steps.revising"],
+  ])("says specifically what it is doing (FR-27): %o", (progress, label) => {
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: { state: "working", steps: ["Reading your session…"], progress },
+    });
+    renderTab();
+    expect(screen.getByTestId("debrief-working")).toHaveTextContent(label);
+  });
+
   it("falls back to the default step label when no steps have arrived", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
     renderTab();

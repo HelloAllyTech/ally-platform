@@ -15,6 +15,7 @@ import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util'
 import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_SEED_BUNDLE,
+  DebriefStep,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
@@ -27,7 +28,10 @@ import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefPracticeService } from './debrief-practice.service';
-import { DebriefRunnerService } from './debrief-runner.service';
+import {
+  DebriefProgress,
+  DebriefRunnerService,
+} from './debrief-runner.service';
 
 /** Sessions per 5-minute tick; at today's volume the backlog clears in one or two ticks. */
 const DRAIN_BATCH = 8;
@@ -62,6 +66,8 @@ export interface LearnerDebriefView {
   cards?: Record<string, any> | null;
   language?: string | null;
   steps?: string[];
+  /** What the debrief is doing now, as a key the app words (v9 FR-27). */
+  progress?: LearnerProgress | null;
   /** The learner stepped out of the role in distress: support comes first. */
   distress?: boolean;
   /** The organisation's support lines (the Guide's), crisis lines first. */
@@ -87,6 +93,43 @@ function practiceIds(cards?: Record<string, any> | null): number[] {
  * tenant switch, and the nightly reconciliation of estimated against actual
  * cost from `llm_usage`.
  */
+/**
+ * The learner's "working" line (v9 FR-27): specific, never a spinner alone.
+ * Keys are worded by the app in the learner's language.
+ */
+export type LearnerProgress =
+  | { key: 'reading' | 'past_sessions' | 'writing' | 'reviewing' | 'care' }
+  | { key: 'guidance'; topic?: string }
+  | { key: 'revising'; round: number };
+
+export function learnerProgress(
+  p: DebriefProgress | undefined,
+  hasRiskCue: boolean,
+): LearnerProgress | null {
+  if (!p?.step) return null;
+  switch (p.step) {
+    case DebriefStep.GUIDANCE_LOOKUP:
+      return p.topic
+        ? { key: 'guidance', topic: p.topic }
+        : { key: 'guidance' };
+    case DebriefStep.PROGRESS_READER:
+      return { key: 'past_sessions' };
+    case DebriefStep.REVISER:
+      return { key: 'revising', round: Math.max(1, p.round ?? 1) };
+  }
+  // A session with a risk cue gets the careful path; say so.
+  if (hasRiskCue) return { key: 'care' };
+  switch (p.step) {
+    case DebriefStep.WRITER:
+      return { key: 'writing' };
+    case DebriefStep.CHECKS:
+    case DebriefStep.EVALUATOR:
+      return { key: 'reviewing' };
+    default:
+      return { key: 'reading' };
+  }
+}
+
 @Injectable()
 export class DebriefAgentService implements OnModuleInit {
   private readonly logger = LoggerService.getInstance(DebriefAgentService.name);
@@ -350,6 +393,10 @@ export class DebriefAgentService implements OnModuleInit {
         return {
           state: 'working',
           steps: [...new Set(run.steps.map((x) => x.label).filter(Boolean))],
+          progress: learnerProgress(
+            run.workspace?.progress as DebriefProgress | undefined,
+            !!run.hasRiskCue,
+          ),
         };
       case DebriefRunStatus.PUBLISHED:
       case DebriefRunStatus.BELOW_BAR:

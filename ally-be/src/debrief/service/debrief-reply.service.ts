@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Observable, ReplaySubject, startWith } from 'rxjs';
@@ -24,6 +25,11 @@ import {
   isGenuineReflection,
   isSubstantiveDebriefReply,
 } from '../../learn/type/debrief-engagement-event.type';
+import {
+  KbCorpus,
+  KbRetrievalConsumer,
+} from '../../knowledge-base/enum/knowledge-base.enum';
+import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
@@ -77,6 +83,9 @@ const event = (data: Record<string, unknown>): SseMessageEvent => ({
  * keywords miss, and adds the support lines and the review item when it
  * finds some. A reply that fails the code checks is replaced, not shown.
  */
+/** Each part of Ask Ally's extra context must arrive within this, or is left out. */
+const EXTRA_CONTEXT_MS = 1200;
+
 @Injectable()
 export class DebriefReplyService {
   private readonly logger = LoggerService.getInstance(DebriefReplyService.name);
@@ -97,6 +106,7 @@ export class DebriefReplyService {
     private readonly events: EventEmitter2,
     private readonly llm: LlmProviderFactory,
     private readonly usage: LlmUsageService,
+    @Optional() private readonly knowledge?: KnowledgeBaseService,
   ) {}
 
   async stream(
@@ -151,10 +161,11 @@ export class DebriefReplyService {
       return subject.pipe(startWith(event({ type: 'start' })));
     }
 
-    const [transcript, system, { bundle }] = await Promise.all([
+    const [transcript, system, { bundle }, extra] = await Promise.all([
       this.context.transcript(sessionId),
       this.systemPrompt(),
       this.runner.resolveRelease(),
+      this.extraContext(run, sessionId, userId),
     ]);
     // The release names Ask Ally's model, as it names every step's.
     const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
@@ -162,6 +173,7 @@ export class DebriefReplyService {
     const distress = this.readDistress(message, language, sessionId);
     const sources = [
       ...transcript.map((t) => t.text),
+      ...extra,
       ...cardTexts(run.cards as unknown as DebriefCards).map((c) => c.text),
     ];
 
@@ -176,6 +188,7 @@ export class DebriefReplyService {
           JSON.stringify(run.cards),
           'TRANSCRIPT:',
           ...transcript.map((t) => `${t.role}: ${t.text}`),
+          ...extra,
         ].join('\n'),
         chatHistory: this.history(prior),
         userMessage: message,
@@ -344,6 +357,97 @@ export class DebriefReplyService {
   }
 
   /** The prompt the GA release pins, else the store's current, else the default file. */
+  /**
+   * v9 FR-43: what Ask Ally knows beyond this debrief — guidance from the
+   * debrief knowledge base (as the learner's organisation may read it,
+   * clinical documents only as signed off), the learner's own earlier
+   * Work-on-this points, and their organisation's wording. Each part has a
+   * short budget and is simply left out when it is slow or fails: the first
+   * words must stay fast. The knowledge query is built from the debrief's
+   * skills, never from the learner's message.
+   */
+  private async extraContext(
+    run: { tenantId?: string | null; cards?: unknown },
+    sessionId: string,
+    userId: number,
+  ): Promise<string[]> {
+    const within = async <T>(f: () => Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await Promise.race([
+          f(),
+          new Promise<T>((r) => {
+            setTimeout(() => r(fallback), EXTRA_CONTEXT_MS).unref?.();
+          }),
+        ]);
+      } catch {
+        return fallback;
+      }
+    };
+    const tenantId = run.tenantId ?? null;
+    // The knowledge base scopes by organisation id; a non-UUID tenant reads global documents.
+    const kbTenantId = tenantId && isUUID(tenantId) ? tenantId : null;
+    const cards = (run.cards ?? {}) as DebriefCards;
+    const query = [
+      ...(cards.work_on_this ?? []).map((c) => c.skill),
+      ...(cards.what_worked ?? []).map((c) => c.skill),
+      cards.practise_next?.skill,
+    ]
+      .filter((x): x is string => typeof x === 'string' && !!x.trim())
+      .slice(0, 6)
+      .join('; ');
+    const [guidance, history, org] = await Promise.all([
+      query && this.knowledge
+        ? within(
+            () =>
+              this.knowledge!.searchForAudience(
+                {
+                  corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+                  query,
+                  limit: 3,
+                  minSimilarity: 0.35,
+                },
+                { tenantId: kbTenantId },
+                {
+                  consumer: KbRetrievalConsumer.DEBRIEF,
+                  sessionId,
+                  userId,
+                },
+              ).then((r) => r.passages),
+            [] as Array<{ document_title: string; text: string }>,
+          )
+        : Promise.resolve(
+            [] as Array<{ document_title: string; text: string }>,
+          ),
+      within(
+        () => this.context.pastWorkOnThis(userId, tenantId, sessionId, 5),
+        [],
+      ),
+      tenantId
+        ? within(() => this.context.orgWording(tenantId), null)
+        : Promise.resolve(null),
+    ]);
+    const out: string[] = [];
+    if (guidance.length) {
+      out.push(
+        'GUIDANCE (practice guidance your organisation uses; draw on it, never quote it as rules):',
+        ...guidance.map((g) => `- ${g.document_title}: ${g.text}`),
+      );
+    }
+    if (history.length) {
+      out.push(
+        "THEIR EARLIER POINTS TO WORK ON (link to these when it helps; don't list them):",
+        ...history.map((h) => `- ${h.date} · ${h.skill}: ${h.point}`),
+      );
+    }
+    if (org) {
+      out.push(
+        'THEIR ORGANISATION (use its wording when pointing them to their supervisor or its procedures):',
+        org,
+      );
+    }
+    return out;
+  }
+
   private async systemPrompt(
     code: string = DEBRIEF_PROMPT_CODES.reply,
   ): Promise<string> {

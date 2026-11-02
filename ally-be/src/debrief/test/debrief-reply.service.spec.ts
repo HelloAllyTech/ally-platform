@@ -11,6 +11,7 @@ const RUN = {
     what_worked: [],
     work_on_this: [],
     skill_words: [],
+    practise_next: { skill: 'Exploring risk', reason: 'Ask directly.' },
     reflective_question: 'What made it hard?',
   },
 };
@@ -21,6 +22,10 @@ function build(opts: {
   safetyFails?: boolean;
   bundleReply?: Record<string, unknown>;
   onTopic?: boolean;
+  guidance?: boolean;
+  history?: boolean;
+  org?: boolean;
+  slowKnowledge?: boolean;
 }) {
   const saved: any[] = [];
   const messages = {
@@ -60,6 +65,36 @@ function build(opts: {
       },
     ]),
     promptText: jest.fn(async () => 'REPLY PROMPT'),
+    pastWorkOnThis: jest.fn(async () =>
+      opts.history
+        ? [
+            {
+              date: '2026-10-20',
+              skill: 'Exploring risk',
+              point: 'Ask directly',
+            },
+          ]
+        : [],
+    ),
+    orgWording: jest.fn(async () =>
+      opts.org ? 'How to refer to their supervisor: your team lead' : null,
+    ),
+  };
+  const knowledge = {
+    searchForAudience: jest.fn(() =>
+      opts.slowKnowledge
+        ? new Promise(() => undefined)
+        : Promise.resolve({
+            passages: opts.guidance
+              ? [
+                  {
+                    document_title: 'Risk guide',
+                    text: 'Ask about safety plainly.',
+                  },
+                ]
+              : [],
+          }),
+    ),
   };
   const runner = {
     resolveRelease: jest.fn(async () => ({
@@ -98,8 +133,9 @@ function build(opts: {
     events as any,
     llm as any,
     { record: jest.fn() } as any,
+    knowledge as any,
   );
-  return { svc, saved, aiChat, feedback, events, getCompletion };
+  return { svc, saved, aiChat, feedback, events, getCompletion, knowledge };
 }
 
 const run = async (svc: DebriefReplyService, message: string) => {
@@ -110,6 +146,44 @@ const run = async (svc: DebriefReplyService, message: string) => {
 };
 
 describe('DebriefReplyService (Ask Ally)', () => {
+  it('knows the guidance, the learner’s earlier points and their organisation (FR-43)', async () => {
+    const { svc, aiChat, knowledge } = build({
+      reply: 'ok',
+      guidance: true,
+      history: true,
+      org: true,
+    });
+    await run(svc, 'Why that point?');
+    const call = (aiChat.streamResponse.mock.calls[0] as any[])[0];
+    expect(call.systemPrompt).toContain(
+      'Risk guide: Ask about safety plainly.',
+    );
+    expect(call.systemPrompt).toContain('Exploring risk: Ask directly');
+    expect(call.systemPrompt).toContain('your team lead');
+    // The query is the debrief's skills, never the learner's own words.
+    const [q] = knowledge.searchForAudience.mock.calls[0] as any[];
+    expect(q.query).not.toContain('Why that point?');
+  });
+
+  it('answers without the guidance when the knowledge base is slow', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      const { svc, aiChat } = build({
+        reply: 'ok',
+        slowKnowledge: true,
+        history: true,
+      });
+      const pending = run(svc, 'Why?');
+      await jest.advanceTimersByTimeAsync(1500);
+      await pending;
+      const call = (aiChat.streamResponse.mock.calls[0] as any[])[0];
+      expect(call.systemPrompt).not.toContain('GUIDANCE');
+      expect(call.systemPrompt).toContain('Exploring risk');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('answers from the debrief, streamed, and saves both sides of the thread', async () => {
     const { svc, saved, aiChat } = build({
       reply: 'Your opening let her lead.',

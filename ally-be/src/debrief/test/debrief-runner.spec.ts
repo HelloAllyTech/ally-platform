@@ -85,6 +85,7 @@ function build(opts: {
   const saved: any[] = [];
   const calls: string[] = [];
   const runs = {
+    query: jest.fn(async (..._args: any[]) => []),
     create: (x: any) => ({ ...x }),
     save: jest.fn(async (x: any) => {
       saved.push({ ...x });
@@ -163,7 +164,7 @@ function build(opts: {
     { optionsFor: async () => opts.practice ?? [] } as any,
     knowledge as any,
   );
-  return { svc, saved, calls, ai, knowledge };
+  return { svc, saved, calls, ai, knowledge, runs };
 }
 
 const safetyWithCue = {
@@ -184,6 +185,26 @@ const analyst = {
 };
 
 describe('DebriefRunnerService', () => {
+  it('tells the learner what it is doing as each step starts (FR-27)', async () => {
+    const { svc, runs } = build({
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [analyst],
+        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+        evaluator: [evaluation(9)],
+      },
+    });
+    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    const announced = runs.query.mock.calls.map((c: any[]) =>
+      JSON.parse(c[1][1]),
+    );
+    expect(announced.map((p: any) => p.step)).toEqual(
+      expect.arrayContaining(['safety_reader', 'guidance_lookup', 'writer']),
+    );
+    // After the Safety reader found a cue, the panel knows it.
+    expect((runs.query.mock.calls.slice(-1)[0] as any[])[1][2]).toBe(true);
+  });
+
   it('publishes a draft that passes the checks and the bar, without revising', async () => {
     const { svc, calls } = build({
       steps: {

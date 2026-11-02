@@ -933,7 +933,17 @@
       "reflectiveQuestion": "One question to think about",
       "working": {
         "title": "Ally is writing your debrief",
-        "defaultStep": "Reading your session…"
+        "defaultStep": "Reading your session…",
+        "steps": {
+          "reading": "Reading your session…",
+          "past_sessions": "Looking at your past sessions…",
+          "guidance": "Looking up guidance…",
+          "guidanceTopic": "Looking up guidance on {{topic}}…",
+          "writing": "Writing your debrief…",
+          "reviewing": "Reviewing my draft…",
+          "care": "Taking extra care with an important moment…",
+          "revising": "Making it clearer (round {{round}})…"
+        }
       },
       "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.",
       "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one.",

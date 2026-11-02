@@ -20,6 +20,13 @@ import {
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import { DebriefRun, DebriefRunStepRecord } from '../entity/debrief-run.entity';
+
+/** What a running debrief is doing now, for the learner's "working" panel. */
+export interface DebriefProgress {
+  step: string;
+  round?: number;
+  topic?: string;
+}
 import {
   DebriefRunArm,
   DebriefRunMode,
@@ -278,6 +285,27 @@ export class DebriefRunnerService {
         run.hasRiskCue ? settings.riskDeadlineMs : settings.deadlineMs;
       const timeLeft = () => deadline() - (now() - startedAt);
 
+      /**
+       * What the learner's "working" panel says now (v9 FR-27). Written as a
+       * step starts, so it names what is happening, not what just finished.
+       * Never awaited and never fails the run.
+       */
+      const announce = (p: DebriefProgress) => {
+        try {
+          void Promise.resolve(
+            this.runs.query(
+              `UPDATE debrief_runs
+                  SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{progress}', $2::jsonb),
+                      "hasRiskCue" = $3
+                WHERE id = $1 AND status = 'running'`,
+              [run.id, JSON.stringify(p), !!run.hasRiskCue],
+            ),
+          ).catch(() => undefined);
+        } catch {
+          // The panel stays on its last line; the debrief carries on.
+        }
+      };
+
       /** One AI step, retried once (on the backup model when there is one). */
       const call = async <T>(
         s: RecipeStep,
@@ -286,6 +314,7 @@ export class DebriefRunnerService {
         est: number,
         round?: number,
       ): Promise<T | null> => {
+        announce({ step: s.step, ...(round ? { round } : {}) });
         // A model whose breaker is open goes after its backup, not before.
         const models = modelsToTry(s.model, s.backupModel);
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -456,6 +485,19 @@ export class DebriefRunnerService {
           evidence.pivotal_moments ?? []
         ).slice(0, 3);
         const t0 = now();
+        // The skill that mattered most names what the lookup is about.
+        const topic = [...(evidence.behaviours ?? [])]
+          .filter((b: { opportunity?: boolean }) => b?.opportunity !== false)
+          .sort(
+            (a: { importance?: number }, b: { importance?: number }) =>
+              (b.importance ?? 0) - (a.importance ?? 0),
+          )[0]?.skill;
+        announce({
+          step: DebriefStep.GUIDANCE_LOOKUP,
+          ...(typeof topic === 'string' && topic.trim()
+            ? { topic: topic.trim().slice(0, 60) }
+            : {}),
+        });
         const seen = new Set<string>();
         let lookups = 0;
         for (const m of moments) {

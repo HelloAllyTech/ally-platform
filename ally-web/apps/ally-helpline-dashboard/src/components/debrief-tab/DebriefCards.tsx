@@ -518,6 +518,17 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
   // Read-aloud is the learner's: its audio links are theirs alone.
   const ready = view.state === "ready" && !!view.cards && !supervisor;
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
+  const progressLine = (): string => {
+    const p = view.progress;
+    if (!p) return latestStep || t("postSim.debriefCards.working.defaultStep");
+    if (p.key === "guidance" && p.topic) {
+      return t("postSim.debriefCards.working.steps.guidanceTopic", { topic: p.topic });
+    }
+    if (p.key === "revising") {
+      return t("postSim.debriefCards.working.steps.revising", { round: p.round });
+    }
+    return t(`postSim.debriefCards.working.steps.${p.key}`);
+  };
 
   let content: ReactNode = null;
   if (view.state === "working") {
@@ -536,9 +547,7 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
           <p className="font-primary text-sm font-semibold text-typography-900">
             {t("postSim.debriefCards.working.title")}
           </p>
-          <p className="font-primary text-sm text-typography-700">
-            {latestStep || t("postSim.debriefCards.working.defaultStep")}
-          </p>
+          <p className="font-primary text-sm text-typography-700">{progressLine()}</p>
         </div>
       </div>
     );
