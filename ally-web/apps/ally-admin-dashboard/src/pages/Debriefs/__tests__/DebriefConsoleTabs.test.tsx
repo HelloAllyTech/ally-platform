@@ -407,6 +407,31 @@ describe("Debrief Console tabs", () => {
     );
   });
 
+  it("Review: a published debrief with learner distress asks someone to check on them (FR-23)", async () => {
+    h.review.mockReturnValue(
+      ok({
+        runs: [
+          {
+            ...RUN_ROW,
+            status: "published",
+            learnerDistress: true,
+            checkFailures: [],
+            evaluatorHardFails: [],
+          },
+        ],
+        flags: [],
+      }),
+    );
+    h.act.mockReturnValue(resolves());
+    render(<ReviewTab />);
+    const run = screen.getByTestId("review-run");
+    expect(run).toHaveTextContent("stepped out of the roleplay in distress");
+    expect(within(run).queryByRole("button", { name: "Publish as it is" })).not.toBeInTheDocument();
+    fireEvent.click(within(run).getByRole("button", { name: "Checked on" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark checked" }));
+    await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: RUN_ROW.id, action: "reviewed" }));
+  });
+
   describe("Knowledge", () => {
     const DOC = {
       id: "d1",

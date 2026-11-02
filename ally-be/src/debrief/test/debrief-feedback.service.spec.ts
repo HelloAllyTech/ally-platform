@@ -180,4 +180,100 @@ describe('debrief feedback', () => {
       build({ run: { mode: 'shadow' } }).svc.publishRun('run-1', 1),
     ).rejects.toThrow('Live run not found');
   });
+
+  it('queues a published debrief where the learner showed distress, first (FR-23)', async () => {
+    const { svc } = build();
+    const query = (svc as any).dataSource.query as jest.Mock;
+    query.mockResolvedValue([]);
+    await svc.queue();
+    const [sql] = query.mock.calls[0] as [string];
+    expect(sql).toContain(
+      `OR (r."learnerDistress" AND r.status = 'published')`,
+    );
+    expect(sql).toMatch(/ORDER BY r\."learnerDistress" DESC/);
+  });
+
+  describe('supervisorView (FR-26)', () => {
+    const viewer = (tenantId: string | null, platformAdmin = false) => ({
+      tenantId,
+      platformAdmin,
+    });
+    const setup = (sessionTenant: string) => {
+      const ctx = build();
+      const query = (ctx.svc as any).dataSource.query as jest.Mock;
+      query.mockImplementation(async (sql: string) =>
+        sql.includes('FROM scenario_sessions')
+          ? [{ tenant_id: sessionTenant, counselor_id: 7 }]
+          : [
+              {
+                senderId: 7,
+                content: 'why that point?',
+                createdAt: new Date('2026-11-02T10:00:00Z'),
+              },
+              {
+                senderId: -1,
+                content: 'Because…',
+                createdAt: new Date('2026-11-02T10:00:05Z'),
+              },
+            ],
+      );
+      const fb = (ctx.svc as any).feedback;
+      fb.find.mockResolvedValue([
+        {
+          userId: 7,
+          kind: 'flag',
+          section: 'what_worked[0]',
+          reason: 'didnt_say',
+          note: 'n',
+          status: 'open',
+          resolutionNote: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          userId: 7,
+          kind: 'flag',
+          section: 'opening',
+          reason: 'something_else',
+          status: 'withdrawn',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          userId: 7,
+          kind: 'helpful',
+          helpful: true,
+          status: 'open',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+      return ctx;
+    };
+
+    it('shows an admin of the same organisation the debrief, flags, helpful and thread, read-only', async () => {
+      const view = await setup('t').svc.supervisorView('s1', viewer('t'));
+      expect(view.readOnly).toBe(true);
+      expect(view.state).toBe('ready');
+      expect(view.flags).toEqual([
+        expect.objectContaining({
+          section: 'what_worked[0]',
+          reason: 'didnt_say',
+        }),
+      ]);
+      expect(view.helpful).toBe(true);
+      expect(view.thread?.map((m) => m.role)).toEqual(['learner', 'ally']);
+    });
+
+    it('refuses an admin of another organisation, but not a platform admin', async () => {
+      await expect(
+        setup('other').svc.supervisorView('s1', viewer('t')),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      const view = await setup('other').svc.supervisorView(
+        's1',
+        viewer('ally', true),
+      );
+      expect(view.state).toBe('ready');
+    });
+  });
 });

@@ -18,7 +18,13 @@ import {
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { DebriefCardsData, DebriefSkillWord, DebriefSupportLine, LearnerDebriefView } from "@types";
+import {
+  DebriefCardsData,
+  DebriefSkillWord,
+  DebriefSupportLine,
+  LearnerDebriefView,
+  SupervisorDebriefFlag,
+} from "@types";
 
 import { CardFlag, DebriefHelpful } from "./DebriefCardFeedback";
 import {
@@ -139,6 +145,32 @@ const SupportLines: FC<{ lines: DebriefSupportLine[] }> = ({ lines }) => (
   </ul>
 );
 
+/** What the learner said about one card, and the outcome — for a supervisor. */
+const SupervisorFlag: FC<{ flag?: SupervisorDebriefFlag }> = ({ flag }) => {
+  const { t } = useTranslation();
+  if (!flag) return null;
+  const outcome =
+    flag.status === "kept"
+      ? t("postSim.debriefCards.supervisor.kept", { note: flag.resolutionNote ?? "" })
+      : flag.status === "removed"
+        ? t("postSim.debriefCards.supervisor.removed")
+        : t("postSim.debriefCards.supervisor.waiting");
+  return (
+    <div
+      data-testid="debrief-supervisor-flag"
+      className="flex flex-col gap-1 rounded-md border-l-4 border-warning-400 bg-warning-50 px-3 py-2 font-primary text-xs text-typography-900"
+    >
+      <span>
+        {t("postSim.debriefCards.supervisor.flagged", {
+          reason: flag.reason ? t(`postSim.debriefCards.flag.reasons.${flag.reason}`) : "",
+        })}
+      </span>
+      {flag.note && <span>{t("postSim.debriefCards.supervisor.note", { note: flag.note })}</span>}
+      <span>{outcome}</span>
+    </div>
+  );
+};
+
 /** A card item that gets a ring while read-aloud is reading it. */
 const ReadableItem: FC<{ section: string; children: ReactNode }> = ({ section, children }) => {
   const reading = useIsBeingRead(section);
@@ -174,30 +206,35 @@ const ReadyCards: FC<{
   view: LearnerDebriefView;
   sessionId: string;
   replyThread?: ReactNode;
-}> = ({ cards, view, sessionId, replyThread }) => {
+  supervisor?: SupervisorView;
+}> = ({ cards, view, sessionId, replyThread, supervisor }) => {
   const { t } = useTranslation();
   // The end of the last Work-on-this card, for DEBRIEF_READ XP.
   const readEndRef = useRef<HTMLDivElement>(null);
-  useReadToTheEnd(sessionId, readEndRef);
+  useReadToTheEnd(sessionId, readEndRef, !supervisor);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
   const flagFor = (section: string) => view.feedback?.flags.find(f => f.section === section);
   const correctionFor = (section: string) => corrections.find(c => c.section === section);
-  const flagControl = (section: string, cardLabel: string) => (
-    <div className="flex flex-wrap items-start gap-1">
-      <ListenButton section={section} cardLabel={cardLabel} />
-      <CardFlag
-        sessionId={sessionId}
-        section={section}
-        cardLabel={cardLabel}
-        flag={flagFor(section)}
-        correction={correctionFor(section)}
-      />
-    </div>
-  );
+  const flagControl = (section: string, cardLabel: string) =>
+    supervisor ? (
+      <SupervisorFlag flag={supervisor.flags?.find(f => f.section === section)} />
+    ) : (
+      <div className="flex flex-wrap items-start gap-1">
+        <ListenButton section={section} cardLabel={cardLabel} />
+        <CardFlag
+          sessionId={sessionId}
+          section={section}
+          cardLabel={cardLabel}
+          flag={flagFor(section)}
+          correction={correctionFor(section)}
+        />
+      </div>
+    );
+  // A supervisor reads; the learner's buttons are not theirs to press.
   const practiceFor = (id?: number | null) =>
-    id == null ? undefined : view.practice?.find(p => p.id === id);
+    id == null || supervisor ? undefined : view.practice?.find(p => p.id === id);
   const moment = removed.has("important_moment") ? null : cards.important_moment;
   const worked = cards.what_worked
     .map((item, index) => ({ item, index }))
@@ -377,7 +414,20 @@ const ReadyCards: FC<{
           {t("postSim.debriefCards.corrections.removed")}
         </p>
       )}
-      <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+      {supervisor ? (
+        <p
+          data-testid="debrief-supervisor-helpful"
+          className="font-primary text-sm text-typography-800"
+        >
+          {supervisor.helpful === true
+            ? t("postSim.debriefCards.supervisor.helpfulYes")
+            : supervisor.helpful === false
+              ? t("postSim.debriefCards.supervisor.helpfulNo")
+              : t("postSim.debriefCards.supervisor.helpfulNone")}
+        </p>
+      ) : (
+        <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+      )}
     </div>
   );
 };
@@ -435,9 +485,14 @@ const DistressFirst: FC<{ view: LearnerDebriefView; children: ReactNode }> = ({
   );
 };
 
+/** What a supervisor sees besides the cards: the learner's flags and answer. */
+type SupervisorView = { flags?: SupervisorDebriefFlag[]; helpful?: boolean | null };
+
 interface DebriefCardsProps {
   view: LearnerDebriefView;
   sessionId: string;
+  /** Read-only for a supervisor on Roleplay Logs: no buttons, the learner's feedback shown. */
+  supervisor?: SupervisorView;
   /** Ask Ally's thread and composer, under the reflective question. */
   replyThread?: ReactNode;
 }
@@ -450,10 +505,16 @@ interface DebriefCardsProps {
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
  */
-export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId, replyThread }) => {
+export const DebriefCards: FC<DebriefCardsProps> = ({
+  view,
+  sessionId,
+  replyThread,
+  supervisor,
+}) => {
   const { t } = useTranslation();
   const readAloud = useDebriefReadAloud(sessionId);
-  const ready = view.state === "ready" && !!view.cards;
+  // Read-aloud is the learner's: its audio links are theirs alone.
+  const ready = view.state === "ready" && !!view.cards && !supervisor;
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
 
   let content: ReactNode = null;
@@ -485,7 +546,13 @@ export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId, replyThre
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
   } else if (view.state === "ready" && view.cards) {
     const cards = (
-      <ReadyCards cards={view.cards} view={view} sessionId={sessionId} replyThread={replyThread} />
+      <ReadyCards
+        cards={view.cards}
+        view={view}
+        sessionId={sessionId}
+        replyThread={replyThread}
+        supervisor={supervisor}
+      />
     );
     content = view.distress ? <DistressFirst view={view}>{cards}</DistressFirst> : cards;
   }
@@ -510,6 +577,10 @@ export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId, replyThre
           className="flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6"
         >
           <ReadAloudStatusLine />
+          {/* FR-27: screen readers hear when the debrief is ready. */}
+          <p className="sr-only" role="status" aria-live="polite">
+            {view.state === "ready" && view.cards ? t("postSim.debriefCards.ready.announce") : ""}
+          </p>
           {content}
         </div>
       </div>

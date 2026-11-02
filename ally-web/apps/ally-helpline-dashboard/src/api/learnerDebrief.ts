@@ -1,5 +1,5 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
-import { DebriefFlagReason, LearnerDebriefView } from "@types";
+import { DebriefFlagReason, LearnerDebriefView, SupervisorDebriefView } from "@types";
 
 import { baseAPI } from "./baseAPI";
 
@@ -60,6 +60,13 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
       ],
     }),
+    /** A supervisor's read-only view of a learner's debrief (Roleplay Logs). */
+    getSupervisorDebrief: builder.query<SupervisorDebriefView, string>({
+      query: sessionId => ({
+        url: ApiEndpoints.DEBRIEFS.SUPERVISOR(sessionId),
+        method: HttpMethod.GET,
+      }),
+    }),
     /** The learner read the debrief to the end: earns DEBRIEF_READ XP once. */
     markDebriefRead: builder.mutation<unknown, string>({
       query: sessionId => ({
@@ -83,6 +90,7 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useGetSupervisorDebriefQuery,
   useLazyGetDebriefCardAudioQuery,
   useMarkDebriefReadMutation,
   useGetLearnerDebriefQuery,

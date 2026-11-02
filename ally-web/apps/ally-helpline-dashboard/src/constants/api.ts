@@ -226,6 +226,8 @@ export const ApiEndpoints = {
     FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
     FLAG: (sessionId: string, flagId: string) =>
       `/v1/debriefs/sessions/${sessionId}/flags/${flagId}`,
+    // A supervisor's read-only view on Roleplay Logs (cards, flags, thread).
+    SUPERVISOR: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/supervisor`,
     // The learner read the debrief to the end (XP, once).
     READ: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/read`,
     // Read-aloud: a short-lived link to one card's audio.

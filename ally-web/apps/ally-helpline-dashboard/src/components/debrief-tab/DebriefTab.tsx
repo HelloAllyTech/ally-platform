@@ -3,7 +3,7 @@ import { FC, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 
-import { useGetChatHistoryQuery } from "@api";
+import { useGetChatHistoryQuery, useGetSupervisorDebriefQuery } from "@api";
 import { Refresh } from "@assets";
 import { useSendMessage } from "@hooks";
 import { initSession } from "@reducer";
@@ -90,6 +90,10 @@ export const DebriefTab: FC<DebriefTabProps> = ({
   // organisation is switched on. `null` — not switched on, request failed,
   // or still loading — keeps today's debrief exactly as it was.
   const learnerDebrief = useLearnerDebrief(sessionId);
+  // Roleplay Logs (read-only): a supervisor reads the learner's new debrief,
+  // their flags and their Ask Ally thread (v9 FR-26). Anything else — not
+  // switched on, an older session, a refusal — keeps today's note.
+  const { data: supervisorView } = useGetSupervisorDebriefQuery(sessionId, { skip: !readOnly });
   const askAlly = learnerDebrief?.state === "ready" && !readOnly;
   const { messages, streamingMessage, isStreaming, error, sendMessage, retryLastMessage } =
     useSendMessage(sessionId, askAlly ? ApiEndpoints.DEBRIEFS.REPLY_STREAM(sessionId) : undefined);
@@ -161,6 +165,44 @@ export const DebriefTab: FC<DebriefTabProps> = ({
     </>
   );
 
+  if (readOnly && supervisorView?.state === "ready" && supervisorView.cards) {
+    const supervisorThread = supervisorView.thread ?? [];
+    return (
+      <DebriefCards
+        view={{
+          state: "ready",
+          cards: supervisorView.cards,
+          language: supervisorView.language,
+          corrections: supervisorView.corrections,
+        }}
+        sessionId={sessionId}
+        supervisor={supervisorView}
+        replyThread={
+          <div data-testid="supervisor-thread" className="flex flex-col gap-3">
+            <p className="font-primary text-sm font-semibold text-typography-900">
+              {t("postSim.debriefCards.supervisor.thread")}
+            </p>
+            {supervisorThread.length === 0 ? (
+              <p className="font-primary text-sm text-typography-700">
+                {t("postSim.debriefCards.supervisor.noThread")}
+              </p>
+            ) : (
+              supervisorThread.map((m, index) => (
+                <ReplyBubble
+                  key={`${m.role}-${index}`}
+                  role={m.role === "learner" ? "user" : "assistant"}
+                  content={m.content}
+                  counsellorName={counsellorName}
+                  agentName={agentName}
+                />
+              ))
+            )}
+          </div>
+        }
+      />
+    );
+  }
+
   if (learnerDebrief) {
     return (
       <DebriefCards
@@ -175,6 +217,10 @@ export const DebriefTab: FC<DebriefTabProps> = ({
                 disabled={isStreaming}
                 placeholder={t("postSim.debriefCards.reply.placeholder")}
               />
+              {/* v9 Q47: supervisors read this thread, and the learner is told. */}
+              <p className="font-primary text-xs text-typography-700">
+                {t("postSim.debriefCards.supervisor.canRead")}
+              </p>
             </div>
           ) : undefined
         }

@@ -96,3 +96,24 @@ export interface LearnerDebriefView {
   /** Roleplays the cards link to that the learner can still open. */
   practice?: Array<{ id: number; title: string }>;
 }
+
+/** One of the learner's flags, as a supervisor reads it (v9 FR-26). */
+export interface SupervisorDebriefFlag {
+  section: string;
+  reason: DebriefFlagReason | null;
+  note: string | null;
+  status: "open" | "kept" | "removed" | "withdrawn";
+  resolutionNote: string | null;
+}
+
+/** A supervisor's read-only view of a learner's Debrief-agent debrief. */
+export interface SupervisorDebriefView {
+  state: "ready" | "not_available";
+  readOnly: true;
+  cards?: DebriefCardsData | null;
+  language?: string | null;
+  corrections?: DebriefCorrection[];
+  flags?: SupervisorDebriefFlag[];
+  helpful?: boolean | null;
+  thread?: Array<{ role: "learner" | "ally"; content: string; at: string }>;
+}

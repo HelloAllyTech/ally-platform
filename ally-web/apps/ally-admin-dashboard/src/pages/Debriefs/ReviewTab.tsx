@@ -27,7 +27,9 @@ const RunItem: React.FC<{
   onAct: (action: RunAction) => void;
 }> = ({ run, onOpen, onAct }) => {
   const s = en.debriefs.review;
-  const waiting = run.status !== "below_bar";
+  // A published debrief is here only because the learner showed distress (FR-23).
+  const distressOnly = run.status === "published";
+  const waiting = run.status !== "below_bar" && !distressOnly;
   return (
     <li className="flex flex-col gap-2 border border-border-light p-4" data-testid="review-run">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -40,7 +42,7 @@ const RunItem: React.FC<{
         <span>· {formatWhen(run.createdAt)}</span>
       </div>
       <p className="text-sm text-typography-800">
-        {waiting ? s.waitingHelp : s.belowBarHelp}{" "}
+        {distressOnly ? s.distressHelp : waiting ? s.waitingHelp : s.belowBarHelp}{" "}
         {s.scores(score(run.evaluatorOverall), score(run.judgeOverall))}
       </p>
       {(run.checkFailures.length > 0 || run.evaluatorHardFails.length > 0) && (
@@ -72,7 +74,7 @@ const RunItem: React.FC<{
           </>
         ) : (
           <Button kind="tertiary" size="sm" onClick={() => onAct("reviewed")}>
-            {s.looksFine}
+            {distressOnly ? s.checkedOn : s.looksFine}
           </Button>
         )}
       </div>

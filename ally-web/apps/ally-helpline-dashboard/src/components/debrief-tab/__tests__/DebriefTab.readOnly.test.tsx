@@ -24,7 +24,11 @@ vi.mock("react-redux", () => ({
   useSelector: () => undefined,
 }));
 
+const mockSupervisorQuery = vi.hoisted(() => vi.fn(() => ({ data: undefined })));
 vi.mock("@api", () => ({
+  useGetSupervisorDebriefQuery: (...args: unknown[]) => mockSupervisorQuery(...args),
+  useLazyGetDebriefCardAudioQuery: () => [vi.fn()],
+  useMarkDebriefReadMutation: () => [vi.fn()],
   useGetChatHistoryQuery: (...args: unknown[]) => mockChatHistoryQuery(...args),
   // The learner's org isn't on the new Debrief agent here, so today's view stays.
   useGetLearnerDebriefQuery: () => ({ data: { state: "not_available" } }),
@@ -164,3 +168,56 @@ describe("DebriefTab — full mode (just finished)", () => {
     expect(mockChatHistoryQuery).toHaveBeenCalledWith({ sessionId: "s-1" }, { skip: false });
   });
 });
+
+describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
+  const CARDS = {
+    opening: "You stayed calm.",
+    what_worked: [
+      { skill: "Listening", turn_index: 2, quote: "Go on.", lead: "You let her lead.", body: "It helped." },
+    ],
+    work_on_this: [],
+    practise_next: null,
+    skill_words: [],
+    reflective_question: "What was hard?",
+  };
+
+  it("reads the learner's debrief, flag, answer and thread, with no buttons", () => {
+    mockSupervisorQuery.mockReturnValue({
+      data: {
+        state: "ready",
+        readOnly: true,
+        cards: CARDS,
+        language: "en",
+        corrections: [],
+        flags: [
+          {
+            section: "what_worked[0]",
+            reason: "didnt_say",
+            note: "I never said that",
+            status: "open",
+            resolutionNote: null,
+          },
+        ],
+        helpful: false,
+        thread: [
+          { role: "learner", content: "Why that point?", at: "2026-11-02T10:00:00Z" },
+          { role: "ally", content: "Because you waited.", at: "2026-11-02T10:00:05Z" },
+        ],
+      },
+    } as never);
+    render(<DebriefTab sessionId="s-1" summaryData={undefined as never} retryMaxReached={false} readOnly />);
+
+    expect(screen.getByTestId("debrief-cards")).toBeInTheDocument();
+    expect(screen.getByTestId("debrief-supervisor-flag")).toHaveTextContent(
+      "postSim.debriefCards.supervisor.flagged",
+    );
+    expect(screen.getByTestId("debrief-supervisor-helpful")).toHaveTextContent(
+      "postSim.debriefCards.supervisor.helpfulNo",
+    );
+    expect(screen.getByTestId("supervisor-thread")).toHaveTextContent("Why that point?");
+    expect(screen.queryByText("postSim.debriefCards.flag.open")).not.toBeInTheDocument();
+    expect(screen.queryByText("postSim.debriefCards.listen.all")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+  });
+});
+

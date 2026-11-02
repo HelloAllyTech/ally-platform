@@ -49,6 +49,7 @@ function build(opts: {
           .map((id) => ({ id, title: 'Exam stress' })),
       ),
     } as any,
+    { ready: jest.fn(async () => undefined) } as any,
   );
 }
 
@@ -192,6 +193,7 @@ describe('DebriefAgentService.onSessionEnded', () => {
       overrides as any,
       { debriefAgentMode: mode } as any,
       { available: jest.fn(async () => []) } as any,
+      { ready: jest.fn(async () => undefined) } as any,
     );
     return { svc, runner };
   };
@@ -263,6 +265,7 @@ describe('DebriefAgentService.sweepStuckRuns', () => {
       {} as any,
       {} as any,
       {} as any,
+      { ready: jest.fn(async () => undefined) } as any,
     );
     expect(await svc.sweepStuckRuns()).toBe(2);
     const [sql, params] = query.mock.calls[0] as unknown as [string, string[]];

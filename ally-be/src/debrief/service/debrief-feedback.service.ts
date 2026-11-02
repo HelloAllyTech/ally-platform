@@ -17,6 +17,7 @@ import {
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
 import { DebriefCards } from '../util/debrief-cards.util';
+import { DebriefNotifier } from './debrief-notifier.service';
 import { LearnerDebriefView } from './debrief-agent.service';
 
 /** A learner can take a flag back for this long after sending it (plan §7.6). */
@@ -33,6 +34,28 @@ export interface DebriefCorrection {
 /** The card a section key names, as text — what a reviewer reads beside the flag. */
 /** The review-queue section for an Ask Ally item. */
 export const ASK_ALLY_SECTION = 'ask_ally';
+
+/**
+ * What a supervisor reads on Roleplay Logs (v9 FR-26, Q47): the learner's
+ * debrief as published, their flags with the outcome, their "Was this
+ * helpful?" answer and their Ask Ally thread — all read-only.
+ */
+export interface SupervisorDebriefView {
+  state: 'ready' | 'not_available';
+  readOnly: true;
+  cards?: Record<string, any> | null;
+  language?: string | null;
+  corrections?: DebriefCorrection[];
+  flags?: Array<{
+    section: string;
+    reason: string | null;
+    note: string | null;
+    status: string;
+    resolutionNote: string | null;
+  }>;
+  helpful?: boolean | null;
+  thread?: Array<{ role: 'learner' | 'ally'; content: string; at: string }>;
+}
 
 export function sectionText(
   cards: DebriefCards | null,
@@ -88,6 +111,7 @@ export class DebriefFeedbackService {
     private readonly runs: Repository<DebriefRun>,
     @InjectRepository(DebriefFeedback)
     private readonly feedback: Repository<DebriefFeedback>,
+    private readonly notifier?: DebriefNotifier,
   ) {}
 
   /** The learner's own published live debrief, or a refusal. */
@@ -278,6 +302,92 @@ export class DebriefFeedbackService {
 
   // --- The Ally team's review queue --------------------------------------------------
 
+  /**
+   * The read-only view for a supervisor: an organisation admin for their own
+   * organisation's sessions, or a platform admin for any. A session with no
+   * published Debrief-agent debrief is `not_available` (today's note stays).
+   */
+  async supervisorView(
+    sessionId: string,
+    viewer: { tenantId: string | null; platformAdmin: boolean },
+  ): Promise<SupervisorDebriefView> {
+    const none: SupervisorDebriefView = {
+      state: 'not_available',
+      readOnly: true,
+    };
+    const [s] = await this.dataSource.query(
+      `SELECT tenant_id, "counselorId" AS counselor_id FROM scenario_sessions WHERE id = $1`,
+      [sessionId],
+    );
+    if (!s) return none;
+    if (!viewer.platformAdmin && s.tenant_id !== viewer.tenantId) {
+      throw new ForbiddenException('Not a session in your organisation');
+    }
+    const run = await this.runs.findOne({
+      where: { scenarioSessionId: sessionId, mode: DebriefRunMode.LIVE },
+    });
+    if (
+      !run?.cards ||
+      ![DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR].includes(
+        run.status,
+      )
+    ) {
+      return none;
+    }
+    const learnerId = Number(s.counselor_id);
+    const rows = await this.feedback.find({ where: { runId: run.id } });
+    const learner = rows.filter((r) => r.userId === learnerId);
+    const thread: Array<{
+      senderId: number;
+      content: string;
+      createdAt: Date;
+    }> = await this.dataSource.query(
+      `SELECT m."senderId", m.content, m."createdAt"
+           FROM scenario_session_chat_messages m
+           JOIN scenario_session_chats c ON c.id = m."chatId"
+          WHERE c."scenarioSessionId" = $1 AND c."userId" = $2
+          ORDER BY m."createdAt" ASC`,
+      [sessionId, learnerId],
+    );
+    const decorated = (await this.decorate(
+      {
+        state: 'ready',
+        runId: run.id,
+        cards: run.cards,
+        language: run.language,
+      },
+      learnerId,
+    )) as { corrections?: DebriefCorrection[] };
+    return {
+      state: 'ready',
+      readOnly: true,
+      cards: run.cards,
+      language: run.language,
+      corrections: decorated.corrections ?? [],
+      flags: learner
+        .filter(
+          (r) =>
+            r.kind === DebriefFeedbackKind.FLAG &&
+            r.status !== DebriefFeedbackStatus.WITHDRAWN,
+        )
+        .map((r) => ({
+          section: r.section!,
+          reason: r.reason ?? null,
+          note: r.note ?? null,
+          status: r.status,
+          resolutionNote: r.resolutionNote ?? null,
+        })),
+      helpful:
+        learner.find((r) => r.kind === DebriefFeedbackKind.HELPFUL)?.helpful ??
+        null,
+      thread: thread.map((m) => ({
+        role: Number(m.senderId) === -1 ? 'ally' : 'learner',
+        content: m.content,
+        at: new Date(m.createdAt).toISOString(),
+      })),
+    };
+  }
+
   async queue() {
     const runs = await this.dataSource.query(
       `SELECT r.id, r."scenarioSessionId", r.status, r."skipReason", r.language,
@@ -287,9 +397,12 @@ export class DebriefFeedbackService {
          FROM debrief_runs r
          LEFT JOIN tenants t ON t.id::text = r.tenant_id
         WHERE r.mode = 'live'
-          AND r.status IN ('needs_person','below_bar','failed')
           AND NOT (r.workspace ? 'review')
-        ORDER BY r."hasRiskCue" DESC, r."createdAt" ASC
+          AND (r.status IN ('needs_person','below_bar','failed')
+               -- v9 FR-23: a learner's own distress is an urgent item even
+               -- when the debrief published normally; someone checks on them.
+               OR (r."learnerDistress" AND r.status = 'published'))
+        ORDER BY r."learnerDistress" DESC, r."hasRiskCue" DESC, r."createdAt" ASC
         LIMIT 200`,
     );
     const flags = await this.dataSource.query(
@@ -331,6 +444,13 @@ export class DebriefFeedbackService {
     await this.review(run, userId, 'published', note, {
       status: DebriefRunStatus.PUBLISHED,
     });
+    // A learner waiting on "on its way" hears that it is ready (FR-28).
+    if (run.status === DebriefRunStatus.NEEDS_PERSON) {
+      await this.notifier?.ready({
+        ...run,
+        status: DebriefRunStatus.PUBLISHED,
+      });
+    }
     return { id: run.id, status: DebriefRunStatus.PUBLISHED };
   }
 
@@ -378,6 +498,12 @@ export class DebriefFeedbackService {
     row.resolvedAt = new Date();
     row.resolutionNote = reason ? reason.slice(0, 500) : null;
     await this.feedback.save(row);
+    // The learner is told their debrief was reviewed (FR-31). An Ask Ally
+    // distress item is about the learner, not a card: nothing to announce.
+    if (row.section !== ASK_ALLY_SECTION) {
+      const run = await this.runs.findOne({ where: { id: row.runId } });
+      if (run) await this.notifier?.reviewed(run);
+    }
     return { id: row.id, status: row.status };
   }
 

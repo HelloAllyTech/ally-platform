@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { useTranslation } from "react-i18next";
 
 import {
   LEARNER_DEBRIEF_FAST_FOR_MS,
@@ -50,6 +52,26 @@ export const useLearnerDebrief = (
   // mid-poll keeps the progress panel (and the polling) going rather than
   // swapping the learner back to the old view. Only a request that never
   // succeeded falls back.
+  // v9 FR-28 on the web: a learner who left the tab while it was writing
+  // sees "Debrief ready · Ally" in the tab title, until they come back.
+  const { t } = useTranslation();
+  const wasWorking = useRef(false);
+  useEffect(() => {
+    const working = data?.state === "working";
+    if (wasWorking.current && data?.state === "ready" && document.hidden) {
+      const before = document.title;
+      document.title = t("postSim.debriefCards.ready.tabTitle");
+      const restore = () => {
+        if (!document.hidden) {
+          document.title = before;
+          document.removeEventListener("visibilitychange", restore);
+        }
+      };
+      document.addEventListener("visibilitychange", restore);
+    }
+    wasWorking.current = working;
+  }, [data?.state, t]);
+
   useEffect(() => {
     setIsWorking(data?.state === "working");
     setIsWaiting(data?.state === "on_its_way");

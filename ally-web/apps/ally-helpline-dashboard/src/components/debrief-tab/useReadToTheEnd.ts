@@ -11,13 +11,14 @@ export const READ_MIN_OPEN_MS = 30_000;
  * most once per mount; the server pays at most once per session anyway.
  * Opening and immediately closing earns nothing.
  */
-export const useReadToTheEnd = (sessionId: string, endRef: RefObject<Element>) => {
+export const useReadToTheEnd = (sessionId: string, endRef: RefObject<Element>, enabled = true) => {
   const [markRead] = useMarkDebriefReadMutation();
   const sent = useRef(false);
 
   useEffect(() => {
     const node = endRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") return undefined;
+    // Only the learner reading their own debrief earns it; never a supervisor.
+    if (!enabled || !node || typeof IntersectionObserver === "undefined") return undefined;
     let seen = false;
     let longEnough = false;
     const maybeSend = () => {
@@ -41,5 +42,5 @@ export const useReadToTheEnd = (sessionId: string, endRef: RefObject<Element>) =
       clearTimeout(timer);
       observer.disconnect();
     };
-  }, [endRef, markRead, sessionId]);
+  }, [endRef, markRead, sessionId, enabled]);
 };

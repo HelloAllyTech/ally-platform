@@ -25,6 +25,7 @@ import {
 } from '../../learn/type/scenario-session-leaderboard-event.type';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
+import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 
@@ -100,7 +101,27 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly overrides: AgentConfigOverrideService,
     private readonly config: AppConfigService,
     private readonly practice: DebriefPracticeService,
+    private readonly notifier: DebriefNotifier,
   ) {}
+
+  /**
+   * v9 FR-28: tell the learner their debrief is ready — only for a live run
+   * this call just finished (the runner hands back an existing run too).
+   */
+  private async announceReady(run: DebriefRun): Promise<void> {
+    const justFinished =
+      run.finishedAt &&
+      Date.now() - new Date(run.finishedAt).getTime() < 2 * 60 * 1000;
+    if (
+      run.mode === DebriefRunMode.LIVE &&
+      justFinished &&
+      [DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR].includes(
+        run.status,
+      )
+    ) {
+      await this.notifier.ready(run);
+    }
+  }
 
   onModuleInit(): void {
     scheduledTaskRegistry.register('5min', 'debrief-agent-drain', () =>
@@ -193,6 +214,7 @@ export class DebriefAgentService implements OnModuleInit {
           ? DebriefRunMode.LIVE
           : DebriefRunMode.SHADOW;
       const run = await this.runner.run(s.id, { mode });
+      await this.announceReady(run);
       // The independent judge scores every debrief, published or not, blind.
       if (run.cards) {
         await this.judge
@@ -241,6 +263,7 @@ export class DebriefAgentService implements OnModuleInit {
       const run = await this.runner.run(sessionId, {
         mode: DebriefRunMode.LIVE,
       });
+      await this.announceReady(run);
       this.logger.info(
         `[debrief] live run ${run.id} session=${sessionId} status=${run.status} rung=${run.fallbackRung} (on session end)`,
       );

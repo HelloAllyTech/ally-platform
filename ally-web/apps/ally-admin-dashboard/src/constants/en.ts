@@ -9620,6 +9620,9 @@ export const en = {
       distress: "Learner distress",
       waitingHelp: 'The learner sees "on its way" until you act.',
       belowBarHelp: "The learner already has this one; it scored below the bar.",
+      distressHelp:
+        "The learner stepped out of the roleplay in distress. They already have their debrief, opening with care and the support lines; check on them.",
+      checkedOn: "Checked on",
       scores: (evaluator: string, judge: string) => `Evaluator ${evaluator} · judge ${judge}.`,
       read: "Read it",
       publish: "Publish as it is",

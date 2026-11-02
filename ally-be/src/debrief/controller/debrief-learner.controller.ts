@@ -34,6 +34,7 @@ import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator'
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
 import { DebriefFlagReason } from '../enum/debrief-run.enum';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
@@ -87,6 +88,7 @@ export class DebriefLearnerController {
     private readonly replies: DebriefReplyService,
     private readonly audio: DebriefAudioService,
     private readonly events: EventEmitter2,
+    private readonly toggles: FeatureToggleService,
   ) {}
 
   @Post('sessions/:sessionId/read')
@@ -107,6 +109,22 @@ export class DebriefLearnerController {
       scenarioSessionId: sessionId,
     } as DebriefThreadQualifiedEventParams);
     return { ok: true };
+  }
+
+  @Get('sessions/:sessionId/supervisor')
+  @AuthPermissions([PERMISSIONS.VIEW_ADMIN_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      "A supervisor's read-only view of a learner's debrief: cards, flags, helpful and the Ask Ally thread",
+  })
+  async supervisor(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.feedback.supervisorView(sessionId, {
+      tenantId: user.tenantId ?? null,
+      platformAdmin: await this.toggles.isPlatformTierAdmin(user.id),
+    });
   }
 
   @Get('sessions/:sessionId/audio/:section')

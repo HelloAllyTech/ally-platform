@@ -40,6 +40,7 @@ vi.mock("@api", () => ({
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
   useMarkDebriefReadMutation: () => [mockMarkRead],
+  useGetSupervisorDebriefQuery: () => ({ data: undefined }),
   LEARNER_DEBRIEF_POLL_MS: 3000,
   LEARNER_DEBRIEF_SLOW_POLL_MS: 30000,
   LEARNER_DEBRIEF_FAST_FOR_MS: 240000,
@@ -178,6 +179,8 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       "s-1",
       "/v1/debriefs/sessions/s-1/reply/stream",
     );
+    // v9 Q47: the learner is told their supervisor can read the thread.
+    expect(screen.getByText("postSim.debriefCards.supervisor.canRead")).toBeInTheDocument();
 
     const container = screen.getByTestId("debrief-cards");
     expect(container).toHaveAttribute("lang", "hi");
