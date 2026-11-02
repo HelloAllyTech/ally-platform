@@ -26,6 +26,49 @@ def scheduler():
 
 
 @pytest.mark.asyncio
+async def test_lt_event_updates_graph_with_as_node(scheduler: TimeEventScheduler):
+    """
+    Tests that for an LT/LTE event, agent_graph.update_state is called with
+    as_node=True.
+    """
+    event_id = "test_event_lt"
+    mock_event_notifier = AsyncMock(return_value=(set(), 0, {"some_data"}))
+    mock_get_live_score = MagicMock(return_value=100)
+    mock_room = MagicMock(spec=rtc.Room)
+    mock_agent_graph = MagicMock()
+
+    event = MockEvent(
+        event_id=event_id,
+        detection_type=DetectionType.TIME,
+        data=EventData(time=0.01, condition=ConditionOperator.LT),
+    )
+
+    event_registry = {}
+
+    await scheduler.start_time_event_schedulers(
+        events=[event],
+        event_registry=event_registry,
+        event_notifier=mock_event_notifier,
+        get_live_score=mock_get_live_score,
+        room=mock_room,
+        agent_graph=mock_agent_graph,
+        thread_id="test_thread",
+    )
+
+    # Allow the task to run
+    await asyncio.sleep(0.1)
+
+    mock_agent_graph.update_state.assert_called_with(
+        {"configurable": {"thread_id": "test_thread"}},
+        values={"branching_and_feedback_data": {"some_data"}},
+        as_node=True,
+    )
+
+    # Cancel any remaining tasks to be safe
+    await scheduler.cancel_all()
+
+
+@pytest.mark.asyncio
 async def test_event_notifier_exception_after_trigger(
     scheduler: TimeEventScheduler, caplog
 ):
