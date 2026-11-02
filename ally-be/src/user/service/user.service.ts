@@ -1110,9 +1110,11 @@ export class UserService {
     // `name`/`logoUrl` stay as they are: released mobile builds read them.
     // `branding` is the resolved org identity for the web clients.
     return {
+      id: tenant.id,
       name: tenant.name,
       logoUrl: tenant.logoUrl,
       branding: tenant.branding,
+      brandedSignInUrl: tenant.brandedSignInUrl ?? null,
     };
   }
   async getPresignedUrlForProfileImage(

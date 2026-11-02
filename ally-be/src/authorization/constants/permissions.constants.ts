@@ -91,6 +91,13 @@ const PERMISSIONS = {
   VIEW_TENANT: 'view:tenant',
   EDIT_TENANT: 'edit:tenant',
   VIEW_TENANTS: 'view:tenants',
+  /**
+   * Edit the caller's OWN organization's branding (logo, display name,
+   * colour, favicon, welcome line) from the consumer web app. Held by the
+   * tenant ADMIN group; never widens past the caller's tenant, and the
+   * org-level on/off switch stays with EDIT_TENANT (platform admins).
+   */
+  EDIT_TENANT_BRANDING: 'edit:tenant-branding',
 
   // === REFERENCE DOCUMENTS ===
   VIEW_REFERENCE_DOCUMENT: 'view:reference-document',
@@ -699,6 +706,12 @@ const ADMIN_PERMISSIONS = [
   // granted by 1975750000000 and revoked by
   // 1976600000000-RevokeTenantAdminHelplineWorkspaceGrants.
   PERMISSIONS.EDIT_HELPLINE_TEAM,
+
+  // Own-org branding editor in the consumer web app (Branding tab). Usable
+  // only once a platform admin has switched branding on for the org — the
+  // switch itself is EDIT_TENANT. Granted by
+  // 1980850000000-AddOrgAdminBrandingPermission.
+  PERMISSIONS.EDIT_TENANT_BRANDING,
 
   // start:microphone-chat / start:cloud-telephony-chat are intentionally NOT
   // granted here — initiating a recording (scribe/dictation/telephony) is a

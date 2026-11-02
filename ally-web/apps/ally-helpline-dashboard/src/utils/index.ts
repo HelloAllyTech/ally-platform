@@ -14,3 +14,4 @@ export * from "./parseContent";
 export * from "./sanitizeHtml";
 export * from "./trackContext";
 export * from "./itemProgressStorage";
+export * from "./brandColour";

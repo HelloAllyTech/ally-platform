@@ -65,6 +65,20 @@ describe('validateBrandingPatch', () => {
     expect(bad.value).toEqual({});
   });
 
+  it('accepts only assets-bucket logo URLs, and null to remove', () => {
+    expect(validateBrandingPatch({ logoUrl: ASSET }).value).toEqual({
+      logoUrl: ASSET,
+    });
+    expect(validateBrandingPatch({ logoUrl: null }).value).toEqual({
+      logoUrl: null,
+    });
+    const bad = validateBrandingPatch({
+      logoUrl: 'https://evil.example/logo.png',
+    });
+    expect(bad.errors[0]).toMatch(/logo upload route/);
+    expect(bad.value).toEqual({});
+  });
+
   it('normalises a good colour and reports no warnings for Ally Blue', () => {
     const r = validateBrandingPatch({ primaryColor: '#264d8e' });
     expect(r.value).toEqual({ primaryColor: '#264D8E' });

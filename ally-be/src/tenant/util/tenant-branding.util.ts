@@ -32,6 +32,8 @@ import {
  */
 
 export interface BrandingPatch {
+  /** Lives on the tenant row, not in settings.branding; the service splits it off. */
+  logoUrl?: string | null;
   displayName?: string | null;
   primaryColor?: string | null;
   faviconUrl?: string | null;
@@ -98,6 +100,19 @@ export function validateBrandingPatch(
       errors,
     );
     if (v !== undefined) value.welcomeLine = v;
+  }
+
+  if ('logoUrl' in patch) {
+    const raw = patch.logoUrl;
+    if (raw === null || raw === '') {
+      value.logoUrl = null;
+    } else if (typeof raw !== 'string' || !ASSETS_URL_PATTERN.test(raw)) {
+      errors.push(
+        'logoUrl must be a file uploaded through the logo upload route',
+      );
+    } else {
+      value.logoUrl = raw;
+    }
   }
 
   if ('faviconUrl' in patch) {

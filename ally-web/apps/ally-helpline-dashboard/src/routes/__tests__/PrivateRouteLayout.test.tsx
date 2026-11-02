@@ -70,6 +70,7 @@ vi.mock("@pages", () => ({
     <div data-testid="achievements-view-all-page">Achievements View All Page</div>
   ),
   CharacterLibrary: () => <div data-testid="character-library-page">Character Library Page</div>,
+  OrgBranding: () => <div data-testid="org-branding-page">Org Branding Page</div>,
   CharacterInterview: () => (
     <div data-testid="character-interview-page">Character Interview Page</div>
   ),

@@ -646,13 +646,19 @@ export class TenantService {
       throw new BadRequestException(errors);
     }
 
-    const branding = applyBrandingPatch(stored, value);
+    // The logo lives on the tenant row (every client reads it from there),
+    // not in settings.branding, so it is split off before the patch is
+    // stored. Undefined = untouched; null = removed.
+    const { logoUrl, ...brandingValue } = value;
+    const branding = applyBrandingPatch(stored, brandingValue);
     const userIdStr = ExecutionManager.getUserId();
     const userId = userIdStr ? Number(userIdStr) : undefined;
     await this.tenantRepository.update(id, {
       settings: { ...(tenant.settings ?? {}), branding } as Record<string, any>,
+      ...(logoUrl !== undefined ? { logoUrl: logoUrl ?? '' } : {}),
       ...(userId ? { updatedBy: userId } : {}),
     });
+    if (logoUrl !== undefined) tenant.logoUrl = logoUrl ?? undefined;
 
     const restricted = await this.tenantScopeService.isRestricted(userId);
     this.auditLogService.log({

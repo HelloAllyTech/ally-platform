@@ -23,6 +23,16 @@ export interface FeatureToggleOptions {
    * decides read vs. write.
    */
   tenantPreference?: PreferenceName;
+  /**
+   * Own-org escape hatch: a caller holding this permission passes without a
+   * toggle row, for a surface that acts on the caller's own organization
+   * only. Pair it with `operator: 'OR'` so PermissionsGuard admits the
+   * holder, and with a scope check in the handler — this never widens WHICH
+   * organization the caller may touch, only who may reach the route. Unlike
+   * `tenantPreference` the org-level gate is the service's own (branding:
+   * the org's switch), so the refusal can name the fix.
+   */
+  orgAdminPermission?: string;
 }
 
 /**
@@ -45,16 +55,20 @@ export function RequireFeatureToggle(
   featureKey: FeatureToggleKey,
   options: {
     permissions?: string[];
+    /** How `permissions` combine; AND unless a route says otherwise. */
+    operator?: 'AND' | 'OR';
     tenantPreference?: PreferenceName;
+    orgAdminPermission?: string;
   } = {},
 ) {
   const permissions = options.permissions ?? [PERMISSIONS.SYSTEM_ACCESS];
   return applyDecorators(
     UseGuards(AuthGuard('jwt'), PermissionsGuard, FeatureToggleGuard),
-    RequirePermissions(permissions, 'AND'),
+    RequirePermissions(permissions, options.operator ?? 'AND'),
     SetMetadata(FEATURE_TOGGLE_KEY, {
       featureKey,
       tenantPreference: options.tenantPreference,
+      orgAdminPermission: options.orgAdminPermission,
     } as FeatureToggleOptions),
   );
 }
