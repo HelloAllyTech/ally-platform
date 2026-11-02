@@ -229,7 +229,7 @@ describe("SessionSidebar", () => {
       expect(screen.getByTestId("supervisor-ai-disclosure")).toHaveTextContent("AI-generated");
       expect(screen.getByTestId("tooltip")).toHaveAttribute(
         "title",
-        "Ally is an AI supervisor. It's listening live and sending these notes automatically — not a person.",
+        "These are AI suggestions from Ally. It's listening live and sending these notes automatically — not a person.",
       );
 
       rerender(
