@@ -9420,6 +9420,38 @@ export const en = {
       releases: "Releases",
       organisations: "Organisations",
       calibration: "Calibration",
+      knowledge: "Knowledge",
+    },
+    knowledge: {
+      title: "Guidance the Debrief agent can use",
+      help:
+        "Practice guidelines, the debrief style guide, level guides and organisations' protocols. The agent looks up to two passages for each important moment. A document marked clinical is used only once the clinical advisor has signed off its current text; editing it afterwards needs a new sign-off. An empty knowledge base never stops a debrief.",
+      add: "Add a document",
+      empty: "No guidance yet. Debriefs are written without it until you add some.",
+      columns: {
+        title: "Document",
+        audience: "Who it's for",
+        status: "Indexing",
+        clinical: "Clinical sign-off",
+        actions: "",
+      },
+      everyone: "Every organisation",
+      organisations: (n: number) => (n === 1 ? "1 organisation" : `${n} organisations`),
+      nobody: "No one yet",
+      archived: "Archived",
+      notClinical: "Not clinical",
+      awaiting: "Waiting for sign-off — not used",
+      signedOff: (by: string | null, when: string) =>
+        `Signed off${by ? ` by ${by}` : ""}, ${when}`,
+      edit: "Edit",
+      markClinical: "Mark clinical",
+      markNotClinical: "Not clinical",
+      signOff: "Sign off",
+      signOffConfirm:
+        "Sign off this document's current text as sound clinical guidance? The Debrief agent will start using it.",
+      saved: "Saved",
+      signedOffToast: "Signed off. The Debrief agent now uses it.",
+      failed: "That didn't save. Try again.",
     },
     status: {
       queued: "Queued",

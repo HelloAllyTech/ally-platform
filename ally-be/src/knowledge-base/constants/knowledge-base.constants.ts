@@ -102,6 +102,15 @@ export const KB_CHUNK_PROFILES: Record<KbCorpus, KbChunkProfile> = {
     maxTokens: 780,
     overlapTokens: 90,
   },
+  // Guidance is read next to one pivotal moment and the Writer sees two passages per
+  // moment, so the unit of use is one piece of advice with its qualification: the
+  // WhatsApp corpus's size, for the same reason.
+  [KbCorpus.DEBRIEF_KNOWLEDGE]: {
+    targetTokens: 400,
+    minTokens: 320,
+    maxTokens: 520,
+    overlapTokens: 60,
+  },
 };
 
 /**
@@ -173,6 +182,7 @@ export const KB_MIN_SIMILARITY_DEFAULT: Record<KbCorpus, number> = {
   [KbCorpus.WHATSAPP_QA]: 0.35,
   [KbCorpus.CHARACTER_LIBRARY]: 0.35,
   [KbCorpus.ALLY_GUIDE_LIBRARY]: 0.35,
+  [KbCorpus.DEBRIEF_KNOWLEDGE]: 0.35,
 };
 
 /**

@@ -251,3 +251,25 @@ export interface DebriefReviewQueue {
   runs: DebriefReviewRun[];
   flags: DebriefReviewFlag[];
 }
+
+/** One document in the debrief knowledge base, with its clinical sign-off. */
+export interface DebriefKnowledgeDocument {
+  id: string;
+  title: string;
+  status: string;
+  isGlobal: boolean;
+  tenantCount: number;
+  chunkCount: number;
+  archived: boolean;
+  updatedAt: string;
+  needsClinicalSignOff: boolean;
+  clinical: "not_clinical" | "signed_off" | "awaiting";
+  signedOffBy: string | null;
+  signedOffAt: string | null;
+}
+
+export interface DebriefKnowledgeList {
+  documents: DebriefKnowledgeDocument[];
+  /** Whether the person looking may sign off clinical guidance. */
+  canSignOff: boolean;
+}

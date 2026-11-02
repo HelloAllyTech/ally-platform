@@ -32,6 +32,14 @@ export enum KbCorpus {
    * targeted by hand — see KB_OWNED_CORPORA.
    */
   ALLY_GUIDE_LIBRARY = 'ally_guide_library',
+  /**
+   * Grounds the Debrief agent's guidance lookup (v9 FR-16): practice guidelines, the
+   * debrief style guide, level guides and organisations' protocols. Curated centrally and
+   * targeted by hand (platform-wide or named organisations), like the WhatsApp corpus; a
+   * document marked clinical is served only once the clinical advisor has signed off its
+   * current content.
+   */
+  DEBRIEF_KNOWLEDGE = 'debrief_knowledge',
 }
 
 /**
@@ -209,6 +217,11 @@ export enum KbRetrievalConsumer {
    * the query, but from what the learner just said, so it can carry their words.
    */
   ALLY_GUIDE = 'ally_guide',
+  /**
+   * The Debrief agent's guidance lookup, one search per pivotal moment. Marked sensitive:
+   * the query describes a moment in a learner's session.
+   */
+  DEBRIEF = 'debrief',
 }
 
 /**

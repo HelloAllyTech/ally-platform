@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AiChatModule } from '../ai-chat/ai-chat.module';
 import { LlmUsageModule } from '../analytics/llm-usage.module';
 import { AwsModule } from '../aws/aws.module';
+import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { GuideCrisisResponse } from '../guide/entity/guide-crisis-response.entity';
 import { GuideSignal } from '../guide/entity/guide-signal.entity';
 import { GuideCrisisService } from '../guide/safety/guide-crisis.service';
@@ -21,6 +22,7 @@ import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
 import { DebriefImproverService } from './service/debrief-improver.service';
+import { DebriefKnowledgeService } from './service/debrief-knowledge.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
@@ -48,6 +50,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     AiChatModule,
     AwsModule,
     LlmUsageModule,
+    // The guidance lookup's corpus, its audience rules and its retrieval log.
+    KnowledgeBaseModule,
     AgentHarnessModule,
     PromptModule,
     // "Practise this next" reads the learner's roleplays as their list does.
@@ -67,6 +71,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefPracticeService,
     DebriefReplyService,
     DebriefAudioService,
+    DebriefKnowledgeService,
     GuideCrisisService,
   ],
   exports: [DebriefAgentService],

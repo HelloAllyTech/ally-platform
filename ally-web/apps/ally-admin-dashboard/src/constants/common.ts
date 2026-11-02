@@ -456,6 +456,9 @@ export const ApiEndpoints = {
     RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
+    KNOWLEDGE: "/v1/debriefs/console/knowledge",
+    KNOWLEDGE_CLINICAL: (id: string) => `/v1/debriefs/console/knowledge/${id}/clinical`,
+    KNOWLEDGE_SIGN_OFF: (id: string) => `/v1/debriefs/console/knowledge/${id}/sign-off`,
   },
   DEBRIEF_CALIBRATION: {
     SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",

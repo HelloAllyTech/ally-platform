@@ -7,6 +7,7 @@ import { en } from "@constants";
 
 import { CalibrationTab } from "./CalibrationTab";
 import { ImproverTab } from "./ImproverTab";
+import { KnowledgeTab } from "./KnowledgeTab";
 import { OrganisationsTab } from "./OrganisationsTab";
 import { ReleasesTab } from "./ReleasesTab";
 import { ReviewTab } from "./ReviewTab";
@@ -19,6 +20,7 @@ export enum DebriefConsoleTab {
   RELEASES = "releases",
   ORGANISATIONS = "organisations",
   CALIBRATION = "calibration",
+  KNOWLEDGE = "knowledge",
 }
 
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
@@ -28,6 +30,7 @@ const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RELEASES]: ReleasesTab,
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
   [DebriefConsoleTab.CALIBRATION]: CalibrationTab,
+  [DebriefConsoleTab.KNOWLEDGE]: KnowledgeTab,
 };
 
 const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));

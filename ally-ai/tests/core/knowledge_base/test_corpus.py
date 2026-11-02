@@ -48,6 +48,7 @@ def test_wire_values_match_ally_be():
         "whatsapp_qa",
         "character_library",
         "ally_guide_library",
+        "debrief_knowledge",
     }
 
 

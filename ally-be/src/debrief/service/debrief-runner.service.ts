@@ -42,6 +42,12 @@ import {
 } from '../util/debrief-budget.util';
 import { DebriefAiClient, DebriefStepError } from './debrief-ai.client';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { isUUID } from 'class-validator';
+import {
+  KbCorpus,
+  KbRetrievalConsumer,
+} from '../../knowledge-base/enum/knowledge-base.enum';
+import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import {
   DebriefContextRepository,
   DebriefSessionContext,
@@ -119,6 +125,7 @@ export class DebriefRunnerService {
     private readonly ai: DebriefAiClient,
     private readonly releases: AgentReleaseService,
     private readonly practice: DebriefPracticeService,
+    private readonly knowledge: KnowledgeBaseService,
   ) {}
 
   /** The GA bundle, or the seed when GA is missing or does not validate. */
@@ -438,11 +445,27 @@ export class DebriefRunnerService {
           }
           try {
             lookups++;
-            const hits = await this.ai.searchGuidance(
-              m.summary,
-              session.tenantId,
-              settings.guidancePassagesPerMoment,
-              settings.guidanceMinSimilarity,
+            // The debrief knowledge base, as the learner's organisation may
+            // read it; clinical documents only as signed off. Logged to
+            // kb_retrievals like every other retrieval.
+            const { passages: hits } = await this.knowledge.searchForAudience(
+              {
+                corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+                query: m.summary,
+                limit: settings.guidancePassagesPerMoment,
+                minSimilarity: settings.guidanceMinSimilarity,
+              },
+              {
+                tenantId:
+                  session.tenantId && isUUID(session.tenantId)
+                    ? session.tenantId
+                    : null,
+              },
+              {
+                consumer: KbRetrievalConsumer.DEBRIEF,
+                sessionId: session.id,
+                userId: session.counselorId,
+              },
             );
             for (const h of hits) {
               if (seen.has(h.chunk_id)) continue;

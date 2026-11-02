@@ -144,7 +144,9 @@ function build(opts: {
       if (next instanceof Error) throw next;
       return next;
     }),
-    searchGuidance: jest.fn(async () => []),
+  };
+  const knowledge = {
+    searchForAudience: jest.fn(async () => ({ passages: [] })),
   };
   const releases = {
     getGa: async () => ({
@@ -159,8 +161,9 @@ function build(opts: {
     ai as any,
     releases as any,
     { optionsFor: async () => opts.practice ?? [] } as any,
+    knowledge as any,
   );
-  return { svc, saved, calls, ai };
+  return { svc, saved, calls, ai, knowledge };
 }
 
 const safetyWithCue = {
@@ -289,6 +292,35 @@ describe('DebriefRunnerService', () => {
       const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
       expect(run.recipeKey).toBe('short');
     });
+  });
+
+  it('looks guidance up in the debrief knowledge base, as the organisation may read it', async () => {
+    const { svc, knowledge } = build({
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [
+          {
+            ...analyst,
+            evidence: {
+              ...(analyst as any).evidence,
+              pivotal_moments: [{ summary: 'client hints at self-harm' }],
+            },
+          },
+        ],
+        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+        evaluator: [evaluation(9)],
+      },
+    });
+    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    expect(knowledge.searchForAudience).toHaveBeenCalledWith(
+      expect.objectContaining({
+        corpus: 'debrief_knowledge',
+        query: 'client hints at self-harm',
+      }),
+      // 't1' is not an organisation id, so only platform documents.
+      { tenantId: null },
+      expect.objectContaining({ consumer: 'debrief', sessionId: 's1' }),
+    );
   });
 
   it('revises a draft below the bar and keeps the better one', async () => {

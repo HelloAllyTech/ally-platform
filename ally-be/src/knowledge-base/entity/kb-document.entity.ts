@@ -159,6 +159,28 @@ export class KbDocument extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
   ownerTenantId?: string | null;
 
+  /**
+   * Clinical content (plan §8.5): served to the Debrief agent only once the
+   * clinical advisor has signed off this exact content. Set by the Ally team.
+   */
+  @Column({ type: 'boolean', name: 'needs_clinical_sign_off', default: false })
+  needsClinicalSignOff!: boolean;
+
+  @Column({ type: 'int', name: 'clinical_signed_off_by', nullable: true })
+  clinicalSignedOffBy?: number | null;
+
+  @Column({ type: 'timestamp', name: 'clinical_signed_off_at', nullable: true })
+  clinicalSignedOffAt?: Date | null;
+
+  /** The content hash that was signed off; an edit after it needs a new sign-off. */
+  @Column({
+    type: 'varchar',
+    length: 64,
+    name: 'clinical_signed_off_hash',
+    nullable: true,
+  })
+  clinicalSignedOffHash?: string | null;
+
   @Index('idx_kb_documents_status')
   @Column({
     type: 'varchar',

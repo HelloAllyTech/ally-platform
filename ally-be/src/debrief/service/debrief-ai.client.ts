@@ -41,35 +41,4 @@ export class DebriefAiClient {
       );
     }
   }
-
-  /**
-   * Practice guidance for one moment from the Ally guide's library: global
-   * material plus the tenant's own protocols, never another tenant's.
-   */
-  async searchGuidance(
-    query: string,
-    tenantId: string | null,
-    limit: number,
-    minSimilarity: number,
-  ): Promise<
-    Array<{
-      chunk_id: string;
-      document_title: string;
-      text: string;
-      similarity: number;
-    }>
-  > {
-    const { apiUrl, outboundApiKey } = this.config.ai;
-    const res = await axios.post(
-      `${apiUrl}/api/v1/knowledge-chunks/search?corpus=ally_guide_library`,
-      {
-        query,
-        limit,
-        min_similarity: minSimilarity,
-        audience: { tenant_id: tenantId, include_global: true },
-      },
-      { headers: { 'x-api-key': outboundApiKey }, timeout: 30_000 },
-    );
-    return res.data?.passages ?? [];
-  }
 }

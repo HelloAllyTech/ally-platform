@@ -247,7 +247,12 @@ export class KbDocumentRepository extends Repository<KbDocument> {
       .select(['doc.id', 'doc.isGlobal'])
       .where('doc.corpus = :corpus', { corpus: options.corpus })
       .andWhere('doc.archivedAt IS NULL')
-      .andWhere('doc.status = :status', { status: KbDocumentStatus.INDEXED });
+      .andWhere('doc.status = :status', { status: KbDocumentStatus.INDEXED })
+      // Clinical content is served only as signed off: its current text, by the advisor.
+      .andWhere(
+        `(doc."needs_clinical_sign_off" = false
+          OR doc."clinical_signed_off_hash" = doc."content_hash")`,
+      );
 
     if (options.tenantId === null) {
       query.andWhere('doc.isGlobal = true');

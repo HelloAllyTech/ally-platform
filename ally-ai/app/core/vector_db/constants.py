@@ -17,6 +17,7 @@ class VectorDBCollectionNames:
     KNOWLEDGE_CHUNKS = "KnowledgeChunk"
     CHARACTER_CHUNKS = "CharacterChunk"
     GUIDE_LIBRARY_CHUNKS = "GuideLibraryChunk"
+    DEBRIEF_KNOWLEDGE_CHUNKS = "DebriefKnowledgeChunk"
 
 
 class MigrationHistoryProperties:
