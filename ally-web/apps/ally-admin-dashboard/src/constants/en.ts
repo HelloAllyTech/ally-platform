@@ -9619,6 +9619,9 @@ export const en = {
       runsHeading: "Debriefs waiting for a person",
       flagsHeading: "Learners' flags",
       distress: "Learner distress",
+      judgeBelow: "Judge below the bar",
+      judgeHelp:
+        "The learner already has this one. The independent judge scored it below the bar or found a hard fail after it was published; read it and correct a card if needed.",
       waitingHelp: 'The learner sees "on its way" until you act.',
       belowBarHelp: "The learner already has this one; it scored below the bar.",
       distressHelp:

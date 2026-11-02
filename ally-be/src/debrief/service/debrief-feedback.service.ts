@@ -17,6 +17,7 @@ import {
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
 import { DebriefCards } from '../util/debrief-cards.util';
+import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { LearnerDebriefView } from './debrief-agent.service';
 
@@ -458,10 +459,17 @@ export class DebriefFeedbackService {
   }
 
   async queue() {
+    // v9 FR-21: a published debrief the independent judge scores below the
+    // bar, or with a hard fail, goes to a person too.
+    const judgeBelow = `(r.workspace ? 'judge' AND (
+           (r.workspace->'judge'->>'overall')::float < $1
+           OR jsonb_array_length(coalesce(r.workspace->'judge'->'hardFails', '[]'::jsonb)) > 0))`;
     const runs = await this.dataSource.query(
       `SELECT r.id, r."scenarioSessionId", r.status, r."skipReason", r.language,
               r."hasRiskCue", r."learnerDistress", r."evaluatorOverall",
               (r.workspace->'judge'->>'overall')::float AS "judgeOverall",
+              r.workspace->'judge'->'hardFails' AS "judgeHardFails",
+              ${judgeBelow} AS "judgeBelowBar",
               r."checkFailures", r."evaluatorHardFails", r."createdAt", t.name AS "tenantName",
               r.workspace->'escalation' AS escalation
          FROM debrief_runs r
@@ -471,9 +479,11 @@ export class DebriefFeedbackService {
           AND (r.status IN ('needs_person','below_bar','failed')
                -- v9 FR-23: a learner's own distress is an urgent item even
                -- when the debrief published normally; someone checks on them.
-               OR (r."learnerDistress" AND r.status = 'published'))
+               OR (r."learnerDistress" AND r.status = 'published')
+               OR (r.status = 'published' AND ${judgeBelow}))
         ORDER BY r."learnerDistress" DESC, r."hasRiskCue" DESC, r."createdAt" ASC
         LIMIT 200`,
+      [DEBRIEF_SEED_BUNDLE.settings.passScore],
     );
     const flags = await this.dataSource.query(
       `SELECT f.id, f."runId", f."scenarioSessionId", f.section, f.reason, f.note, f.urgent, f.status,

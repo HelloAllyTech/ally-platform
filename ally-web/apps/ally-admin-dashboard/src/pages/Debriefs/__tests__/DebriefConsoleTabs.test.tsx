@@ -533,6 +533,36 @@ describe("Debrief Console tabs", () => {
     await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: RUN_ROW.id, action: "reviewed" }));
   });
 
+  it("Review: a published debrief the judge scored below the bar is checked, not republished (FR-21)", async () => {
+    h.review.mockReturnValue(
+      ok({
+        runs: [
+          {
+            ...RUN_ROW,
+            status: "published",
+            learnerDistress: false,
+            judgeBelowBar: true,
+            judgeHardFails: [{ code: "missed_risk_cue", evidence: "turn 14 not addressed" }],
+            checkFailures: [],
+            evaluatorHardFails: [],
+          },
+        ],
+        flags: [],
+      }),
+    );
+    h.act.mockReturnValue(resolves());
+    render(<ReviewTab />);
+    const run = screen.getByTestId("review-run");
+    expect(run).toHaveTextContent("Judge below the bar");
+    expect(run).toHaveTextContent("independent judge scored it below the bar");
+    expect(run).toHaveTextContent("missed_risk_cue: turn 14 not addressed");
+    expect(run).not.toHaveTextContent("stepped out of the roleplay in distress");
+    expect(within(run).queryByRole("button", { name: "Publish as it is" })).not.toBeInTheDocument();
+    fireEvent.click(within(run).getByRole("button", { name: "Looks fine" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark checked" }));
+    await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: RUN_ROW.id, action: "reviewed" }));
+  });
+
   describe("Knowledge", () => {
     const DOC = {
       id: "d1",

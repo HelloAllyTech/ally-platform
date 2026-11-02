@@ -244,6 +244,9 @@ export interface DebriefReviewRun {
   createdAt: string;
   tenantName: string | null;
   escalation: { by: number; at: string; note: string | null } | null;
+  /** v9 FR-21: published, but the independent judge scored it below the bar or found a hard fail. */
+  judgeBelowBar: boolean;
+  judgeHardFails: Array<{ code: string; evidence: string }> | null;
 }
 
 /** The words of a card a reviewer may rewrite; the quote never changes. */

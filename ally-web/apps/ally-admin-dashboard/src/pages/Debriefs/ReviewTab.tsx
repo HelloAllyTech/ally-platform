@@ -51,15 +51,19 @@ const RunItem: React.FC<{
   onAct: (action: RunAction) => void;
 }> = ({ run, onOpen, onAct }) => {
   const s = en.debriefs.review;
-  // A published debrief is here only because the learner showed distress (FR-23).
-  const distressOnly = run.status === "published";
-  const waiting = run.status !== "below_bar" && !distressOnly;
+  // A published debrief is here because the learner showed distress (FR-23)
+  // or because the independent judge scored it below the bar (FR-21).
+  const published = run.status === "published";
+  const distressOnly = published && run.learnerDistress;
+  const judgeOnly = published && !run.learnerDistress && run.judgeBelowBar;
+  const waiting = run.status !== "below_bar" && !published;
   return (
     <li className="flex flex-col gap-2 border border-border-light p-4" data-testid="review-run">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Pill tone={waiting ? "warning" : "neutral"}>{en.debriefs.status[run.status]}</Pill>
         {run.hasRiskCue && <Pill tone="info">{en.debriefs.runs.riskCue}</Pill>}
         {run.learnerDistress && <Pill tone="warning">{s.distress}</Pill>}
+        {run.judgeBelowBar && <Pill tone="warning">{s.judgeBelow}</Pill>}
         {run.escalation && <Pill tone="info">{s.escalated}</Pill>}
         <span className="font-mono text-xs">{shortId(run.scenarioSessionId)}</span>
         <SessionLogLink sessionId={run.scenarioSessionId} />
@@ -68,7 +72,13 @@ const RunItem: React.FC<{
         <span>· {formatWhen(run.createdAt)}</span>
       </div>
       <p className="text-sm text-typography-800">
-        {distressOnly ? s.distressHelp : waiting ? s.waitingHelp : s.belowBarHelp}{" "}
+        {distressOnly
+          ? s.distressHelp
+          : judgeOnly
+            ? s.judgeHelp
+            : waiting
+              ? s.waitingHelp
+              : s.belowBarHelp}{" "}
         {s.scores(score(run.evaluatorOverall), score(run.judgeOverall))}
       </p>
       {run.escalation && (
@@ -77,7 +87,9 @@ const RunItem: React.FC<{
           {run.escalation.note ? ` ${run.escalation.note}` : ""}
         </p>
       )}
-      {(run.checkFailures.length > 0 || run.evaluatorHardFails.length > 0) && (
+      {(run.checkFailures.length > 0 ||
+        run.evaluatorHardFails.length > 0 ||
+        (run.judgeHardFails?.length ?? 0) > 0) && (
         <ul className="list-disc pl-5 text-sm">
           {run.checkFailures.map((f, i) => (
             <li key={`c${i}`}>
@@ -86,6 +98,11 @@ const RunItem: React.FC<{
           ))}
           {run.evaluatorHardFails.map((h, i) => (
             <li key={`h${i}`}>
+              {h.code}: {h.evidence}
+            </li>
+          ))}
+          {(run.judgeHardFails ?? []).map((h, i) => (
+            <li key={`j${i}`}>
               {h.code}: {h.evidence}
             </li>
           ))}
