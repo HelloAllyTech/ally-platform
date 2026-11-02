@@ -87,4 +87,48 @@ describe('NotificationsScreen', () => {
 
     expect(mockPush).not.toHaveBeenCalled();
   });
+
+  it.each(['DEBRIEF_READY', 'DEBRIEF_REVIEWED'])(
+    'opens the session’s debrief on a %s tap',
+    type => {
+      mockNotifications = [
+        {
+          id: 'notif-3',
+          type,
+          title: 'Your debrief is ready',
+          body: 'Ally has written your debrief for "Meena".',
+          data: {screen: 'SimulationFeedback', scenarioSessionId: 'sess-9'},
+          readAt: null,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+
+      const {getByTestId} = render(<NotificationsScreen />);
+      fireEvent.press(getByTestId('notification-item'));
+
+      expect(mockMarkRead).toHaveBeenCalledWith('notif-3');
+      expect(mockPush).toHaveBeenCalledWith('SimulationFeedback', {
+        scenarioSessionId: 'sess-9',
+      });
+    },
+  );
+
+  it('does not navigate for a debrief notification without a session', () => {
+    mockNotifications = [
+      {
+        id: 'notif-4',
+        type: 'DEBRIEF_READY',
+        title: 'Your debrief is ready',
+        body: '',
+        data: {screen: 'SimulationFeedback'},
+        readAt: '2026-11-02T10:00:00.000Z',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    const {getByTestId} = render(<NotificationsScreen />);
+    fireEvent.press(getByTestId('notification-item'));
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

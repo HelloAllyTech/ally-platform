@@ -37,6 +37,24 @@ bool isReminderNotification(Map<String, dynamic>? data) => data?['type'] == remi
 String reminderRouteFor(Map<String, dynamic>? data) =>
     data?['screen'] == _simulationsScreenHint ? '/simulations' : '/notifications';
 
+/// The Debrief agent's "your debrief is ready" and "the Ally team reviewed
+/// your flag" notifications (ally-be `debrief-notifier.service.ts`). Both
+/// carry `screen: "SimulationFeedback"` and the `scenarioSessionId`: flat
+/// in a push's data, under `data` on the in-app notification.
+const String debriefReadyNotificationType = 'DEBRIEF_READY';
+const String debriefReviewedNotificationType = 'DEBRIEF_REVIEWED';
+
+bool isDebriefNotificationType(Object? type) =>
+    type == debriefReadyNotificationType || type == debriefReviewedNotificationType;
+
+/// The session's Simulation feedback screen, which opens on its Debrief
+/// tab, or null without a session id (web `notificationTargetRoute`).
+String? debriefRouteFor(Map<String, dynamic>? data) {
+  final sessionId = data?['scenarioSessionId'];
+  if (sessionId is! String || sessionId.isEmpty) return null;
+  return '/simulations/feedback/${Uri.encodeComponent(sessionId)}';
+}
+
 /// The single decision point every notification-tap handler (foreground,
 /// background-but-not-killed, and cold-start) calls into. `null` means
 /// "nothing to navigate for this tap."
@@ -47,5 +65,6 @@ String reminderRouteFor(Map<String, dynamic>? data) =>
 String? routeForNotificationTap({String? notificationId, Map<String, dynamic>? data}) {
   if (notificationId == leaderboardNotificationId) return homeTabLocation(kTabLeaderboard);
   if (isReminderNotification(data)) return reminderRouteFor(data);
+  if (isDebriefNotificationType(data?['type'])) return debriefRouteFor(data);
   return null;
 }

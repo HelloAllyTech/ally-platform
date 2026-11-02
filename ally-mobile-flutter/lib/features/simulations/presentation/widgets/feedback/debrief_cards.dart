@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../../core/localization/localization_controller.dart';
 import '../../../../../core/localization/translate_ref.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
@@ -20,9 +23,12 @@ import 'learner_debrief_controller.dart';
 /// No score, no percentage and no red anywhere: amber marks what needs
 /// attention, and every status carries text plus an icon, never colour alone.
 class DebriefCards extends ConsumerStatefulWidget {
-  const DebriefCards({super.key, required this.controller, this.replyThread});
+  const DebriefCards({super.key, required this.controller, this.replyThread, this.readOnly = false});
 
   final LearnerDebriefController controller;
+
+  /// Opened from Logs: the debrief is not marked opened.
+  final bool readOnly;
 
   /// Ask Ally's thread and composer, under the reflective question. Shown
   /// only once the debrief is `ready`; null on the read-only (Logs) view.
@@ -32,11 +38,15 @@ class DebriefCards extends ConsumerStatefulWidget {
   /// DEBRIEF_READ XP.
   static const readMinOpen = Duration(seconds: 30);
 
+  /// v9 FR-31 (web `useMarkOpened`): ready cards on screen, app in the
+  /// foreground, this long without a break, records the debrief as opened.
+  static const openedAfter = Duration(seconds: 2);
+
   @override
   ConsumerState<DebriefCards> createState() => _DebriefCardsState();
 }
 
-class _DebriefCardsState extends ConsumerState<DebriefCards> {
+class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBindingObserver {
   static const _k = 'postSim.debriefCards';
 
   late final DebriefReadAloud _readAloud = DebriefReadAloud(
@@ -53,14 +63,73 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> {
   bool _openLongEnough = false;
   bool _readEndSeen = false;
 
+  /// The state last seen, so the move from writing to ready is announced.
+  LearnerDebriefState? _lastState;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastState = widget.controller.view?.state;
+    widget.controller.addListener(_announceWhenReady);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.controller.removeListener(_announceWhenReady);
+    _openedTimer?.cancel();
     _openTimer?.cancel();
     _readAloud.dispose();
     super.dispose();
   }
 
+  /// v9 FR-27 (web: the `ready.announce` live region): a debrief that
+  /// finishes while the screen is open tells screen-reader users so. Not
+  /// said for one that was already ready when the screen opened.
+  void _announceWhenReady() {
+    final view = widget.controller.view;
+    final previous = _lastState;
+    _lastState = view?.state;
+    final wasWaiting = previous == LearnerDebriefState.working || previous == LearnerDebriefState.onItsWay;
+    if (!mounted || !wasWaiting || view?.state != LearnerDebriefState.ready || view?.cards == null) return;
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      ref.tr('postSim.debriefCards.ready.announce'),
+      Directionality.of(context),
+    );
+  }
+
+  // Opened (web `useMarkOpened`): a [DebriefCards.openedAfter] timer that
+  // runs only while the ready cards show and the app is resumed; leaving
+  // the foreground cancels it and coming back starts it again. Sent once.
+  Timer? _openedTimer;
+  bool _readyShown = false;
+  bool _openedSent = false;
+
+  void _armOpened() {
+    if (widget.readOnly || _openedSent || !_readyShown || _openedTimer != null) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
+    _openedTimer = Timer(DebriefCards.openedAfter, () {
+      _openedSent = true;
+      widget.controller.markOpened();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _armOpened();
+    } else {
+      _openedTimer?.cancel();
+      _openedTimer = null;
+    }
+  }
+
   void _afterReadyFrame() {
+    _readyShown = true;
+    _armOpened();
     _openTimer ??= Timer(DebriefCards.readMinOpen, () {
       _openLongEnough = true;
       _maybeMarkRead();
@@ -95,7 +164,10 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> {
         if (view == null) return const SizedBox.shrink();
         final ready = view.state == LearnerDebriefState.ready && view.cards != null;
         Widget content = switch (view.state) {
-          LearnerDebriefState.working => _Working(latestStep: view.steps.isEmpty ? null : view.steps.last),
+          LearnerDebriefState.working => _Working(
+            progress: view.progress,
+            latestStep: view.steps.isEmpty ? null : view.steps.last,
+          ),
           LearnerDebriefState.onItsWay => _Body(ref.t('$_k.onItsWay'), key: const Key('debrief-on-its-way')),
           LearnerDebriefState.tooShort => _Body(ref.t('$_k.tooShort'), key: const Key('debrief-too-short')),
           LearnerDebriefState.ready when view.cards != null => _ReadyCards(
@@ -278,6 +350,18 @@ const _leadStyle = TextStyle(
 
 /// Amber for "needs attention" — never red.
 const _amberStrong = Color(0xFFB45309);
+
+/// A medium date in the app's language (web `toLocaleDateString(lang,
+/// {dateStyle: "medium"})`). The date symbols for all five languages are
+/// loaded by flutter_localizations' delegates in the app; where they aren't
+/// (a bare widget test), the always-present default (US English) is used.
+String _mediumDate(DateTime date, String language) {
+  try {
+    return DateFormat.yMMMd(language).format(date);
+  } on Exception {
+    return DateFormat.yMMMd().format(date);
+  }
+}
 const _amberBorder = AppColors.warning;
 const _amberFill = AppColors.amber50;
 
@@ -392,17 +476,29 @@ class _ReadingRing extends StatelessWidget {
 
 /// A working state: calm, no percentage. The spinner stops under the
 /// system's reduce-motion setting.
+///
+/// The line under the title words [progress] in the learner's language (web
+/// `progressLine`); without it (an older server, or a key this app doesn't
+/// know) it is the latest of the server's own steps, else "Reading your
+/// session…".
 class _Working extends ConsumerWidget {
-  const _Working({required this.latestStep});
+  const _Working({required this.progress, required this.latestStep});
 
+  final DebriefProgress? progress;
   final String? latestStep;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    const k = 'postSim.debriefCards.working';
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final step = (latestStep == null || latestStep!.trim().isEmpty)
-        ? ref.t('postSim.debriefCards.working.defaultStep')
-        : latestStep!;
+    final p = progress;
+    final step = switch (p) {
+      null when latestStep == null || latestStep!.trim().isEmpty => ref.t('$k.defaultStep'),
+      null => latestStep!,
+      DebriefProgress(key: 'guidance', :final topic?) => ref.t('$k.steps.guidanceTopic', {'topic': topic}),
+      DebriefProgress(key: 'revising', :final round) => ref.t('$k.steps.revising', {'round': round}),
+      _ => ref.t('$k.steps.${p.key}'),
+    };
     return Semantics(
       liveRegion: true,
       child: Container(
@@ -1140,6 +1236,19 @@ class _CardFlagState extends ConsumerState<CardFlag> {
   @override
   Widget build(BuildContext context) {
     final correction = widget.correction;
+    if (correction?.outcome == DebriefCorrectionOutcome.corrected) {
+      // v9 FR-31: the card already shows the new words; say when and why.
+      final at = correction!.at;
+      final language = ref.watch(localizationControllerProvider.notifier).currentLanguage;
+      return Text(
+        ref.t('postSim.debriefCards.corrections.corrected', {
+          'date': at == null ? '' : _mediumDate(at.toLocal(), language),
+          'note': correction.note ?? '',
+        }).trim(),
+        key: const Key('debrief-correction'),
+        style: _smallStyle,
+      );
+    }
     if (correction != null && !correction.removed) {
       return Text(
         ref.t('postSim.debriefCards.corrections.kept', {'note': correction.note ?? ''}).trim(),

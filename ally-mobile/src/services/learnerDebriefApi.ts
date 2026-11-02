@@ -78,6 +78,16 @@ export const learnerDebriefApi = api.injectEndpoints({
         method: API_METHODS.POST,
       }),
     }),
+    /**
+     * The learner opened the ready debrief (v9 FR-31): the server records the
+     * first time only. 404 (no published debrief) and 403 are fine to ignore.
+     */
+    markDebriefOpened: builder.mutation<unknown, string>({
+      query: sessionId => ({
+        url: API_ROUTES.DEBRIEFS.OPENED(sessionId),
+        method: API_METHODS.POST,
+      }),
+    }),
     /** Read-aloud: one card's audio, made on the first request and cached. */
     getDebriefCardAudio: builder.query<
       {url: string; cached: boolean},
@@ -99,5 +109,6 @@ export const {
   useFlagDebriefCardMutation,
   useUndoDebriefFlagMutation,
   useMarkDebriefReadMutation,
+  useMarkDebriefOpenedMutation,
   useLazyGetDebriefCardAudioQuery,
 } = learnerDebriefApi;

@@ -44,6 +44,20 @@ void main() {
       );
     });
 
+    test('a Debrief agent push (flat data) opens that session\'s feedback screen', () {
+      for (final type in ['DEBRIEF_READY', 'DEBRIEF_REVIEWED']) {
+        expect(
+          routeForNotificationTap(
+            data: {'type': type, 'title': 'Ally', 'body': 'b', 'screen': 'SimulationFeedback', 'scenarioSessionId': 's-1'},
+          ),
+          '/simulations/feedback/s-1',
+        );
+      }
+      // No session id: nowhere to go.
+      expect(routeForNotificationTap(data: {'type': 'DEBRIEF_READY', 'screen': 'SimulationFeedback'}), isNull);
+      expect(routeForNotificationTap(data: {'type': 'DEBRIEF_READY', 'scenarioSessionId': ''}), isNull);
+    });
+
     test('an unrecognized id with no reminder data routes nowhere', () {
       expect(routeForNotificationTap(), isNull);
       expect(routeForNotificationTap(notificationId: 'some-other-id'), isNull);

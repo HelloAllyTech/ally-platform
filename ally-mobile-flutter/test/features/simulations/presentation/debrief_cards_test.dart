@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:url_launcher_platform_interface/link.dart';
@@ -190,6 +191,31 @@ void main() {
     // The kept point's flag control is replaced by the review note.
     expect(find.byKey(const ValueKey('debrief-flag-what_worked[1]')), findsOneWidget);
     expect(find.byKey(const Key('debrief-flag-open')), findsNWidgets(3));
+  });
+
+  testWidgets('a corrected point says when and why, in place of its flag control', (tester) async {
+    stubDebrief({
+      ...readyDebriefJson(),
+      'corrections': [
+        {'section': 'work_on_this[0]', 'outcome': 'corrected', 'note': 'We reworded the advice.', 'at': '2026-10-30T12:00:00Z'},
+      ],
+      'feedback': {
+        'helpful': null,
+        'flags': [
+          {'id': 'f1', 'section': 'work_on_this[0]', 'status': 'corrected', 'canUndoUntil': null},
+        ],
+      },
+    });
+    await h.pump(tester);
+
+    expect(
+      find.text('Updated on Oct 30, 2026 after a review by the Ally team: We reworded the advice.'),
+      findsOneWidget,
+    );
+    // Still on screen (it was rewritten, not removed); no "Sent to the Ally team".
+    expect(find.text('A closed question shut the door.'), findsOneWidget);
+    expect(find.text('A point was removed after a review by the Ally team.'), findsNothing);
+    expect(find.text('Sent to the Ally team'), findsNothing);
   });
 
   testWidgets('flag: pick a reason, send, then Undo while the window is open', (tester) async {
@@ -446,11 +472,23 @@ void main() {
     verifyNever(() => h.chatApi.streamChat(any(), any(), cancelToken: any(named: 'cancelToken')));
   });
 
+  testWidgets('Ask Ally tells the learner their supervisor can read it, under the input', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester);
+    final note = find.text('Your supervisor can read this conversation.');
+    expect(find.descendant(of: find.byKey(const Key('ask-ally')), matching: note), findsOneWidget);
+    expect(
+      tester.getTopLeft(note).dy,
+      greaterThan(tester.getTopLeft(find.byKey(const Key('ask-ai-input'))).dy),
+    );
+  });
+
   testWidgets('read-only (Logs): no Ask Ally', (tester) async {
     stubDebrief(readyDebriefJson());
     await h.pump(tester, fromLogs: true);
     expect(find.byKey(const Key('debrief-card-reflective-question')), findsOneWidget);
     expect(find.byKey(const Key('ask-ally')), findsNothing);
+    expect(find.text('Your supervisor can read this conversation.'), findsNothing);
   });
 
   group('read-aloud', () {
@@ -508,6 +546,57 @@ void main() {
       // Done: back to "Listen all", nothing highlighted.
       expect(find.byKey(const Key('debrief-listen-all-play')), findsOneWidget);
       expect(find.byKey(const Key('debrief-reading')), findsNothing);
+    });
+  });
+
+  group('opened (v9 FR-31)', () {
+    testWidgets('sent once the ready cards have been on screen 2 s, not before, and once only', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      await tester.pump(const Duration(milliseconds: 1500));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
+
+      await tester.pump(const Duration(milliseconds: 600));
+      verify(() => h.learnerDebrief.markOpened('session-1')).called(1);
+
+      // Rebuilds and a trip to the background and back never send it again.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -300));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
+    });
+
+    testWidgets('leaving the foreground restarts the 2 s', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      await tester.pump(const Duration(milliseconds: 1500));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump(const Duration(seconds: 5));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(milliseconds: 1500));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
+      await tester.pump(const Duration(milliseconds: 600));
+      verify(() => h.learnerDebrief.markOpened('session-1')).called(1);
+    });
+
+    testWidgets('not sent while the debrief is still being written', (tester) async {
+      stubDebrief({'state': 'working'});
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      await h.pump(tester);
+      await tester.pump(const Duration(seconds: 2));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
+    });
+
+    testWidgets('not sent from Logs (read-only)', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester, fromLogs: true);
+      await tester.pump(const Duration(seconds: 5));
+      verifyNever(() => h.learnerDebrief.markOpened(any()));
     });
   });
 
@@ -572,6 +661,73 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Ally is writing your debrief'), findsNothing);
       expect(find.text('What worked'), findsOneWidget);
+    });
+
+    group('working: the progress line', () {
+      Future<void> expectLine(WidgetTester tester, Object? progress, String line) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+        stubDebrief({
+          'state': 'working',
+          'steps': ['Looking at the hard moments…'],
+          'progress': progress,
+        });
+        await h.pump(tester);
+        expect(find.text('Ally is writing your debrief'), findsOneWidget);
+        expect(find.text(line), findsOneWidget);
+      }
+
+      testWidgets('guidance with a topic', (tester) async {
+        await expectLine(tester, {'key': 'guidance', 'topic': 'safety planning'}, 'Looking up guidance on safety planning…');
+      });
+
+      testWidgets('guidance without a topic', (tester) async {
+        await expectLine(tester, {'key': 'guidance'}, 'Looking up guidance…');
+      });
+
+      testWidgets('revising, with its round', (tester) async {
+        await expectLine(tester, {'key': 'revising', 'round': 2}, 'Making it clearer (round 2)…');
+      });
+
+      testWidgets('a plain key', (tester) async {
+        await expectLine(tester, {'key': 'past_sessions'}, 'Looking at your past sessions…');
+        expect(find.text('Looking at the hard moments…'), findsNothing);
+      });
+
+      testWidgets('an unknown key falls back to the latest step', (tester) async {
+        await expectLine(tester, {'key': 'something_new'}, 'Looking at the hard moments…');
+      });
+    });
+
+    testWidgets('ready while open is announced to screen readers; ready on arrival is not', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      final announcements = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility, (
+        message,
+      ) async {
+        final event = message as Map<Object?, Object?>;
+        if (event['type'] == 'announce') announcements.add((event['data']! as Map<Object?, Object?>)['message']! as String);
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility, null),
+      );
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer(
+        (_) async => LearnerDebriefView.fromJson(calls++ == 0 ? {'state': 'working'} : readyDebriefJson()),
+      );
+      await h.pump(tester);
+      expect(announcements, isEmpty);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('What worked'), findsOneWidget);
+      expect(announcements, ['Your debrief is ready.']);
+
+      // A re-read after "Was this helpful?" is ready → ready: said once only.
+      when(() => h.learnerDebrief.setHelpful(any(), helpful: any(named: 'helpful'))).thenAnswer((_) async {});
+      await tapVisible(tester, find.byKey(const Key('debrief-helpful-yes')));
+      expect(announcements, ['Your debrief is ready.']);
     });
 
     testWidgets('on_its_way', (tester) async {

@@ -1,5 +1,5 @@
 import React from 'react';
-import {Linking} from 'react-native';
+import {AccessibilityInfo, AppState, Linking} from 'react-native';
 import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 
 import {DebriefTab} from '../DebriefTab';
@@ -14,11 +14,14 @@ const mockHelpful = jest.fn();
 const mockFlag = jest.fn();
 const mockUndo = jest.fn();
 const mockMarkRead = jest.fn();
+const mockMarkOpened = jest.fn();
 const mockFetchAudio = jest.fn();
 const mockGetScenario = jest.fn();
 const mockNavigate = jest.fn();
 const mockAskAIChat = jest.fn();
 const mockSend = jest.fn();
+// Echoes the key, so tests find copy by key; params are checked on the spy.
+const mockT = jest.fn((key: string, _params?: Record<string, unknown>) => key);
 
 jest.mock('@/services/learnerDebriefApi', () => ({
   LEARNER_DEBRIEF_POLL_MS: 3000,
@@ -29,6 +32,7 @@ jest.mock('@/services/learnerDebriefApi', () => ({
   useFlagDebriefCardMutation: () => [mockFlag, {isLoading: false}],
   useUndoDebriefFlagMutation: () => [mockUndo, {isLoading: false}],
   useMarkDebriefReadMutation: () => [mockMarkRead],
+  useMarkDebriefOpenedMutation: () => [mockMarkOpened],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
 }));
 
@@ -51,7 +55,7 @@ jest.mock('../../AskAI/useAskAIChat', () => ({
 }));
 
 jest.mock('@/hooks', () => ({
-  useTranslate: () => ({t: (key: string) => key}),
+  useTranslate: () => ({t: mockT}),
   useAppNavigation: () => ({navigate: mockNavigate}),
 }));
 
@@ -460,6 +464,263 @@ describe('DebriefTab — the Debrief agent’s debrief', () => {
       // Reaching it later still counts.
       scrollTo(result, 520);
       expect(mockMarkRead).toHaveBeenCalledWith('s-1');
+    });
+  });
+
+  describe('what the agent is doing, and what changed since', () => {
+    const working = (extra: Record<string, unknown>) =>
+      mockQuery.mockReturnValue({data: {state: 'working', ...extra}});
+
+    it('words a guidance step with its topic, and without one', () => {
+      working({progress: {key: 'guidance', topic: 'safety planning'}});
+      const {getByTestId, unmount} = renderTab();
+      expect(getByTestId('debrief-working-step')).toHaveTextContent(
+        'postSim.debriefCards.working.steps.guidanceTopic',
+      );
+      expect(mockT).toHaveBeenCalledWith(
+        'postSim.debriefCards.working.steps.guidanceTopic',
+        {topic: 'safety planning'},
+      );
+      unmount();
+
+      working({progress: {key: 'guidance'}});
+      expect(renderTab().getByTestId('debrief-working-step')).toHaveTextContent(
+        'postSim.debriefCards.working.steps.guidance',
+      );
+    });
+
+    it('words a revising step with its round, and other steps by their key', () => {
+      working({progress: {key: 'revising', round: 2}});
+      const {getByTestId, unmount} = renderTab();
+      expect(getByTestId('debrief-working-step')).toHaveTextContent(
+        'postSim.debriefCards.working.steps.revising',
+      );
+      expect(mockT).toHaveBeenCalledWith(
+        'postSim.debriefCards.working.steps.revising',
+        {round: 2},
+      );
+      unmount();
+
+      working({progress: {key: 'care'}, steps: ['Writing your debrief…']});
+      expect(renderTab().getByTestId('debrief-working-step')).toHaveTextContent(
+        'postSim.debriefCards.working.steps.care',
+      );
+    });
+
+    it('falls back to the last step, then the default, with no progress', () => {
+      working({progress: null, steps: ['Reading…', 'Writing your debrief…']});
+      const {getByTestId, unmount} = renderTab();
+      expect(getByTestId('debrief-working-step')).toHaveTextContent(
+        'Writing your debrief…',
+      );
+      unmount();
+
+      working({steps: []});
+      expect(renderTab().getByTestId('debrief-working-step')).toHaveTextContent(
+        'postSim.debriefCards.working.defaultStep',
+      );
+    });
+
+    it('says when and why the Ally team updated a card', () => {
+      ready({
+        corrections: [
+          {
+            section: 'what_worked[0]',
+            outcome: 'corrected',
+            note: 'The quote was from turn 4.',
+            at: '2026-11-02T10:00:00.000Z',
+          },
+        ],
+      });
+      const {getByTestId, getByText} = renderTab();
+      expect(getByTestId('debrief-correction')).toHaveTextContent(
+        'postSim.debriefCards.corrections.corrected',
+      );
+      expect(mockT).toHaveBeenCalledWith(
+        'postSim.debriefCards.corrections.corrected',
+        {
+          date: new Date('2026-11-02T10:00:00.000Z').toLocaleDateString(
+            undefined,
+            {dateStyle: 'medium'},
+          ),
+          note: 'The quote was from turn 4.',
+        },
+      );
+      // The corrected card stays, already showing the new words.
+      expect(getByText('You named her feeling.')).toBeTruthy();
+    });
+
+    it('tells the learner their supervisor can read the Ask Ally thread', () => {
+      ready();
+      const {getByTestId} = renderTab();
+      expect(getByTestId('ask-ally')).toContainElement(
+        getByTestId('ask-ally-can-read'),
+      );
+      expect(getByTestId('ask-ally-can-read')).toHaveTextContent(
+        'postSim.debriefCards.supervisor.canRead',
+      );
+    });
+
+    it('has no supervisor line where there is no Ask Ally', () => {
+      ready();
+      expect(renderTab(true).queryByTestId('ask-ally-can-read')).toBeNull();
+    });
+
+    it('announces the debrief once it is ready, but not when it opens ready', () => {
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => {});
+      try {
+        working({progress: {key: 'writing'}});
+        const {rerender, unmount} = renderTab();
+        expect(announce).not.toHaveBeenCalled();
+        ready();
+        rerender(
+          <DebriefTab
+            scenarioSessionId="s-1"
+            simulationDetails={details}
+            retryLimitReached={false}
+          />,
+        );
+        expect(announce).toHaveBeenCalledTimes(1);
+        expect(announce).toHaveBeenCalledWith(
+          'postSim.debriefCards.ready.announce',
+        );
+        unmount();
+
+        announce.mockClear();
+        ready();
+        renderTab();
+        expect(announce).not.toHaveBeenCalled();
+      } finally {
+        announce.mockRestore();
+      }
+    });
+  });
+
+  describe('marking the debrief opened', () => {
+    let appStateListener: ((state: string) => void) | undefined;
+    const remove = jest.fn();
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      appStateListener = undefined;
+      Object.defineProperty(AppState, 'currentState', {
+        value: 'active',
+        configurable: true,
+      });
+      jest
+        .spyOn(AppState, 'addEventListener')
+        .mockImplementation((_type, listener) => {
+          appStateListener = listener as (state: string) => void;
+          return {remove} as never;
+        });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+      jest.useRealTimers();
+    });
+
+    const advance = (ms: number) =>
+      act(() => {
+        jest.advanceTimersByTime(ms);
+      });
+    const moveTo = (state: string) =>
+      act(() => {
+        appStateListener?.(state);
+      });
+
+    it('sends once the ready cards have been in the foreground for 2 s', () => {
+      ready();
+      renderTab();
+      advance(1_999);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+      advance(1);
+      expect(mockMarkOpened).toHaveBeenCalledTimes(1);
+      expect(mockMarkOpened).toHaveBeenCalledWith('s-1');
+    });
+
+    it('never sends twice, even when the app comes back to the foreground', () => {
+      ready();
+      const {rerender} = renderTab();
+      advance(2_000);
+      moveTo('background');
+      moveTo('active');
+      advance(10_000);
+      rerender(
+        <DebriefTab
+          scenarioSessionId="s-1"
+          simulationDetails={details}
+          retryLimitReached={false}
+        />,
+      );
+      advance(10_000);
+      expect(mockMarkOpened).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts the 2 s over when the app leaves the foreground', () => {
+      ready();
+      renderTab();
+      advance(1_500);
+      moveTo('background');
+      advance(5_000);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+      moveTo('active');
+      advance(1_500);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+      advance(500);
+      expect(mockMarkOpened).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for the foreground when the cards mount in the background', () => {
+      Object.defineProperty(AppState, 'currentState', {
+        value: 'background',
+        configurable: true,
+      });
+      ready();
+      renderTab();
+      advance(5_000);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+      moveTo('active');
+      advance(2_000);
+      expect(mockMarkOpened).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends nothing when the screen closes within 2 s', () => {
+      ready();
+      const {unmount} = renderTab();
+      advance(1_000);
+      unmount();
+      advance(5_000);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+      expect(remove).toHaveBeenCalled();
+    });
+
+    it('sends nothing on the read-only Logs view, or while still working', () => {
+      ready();
+      const {unmount} = renderTab(true);
+      advance(5_000);
+      unmount();
+      mockQuery.mockReturnValue({data: {state: 'working', steps: []}});
+      renderTab();
+      advance(5_000);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+    });
+
+    it('waits until a distressed learner opens the cards', () => {
+      ready({distress: true, supportLines: SUPPORT});
+      const {getByTestId} = renderTab();
+      advance(5_000);
+      expect(mockMarkOpened).not.toHaveBeenCalled();
+      fireEvent.press(getByTestId('debrief-when-ready'));
+      advance(2_000);
+      expect(mockMarkOpened).toHaveBeenCalledTimes(1);
+      // Collapsing and reopening is the same visit.
+      fireEvent.press(getByTestId('debrief-when-ready'));
+      fireEvent.press(getByTestId('debrief-when-ready'));
+      advance(2_000);
+      expect(mockMarkOpened).toHaveBeenCalledTimes(1);
     });
   });
 });

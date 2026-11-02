@@ -1,5 +1,7 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
+import i18next from 'i18next';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Linking,
   ScrollView,
@@ -25,6 +27,7 @@ import {
   DebriefFlagReason,
   DebriefMyFlag,
   DebriefPractice,
+  DebriefProgress,
   DebriefSkillWord,
   DebriefSupportLine,
   LearnerDebriefView,
@@ -41,7 +44,7 @@ import {
 } from './ReadAloudControls';
 import {styles} from './styles';
 import {useDebriefReadAloud} from './useDebriefReadAloud';
-import {useReadToTheEnd} from './useReadToTheEnd';
+import {useMarkOpened, useReadToTheEnd} from './useReadToTheEnd';
 
 const REASONS: DebriefFlagReason[] = [
   'didnt_say',
@@ -55,6 +58,20 @@ const SKILL_WORD_SYMBOL: Record<DebriefSkillWord, string> = {
   strength: '★',
   keep_practising: '↗',
   didnt_come_up: '○',
+};
+
+/** A medium date in the app's language, e.g. "2 Nov 2026". */
+const formatCorrectionDate = (iso: string): string => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  try {
+    return date.toLocaleDateString(i18next.language, {dateStyle: 'medium'});
+  } catch {
+    // An engine without `dateStyle` still gets a date.
+    return date.toLocaleDateString();
+  }
 };
 
 const canUndo = (flag?: DebriefMyFlag) =>
@@ -86,6 +103,17 @@ const CardFlag: React.FC<{
     return () => clearTimeout(timer);
   }, [flag]);
 
+  if (correction?.outcome === 'corrected') {
+    // The card already shows the new words; say when and why.
+    return (
+      <Text style={s.smallText} testID="debrief-correction">
+        {t('postSim.debriefCards.corrections.corrected', {
+          date: correction.at ? formatCorrectionDate(correction.at) : '',
+          note: correction.note ?? '',
+        })}
+      </Text>
+    );
+  }
   if (correction?.outcome === 'kept') {
     return (
       <Text style={s.smallText} testID="debrief-correction">
@@ -390,8 +418,24 @@ const ReadyCards: React.FC<{
   /** The end of the last Work-on-this card, for DEBRIEF_READ XP. */
   readEndRef: React.RefObject<View | null>;
   onReadEndLayout: () => void;
-}> = ({cards, view, sessionId, replyThread, readEndRef, onReadEndLayout}) => {
+  /** Read-only (Logs): reading it back isn't the learner opening it. */
+  readOnly: boolean;
+  /** Owned by DebriefCards, so a remount never sends "opened" twice. */
+  openedSent: React.MutableRefObject<boolean>;
+}> = ({
+  cards,
+  view,
+  sessionId,
+  replyThread,
+  readEndRef,
+  onReadEndLayout,
+  readOnly,
+  openedSent,
+}) => {
   const {t} = useTranslate();
+  // Mounted only while the ready cards are on screen (not while the distress
+  // panel keeps them collapsed).
+  useMarkOpened(sessionId, !readOnly, openedSent);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index — the one a flag and a correction name.
   const removed = new Set(
@@ -631,14 +675,51 @@ export const DebriefCards: React.FC<{
   sessionId: string;
   /** Ask Ally's thread and composer, under the reflective question. */
   replyThread?: React.ReactNode;
-}> = ({view, sessionId, replyThread}) => {
+  /** The read-only Logs view: never marks the debrief opened. */
+  readOnly?: boolean;
+}> = ({view, sessionId, replyThread, readOnly = false}) => {
   const {t} = useTranslate();
+  const openedSent = useRef(false);
   const readAloud = useDebriefReadAloud(sessionId);
   const ready = view.state === 'ready' && !!view.cards;
   const readToTheEnd = useReadToTheEnd(sessionId, ready);
   const latestStep = view.steps?.length
     ? view.steps[view.steps.length - 1]
     : undefined;
+  // What the agent is doing now, worded in the learner's language; else its
+  // last free-text step; else the default.
+  const progressLine = (): string => {
+    const p: DebriefProgress | null | undefined = view.progress;
+    if (!p) {
+      return latestStep || t('postSim.debriefCards.working.defaultStep');
+    }
+    if (p.key === 'guidance' && p.topic) {
+      return t('postSim.debriefCards.working.steps.guidanceTopic', {
+        topic: p.topic,
+      });
+    }
+    if (p.key === 'revising') {
+      return t('postSim.debriefCards.working.steps.revising', {
+        round: p.round,
+      });
+    }
+    return t(`postSim.debriefCards.working.steps.${p.key}`);
+  };
+
+  // Screen readers hear when a debrief the learner was waiting on lands —
+  // only on the change, not when the screen opens on one already ready.
+  const previousState = useRef(view.state);
+  useEffect(() => {
+    const was = previousState.current;
+    previousState.current = view.state;
+    if (ready && (was === 'working' || was === 'on_its_way')) {
+      AccessibilityInfo.announceForAccessibility(
+        t('postSim.debriefCards.ready.announce'),
+      );
+    }
+    // `t` changes identity every render; only the state change matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.state, ready]);
 
   let content: React.ReactNode = null;
   if (view.state === 'working') {
@@ -652,8 +733,8 @@ export const DebriefCards: React.FC<{
           <Text style={s.cardTitle}>
             {t('postSim.debriefCards.working.title')}
           </Text>
-          <Text style={s.bodyText}>
-            {latestStep || t('postSim.debriefCards.working.defaultStep')}
+          <Text style={s.bodyText} testID="debrief-working-step">
+            {progressLine()}
           </Text>
         </View>
       </View>
@@ -675,6 +756,8 @@ export const DebriefCards: React.FC<{
         replyThread={replyThread}
         readEndRef={readToTheEnd.endRef}
         onReadEndLayout={readToTheEnd.measureEnd}
+        readOnly={readOnly}
+        openedSent={openedSent}
       />
     );
     content = view.distress ? (

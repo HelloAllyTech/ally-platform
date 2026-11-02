@@ -22,6 +22,7 @@ import {
   useMarkNotificationReadMutation,
 } from '@/services/notificationsApi';
 import {colors} from '@/theme';
+import {getDebriefNotificationSessionId} from '@/utils/notificationNavigation';
 
 import {styles} from './styles';
 
@@ -80,6 +81,19 @@ export const NotificationsScreen: React.FC = () => {
             highlightPostId: postId,
           });
         }
+        return;
+      }
+
+      // Debrief ready / reviewed → that session's feedback screen, which
+      // opens on its Debrief tab.
+      const debriefSessionId = getDebriefNotificationSessionId(
+        item.data ?? undefined,
+        item.type,
+      );
+      if (debriefSessionId) {
+        navigation.push(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+          scenarioSessionId: debriefSessionId,
+        });
       }
     },
     [markRead, navigation],

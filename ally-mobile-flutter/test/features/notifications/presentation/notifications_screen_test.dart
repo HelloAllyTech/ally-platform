@@ -289,4 +289,51 @@ void main() {
     verify(() => repository.markRead('n1')).called(1);
     expect(find.text('ITEM:i1:t1:p1'), findsOneWidget);
   });
+
+  testWidgets('tapping a debrief notification opens that session\'s feedback screen (web)', (tester) async {
+    when(() => repository.list()).thenAnswer(
+      (_) async => _page([
+        _item(
+          id: 'n1',
+          title: 'Your debrief is ready',
+          body: 'Ally wrote your debrief',
+          type: 'DEBRIEF_READY',
+          data: {'screen': 'SimulationFeedback', 'scenarioSessionId': 's-1'},
+        ),
+        _item(
+          id: 'n2',
+          title: 'Your flag was reviewed',
+          body: 'The Ally team looked at it',
+          readAt: '2026-10-01T11:00:00.000Z',
+          type: 'DEBRIEF_REVIEWED',
+          data: {'screen': 'SimulationFeedback', 'scenarioSessionId': 's-2'},
+        ),
+      ]),
+    );
+    when(() => repository.markRead('n1')).thenAnswer((_) async {});
+
+    final router = await pumpRouterApp(
+      tester,
+      initialLocation: '/notifications',
+      routes: [
+        GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+        GoRoute(
+          path: '/simulations/feedback/:sessionId',
+          builder: (context, state) => Text('FEEDBACK:${state.pathParameters['sessionId']}'),
+        ),
+      ],
+      overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.text('Your debrief is ready'));
+    await tester.pumpAndSettle();
+    verify(() => repository.markRead('n1')).called(1);
+    expect(find.text('FEEDBACK:s-1'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Your flag was reviewed'));
+    await tester.pumpAndSettle();
+    expect(find.text('FEEDBACK:s-2'), findsOneWidget);
+  });
 }

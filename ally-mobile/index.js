@@ -12,7 +12,10 @@ import {App} from './src';
 import {LEADERBOARD_NOTIFICATION_ID} from './src/constants';
 import {navigateToLeaderboard} from './src/navigation/RootNavigator';
 import {displayRemoteMessage} from './src/services/pushNotificationService';
-import {isReminderNotification} from './src/utils/notificationNavigation';
+import {
+  getDebriefNotificationSessionId,
+  isReminderNotification,
+} from './src/utils/notificationNavigation';
 
 // Handle notification press when app is in the background (not killed)
 notifee.onBackgroundEvent(async ({type, detail}) => {
@@ -21,10 +24,13 @@ notifee.onBackgroundEvent(async ({type, detail}) => {
     navigateToLeaderboard();
     return;
   }
-  // Engagement reminders navigate via the initial-notification /
-  // foreground-event paths once the app is up; nothing to do here beyond
-  // letting the press open the app.
-  if (isReminderNotification(detail.notification?.data)) {
+  // Engagement reminders and debrief notifications navigate via the
+  // initial-notification / foreground-event paths once the app is up; nothing
+  // to do here beyond letting the press open the app.
+  if (
+    isReminderNotification(detail.notification?.data) ||
+    getDebriefNotificationSessionId(detail.notification?.data)
+  ) {
     return;
   }
 });

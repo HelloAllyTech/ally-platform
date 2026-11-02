@@ -126,12 +126,28 @@ void main() {
       expect(of({'state': 'ready'}).isShowable, isFalse);
     });
 
+    test('progress: known keys, guidance topic, revising round; anything else is null', () {
+      DebriefProgress? of(Object? progress) =>
+          LearnerDebriefView.fromJson({'state': 'working', 'steps': ['a'], 'progress': progress}).progress;
+      expect(of({'key': 'past_sessions'})?.key, 'past_sessions');
+      expect(of({'key': 'guidance', 'topic': 'safety planning'})?.topic, 'safety planning');
+      expect(of({'key': 'guidance'})?.key, 'guidance');
+      expect(of({'key': 'guidance'})?.topic, isNull);
+      expect(of({'key': 'revising', 'round': 2})?.round, 2);
+      expect(of({'key': 'revising'}), isNull);
+      expect(of({'key': 'something_new'}), isNull);
+      expect(of(null), isNull);
+      expect(of('reading'), isNull);
+      expect(LearnerDebriefView.fromJson({'state': 'working'}).progress, isNull);
+    });
+
     test('corrections and the learner\'s own flags', () {
       final view = LearnerDebriefView.fromJson({
         ...readyDebriefJson(),
         'corrections': [
           {'section': 'what_worked[1]', 'outcome': 'removed', 'note': null, 'at': '2026-10-30T10:00:00Z'},
           {'section': 'practise_next', 'outcome': 'kept', 'note': 'It fits.', 'at': '2026-10-30T10:00:00Z'},
+          {'section': 'work_on_this[0]', 'outcome': 'corrected', 'note': 'Reworded.', 'at': '2026-10-31T12:00:00Z'},
         ],
         'feedback': {
           'helpful': true,
@@ -141,7 +157,12 @@ void main() {
         },
       });
       expect(view.corrections.first.removed, isTrue);
-      expect(view.corrections.last.note, 'It fits.');
+      expect(view.corrections[1].outcome, DebriefCorrectionOutcome.kept);
+      expect(view.corrections[1].note, 'It fits.');
+      final corrected = view.corrections.last;
+      expect(corrected.outcome, DebriefCorrectionOutcome.corrected);
+      expect(corrected.removed, isFalse);
+      expect(corrected.at, DateTime.utc(2026, 10, 31, 12));
       expect(view.helpful, isTrue);
       final flag = view.flags.single;
       expect(flag.canUndoAt(DateTime.utc(2026, 10, 30, 10, 5)), isTrue);
@@ -193,7 +214,7 @@ void main() {
       ).called(1);
     });
 
-    test('GET a card\'s audio (section URL-encoded) and POST read', () async {
+    test('GET a card\'s audio (section URL-encoded), POST read and opened', () async {
       when(() => dio.get<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => _response({'url': 'https://signed/mp3', 'cached': true}));
       expect(await repository.getCardAudioUrl('s-1', 'work_on_this[0]'), 'https://signed/mp3');
@@ -202,6 +223,8 @@ void main() {
       when(() => dio.post<void>(any())).thenAnswer((_) async => _response<void>(null));
       await repository.markRead('s-1');
       verify(() => dio.post<void>('/debriefs/sessions/s-1/read')).called(1);
+      await repository.markOpened('s-1');
+      verify(() => dio.post<void>('/debriefs/sessions/s-1/opened')).called(1);
       expect(LearnerDebriefRepository.replyStreamPath('s-1'), '/debriefs/sessions/s-1/reply/stream');
     });
 

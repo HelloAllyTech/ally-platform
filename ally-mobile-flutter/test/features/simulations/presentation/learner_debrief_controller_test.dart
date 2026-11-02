@@ -132,6 +132,15 @@ void main() {
     c.dispose();
   });
 
+  test('markOpened is sent once, and a failure is silent', () async {
+    when(() => repo.markOpened('s-1')).thenThrow(Exception('404'));
+    final c = make();
+    await c.markOpened();
+    await c.markOpened();
+    verify(() => repo.markOpened('s-1')).called(1);
+    c.dispose();
+  });
+
   test('helpful shows the pressed state once the server accepts', () async {
     when(() => repo.getDebrief('s-1')).thenAnswer((_) async => LearnerDebriefView.fromJson(readyDebriefJson()));
     when(() => repo.setHelpful('s-1', helpful: true)).thenAnswer((_) async {});

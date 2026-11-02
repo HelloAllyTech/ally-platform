@@ -1,12 +1,17 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {MutableRefObject, useCallback, useEffect, useRef} from 'react';
 import {
+  AppState,
+  AppStateStatus,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   View,
 } from 'react-native';
 
-import {useMarkDebriefReadMutation} from '@/services/learnerDebriefApi';
+import {
+  useMarkDebriefOpenedMutation,
+  useMarkDebriefReadMutation,
+} from '@/services/learnerDebriefApi';
 
 /** The debrief must have been open this long (v9 FR-65). */
 export const READ_MIN_OPEN_MS = 30_000;
@@ -103,4 +108,47 @@ export const useReadToTheEnd = (sessionId: string, enabled: boolean) => {
     /** For the ScrollView. */
     scrollProps: {onScroll, onLayout, scrollEventThrottle: 100},
   };
+};
+
+/** v9 FR-31: "opened" is the ready debrief in the foreground for 2 s. */
+export const OPENED_AFTER_MS = 2000;
+
+/**
+ * Tells the server, once, that the learner opened their debrief — mirrors
+ * ally-web's useMarkOpened, with AppState for page visibility: the 2 s start
+ * over whenever the app comes back to the foreground. `sent` can be owned by
+ * the caller so a remount (e.g. the distress panel collapsed and reopened)
+ * still never sends twice in one visit. Errors are ignored.
+ */
+export const useMarkOpened = (
+  sessionId: string,
+  enabled: boolean,
+  sentRef?: MutableRefObject<boolean>,
+) => {
+  const [markOpened] = useMarkDebriefOpenedMutation();
+  const ownSent = useRef(false);
+  const sent = sentRef ?? ownSent;
+  useEffect(() => {
+    if (!enabled || sent.current) {
+      return undefined;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = (state: AppStateStatus) => {
+      clearTimeout(timer);
+      timer = undefined;
+      if (state !== 'active' || sent.current) {
+        return;
+      }
+      timer = setTimeout(() => {
+        sent.current = true;
+        markOpened(sessionId);
+      }, OPENED_AFTER_MS);
+    };
+    arm(AppState.currentState);
+    const subscription = AppState.addEventListener('change', arm);
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [enabled, markOpened, sessionId, sent]);
 };

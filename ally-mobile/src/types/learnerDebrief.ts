@@ -64,10 +64,13 @@ export type DebriefFlagReason =
   | 'advice_doesnt_fit'
   | 'something_else';
 
-/** The Ally team's answer to a flag: the card stays (with why) or is taken out. */
+/**
+ * The Ally team's answer to a flag: the card stays (with why), is taken out,
+ * or is reworded (`corrected` — the card already shows the new words).
+ */
 export interface DebriefCorrection {
   section: string;
-  outcome: 'kept' | 'removed';
+  outcome: 'kept' | 'removed' | 'corrected';
   note: string | null;
   at: string;
 }
@@ -75,9 +78,15 @@ export interface DebriefCorrection {
 export interface DebriefMyFlag {
   id: string;
   section: string;
-  status: 'open' | 'kept' | 'removed';
+  status: 'open' | 'kept' | 'removed' | 'corrected';
   canUndoUntil: string | null;
 }
+
+/** A running debrief's current step, as a key the app words in the learner's language. */
+export type DebriefProgress =
+  | {key: 'reading' | 'past_sessions' | 'writing' | 'reviewing' | 'care'}
+  | {key: 'guidance'; topic?: string}
+  | {key: 'revising'; round: number};
 
 /** One of the organisation's support lines, shown with the debrief. */
 export interface DebriefSupportLine {
@@ -99,6 +108,8 @@ export interface LearnerDebriefView {
   cards?: DebriefCardsData | null;
   language?: string | null;
   steps?: string[];
+  /** What the debrief is doing now; takes precedence over `steps`. */
+  progress?: DebriefProgress | null;
   corrections?: DebriefCorrection[];
   feedback?: {helpful: boolean | null; flags: DebriefMyFlag[]};
   /** The learner stepped out of the role in distress: care before coaching. */

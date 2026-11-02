@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/push/notification_navigation.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/back_title_header.dart';
 import '../../courses/presentation/course_item_player_screen.dart';
@@ -16,7 +17,9 @@ import '../data/notifications_repository.dart';
 /// notification.
 ///
 /// Like RN, a reply notification pushes the course item player at the
-/// replied-to item with `highlightPostId`.
+/// replied-to item with `highlightPostId`. A Debrief agent notification
+/// (`DEBRIEF_READY` / `DEBRIEF_REVIEWED`, as the web helpline) pushes that
+/// session's Simulation feedback screen, which opens on its Debrief tab.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -71,6 +74,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (!item.isRead) {
       await ref.read(notificationsRepositoryProvider).markRead(item.id);
       ref.invalidate(notificationsControllerProvider);
+    }
+    if (isDebriefNotificationType(item.type)) {
+      final route = debriefRouteFor(item.data);
+      if (route != null && mounted) context.push(route);
+      return;
     }
     if (item.type == kCourseDiscussionReplyNotificationType) {
       final trackId = item.data?['trackId'] as String?;

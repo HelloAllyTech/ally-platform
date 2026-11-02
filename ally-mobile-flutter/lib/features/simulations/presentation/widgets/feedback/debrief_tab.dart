@@ -157,6 +157,19 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
           disabled: chat.isStreaming,
           onSend: chat.sendMessage,
         ),
+        // v9 Q47: supervisors read this thread, and the learner is told.
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            ref.t('postSim.debriefCards.supervisor.canRead'),
+            key: const Key('ask-ally-supervisor-can-read'),
+            style: const TextStyle(
+              fontFamily: AppFonts.ibmPlexSerifRegular,
+              fontSize: 12,
+              color: AppColors.mediumEmphasis,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -165,7 +178,11 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
   Widget build(BuildContext context) {
     final chat = widget.chat;
     if (_showingLearnerDebrief) {
-      return DebriefCards(controller: _learnerDebrief, replyThread: widget.readOnly ? null : _askAlly(chat));
+      return DebriefCards(
+        controller: _learnerDebrief,
+        replyThread: widget.readOnly ? null : _askAlly(chat),
+        readOnly: widget.readOnly,
+      );
     }
     final note = widget.summary?.supervisorNote;
     final hasNote = note != null && note.isNotEmpty;

@@ -73,6 +73,8 @@ import {
   navigateToCallSummaryOrLog,
 } from '@/utils/deeplink';
 import {
+  getDebriefNotificationSessionId,
+  handleDebriefNavigation,
   handleReminderNavigation,
   isReminderNotification,
 } from '@/utils/notificationNavigation';
@@ -330,6 +332,14 @@ const NavigationContent = ({
       }
       if (isReminderNotification(detail.notification?.data)) {
         handleReminderNavigation(navigationRef, detail.notification?.data);
+        return;
+      }
+      // Debrief ready / reviewed (server push): open that session's debrief.
+      const debriefSessionId = getDebriefNotificationSessionId(
+        detail.notification?.data,
+      );
+      if (debriefSessionId) {
+        handleDebriefNavigation(navigationRef, debriefSessionId);
       }
     });
   }, [navigateToLeaderboard, navigationRef]);
@@ -346,6 +356,15 @@ const NavigationContent = ({
           navigationRef,
           initialNotification.notification?.data,
         );
+        return;
+      }
+
+      // Debrief ready / reviewed (server push): open that session's debrief.
+      const debriefSessionId = getDebriefNotificationSessionId(
+        initialNotification.notification?.data,
+      );
+      if (debriefSessionId) {
+        handleDebriefNavigation(navigationRef, debriefSessionId);
         return;
       }
 

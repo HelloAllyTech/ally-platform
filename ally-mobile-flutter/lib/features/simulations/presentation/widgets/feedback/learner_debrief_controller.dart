@@ -140,6 +140,20 @@ class LearnerDebriefController extends ChangeNotifier {
     }
   }
 
+  bool _openedSent = false;
+
+  /// v9 FR-31 `openedAt`, at most once per controller (one screen visit); a
+  /// failure is silent, as [markRead].
+  Future<void> markOpened() async {
+    if (_openedSent) return;
+    _openedSent = true;
+    try {
+      await _repository.markOpened(sessionId);
+    } catch (_) {
+      // Nothing to show: the learner sees the same debrief either way.
+    }
+  }
+
   /// Takes a flag back. A failure leaves the flag as it was.
   Future<void> undoFlag(String flagId) async {
     try {

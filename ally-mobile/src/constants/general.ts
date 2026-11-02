@@ -391,6 +391,7 @@ export const API_ROUTES = {
     AUDIO: (sessionId: string, section: string) =>
       `/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,
     READ: (sessionId: string) => `/debriefs/sessions/${sessionId}/read`,
+    OPENED: (sessionId: string) => `/debriefs/sessions/${sessionId}/opened`,
   },
   APP_VERSION: {
     ANDROID: '/app-version/android',

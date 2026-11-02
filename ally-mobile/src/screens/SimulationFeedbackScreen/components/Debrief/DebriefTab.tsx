@@ -355,6 +355,7 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
       <DebriefCards
         view={learnerDebrief}
         sessionId={scenarioSessionId}
+        readOnly={readOnly}
         replyThread={
           askAlly ? (
             <View style={cardStyles.askAlly} testID="ask-ally">
@@ -372,6 +373,10 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
                 disabled={isStreaming}
                 placeholder={t('postSim.debriefCards.reply.placeholder')}
               />
+              {/* Supervisors read this thread, and the learner is told. */}
+              <Text style={cardStyles.smallText} testID="ask-ally-can-read">
+                {t('postSim.debriefCards.supervisor.canRead')}
+              </Text>
             </View>
           ) : undefined
         }

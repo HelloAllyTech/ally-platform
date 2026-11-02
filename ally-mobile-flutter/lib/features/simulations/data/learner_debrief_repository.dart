@@ -223,19 +223,69 @@ class DebriefCardsData {
   final String? progressNote;
 }
 
-/// The Ally team's answer to a flag: the card stays (with why) or is taken out.
+/// What the Ally team decided about a flagged card.
+enum DebriefCorrectionOutcome {
+  kept,
+  removed,
+
+  /// The card now shows the team's new words (v9 FR-31).
+  corrected;
+
+  /// Anything unrecognised reads as `kept`: the card stays as it is.
+  static DebriefCorrectionOutcome parse(Object? value) => switch (value) {
+    'removed' => removed,
+    'corrected' => corrected,
+    _ => kept,
+  };
+}
+
+/// The Ally team's answer to a flag: the card stays (with why), is
+/// rewritten (with when and why), or is taken out.
 class DebriefCorrection {
-  const DebriefCorrection({required this.section, required this.removed, this.note});
+  const DebriefCorrection({required this.section, required this.outcome, this.note, this.at});
 
   factory DebriefCorrection.fromJson(Map<String, dynamic> json) => DebriefCorrection(
     section: _str(json['section']),
-    removed: json['outcome'] == 'removed',
+    outcome: DebriefCorrectionOutcome.parse(json['outcome']),
     note: _optStr(json['note']),
+    at: json['at'] is String ? DateTime.tryParse(json['at'] as String) : null,
   );
 
   final String section;
-  final bool removed;
+  final DebriefCorrectionOutcome outcome;
   final String? note;
+  final DateTime? at;
+
+  bool get removed => outcome == DebriefCorrectionOutcome.removed;
+}
+
+/// What a `working` debrief is doing now (v9 FR-27), as a key the app words
+/// in the learner's language (`postSim.debriefCards.working.steps.<key>`).
+/// [parse] returns null for an unknown key, so the card falls back to the
+/// latest `steps` line.
+class DebriefProgress {
+  const DebriefProgress._(this.key, {this.topic, this.round});
+
+  static const _plainKeys = {'reading', 'past_sessions', 'writing', 'reviewing', 'care'};
+
+  static DebriefProgress? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final key = json['key'];
+    if (key == 'guidance') return DebriefProgress._('guidance', topic: _optStr(json['topic']));
+    if (key == 'revising') {
+      final round = _optInt(json['round']);
+      return round == null ? null : DebriefProgress._('revising', round: round);
+    }
+    return _plainKeys.contains(key) ? DebriefProgress._(key as String) : null;
+  }
+
+  final String key;
+
+  /// `guidance` only: what the guidance is about, when the agent says.
+  final String? topic;
+
+  /// `revising` only: which pass of the reviewer's notes this is.
+  final int? round;
 }
 
 /// One of the learner's own flags. [canUndoUntil] is null once the undo
@@ -252,6 +302,9 @@ class DebriefMyFlag {
 
   final String id;
   final String section;
+
+  /// `open`, `kept`, `removed` or `corrected`; a reviewed flag's card shows
+  /// its [DebriefCorrection] instead.
   final String status;
   final DateTime? canUndoUntil;
 
@@ -295,6 +348,7 @@ class LearnerDebriefView {
     this.cards,
     this.language,
     this.steps = const [],
+    this.progress,
     this.corrections = const [],
     this.helpful,
     this.flags = const [],
@@ -312,6 +366,7 @@ class LearnerDebriefView {
       cards: cards is Map<String, dynamic> ? DebriefCardsData.fromJson(cards) : null,
       language: _optStr(json['language']),
       steps: json['steps'] is List ? (json['steps'] as List).whereType<String>().toList() : const [],
+      progress: DebriefProgress.parse(json['progress']),
       corrections: _maps(json['corrections']).map(DebriefCorrection.fromJson).toList(),
       helpful: helpful is bool ? helpful : null,
       flags: feedback is Map<String, dynamic>
@@ -333,6 +388,10 @@ class LearnerDebriefView {
   final DebriefCardsData? cards;
   final String? language;
   final List<String> steps;
+
+  /// `working` only: the current step as a key; null on older servers, so
+  /// the card shows the latest of [steps] instead.
+  final DebriefProgress? progress;
   final List<DebriefCorrection> corrections;
   final bool? helpful;
   final List<DebriefMyFlag> flags;
@@ -358,6 +417,7 @@ class LearnerDebriefView {
     cards: cards,
     language: language,
     steps: steps,
+    progress: progress,
     corrections: corrections,
     helpful: helpful ?? this.helpful,
     flags: flags ?? this.flags,
@@ -423,6 +483,12 @@ class LearnerDebriefRepository {
   /// (the server pays at most once per session).
   Future<void> markRead(String sessionId) async {
     await _dio.post<void>('/debriefs/sessions/$sessionId/read');
+  }
+
+  /// The learner had the ready debrief open (v9 FR-31 `openedAt`); the
+  /// server records the first one only. 404 without a published debrief.
+  Future<void> markOpened(String sessionId) async {
+    await _dio.post<void>('/debriefs/sessions/$sessionId/opened');
   }
 
   /// Ask Ally: the debrief chat's thread, answered by the Debrief agent.
