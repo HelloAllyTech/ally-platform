@@ -72,7 +72,7 @@ What this adds up to, from the 2026-10-20 prod audit of 194 rows:
 
 Other facts that shape the design:
 
-- **Sync never overwrites a live version.** It refreshes `defaultPrompt` and metadata but never touches `prompts_versions`, `currentVersion` or `useDashboardOverride`.
+- **Sync never overwrites a live version.** It refreshes `defaultPrompt` and metadata but never touches `prompts_versions` or `currentVersion`.
 - **There is no draft or staging concept.** The version at `currentVersion` is what's published, and it's only live while the override is on. Only the last 5 versions are kept.
 - **No path from prod to local.** `GET /api/v1/prompts/by-codes` returns bodies only, with no versions, model settings or translations. No script pulls prompts from prod or seeds them locally.
 - **Translations are checked against the English text.** One is served only when its `sourceHash` matches the current English body, which already gives us a reliable freshness check.
@@ -163,7 +163,7 @@ Every resolution logs `code`, `version`, a short hash and the source (`local` / 
 | Default body | Git, `*/prompts/*.txt` | Yes, only to keep up with the contract | A minimal prompt that works with the current code. Creates the prompt on first deploy; last-resort fallback in ally-ai and ally-ai-learn; open-source default. It never overwrites an existing prompt's stored default |
 | Stored default | Store, `prompts.defaultPrompt` | No | **Decided 2026-10-26:** the production text at the cutover (each prompt's current version), or a new prompt's first text. What Revert to default restores, and ally-be's fallback when a prompt has no usable version |
 
-A deploy only creates prompts that don't exist yet; it never changes an existing prompt's live text, and it never recreates one the store removed (`REMOVED_PROMPT_CODES`), even when an older build of its service still syncs the file. Editing a default to improve behaviour is pointless, because production never serves it. Improvements go to the store. The default only changes when the code's contract does.
+A deploy only creates prompts that don't exist yet; it never changes an existing prompt's live text. Editing a default to improve behaviour is pointless, because production never serves it. Improvements go to the store. The default only changes when the code's contract does.
 
 ### Contracts keep code and prompts compatible
 
@@ -333,7 +333,7 @@ Four phases, each shippable on its own. Phase 0 must land first: until every ser
 - Before widening either, settle every row whose file and store disagree, so the store holds the right text:
   - File-backed rows: **decided 2026-10-26, what production runs today becomes the live version**, so no prompt's running text changes. Production's code served an override-off row's file text, not its store version. In production (read 2026-10-26) 98 of 124 such rows hold the same text in both; for the other 26 the migration publishes the served file text as a new version (for example `bug_hunter_decide`: the 5317-char file it runs, not its 2665-char v1, which stays in history). Migration `1980150000000` snapshots the prompt tables first.
   - 41 overridden rows with a different file: the store wins. For the 6 with newer, unshipped file edits, decide row by row.
-- Retire `useDashboardOverride` once every service ignores it.
+- ~~Retire `useDashboardOverride` once every service ignores it.~~ **Done 2026-11-02:** the column is dropped (`1980840000000`), with the other rollback shims.
 
 **Done when:** `PROMPT_SOURCE` logs show `store` for every prompt in all three services, and a v2v run reports a version hash per prompt, every prerequisite is checked off, and two simultaneous saves produce one version and one 409.
 
@@ -425,15 +425,7 @@ Verified locally: migration on the local DB (29 file-served prompts published, a
 
 **Base versions in Git.** The defaults were cut to minimal bases as the last step: ally-be 207k → 70k characters (64 defaults, plus 8 new defaults with contracts for the migration-seeded prompts that code runs), ally-ai 58k → 21k, ally-ai-learn 44k → 17k. Every placeholder, output format and parser-checked marker is kept. 88 prompts have their answer parsed as JSON: 13 parse free text (`output: json`, and the structured check passes on all of them), 75 rely on provider-enforced JSON (`output: structured`).
 
-**Deploy order (required).** Deploy **ally-be first**, then the admin dashboard, then ally-ai and ally-ai-learn. ally-be's migrations snapshot the prompt tables (`1980150000000`), make what production runs today each prompt's live version and stored default, and only then does sync run (it never overwrites an existing prompt's text or default). The ally-ai and ally-ai-learn release workflows enforce the order: a `require-skills-store` job blocks their deploy until production ally-be serves the Skills Store. Before deploying, run `scripts/prompts/migration-preview.sql` read-only against production: it lists the file-backed prompts whose served file text gets published as a new version, and any row with no usable version. No prompt's running text changes.
-
-**Rolling back (rehearsed 2026-10-26 on a copy of production prompt data).** Go in reverse deploy order. Nothing is lost at any step, and every prompt keeps serving the same text.
-
-1. ally-ai and ally-ai-learn back to their previous images. They run as they do today behind the new ally-be: it sends every prompt, every override flag is on, and their local files hold the same text as the store. An old build's startup sync changes nothing, and it can't recreate a removed prompt (`REMOVED_PROMPT_CODES`).
-2. The admin dashboard.
-3. ally-be: run `scripts/prompts/rollback-prepare.sql` first, then deploy the previous image (no `down` migrations). Without the script every translation write fails, because the old upsert needs a unique index on prompt and language. The script archives any extra translation rows and adds that index. The old build serves each prompt's current version, and its sync puts the pre-cutover defaults back on the 18 dashboard-overridden prompts.
-
-To return to the Skills Store, run `scripts/prompts/roll-forward-after-rollback.sql` with the time the rollback started, then deploy in the normal order. It drops the index, restores the archived translations, marks the versions saved during the rollback as published, and makes each stored default the live text again.
+**Deploy order (required).** Deploy **ally-be first**, then the admin dashboard, then ally-ai and ally-ai-learn. ally-be's migrations snapshot the prompt tables (`1980150000000`; the snapshots were dropped by `1980850000000` once the rollback window closed), make what production runs today each prompt's live version and stored default, and only then does sync run (it never overwrites an existing prompt's text or default). The ally-ai and ally-ai-learn release workflows enforce the order: a `require-skills-store` job blocks their deploy until production ally-be serves the Skills Store. No prompt's running text changes.
 
 **After deploying:** Revert to default restores the production text from the cutover (the stored default), never the minimal Git base; the Git files only seed new prompts and are the last-resort fallback inside ally-ai and ally-ai-learn; a fresh local stack needs `prompts pull --into-local` to run on production's text.
 

@@ -710,8 +710,8 @@ class AgentWorker:
         # no errors, and simply lacks the block. That is exactly how a prod
         # session ran for a full 8 exchanges looking perfect while the feature
         # was silently disabled — the prompt was file-backed, so ally-be never
-        # dispatched it (getPromptsForScenarioSession filters
-        # useDashboardOverrideOnly) and the placeholder check found nothing.
+        # dispatched it (before the Skills Store, ally-be sent only prompts
+        # flagged for the dashboard) and the placeholder check found nothing.
         #
         # The old signal for the off path was logger.debug, and prod runs at
         # INFO, so the only way to tell was correlating [PROMPT_SOURCE] lines in

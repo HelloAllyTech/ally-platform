@@ -75,7 +75,6 @@ def build_scenario(row: dict, mode: str, main_code: str, args) -> Scenario:
         prompts[code] = {
             "prompt": text,
             "availableVariables": _variables(text),
-            "useDashboardOverride": True,
         }
     states = sorted(metadata.get("states") or [], key=lambda s: s.get("scoreLower", 0))
     prompt_data = {
