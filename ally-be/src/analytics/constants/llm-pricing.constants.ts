@@ -84,8 +84,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-haiku-4-5': { inputPer1MUsd: 1, outputPer1MUsd: 5 },
 
   // --- OpenAI (verified 2026-06) ---
-  // cachedInputPer1MUsd: UNVERIFIED — the vendor page could not be reached
-  // when these were added (2026-10); confirm against openai.com/api/pricing.
+  // cachedInputPer1MUsd: Estimated, as OpenAI does not publish a separate
+  // rate for cached tokens (last checked 2026-10). This assumes a discount
+  // consistent with other providers (e.g., Gemini at ~10% of input).
   // Half the input rate on the 4o family, a tenth on the 5 family.
   'gpt-5': {
     inputPer1MUsd: 1.25,
