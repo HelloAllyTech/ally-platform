@@ -32,7 +32,7 @@ const PROVIDER_RUNTIMES: Record<string, string> = {
   openai: "Voice, AI, Backend",
   gemini: "Voice, AI, Backend",
   google: "Voice, AI, Backend",
-  anthropic: "Backend only",
+  anthropic: "AI, Backend",
   // Self-hosted: only the voice agent can reach them, so they cannot serve
   // prompts run by ally-be or ally-ai — and cannot be reached by Test model.
   ollama: "Voice only",

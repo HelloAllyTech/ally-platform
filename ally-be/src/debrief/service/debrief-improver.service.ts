@@ -606,10 +606,14 @@ export class DebriefImproverService implements OnModuleInit {
             },
           }
         : null;
-    if (challengerBundle && validateDebriefBundle(challengerBundle).length) {
-      throw new BadRequestException(
-        validateDebriefBundle(challengerBundle).join('; '),
-      );
+    const challengerProblems = challengerBundle
+      ? validateDebriefBundle(
+          challengerBundle,
+          await this.runner.modelCatalog(),
+        )
+      : [];
+    if (challengerProblems.length) {
+      throw new BadRequestException(challengerProblems.join('; '));
     }
     const sessions = await this.testSets.sessions(
       DebriefTestSet.OPEN,
@@ -822,7 +826,10 @@ export class DebriefImproverService implements OnModuleInit {
         (next.settings as unknown as Record<string, number>)[key] = v;
       }
     }
-    const problems = validateDebriefBundle(next);
+    const problems = validateDebriefBundle(
+      next,
+      await this.runner.modelCatalog(),
+    );
     if (problems.length) throw new BadRequestException(problems.join('; '));
     const draft = await this.releases.createDraft(
       DEBRIEF_AGENT_KEY,

@@ -322,10 +322,25 @@ export const MANDATORY_STEPS: readonly DebriefStep[] = [
 ];
 
 /**
- * Every problem with a bundle, empty when it may be used. A release whose
- * bundle fails this is never run: the runner falls back to the seed.
+ * The platform's LLM catalog (Admin → Model Catalog), as the debrief reads it:
+ * the active model ids each place a debrief model runs can call. The steps
+ * run in ally-ai; Ask Ally and the reflection check run in ally-be.
  */
-export function validateDebriefBundle(bundle: unknown): string[] {
+export interface DebriefModelCatalog {
+  steps: ReadonlySet<string>;
+  reply: ReadonlySet<string>;
+}
+
+/**
+ * Every problem with a bundle, empty when it may be used. A release whose
+ * bundle fails this is never run: the runner falls back to the seed. With the
+ * catalog, every model must also be active there for the place it runs, so a
+ * model switched off in Admin → Model Catalog stops being used here too.
+ */
+export function validateDebriefBundle(
+  bundle: unknown,
+  catalog?: DebriefModelCatalog,
+): string[] {
   const problems: string[] = [];
   const b = bundle as Partial<DebriefBundle> | null;
   if (!b || typeof b !== 'object') return ['bundle is not an object'];
@@ -336,10 +351,23 @@ export function validateDebriefBundle(bundle: unknown): string[] {
       if (st.backupModel) models.add(st.backupModel);
     }
   }
-  if (b.reply?.model) models.add(b.reply.model);
   for (const m of models) {
     const problem = modelProblem(m);
     if (problem) problems.push(problem);
+    else if (catalog && !catalog.steps.has(m)) {
+      problems.push(
+        `${m} is not an active model in the LLM catalog for ally-ai`,
+      );
+    }
+  }
+  if (b.reply?.model) {
+    const problem = modelProblem(b.reply.model);
+    if (problem) problems.push(problem);
+    else if (catalog && !catalog.reply.has(b.reply.model)) {
+      problems.push(
+        `${b.reply.model} is not an active model in the LLM catalog for ally-be`,
+      );
+    }
   }
   if (b.reply) {
     if (!['gemini', 'openai'].includes(b.reply.provider)) {

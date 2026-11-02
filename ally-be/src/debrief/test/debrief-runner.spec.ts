@@ -1,4 +1,7 @@
-import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
+import {
+  DEBRIEF_MODELS,
+  DEBRIEF_SEED_BUNDLE,
+} from '../constants/debrief-release.constants';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefCards } from '../util/debrief-cards.util';
@@ -163,6 +166,11 @@ function build(opts: {
     releases as any,
     { optionsFor: async () => opts.practice ?? [] } as any,
     knowledge as any,
+    {
+      // Every model the seed names is in the catalog, as it is in prod.
+      getModels: async () =>
+        Object.values(DEBRIEF_MODELS).map((model) => ({ model })),
+    } as any,
   );
   return { svc, saved, calls, ai, knowledge, runs };
 }
@@ -185,6 +193,17 @@ const analyst = {
 };
 
 describe('DebriefRunnerService', () => {
+  it('runs the seed when the live release names a model switched off in the catalog', async () => {
+    const custom = JSON.parse(JSON.stringify(DEBRIEF_SEED_BUNDLE));
+    custom.recipes.standard.steps.find(
+      (s: { step: string }) => s.step === 'writer',
+    ).model = 'gpt-4.1';
+    const { svc } = build({ steps: {}, bundle: custom });
+    const { release, bundle } = await svc.resolveRelease();
+    expect(release).toBeNull();
+    expect(bundle).toBe(DEBRIEF_SEED_BUNDLE);
+  });
+
   it('tells the learner what it is doing as each step starts (FR-27)', async () => {
     const { svc, runs } = build({
       steps: {

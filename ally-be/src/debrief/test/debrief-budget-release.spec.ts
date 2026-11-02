@@ -1,4 +1,5 @@
 import {
+  DEBRIEF_MODELS,
   DEBRIEF_SEED_BUNDLE,
   DebriefRecipeKey,
   DebriefStep,
@@ -14,6 +15,30 @@ const settings = DEBRIEF_SEED_BUNDLE.settings;
 describe('debrief release bundle', () => {
   it('the seed validates', () => {
     expect(validateDebriefBundle(DEBRIEF_SEED_BUNDLE)).toEqual([]);
+  });
+
+  it('with the LLM catalog, refuses a model that is not active there for where it runs', () => {
+    const all = new Set<string>(Object.values(DEBRIEF_MODELS));
+    expect(
+      validateDebriefBundle(DEBRIEF_SEED_BUNDLE, { steps: all, reply: all }),
+    ).toEqual([]);
+    const noWriter = new Set(
+      [...all].filter((m) => m !== DEBRIEF_MODELS.writer),
+    );
+    expect(
+      validateDebriefBundle(DEBRIEF_SEED_BUNDLE, {
+        steps: noWriter,
+        reply: all,
+      }).join('\n'),
+    ).toContain(
+      `${DEBRIEF_MODELS.writer} is not an active model in the LLM catalog for ally-ai`,
+    );
+    expect(
+      validateDebriefBundle(DEBRIEF_SEED_BUNDLE, {
+        steps: all,
+        reply: new Set(),
+      }).join('\n'),
+    ).toContain('in the LLM catalog for ally-be');
   });
 
   it('refuses a recipe that drops a mandatory step or reorders the loop', () => {

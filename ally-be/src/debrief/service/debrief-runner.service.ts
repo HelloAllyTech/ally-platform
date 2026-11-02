@@ -17,6 +17,7 @@ import {
   DebriefRecipeKey,
   DebriefStep,
   RecipeStep,
+  DebriefModelCatalog,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import { DebriefRun, DebriefRunStepRecord } from '../entity/debrief-run.entity';
@@ -63,6 +64,8 @@ import {
   KbRetrievalConsumer,
 } from '../../knowledge-base/enum/knowledge-base.enum';
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
+import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
+import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
   DebriefContextRepository,
   DebriefSessionContext,
@@ -142,19 +145,39 @@ export class DebriefRunnerService {
     private readonly releases: AgentReleaseService,
     private readonly practice: DebriefPracticeService,
     private readonly knowledge: KnowledgeBaseService,
+    private readonly llmModels: LlmModelService,
   ) {}
+
+  /**
+   * The LLM catalog as the release check reads it. Its service falls back to
+   * the in-code list when the table is unreadable, so a database hiccup
+   * narrows what may run rather than failing the run.
+   */
+  async modelCatalog(): Promise<DebriefModelCatalog> {
+    const [steps, reply] = await Promise.all([
+      this.llmModels.getModels(LlmRuntime.ALLY_AI),
+      this.llmModels.getModels(LlmRuntime.ALLY_BE),
+    ]);
+    return {
+      steps: new Set(steps.map((m) => m.model)),
+      reply: new Set(reply.map((m) => m.model)),
+    };
+  }
 
   /** The GA bundle, or the seed when GA is missing or does not validate. */
   async resolveRelease(
     release?: AgentRelease | null,
   ): Promise<{ release: AgentRelease | null; bundle: DebriefBundle }> {
     const r = release ?? (await this.releases.getGa(DEBRIEF_AGENT_KEY));
-    if (r && validateDebriefBundle(r.bundle).length === 0) {
+    const problems = r
+      ? validateDebriefBundle(r.bundle, await this.modelCatalog())
+      : [];
+    if (r && problems.length === 0) {
       return { release: r, bundle: r.bundle as unknown as DebriefBundle };
     }
     if (r) {
       this.logger.error(
-        `debrief release v${r.version} does not validate; running the seed bundle`,
+        `debrief release v${r.version} does not validate (${problems.join('; ')}); running the seed bundle`,
       );
     }
     return { release: null, bundle: DEBRIEF_SEED_BUNDLE };

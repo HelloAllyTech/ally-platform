@@ -1,3 +1,4 @@
+import { LlmModule } from '../llm/llm.module';
 import { Module } from '@nestjs/common';
 import { AiChatModule } from '../ai-chat/ai-chat.module';
 import { LlmUsageModule } from '../analytics/llm-usage.module';
@@ -51,6 +52,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     ]),
     AiChatModule,
     AwsModule,
+    // The LLM catalog: a release's models must be active there.
+    LlmModule,
     LlmUsageModule,
     // The guidance lookup's corpus, its audience rules and its retrieval log.
     KnowledgeBaseModule,
