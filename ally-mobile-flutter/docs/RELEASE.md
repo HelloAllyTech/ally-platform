@@ -101,17 +101,11 @@ and run `firebase crashlytics:symbols:upload --app=<GOOGLE_APP_ID> <dir>`.
 ## Version and build numbers
 
 - **Marketing version** (`CFBundleShortVersionString` / `versionName`):
-  `pubspec.yaml` `version`, continuing RN's own numbering one patch ahead of
-  whatever is live (e.g. RN 1.23.47 -> Flutter 1.23.48), so the store
-  listing's version history reads as one continuous sequence across the
-  cutover instead of jumping to a fresh major version. Both production
-  workflows accept a `build_name` override. Apple requires each App Store
-  release to be higher than the live one, so the first Flutter release must
-  be above whatever RN version is live then. This continuation scheme is
-  only collision-free while RN's `scheduled-mobile-release.yml` is paused
-  (`AUTO_RELEASE_ENABLED` repo variable) — if it's ever re-enabled before the
-  real cutover and bumps RN's patch again, `pubspec.yaml`'s version must be
-  bumped past it again before the next Flutter build.
+  `pubspec.yaml` `version`, currently **2.0.0**, above RN's 1.23.x. Both
+  production workflows accept a `build_name` override. Apple requires each
+  App Store release to be higher than the live one, so the first Flutter
+  release must be above whatever RN version is live then (RN's scheduled
+  release only bumps the patch, so 2.0.0 stays above it).
 - **iOS build number** (`CFBundleVersion`), same scheme as RN's workflows:
   prod `1YYYYMMDDHHMM`, dev `YYYYMMDDHHMM`. Time-based, so RN and Flutter
   uploads to the same App Store Connect app stay in order with no bookkeeping.
