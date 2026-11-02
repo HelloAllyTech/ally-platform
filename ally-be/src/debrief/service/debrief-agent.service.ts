@@ -68,7 +68,7 @@ export interface LearnerDebriefView {
 }
 
 /** The roleplays a debrief's cards link to, once each. */
-function practiceIds(cards: Record<string, any> | null): number[] {
+function practiceIds(cards?: Record<string, any> | null): number[] {
   const ids = [
     cards?.practise_next?.scenario_id,
     ...(
@@ -321,7 +321,7 @@ export class DebriefAgentService implements OnModuleInit {
    * The support lines a learner sees: the organisation's own from its Guide
    * profile for this language, else its English ones, else Tele-MANAS.
    */
-  private async supportLines(
+  async supportLines(
     tenantId: string,
     language?: string | null,
   ): Promise<GuideSupportLine[]> {

@@ -124,11 +124,12 @@ const SupportLines: FC<{ lines: DebriefSupportLine[] }> = ({ lines }) => (
   </ul>
 );
 
-const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessionId: string }> = ({
-  cards,
-  view,
-  sessionId,
-}) => {
+const ReadyCards: FC<{
+  cards: DebriefCardsData;
+  view: LearnerDebriefView;
+  sessionId: string;
+  replyThread?: ReactNode;
+}> = ({ cards, view, sessionId, replyThread }) => {
   const { t } = useTranslation();
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
@@ -306,6 +307,7 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
           icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
         >
           <Body>{cards.reflective_question}</Body>
+          {replyThread}
         </Card>
       </ul>
       {removed.size > 0 && (
@@ -374,6 +376,8 @@ const DistressFirst: FC<{ view: LearnerDebriefView; children: ReactNode }> = ({
 interface DebriefCardsProps {
   view: LearnerDebriefView;
   sessionId: string;
+  /** Ask Ally's thread and composer, under the reflective question. */
+  replyThread?: ReactNode;
 }
 
 /**
@@ -384,7 +388,7 @@ interface DebriefCardsProps {
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
  */
-export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId }) => {
+export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId, replyThread }) => {
   const { t } = useTranslation();
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
 
@@ -416,7 +420,9 @@ export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId }) => {
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
   } else if (view.state === "ready" && view.cards) {
-    const cards = <ReadyCards cards={view.cards} view={view} sessionId={sessionId} />;
+    const cards = (
+      <ReadyCards cards={view.cards} view={view} sessionId={sessionId} replyThread={replyThread} />
+    );
     content = view.distress ? <DistressFirst view={view}>{cards}</DistressFirst> : cards;
   }
 

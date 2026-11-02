@@ -77,6 +77,14 @@ export const DEBRIEF_PROMPT_CODES = {
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
   improver: 'debrief_improver_system',
+  reply: 'debrief_reply_system',
+} as const;
+
+/** Ask Ally's model: fast first words matter more than depth for a reply. */
+export const DEBRIEF_REPLY_MODEL = {
+  providerType: 'gemini',
+  model: 'gemini-2.5-flash',
+  maxTokens: 400,
 } as const;
 
 /**

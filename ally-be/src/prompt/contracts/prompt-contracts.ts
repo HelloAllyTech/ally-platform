@@ -1344,6 +1344,18 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/reply_system.txt */
+export const DEBRIEF_REPLY_SYSTEM = definePrompt(
+  'debrief_reply_system',
+  {},
+  {
+    name: 'Ask Ally (debrief reply)',
+    description:
+      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match). Release-only.",
+    category: 'evaluation',
+  },
+);
+
 /** src/prompts/debrief/improver_system.txt */
 export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
   'debrief_improver_system',

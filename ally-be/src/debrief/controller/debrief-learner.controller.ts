@@ -7,7 +7,9 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -30,11 +32,19 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { DebriefFlagReason } from '../enum/debrief-run.enum';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
+import { DebriefReplyService } from '../service/debrief-reply.service';
 
 class HelpfulDto {
   @ApiProperty()
   @IsBoolean()
   helpful!: boolean;
+}
+
+class ReplyDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  message!: string;
 }
 
 class FlagDto {
@@ -68,6 +78,7 @@ export class DebriefLearnerController {
   constructor(
     private readonly agent: DebriefAgentService,
     private readonly feedback: DebriefFeedbackService,
+    private readonly replies: DebriefReplyService,
   ) {}
 
   @Get('sessions/:sessionId')
@@ -120,5 +131,31 @@ export class DebriefLearnerController {
     @CurrentUser() user: TokenUser,
   ) {
     return this.feedback.undoFlag(sessionId, user.id, flagId);
+  }
+
+  @Post('sessions/:sessionId/reply/stream')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      'Ask Ally: a reply about the debrief, streamed as server-sent events',
+  })
+  async reply(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() body: ReplyDto,
+    @CurrentUser() user: TokenUser,
+    @Res() res: Response,
+  ) {
+    // Ownership and a published debrief are checked before the stream opens,
+    // so a refusal is an ordinary HTTP error, not a broken stream.
+    const stream = await this.replies.stream(sessionId, user.id, body.message);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    stream.subscribe({
+      next: (e) => res.write(`data: ${e.data}\n\n`),
+      complete: () => res.end(),
+      error: () => res.end(),
+    });
   }
 }

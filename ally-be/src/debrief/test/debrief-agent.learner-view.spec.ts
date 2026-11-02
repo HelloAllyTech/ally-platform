@@ -191,6 +191,7 @@ describe('DebriefAgentService.onSessionEnded', () => {
       releases as any,
       overrides as any,
       { debriefAgentMode: mode } as any,
+      { available: jest.fn(async () => []) } as any,
     );
     return { svc, runner };
   };

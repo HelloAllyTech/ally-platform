@@ -223,6 +223,8 @@ export const ApiEndpoints = {
     FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
     FLAG: (sessionId: string, flagId: string) =>
       `/v1/debriefs/sessions/${sessionId}/flags/${flagId}`,
+    // Ask Ally: replies about the Debrief agent's debrief, streamed.
+    REPLY_STREAM: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/reply/stream`,
   },
   PRACTICE_STREAK: {
     GET_PRACTICE_STREAK: "/v1/community/practice-streak",

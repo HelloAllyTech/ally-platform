@@ -44,15 +44,19 @@ vi.mock("@assets", () => ({
   Refresh: () => <svg />,
 }));
 
+const mockUseSendMessage = vi.hoisted(() => vi.fn());
 vi.mock("@hooks", () => ({
-  useSendMessage: () => ({
+  useSendMessage: (...args: unknown[]) => {
+    mockUseSendMessage(...args);
+    return {
     messages: [],
     streamingMessage: undefined,
     isStreaming: false,
     error: undefined,
     sendMessage: vi.fn(),
     retryLastMessage: vi.fn(),
-  }),
+    };
+  },
 }));
 
 vi.mock("@reducer", () => ({ initSession: vi.fn() }));
@@ -159,7 +163,15 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     renderTab();
 
     expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+    // Ask Ally: the reply box sits under the reflective question and posts
+    // to the Debrief agent, not today's debrief chat.
+    expect(
+      within(screen.getByTestId("debrief-card-reflective-question")).getByTestId("reply-input"),
+    ).toBeInTheDocument();
+    expect(mockUseSendMessage).toHaveBeenLastCalledWith(
+      "s-1",
+      "/v1/debriefs/sessions/s-1/reply/stream",
+    );
 
     const container = screen.getByTestId("debrief-cards");
     expect(container).toHaveAttribute("lang", "hi");

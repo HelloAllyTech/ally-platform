@@ -516,3 +516,29 @@ export function keepOfferedPractice(
       : cards.practise_next,
   };
 }
+
+/**
+ * The code checks on one Ask Ally reply (v9 FR-43): no score, no diagnosis,
+ * no turn numbers, and anything it puts in quotation marks is said
+ * somewhere — in the transcript, or in the debrief it is talking about.
+ */
+export function replyCheckFailures(
+  reply: string,
+  sources: string[],
+): DebriefCheckCode[] {
+  const fails: DebriefCheckCode[] = [];
+  if (SCORE_RE.test(reply)) fails.push(DebriefCheckCode.SCORE_MENTIONED);
+  if (DIAGNOSIS_RE.test(reply)) fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
+  if (TURN_NUMBER_RE.test(reply)) fails.push(DebriefCheckCode.TURN_NUMBER);
+  const said = sources.map(normaliseForQuote);
+  const quotes = [...reply.matchAll(/[“"]([^”"]{12,})[”"]/g)].map((m) => m[1]);
+  if (
+    quotes.some((q) => {
+      const n = normaliseForQuote(q);
+      return !said.some((src) => src.includes(n));
+    })
+  ) {
+    fails.push(DebriefCheckCode.QUOTE_MISMATCH);
+  }
+  return fails;
+}

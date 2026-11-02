@@ -86,9 +86,9 @@ export class DebriefPracticeService {
         },
         { path: 'debrief-practice' },
       );
-      return (data ?? []).map((s: { id: number; title: string }) => ({
+      return (data ?? []).map((s) => ({
         id: Number(s.id),
-        title: s.title,
+        title: s.title ?? '',
       }));
     } catch (e) {
       // No practice suggestion never stops a debrief.

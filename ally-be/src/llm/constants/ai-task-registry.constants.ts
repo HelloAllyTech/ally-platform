@@ -970,6 +970,22 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'debrief release bundle (recipes.standard.steps[reviser].model)',
   },
   {
+    id: 'debrief-reply',
+    task: LlmTask.DEBRIEF_REPLY,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner replies under the reflective question of a published Debrief-agent debrief',
+    detail:
+      'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
+      'per message (≤ $0.05). A first-person risk statement gets the fixed support reply instead, ' +
+      'and the Safety reader reads each message alongside. Replaces coaching-chat for switched-on organisations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'DEBRIEF_REPLY_MODEL in debrief-release.constants.ts',
+    promptOverride: 'debrief_reply_system',
+  },
+  {
     id: 'debrief-improver',
     task: LlmTask.DEBRIEF_IMPROVER,
     runtime: LlmRuntime.ALLY_AI,

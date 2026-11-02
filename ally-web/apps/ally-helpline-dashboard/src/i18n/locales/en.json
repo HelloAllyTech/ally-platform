@@ -886,6 +886,9 @@
         "this": "Practise this",
         "label": "Practise this in the roleplay \"{{title}}\""
       },
+      "reply": {
+        "placeholder": "Answer here, or ask Ally anything about this session…"
+      },
       "whatWorked": "What worked",
       "workOnThis": "Work on this",
       "trySaying": "Try saying:",
