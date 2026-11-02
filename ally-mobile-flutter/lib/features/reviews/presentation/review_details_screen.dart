@@ -328,7 +328,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with 
     final permissions = ref.watch(userPermissionsProvider).value ?? const <String>[];
 
     if (!_loadedOnce && _isFetching) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
@@ -525,7 +525,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> with 
         );
     final trailing = <Widget>[
       if (_isFetching && _messages.isNotEmpty)
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(vertical: 16),
           child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
         )

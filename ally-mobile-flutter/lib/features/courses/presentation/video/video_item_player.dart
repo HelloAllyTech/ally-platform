@@ -227,7 +227,7 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
                   child: FractionallySizedBox(
                     widthFactor: (_tracker.watchedPct / 100).clamp(0.0, 1.0),
                     heightFactor: 1,
-                    child: const ColoredBox(color: AppColors.primary),
+                    child: ColoredBox(color: AppColors.primary),
                   ),
                 ),
         ),

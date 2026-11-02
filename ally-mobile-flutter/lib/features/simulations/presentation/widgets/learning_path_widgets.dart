@@ -70,7 +70,7 @@ class LearningPathLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       key: Key('activity-indicator'),
       child: CircularProgressIndicator(color: AppColors.primary),
     );
@@ -277,7 +277,7 @@ class _TappableProgress extends ConsumerWidget {
               Text(
                 ref.t('courses.progressDashboard.tapHint'),
                 // styles.progressTapHint: ROBOTO.REGULAR + body.tiny, medium.
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppFonts.robotoRegular,
                   fontSize: 10,
                   height: 14 / 10,

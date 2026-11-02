@@ -37,7 +37,7 @@ class ProgressScreen extends ConsumerWidget {
               // gate or the data loads, else whatever exists (no hero or
               // stats when the gate is closed) plus both link cards.
               child: dashboardAsync.when(
-                loading: () => const Center(
+                loading: () => Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 ),
                 error: (error, _) => Center(

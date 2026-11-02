@@ -113,7 +113,7 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
     final isLoading = discussionAsync.isLoading && data == null;
     final isError = discussionAsync.hasError && data == null;
     final isFetching = discussionAsync.isLoading && data != null;
-    final primarySpinner = const CupertinoActivityIndicator(color: AppColors.primary);
+    final primarySpinner = CupertinoActivityIndicator(color: AppColors.primary);
 
     final Widget body;
     if (isLoading) {
@@ -292,7 +292,7 @@ class _DiscussionThreadState extends ConsumerState<DiscussionThread> {
                     data!.isLocked
                         ? ref.t('courses.discussion.unlockDiscussion')
                         : ref.t('courses.discussion.lockDiscussion'),
-                    style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 12, color: AppColors.primary),
+                    style: TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 12, color: AppColors.primary),
                   ),
                 ),
             ],

@@ -165,7 +165,7 @@ class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
           if (index == _reactions.length) {
             return Padding(
               padding: EdgeInsets.only(top: 24, bottom: bottomInset + 120),
-              child: const Center(
+              child: Center(
                 child: SizedBox(
                   width: 20,
                   height: 20,
@@ -298,7 +298,7 @@ class _FilterTab extends StatelessWidget {
               child: Container(
                 key: const Key('reaction-filter-indicator'),
                 height: 3,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.azureBlue,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
                 ),

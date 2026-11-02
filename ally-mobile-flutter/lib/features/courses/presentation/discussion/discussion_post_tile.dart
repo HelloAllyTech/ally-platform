@@ -162,7 +162,7 @@ class _DiscussionPostTileState extends ConsumerState<DiscussionPostTile> with Au
     }
 
     final isHighlighted = widget.highlightPostId != null && widget.highlightPostId == post.id;
-    const actionStyle = TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 12, color: AppColors.primary);
+    final actionStyle = TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, fontSize: 12, color: AppColors.primary);
 
     return Container(
       margin: EdgeInsets.only(left: indent),

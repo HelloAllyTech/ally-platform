@@ -213,6 +213,27 @@ void main() {
         '/home',
       );
     });
+
+    test('signed in, /splash and /login also wait for /users/tenant so Home opens already branded', () {
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/splash', profileCompleted: true, isBrandingLoading: true),
+        isNull,
+      );
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/login', profileCompleted: true, isBrandingLoading: true),
+        isNull,
+      );
+      // Settled (or failed) tenant fetch: on to Home as before.
+      expect(
+        computeRedirect(isAuthenticated: true, matchedLocation: '/login', profileCompleted: true),
+        '/home',
+      );
+      // Signed out, the tenant fetch is pending by design and must not hold /login.
+      expect(
+        computeRedirect(isAuthenticated: false, matchedLocation: '/login', profileCompleted: null, isBrandingLoading: true),
+        isNull,
+      );
+    });
   });
 
   group('buildShareForReviewScreen', () {

@@ -398,7 +398,7 @@ class _VoiceNotePanelState extends ConsumerState<_VoiceNotePanel> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CupertinoActivityIndicator(color: AppColors.azureBlue),
+                  CupertinoActivityIndicator(color: AppColors.azureBlue),
                   const SizedBox(width: 10),
                   Flexible(child: Text(messages[_messageIndex % messages.length], style: _statusText)),
                 ],

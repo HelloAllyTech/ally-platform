@@ -286,7 +286,7 @@ class ExpandedComments extends ConsumerWidget {
       if (isLoading)
         Padding(
           padding: EdgeInsets.symmetric(vertical: rn.s(16)),
-          child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
         )
       else ...[
         for (final comment in comments)

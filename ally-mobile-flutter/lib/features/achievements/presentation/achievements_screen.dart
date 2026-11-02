@@ -139,7 +139,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     return badgesAsync.when(
       // styles.centerContainer: 48pt top/bottom.
       loading: () => _scrollable(
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(vertical: 48),
           child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
         ),

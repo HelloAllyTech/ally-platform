@@ -292,7 +292,7 @@ class _GeneralCommentsSectionState extends ConsumerState<GeneralCommentsSection>
         body.add(
           Padding(
             padding: EdgeInsets.symmetric(vertical: rn.vs(24)),
-            child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
           ),
         );
       } else if (controller.comments.isEmpty) {
@@ -353,7 +353,7 @@ class _GeneralCommentsSectionState extends ConsumerState<GeneralCommentsSection>
                 padding: EdgeInsets.symmetric(vertical: rn.vs(12)),
                 child: Center(
                   child: controller.isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),

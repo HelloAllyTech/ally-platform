@@ -172,7 +172,7 @@ jobs:
           retention-days: 30
 
       - name: Upload to TestFlight (Production)
-        uses: Apple-Actions/upload-testflight-build@master
+        uses: Apple-Actions/upload-testflight-build@v5.9.0
         with:
           app-path: ${{ runner.temp }}/build/ally.ipa
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}

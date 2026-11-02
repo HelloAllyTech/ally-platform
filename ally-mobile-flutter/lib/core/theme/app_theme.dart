@@ -31,8 +31,10 @@ import 'app_fonts.dart';
 class AppTheme {
   AppTheme._();
 
+  /// Built on every read, not cached: the brand tokens in [AppColors] follow
+  /// the signed-in org, and the app root re-reads this whenever that changes.
   static ThemeData get light {
-    const colorScheme = ColorScheme.light(
+    final colorScheme = ColorScheme.light(
       primary: AppColors.primary,
       onPrimary: AppColors.onPrimary,
       primaryContainer: AppColors.primaryLight,
@@ -60,7 +62,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.appBar,
         foregroundColor: AppColors.onPrimary,
       ),

@@ -126,7 +126,7 @@ class _RnButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.background = AppColors.primary,
+    this.background,
     this.textColor = Colors.white,
     this.borderColor,
     this.borderRadius = 999,
@@ -139,7 +139,9 @@ class _RnButton extends StatelessWidget {
 
   final String label;
   final VoidCallback? onPressed;
-  final Color background;
+  /// Null means the brand colour (`AppColors.primary`), read at build so it
+  /// follows the signed-in org.
+  final Color? background;
   final Color textColor;
   final Color? borderColor;
   final double borderRadius;
@@ -155,7 +157,7 @@ class _RnButton extends StatelessWidget {
     final disabled = isDisabled || isLoading;
     final radius = BorderRadius.circular(borderRadius);
     return Material(
-      color: isDisabled ? AppColors.disabledContainer : background,
+      color: isDisabled ? AppColors.disabledContainer : (background ?? AppColors.primary),
       shape: RoundedRectangleBorder(
         borderRadius: radius,
         side: borderColor == null

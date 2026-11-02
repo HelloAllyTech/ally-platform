@@ -150,7 +150,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     },
                     child: Text(
                       ref.t('notifications.markAllRead'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: _system,
                         fontSize: 12,
                         height: 16 / 12,
@@ -163,7 +163,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
           Expanded(
             child: pageAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
               error: (error, _) => _centered(ref.t('notifications.loadError')),
               data: (page) {
                 if (page.items.isEmpty) return _centered(ref.t('notifications.empty'));
@@ -176,7 +176,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index >= page.items.length) {
-                        return const Padding(
+                        return Padding(
                           padding: EdgeInsets.symmetric(vertical: 16),
                           child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
                         );
@@ -233,7 +233,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 width: 8,
                 height: 8,
                 margin: const EdgeInsets.only(top: 6, right: 8),
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
               ),
             Expanded(
               child: Column(

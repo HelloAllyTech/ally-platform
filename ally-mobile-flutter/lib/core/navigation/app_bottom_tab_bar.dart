@@ -104,7 +104,7 @@ class _TabIcon extends StatelessWidget {
           child: Container(
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
           ),
         ),
       ],

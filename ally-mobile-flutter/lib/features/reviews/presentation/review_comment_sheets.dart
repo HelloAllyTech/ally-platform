@@ -298,7 +298,7 @@ class _ThreadCard extends ConsumerWidget {
   }
 }
 
-Widget _sheetSpinner() => const Padding(
+Widget _sheetSpinner() => Padding(
   padding: EdgeInsets.symmetric(vertical: 40),
   child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
 );

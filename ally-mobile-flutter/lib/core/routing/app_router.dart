@@ -115,18 +115,25 @@ String? computeRedirect({
   bool isRestored = true,
   bool isSplashFinished = true,
   bool isUserLoading = false,
+  bool isBrandingLoading = false,
 }) {
   // Launch: RN's SplashScreen plays its animation on every cold start and
   // only routes once it has ended (`isAnimationEnded`) and, signed in, once
   // `/users/me` has settled (`isUserLoading`), so the profile-completion
   // gate is known. A failed `/users/me` still moves on (no logout on
   // network errors; a 401 is the auth interceptor's job).
+  //
+  // `/users/tenant` (`isBrandingLoading`) is awaited the same way, from the
+  // splash and from the login screen alike, so Home's first frame already
+  // wears the org's colours instead of repainting from Ally a moment later.
+  // It settles on failure too (Ally look, nothing blocked).
   if (!isRestored) return matchedLocation == '/splash' ? null : '/splash';
   final isLaunching = matchedLocation == '/splash';
-  if (isLaunching && (!isSplashFinished || (isAuthenticated && isUserLoading))) return null;
+  if (isLaunching && (!isSplashFinished || (isAuthenticated && (isUserLoading || isBrandingLoading)))) return null;
   // Signed in, the splash leaves exactly like /login does (to Home or
   // complete-profile below); signed out, the generic rule sends it to /login.
   final isLoggingIn = matchedLocation == '/login' || (isLaunching && isAuthenticated);
+  if (isLoggingIn && isAuthenticated && isBrandingLoading) return null;
   final isCompletingProfile = matchedLocation == '/complete-profile';
   // RN keeps SuspendedAccountScreen as a sibling of the login screen inside
   // the same "not authenticated" stack branch (RootNavigator.tsx's `else`
@@ -171,6 +178,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // whatever's currently cached (null while the very first fetch is
       // still in flight) rather than block routing on it.
       final userAsync = ref.read(currentUserProvider);
+      final tenantAsync = ref.read(tenantInfoProvider);
       return computeRedirect(
         isAuthenticated: isAuthenticated,
         matchedLocation: state.matchedLocation,
@@ -178,6 +186,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         isRestored: auth.isRestored,
         isSplashFinished: ref.read(launchSplashProvider).finished,
         isUserLoading: !userAsync.hasValue && !userAsync.hasError,
+        isBrandingLoading: !tenantAsync.hasValue && !tenantAsync.hasError,
       );
     },
     routes: [
@@ -407,11 +416,14 @@ class _RouterRefreshListenable extends ChangeNotifier {
         notifyListeners();
       }
     });
+    bool settled(AsyncValue<Object?>? v) => v != null && (v.hasValue || v.hasError);
     ref.listen(currentUserProvider, (previous, next) {
-      bool settled(AsyncValue<Object?>? v) => v != null && (v.hasValue || v.hasError);
       if (previous?.value?.profileCompleted != next.value?.profileCompleted || settled(previous) != settled(next)) {
         notifyListeners();
       }
+    });
+    ref.listen(tenantInfoProvider, (previous, next) {
+      if (settled(previous) != settled(next)) notifyListeners();
     });
     ref.listen(launchSplashProvider, (previous, next) {
       if (previous?.finished != next.finished) notifyListeners();

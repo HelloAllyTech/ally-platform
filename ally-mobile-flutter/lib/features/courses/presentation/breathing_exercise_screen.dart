@@ -120,7 +120,7 @@ class _BreathingExerciseScreenState extends ConsumerState<BreathingExerciseScree
                   onPressed: () => context.pop(),
                   child: Text(
                     ref.t('courses.player.exit'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: AppFonts.ibmPlexSerifMedium,
                       color: AppColors.primary,
                     ),
@@ -203,7 +203,7 @@ class _BreathingDot extends StatelessWidget {
       key: const ValueKey('breathing-dot'),
       width: size,
       height: size,
-      decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
     );
   }
 }

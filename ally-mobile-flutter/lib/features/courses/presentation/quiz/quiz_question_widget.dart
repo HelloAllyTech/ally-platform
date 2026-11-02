@@ -257,7 +257,8 @@ class _OrderingQuestion extends ConsumerWidget {
 }
 
 /// RN `PAIR_COLORS`: a matched left/right share a chip colour.
-const _pairColors = [
+// A getter: the first pair wears the brand colour, read at build.
+List<({Color bg, Color border, Color text})> get _pairColors => [
   (bg: AppColors.lightBlue100, border: AppColors.lightBlue300, text: AppColors.primary),
   (bg: AppColors.green50, border: AppColors.green300, text: AppColors.green800),
   (bg: AppColors.amber50, border: AppColors.amber300, text: AppColors.amber800),
@@ -449,7 +450,7 @@ class _FillBlankQuestionState extends State<_FillBlankQuestion> {
                   if (s.text != null)
                     TextSpan(text: s.text)
                   else
-                    const TextSpan(
+                    TextSpan(
                       text: ' ____ ',
                       style: TextStyle(fontFamily: AppFonts.ibmPlexSerifMedium, color: AppColors.primary),
                     ),
