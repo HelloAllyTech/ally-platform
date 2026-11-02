@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button, TextArea } from "@ally-ui-mono/ui-shared";
 import {
   useActOnDebriefRunMutation,
+  useEscalateDebriefMutation,
   useGetDebriefReviewQuery,
   useResolveDebriefFlagMutation,
 } from "@api";
@@ -13,13 +14,36 @@ import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
-import { DebriefReviewFlag, DebriefReviewRun } from "@types";
+import { DebriefCardCorrection, DebriefReviewFlag, DebriefReviewRun } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { formatWhen, score } from "./consoleTable";
 import { RunPanel } from "./RunPanel";
 
 type RunAction = "publish" | "todays-debrief" | "reviewed";
+
+/** v9 FR-38: send an item to the clinical advisor. It stays in the queue, marked. */
+const EscalateButton: React.FC<{ kind: "flags" | "runs"; id: string; reason?: string }> = ({
+  kind,
+  id,
+  reason,
+}) => {
+  const s = en.debriefs.review;
+  const [escalate, { isLoading }] = useEscalateDebriefMutation();
+  const go = async () => {
+    try {
+      await escalate({ kind, id, reason: reason?.trim() || undefined }).unwrap();
+      toast.success(s.escalatedDone);
+    } catch (e) {
+      toast.error(getErrorMessage(e, s.failed));
+    }
+  };
+  return (
+    <Button kind="tertiary" size="sm" disabled={isLoading} onClick={() => void go()}>
+      {s.escalate}
+    </Button>
+  );
+};
 
 const RunItem: React.FC<{
   run: DebriefReviewRun;
@@ -36,6 +60,7 @@ const RunItem: React.FC<{
         <Pill tone={waiting ? "warning" : "neutral"}>{en.debriefs.status[run.status]}</Pill>
         {run.hasRiskCue && <Pill tone="info">{en.debriefs.runs.riskCue}</Pill>}
         {run.learnerDistress && <Pill tone="warning">{s.distress}</Pill>}
+        {run.escalation && <Pill tone="info">{s.escalated}</Pill>}
         <span className="font-mono text-xs">{shortId(run.scenarioSessionId)}</span>
         <span>{run.tenantName ?? "—"}</span>
         <span>· {run.language ?? "—"}</span>
@@ -45,6 +70,12 @@ const RunItem: React.FC<{
         {distressOnly ? s.distressHelp : waiting ? s.waitingHelp : s.belowBarHelp}{" "}
         {s.scores(score(run.evaluatorOverall), score(run.judgeOverall))}
       </p>
+      {run.escalation && (
+        <p className="text-sm text-typography-700">
+          {s.escalatedHelp(formatWhen(run.escalation.at))}
+          {run.escalation.note ? ` ${run.escalation.note}` : ""}
+        </p>
+      )}
       {(run.checkFailures.length > 0 || run.evaluatorHardFails.length > 0) && (
         <ul className="list-disc pl-5 text-sm">
           {run.checkFailures.map((f, i) => (
@@ -77,6 +108,7 @@ const RunItem: React.FC<{
             {distressOnly ? s.checkedOn : s.looksFine}
           </Button>
         )}
+        {!run.escalation && <EscalateButton kind="runs" id={run.id} />}
       </div>
     </li>
   );
@@ -89,24 +121,60 @@ const FlagItem: React.FC<{ flag: DebriefReviewFlag; onOpenRun: () => void }> = (
   const s = en.debriefs.review;
   const [resolve, { isLoading }] = useResolveDebriefFlagMutation();
   const [note, setNote] = useState("");
-  const act = async (outcome: "kept" | "removed") => {
+  const [draft, setDraft] = useState<DebriefCardCorrection | null>(null);
+  const act = async (outcome: "kept" | "removed" | "corrected") => {
     try {
-      await resolve({ id: flag.id, outcome, note: note.trim() || undefined }).unwrap();
-      toast.success(outcome === "kept" ? s.kept : s.removed);
+      await resolve({
+        id: flag.id,
+        outcome,
+        note: note.trim() || undefined,
+        correction: outcome === "corrected" ? (draft ?? undefined) : undefined,
+      }).unwrap();
+      toast.success(
+        outcome === "kept" ? s.kept : outcome === "corrected" ? s.corrected : s.removed,
+      );
     } catch (e) {
       toast.error(getErrorMessage(e, s.failed));
     }
   };
+  const changed =
+    draft !== null &&
+    Object.entries(draft).some(
+      ([field, text]) => text.trim() && text !== flag.card?.[field as keyof DebriefCardCorrection],
+    );
   return (
     <li className="flex flex-col gap-2 border border-border-light p-4" data-testid="review-flag">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {flag.urgent && <Pill tone="warning">{s.urgent}</Pill>}
+        {flag.status === "escalated" && <Pill tone="info">{s.escalated}</Pill>}
         <Pill tone="neutral">{s.reasons[flag.reason]}</Pill>
         <span className="font-mono text-xs">{flag.section}</span>
         <span>{flag.tenantName ?? "—"}</span>
         <span>· {formatWhen(flag.createdAt)}</span>
       </div>
-      <p className="whitespace-pre-wrap bg-neutral-50 p-2 text-sm">{flag.cardText ?? "—"}</p>
+      {draft ? (
+        <div
+          className="flex flex-col gap-2 border border-border-light p-3"
+          data-testid="correct-card"
+        >
+          <p className="text-sm font-semibold">{s.correctHeading}</p>
+          <p className="text-sm text-typography-700">{s.correctHelp}</p>
+          {Object.keys(draft).map(field => (
+            <TextArea
+              key={field}
+              id={`flag-${flag.id}-${field}`}
+              labelText={s.fields[field] ?? field}
+              rows={2}
+              value={draft[field as keyof DebriefCardCorrection] ?? ""}
+              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setDraft({ ...draft, [field]: event.target.value })
+              }
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap bg-neutral-50 p-2 text-sm">{flag.cardText ?? "—"}</p>
+      )}
       {flag.note && (
         <p className="text-sm">
           <span className="font-semibold">{s.learnerSaid}</span> {flag.note}
@@ -126,17 +194,48 @@ const FlagItem: React.FC<{ flag: DebriefReviewFlag; onOpenRun: () => void }> = (
         <Button kind="tertiary" size="sm" onClick={onOpenRun}>
           {s.read}
         </Button>
-        <Button
-          kind="tertiary"
-          size="sm"
-          disabled={isLoading || !note.trim()}
-          onClick={() => void act("kept")}
-        >
-          {s.keep}
-        </Button>
-        <Button kind="primary" size="sm" disabled={isLoading} onClick={() => void act("removed")}>
-          {s.remove}
-        </Button>
+        {draft ? (
+          <>
+            <Button
+              kind="primary"
+              size="sm"
+              disabled={isLoading || !note.trim() || !changed}
+              onClick={() => void act("corrected")}
+            >
+              {s.saveCorrection}
+            </Button>
+            <Button kind="tertiary" size="sm" onClick={() => setDraft(null)}>
+              {s.cancel}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              kind="tertiary"
+              size="sm"
+              disabled={isLoading || !note.trim()}
+              onClick={() => void act("kept")}
+            >
+              {s.keep}
+            </Button>
+            {flag.card && (
+              <Button kind="tertiary" size="sm" onClick={() => setDraft({ ...flag.card })}>
+                {s.correct}
+              </Button>
+            )}
+            <Button
+              kind="primary"
+              size="sm"
+              disabled={isLoading}
+              onClick={() => void act("removed")}
+            >
+              {s.remove}
+            </Button>
+            {flag.status !== "escalated" && (
+              <EscalateButton kind="flags" id={flag.id} reason={note} />
+            )}
+          </>
+        )}
       </div>
     </li>
   );

@@ -906,6 +906,7 @@
         "note": "Their note: {{note}}",
         "waiting": "Waiting for the Ally team's review",
         "kept": "Kept after review: {{note}}",
+        "corrected": "Corrected after review: {{note}}",
         "removed": "Removed after review",
         "helpfulYes": "The learner found this debrief helpful.",
         "helpfulNo": "The learner found this debrief not helpful.",
@@ -957,6 +958,7 @@
       },
       "corrections": {
         "kept": "Reviewed: the Ally team kept this point. {{note}}",
+        "corrected": "Updated on {{date}} after a review by the Ally team: {{note}}",
         "removed": "A point was removed after a review by the Ally team."
       },
       "helpful": {

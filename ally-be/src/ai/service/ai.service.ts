@@ -1,8 +1,10 @@
 import {
   HttpStatus,
   Injectable,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosError } from 'axios';
 import {
@@ -69,6 +71,7 @@ import {
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
 import { ExecutionManager } from '../../common/execution/execution-manager';
+import { DEBRIEF_AGENT_KEY } from '../../debrief/constants/debrief-release.constants';
 import {
   ALLY_AI_PROMPT_PREFIX,
   ALLY_AI_LEARN_PROMPT_PREFIX,
@@ -143,7 +146,42 @@ export class AiService {
     private eventEmitter: EventEmitter2,
     private promptSharedService: PromptSharedService,
     private skillExperiments: SkillExperimentRouterService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
+
+  /**
+   * v9 FR-44: once an organisation is switched on for the Debrief agent, the
+   * old optimiser stops experimenting on today's debrief there. Learners read
+   * the agent's debrief, so a challenger would be judged on text nobody sees.
+   * Fails open to "not live": an experiment must never make a debrief fail.
+   */
+  private async debriefAgentIsLive(
+    scenarioSessionId?: string,
+  ): Promise<boolean> {
+    if (!this.dataSource) return false;
+    const tenantId = ExecutionManager.getTenantId() ?? null;
+    if (!scenarioSessionId && !tenantId) return false;
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT 1 FROM agent_config_overrides o
+          WHERE o."agentKey" = $1 AND o.layer = 'org'
+            AND (o."values"->>'live')::boolean = true
+            AND o."scopeId" = COALESCE(
+              (SELECT s.tenant_id FROM scenario_sessions s WHERE s.id::text = $2),
+              $3)
+          LIMIT 1`,
+        [DEBRIEF_AGENT_KEY, scenarioSessionId ?? null, tenantId],
+      );
+      return rows.length > 0;
+    } catch (error) {
+      this.logger.warn(
+        `[SKILL_EXPERIMENT] could not read the debrief agent's live organisations: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
 
   async transcribeAudioFromBuffer(audioBuffer: Buffer): Promise<string> {
     try {
@@ -1144,9 +1182,10 @@ export class AiService {
     const promptCode = needMemory
       ? SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE
       : SCENARIO_EVALUATION_PROMPT_CODE;
-    const arm = usageTask
-      ? null
-      : await this.skillExperiments.assign(promptCode, scenarioSessionId);
+    const arm =
+      usageTask || (await this.debriefAgentIsLive(scenarioSessionId))
+        ? null
+        : await this.skillExperiments.assign(promptCode, scenarioSessionId);
     const experimentInput = {
       scenarioSessionId: scenarioSessionId ?? null,
       transcript: messages.map((m) => `${m.role}: ${m.content}`).join('\n'),

@@ -50,6 +50,10 @@ export enum DebriefFeedbackStatus {
   KEPT = 'kept',
   /** Reviewed: the point is taken out of the learner's debrief. */
   REMOVED = 'removed',
+  /** Reviewed: the Ally team rewrote the point; the learner sees what changed. */
+  CORRECTED = 'corrected',
+  /** Sent to the clinical advisor; still open until they resolve it. */
+  ESCALATED = 'escalated',
   /** The learner undid it within the undo window. */
   WITHDRAWN = 'withdrawn',
   /** A "was this helpful?" answer: nothing to review. */

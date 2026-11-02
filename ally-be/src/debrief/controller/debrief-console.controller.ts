@@ -22,7 +22,9 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
@@ -43,19 +45,57 @@ class ReasonDto {
   reason?: string;
 }
 
+class CardCorrectionDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  lead?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  body?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  why?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  try_saying?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  reason?: string;
+}
+
 class ResolveFlagDto {
-  @ApiProperty({ enum: ['kept', 'removed'] })
-  @IsIn(['kept', 'removed'])
-  outcome!: 'kept' | 'removed';
+  @ApiProperty({ enum: ['kept', 'removed', 'corrected'] })
+  @IsIn(['kept', 'removed', 'corrected'])
+  outcome!: 'kept' | 'removed' | 'corrected';
 
   @ApiProperty({
     required: false,
-    description: 'Required to keep a point: the learner reads it.',
+    description: 'Required to keep or correct a point: the learner reads it.',
   })
   @IsOptional()
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  @ApiProperty({ required: false, type: CardCorrectionDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CardCorrectionDto)
+  correction?: CardCorrectionDto;
 }
 
 class ClinicalDto {
@@ -162,7 +202,39 @@ export class DebriefConsoleController {
     @Req() req: AuthedRequest,
     @Body() body: ResolveFlagDto,
   ) {
-    return this.feedback.resolveFlag(id, req.user.id, body.outcome, body.note);
+    return this.feedback.resolveFlag(
+      id,
+      req.user.id,
+      body.outcome,
+      body.note,
+      body.correction,
+    );
+  }
+
+  @Post('flags/:id/escalate')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Send a flag to the clinical advisor; it stays in the queue',
+  })
+  escalateFlag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.feedback.escalateFlag(id, req.user.id, body?.reason);
+  }
+
+  @Post('runs/:id/escalate')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Send a debrief waiting in Review to the clinical advisor',
+  })
+  escalateRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.feedback.escalateRun(id, req.user.id, body?.reason);
   }
 
   @Get('overview')

@@ -414,6 +414,38 @@ describe('AiService', () => {
       expect(mockSkillExperiments.assign).not.toHaveBeenCalled();
     });
 
+    it('never experiments for an organisation live on the Debrief agent (FR-44)', async () => {
+      const query = jest.fn().mockResolvedValue([{ '?column?': 1 }]);
+      (service as any).dataSource = { query };
+      (mockedAxios as any).mockResolvedValue({ data: {} });
+      await service.getScenarioSessionEvaluation(
+        mockMessages,
+        false,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'sess-1',
+      );
+      expect(query.mock.calls[0][1]).toEqual(['debrief', 'sess-1', null]);
+      expect(mockSkillExperiments.assign).not.toHaveBeenCalled();
+
+      query.mockResolvedValue([]);
+      await service.getScenarioSessionEvaluation(
+        mockMessages,
+        false,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'sess-2',
+      );
+      expect(mockSkillExperiments.assign).toHaveBeenCalledWith(CODE, 'sess-2');
+      (service as any).dataSource = undefined;
+    });
+
     it('records a failed challenger and retries the debrief on the skill text', async () => {
       mockSkillExperiments.assign.mockResolvedValue(arm(false));
       (mockedAxios as any)

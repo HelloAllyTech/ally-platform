@@ -56,12 +56,12 @@ vi.mock("@hooks", () => ({
   useSendMessage: (...args: unknown[]) => {
     mockUseSendMessage(...args);
     return {
-    messages: [],
-    streamingMessage: undefined,
-    isStreaming: false,
-    error: undefined,
-    sendMessage: vi.fn(),
-    retryLastMessage: vi.fn(),
+      messages: [],
+      streamingMessage: undefined,
+      isStreaming: false,
+      error: undefined,
+      sendMessage: vi.fn(),
+      retryLastMessage: vi.fn(),
     };
   },
 }));
@@ -367,6 +367,27 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       );
     });
 
+    it("says a corrected card was updated after a review, with the reason (FR-31)", () => {
+      ready({
+        corrections: [
+          {
+            section: "what_worked[0]",
+            outcome: "corrected",
+            note: "Reworded for your setting.",
+            at: "2026-11-02T10:00:00Z",
+          },
+        ],
+        feedback: {
+          helpful: null,
+          flags: [{ id: "f1", section: "what_worked[0]", status: "corrected", canUndoUntil: null }],
+        },
+      });
+      renderTab();
+      expect(screen.getByTestId("debrief-correction")).toHaveTextContent(
+        "postSim.debriefCards.corrections.corrected",
+      );
+    });
+
     it("asks whether it was helpful and records the answer", () => {
       ready({ feedback: { helpful: true, flags: [] } });
       renderTab();
@@ -412,7 +433,9 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(within(care).getByText("postSim.debriefCards.distress.title")).toBeInTheDocument();
       expect(within(care).getByRole("link", { name: /Tele-MANAS/ })).toBeInTheDocument();
 
-      const toggle = screen.getByRole("button", { name: "postSim.debriefCards.distress.whenReady" });
+      const toggle = screen.getByRole("button", {
+        name: "postSim.debriefCards.distress.whenReady",
+      });
       expect(toggle).toHaveAttribute("aria-expanded", "false");
       expect(screen.getByTestId("debrief-card-opening")).not.toBeVisible();
 

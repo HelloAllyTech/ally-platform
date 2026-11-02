@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  DebriefCardCorrection,
   DebriefKnowledgeDocument,
   DebriefKnowledgeList,
   DebriefOverview,
@@ -117,12 +118,28 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
     }),
     resolveDebriefFlag: builder.mutation<
       unknown,
-      { id: string; outcome: "kept" | "removed"; note?: string }
+      {
+        id: string;
+        outcome: "kept" | "removed" | "corrected";
+        note?: string;
+        correction?: DebriefCardCorrection;
+      }
     >({
       query: ({ id, ...body }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.RESOLVE_FLAG(id),
         method: HttpMethod.POST,
         body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    escalateDebrief: builder.mutation<
+      unknown,
+      { kind: "flags" | "runs"; id: string; reason?: string }
+    >({
+      query: ({ kind, id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.ESCALATE(kind, id),
+        method: HttpMethod.POST,
+        body: reason ? { reason } : {},
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
@@ -172,4 +189,5 @@ export const {
   useGetDebriefReviewQuery,
   useActOnDebriefRunMutation,
   useResolveDebriefFlagMutation,
+  useEscalateDebriefMutation,
 } = debriefConsoleAPI;

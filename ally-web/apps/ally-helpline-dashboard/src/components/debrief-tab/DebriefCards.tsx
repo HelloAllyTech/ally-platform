@@ -152,9 +152,11 @@ const SupervisorFlag: FC<{ flag?: SupervisorDebriefFlag }> = ({ flag }) => {
   const outcome =
     flag.status === "kept"
       ? t("postSim.debriefCards.supervisor.kept", { note: flag.resolutionNote ?? "" })
-      : flag.status === "removed"
-        ? t("postSim.debriefCards.supervisor.removed")
-        : t("postSim.debriefCards.supervisor.waiting");
+      : flag.status === "corrected"
+        ? t("postSim.debriefCards.supervisor.corrected", { note: flag.resolutionNote ?? "" })
+        : flag.status === "removed"
+          ? t("postSim.debriefCards.supervisor.removed")
+          : t("postSim.debriefCards.supervisor.waiting");
   return (
     <div
       data-testid="debrief-supervisor-flag"

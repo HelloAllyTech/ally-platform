@@ -239,7 +239,13 @@ export interface DebriefReviewRun {
   evaluatorHardFails: Array<{ code: string; evidence: string }>;
   createdAt: string;
   tenantName: string | null;
+  escalation: { by: number; at: string; note: string | null } | null;
 }
+
+/** The words of a card a reviewer may rewrite; the quote never changes. */
+export type DebriefCardCorrection = Partial<
+  Record<"lead" | "body" | "why" | "try_saying" | "reason", string>
+>;
 
 export interface DebriefReviewFlag {
   id: string;
@@ -249,10 +255,12 @@ export interface DebriefReviewFlag {
   reason: "didnt_say" | "described_wrongly" | "advice_doesnt_fit" | "something_else";
   note: string | null;
   urgent: boolean;
+  status: "open" | "escalated";
   createdAt: string;
   language: string | null;
   tenantName: string | null;
   cardText: string | null;
+  card: DebriefCardCorrection | null;
 }
 
 export interface DebriefReviewQueue {

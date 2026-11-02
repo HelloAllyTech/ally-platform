@@ -36,7 +36,7 @@ export const CardFlag: FC<{
   flag?: DebriefMyFlag;
   correction?: DebriefCorrection;
 }> = ({ sessionId, section, cardLabel, flag, correction }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<DebriefFlagReason | null>(null);
@@ -53,6 +53,17 @@ export const CardFlag: FC<{
     return () => clearTimeout(timer);
   }, [flag]);
 
+  if (correction?.outcome === "corrected") {
+    // v9 FR-31: the card already shows the new words; say when and why.
+    const date = correction.at
+      ? new Date(correction.at).toLocaleDateString(i18n?.language, { dateStyle: "medium" })
+      : "";
+    return (
+      <p data-testid="debrief-correction" className="font-primary text-xs text-typography-700">
+        {t("postSim.debriefCards.corrections.corrected", { date, note: correction.note ?? "" })}
+      </p>
+    );
+  }
   if (correction?.outcome === "kept") {
     return (
       <p data-testid="debrief-correction" className="font-primary text-xs text-typography-700">

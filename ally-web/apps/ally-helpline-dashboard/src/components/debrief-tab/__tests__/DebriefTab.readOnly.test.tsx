@@ -173,7 +173,13 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
   const CARDS = {
     opening: "You stayed calm.",
     what_worked: [
-      { skill: "Listening", turn_index: 2, quote: "Go on.", lead: "You let her lead.", body: "It helped." },
+      {
+        skill: "Listening",
+        turn_index: 2,
+        quote: "Go on.",
+        lead: "You let her lead.",
+        body: "It helped.",
+      },
     ],
     work_on_this: [],
     practise_next: null,
@@ -205,7 +211,14 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
         ],
       },
     } as never);
-    render(<DebriefTab sessionId="s-1" summaryData={undefined as never} retryMaxReached={false} readOnly />);
+    render(
+      <DebriefTab
+        sessionId="s-1"
+        summaryData={undefined as never}
+        retryMaxReached={false}
+        readOnly
+      />,
+    );
 
     expect(screen.getByTestId("debrief-cards")).toBeInTheDocument();
     expect(screen.getByTestId("debrief-supervisor-flag")).toHaveTextContent(
@@ -220,4 +233,3 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
     expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
   });
 });
-

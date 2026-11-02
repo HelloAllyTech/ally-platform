@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   review: vi.fn(),
   act: vi.fn(),
   resolve: vi.fn(),
+  escalate: vi.fn(),
   knowledge: vi.fn(),
   setClinical: vi.fn(),
   signOff: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefReviewQuery: () => h.review(),
   useActOnDebriefRunMutation: () => [h.act, { isLoading: false }],
   useResolveDebriefFlagMutation: () => [h.resolve, { isLoading: false }],
+  useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
   useGetDebriefKnowledgeQuery: () => h.knowledge(),
   useSetDebriefKnowledgeClinicalMutation: () => [h.setClinical, { isLoading: false }],
   useSignOffDebriefKnowledgeMutation: () => [h.signOff, { isLoading: false }],
@@ -276,11 +278,13 @@ describe("Debrief Console tabs", () => {
             language: "en",
             tenantName: "Ally",
             cardText: "Ask about safety directly.",
+            status: "open",
+            card: { lead: "Ask about safety", why: "It keeps them safe." },
           },
         ],
       }),
     );
-    [h.decide, h.rollback, h.setLive, h.screen, h.build, h.act, h.resolve].forEach(f =>
+    [h.decide, h.rollback, h.setLive, h.screen, h.build, h.act, h.resolve, h.escalate].forEach(f =>
       f.mockReturnValue(resolves()),
     );
     h.runImprover.mockReturnValue(resolves({ report: "r", ideas: [] }));
@@ -407,6 +411,50 @@ describe("Debrief Console tabs", () => {
     );
   });
 
+  it("Review: correcting a card needs new words and a reason, and sends only the card's fields (FR-38)", async () => {
+    render(<ReviewTab />);
+    const flag = screen.getByTestId("review-flag");
+    fireEvent.click(within(flag).getByRole("button", { name: "Correct it" }));
+    const save = within(flag).getByRole("button", { name: "Save the correction" });
+    expect(save).toBeDisabled();
+    fireEvent.change(within(flag).getByLabelText("Why it matters"), {
+      target: { value: "It shows you take them seriously." },
+    });
+    expect(save).toBeDisabled();
+    fireEvent.change(within(flag).getByLabelText("Your reason"), {
+      target: { value: "Reworded for this setting" },
+    });
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(h.resolve).toHaveBeenCalledWith({
+        id: "flag-1",
+        outcome: "corrected",
+        note: "Reworded for this setting",
+        correction: { lead: "Ask about safety", why: "It shows you take them seriously." },
+      }),
+    );
+  });
+
+  it("Review: a flag or a debrief can be escalated to the clinical advisor (FR-38)", async () => {
+    render(<ReviewTab />);
+    fireEvent.click(
+      within(screen.getByTestId("review-flag")).getByRole("button", {
+        name: "Escalate to clinical advisor",
+      }),
+    );
+    await waitFor(() =>
+      expect(h.escalate).toHaveBeenCalledWith({ kind: "flags", id: "flag-1", reason: undefined }),
+    );
+    fireEvent.click(
+      within(screen.getByTestId("review-run")).getByRole("button", {
+        name: "Escalate to clinical advisor",
+      }),
+    );
+    await waitFor(() =>
+      expect(h.escalate).toHaveBeenCalledWith({ kind: "runs", id: RUN_ROW.id, reason: undefined }),
+    );
+  });
+
   it("Review: a published debrief with learner distress asks someone to check on them (FR-23)", async () => {
     h.review.mockReturnValue(
       ok({
@@ -473,7 +521,10 @@ describe("Debrief Console tabs", () => {
     it("the Ally team marks a document clinical or not", async () => {
       h.setClinical.mockReturnValue(resolves());
       h.knowledge.mockReturnValue(
-        ok({ documents: [{ ...DOC, needsClinicalSignOff: false, clinical: "not_clinical" }], canSignOff: false }),
+        ok({
+          documents: [{ ...DOC, needsClinicalSignOff: false, clinical: "not_clinical" }],
+          canSignOff: false,
+        }),
       );
       render(<KnowledgeTab />);
       fireEvent.click(screen.getByRole("button", { name: "Mark clinical" }));

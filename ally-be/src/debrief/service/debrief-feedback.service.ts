@@ -26,12 +26,50 @@ export const FLAG_UNDO_MS = 10 * 60 * 1000;
 /** What the learner sees on a card after the Ally team reviewed their flag. */
 export interface DebriefCorrection {
   section: string;
-  outcome: 'kept' | 'removed';
+  outcome: 'kept' | 'removed' | 'corrected';
   note: string | null;
   at: string;
 }
 
-/** The card a section key names, as text — what a reviewer reads beside the flag. */
+/** The fields of a card a reviewer may rewrite; the quote is the learner's own words. */
+export const CORRECTABLE_FIELDS = [
+  'lead',
+  'body',
+  'why',
+  'try_saying',
+  'reason',
+] as const;
+export type CardCorrection = Partial<
+  Record<(typeof CORRECTABLE_FIELDS)[number], string>
+>;
+
+/** The card object a section key names, or undefined. */
+function cardAt(
+  cards: Record<string, any> | null | undefined,
+  section: string,
+): Record<string, any> | undefined {
+  if (!cards) return undefined;
+  const m = /^(what_worked|work_on_this)\[(\d+)\]$/.exec(section);
+  if (m) return cards[m[1]]?.[Number(m[2])];
+  return section === 'important_moment' || section === 'practise_next'
+    ? cards[section]
+    : undefined;
+}
+
+/** The card a section names, cut to the fields a reviewer may rewrite. */
+export function correctableFields(
+  cards: DebriefCards | null | undefined,
+  section: string,
+): CardCorrection | null {
+  const card = cardAt(cards as Record<string, any>, section);
+  if (!card) return null;
+  const out: CardCorrection = {};
+  for (const f of CORRECTABLE_FIELDS) {
+    if (typeof card[f] === 'string') out[f] = card[f];
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** The review-queue section for an Ask Ally item. */
 export const ASK_ALLY_SECTION = 'ask_ally';
 
@@ -57,6 +95,7 @@ export interface SupervisorDebriefView {
   thread?: Array<{ role: 'learner' | 'ally'; content: string; at: string }>;
 }
 
+/** The card a section key names, as text — what a reviewer reads beside the flag. */
 export function sectionText(
   cards: DebriefCards | null,
   section: string,
@@ -263,11 +302,17 @@ export class DebriefFeedbackService {
       .filter(
         (r) =>
           r.status === DebriefFeedbackStatus.KEPT ||
-          r.status === DebriefFeedbackStatus.REMOVED,
+          r.status === DebriefFeedbackStatus.REMOVED ||
+          r.status === DebriefFeedbackStatus.CORRECTED,
       )
       .map((r) => ({
         section: r.section!,
-        outcome: r.status === DebriefFeedbackStatus.KEPT ? 'kept' : 'removed',
+        outcome:
+          r.status === DebriefFeedbackStatus.KEPT
+            ? 'kept'
+            : r.status === DebriefFeedbackStatus.CORRECTED
+              ? 'corrected'
+              : 'removed',
         note: r.resolutionNote ?? null,
         at: (r.resolvedAt ?? r.updatedAt).toISOString(),
       }));
@@ -288,7 +333,11 @@ export class DebriefFeedbackService {
           .map((r) => ({
             id: r.id,
             section: r.section,
-            status: r.status,
+            // Escalation is the team's business; the learner still sees "under review".
+            status:
+              r.status === DebriefFeedbackStatus.ESCALATED
+                ? DebriefFeedbackStatus.OPEN
+                : r.status,
             canUndoUntil:
               r.status === DebriefFeedbackStatus.OPEN
                 ? new Date(
@@ -393,7 +442,8 @@ export class DebriefFeedbackService {
       `SELECT r.id, r."scenarioSessionId", r.status, r."skipReason", r.language,
               r."hasRiskCue", r."learnerDistress", r."evaluatorOverall",
               (r.workspace->'judge'->>'overall')::float AS "judgeOverall",
-              r."checkFailures", r."evaluatorHardFails", r."createdAt", t.name AS "tenantName"
+              r."checkFailures", r."evaluatorHardFails", r."createdAt", t.name AS "tenantName",
+              r.workspace->'escalation' AS escalation
          FROM debrief_runs r
          LEFT JOIN tenants t ON t.id::text = r.tenant_id
         WHERE r.mode = 'live'
@@ -406,12 +456,12 @@ export class DebriefFeedbackService {
         LIMIT 200`,
     );
     const flags = await this.dataSource.query(
-      `SELECT f.id, f."runId", f."scenarioSessionId", f.section, f.reason, f.note, f.urgent,
+      `SELECT f.id, f."runId", f."scenarioSessionId", f.section, f.reason, f.note, f.urgent, f.status,
               f."createdAt", r.cards, r.language, t.name AS "tenantName"
          FROM debrief_run_feedback f
          JOIN debrief_runs r ON r.id = f."runId"
          LEFT JOIN tenants t ON t.id::text = f.tenant_id
-        WHERE f.kind = 'flag' AND f.status = 'open'
+        WHERE f.kind = 'flag' AND f.status IN ('open','escalated')
           AND f."updatedAt" < now() - make_interval(secs => $1)
         ORDER BY f.urgent DESC, f."createdAt" ASC
         LIMIT 200`,
@@ -423,6 +473,7 @@ export class DebriefFeedbackService {
       flags: flags.map(({ cards, ...f }: Record<string, any>) => ({
         ...f,
         cardText: sectionText(cards as DebriefCards, f.section),
+        card: correctableFields(cards as DebriefCards, f.section),
       })),
     };
   }
@@ -474,26 +525,38 @@ export class DebriefFeedbackService {
   async resolveFlag(
     flagId: string,
     userId: number,
-    outcome: 'kept' | 'removed',
+    outcome: 'kept' | 'removed' | 'corrected',
     note?: string | null,
+    correction?: CardCorrection | null,
   ) {
     const row = await this.feedback.findOne({
       where: { id: flagId, kind: DebriefFeedbackKind.FLAG },
     });
     if (!row) throw new NotFoundException('Flag not found');
-    if (row.status !== DebriefFeedbackStatus.OPEN) {
+    if (
+      ![DebriefFeedbackStatus.OPEN, DebriefFeedbackStatus.ESCALATED].includes(
+        row.status,
+      )
+    ) {
       throw new ConflictException(`This flag is already ${row.status}`);
     }
     const reason = note?.trim() ?? '';
-    if (outcome === 'kept' && !reason) {
+    if ((outcome === 'kept' || outcome === 'corrected') && !reason) {
       throw new BadRequestException(
-        'Say why the point stays; the learner reads it',
+        outcome === 'kept'
+          ? 'Say why the point stays; the learner reads it'
+          : 'Say what changed; the learner reads it',
       );
+    }
+    if (outcome === 'corrected') {
+      await this.correctCard(row.runId, row.section!, correction ?? {}, userId);
     }
     row.status =
       outcome === 'kept'
         ? DebriefFeedbackStatus.KEPT
-        : DebriefFeedbackStatus.REMOVED;
+        : outcome === 'corrected'
+          ? DebriefFeedbackStatus.CORRECTED
+          : DebriefFeedbackStatus.REMOVED;
     row.resolvedBy = userId;
     row.resolvedAt = new Date();
     row.resolutionNote = reason ? reason.slice(0, 500) : null;
@@ -505,6 +568,90 @@ export class DebriefFeedbackService {
       if (run) await this.notifier?.reviewed(run);
     }
     return { id: row.id, status: row.status };
+  }
+
+  /**
+   * v9 FR-31 "Correct": a reviewer rewrites a card's words. The cards become
+   * a new version; the one before is kept in the workspace, so nothing a
+   * learner was shown is lost. The quote never changes: it is the learner's
+   * own words.
+   */
+  private async correctCard(
+    runId: string,
+    section: string,
+    correction: CardCorrection,
+    userId: number,
+  ): Promise<void> {
+    const run = await this.runs.findOne({ where: { id: runId } });
+    if (!run?.cards) throw new NotFoundException('This debrief has no cards');
+    const cards = JSON.parse(JSON.stringify(run.cards)) as Record<string, any>;
+    const card = cardAt(cards, section);
+    if (!card) throw new BadRequestException('That card cannot be corrected');
+    const changes = Object.entries(correction).filter(
+      ([field, text]) =>
+        (CORRECTABLE_FIELDS as readonly string[]).includes(field) &&
+        typeof text === 'string' &&
+        text.trim() &&
+        field in card,
+    );
+    if (!changes.length) {
+      throw new BadRequestException('Change at least one line of the card');
+    }
+    for (const [field, text] of changes) card[field] = (text as string).trim();
+    const versions = [
+      ...((run.workspace?.versions as unknown[]) ?? []),
+      { at: new Date().toISOString(), by: userId, section, before: run.cards },
+    ];
+    await this.runs.update(run.id, {
+      cards,
+      workspace: { ...(run.workspace ?? {}), versions },
+    } as Partial<DebriefRun>);
+  }
+
+  /**
+   * "Escalate to clinical advisor" (v9 FR-38): the flag stays in the queue,
+   * marked, and the clinical advisor is told. They resolve it as anyone would.
+   */
+  async escalateFlag(flagId: string, userId: number, note?: string | null) {
+    const row = await this.feedback.findOne({
+      where: { id: flagId, kind: DebriefFeedbackKind.FLAG },
+    });
+    if (!row) throw new NotFoundException('Flag not found');
+    if (row.status !== DebriefFeedbackStatus.OPEN) {
+      throw new ConflictException(`This flag is already ${row.status}`);
+    }
+    row.status = DebriefFeedbackStatus.ESCALATED;
+    row.urgent = true;
+    await this.feedback.save(row);
+    await this.notifier?.escalated({
+      what: 'flag',
+      scenarioSessionId: row.scenarioSessionId,
+      note: note?.trim() || null,
+      by: userId,
+    });
+    return { id: row.id, status: row.status };
+  }
+
+  /** Escalate a debrief waiting in Review (needs a person, below the bar, distress). */
+  async escalateRun(runId: string, userId: number, note?: string | null) {
+    const run = await this.liveRun(runId);
+    await this.runs.update(run.id, {
+      workspace: {
+        ...(run.workspace ?? {}),
+        escalation: {
+          by: userId,
+          at: new Date().toISOString(),
+          note: note?.trim() || null,
+        },
+      },
+    } as Partial<DebriefRun>);
+    await this.notifier?.escalated({
+      what: 'run',
+      scenarioSessionId: run.scenarioSessionId,
+      note: note?.trim() || null,
+      by: userId,
+    });
+    return { id: run.id, escalated: true };
   }
 
   private async liveRun(runId: string): Promise<DebriefRun> {

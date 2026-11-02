@@ -62,7 +62,7 @@ export type DebriefFlagReason =
 /** The Ally team's answer to a flag: the card stays (with why) or is taken out. */
 export interface DebriefCorrection {
   section: string;
-  outcome: "kept" | "removed";
+  outcome: "kept" | "removed" | "corrected";
   note: string | null;
   at: string;
 }
@@ -70,7 +70,7 @@ export interface DebriefCorrection {
 export interface DebriefMyFlag {
   id: string;
   section: string;
-  status: "open" | "kept" | "removed";
+  status: "open" | "kept" | "removed" | "corrected";
   canUndoUntil: string | null;
 }
 
@@ -102,7 +102,7 @@ export interface SupervisorDebriefFlag {
   section: string;
   reason: DebriefFlagReason | null;
   note: string | null;
-  status: "open" | "kept" | "removed" | "withdrawn";
+  status: "open" | "escalated" | "kept" | "removed" | "corrected" | "withdrawn";
   resolutionNote: string | null;
 }
 

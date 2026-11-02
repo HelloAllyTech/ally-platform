@@ -4,10 +4,22 @@ import { LoggerService } from '../../logger/logger.service';
 import { DeviceTokenService } from '../../notification/service/device-token.service';
 import { InAppNotificationService } from '../../notification/service/in-app-notification.service';
 import { PushService } from '../../notification/service/push.service';
+import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
+
+const DEBRIEF_CLINICAL_SIGN_OFF_KEY =
+  FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF;
 
 export const DEBRIEF_READY_NOTIFICATION = 'DEBRIEF_READY';
 export const DEBRIEF_REVIEWED_NOTIFICATION = 'DEBRIEF_REVIEWED';
+export const DEBRIEF_ESCALATED_NOTIFICATION = 'DEBRIEF_ESCALATED';
+
+export interface DebriefEscalation {
+  what: 'flag' | 'run';
+  scenarioSessionId: string;
+  note: string | null;
+  by: number;
+}
 
 type Kind = 'ready' | 'reviewed';
 
@@ -89,6 +101,45 @@ export class DebriefNotifier {
 
   reviewed(run: DebriefRun): Promise<void> {
     return this.notify(run, 'reviewed');
+  }
+
+  /**
+   * "Escalate to clinical advisor" (v9 FR-38): everyone who holds the
+   * clinical sign-off toggle gets a bell notification that opens the Review
+   * tab. Staff-facing, so English. The person escalating is not told twice.
+   */
+  async escalated(e: DebriefEscalation): Promise<void> {
+    try {
+      const advisors: { id: number; tenant_id: string }[] =
+        await this.dataSource.query(
+          `SELECT u.id, u.tenant_id
+             FROM admin_feature_toggles t
+             JOIN users u ON u.id = t."userId"
+            WHERE t."featureKey" = $1 AND t.enabled = true AND u.id <> $2`,
+          [DEBRIEF_CLINICAL_SIGN_OFF_KEY, e.by],
+        );
+      const what = e.what === 'flag' ? 'A flagged point' : 'A debrief';
+      const body = e.note
+        ? `${what} needs your clinical view: ${e.note}`
+        : `${what} needs your clinical view.`;
+      for (const a of advisors) {
+        await this.inApp.create({
+          userId: Number(a.id),
+          tenantId: a.tenant_id,
+          type: DEBRIEF_ESCALATED_NOTIFICATION,
+          title: 'Escalated to you in Debriefs',
+          body,
+          data: {
+            screen: 'DebriefReview',
+            scenarioSessionId: e.scenarioSessionId,
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `[debrief] escalation notification for session ${e.scenarioSessionId} failed: ${(err as Error).message}`,
+      );
+    }
   }
 
   private async notify(run: DebriefRun, kind: Kind): Promise<void> {

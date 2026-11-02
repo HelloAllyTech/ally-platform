@@ -160,6 +160,57 @@ describe('debrief feedback', () => {
     expect(ok.saved[0]).toMatchObject({ status: 'removed', resolvedBy: 1 });
   });
 
+  it('correcting a card rewrites its words, keeps the old version and never the quote', async () => {
+    const ctx = build({
+      existing: {
+        id: 'f',
+        kind: 'flag',
+        status: 'open',
+        runId: 'run-1',
+        section: 'work_on_this[0]',
+      },
+    });
+    await expect(
+      ctx.svc.resolveFlag('f', 1, 'corrected', '', { why: 'x' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      ctx.svc.resolveFlag('f', 1, 'corrected', 'n', { quote: 'z' } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await ctx.svc.resolveFlag('f', 1, 'corrected', 'Reworded', {
+      why: 'Better why',
+    });
+    const [, patch] = ctx.runs.update.mock.calls.slice(-1)[0] as any[];
+    expect(patch.cards.work_on_this[0]).toMatchObject({
+      why: 'Better why',
+      quote: 'q3',
+    });
+    expect(patch.workspace.versions[0].before.work_on_this[0].why).toBe('w');
+    expect(ctx.saved.slice(-1)[0]).toMatchObject({ status: 'corrected' });
+  });
+
+  it('an escalated flag stays open to resolve, and tells the advisors', async () => {
+    const notifier = { escalated: jest.fn() };
+    const ctx = build({
+      existing: {
+        id: 'f',
+        kind: 'flag',
+        status: 'open',
+        scenarioSessionId: 's',
+      },
+    });
+    (ctx.svc as any).notifier = notifier;
+    await ctx.svc.escalateFlag('f', 1, 'clinical wording');
+    expect(ctx.saved[0]).toMatchObject({ status: 'escalated', urgent: true });
+    expect(notifier.escalated).toHaveBeenCalledWith(
+      expect.objectContaining({ what: 'flag', note: 'clinical wording' }),
+    );
+    const again = build({
+      existing: { id: 'f', kind: 'flag', status: 'escalated' },
+    });
+    await again.svc.resolveFlag('f', 137, 'removed');
+    expect(again.saved[0]).toMatchObject({ status: 'removed' });
+  });
+
   it('a person can publish a live draft or send the learner back to today’s debrief', async () => {
     const a = build({ run: { status: 'needs_person' } });
     await a.svc.publishRun('run-1', 1);
