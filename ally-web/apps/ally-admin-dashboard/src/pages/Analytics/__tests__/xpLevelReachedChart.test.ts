@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  XP_LEVEL_REACHED_MAX_LEVEL,
   XpLevelReachedPoint,
   buildXpLevelReachedSeries,
   buildXpLevelReachedTable,
@@ -34,7 +33,7 @@ describe("buildXpLevelReachedSeries", () => {
 
 describe("xpLevelRanges", () => {
   it("splits L1-L50 into five ranges of ten, starting at L1", () => {
-    const ranges = xpLevelRanges();
+    const ranges = xpLevelRanges(50);
     expect(ranges.map(r => r.label)).toEqual([
       "L1–L10",
       "L11–L20",
@@ -43,8 +42,9 @@ describe("xpLevelRanges", () => {
       "L41–L50",
     ]);
     expect(ranges[0].from).toBe(1);
-    expect(ranges.at(-1)?.to).toBe(XP_LEVEL_REACHED_MAX_LEVEL);
+    expect(ranges.at(-1)?.to).toBe(50);
   });
+
 
   it("ends a short final range at the top level instead of overshooting", () => {
     expect(xpLevelRanges(25).at(-1)).toMatchObject({ from: 21, to: 25, label: "L21–L25" });
@@ -52,11 +52,11 @@ describe("xpLevelRanges", () => {
 });
 
 describe("pointsInLevelRange", () => {
-  const fifty = Array.from({ length: XP_LEVEL_REACHED_MAX_LEVEL }, (_, i) => i + 1);
+  const fifty = Array.from({ length: 50 }, (_, i) => i + 1);
 
   it("keeps only the levels in the range and leaves the buckets alone", () => {
     const points = [point("2026-06-01", fifty), point("2026-07-01", fifty)];
-    const [, second] = xpLevelRanges();
+    const [, second] = xpLevelRanges(50);
 
     const ranged = pointsInLevelRange(points, second);
 
@@ -92,7 +92,7 @@ describe("xpLevelReachedEmptyText", () => {
   });
 
   it("does not read an all-zero L8-L10 tail as empty when L1 has crossings — that's expected, not broken", () => {
-    const usersByLevel = Array.from({ length: XP_LEVEL_REACHED_MAX_LEVEL }, (_, i) =>
+    const usersByLevel = Array.from({ length: 50 }, (_, i) =>
       i === 0 ? 12 : 0,
     );
     expect(xpLevelReachedEmptyText([point("2026-06-01", usersByLevel)])).toBeUndefined();
