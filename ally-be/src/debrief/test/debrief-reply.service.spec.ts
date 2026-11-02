@@ -1,5 +1,8 @@
 import { firstValueFrom, of, toArray } from 'rxjs';
-import { DebriefReplyService } from '../service/debrief-reply.service';
+import {
+  DebriefReplyService,
+  REPLY_LENGTH_REMINDER,
+} from '../service/debrief-reply.service';
 
 const RUN = {
   id: 'run-1',
@@ -195,6 +198,8 @@ describe('DebriefReplyService (Ask Ally)', () => {
     expect(events[2].content).toBe('Your opening let her lead.');
     const call = (aiChat.streamResponse.mock.calls[0] as any[])[0];
     expect(call.systemPrompt).toContain('REPLY PROMPT');
+    // The length rule is the last thing the model reads.
+    expect(call.systemPrompt.trim().endsWith(REPLY_LENGTH_REMINDER)).toBe(true);
     expect(call.systemPrompt).toContain('You stayed with Meena');
     expect(call.chatHistory).toEqual([
       { role: 'user', content: 'earlier question' },

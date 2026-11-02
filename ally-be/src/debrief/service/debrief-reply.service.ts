@@ -83,6 +83,14 @@ const event = (data: Record<string, unknown>): SseMessageEvent => ({
  * keywords miss, and adds the support lines and the review item when it
  * finds some. A reply that fails the code checks is replaced, not shown.
  */
+/**
+ * The prompt's own length rule, said again after the debrief, transcript and
+ * context it is followed by: from the top of a long prompt the model drifted
+ * (a 190-word reply in the prod end-to-end check, 2 Nov 2026).
+ */
+export const REPLY_LENGTH_REMINDER =
+  'Now write your reply: at most 120 words, in short paragraphs, with at most one question back.';
+
 /** Each part of Ask Ally's extra context must arrive within this, or is left out. */
 const EXTRA_CONTEXT_MS = 1200;
 
@@ -189,6 +197,8 @@ export class DebriefReplyService {
           'TRANSCRIPT:',
           ...transcript.map((t) => `${t.role}: ${t.text}`),
           ...extra,
+          '',
+          REPLY_LENGTH_REMINDER,
         ].join('\n'),
         chatHistory: this.history(prior),
         userMessage: message,
