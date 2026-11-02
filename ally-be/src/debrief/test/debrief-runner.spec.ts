@@ -85,7 +85,7 @@ function build(opts: {
   const saved: any[] = [];
   const calls: string[] = [];
   const runs = {
-    query: jest.fn(async (..._args: any[]) => []),
+    query: jest.fn(async () => []),
     create: (x: any) => ({ ...x }),
     save: jest.fn(async (x: any) => {
       saved.push({ ...x });
